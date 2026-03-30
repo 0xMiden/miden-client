@@ -593,3 +593,83 @@ test.describe("transactions.execute()", () => {
     expect(txId.toHex().length).toBeGreaterThan(0);
   });
 });
+
+// ════════════════════════════════════════════════════════════════
+// transactions.executeProgram()
+// ════════════════════════════════════════════════════════════════
+
+test.describe("transactions.executeProgram()", () => {
+  test("reads updated state after a mutating transaction", async ({ page }) => {
+    const result = await page.evaluate(
+      async ({ code, slotName }) => {
+        const client = await window.MidenClient.createMock();
+
+        const component = await client.compile.component({
+          code,
+          slots: [window.StorageSlot.emptyValue(slotName)],
+        });
+
+        const seed = new Uint8Array(32);
+        seed.fill(0x60);
+        const auth = window.AuthSecretKey.rpoFalconWithRNG(seed);
+
+        const account = await client.accounts.create({
+          type: "ImmutableContract",
+          storage: "public",
+          seed,
+          auth,
+          components: [component],
+        });
+
+        client.proveBlock();
+        await client.sync();
+
+        // Increment the counter
+        const incrScript = await client.compile.txScript({
+          code: `
+            use external_contract::counter_contract
+            begin
+              call.counter_contract::increment_count
+            end
+          `,
+          libraries: [
+            { namespace: "external_contract::counter_contract", code },
+          ],
+        });
+
+        await client.transactions.execute({
+          account: account.id(),
+          script: incrScript,
+        });
+
+        client.proveBlock();
+        await client.sync();
+
+        // Now read the count via executeProgram — should be 1
+        const readScript = await client.compile.txScript({
+          code: `
+            use external_contract::counter_contract
+            begin
+              call.counter_contract::get_count
+            end
+          `,
+          libraries: [
+            { namespace: "external_contract::counter_contract", code },
+          ],
+        });
+
+        const feltArray = await client.transactions.executeProgram({
+          account: account.id(),
+          script: readScript,
+        });
+
+        const count = feltArray.get(0).asInt();
+
+        return { count: count.toString() };
+      },
+      { code: COUNTER_CODE, slotName: COUNTER_SLOT_NAME }
+    );
+
+    expect(result.count).toBe("1");
+  });
+});

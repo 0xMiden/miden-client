@@ -1,8 +1,11 @@
+use alloc::collections::BTreeSet;
+
 use js_export_macro::js_export;
 use miden_client::ClientError;
 use miden_client::asset::FungibleAsset;
 use miden_client::note::{BlockNumber, Note as NativeNote};
 use miden_client::transaction::{
+    ForeignAccount as NativeForeignAccount,
     PaymentNoteDescription,
     ProvenTransaction as NativeProvenTransaction,
     SwapTransactionData,
@@ -15,12 +18,16 @@ use miden_client::transaction::{
 
 use crate::models::NoteType;
 use crate::models::account_id::AccountId;
+use crate::models::advice_inputs::AdviceInputs;
+use crate::models::felt::Felt;
+use crate::models::miden_arrays::{FeltArray, ForeignAccountArray};
 use crate::models::note::Note;
 use crate::models::proven_transaction::ProvenTransaction;
 use crate::models::provers::TransactionProver;
 use crate::models::transaction_id::TransactionId;
 use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_result::TransactionResult;
+use crate::models::transaction_script::TransactionScript;
 use crate::models::transaction_store_update::TransactionStoreUpdate;
 use crate::models::transaction_summary::TransactionSummary;
 use crate::platform::{JsErr, from_str_err, js_u64_to_u64, maybe_wrap_send};
@@ -278,6 +285,36 @@ impl WebClient {
             ))) => Ok(TransactionSummary::from(*summary)),
             Err(err) => Err(js_error_with_context(err, "failed to execute transaction")),
         }
+    }
+
+    /// Executes the provided transaction script against the specified account
+    /// and returns the resulting stack output. This is a local-only "view call"
+    /// that does not submit anything to the network.
+    #[js_export(js_name = "executeProgram")]
+    pub async fn execute_program(
+        &self,
+        account_id: &AccountId,
+        tx_script: &TransactionScript,
+        advice_inputs: &AdviceInputs,
+        foreign_accounts: &ForeignAccountArray,
+    ) -> Result<FeltArray, JsErr> {
+        let mut guard = self.get_mut_inner().await;
+        let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
+        let foreign_accounts_set: BTreeSet<NativeForeignAccount> =
+            foreign_accounts.__inner.iter().map(|a| a.clone().into()).collect();
+
+        let result = client
+            .execute_program(
+                account_id.into(),
+                tx_script.into(),
+                advice_inputs.into(),
+                foreign_accounts_set,
+            )
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to execute program"))?;
+
+        let felt_vec: Vec<Felt> = result.iter().map(|f| Felt::from(*f)).collect();
+        Ok(felt_vec.into())
     }
 
     /// Generates a transaction proof using either the provided prover or the client's default

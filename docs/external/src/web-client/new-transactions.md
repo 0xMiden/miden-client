@@ -305,6 +305,57 @@ try {
 }
 ```
 
+## Execute Program (View Call)
+
+Use `transactions.executeProgram()` to execute a transaction script locally against an account and inspect the resulting stack output — without submitting anything to the network. This is useful for reading on-chain state (e.g. querying a storage map or computing a derived value).
+
+```typescript
+import { MidenClient } from "@miden-sdk/miden-sdk";
+
+try {
+    const client = await MidenClient.create();
+
+    // Compile a read-only script
+    const script = await client.compile.txScript({
+        code: `
+            use external_contract::counter_contract
+            begin
+                call.counter_contract::get_count
+            end
+        `,
+        libraries: [
+            { namespace: "external_contract::counter_contract", code: counterContractCode }
+        ]
+    });
+
+    // Execute locally — returns a FeltArray (16-element stack output)
+    const result = await client.transactions.executeProgram({
+        account: contractAccount.id(),
+        script,
+        foreignAccounts: [counterAccount.id()]
+    });
+
+    // Read the stack output
+    const count = result.get(0).asInt();
+    console.log("Current count:", count);
+} catch (error) {
+    console.error("Execute program failed:", error.message);
+}
+```
+
+### Options
+
+| Option | Type | Required | Description |
+|--------|------|----------|-------------|
+| `account` | `AccountRef` | Yes | Account to execute against |
+| `script` | `TransactionScript` | Yes | Compiled script to execute |
+| `adviceInputs` | `AdviceInputs` | No | Advice inputs (defaults to empty) |
+| `foreignAccounts` | `(AccountRef \| { id, storage? })[]` | No | Foreign accounts for FPI reads |
+
+:::note
+`executeProgram` runs entirely locally. It does not prove, submit, or modify any state. Think of it as a "view call" similar to `eth_call` in Ethereum.
+:::
+
 ### Advanced: Manual Transaction Request
 
 For full control over note inputs/outputs, build a `TransactionRequest` manually and call `submit()`:
@@ -355,5 +406,5 @@ try {
 ```
 
 :::note
-`withExpirationDelta()` is intended for builder flows that derive the transaction script from the request. It cannot be combined with `withCustomScript()`.
+`withExpirationDelta()` is intended for builder flows that derive the transaction script from the request. It cannot be combined with `withCustomScript()`. When using a custom script, the expiration can be set manually within the script itself.
 :::
