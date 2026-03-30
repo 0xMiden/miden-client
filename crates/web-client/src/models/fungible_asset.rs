@@ -19,9 +19,8 @@ pub struct FungibleAsset(FungibleAssetNative);
 impl FungibleAsset {
     /// Creates a fungible asset for the given faucet and amount.
     #[js_export(constructor)]
-    pub fn new(faucet_id: &AccountId, amount: JsU64) -> FungibleAsset {
+    pub fn new(faucet_id: &AccountId, amount: JsU64) -> Result<FungibleAsset, JsErr> {
         FungibleAsset::new_inner(faucet_id, js_u64_to_u64(amount))
-            .expect("Failed to create FungibleAsset (invalid faucet ID or amount exceeds max)")
     }
 
     /// Returns the amount of fungible units.
