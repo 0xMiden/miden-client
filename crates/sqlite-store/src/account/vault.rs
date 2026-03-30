@@ -218,9 +218,8 @@ impl SqliteStore {
 
         // Archive and delete removed assets
         for vault_key in removed_vault_keys {
-            let vault_key_word: Word = (*vault_key).into();
-            let vault_key_hex = vault_key_word.to_hex();
-            let faucet_prefix_hex = vault_key.faucet_id().to_hex();
+            let vault_key_hex = vault_key.to_string();
+            let faucet_prefix_hex = vault_key.faucet_id().prefix().to_hex();
 
             // Read old asset value from latest (should exist since we're removing it)
             let old_asset: Option<String> = tx
@@ -254,7 +253,7 @@ impl SqliteStore {
                     Rc::new(
                         removed_vault_keys
                             .iter()
-                            .map(|k| Value::from(Word::from(*k).to_hex()))
+                            .map(|k| Value::from(k.to_string()))
                             .collect::<Vec<Value>>(),
                     ),
                 ],
@@ -264,9 +263,8 @@ impl SqliteStore {
 
         // Archive old values and insert updated assets
         for asset in updated_assets {
-            let vault_key_word: Word = asset.vault_key().into();
-            let vault_key_hex = vault_key_word.to_hex();
-            let faucet_prefix_hex = asset.faucet_id().to_hex();
+            let vault_key_hex = asset.vault_key().to_string();
+            let faucet_prefix_hex = asset.faucet_id().prefix().to_hex();
             let asset_hex = asset.to_value_word().to_hex();
 
             // Read old asset value from latest (NULL if asset is new)

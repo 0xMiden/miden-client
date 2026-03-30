@@ -47,18 +47,18 @@ miden-testing   = { default-features = false, version = "0.14.0" }
 miden-tx        = { default-features = false, version = "0.14.0" }
 
 # Miden node dependencies (from git branch until compatible crates.io release)
-miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/miden-node" }
-miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-store = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
-miden-node-validator = { branch = "next", git = "https://github.com/0xMiden/miden-node" }
+miden-node-block-producer = { git = "https://github.com/0xMiden/miden-node", rev = "a329b4c7fc5592bd2844242f8a325084e76c9512" }
+miden-node-ntx-builder = { git = "https://github.com/0xMiden/miden-node", rev = "a329b4c7fc5592bd2844242f8a325084e76c9512" }
+miden-node-proto = { git = "https://github.com/0xMiden/miden-node", rev = "a329b4c7fc5592bd2844242f8a325084e76c9512" }
+miden-node-proto-build = { default-features = false, git = "https://github.com/0xMiden/miden-node", rev = "a329b4c7fc5592bd2844242f8a325084e76c9512" }
+miden-node-rpc = { git = "https://github.com/0xMiden/miden-node", rev = "a329b4c7fc5592bd2844242f8a325084e76c9512" }
+miden-node-store = { git = "https://github.com/0xMiden/miden-node", rev = "a329b4c7fc5592bd2844242f8a325084e76c9512" }
+miden-node-utils = { git = "https://github.com/0xMiden/miden-node", rev = "a329b4c7fc5592bd2844242f8a325084e76c9512" }
+miden-node-validator = { git = "https://github.com/0xMiden/miden-node", rev = "a329b4c7fc5592bd2844242f8a325084e76c9512" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-remote-prover-client = { branch = "next", default-features = false, features = [
+miden-remote-prover-client = { default-features = false, features = [
   "tx-prover",
-], git = "https://github.com/0xMiden/miden-node" }
+], git = "https://github.com/0xMiden/miden-node", rev = "a329b4c7fc5592bd2844242f8a325084e76c9512" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
