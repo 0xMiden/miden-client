@@ -678,27 +678,6 @@ export async function setupNodeGlobals(
   };
 }
 
-/**
- * Recursively converts null values to undefined in plain objects.
- * This normalizes the napi (null) vs wasm-bindgen (undefined) difference
- * for Option<T> → JS when values are returned from page.evaluate callbacks.
- */
-function nullToUndefined(val: any): any {
-  if (val === null) return undefined;
-  if (
-    typeof val !== "object" ||
-    val instanceof Uint8Array ||
-    val instanceof Buffer
-  )
-    return val;
-  if (Array.isArray(val)) return val.map(nullToUndefined);
-  const out: Record<string, any> = {};
-  for (const [k, v] of Object.entries(val)) {
-    out[k] = nullToUndefined(v);
-  }
-  return out;
-}
-
 export function createFakePage() {
   return {
     evaluate: async (fn: Function, args?: any) => fn(args),
