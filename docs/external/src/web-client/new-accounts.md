@@ -113,17 +113,20 @@ Unlike wallets (which default to `"private"`), contracts default to `"public"` s
 If you need full control over account construction — for example, to set a custom auth commitment from an external signer — you can build the account manually with `AccountBuilder` and insert it directly:
 
 ```typescript
-import { MidenClient, AccountBuilder, AccountComponent, AccountStorageMode } from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountBuilder, AccountComponent, AccountStorageMode, AccountType } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
+
+    // The public-key commitment from your external signer (e.g. wallet extension).
+    const commitment = /* externalSigner.getPublicKeyCommitment() */;
 
     const seed = new Uint8Array(32); // your deterministic seed
     const account = new AccountBuilder(seed)
         .withAuthComponent(
             AccountComponent.createAuthComponentFromCommitment(commitment, 1)
         )
-        .accountType("RegularAccountImmutableCode")
+        .accountType(AccountType.RegularAccountImmutableCode)
         .storageMode(AccountStorageMode.public())
         .withBasicWalletComponent()
         .build().account;

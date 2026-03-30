@@ -109,25 +109,26 @@ export type StorageMode = "public" | "private" | "network";
 export type AccountType = (typeof AccountType)[keyof typeof AccountType];
 
 /**
- * User-friendly account type constants for the simplified API.
- * Replaces the WASM `AccountType` enum (which has internal names like
- * `RegularAccountUpdatableCode`) with readable string constants.
+ * Account type constants with numeric values matching the WASM `AccountType` enum.
+ * Includes SDK-friendly aliases (e.g. `MutableWallet`) that map to the same
+ * numeric values. These values work with both `accounts.create()` and the
+ * low-level `AccountBuilder.accountType()`.
  */
 export declare const AccountType: {
-  readonly MutableWallet: "MutableWallet";
-  readonly ImmutableWallet: "ImmutableWallet";
-  readonly FungibleFaucet: "FungibleFaucet";
-  readonly ImmutableContract: "ImmutableContract";
-  readonly MutableContract: "MutableContract";
+  // WASM-compatible values
+  readonly FungibleFaucet: 0;
+  readonly NonFungibleFaucet: 1;
+  readonly RegularAccountImmutableCode: 2;
+  readonly RegularAccountUpdatableCode: 3;
+  // SDK-friendly aliases
+  readonly MutableWallet: 3;
+  readonly ImmutableWallet: 2;
+  readonly ImmutableContract: 2;
+  readonly MutableContract: 3;
 };
 
-/** Union of valid AccountType string values. */
-export type AccountTypeValue =
-  | "MutableWallet"
-  | "ImmutableWallet"
-  | "FungibleFaucet"
-  | "ImmutableContract"
-  | "MutableContract";
+/** Union of valid AccountType numeric values. */
+export type AccountTypeValue = 0 | 1 | 2 | 3;
 
 // ════════════════════════════════════════════════════════════════
 // Client options
@@ -201,15 +202,15 @@ export type CreateAccountOptions =
   | ContractCreateOptions;
 
 export interface WalletCreateOptions {
-  /** Account type. Defaults to "MutableWallet". Use AccountType enum. */
-  type?: "MutableWallet" | "ImmutableWallet";
+  /** Account type. Defaults to MutableWallet (3). Use AccountType enum. */
+  type?: 2 | 3;
   storage?: StorageMode;
   auth?: AuthSchemeType;
   seed?: string | Uint8Array;
 }
 
 export interface FaucetCreateOptions {
-  type: "FungibleFaucet";
+  type: 0 | 1;
   symbol: string;
   decimals: number;
   maxSupply: number | bigint;
@@ -218,13 +219,14 @@ export interface FaucetCreateOptions {
 }
 
 export interface ContractCreateOptions {
-  type: "ImmutableContract" | "MutableContract";
+  /** Account type. Use AccountType.ImmutableContract (2) or AccountType.MutableContract (3). */
+  type?: 2 | 3;
   /** Raw 32-byte seed (Uint8Array). Required. */
   seed: Uint8Array;
   /** Auth secret key. Required. */
   auth: AuthSecretKey;
-  /** Pre-compiled AccountComponent instances. */
-  components?: AccountComponent[];
+  /** Pre-compiled AccountComponent instances. Required for contracts. */
+  components: AccountComponent[];
   /** Storage mode. Defaults to "public" for contracts. */
   storage?: StorageMode;
 }
@@ -249,8 +251,8 @@ export type ImportAccountInput =
   | { file: AccountFile }
   | {
       seed: Uint8Array;
-      /** Account type. Defaults to "MutableWallet". Use AccountType enum. */
-      type?: "MutableWallet" | "ImmutableWallet";
+      /** Account type. Defaults to MutableWallet (3). Use AccountType enum. */
+      type?: 2 | 3;
       auth?: AuthSchemeType;
     };
 

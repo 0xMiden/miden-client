@@ -112,6 +112,38 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.isPublic).toBe(true);
   });
 
+  test("accounts.insert stores a pre-built account", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const client = await window.MidenClient.createMock();
+
+      const seed = new Uint8Array(32);
+      crypto.getRandomValues(seed);
+      const secretKey = window.AuthSecretKey.rpoFalconWithRNG(seed);
+      const authComponent =
+        window.AccountComponent.createAuthComponentFromSecretKey(secretKey);
+
+      const built = new window.AccountBuilder(seed)
+        .accountType(window.AccountType.RegularAccountImmutableCode)
+        .storageMode(window.AccountStorageMode.public())
+        .withAuthComponent(authComponent)
+        .withBasicWalletComponent()
+        .build();
+
+      await client.accounts.insert({ account: built.account });
+
+      const fetched = await client.accounts.get(built.account.id().toString());
+
+      return {
+        insertedId: built.account.id().toString(),
+        fetchedId: fetched?.id().toString(),
+        isPublic: fetched?.isPublic(),
+      };
+    });
+
+    expect(result.fetchedId).toBe(result.insertedId);
+    expect(result.isPublic).toBe(true);
+  });
+
   test("accounts.list returns created accounts", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();

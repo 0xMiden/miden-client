@@ -47,10 +47,15 @@ impl AccountBuilder {
     }
 
     /// Sets the account type (regular, faucet, etc.).
+    ///
+    /// Accepts either a numeric WASM enum value (0–3) or a string name
+    /// (`"FungibleFaucet"`, `"NonFungibleFaucet"`,
+    /// `"RegularAccountImmutableCode"`, `"RegularAccountUpdatableCode"`).
     #[wasm_bindgen(js_name = "accountType")]
-    pub fn account_type(mut self, account_type: AccountType) -> Self {
-        self.0 = self.0.account_type(account_type.into());
-        self
+    pub fn account_type(mut self, account_type: JsValue) -> Result<AccountBuilder, JsValue> {
+        let at = parse_account_type(&account_type)?;
+        self.0 = self.0.account_type(at.into());
+        Ok(self)
     }
 
     // TODO: AccountStorageMode as Enum
@@ -99,5 +104,40 @@ impl AccountBuilder {
             account: account.into(),
             seed: seed.into(),
         })
+    }
+}
+
+/// Parses a `JsValue` into an `AccountType`, accepting either a numeric enum
+/// value (0–3) or a string variant name.
+fn parse_account_type(value: &JsValue) -> Result<AccountType, JsValue> {
+    if let Some(n) = value.as_f64() {
+        if n.fract() != 0.0 || n < 0.0 {
+            return Err(JsValue::from_str(&format!("accountType must be an integer 0–3, got {n}")));
+        }
+        match n as u32 {
+            0 => Ok(AccountType::FungibleFaucet),
+            1 => Ok(AccountType::NonFungibleFaucet),
+            2 => Ok(AccountType::RegularAccountImmutableCode),
+            3 => Ok(AccountType::RegularAccountUpdatableCode),
+            _ => Err(JsValue::from_str(&format!(
+                "Unknown account type: {n}. Expected 0 (FungibleFaucet), \
+                 1 (NonFungibleFaucet), 2 (RegularAccountImmutableCode), \
+                 or 3 (RegularAccountUpdatableCode)"
+            ))),
+        }
+    } else if let Some(s) = value.as_string() {
+        match s.as_str() {
+            "FungibleFaucet" => Ok(AccountType::FungibleFaucet),
+            "NonFungibleFaucet" => Ok(AccountType::NonFungibleFaucet),
+            "RegularAccountImmutableCode" => Ok(AccountType::RegularAccountImmutableCode),
+            "RegularAccountUpdatableCode" => Ok(AccountType::RegularAccountUpdatableCode),
+            _ => Err(JsValue::from_str(&format!(
+                "Unknown account type: \"{s}\". Expected \"FungibleFaucet\", \
+                 \"NonFungibleFaucet\", \"RegularAccountImmutableCode\", \
+                 or \"RegularAccountUpdatableCode\""
+            ))),
+        }
+    } else {
+        Err(JsValue::from_str("accountType must be a number (0–3) or a string variant name"))
     }
 }
