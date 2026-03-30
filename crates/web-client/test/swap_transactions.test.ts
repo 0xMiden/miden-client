@@ -1,4 +1,4 @@
-import test from "./playwright.global.setup";
+import test, { getProverUrl } from "./playwright.global.setup";
 import { expect } from "@playwright/test";
 import {
   mintAndConsumeTransaction,
@@ -6,25 +6,36 @@ import {
   swapTransaction,
 } from "./webClientTestUtils";
 
+const hasRemoteProver = !!getProverUrl();
+
 // SWAP_TRANSACTION TEST
 // =======================================================================================================
 
 test.describe("swap transaction tests", () => {
-  test("swap transaction completes successfully", async ({ page }) => {
-    test.setTimeout(480000);
-    const { accountId: accountA, faucetId: faucetA } =
-      await setupWalletAndFaucet(page);
-    const { accountId: accountB, faucetId: faucetB } =
-      await setupWalletAndFaucet(page);
+  const testCases = [
+    { flag: false, description: "swap transaction completes successfully" },
+    {
+      flag: true,
+      description:
+        "swap transaction with remote prover completes successfully",
+    },
+  ];
 
-    const assetAAmount = BigInt(1);
-    const assetBAmount = BigInt(25);
+  testCases.forEach(({ flag, description }) => {
+    test(description, async ({ page }) => {
+      test.skip(flag && !hasRemoteProver, "no remote prover configured");
+      test.setTimeout(480000);
+      const { accountId: accountA, faucetId: faucetA } =
+        await setupWalletAndFaucet(page);
+      const { accountId: accountB, faucetId: faucetB } =
+        await setupWalletAndFaucet(page);
 
-    // Mint/consume once and reuse the setup for both prover modes.
-    await mintAndConsumeTransaction(page, accountA, faucetA, false);
-    await mintAndConsumeTransaction(page, accountB, faucetB, false);
+      const assetAAmount = BigInt(1);
+      const assetBAmount = BigInt(25);
 
-    const runSwapAssertions = async (withRemoteProver: boolean) => {
+      await mintAndConsumeTransaction(page, accountA, faucetA, false);
+      await mintAndConsumeTransaction(page, accountB, faucetB, false);
+
       const { accountAAssets, accountBAssets } = await swapTransaction(
         page,
         accountA,
@@ -35,7 +46,7 @@ test.describe("swap transaction tests", () => {
         assetBAmount,
         "private",
         "private",
-        withRemoteProver
+        flag
       );
 
       // --- assertions for Account A ---
@@ -55,15 +66,6 @@ test.describe("swap transaction tests", () => {
       const bB = accountBAssets!.find((a) => a.assetId === faucetB);
       expect(bB, `Expected to find asset ${faucetB} on Account B`).toBeTruthy();
       expect(BigInt(bB!.amount)).toEqual(975n);
-    };
-
-    await runSwapAssertions(false);
-
-    const hasRemoteProver = await page.evaluate(
-      () => window.remoteProverUrl != null
-    );
-    if (hasRemoteProver) {
-      await runSwapAssertions(true);
-    }
+    });
   });
 });

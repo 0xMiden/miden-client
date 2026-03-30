@@ -1,4 +1,4 @@
-import test from "./playwright.global.setup";
+import test, { getProverUrl } from "./playwright.global.setup";
 import {
   badHexId,
   consumeTransaction,
@@ -14,6 +14,8 @@ import {
 } from "./webClientTestUtils";
 import { Page, expect } from "@playwright/test";
 import { ConsumableNoteRecord } from "../dist/crates/miden_client_web";
+
+const hasRemoteProver = !!getProverUrl();
 
 const getConsumableNotes = async (
   testingPage: Page,
@@ -205,60 +207,89 @@ test.describe("get_consumable_notes", () => {
     });
   });
 
-  test("no filter by account", async ({ page }) => {
-    test.slow();
-    const { createdNoteId: noteId1, accountId: accountId1 } =
-      await setupMintedNote(page);
-    const { createdNoteId: noteId2, accountId: accountId2 } =
-      await setupMintedNote(page);
+  const noFilterTestCases = [
+    { flag: false, description: "no filter by account" },
+    {
+      flag: true,
+      description: "no filter by account with remote prover",
+    },
+  ];
 
-    const noteIds = new Set([noteId1, noteId2]);
-    const accountIds = new Set([accountId1, accountId2]);
-    const result = await getConsumableNotes(page);
-    expect(noteIds).toEqual(new Set(result.map((r) => r.noteId)));
-    expect(accountIds).toEqual(
-      new Set(result.map((r) => r.consumability[0].accountId))
-    );
-    expect(result.length).toBeGreaterThanOrEqual(2);
-    const consumableRecord1 = result.find((r) => r.noteId === noteId1);
-    const consumableRecord2 = result.find((r) => r.noteId === noteId2);
+  noFilterTestCases.forEach(({ flag, description }) => {
+    test(description, async ({ page }) => {
+      test.skip(flag && !hasRemoteProver, "no remote prover configured");
+      test.slow();
+      const { createdNoteId: noteId1, accountId: accountId1 } =
+        await setupMintedNote(page, false, flag);
+      const { createdNoteId: noteId2, accountId: accountId2 } =
+        await setupMintedNote(page, false, flag);
 
-    consumableRecord1!!.consumability.forEach((c) => {
-      expect(c.accountId).toEqual(accountId1);
-    });
+      const noteIds = new Set([noteId1, noteId2]);
+      const accountIds = new Set([accountId1, accountId2]);
+      const result = await getConsumableNotes(page);
+      expect(noteIds).toEqual(new Set(result.map((r) => r.noteId)));
+      expect(accountIds).toEqual(
+        new Set(result.map((r) => r.consumability[0].accountId))
+      );
+      expect(result.length).toBeGreaterThanOrEqual(2);
+      const consumableRecord1 = result.find((r) => r.noteId === noteId1);
+      const consumableRecord2 = result.find((r) => r.noteId === noteId2);
 
-    consumableRecord2!!.consumability.forEach((c) => {
-      expect(c.accountId).toEqual(accountId2);
+      consumableRecord1!!.consumability.forEach((c) => {
+        expect(c.accountId).toEqual(accountId1);
+      });
+
+      consumableRecord2!!.consumability.forEach((c) => {
+        expect(c.accountId).toEqual(accountId2);
+      });
     });
   });
 
-  test("p2ide consume after block", async ({ page }) => {
-    test.slow();
-    const { accountId: senderAccountId, faucetId } =
-      await setupWalletAndFaucet(page);
-    const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
-    // This flow proves multiple transactions before we inspect consumability.
-    // Keep the reclaim height comfortably ahead of the moving local chain tip so
-    // the sender still resolves to ConsumableAfter(...) under suite load.
-    const recallHeight = (await getSyncHeight(page)) + 200;
-    await sendTransaction(
-      page,
-      senderAccountId,
-      targetAccountId,
-      faucetId,
-      recallHeight
-    );
+  const p2ideTestCases = [
+    { flag: false, description: "p2ide consume after block" },
+    {
+      flag: true,
+      description: "p2ide consume after block with remote prover",
+    },
+  ];
 
-    const consumableRecipient = await getConsumableNotes(page, targetAccountId);
-    const consumableSender = await getConsumableNotes(page, senderAccountId);
-    expect(consumableSender.length).toBe(1);
-    expect(consumableSender[0].consumability[0].consumableAfterBlock).toBe(
-      recallHeight
-    );
-    expect(consumableRecipient.length).toBe(1);
-    expect(
-      consumableRecipient[0].consumability[0].consumableAfterBlock
-    ).toBeUndefined();
+  p2ideTestCases.forEach(({ flag, description }) => {
+    test(description, async ({ page }) => {
+      test.skip(flag && !hasRemoteProver, "no remote prover configured");
+      test.slow();
+      const { accountId: senderAccountId, faucetId } =
+        await setupWalletAndFaucet(page);
+      const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
+      // This flow proves multiple transactions before we inspect consumability.
+      // Keep the reclaim height comfortably ahead of the moving local chain tip so
+      // the sender still resolves to ConsumableAfter(...) under suite load.
+      const recallHeight = (await getSyncHeight(page)) + 200;
+      await sendTransaction(
+        page,
+        senderAccountId,
+        targetAccountId,
+        faucetId,
+        recallHeight,
+        flag
+      );
+
+      const consumableRecipient = await getConsumableNotes(
+        page,
+        targetAccountId
+      );
+      const consumableSender = await getConsumableNotes(
+        page,
+        senderAccountId
+      );
+      expect(consumableSender.length).toBe(1);
+      expect(consumableSender[0].consumability[0].consumableAfterBlock).toBe(
+        recallHeight
+      );
+      expect(consumableRecipient.length).toBe(1);
+      expect(
+        consumableRecipient[0].consumability[0].consumableAfterBlock
+      ).toBeUndefined();
+    });
   });
 });
 

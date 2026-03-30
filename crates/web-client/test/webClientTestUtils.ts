@@ -1004,14 +1004,15 @@ export const getInputNotes = async (testingPage: Page) => {
 
 export const setupMintedNote = async (
   page: Page,
-  publicNote: boolean = false
+  publicNote: boolean = false,
+  withRemoteProver: boolean = false
 ) => {
   const { accountId, faucetId } = await setupWalletAndFaucet(page);
   const { createdNoteId } = await mintTransaction(
     page,
     accountId,
     faucetId,
-    undefined,
+    withRemoteProver,
     undefined,
     publicNote
   );
