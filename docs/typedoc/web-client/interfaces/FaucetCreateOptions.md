@@ -40,4 +40,4 @@
 
 ### type
 
-> **type**: `"FungibleFaucet"`
+> **type**: `0` \| `1`

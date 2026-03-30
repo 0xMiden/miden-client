@@ -28,6 +28,6 @@
 
 ### type?
 
-> `optional` **type**: `"MutableWallet"` \| `"ImmutableWallet"`
+> `optional` **type**: `2` \| `3`
 
-Account type. Defaults to "MutableWallet". Use AccountType enum.
+Account type. Defaults to MutableWallet (3). Use AccountType enum.
