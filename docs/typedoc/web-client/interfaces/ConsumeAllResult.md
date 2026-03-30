@@ -22,12 +22,6 @@ Result of consumeAll — includes count of remaining notes for pagination.
 
 ***
 
-### result?
-
-> `optional` **result**: `TransactionResult`
-
-***
-
 ### txId
 
 > **txId**: [`TransactionId`](../classes/TransactionId.md)

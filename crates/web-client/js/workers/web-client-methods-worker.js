@@ -85,7 +85,6 @@ const serializeError = (error) => {
 // Global state variables.
 let wasmWebClient = null;
 let wasmSeed = null; // Seed for the WASM WebClient, if needed.
-let wasmStoreName = null; // Store name for the WASM WebClient, if needed.
 let ready = false; // Indicates if the worker is fully initialized.
 let messageQueue = []; // Queue for sequential processing.
 let processing = false; // Flag to ensure one message is processed at a time.
@@ -302,8 +301,7 @@ methodHandlers[MethodName.SYNC_STATE_MOCK] = async (args) => {
   await wasmWebClient.createMockClient(
     wasmSeed,
     serializedMockChain,
-    serializedMockNoteTransportNode,
-    wasmStoreName
+    serializedMockNoteTransportNode
   );
 
   return await methodHandlers[MethodName.SYNC_STATE]();
@@ -322,8 +320,7 @@ methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION_MOCK] = async (args) => {
   await wasmWebClient.createMockClient(
     wasmSeed,
     serializedMockChain,
-    serializedMockNoteTransportNode,
-    wasmStoreName
+    serializedMockNoteTransportNode
   );
 
   const result = await methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION](args);
@@ -424,7 +421,7 @@ async function processMessage(event) {
       self.postMessage({ ready: true });
       return;
     } else if (action === WorkerAction.INIT_MOCK) {
-      const [seed, storeName, logLevel] = args;
+      const [seed, logLevel] = args;
       const wasm = await getWasmOrThrow();
 
       if (logLevel) {
@@ -435,12 +432,10 @@ async function processMessage(event) {
       await wasmWebClient.createMockClient(
         seed,
         undefined,
-        undefined,
-        storeName
+        undefined
       );
 
       wasmSeed = seed;
-      wasmStoreName = storeName;
       ready = true;
       self.postMessage({ ready: true });
       return;

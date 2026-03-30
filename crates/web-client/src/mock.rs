@@ -20,7 +20,6 @@ impl WebClient {
         seed: Option<Vec<u8>>,
         serialized_mock_chain: Option<Vec<u8>>,
         serialized_mock_note_transport_node: Option<Vec<u8>>,
-        store_name: Option<String>,
     ) -> Result<JsValue, JsValue> {
         let mock_rpc_api = match serialized_mock_chain {
             Some(chain) => {
@@ -41,16 +40,20 @@ impl WebClient {
             None => Arc::new(MockNoteTransportApi::default()),
         };
 
-        let store_name = store_name.unwrap_or_else(|| "mock_client_db".to_owned());
-
         let store = Arc::new(
-            IdxdbStore::new(store_name.clone())
+            IdxdbStore::new("mock_client_db".to_owned())
                 .await
                 .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
         );
 
         let rng = create_rng(seed)?;
-        let keystore = Arc::new(WebKeyStore::new_with_callbacks(rng, store_name, None, None, None));
+        let keystore = Arc::new(WebKeyStore::new_with_callbacks(
+            rng,
+            "mock_client_db".to_owned(),
+            None,
+            None,
+            None,
+        ));
 
         self.setup_client(
             mock_rpc_api.clone(),
@@ -91,59 +94,6 @@ impl WebClient {
                 )
             })
     }
-
-    /// Adds an executed transaction to the mock chain's pending pool using a dummy proof,
-    /// then proves the block and applies the transaction to the local store.
-    /// This skips real STARK proof generation, making it near-instant.
-    #[wasm_bindgen(js_name = "submitAndApplyExecutedTransaction")]
-    pub async fn submit_and_apply_executed_transaction(
-        &mut self,
-        transaction_result: &crate::models::transaction_result::TransactionResult,
-    ) -> Result<crate::models::transaction_store_update::TransactionStoreUpdate, JsValue> {
-        use miden_client::transaction::TransactionStoreUpdate as NativeTransactionStoreUpdate;
-
-        let api = self.mock_rpc_api.as_ref().ok_or_else(|| {
-            JsValue::from_str("submitAndApplyExecutedTransaction requires a mock client")
-        })?;
-
-        // Add the executed transaction to the mock chain with a dummy proof.
-        api.mock_chain
-            .write()
-            .add_pending_executed_transaction(transaction_result.native().executed_transaction())
-            .map_err(|err| {
-                JsValue::from_str(&format!("failed to add pending transaction: {err}"))
-            })?;
-
-        // Prove the block so the mock chain commits the transaction.
-        api.prove_block();
-
-        // Get the block number where the transaction was committed.
-        // We intentionally do NOT sync here — the transaction must be locally applied
-        // before sync processes the committed block, otherwise sync transitions note
-        // states (e.g. consumed) before apply_transaction_update can do so, causing
-        // "Note already consumed" errors.
-        let block_num = api.get_chain_tip_block_num();
-
-        let client = self
-            .get_mut_inner()
-            .ok_or_else(|| JsValue::from_str("Client not initialized"))?;
-
-        let update: crate::models::transaction_store_update::TransactionStoreUpdate =
-            Box::pin(client.get_transaction_store_update(transaction_result.native(), block_num))
-                .await
-                .map(Into::into)
-                .map_err(|err| {
-                    crate::js_error_with_context(err, "failed to build transaction update")
-                })?;
-
-        let native_update: NativeTransactionStoreUpdate = (&update).into();
-        Box::pin(client.apply_transaction_update(native_update)).await.map_err(|err| {
-            crate::js_error_with_context(err, "failed to apply transaction result")
-        })?;
-
-        Ok(update)
-    }
-
     #[wasm_bindgen(js_name = "proveBlock")]
     pub fn prove_block(&mut self) -> Result<(), JsValue> {
         match self.mock_rpc_api.as_ref() {

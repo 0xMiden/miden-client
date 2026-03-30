@@ -108,6 +108,8 @@ const READ_METHODS = new Set([
   "listTags",
 ]);
 
+const MOCK_STORE_NAME = "mock_client_db";
+
 // Suppress unused-variable warnings — these sets exist solely for the CI lint check.
 void SYNC_METHODS;
 void WRITE_METHODS;
@@ -228,10 +230,6 @@ function createClientProxy(instance) {
       return undefined;
     },
   });
-}
-
-function createMockStoreName() {
-  return `mock_${crypto.randomUUID()}`;
 }
 
 class WebClient {
@@ -846,7 +844,7 @@ class MockWebClient extends WebClient {
       null,
       null,
       seed,
-      createMockStoreName(),
+      MOCK_STORE_NAME,
       undefined,
       undefined,
       undefined,
@@ -857,7 +855,7 @@ class MockWebClient extends WebClient {
   initializeWorker() {
     this.worker.postMessage({
       action: WorkerAction.INIT_MOCK,
-      args: [this.seed, this.storeName, this.logLevel],
+      args: [this.seed, this.logLevel],
     });
   }
 
@@ -889,8 +887,7 @@ class MockWebClient extends WebClient {
     await wasmWebClient.createMockClient(
       seed,
       serializedMockChain,
-      serializedMockNoteTransportNode,
-      instance.storeName
+      serializedMockNoteTransportNode
     );
 
     // Wait for the worker to be ready
@@ -1003,8 +1000,7 @@ class MockWebClient extends WebClient {
       await this.wasmWebClient.createMockClient(
         this.seed,
         newMockChain,
-        newMockNoteTransportNode,
-        this.storeName
+        newMockNoteTransportNode
       );
 
       return transactionResult.id();
@@ -1059,8 +1055,7 @@ class MockWebClient extends WebClient {
       await this.wasmWebClient.createMockClient(
         this.seed,
         newMockChain,
-        newMockNoteTransportNode,
-        this.storeName
+        newMockNoteTransportNode
       );
 
       return transactionResult.id();

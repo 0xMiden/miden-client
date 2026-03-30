@@ -273,41 +273,16 @@ export interface TransactionOptions {
   prover?: TransactionProver;
 }
 
-export interface SendOptionsDefault extends TransactionOptions {
+export interface SendOptions extends TransactionOptions {
   account: AccountRef;
   to: AccountRef;
   token: AccountRef;
   amount: number | bigint;
   type?: NoteVisibility;
-  returnNote?: false;
   /** Block height after which the sender can reclaim the note. This is a block number, not wall-clock time. */
   reclaimAfter?: number;
   /** Block height until which the note is timelocked. This is a block number, not wall-clock time. */
   timelockUntil?: number;
-}
-
-export interface SendOptionsReturnNote extends TransactionOptions {
-  account: AccountRef;
-  to: AccountRef;
-  token: AccountRef;
-  amount: number | bigint;
-  type?: NoteVisibility;
-  returnNote: true;
-}
-
-/** @deprecated Use SendOptionsDefault or SendOptionsReturnNote instead */
-export type SendOptions = SendOptionsDefault | SendOptionsReturnNote;
-
-export interface SendResult {
-  txId: TransactionId;
-  note: Note | null;
-  result: TransactionResult;
-}
-
-/** Result of methods that previously returned bare TransactionId. */
-export interface TransactionSubmitResult {
-  txId: TransactionId;
-  result: TransactionResult;
 }
 
 export interface MintOptions extends TransactionOptions {
@@ -407,7 +382,6 @@ export interface ConsumeAllResult {
   txId: TransactionId | null;
   consumed: number;
   remaining: number;
-  result?: TransactionResult;
 }
 
 /**
@@ -508,18 +482,12 @@ export interface AccountsResource {
 }
 
 export interface TransactionsResource {
-  send(
-    options: SendOptionsDefault
-  ): Promise<{ txId: TransactionId; note: null; result: TransactionResult }>;
-  send(
-    options: SendOptionsReturnNote
-  ): Promise<{ txId: TransactionId; note: Note; result: TransactionResult }>;
-  send(options: SendOptions): Promise<SendResult>;
-  mint(options: MintOptions): Promise<TransactionSubmitResult>;
-  consume(options: ConsumeOptions): Promise<TransactionSubmitResult>;
-  swap(options: SwapOptions): Promise<TransactionSubmitResult>;
+  send(options: SendOptions): Promise<TransactionId>;
+  mint(options: MintOptions): Promise<TransactionId>;
+  consume(options: ConsumeOptions): Promise<TransactionId>;
+  swap(options: SwapOptions): Promise<TransactionId>;
   consumeAll(options: ConsumeAllOptions): Promise<ConsumeAllResult>;
-  execute(options: ExecuteOptions): Promise<TransactionSubmitResult>;
+  execute(options: ExecuteOptions): Promise<TransactionId>;
 
   preview(options: PreviewOptions): Promise<TransactionSummary>;
 
@@ -531,7 +499,7 @@ export interface TransactionsResource {
     account: AccountRef,
     request: TransactionRequest,
     options?: TransactionOptions
-  ): Promise<TransactionSubmitResult>;
+  ): Promise<TransactionId>;
 
   list(query?: TransactionQuery): Promise<TransactionRecord[]>;
 

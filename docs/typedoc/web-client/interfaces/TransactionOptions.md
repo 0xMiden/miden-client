@@ -8,8 +8,7 @@
 
 ## Extended by
 
-- [`SendOptionsDefault`](SendOptionsDefault.md)
-- [`SendOptionsReturnNote`](SendOptionsReturnNote.md)
+- [`SendOptions`](SendOptions.md)
 - [`MintOptions`](MintOptions.md)
 - [`ConsumeOptions`](ConsumeOptions.md)
 - [`ConsumeAllOptions`](ConsumeAllOptions.md)
