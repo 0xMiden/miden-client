@@ -42,6 +42,6 @@ Storage mode. Defaults to "public" for contracts.
 
 ### type?
 
-> `optional` **type**: `2` \| `3`
+> `optional` **type**: [`AccountTypeValue`](../type-aliases/AccountTypeValue.md)
 
-Account type. Use AccountType.ImmutableContract (2) or AccountType.MutableContract (3).
+Use `AccountType.ImmutableContract` or `AccountType.MutableContract`.

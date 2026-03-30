@@ -40,4 +40,6 @@
 
 ### type
 
-> **type**: `0` \| `1`
+> **type**: [`AccountTypeValue`](../type-aliases/AccountTypeValue.md)
+
+Use `AccountType.FungibleFaucet` or `AccountType.NonFungibleFaucet`.

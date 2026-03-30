@@ -6,7 +6,7 @@
 
 # Type Alias: ImportAccountInput
 
-> **ImportAccountInput** = [`AccountRef`](AccountRef.md) \| \{ `file`: [`AccountFile`](../classes/AccountFile.md); \} \| \{ `auth?`: [`AuthSchemeType`](AuthSchemeType.md); `seed`: `Uint8Array`; `type?`: `2` \| `3`; \}
+> **ImportAccountInput** = [`AccountRef`](AccountRef.md) \| \{ `file`: [`AccountFile`](../classes/AccountFile.md); \} \| \{ `auth?`: [`AuthSchemeType`](AuthSchemeType.md); `seed`: `Uint8Array`; `type?`: [`AccountTypeValue`](AccountTypeValue.md); \}
 
 Discriminated union for account import.
 
@@ -24,7 +24,7 @@ Discriminated union for account import.
 
 > **file**: [`AccountFile`](../classes/AccountFile.md)
 
-\{ `auth?`: [`AuthSchemeType`](AuthSchemeType.md); `seed`: `Uint8Array`; `type?`: `2` \| `3`; \}
+\{ `auth?`: [`AuthSchemeType`](AuthSchemeType.md); `seed`: `Uint8Array`; `type?`: [`AccountTypeValue`](AccountTypeValue.md); \}
 
 ### auth?
 
@@ -36,6 +36,6 @@ Discriminated union for account import.
 
 ### type?
 
-> `optional` **type**: `2` \| `3`
+> `optional` **type**: [`AccountTypeValue`](AccountTypeValue.md)
 
-Account type. Defaults to MutableWallet (3). Use AccountType enum.
+Account type. Defaults to `AccountType.MutableWallet`.

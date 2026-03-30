@@ -28,6 +28,6 @@
 
 ### type?
 
-> `optional` **type**: `2` \| `3`
+> `optional` **type**: [`AccountTypeValue`](../type-aliases/AccountTypeValue.md)
 
-Account type. Defaults to MutableWallet (3). Use AccountType enum.
+Account type. Defaults to `AccountType.MutableWallet`.

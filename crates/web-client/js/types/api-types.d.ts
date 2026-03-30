@@ -202,15 +202,16 @@ export type CreateAccountOptions =
   | ContractCreateOptions;
 
 export interface WalletCreateOptions {
-  /** Account type. Defaults to MutableWallet (3). Use AccountType enum. */
-  type?: 2 | 3;
+  /** Account type. Defaults to `AccountType.MutableWallet`. */
+  type?: AccountTypeValue;
   storage?: StorageMode;
   auth?: AuthSchemeType;
   seed?: string | Uint8Array;
 }
 
 export interface FaucetCreateOptions {
-  type: 0 | 1;
+  /** Use `AccountType.FungibleFaucet` or `AccountType.NonFungibleFaucet`. */
+  type: AccountTypeValue;
   symbol: string;
   decimals: number;
   maxSupply: number | bigint;
@@ -219,8 +220,8 @@ export interface FaucetCreateOptions {
 }
 
 export interface ContractCreateOptions {
-  /** Account type. Use AccountType.ImmutableContract (2) or AccountType.MutableContract (3). */
-  type?: 2 | 3;
+  /** Use `AccountType.ImmutableContract` or `AccountType.MutableContract`. */
+  type?: AccountTypeValue;
   /** Raw 32-byte seed (Uint8Array). Required. */
   seed: Uint8Array;
   /** Auth secret key. Required. */
@@ -251,8 +252,8 @@ export type ImportAccountInput =
   | { file: AccountFile }
   | {
       seed: Uint8Array;
-      /** Account type. Defaults to MutableWallet (3). Use AccountType enum. */
-      type?: 2 | 3;
+      /** Account type. Defaults to `AccountType.MutableWallet`. */
+      type?: AccountTypeValue;
       auth?: AuthSchemeType;
     };
 
