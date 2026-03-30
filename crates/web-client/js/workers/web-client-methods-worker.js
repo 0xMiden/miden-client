@@ -429,11 +429,7 @@ async function processMessage(event) {
       }
 
       wasmWebClient = new wasm.WebClient();
-      await wasmWebClient.createMockClient(
-        seed,
-        undefined,
-        undefined
-      );
+      await wasmWebClient.createMockClient(seed, undefined, undefined);
 
       wasmSeed = seed;
       ready = true;

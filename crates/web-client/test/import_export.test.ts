@@ -23,12 +23,15 @@ test.describe("export and import the db", () => {
 
     await clearStore(page, exported.storeName);
 
-    const restoredCommitment = await page.evaluate(async ({ storeData, walletId }) => {
-      const client = await window.MidenClient.createMock();
-      await window.importStore(client.storeIdentifier(), storeData);
-      const restored = await client.accounts.get(walletId);
-      return restored?.to_commitment().toHex();
-    }, exported);
+    const restoredCommitment = await page.evaluate(
+      async ({ storeData, walletId }) => {
+        const client = await window.MidenClient.createMock();
+        await window.importStore(client.storeIdentifier(), storeData);
+        const restored = await client.accounts.get(walletId);
+        return restored?.to_commitment().toHex();
+      },
+      exported
+    );
 
     expect(restoredCommitment).toEqual(exported.commitment);
   });

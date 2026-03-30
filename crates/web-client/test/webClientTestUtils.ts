@@ -934,19 +934,22 @@ export const syncState = async (testingPage: Page) => {
   });
 };
 export const clearStore = async (page: Page, storeName?: string) => {
-  await page.evaluate(async ({ storeName }) => {
-    if (storeName) {
-      indexedDB.deleteDatabase(storeName);
-      return;
-    }
-
-    const databases = await indexedDB.databases();
-    for (const db of databases) {
-      if (db.name) {
-        indexedDB.deleteDatabase(db.name);
+  await page.evaluate(
+    async ({ storeName }) => {
+      if (storeName) {
+        indexedDB.deleteDatabase(storeName);
+        return;
       }
-    }
-  }, { storeName });
+
+      const databases = await indexedDB.databases();
+      for (const db of databases) {
+        if (db.name) {
+          indexedDB.deleteDatabase(db.name);
+        }
+      }
+    },
+    { storeName }
+  );
 };
 
 // Misc test utils

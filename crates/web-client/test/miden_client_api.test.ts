@@ -315,13 +315,16 @@ test.describe("MidenClient API - Mock Chain", () => {
 
     await clearStore(page, exported.storeName);
 
-    const foundInImport = await page.evaluate(async ({ walletId, storeData }) => {
-      const client = await window.MidenClient.createMock();
-      await window.importStore(client.storeIdentifier(), storeData);
-      const accounts = await client.accounts.list();
-      const accountIds = accounts.map((a) => a.id().toString());
-      return accountIds.includes(walletId);
-    }, exported);
+    const foundInImport = await page.evaluate(
+      async ({ walletId, storeData }) => {
+        const client = await window.MidenClient.createMock();
+        await window.importStore(client.storeIdentifier(), storeData);
+        const accounts = await client.accounts.list();
+        const accountIds = accounts.map((a) => a.id().toString());
+        return accountIds.includes(walletId);
+      },
+      exported
+    );
 
     expect(foundInImport).toBe(true);
   });
