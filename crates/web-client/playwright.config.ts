@@ -76,7 +76,7 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   // FIXME: Modularise test server constants (localhost, port)
   webServer: {
-    command: "npx http-server ./dist -p 8080",
+    command: "npx http-server ./dist -a 127.0.0.1 -p 8080",
     url: "http://127.0.0.1:8080",
     reuseExistingServer: true,
   },

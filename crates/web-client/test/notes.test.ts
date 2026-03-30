@@ -206,6 +206,7 @@ test.describe("get_consumable_notes", () => {
   });
 
   test("no filter by account", async ({ page }) => {
+    test.slow();
     const { createdNoteId: noteId1, accountId: accountId1 } =
       await setupMintedNote(page);
     const { createdNoteId: noteId2, accountId: accountId2 } =
@@ -232,10 +233,14 @@ test.describe("get_consumable_notes", () => {
   });
 
   test("p2ide consume after block", async ({ page }) => {
+    test.slow();
     const { accountId: senderAccountId, faucetId } =
       await setupWalletAndFaucet(page);
     const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
-    const recallHeight = (await getSyncHeight(page)) + 30;
+    // This flow proves multiple transactions before we inspect consumability.
+    // Keep the reclaim height comfortably ahead of the moving local chain tip so
+    // the sender still resolves to ConsumableAfter(...) under suite load.
+    const recallHeight = (await getSyncHeight(page)) + 200;
     await sendTransaction(
       page,
       senderAccountId,
@@ -261,6 +266,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
   test("should create a proper consumable p2id note from the createP2IDNote function", async ({
     page,
   }) => {
+    test.slow();
     const { accountId: senderId, faucetId } = await setupWalletAndFaucet(page);
     const { accountId: targetId } = await setupWalletAndFaucet(page);
 

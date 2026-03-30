@@ -6,7 +6,7 @@
 
 # Function: createP2IDENote()
 
-> **createP2IDENote**(`options`): [`RawOutputNote`](../classes/RawOutputNote.md)
+> **createP2IDENote**(`options`): [`Note`](../classes/Note.md)
 
 Creates a P2IDE (Pay-to-ID with Expiration) note.
 
@@ -18,4 +18,4 @@ Creates a P2IDE (Pay-to-ID with Expiration) note.
 
 ## Returns
 
-[`RawOutputNote`](../classes/RawOutputNote.md)
+[`Note`](../classes/Note.md)

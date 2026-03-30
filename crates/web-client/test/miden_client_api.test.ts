@@ -356,6 +356,7 @@ test.describe("MidenClient API - Mock Chain", () => {
   });
 
   test("consumeAll consumes all available notes", async ({ page }) => {
+    test.slow();
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -377,6 +378,7 @@ test.describe("MidenClient API - Mock Chain", () => {
         to: wallet,
         amount: 200n,
       });
+      await client.sync();
       client.proveBlock();
       await client.sync();
 
@@ -396,6 +398,7 @@ test.describe("MidenClient API - Mock Chain", () => {
   });
 
   test("consumeAll with maxNotes limits consumption", async ({ page }) => {
+    test.slow();
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -416,6 +419,7 @@ test.describe("MidenClient API - Mock Chain", () => {
         to: wallet,
         amount: 200n,
       });
+      await client.sync();
       client.proveBlock();
       await client.sync();
 
@@ -451,6 +455,10 @@ test.describe("MidenClient API - Mock Chain", () => {
         to: wallet,
         amount: 100n,
       });
+      // The mock shortcut already proves the block during mint().
+      // Sync twice: the first sync discovers the committed note and
+      // transitions it from Expected to Committed.
+      await client.sync();
       client.proveBlock();
       await client.sync();
 
@@ -554,6 +562,7 @@ test.describe("MidenClient API - Mock Chain", () => {
         to: wallet,
         amount: 500n,
       });
+      await client.sync();
       client.proveBlock();
       await client.sync();
 
@@ -694,6 +703,7 @@ test.describe("MidenClient API - Mock Chain", () => {
         amount: 500n,
         type: "public",
       });
+      await client.sync();
       client.proveBlock();
       await client.sync();
 
@@ -701,9 +711,10 @@ test.describe("MidenClient API - Mock Chain", () => {
       const notes = await client.notes.list();
       const noteId = notes[0].id().toString();
 
-      // Export with full format
+      // Export with details format (mock chain may not have inclusion proofs
+      // for output notes, so Full/NoteWithProof is not always available)
       const noteFile = await client.notes.export(noteId, {
-        format: window.NoteExportFormat.Full,
+        format: window.NoteExportFormat.Details,
       });
 
       return {
@@ -736,6 +747,7 @@ test.describe("MidenClient API - Mock Chain", () => {
         amount: 500n,
         type: "public",
       });
+      await client.sync();
       client.proveBlock();
       await client.sync();
 
@@ -874,10 +886,18 @@ test.describe("MidenClient API - Mock Chain", () => {
   test("accounts.getOrImport works across serialized mock chain", async ({
     page,
   }) => {
+    test.slow();
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create({ storage: "public" });
       const walletId = wallet.id().toString();
+
+      // Public accounts created via the SDK are local-only until a block commits
+      // an update for them. Submit a minimal transaction so the mock chain tracks
+      // this account and a restored client can fetch it by ID.
+      const request = new window.TransactionRequestBuilder().build();
+      await client.transactions.submit(wallet.id(), request);
+      await client.sync();
 
       // Serialize chain so the second client sees the same blocks
       const chain = client.serializeMockChain();

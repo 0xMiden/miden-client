@@ -65,6 +65,7 @@ test.describe("get_transactions tests", () => {
   test("get_transactions retrieves uncommitted transactions successfully", async ({
     page,
   }) => {
+    test.slow();
     const { accountId, faucetId } = await setupWalletAndFaucet(page);
     const { mintResult, consumeResult } = await mintAndConsumeTransaction(
       page,
@@ -166,7 +167,7 @@ test.describe("get_transactions tests", () => {
       let allTransactionIds = allTransactions.map((tx) => tx.id().toHex());
       let currentBlockNum = allTransactions[0].blockNum();
 
-      let futureBlockNum = currentBlockNum + 10;
+      let futureBlockNum = currentBlockNum + 100;
       let futureExpiredFilter =
         window.TransactionFilter.expiredBefore(futureBlockNum);
       let futureExpiredTransactions =

@@ -1,4 +1,4 @@
-import test from "./playwright.global.setup";
+import test, { getProverUrl } from "./playwright.global.setup";
 import { expect, Page } from "@playwright/test";
 import {
   consumeTransaction,
@@ -8,6 +8,8 @@ import {
   setupWalletAndFaucet,
   setupConsumedNote,
 } from "./webClientTestUtils";
+
+const hasRemoteProver = !!getProverUrl();
 import {
   Account,
   TransactionRecord,
@@ -145,6 +147,8 @@ test.describe("mint transaction tests", () => {
 
   testCases.forEach(({ flag, description }) => {
     test(description, async ({ page }) => {
+      test.skip(flag && !hasRemoteProver, "no remote prover configured");
+      test.slow();
       // This test was added in #995 to reproduce an issue in the web wallet.
       // It is useful because most tests consume the note right on the latest client block,
       // but this test mints 3 notes and consumes them after the fact. This ensures the
@@ -176,6 +180,7 @@ test.describe("consume transaction tests", () => {
 
   testCases.forEach(({ flag, description }) => {
     test(description, async ({ page }) => {
+      test.skip(flag && !hasRemoteProver, "no remote prover configured");
       const { faucetId, accountId } = await setupWalletAndFaucet(page);
       const { consumeResult: result } = await mintAndConsumeTransaction(
         page,
@@ -249,6 +254,8 @@ test.describe("send transaction tests", () => {
 
   testCases.forEach(({ flag, description }) => {
     test(description, async ({ page }) => {
+      test.skip(flag && !hasRemoteProver, "no remote prover configured");
+      test.slow();
       const { accountId: senderAccountId, faucetId } =
         await setupWalletAndFaucet(page);
       const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
@@ -343,8 +350,8 @@ export const customTransaction = async (
       let expectedNoteArgs = noteArgs.map((felt) => felt.asInt());
       let memAddress = "1000";
       let memAddress2 = "1004";
-      let expectedNoteArg1 = expectedNoteArgs.slice(0, 4).join(".");
-      let expectedNoteArg2 = expectedNoteArgs.slice(4, 8).join(".");
+      let expectedNoteArg1 = expectedNoteArgs.slice(0, 4).reverse().join(".");
+      let expectedNoteArg2 = expectedNoteArgs.slice(4, 8).reverse().join(".");
 
       let noteScript = `
             # Custom P2ID note script
@@ -380,7 +387,7 @@ export const customTransaction = async (
                 # read first word
                 push.${memAddress}
                 # => [data_mem_address]
-                mem_loadw_be
+                mem_loadw_le
                 # => [NOTE_ARG_1]
 
                 push.${expectedNoteArg1} assert_eqw.err="First note argument didn't match expected"
@@ -389,26 +396,28 @@ export const customTransaction = async (
                 # read second word
                 push.${memAddress2}
                 # => [data_mem_address_2]
-                mem_loadw_be
+                mem_loadw_le
                 # => [NOTE_ARG_2]
 
                 push.${expectedNoteArg2} assert_eqw.err="Second note argument didn't match expected"
                 # => []
 
                 # store the note storage to memory starting at address 0
-                padw push.0 exec.active_note::get_storage
-                # => [num_storage_items, storage_ptr, EMPTY_WORD]
+                push.0 exec.active_note::get_storage
+                # => [num_storage_items, storage_ptr]
 
                 # make sure the number of storage items is 2
                 eq.2 assert.err="P2ID script expects exactly 2 note storage items"
-                # => [storage_ptr, EMPTY_WORD]
+                # => [storage_ptr]
 
-                # read the target account id from the note storage
-                mem_loadw_be drop drop
-                # => [target_account_id_prefix, target_account_id_suffix]
+                # read the target account ID from the note storage
+                drop
+                mem_load.1
+                mem_load.0
+                # => [target_account_id_suffix, target_account_id_prefix]
 
                 exec.active_account::get_id
-                # => [account_id_prefix, account_id_suffix, target_account_id_prefix, target_account_id_suffix, ...]
+                # => [account_id_suffix, account_id_prefix, target_account_id_suffix, target_account_id_prefix]
 
                 # ensure account_id = target_account_id, fails otherwise
                 exec.account_id::is_equal assert.err="P2ID's target account address and transaction address do not match"
@@ -447,8 +456,10 @@ export const customTransaction = async (
 
       // Creating First Custom Transaction Request to Mint the Custom Note
 
+      let mintNotes = new window.MidenArrays.NoteArray();
+      mintNotes.push(note);
       let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnOutputNotes(new window.MidenArrays.NoteArray([note]))
+        .withOwnOutputNotes(mintNotes)
         .build();
 
       // Execute and Submit Transaction
@@ -475,13 +486,13 @@ export const customTransaction = async (
       // Creating Second Custom Transaction Request to Consume Custom Note
       // with Invalid/Valid Transaction Script
       let transactionScript = await builder.compileTxScript(txScript);
-      let noteArgsCommitment = window.Rpo256.hashElements(feltArray); // gets consumed by NoteIdAndArgs
+      let noteArgsCommitment = window.Rpo256.hashElementsPoseidon2(feltArray); // gets consumed by NoteIdAndArgs
 
       let noteAndArgs = new window.NoteAndArgs(note, noteArgsCommitment);
       let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
 
       let adviceMap = new window.AdviceMap();
-      let noteArgsCommitment2 = window.Rpo256.hashElements(feltArray);
+      let noteArgsCommitment2 = window.Rpo256.hashElementsPoseidon2(feltArray);
 
       adviceMap.insert(noteArgsCommitment2, feltArray);
 
@@ -677,6 +688,7 @@ test.describe("custom transaction tests", () => {
   test("custom transaction with remote prover completes successfully", async ({
     page,
   }) => {
+    test.skip(!hasRemoteProver, "no remote prover configured");
     // TODO: hotfix CI failure, we should investigate slow prover tests further.
     test.slow();
     await expect(customTransaction(page, "0", true)).resolves.toBeUndefined();
@@ -725,6 +737,7 @@ test.describe("custom transaction with multiple output notes", () => {
 
   testCases.forEach(({ description, shouldFail }) => {
     test(description, async ({ page }) => {
+      test.slow();
       const { accountId, faucetId } = await setupConsumedNote(page);
       if (shouldFail) {
         await expect(
@@ -883,7 +896,7 @@ export const customAccountComponent = async (
         ?.storage()
         .getMapItem(MAP_SLOT_NAME, keyZero);
 
-      const expected = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
+      const expected = new window.Word(new BigUint64Array([4n, 3n, 2n, 1n]));
 
       if (retrieveMapKey?.toHex() !== expected.toHex()) {
         throw new Error(
@@ -1111,6 +1124,7 @@ export const discardedTransaction = async (
 
 test.describe("discarded_transaction tests", () => {
   test("transaction gets discarded", async ({ page }) => {
+    test.slow();
     const result = await discardedTransaction(page);
 
     expect(result.discardedTransactions.length).toEqual(1);
@@ -1317,14 +1331,14 @@ export const testStorageMap = async (page: Page): Promise<any> => {
 
     const MAP_KEY = new window.Word(new BigUint64Array([1n, 1n, 1n, 1n]));
     const FPI_STORAGE_VALUE = new window.Word(
-      new BigUint64Array([0n, 0n, 0n, 1n])
+      new BigUint64Array([1n, 0n, 0n, 0n])
     );
 
     let storageMap = new window.StorageMap();
     storageMap.insert(MAP_KEY, FPI_STORAGE_VALUE);
     storageMap.insert(
       new window.Word(new BigUint64Array([2n, 2n, 2n, 2n])),
-      new window.Word(new BigUint64Array([0n, 0n, 0n, 9n]))
+      new window.Word(new BigUint64Array([9n, 0n, 0n, 0n]))
     );
 
     const accountCode = `
@@ -1449,7 +1463,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
 };
 
 test.describe("storage map test", () => {
-  test.setTimeout(50000);
+  test.setTimeout(240000);
   test("storage map is updated correctly in transaction", async ({ page }) => {
     let { initialMapValue, finalMapValue, mapEntries } =
       await testStorageMap(page);

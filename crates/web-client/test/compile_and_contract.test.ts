@@ -549,11 +549,8 @@ test.describe("transactions.execute()", () => {
         const updated = await client.accounts.get(account.id());
         const countWord = updated?.storage().getItem(slotName);
 
-        // The counter word is stored little-endian; extract the value from the last 8 hex chars
-        const countHex = countWord?.toHex() ?? "";
-        const countValue = Number(
-          BigInt("0x" + countHex.slice(-16).match(/../g).reverse().join(""))
-        );
+        // The counter value is stored in the first felt of the word (index 0)
+        const countValue = Number(countWord?.toU64s()[0] ?? 0n);
 
         return { countValue };
       },

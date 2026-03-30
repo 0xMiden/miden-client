@@ -27,7 +27,10 @@ export function getDatabase(dbId) {
  */
 export async function openDatabase(network, clientVersion) {
     const db = new MidenDatabase(network);
-    await db.open(clientVersion);
+    const success = await db.open(clientVersion);
+    if (!success) {
+        throw new Error(`Failed to open IndexedDB database: ${network}`);
+    }
     databaseRegistry.set(network, db);
     return network;
 }

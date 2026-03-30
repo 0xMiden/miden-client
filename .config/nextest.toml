@@ -5,9 +5,16 @@ retries        = { backoff = "exponential", count = 2, delay = "1s", jitter = tr
 slow-timeout   = { period = "3m", terminate-after = 2 }
 status-level   = "skip"
 
+[test-groups.integration]
+max-threads = 5
+
 [[profile.default.overrides]]
-filter           = "package(miden-client-unit-tests) | package(miden-client-integration-tests)"
+filter           = "package(miden-client-unit-tests)"
 threads-required = 2
+
+[[profile.default.overrides]]
+filter     = "binary(integration)"
+test-group = "integration"
 
 [[profile.default.overrides]]
 filter  = "test(import_genesis_accounts_can_be_used_for_transactions)"

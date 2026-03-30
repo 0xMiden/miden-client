@@ -92,6 +92,7 @@ pub mod output_note_record;
 pub mod output_note_state;
 pub mod package;
 pub mod partial_note;
+pub mod poseidon2;
 pub mod program;
 pub mod proven_transaction;
 pub mod provers;

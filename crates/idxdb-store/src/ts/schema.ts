@@ -38,7 +38,10 @@ export async function openDatabase(
   clientVersion: string
 ): Promise<string> {
   const db = new MidenDatabase(network);
-  await db.open(clientVersion);
+  const success = await db.open(clientVersion);
+  if (!success) {
+    throw new Error(`Failed to open IndexedDB database: ${network}`);
+  }
   databaseRegistry.set(network, db);
   return network;
 }

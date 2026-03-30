@@ -150,7 +150,7 @@ impl WebClient {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
         })?;
 
-        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 0));
+        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 10_000));
 
         let note_transport_client = node_note_transport_url
             .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
@@ -210,7 +210,7 @@ impl WebClient {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
         })?;
 
-        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 0));
+        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 10_000));
 
         let note_transport_client = node_note_transport_url
             .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);

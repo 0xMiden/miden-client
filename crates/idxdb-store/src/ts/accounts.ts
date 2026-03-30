@@ -206,6 +206,7 @@ export async function getAccountVaultAssets(
     }
 
     return records.map((record) => ({
+      vaultKey: record.vaultKey,
       asset: record.asset,
     }));
   } catch (error: unknown) {

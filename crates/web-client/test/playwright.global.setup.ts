@@ -36,7 +36,7 @@ export function getRpcUrl(): string {
       return "https://rpc.testnet.miden.io";
     case "localhost":
     default:
-      return `http://localhost:${MIDEN_NODE_PORT}`;
+      return `http://127.0.0.1:${MIDEN_NODE_PORT}`;
   }
 }
 
@@ -59,7 +59,7 @@ export function getProverUrl(): string | undefined {
       return "https://tx-prover.testnet.miden.io";
     case "localhost":
     default:
-      return `http://localhost:${REMOTE_TX_PROVER_PORT}`;
+      return `http://127.0.0.1:${REMOTE_TX_PROVER_PORT}`;
   }
 }
 
@@ -81,7 +81,7 @@ export const test = base.extend<{ forEachTest: void }>({
         console.error("PUPPETEER ERROR:", err);
       });
 
-      await page.goto("http://localhost:8080");
+      await page.goto("http://127.0.0.1:8080");
 
       await page.evaluate(
         async ({ rpcUrl, proverUrl, storeName, remoteProverTimeoutMs }) => {
@@ -95,15 +95,15 @@ export const test = base.extend<{ forEachTest: void }>({
           // AuthScheme constant from index.js shadows the WASM export).
           const wasm = await window.getWasmOrThrow();
           window.AuthScheme = wasm.AuthScheme;
+          window.rpcUrl = rpcUrl;
+          window.storeName = storeName;
+
           const client = await window.WasmWebClient.createClient(
             rpcUrl,
             undefined,
             undefined,
             storeName
           );
-          window.rpcUrl = rpcUrl;
-          window.storeName = storeName;
-
           window.client = client;
 
           // Create a namespace for helper functions
@@ -151,47 +151,22 @@ export const test = base.extend<{ forEachTest: void }>({
             prover
           ) => {
             const client = window.client;
-
-            const t0 = performance.now();
             const result = await client.executeTransaction(
               accountId,
               transactionRequest
             );
-            const t1 = performance.now();
-            console.debug(
-              `[timing] executeTransaction: ${(t1 - t0).toFixed(0)}ms`
-            );
 
             const proverToUse =
               prover ?? window.TransactionProver.newLocalProver();
-
-            const t2 = performance.now();
             const proven = await client.proveTransaction(result, proverToUse);
-            const t3 = performance.now();
-            console.debug(
-              `[timing] proveTransaction: ${(t3 - t2).toFixed(0)}ms`
-            );
-
-            const t4 = performance.now();
             const submissionHeight = await client.submitProvenTransaction(
               proven,
               result
             );
-            const t5 = performance.now();
-            console.debug(
-              `[timing] submitProvenTransaction: ${(t5 - t4).toFixed(0)}ms`
-            );
-
-            const t6 = performance.now();
             const txUpdate = await client.applyTransaction(
               result,
               submissionHeight
             );
-            const t7 = performance.now();
-            console.debug(
-              `[timing] applyTransaction: ${(t7 - t6).toFixed(0)}ms`
-            );
-            console.debug(`[timing] total: ${(t7 - t0).toFixed(0)}ms`);
 
             return txUpdate;
           };

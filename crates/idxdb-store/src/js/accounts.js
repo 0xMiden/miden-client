@@ -158,6 +158,7 @@ export async function getAccountVaultAssets(dbId, accountId, faucetIdPrefixes) {
             records = await query.toArray();
         }
         return records.map((record) => ({
+            vaultKey: record.vaultKey,
             asset: record.asset,
         }));
     }
