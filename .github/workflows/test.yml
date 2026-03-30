@@ -340,7 +340,7 @@ jobs:
           pgrep -f testing-node-builder || (echo "Failed to start node" && exit 1)
       - name: Run web client tests
         run: |
-          make integration-test-web-client
+          make integration-test-web-client-opt
         env:
           SHARD_PARAMETER: "--shard=${{ matrix.shard_index }}/${{ matrix.shard_total }}"
       - name: Stop test node

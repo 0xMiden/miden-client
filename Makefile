@@ -19,9 +19,8 @@ NOTE_TRANSPORT_ENDPOINT=http://127.0.0.1:57292
 # --- Linting -------------------------------------------------------------------------------------
 
 .PHONY: clippy
-clippy: ## Run Clippy with configs. We need two separate commands because the `testing-remote-prover` cannot be built along with the rest of the workspace. This is because they use different versions of the `miden-tx` crate which aren't compatible with each other.
-	cargo +nightly clippy --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --features "testing std" --all-targets -- -D warnings
-	cargo +nightly clippy --package testing-remote-prover --all-targets -- -D warnings
+clippy: ## Run Clippy with configs
+	cargo +nightly clippy --workspace $(EXCLUDE_WASM_PACKAGES) --features "testing std" --all-targets -- -D warnings
 
 .PHONY: clippy-wasm
 clippy-wasm: rust-client-ts-build ## Run Clippy for the wasm packages (web client and idxdb store)
@@ -29,9 +28,8 @@ clippy-wasm: rust-client-ts-build ## Run Clippy for the wasm packages (web clien
 	cargo +nightly clippy --package miden-idxdb-store --target wasm32-unknown-unknown --all-targets -- -D warnings
 
 .PHONY: fix
-fix: ## Run Fix with configs, building tests with proper features to avoid type split.
-	cargo +nightly fix --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --features "testing std" --all-targets --allow-staged --allow-dirty
-	cargo +nightly fix --package testing-remote-prover --all-targets --allow-staged --allow-dirty
+fix: ## Run Fix with configs
+	cargo +nightly fix --workspace $(EXCLUDE_WASM_PACKAGES) --features "testing std" --all-targets --allow-staged --allow-dirty
 
 .PHONY: fix-wasm
 fix-wasm: ## Run Fix for the wasm packages (web client and idxdb store)
@@ -40,11 +38,15 @@ fix-wasm: ## Run Fix for the wasm packages (web client and idxdb store)
 
 .PHONY: format
 format: ## Run format using nightly toolchain
-	cargo +nightly fmt --all && yarn --silent prettier . --write --log-level silent && yarn --silent eslint . --fix
+	cargo +nightly fmt --all
+	yarn --silent prettier . --write --log-level silent
+	yarn --silent eslint . --fix
 
 .PHONY: format-check
 format-check: ## Run format using nightly toolchain but only in check mode
-	cargo +nightly fmt --all --check && yarn prettier . --check && yarn eslint .
+	cargo +nightly fmt --all --check
+	yarn --silent prettier . --check
+	yarn --silent eslint .
 
 .PHONY: lint
 lint: format toml clippy clippy-wasm typos-check rust-client-ts-lint web-client-check-methods ## Run all linting tasks at once (clippy, fixing, formatting, typos)
@@ -205,8 +207,7 @@ build: ## Build the CLI binary, client library and tests binary in release mode
 	cargo build --package miden-client-integration-tests --release --locked
 
 build-wasm: rust-client-ts-build ## Build the wasm packages (web client and idxdb store)
-	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown --locked
-	cargo build --package miden-idxdb-store --target wasm32-unknown-unknown --locked
+	cargo build --package miden-client-web --package miden-idxdb-store --target wasm32-unknown-unknown --locked
 
 .PHONY: rust-client-ts-build
 rust-client-ts-build:
