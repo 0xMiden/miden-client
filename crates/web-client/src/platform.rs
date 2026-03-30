@@ -129,7 +129,7 @@ pub fn js_u64_to_u64(val: JsU64) -> u64 {
     #[cfg(feature = "nodejs")]
     {
         const MAX_SAFE_INT: f64 = 9_007_199_254_740_992.0; // 2^53
-        if val > MAX_SAFE_INT || val < 0.0 {
+        if !val.is_finite() || val > MAX_SAFE_INT || val < 0.0 {
             panic!(
                 "u64 value {val} is outside the safe integer range (0..2^53). \
                  Use string-based APIs for values above Number.MAX_SAFE_INTEGER."
