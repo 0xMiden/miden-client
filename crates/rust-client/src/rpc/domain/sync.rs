@@ -4,6 +4,7 @@ use miden_protocol::Word;
 use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::MmrDelta;
+use miden_protocol::note::Nullifier;
 
 use super::note::CommittedNote;
 use super::transaction::TransactionInclusion;
@@ -30,6 +31,9 @@ pub struct StateSyncInfo {
     /// `response.block_num-1`) along with the account the tx was executed against and the block
     /// number the transaction was included in.
     pub transactions: Vec<TransactionInclusion>,
+    /// Nullifiers ordered by consuming transaction position, per account. Nullifiers from the
+    /// same account are in execution order; ordering across different accounts is not guaranteed.
+    pub nullifiers: Vec<Nullifier>,
 }
 
 // CHAIN MMR INFO

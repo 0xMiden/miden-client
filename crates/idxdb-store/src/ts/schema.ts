@@ -83,9 +83,9 @@ export interface ILatestAccountStorage {
 
 export interface IHistoricalAccountStorage {
   accountId: string;
-  nonce: string;
+  replacedAtNonce: string;
   slotName: string;
-  slotValue: string;
+  oldSlotValue: string | null;
   slotType: number;
 }
 
@@ -98,10 +98,10 @@ export interface ILatestStorageMapEntry {
 
 export interface IHistoricalStorageMapEntry {
   accountId: string;
-  nonce: string;
+  replacedAtNonce: string;
   slotName: string;
   key: string;
-  value: string | null;
+  oldValue: string | null;
 }
 
 export interface ILatestAccountAsset {
@@ -113,10 +113,10 @@ export interface ILatestAccountAsset {
 
 export interface IHistoricalAccountAsset {
   accountId: string;
-  nonce: string;
+  replacedAtNonce: string;
   vaultKey: string;
   faucetIdPrefix: string;
-  asset: string | null;
+  oldAsset: string | null;
 }
 
 export interface IAccountAuth {
@@ -131,6 +131,19 @@ export interface IAccountKeyMapping {
 
 export interface IAccount {
   id: string;
+  codeRoot: string;
+  storageRoot: string;
+  vaultRoot: string;
+  nonce: string;
+  committed: boolean;
+  accountSeed?: Uint8Array;
+  accountCommitment: string;
+  locked: boolean;
+}
+
+export interface IHistoricalAccount {
+  id: string;
+  replacedAtNonce: string;
   codeRoot: string;
   storageRoot: string;
   vaultRoot: string;
@@ -170,6 +183,9 @@ export interface IInputNote {
   nullifier: string;
   serializedCreatedAt: string;
   state: Uint8Array;
+  consumedBlockHeight?: number;
+  consumedTxOrder?: number;
+  consumerAccountId?: string;
 }
 
 export interface IOutputNote {
@@ -250,9 +266,9 @@ const V1_STORES: Record<string, string> = {
   [Table.AccountCode]: indexes("root"),
   [Table.LatestAccountStorage]: indexes("[accountId+slotName]", "accountId"),
   [Table.HistoricalAccountStorage]: indexes(
-    "[accountId+nonce+slotName]",
+    "[accountId+replacedAtNonce+slotName]",
     "accountId",
-    "[accountId+nonce]"
+    "[accountId+replacedAtNonce]"
   ),
   [Table.LatestStorageMapEntries]: indexes(
     "[accountId+slotName+key]",
@@ -260,9 +276,9 @@ const V1_STORES: Record<string, string> = {
     "[accountId+slotName]"
   ),
   [Table.HistoricalStorageMapEntries]: indexes(
-    "[accountId+nonce+slotName+key]",
+    "[accountId+replacedAtNonce+slotName+key]",
     "accountId",
-    "[accountId+nonce]"
+    "[accountId+replacedAtNonce]"
   ),
   [Table.LatestAccountAssets]: indexes(
     "[accountId+vaultKey]",
@@ -270,9 +286,9 @@ const V1_STORES: Record<string, string> = {
     "faucetIdPrefix"
   ),
   [Table.HistoricalAccountAssets]: indexes(
-    "[accountId+nonce+vaultKey]",
+    "[accountId+replacedAtNonce+vaultKey]",
     "accountId",
-    "[accountId+nonce]"
+    "[accountId+replacedAtNonce]"
   ),
   [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
   [Table.AccountKeyMapping]: indexes(
@@ -284,12 +300,17 @@ const V1_STORES: Record<string, string> = {
   [Table.HistoricalAccountHeaders]: indexes(
     "&accountCommitment",
     "id",
-    "[id+nonce]"
+    "[id+replacedAtNonce]"
   ),
   [Table.Addresses]: indexes("address", "id"),
   [Table.Transactions]: indexes("id", "statusVariant"),
   [Table.TransactionScripts]: indexes("scriptRoot"),
-  [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+  [Table.InputNotes]: indexes(
+    "noteId",
+    "nullifier",
+    "stateDiscriminant",
+    "[consumedBlockHeight+consumedTxOrder+noteId]"
+  ),
   [Table.OutputNotes]: indexes(
     "noteId",
     "recipientDigest",
@@ -347,7 +368,7 @@ export type MidenDexie = Dexie & {
   accountAuths: Dexie.Table<IAccountAuth, string>;
   accountKeyMappings: Dexie.Table<IAccountKeyMapping, string>;
   latestAccountHeaders: Dexie.Table<IAccount, string>;
-  historicalAccountHeaders: Dexie.Table<IAccount, string>;
+  historicalAccountHeaders: Dexie.Table<IHistoricalAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
   transactionScripts: Dexie.Table<ITransactionScript, string>;
@@ -374,7 +395,7 @@ export class MidenDatabase {
   accountAuths: Dexie.Table<IAccountAuth, string>;
   accountKeyMappings: Dexie.Table<IAccountKeyMapping, string>;
   latestAccountHeaders: Dexie.Table<IAccount, string>;
-  historicalAccountHeaders: Dexie.Table<IAccount, string>;
+  historicalAccountHeaders: Dexie.Table<IHistoricalAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
   transactionScripts: Dexie.Table<ITransactionScript, string>;
@@ -471,9 +492,10 @@ export class MidenDatabase {
     this.latestAccountHeaders = this.dexie.table<IAccount, string>(
       Table.LatestAccountHeaders
     );
-    this.historicalAccountHeaders = this.dexie.table<IAccount, string>(
-      Table.HistoricalAccountHeaders
-    );
+    this.historicalAccountHeaders = this.dexie.table<
+      IHistoricalAccount,
+      string
+    >(Table.HistoricalAccountHeaders);
     this.addresses = this.dexie.table<IAddress, string>(Table.Addresses);
     this.transactions = this.dexie.table<ITransaction, string>(
       Table.Transactions

@@ -28,9 +28,12 @@ mod states;
 pub use states::{
     CommittedNoteState,
     ConsumedAuthenticatedLocalNoteState,
+    ConsumedExternalNoteState,
+    ConsumedUnauthenticatedLocalNoteState,
     ExpectedNoteState,
     InputNoteState,
     InvalidNoteState,
+    NoteSubmissionData,
     ProcessingAuthenticatedNoteState,
     ProcessingUnauthenticatedNoteState,
     UnverifiedNoteState,
@@ -130,6 +133,28 @@ impl InputNoteRecord {
         self.state.consumer_transaction_id()
     }
 
+    /// Returns the account ID that consumed this note, if available.
+    ///
+    /// This is available for notes in processing or consumed-local states, where the
+    /// submission data contains the consumer account. Returns `None` for externally
+    /// consumed notes, invalid notes, or notes that haven't been submitted for
+    /// consumption.
+    pub fn consumer_account(&self) -> Option<AccountId> {
+        match &self.state {
+            InputNoteState::ProcessingAuthenticated(s) => Some(s.submission_data.consumer_account),
+            InputNoteState::ProcessingUnauthenticated(s) => {
+                Some(s.submission_data.consumer_account)
+            },
+            InputNoteState::ConsumedAuthenticatedLocal(s) => {
+                Some(s.submission_data.consumer_account)
+            },
+            InputNoteState::ConsumedUnauthenticatedLocal(s) => {
+                Some(s.submission_data.consumer_account)
+            },
+            _ => None,
+        }
+    }
+
     /// Returns true if the note is authenticated, meaning that it has the necessary inclusion
     /// proof and block header information to be considered valid.
     pub fn is_authenticated(&self) -> bool {
@@ -164,6 +189,12 @@ impl InputNoteRecord {
     /// isn't consumed or being processed).
     pub fn is_committed(&self) -> bool {
         matches!(self.state, InputNoteState::Committed { .. })
+    }
+
+    /// Sets the consumed transaction order on the inner note state. No-op if the note is not in
+    /// a consumed state.
+    pub fn set_consumed_tx_order(&mut self, order: Option<u32>) {
+        self.state.set_consumed_tx_order(order);
     }
 
     // TRANSITIONS

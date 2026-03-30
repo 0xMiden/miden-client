@@ -66,6 +66,7 @@ use crate::store::{InputNoteRecord, NoteFilter, OutputNoteRecord};
 use crate::{Client, ClientError, IdPrefixFetchError};
 
 mod import;
+mod note_reader;
 mod note_screener;
 mod note_update_tracker;
 
@@ -106,6 +107,7 @@ pub use miden_standards::note::{
     SwapNote,
 };
 pub use miden_tx::{FailedNote, NoteConsumptionInfo};
+pub use note_reader::InputNoteReader;
 pub use note_screener::{NoteConsumability, NoteScreener, NoteScreenerError};
 pub use note_update_tracker::{
     InputNoteUpdate,
@@ -213,6 +215,25 @@ where
         note_id: NoteId,
     ) -> Result<Option<OutputNoteRecord>, ClientError> {
         Ok(self.store.get_output_notes(NoteFilter::Unique(note_id)).await?.pop())
+    }
+
+    /// Returns an [`InputNoteReader`] that lazily iterates over consumed input notes
+    /// for the given consumer account.
+    ///
+    /// The consumer is required because ordering is only guaranteed among notes
+    /// consumed by the same account.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let mut reader = client.input_note_reader(account_id);
+    ///
+    /// while let Some(note) = reader.next().await? {
+    ///     process(note);
+    /// }
+    /// ```
+    pub fn input_note_reader(&self, consumer: AccountId) -> InputNoteReader {
+        InputNoteReader::new(self.store.clone(), consumer)
     }
 }
 

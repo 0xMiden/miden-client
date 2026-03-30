@@ -111,6 +111,7 @@ const READ_METHODS = new Set([
   "getTransactions",
   "listSettingKeys",
   "listTags",
+  "executeProgram",
 ]);
 
 // Suppress unused-variable warnings — these sets exist solely for the CI lint check.

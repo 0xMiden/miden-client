@@ -8,7 +8,7 @@ use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
-use miden_protocol::note::{NoteId, NoteTag};
+use miden_protocol::note::{NoteId, NoteTag, Nullifier};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -18,7 +18,10 @@ use crate::note::NoteUpdateTracker;
 use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::sync::StateSyncInfo;
-use crate::rpc::domain::transaction::{self as rpc_tx, TransactionInclusion};
+use crate::rpc::domain::transaction::{
+    TransactionInclusion,
+    TransactionRecord as RpcTransactionRecord,
+};
 use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
 use crate::transaction::TransactionRecord;
 
@@ -243,57 +246,14 @@ impl StateSync {
         // to notes based on the received information.
         info!("Applying state transitions locally.");
 
-        for sync_step in state_sync_steps {
-            let StateSyncInfo {
-                chain_tip,
-                block_header,
-                mmr_delta,
-                note_inclusions,
-                transactions,
-                ..
-            } = sync_step;
+        self.apply_sync_steps(
+            state_sync_steps,
+            &public_note_records,
+            &mut state_sync_update,
+            current_partial_mmr,
+        )
+        .await?;
 
-            self.transaction_state_sync(
-                &mut state_sync_update.transaction_updates,
-                &block_header,
-                &transactions,
-            );
-
-            let found_relevant_note = self
-                .note_state_sync(
-                    &mut state_sync_update.note_updates,
-                    note_inclusions,
-                    &block_header,
-                    &public_note_records,
-                )
-                .await?;
-
-            let (new_mmr_peaks, new_authentication_nodes) = apply_mmr_changes(
-                &block_header,
-                found_relevant_note,
-                current_partial_mmr,
-                mmr_delta,
-            )?;
-
-            let include_block = found_relevant_note || chain_tip == block_header.block_num();
-            if include_block {
-                state_sync_update.block_updates.insert(
-                    block_header,
-                    found_relevant_note,
-                    new_mmr_peaks,
-                    new_authentication_nodes,
-                );
-            } else {
-                // Even though this block header is not stored, `apply_mmr_changes` may
-                // produce authentication nodes for already-tracked leaves whose Merkle
-                // paths change as the MMR grows. These must be persisted so that the
-                // `PartialMmr` can be correctly reconstructed from the store after a
-                // client restart.
-                state_sync_update
-                    .block_updates
-                    .extend_authentication_nodes(new_authentication_nodes);
-            }
-        }
         if self.sync_nullifiers {
             info!("Syncing nullifiers.");
             self.nullifiers_state_sync(&mut state_sync_update, block_num).await?;
@@ -337,8 +297,8 @@ impl StateSync {
             .mmr_delta;
 
         // Gather transactions for tracked accounts (skip if none)
-        let (account_commitment_updates, transactions) = if account_ids.is_empty() {
-            (vec![], vec![])
+        let (account_commitment_updates, transactions, nullifiers) = if account_ids.is_empty() {
+            (vec![], vec![], vec![])
         } else {
             let tx_info = self
                 .rpc_api
@@ -358,7 +318,9 @@ impl StateSync {
                 })
                 .collect();
 
-            (account_updates, tx_inclusions)
+            let nullifiers = compute_ordered_nullifiers(&tx_info.transaction_records);
+
+            (account_updates, tx_inclusions, nullifiers)
         };
 
         // Compose StateSyncInfo with sync results
@@ -369,11 +331,78 @@ impl StateSync {
             account_commitment_updates,
             note_inclusions: note_sync.notes,
             transactions,
+            nullifiers,
         }))
     }
 
     // HELPERS
     // --------------------------------------------------------------------------------------------
+
+    /// Applies each sync step to the update.
+    async fn apply_sync_steps(
+        &self,
+        sync_steps: Vec<StateSyncInfo>,
+        public_note_records: &BTreeMap<NoteId, InputNoteRecord>,
+        state_sync_update: &mut StateSyncUpdate,
+        current_partial_mmr: &mut PartialMmr,
+    ) -> Result<(), ClientError> {
+        for sync_step in sync_steps {
+            let StateSyncInfo {
+                chain_tip,
+                block_header,
+                mmr_delta,
+                note_inclusions,
+                transactions,
+                nullifiers,
+                ..
+            } = sync_step;
+
+            state_sync_update.note_updates.extend_nullifiers(nullifiers);
+
+            self.transaction_state_sync(
+                &mut state_sync_update.transaction_updates,
+                &block_header,
+                &transactions,
+            );
+
+            let found_relevant_note = self
+                .note_state_sync(
+                    &mut state_sync_update.note_updates,
+                    note_inclusions,
+                    &block_header,
+                    public_note_records,
+                )
+                .await?;
+
+            let (new_mmr_peaks, new_authentication_nodes) = apply_mmr_changes(
+                &block_header,
+                found_relevant_note,
+                current_partial_mmr,
+                mmr_delta,
+            )?;
+
+            let include_block = found_relevant_note || chain_tip == block_header.block_num();
+            if include_block {
+                state_sync_update.block_updates.insert(
+                    block_header,
+                    found_relevant_note,
+                    new_mmr_peaks,
+                    new_authentication_nodes,
+                );
+            } else {
+                // Even though this block header is not stored, `apply_mmr_changes` may
+                // produce authentication nodes for already-tracked leaves whose Merkle
+                // paths change as the MMR grows. These must be persisted so that the
+                // `PartialMmr` can be correctly reconstructed from the store after a
+                // client restart.
+                state_sync_update
+                    .block_updates
+                    .extend_authentication_nodes(new_authentication_nodes);
+            }
+        }
+
+        Ok(())
+    }
 
     /// Compares the state of tracked accounts with the updates received from the node. The method
     /// updates the `state_sync_update` field with the details of the accounts that need to be
@@ -589,9 +618,9 @@ impl StateSync {
 /// highest `block_num`. This replicates the old `SyncState` behavior where the node returned
 /// the latest account commitment per account in the synced range.
 fn derive_account_commitment_updates(
-    transaction_records: &[rpc_tx::TransactionRecord],
+    transaction_records: &[RpcTransactionRecord],
 ) -> Vec<(AccountId, Word)> {
-    let mut latest_by_account: BTreeMap<AccountId, &rpc_tx::TransactionRecord> = BTreeMap::new();
+    let mut latest_by_account: BTreeMap<AccountId, &RpcTransactionRecord> = BTreeMap::new();
 
     for record in transaction_records {
         let account_id = record.transaction_header.account_id();
@@ -633,6 +662,60 @@ fn apply_mmr_changes(
     Ok((new_peaks, new_authentication_nodes))
 }
 
+/// Returns nullifiers ordered by consuming transaction position, per account.
+///
+/// Groups RPC transaction records by (`account_id`, `block_num`), chains them using
+/// `initial_state_commitment` / `final_state_commitment`, and collects each transaction's
+/// input note nullifiers in execution order. Nullifiers from the same account are in execution
+/// order; ordering across different accounts is arbitrary.
+fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> Vec<Nullifier> {
+    // Group transactions by (account_id, block_num).
+    let mut groups: BTreeMap<(AccountId, BlockNumber), Vec<&RpcTransactionRecord>> =
+        BTreeMap::new();
+
+    for record in transaction_records {
+        let account_id = record.transaction_header.account_id();
+        groups.entry((account_id, record.block_num)).or_default().push(record);
+    }
+
+    let mut result = Vec::new();
+
+    for txs in groups.values() {
+        // Build a lookup from initial_state_commitment -> transaction record.
+        let mut init_to_tx: BTreeMap<Word, &RpcTransactionRecord> = txs
+            .iter()
+            .map(|tx| (tx.transaction_header.initial_state_commitment(), *tx))
+            .collect();
+
+        // Build a set of all final states to find the chain start.
+        let final_states: BTreeSet<Word> =
+            txs.iter().map(|tx| tx.transaction_header.final_state_commitment()).collect();
+
+        // Find the chain start: the tx whose initial_state_commitment is not any other tx's
+        // final_state_commitment.
+        let chain_start = txs
+            .iter()
+            .find(|tx| !final_states.contains(&tx.transaction_header.initial_state_commitment()));
+
+        let Some(start_tx) = chain_start else {
+            continue;
+        };
+
+        // Walk the chain from start, removing each step from the map.
+        let mut current =
+            init_to_tx.remove(&start_tx.transaction_header.initial_state_commitment());
+
+        while let Some(tx) = current {
+            for commitment in tx.transaction_header.input_notes().iter() {
+                result.push(commitment.nullifier());
+            }
+            current = init_to_tx.remove(&tx.transaction_header.final_state_commitment());
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::collections::BTreeSet;
@@ -666,6 +749,272 @@ mod tests {
             output_notes: vec![],
             uncommitted_transactions: vec![],
         }
+    }
+
+    // COMPUTE NULLIFIER TX ORDER TESTS
+    // --------------------------------------------------------------------------------------------
+
+    mod compute_nullifiers_tests {
+        use alloc::vec;
+
+        use miden_protocol::asset::FungibleAsset;
+        use miden_protocol::block::BlockNumber;
+        use miden_protocol::note::Nullifier;
+        use miden_protocol::transaction::{InputNoteCommitment, InputNotes, TransactionHeader};
+        use miden_protocol::{Felt, ZERO};
+
+        use crate::rpc::domain::transaction::{
+            ACCOUNT_ID_NATIVE_ASSET_FAUCET,
+            TransactionRecord as RpcTransactionRecord,
+        };
+
+        fn word(n: u64) -> miden_protocol::Word {
+            [Felt::new(n), ZERO, ZERO, ZERO].into()
+        }
+
+        fn make_rpc_tx(
+            init_state: u64,
+            final_state: u64,
+            nullifier_vals: &[u64],
+            block_number: u32,
+        ) -> RpcTransactionRecord {
+            let account_id = miden_protocol::account::AccountId::try_from(
+                miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
+            )
+            .unwrap();
+
+            let input_notes = InputNotes::new_unchecked(
+                nullifier_vals
+                    .iter()
+                    .map(|v| InputNoteCommitment::from(Nullifier::from_raw(word(*v))))
+                    .collect(),
+            );
+
+            let fee =
+                FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("valid"), 0u64)
+                    .unwrap();
+
+            RpcTransactionRecord {
+                block_num: BlockNumber::from(block_number),
+                transaction_header: TransactionHeader::new(
+                    account_id,
+                    word(init_state),
+                    word(final_state),
+                    input_notes,
+                    vec![],
+                    fee,
+                ),
+            }
+        }
+
+        #[test]
+        fn chains_rpc_transactions_by_state_commitment() {
+            // Chain: tx_a (state 1->2) -> tx_b (state 2->3) -> tx_c (state 3->4)
+            // Passed in reverse order to verify chaining uses state, not insertion order.
+            let tx_a = make_rpc_tx(1, 2, &[10], 5);
+            let tx_b = make_rpc_tx(2, 3, &[20], 5);
+            let tx_c = make_rpc_tx(3, 4, &[30], 5);
+
+            let result = super::super::compute_ordered_nullifiers(&[tx_c, tx_a, tx_b]);
+
+            assert_eq!(result[0], Nullifier::from_raw(word(10)));
+            assert_eq!(result[1], Nullifier::from_raw(word(20)));
+            assert_eq!(result[2], Nullifier::from_raw(word(30)));
+        }
+
+        #[test]
+        fn groups_independently_by_account_and_block() {
+            // Account A, block 5: two chained txs.
+            let tx_a1 = make_rpc_tx(1, 2, &[10], 5);
+            let tx_a2 = make_rpc_tx(2, 3, &[20], 5);
+
+            // Account A, block 6: independent chain.
+            let tx_a3 = make_rpc_tx(3, 4, &[30], 6);
+
+            // Account B, block 5: independent chain.
+            let account_b = miden_protocol::account::AccountId::try_from(
+                miden_protocol::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+            )
+            .unwrap();
+
+            let fee =
+                FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("valid"), 0u64)
+                    .unwrap();
+
+            let tx_b1 = RpcTransactionRecord {
+                block_num: BlockNumber::from(5u32),
+                transaction_header: TransactionHeader::new(
+                    account_b,
+                    word(100),
+                    word(200),
+                    InputNotes::new_unchecked(vec![InputNoteCommitment::from(
+                        Nullifier::from_raw(word(40)),
+                    )]),
+                    vec![],
+                    fee,
+                ),
+            };
+
+            let result = super::super::compute_ordered_nullifiers(&[tx_a2, tx_b1, tx_a3, tx_a1]);
+
+            // Nullifiers are ordered by chain position within each (account, block) group.
+            // The exact global indices depend on BTreeMap iteration order of the groups.
+            let pos = |val: u64| -> usize {
+                result.iter().position(|n| *n == Nullifier::from_raw(word(val))).unwrap()
+            };
+
+            // Within the same group, chain order is preserved.
+            assert!(pos(10) < pos(20)); // A, block 5: pos 0 < pos 1
+            // Nullifiers from different groups are all present.
+            assert!(result.contains(&Nullifier::from_raw(word(30)))); // A, block 6
+            assert!(result.contains(&Nullifier::from_raw(word(40)))); // B, block 5
+        }
+
+        #[test]
+        fn multiple_nullifiers_per_transaction_are_consecutive() {
+            // Single tx consuming 3 notes — all should appear consecutively.
+            let tx = make_rpc_tx(1, 2, &[10, 20, 30], 5);
+
+            let result = super::super::compute_ordered_nullifiers(&[tx]);
+
+            assert_eq!(result.len(), 3);
+            assert!(result.contains(&Nullifier::from_raw(word(10))));
+            assert!(result.contains(&Nullifier::from_raw(word(20))));
+            assert!(result.contains(&Nullifier::from_raw(word(30))));
+        }
+
+        #[test]
+        fn empty_input_returns_empty_vec() {
+            let result = super::super::compute_ordered_nullifiers(&[]);
+            assert!(result.is_empty());
+        }
+    }
+
+    // CONSUMED NOTE ORDERING INTEGRATION TESTS
+    // --------------------------------------------------------------------------------------------
+
+    /// Mock note screener that commits all notes matching tracked input notes.
+    /// This ensures committed notes get their inclusion proofs set during sync.
+    struct CommitAllScreener;
+
+    #[async_trait(?Send)]
+    impl OnNoteReceived for CommitAllScreener {
+        async fn on_note_received(
+            &self,
+            committed_note: CommittedNote,
+            _public_note: Option<InputNoteRecord>,
+        ) -> Result<NoteUpdateAction, ClientError> {
+            Ok(NoteUpdateAction::Commit(committed_note))
+        }
+    }
+
+    use miden_protocol::account::Account;
+    use miden_protocol::note::Note;
+
+    /// Builds a `MockChain` where 3 notes are consumed by chained transactions in the same block.
+    ///
+    /// Returns the chain, the account, and the 3 notes (in consumption order).
+    async fn build_chain_with_chained_consume_txs() -> (miden_testing::MockChain, Account, [Note; 3])
+    {
+        use miden_protocol::asset::{Asset, FungibleAsset};
+        use miden_protocol::note::NoteType;
+        use miden_protocol::testing::account_id::{
+            ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+            ACCOUNT_ID_SENDER,
+        };
+        use miden_testing::{MockChainBuilder, TxContextInput};
+
+        let sender_id: AccountId = ACCOUNT_ID_SENDER.try_into().unwrap();
+        let faucet_id: AccountId = ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap();
+
+        let mut builder = MockChainBuilder::new();
+        let account = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
+        let account_id = account.id();
+
+        let asset = Asset::Fungible(FungibleAsset::new(faucet_id, 100u64).unwrap());
+        let note1 = builder
+            .add_p2id_note(sender_id, account_id, &[asset], NoteType::Public)
+            .unwrap();
+        let note2 = builder
+            .add_p2id_note(sender_id, account_id, &[asset], NoteType::Public)
+            .unwrap();
+        let note3 = builder
+            .add_p2id_note(sender_id, account_id, &[asset], NoteType::Public)
+            .unwrap();
+
+        let mut chain = builder.build().unwrap();
+        chain.prove_next_block().unwrap(); // block 1: makes genesis notes consumable
+
+        // Execute 3 chained consume transactions (state S0→S1→S2→S3).
+        let mut current_account = account.clone();
+        for note in [&note1, &note2, &note3] {
+            let tx = Box::pin(
+                chain
+                    .build_tx_context(
+                        TxContextInput::Account(current_account.clone()),
+                        &[],
+                        core::slice::from_ref(note),
+                    )
+                    .unwrap()
+                    .build()
+                    .unwrap()
+                    .execute(),
+            )
+            .await
+            .unwrap();
+            current_account.apply_delta(tx.account_delta()).unwrap();
+            chain.add_pending_executed_transaction(&tx).unwrap();
+        }
+
+        chain.prove_next_block().unwrap(); // block 2: all 3 txs in one block
+        (chain, account, [note1, note2, note3])
+    }
+
+    /// Verifies that `consumed_tx_order` is correctly set when multiple chained transactions
+    /// for the same account consume notes in the same block.
+    #[tokio::test]
+    async fn sync_state_sets_consumed_tx_order_for_chained_transactions() {
+        use miden_protocol::note::NoteMetadata;
+
+        let (chain, account, [note1, note2, note3]) = build_chain_with_chained_consume_txs().await;
+
+        let mock_rpc = MockRpcApi::new(chain);
+        let state_sync =
+            StateSync::new(Arc::new(mock_rpc.clone()), Arc::new(CommitAllScreener), None);
+
+        let genesis_peaks = mock_rpc.get_mmr().peaks_at(Forest::new(1)).unwrap();
+        let mut partial_mmr = PartialMmr::from_peaks(genesis_peaks);
+
+        let input_notes: Vec<InputNoteRecord> = [&note1, &note2, &note3]
+            .into_iter()
+            .map(|n| InputNoteRecord::from(n.clone()))
+            .collect();
+
+        let note_tags: BTreeSet<NoteTag> =
+            input_notes.iter().filter_map(|n| n.metadata().map(NoteMetadata::tag)).collect();
+
+        let sync_input = StateSyncInput {
+            accounts: vec![account.into()],
+            note_tags,
+            input_notes,
+            output_notes: vec![],
+            uncommitted_transactions: vec![],
+        };
+
+        let update = state_sync.sync_state(&mut partial_mmr, sync_input).await.unwrap();
+
+        let updated_notes: Vec<_> = update.note_updates.updated_input_notes().collect();
+
+        let find_order = |note_id: NoteId| -> Option<u32> {
+            updated_notes
+                .iter()
+                .find(|n| n.id() == note_id)
+                .and_then(|n| n.consumed_tx_order())
+        };
+
+        assert_eq!(find_order(note1.id()), Some(0), "note1 should have tx_order 0");
+        assert_eq!(find_order(note2.id()), Some(1), "note2 should have tx_order 1");
+        assert_eq!(find_order(note3.id()), Some(2), "note3 should have tx_order 2");
     }
 
     #[tokio::test]

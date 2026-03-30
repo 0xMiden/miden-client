@@ -50,6 +50,7 @@
 - [ConsumeOptions](interfaces/ConsumeOptions.md)
 - [ContractCreateOptions](interfaces/ContractCreateOptions.md)
 - [ExecuteOptions](interfaces/ExecuteOptions.md)
+- [ExecuteProgramOptions](interfaces/ExecuteProgramOptions.md)
 - [ExportAccountOptions](interfaces/ExportAccountOptions.md)
 - [ExportNoteOptions](interfaces/ExportNoteOptions.md)
 - [FaucetCreateOptions](interfaces/FaucetCreateOptions.md)

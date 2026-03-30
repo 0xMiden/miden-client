@@ -69,6 +69,24 @@ Execute options including the account, compiled script, and foreign accounts.
 
 ***
 
+### executeProgram()
+
+> **executeProgram**(`options`): `Promise`\<`FeltArray`\>
+
+Execute a program (view call) and return the resulting stack output.
+
+#### Parameters
+
+##### options
+
+[`ExecuteProgramOptions`](ExecuteProgramOptions.md)
+
+#### Returns
+
+`Promise`\<`FeltArray`\>
+
+***
+
 ### list()
 
 > **list**(`query?`): `Promise`\<[`TransactionRecord`](../classes/TransactionRecord.md)[]\>
