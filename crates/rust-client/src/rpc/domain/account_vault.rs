@@ -58,7 +58,6 @@ impl TryFrom<proto::rpc::SyncAccountVaultResponse> for AccountVaultInfo {
 // ================================================================================================
 
 /// Represents an update to an account vault, including the vault key and asset value involved.
-#[derive(Debug, Clone)]
 pub struct AccountVaultUpdate {
     /// Block number in which the slot was updated.
     pub block_num: BlockNumber,

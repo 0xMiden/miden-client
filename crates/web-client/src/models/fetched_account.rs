@@ -81,12 +81,6 @@ impl From<NativeFetchedAccount> for FetchedAccount {
                     account: Some(account),
                 }
             },
-            NativeFetchedAccount::PublicLarge(details, summary) => FetchedAccount {
-                account_id: details.header.id().into(),
-                commitment: summary.commitment.into(),
-                last_block_num: summary.last_block_num,
-                account: None,
-            },
         }
     }
 }

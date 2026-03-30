@@ -549,20 +549,28 @@ impl NodeRpcClient for GrpcClient {
                     "GetAccountDetails returned a public account without details".to_owned(),
                 ))?;
 
-            // Check if any storage maps or the vault exceed size thresholds. If so,
-            // return the details without downloading the oversized data — the caller
-            // can decide whether to do a full download or a delta sync.
-            let is_oversize = details.vault_details.too_many_assets
-                || details.storage_details.map_details.iter().any(|m| m.too_many_entries);
-
-            if is_oversize {
-                return Ok(FetchedAccount::new_public_large(update_summary, details));
-            }
-
-            // Small account: build the full Account directly.
             let account_id = details.header.id();
             let nonce = details.header.nonce();
-            let assets = details.vault_details.assets;
+
+            // If the vault exceeds the node's size threshold, download the full vault
+            // via the sync endpoint; otherwise use the assets from the response directly.
+            let assets = if details.vault_details.too_many_assets {
+                let mut updates =
+                    self.sync_account_vault(BlockNumber::from(0), None, account_id).await?.updates;
+                updates.sort_by_key(|u| u.block_num);
+                updates
+                    .into_iter()
+                    .map(|u| (Word::from(u.vault_key), u.asset))
+                    .collect::<BTreeMap<_, _>>()
+                    .into_values()
+                    .flatten()
+                    .collect()
+            } else {
+                details.vault_details.assets
+            };
+
+            // build_storage_slots handles too_many_entries maps internally via
+            // sync_storage_maps.
             let slots = self.build_storage_slots(account_id, &details.storage_details).await?;
             let asset_vault = AssetVault::new(&assets).map_err(|err| {
                 RpcError::InvalidResponse(format!("api rpc returned non-valid assets: {err}"))

@@ -1,16 +1,12 @@
-use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use miden_client::account::{AccountId, StorageMap, StorageSlotContent, StorageSlotName};
-use miden_client::asset::AssetVaultKey;
-use miden_client::crypto::EmptySubtreeRoots;
+use miden_client::Word;
+use miden_client::account::AccountId;
 use miden_client::note::{BlockNumber, NoteId, NoteTag};
 use miden_client::store::StoreError;
 use miden_client::sync::{BlockUpdates, NoteTagRecord, NoteTagSource, StateSyncUpdate};
 use miden_client::utils::{Deserializable, Serializable};
-use miden_client::{EMPTY_WORD, Word};
-use wasm_bindgen_futures::JsFuture;
 
 use super::IdxdbStore;
 use super::chain_data::utils::{
@@ -30,13 +26,6 @@ use js_bindings::{
     idxdb_get_note_tags,
     idxdb_get_sync_height,
     idxdb_remove_note_tag,
-};
-
-use crate::account::{
-    JsStorageMapEntry,
-    JsStorageSlot,
-    JsVaultAsset,
-    idxdb_apply_transaction_delta,
 };
 
 mod models;
@@ -204,8 +193,6 @@ impl IdxdbStore {
             }
         }
 
-        self.apply_delta_updates(&account_updates).await?;
-
         let state_update = JsStateSyncUpdate {
             block_num: block_num.as_u32(),
             flattened_new_block_headers: flatten_nested_u8_vec(block_headers_as_bytes),
@@ -227,174 +214,6 @@ impl IdxdbStore {
         let promise = idxdb_apply_state_sync(self.db_id(), state_update);
         await_js_value(promise, "failed to apply state sync").await?;
 
-        Ok(())
-    }
-
-    /// Applies delta updates for large public accounts by calling the JS
-    /// `applyTransactionDelta` binding directly with incremental changes, then updating
-    /// the in-memory SMT forest roots accordingly.
-    async fn apply_delta_updates(
-        &self,
-        account_updates: &miden_client::sync::AccountUpdates,
-    ) -> Result<(), StoreError> {
-        for delta in account_updates.delta_updated_accounts() {
-            self.apply_single_delta(delta).await?;
-        }
-        Ok(())
-    }
-
-    /// Applies a single [`AccountDeltaUpdate`] — writes incremental changes to `IndexedDB`
-    /// via the JS `applyTransactionDelta` binding and updates the in-memory SMT forest.
-    #[allow(clippy::too_many_lines)]
-    async fn apply_single_delta(
-        &self,
-        delta: &miden_client::sync::AccountDeltaUpdate,
-    ) -> Result<(), StoreError> {
-        let account_id = delta.account_id();
-
-        // Build JS storage slot objects for non-oversized slots.
-        let js_slots: Vec<JsStorageSlot> =
-            delta.non_oversized_slots.iter().map(JsStorageSlot::from_slot).collect();
-
-        // Build JS storage map entry objects for incremental map updates.
-        let changed_map_entries: Vec<JsStorageMapEntry> = delta
-            .storage_map_updates
-            .iter()
-            .map(|u| {
-                let value_str = if u.value == EMPTY_WORD {
-                    String::new()
-                } else {
-                    u.value.to_hex()
-                };
-                JsStorageMapEntry {
-                    slot_name: u.slot_name.to_string(),
-                    key: Word::from(u.key).to_hex(),
-                    value: value_str,
-                }
-            })
-            .collect();
-
-        // Build JS vault asset objects: added assets + removal sentinels.
-        let mut changed_assets: Vec<JsVaultAsset> = delta
-            .vault_updates
-            .iter()
-            .filter_map(|u| u.asset.as_ref().map(JsVaultAsset::from_asset))
-            .collect();
-        for u in &delta.vault_updates {
-            if u.asset.is_none() {
-                changed_assets.push(JsVaultAsset {
-                    vault_key: Word::from(u.vault_key).to_hex(),
-                    faucet_id_prefix: u.vault_key.faucet_id_prefix().to_hex(),
-                    asset: String::new(),
-                });
-            }
-        }
-
-        // Account record fields from the new header.
-        let code_root = delta.header.code_commitment().to_string();
-        let storage_root = delta.header.storage_commitment().to_string();
-        let vault_root_str = delta.header.vault_root().to_string();
-        let committed = account_id.is_public();
-        let commitment = delta.header.to_commitment().to_string();
-
-        // Fetch current map slot names (in sorted order) from IndexedDB BEFORE applying
-        // the delta, so we can pair them with the old SMT roots positionally.
-        let old_map_roots: BTreeMap<StorageSlotName, Word> =
-            self.get_storage_map_roots(account_id, vec![]).await?;
-
-        // Collect non-oversized map slots that are being fully replaced.
-        let non_oversized_maps: BTreeMap<StorageSlotName, StorageMap> = delta
-            .non_oversized_slots
-            .iter()
-            .filter_map(|s| {
-                if let StorageSlotContent::Map(map) = s.content() {
-                    Some((s.name().clone(), map.clone()))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        // Group oversized map updates by slot name.
-        let mut map_updates_by_slot: BTreeMap<
-            StorageSlotName,
-            Vec<(miden_client::account::StorageMapKey, Word)>,
-        > = BTreeMap::new();
-        for mu in &delta.storage_map_updates {
-            map_updates_by_slot
-                .entry(mu.slot_name.clone())
-                .or_default()
-                .push((mu.key, mu.value));
-        }
-
-        // Track names of non-oversized slots (maps that are fully replaced).
-        let non_oversized_names: BTreeSet<_> =
-            delta.non_oversized_slots.iter().map(|s| s.name().clone()).collect();
-
-        // Write all delta changes to IndexedDB atomically.
-        JsFuture::from(idxdb_apply_transaction_delta(
-            self.db_id(),
-            account_id.to_string(),
-            delta.header.nonce().to_string(),
-            js_slots,
-            changed_map_entries,
-            changed_assets,
-            code_root,
-            storage_root,
-            vault_root_str,
-            committed,
-            commitment,
-        ))
-        .await
-        .map_err(|err| StoreError::DatabaseError(format!("{err:?}")))?;
-
-        // Update the in-memory SMT forest with the new vault and storage map roots.
-        let mut smt_forest = self.smt_forest.write();
-
-        let empty_smt_root = *EmptySubtreeRoots::entry(64, 0);
-        let old_roots: Vec<Word> = smt_forest.get_roots(&account_id).cloned().unwrap_or_default();
-        let old_vault_root = old_roots.first().copied().unwrap_or(empty_smt_root);
-
-        // Update vault SMT nodes.
-        let removed_vault_keys: Vec<AssetVaultKey> = delta
-            .vault_updates
-            .iter()
-            .filter(|u| u.asset.is_none())
-            .map(|u| u.vault_key)
-            .collect();
-        let updated_assets = delta.vault_updates.iter().filter_map(|u| u.asset);
-        let new_vault_root = smt_forest.update_asset_nodes(
-            old_vault_root,
-            updated_assets,
-            removed_vault_keys.into_iter(),
-        )?;
-
-        // Iterate map slots in sorted name order (same as collect_account_roots),
-        // pairing each with its old root from the stored roots vector positionally.
-        let mut new_roots = vec![new_vault_root];
-        let mut old_map_root_iter = old_roots.iter().skip(1); // skip vault root
-        for slot_name in old_map_roots.keys() {
-            let old_map_root = old_map_root_iter.next().copied().unwrap_or(empty_smt_root);
-            let new_map_root = if non_oversized_names.contains(slot_name) {
-                if let Some(map) = non_oversized_maps.get(slot_name) {
-                    // Full map replaced — insert all nodes from the new map.
-                    smt_forest.insert_storage_map_nodes_for_map(map)?;
-                    map.root()
-                } else {
-                    // Slot replaced with a value type — keep old map root.
-                    old_map_root
-                }
-            } else if let Some(entries) = map_updates_by_slot.get(slot_name) {
-                // Incremental map update — apply only the changed entries.
-                smt_forest.update_storage_map_nodes(old_map_root, entries.iter().copied())?
-            } else {
-                // No change to this map — keep old root as-is.
-                old_map_root
-            };
-            new_roots.push(new_map_root);
-        }
-
-        smt_forest.replace_roots(account_id, new_roots);
         Ok(())
     }
 

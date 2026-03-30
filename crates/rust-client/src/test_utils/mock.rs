@@ -75,9 +75,9 @@ impl MockRpcApi {
         }
     }
 
-    /// Sets the oversize threshold for determining when `get_account_details` returns
-    /// `PublicLarge` instead of `Public`. Any storage map with more entries than this
-    /// threshold, or a vault with more assets, will trigger the oversize response.
+    /// Sets the oversize threshold for `get_account_proof`. Any storage map with more
+    /// entries than this threshold, or a vault with more assets, will have the
+    /// `too_many_entries` / `too_many_assets` flags set in the response.
     #[must_use]
     pub fn with_oversize_threshold(mut self, threshold: usize) -> Self {
         self.oversize_threshold = threshold;
@@ -348,52 +348,6 @@ impl MockRpcApi {
         let mut mock_chain = self.mock_chain.write();
         mock_chain.prove_until_block(current_height + num_blocks).unwrap();
     }
-
-    /// Builds [`AccountDetails`] from a committed account. Iterates all storage slots
-    /// and marks maps as `too_many_entries` when they exceed `threshold`. Similarly marks
-    /// the vault as `too_many_assets`.
-    fn build_account_details(
-        account: &miden_protocol::account::Account,
-        threshold: usize,
-    ) -> AccountDetails {
-        let mut map_details = vec![];
-        for slot in account.storage().slots() {
-            if let StorageSlotContent::Map(storage_map) = slot.content() {
-                let entries: Vec<StorageMapEntry> = storage_map
-                    .entries()
-                    .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
-                    .collect();
-
-                let too_many_entries = entries.len() > threshold;
-                map_details.push(AccountStorageMapDetails {
-                    slot_name: slot.name().clone(),
-                    too_many_entries,
-                    entries: StorageMapEntries::AllEntries(entries),
-                });
-            }
-        }
-
-        let storage_details = AccountStorageDetails {
-            header: account.storage().to_header(),
-            map_details,
-        };
-
-        let mut assets = vec![];
-        for asset in account.vault().assets() {
-            assets.push(asset);
-        }
-        let vault_details = AccountVaultDetails {
-            too_many_assets: assets.len() > threshold,
-            assets,
-        };
-
-        AccountDetails {
-            header: account.into(),
-            storage_details,
-            code: account.code().clone(),
-            vault_details,
-        }
-    }
 }
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -526,8 +480,7 @@ impl NodeRpcClient for MockRpcApi {
     }
 
     /// Returns the node's tracked account details for the specified account ID.
-    /// When the account exceeds the oversize threshold (storage maps with more entries
-    /// or vault with more assets), returns `PublicLarge` instead of `Public`.
+    /// Always returns the full account for public accounts.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         let summary = self
             .account_commitment_updates
@@ -543,19 +496,7 @@ impl NodeRpcClient for MockRpcApi {
             .unwrap();
 
         if let Ok(account) = self.mock_chain.read().committed_account(account_id) {
-            let threshold = self.oversize_threshold;
-
-            let has_oversized_map = account.storage().slots().iter().any(|slot| {
-                matches!(slot.content(), StorageSlotContent::Map(map) if map.entries().count() > threshold)
-            });
-            let has_oversized_vault = account.vault().assets().count() > threshold;
-
-            if has_oversized_map || has_oversized_vault {
-                let details = Self::build_account_details(account, threshold);
-                Ok(FetchedAccount::new_public_large(summary, details))
-            } else {
-                Ok(FetchedAccount::new_public(account.clone(), summary))
-            }
+            Ok(FetchedAccount::new_public(account.clone(), summary))
         } else {
             Ok(FetchedAccount::new_private(account_id, summary))
         }

@@ -2,15 +2,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
-use miden_protocol::account::{
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountStorage,
-    StorageSlot,
-    StorageSlotContent,
-};
-use miden_protocol::asset::AssetVault;
+use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks};
 use miden_protocol::note::{NoteId, Nullifier};
@@ -19,8 +11,6 @@ use miden_protocol::transaction::TransactionId;
 use super::SyncSummary;
 use crate::account::Account;
 use crate::note::{NoteUpdateTracker, NoteUpdateType};
-use crate::rpc::domain::account_vault::AccountVaultUpdate;
-use crate::rpc::domain::storage_map::StorageMapUpdate;
 use crate::rpc::domain::transaction::TransactionInclusion;
 use crate::transaction::{DiscardCause, TransactionRecord, TransactionStatus};
 
@@ -94,13 +84,6 @@ impl From<&StateSyncUpdate> for SyncSummary {
                 .updated_public_accounts()
                 .iter()
                 .map(Account::id)
-                .chain(
-                    value
-                        .account_updates
-                        .delta_updated_accounts()
-                        .iter()
-                        .map(AccountDeltaUpdate::account_id),
-                )
                 .collect(),
             value
                 .account_updates
@@ -325,10 +308,8 @@ impl TransactionUpdateTracker {
 #[derive(Debug, Clone, Default)]
 #[allow(clippy::struct_field_names)]
 pub struct AccountUpdates {
-    /// Full state for small public accounts (current behavior — full replacement).
+    /// Full state for public accounts.
     updated_public_accounts: Vec<Account>,
-    /// Delta-based updates for large public accounts (incremental changes only).
-    delta_updated_accounts: Vec<AccountDeltaUpdate>,
     /// Account commitments received from the network that don't match the currently
     /// locally-tracked state of the private accounts.
     ///
@@ -346,7 +327,6 @@ impl AccountUpdates {
     ) -> Self {
         Self {
             updated_public_accounts,
-            delta_updated_accounts: Vec::new(),
             mismatched_private_accounts,
         }
     }
@@ -356,11 +336,6 @@ impl AccountUpdates {
         &self.updated_public_accounts
     }
 
-    /// Returns the delta-updated public accounts (incremental changes).
-    pub fn delta_updated_accounts(&self) -> &[AccountDeltaUpdate] {
-        &self.delta_updated_accounts
-    }
-
     /// Returns the mismatched private accounts.
     pub fn mismatched_private_accounts(&self) -> &[(AccountId, Word)] {
         &self.mismatched_private_accounts
@@ -368,93 +343,6 @@ impl AccountUpdates {
 
     pub fn extend(&mut self, other: AccountUpdates) {
         self.updated_public_accounts.extend(other.updated_public_accounts);
-        self.delta_updated_accounts.extend(other.delta_updated_accounts);
         self.mismatched_private_accounts.extend(other.mismatched_private_accounts);
-    }
-
-    /// Adds a delta update for a large public account.
-    pub fn push_delta_update(&mut self, delta: AccountDeltaUpdate) {
-        self.delta_updated_accounts.push(delta);
-    }
-}
-
-// ACCOUNT DELTA UPDATE
-// ================================================================================================
-
-/// Represents incremental changes to a large public account that exceeded the node's size
-/// thresholds during sync. Instead of replacing the full account state, the store should
-/// apply these changes to the existing local baseline.
-#[derive(Debug, Clone)]
-pub struct AccountDeltaUpdate {
-    /// Updated account header (nonce, commitments).
-    pub header: AccountHeader,
-    /// Account code (may have changed).
-    pub code: AccountCode,
-    /// Vault changes since the last sync block.
-    pub vault_updates: Vec<AccountVaultUpdate>,
-    /// Storage map changes since the last sync block.
-    pub storage_map_updates: Vec<StorageMapUpdate>,
-    /// Full storage slots that were NOT oversized (value slots + small maps).
-    /// These can be replaced directly.
-    pub non_oversized_slots: Vec<StorageSlot>,
-}
-
-impl AccountDeltaUpdate {
-    /// Returns the account ID from the header.
-    pub fn account_id(&self) -> AccountId {
-        self.header.id()
-    }
-
-    /// Applies this delta to existing assets and storage, producing a rebuilt [`Account`].
-    pub fn rebuild_account(
-        &self,
-        mut assets: Vec<miden_protocol::asset::Asset>,
-        current_storage: &miden_protocol::account::AccountStorage,
-    ) -> Result<Account, crate::ClientError> {
-        // Apply vault updates.
-        for vault_update in &self.vault_updates {
-            assets.retain(|a| a.vault_key() != vault_update.vault_key);
-            if let Some(new_asset) = &vault_update.asset {
-                assets.push(*new_asset);
-            }
-        }
-        let vault = AssetVault::new(&assets).map_err(|e| {
-            crate::ClientError::RpcError(crate::rpc::RpcError::InvalidResponse(format!(
-                "failed to rebuild vault from delta: {e}"
-            )))
-        })?;
-
-        // Apply storage changes.
-        let mut slots: Vec<StorageSlot> = current_storage.slots().to_vec();
-
-        for map_update in &self.storage_map_updates {
-            if let Some(slot) = slots.iter_mut().find(|s| *s.name() == map_update.slot_name)
-                && let StorageSlotContent::Map(map) = slot.content()
-            {
-                let mut new_map = map.clone();
-                new_map.insert(map_update.key, map_update.value).map_err(|e| {
-                    crate::ClientError::RpcError(crate::rpc::RpcError::InvalidResponse(format!(
-                        "failed to apply storage map delta: {e}"
-                    )))
-                })?;
-                *slot = StorageSlot::with_map(slot.name().clone(), new_map);
-            }
-        }
-
-        for new_slot in &self.non_oversized_slots {
-            if let Some(slot) = slots.iter_mut().find(|s| s.name() == new_slot.name()) {
-                *slot = new_slot.clone();
-            }
-        }
-
-        let storage = AccountStorage::new(slots)?;
-        Ok(Account::new(
-            self.account_id(),
-            vault,
-            storage,
-            self.code.clone(),
-            self.header.nonce(),
-            None,
-        )?)
     }
 }

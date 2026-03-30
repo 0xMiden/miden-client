@@ -1,6 +1,6 @@
 //! Account-related database operations.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::string::{String, ToString};
 use std::sync::{Arc, RwLock};
@@ -20,8 +20,6 @@ use miden_client::account::{
     PartialStorageMap,
     StorageMap,
     StorageMapKey,
-    StorageSlot,
-    StorageSlotContent,
     StorageSlotName,
     StorageSlotType,
 };
@@ -826,138 +824,6 @@ impl SqliteStore {
 
         // Insert account header (archives old header to historical)
         Self::insert_account_header(tx, &new_account_state.into(), None, old_header.as_ref())?;
-
-        Ok(())
-    }
-
-    /// Applies incremental delta changes to a large public account that exceeded size thresholds
-    /// during sync.
-    ///
-    /// Unlike `update_account_state` which does a full wipe-and-reinsert, this method applies
-    /// only the changes received from the node's delta sync endpoints. The SMT forest is updated
-    /// incrementally rather than rebuilt from scratch.
-    pub(crate) fn apply_sync_account_delta(
-        tx: &Transaction<'_>,
-        smt_forest: &mut AccountSmtForest,
-        delta: &miden_client::sync::AccountDeltaUpdate,
-    ) -> Result<(), StoreError> {
-        let account_id = delta.account_id();
-        let account_id_hex = account_id.to_hex();
-        let nonce = delta.header.nonce().as_int();
-        let nonce_val = u64_to_value(nonce);
-
-        // Decompose vault updates into additions and removals.
-        let mut removed_vault_keys: Vec<AssetVaultKey> = Vec::new();
-        let mut updated_assets: Vec<Asset> = Vec::new();
-        for vault_update in &delta.vault_updates {
-            if let Some(asset) = vault_update.asset {
-                updated_assets.push(asset);
-            } else {
-                removed_vault_keys.push(vault_update.vault_key);
-            }
-        }
-        Self::persist_vault_delta(
-            tx,
-            &account_id_hex,
-            &nonce_val,
-            &removed_vault_keys,
-            &updated_assets,
-        )?;
-
-        // Decompose storage map updates into (slot_name, key_word, value) triples.
-        let map_entries: Vec<(StorageSlotName, Word, Word)> = delta
-            .storage_map_updates
-            .iter()
-            .map(|u| (u.slot_name.clone(), Word::from(u.key), u.value))
-            .collect();
-        Self::persist_storage_map_delta(tx, &account_id_hex, &nonce_val, &map_entries)?;
-
-        // Replace non-oversized storage slots (value slots + small maps).
-        for slot in &delta.non_oversized_slots {
-            tx.execute(
-                "DELETE FROM latest_storage_map_entries \
-                 WHERE account_id = ? AND slot_name = ?",
-                params![&account_id_hex, slot.name().to_string()],
-            )
-            .into_store_error()?;
-        }
-        Self::insert_storage_slots(tx, account_id, delta.non_oversized_slots.iter())?;
-
-        // Update the account header and code.
-        Self::insert_account_header(tx, &delta.header, None, None)?;
-        Self::insert_account_code(tx, &delta.code)?;
-
-        let old_roots = smt_forest.get_roots(&account_id).cloned().unwrap_or_default();
-        let old_vault_root = old_roots.first().copied().unwrap_or_default();
-
-        // Compute new vault root by applying asset additions and removals.
-        let new_vault_root = smt_forest.update_asset_nodes(
-            old_vault_root,
-            updated_assets.into_iter(),
-            removed_vault_keys.into_iter(),
-        )?;
-
-        // Build a set of slot names that have map updates (for efficient lookup).
-        let updated_map_slot_names: BTreeSet<&StorageSlotName> =
-            delta.storage_map_updates.iter().map(|u| &u.slot_name).collect();
-
-        // Build a set of slot names in non_oversized_slots that are map-type slots.
-        let replaced_map_slot_names: BTreeSet<&StorageSlotName> = delta
-            .non_oversized_slots
-            .iter()
-            .filter(|s| matches!(s.content(), StorageSlotContent::Map(_)))
-            .map(StorageSlot::name)
-            .collect();
-
-        // Query all storage slots from DB (name-sorted), filter to map-type slots.
-        let all_slots = query_storage_slots(tx, account_id, &AccountStorageFilter::All)?;
-        let map_slots: Vec<_> = all_slots
-            .iter()
-            .filter(|(_, slot)| slot.slot_type() == StorageSlotType::Map)
-            .collect();
-
-        // old_roots[1..] are the map roots in the same name-sorted order.
-        let old_map_roots: Vec<Word> = old_roots.into_iter().skip(1).collect();
-
-        let mut new_roots = vec![new_vault_root];
-        for (idx, (slot_name, slot)) in map_slots.iter().enumerate() {
-            let old_map_root = old_map_roots.get(idx).copied().unwrap_or_default();
-
-            if replaced_map_slot_names.contains(slot_name) {
-                // This map was fully replaced — insert full map nodes and use new root.
-                if let StorageSlotContent::Map(map) = slot.content() {
-                    smt_forest.insert_storage_map_nodes_for_map(map)?;
-                    new_roots.push(map.root());
-                } else {
-                    new_roots.push(old_map_root);
-                }
-            } else if updated_map_slot_names.contains(slot_name) {
-                // This map had delta updates — apply them incrementally.
-                let slot_updates: Vec<(StorageMapKey, Word)> = delta
-                    .storage_map_updates
-                    .iter()
-                    .filter(|u| &u.slot_name == *slot_name)
-                    .map(|u| (u.key, u.value))
-                    .collect();
-                let new_map_root =
-                    smt_forest.update_storage_map_nodes(old_map_root, slot_updates.into_iter())?;
-
-                // Update the root in latest_account_storage so it stays consistent.
-                tx.execute(
-                    "UPDATE latest_account_storage SET slot_value = ? \
-                     WHERE account_id = ? AND slot_name = ?",
-                    params![new_map_root.to_hex(), &account_id_hex, slot_name.to_string()],
-                )
-                .into_store_error()?;
-
-                new_roots.push(new_map_root);
-            } else {
-                // No changes to this map — keep old root.
-                new_roots.push(old_map_root);
-            }
-        }
-
-        smt_forest.replace_roots(account_id, new_roots);
 
         Ok(())
     }

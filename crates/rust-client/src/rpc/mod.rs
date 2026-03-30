@@ -47,26 +47,20 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
-use domain::account::{AccountDetails, AccountProof, FetchedAccount};
+use domain::account::{AccountProof, FetchedAccount};
 use domain::note::{FetchedNote, NoteSyncInfo};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::ChainMmrInfo;
 use miden_protocol::Word;
-use miden_protocol::account::{
-    Account,
-    AccountCode,
-    AccountId,
-    AccountStorage,
-    StorageMap,
-    StorageSlotType,
-};
+use miden_protocol::account::{Account, AccountCode, AccountId};
 use miden_protocol::address::NetworkId;
-use miden_protocol::asset::{Asset, AssetVault};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
 use miden_protocol::crypto::merkle::smt::SmtProof;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
+
+use crate::rpc::domain::storage_map::StorageMapInfo;
 
 /// Contains domain types related to RPC requests and responses, as well as utility functions
 /// for dealing with them.
@@ -93,7 +87,6 @@ pub use tonic_client::GrpcClient;
 
 use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::rpc::domain::account_vault::AccountVaultInfo;
-use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
@@ -290,122 +283,18 @@ pub trait NodeRpcClient: Send + Sync {
         Ok(public_notes)
     }
 
-    /// Fetches the full state of a public account, including oversized maps and vaults.
+    /// Fetches the full state of a public account.
     ///
-    /// This method always downloads the complete account state, using `SyncAccountVault` and
-    /// `SyncAccountStorageMaps` for data that exceeds the `GetAccount` response thresholds.
-    /// Use this for initial imports where no local baseline exists.
+    /// This is a convenience wrapper around `get_account_details` that returns the [`Account`]
+    /// directly. Oversized maps and vaults are handled internally by `get_account_details`.
     async fn get_full_public_account(&self, account_id: AccountId) -> Result<Account, RpcError> {
         let response = self.get_account_details(account_id).await?;
         match response {
             FetchedAccount::Public(account, _) => Ok(*account),
-            FetchedAccount::PublicLarge(details, _) => {
-                self.build_full_account_from_details(*details).await
-            },
             FetchedAccount::Private(..) => Err(RpcError::ExpectedDataMissing(
                 "expected public account but got private".to_owned(),
             )),
         }
-    }
-
-    /// Builds a full [`Account`] from [`AccountDetails`] by fetching oversized data via
-    /// sync endpoints. This is the fallback path when `get_account_details` returns
-    /// `PublicLarge`.
-    async fn build_full_account_from_details(
-        &self,
-        details: AccountDetails,
-    ) -> Result<Account, RpcError> {
-        let account_id = details.header.id();
-        let nonce = details.header.nonce();
-
-        let assets: Vec<Asset> = if details.vault_details.too_many_assets {
-            let mut updates =
-                self.sync_account_vault(BlockNumber::from(0), None, account_id).await?.updates;
-            updates.sort_by_key(|u| u.block_num);
-            updates
-                .into_iter()
-                .map(|u| (Word::from(u.vault_key), u.asset))
-                .collect::<BTreeMap<_, _>>()
-                .into_values()
-                .flatten()
-                .collect()
-        } else {
-            details.vault_details.assets
-        };
-
-        let mut slots = vec![];
-        let mut map_cache: Option<StorageMapInfo> = None;
-        for slot_header in details.storage_details.header.slots() {
-            match slot_header.slot_type() {
-                StorageSlotType::Value => {
-                    slots.push(miden_protocol::account::StorageSlot::with_value(
-                        slot_header.name().clone(),
-                        slot_header.value(),
-                    ));
-                },
-                StorageSlotType::Map => {
-                    let map_details = details
-                        .storage_details
-                        .find_map_details(slot_header.name())
-                        .ok_or(RpcError::ExpectedDataMissing(format!(
-                            "slot named '{}' was reported as a map, but has no matching map_detail",
-                            slot_header.name(),
-                        )))?;
-
-                    let storage_map =
-                        if map_details.too_many_entries {
-                            let map_info = if let Some(ref info) = map_cache {
-                                info
-                            } else {
-                                let fetched_data =
-                                    self.sync_storage_maps(0_u32.into(), None, account_id).await?;
-                                map_cache.insert(fetched_data)
-                            };
-                            let mut sorted_updates: Vec<_> = map_info
-                                .updates
-                                .iter()
-                                .filter(|slot_info| slot_info.slot_name == *slot_header.name())
-                                .collect();
-                            sorted_updates.sort_by_key(|u| u.block_num);
-                            let map_entries: Vec<_> = sorted_updates
-                                .into_iter()
-                                .map(|u| (u.key, u.value))
-                                .collect::<BTreeMap<_, _>>()
-                                .into_iter()
-                                .collect();
-                            StorageMap::with_entries(map_entries)
-                        } else {
-                            map_details.entries.clone().into_storage_map().expect(
-                                "non-oversized map entries should always be AllEntries variant",
-                            )
-                        }
-                        .map_err(|err| {
-                            RpcError::InvalidResponse(format!(
-                                "the rpc api returned a non-valid map entry: {err}"
-                            ))
-                        })?;
-
-                    slots.push(miden_protocol::account::StorageSlot::with_map(
-                        slot_header.name().clone(),
-                        storage_map,
-                    ));
-                },
-            }
-        }
-
-        let asset_vault = AssetVault::new(&assets).map_err(|err| {
-            RpcError::InvalidResponse(format!("api rpc returned non-valid assets: {err}"))
-        })?;
-        let account_storage = AccountStorage::new(slots).map_err(|err| {
-            RpcError::InvalidResponse(format!("api rpc returned non-valid storage slots: {err}"))
-        })?;
-        Account::new(account_id, asset_vault, account_storage, details.code, nonce, None).map_err(
-            |err| {
-                RpcError::InvalidResponse(format!(
-                    "failed to instance an account from the rpc api response: {err}"
-                ))
-            },
-        )
     }
 
     /// Given a block number, fetches the block header corresponding to that height from the node

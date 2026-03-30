@@ -2912,17 +2912,14 @@ async fn sync_storage_maps_pagination_from_middle() {
     assert_eq!(result.block_number, chain_tip);
 }
 
-// DELTA SYNC TESTS
+// LARGE PUBLIC ACCOUNT SYNC TESTS
 // ================================================================================================
 
-/// Tests that syncing a public account whose storage map exceeds the oversize threshold
-/// goes through the delta sync path (`PublicLarge` → `sync_account_vault` +
-/// `sync_storage_maps` → `AccountDeltaUpdate::rebuild_account`).
-///
-/// The test uses a low oversize threshold (5) with an account that has 10 map entries,
-/// avoiding the need to create 1100+ entries to exceed the real node threshold (1000).
+/// Tests that syncing a public account with a large storage map works correctly.
+/// The account is synced via full-state replacement after `get_account_details`
+/// internally handles the oversized storage maps.
 #[tokio::test]
-async fn sync_large_public_account_uses_delta_path() {
+async fn sync_large_public_account() {
     // 1. Create a public account with 10 storage map entries.
     let map_slot = StorageSlot::with_map(
         StorageSlotName::new("test::large_map").unwrap(),
@@ -2959,12 +2956,12 @@ async fn sync_large_public_account_uses_delta_path() {
     mock_chain.add_pending_executed_transaction(&tx).unwrap();
     mock_chain.prove_next_block().unwrap();
 
-    // 3. Create MockRpcApi with threshold=5 so the 10-entry account is "oversize".
-    let rpc_api = MockRpcApi::new(mock_chain).with_oversize_threshold(5);
+    // 3. Create MockRpcApi.
+    let rpc_api = MockRpcApi::new(mock_chain);
     let arc_rpc_api = Arc::new(rpc_api.clone());
 
     // 4. Build a client and add the ORIGINAL (pre-tx) account.
-    // The pre-tx commitment differs from on-chain, which triggers delta sync.
+    // The pre-tx commitment differs from on-chain, which triggers sync.
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
     let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
@@ -2984,8 +2981,7 @@ async fn sync_large_public_account_uses_delta_path() {
     client.ensure_genesis_in_place().await.unwrap();
     client.add_account(&original_account, false).await.unwrap();
 
-    // 5. Sync — the client detects a commitment mismatch, calls get_account_details,
-    // gets PublicLarge, and goes through the delta sync path.
+    // 5. Sync — the client detects a commitment mismatch, fetches full account state.
     client.sync_state().await.unwrap();
 
     // 6. Verify the synced account matches the on-chain state.
@@ -2996,10 +2992,10 @@ async fn sync_large_public_account_uses_delta_path() {
     assert_eq!(
         synced_account.to_commitment(),
         on_chain_account.to_commitment(),
-        "client should have the updated account state after delta sync"
+        "client should have the updated account state after sync"
     );
 
-    // Verify the storage map entries are preserved (not lost during rebuild).
+    // Verify the storage map entries are preserved.
     let map_name = StorageSlotName::new("test::large_map").unwrap();
     let map_slot = synced_account
         .storage()
@@ -3010,11 +3006,7 @@ async fn sync_large_public_account_uses_delta_path() {
     let StorageSlotContent::Map(map) = map_slot.content() else {
         panic!("expected map slot content");
     };
-    assert_eq!(
-        map.entries().count(),
-        10,
-        "all 10 map entries should be preserved after delta sync"
-    );
+    assert_eq!(map.entries().count(), 10, "all 10 map entries should be preserved after sync");
 }
 
 // HELPERS

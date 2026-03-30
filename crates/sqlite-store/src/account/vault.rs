@@ -185,7 +185,7 @@ impl SqliteStore {
 
     /// Persists vault delta changes: archives old values from latest to historical,
     /// then updates latest (deletes removed assets, inserts/updates changed assets).
-    pub(crate) fn persist_vault_delta(
+    fn persist_vault_delta(
         tx: &Transaction<'_>,
         account_id_hex: &str,
         nonce_val: &rusqlite::types::Value,

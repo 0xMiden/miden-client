@@ -52,12 +52,7 @@ use crate::account::utils::{
 use crate::promise::{await_js, await_js_value};
 
 mod js_bindings;
-pub use js_bindings::{
-    JsStorageMapEntry,
-    JsStorageSlot,
-    JsVaultAsset,
-    idxdb_apply_transaction_delta,
-};
+pub use js_bindings::{JsStorageMapEntry, JsStorageSlot, JsVaultAsset};
 use js_bindings::{
     idxdb_get_account_code,
     idxdb_get_account_header,

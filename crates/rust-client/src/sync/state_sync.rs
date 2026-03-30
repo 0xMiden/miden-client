@@ -5,13 +5,13 @@ use alloc::vec::Vec;
 
 use async_trait::async_trait;
 use miden_protocol::Word;
-use miden_protocol::account::{AccountHeader, AccountId, StorageSlot, StorageSlotType};
+use miden_protocol::account::{AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
 use miden_protocol::note::{NoteId, NoteTag, Nullifier};
 use tracing::info;
 
-use super::state_sync_update::{AccountDeltaUpdate, TransactionUpdateTracker};
+use super::state_sync_update::TransactionUpdateTracker;
 use super::{AccountUpdates, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
@@ -198,10 +198,6 @@ impl StateSync {
         let note_tags = Arc::new(note_tags);
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
         let mut state_sync_steps = Vec::new();
-        // Track the initial sync height so delta syncs can use it as `block_from`.
-        let initial_block_num = block_num;
-        // Track oversize accounts that have already been delta-synced across steps.
-        let mut processed_oversize_accounts: BTreeSet<AccountId> = BTreeSet::new();
 
         while let Some(step) = self
             .sync_state_step(state_sync_update.block_num, &account_ids, &note_tags)
@@ -244,8 +240,6 @@ impl StateSync {
             &mut state_sync_update.account_updates,
             &accounts,
             &merged_commitment_updates,
-            initial_block_num,
-            &mut processed_oversize_accounts,
         )
         .await?;
 
@@ -420,30 +414,17 @@ impl StateSync {
     /// * Private accounts that have been marked as mismatched because the current commitment
     ///   doesn't match the one received from the node. The client will need to handle these cases
     ///   as they could be a stale account state or a reason to lock the account.
-    ///
-    /// For public accounts that exceed the node's size thresholds (`too_many_entries` /
-    /// `too_many_assets`), delta sync endpoints are used to fetch only the changes since
-    /// `initial_block_num`. The `processed_oversize_accounts` set prevents re-processing
-    /// the same large account across multiple sync steps.
     async fn account_state_sync(
         &self,
         account_updates: &mut AccountUpdates,
         accounts: &[AccountHeader],
         account_commitment_updates: &[(AccountId, Word)],
-        initial_block_num: BlockNumber,
-        processed_oversize_accounts: &mut BTreeSet<AccountId>,
     ) -> Result<(), ClientError> {
         let (public_accounts, private_accounts): (Vec<_>, Vec<_>) =
             accounts.iter().partition(|account_header| !account_header.id().is_private());
 
-        self.sync_public_accounts(
-            account_updates,
-            account_commitment_updates,
-            &public_accounts,
-            initial_block_num,
-            processed_oversize_accounts,
-        )
-        .await?;
+        self.sync_public_accounts(account_updates, account_commitment_updates, &public_accounts)
+            .await?;
 
         let mismatched_private_accounts = account_commitment_updates
             .iter()
@@ -462,17 +443,13 @@ impl StateSync {
 
     /// Queries the node for updated public accounts and populates `account_updates`.
     ///
-    /// For each mismatched public account, calls `get_account_details` and branches:
-    /// - `Public` (small account): adds full account to the update list.
-    /// - `PublicLarge` (large account): uses delta sync endpoints to fetch only changes since
-    ///   `initial_block_num` and adds an `AccountDeltaUpdate`.
+    /// For each mismatched public account, calls `get_account_details` (which internally
+    /// handles oversized maps and vaults) and adds the full account to the update list.
     async fn sync_public_accounts(
         &self,
         account_updates: &mut AccountUpdates,
         commitment_updates: &[(AccountId, Word)],
         current_public_accounts: &[&AccountHeader],
-        initial_block_num: BlockNumber,
-        processed_oversize_accounts: &mut BTreeSet<AccountId>,
     ) -> Result<(), ClientError> {
         for (id, commitment) in commitment_updates {
             let Some(local_account) = current_public_accounts
@@ -481,11 +458,6 @@ impl StateSync {
             else {
                 continue;
             };
-
-            // Skip oversize accounts we've already processed in a previous sync step.
-            if processed_oversize_accounts.contains(id) {
-                continue;
-            }
 
             let response = self
                 .rpc_api
@@ -501,39 +473,6 @@ impl StateSync {
                         account_updates.extend(AccountUpdates::new(vec![account], Vec::new()));
                     }
                 },
-                FetchedAccount::PublicLarge(details, _) => {
-                    let account_id = details.header.id();
-
-                    // Fetch only the changes since the last sync.
-                    let vault_updates = self
-                        .rpc_api
-                        .sync_account_vault(initial_block_num, None, account_id)
-                        .await
-                        .map_err(ClientError::RpcError)?
-                        .updates;
-
-                    let storage_map_updates = self
-                        .rpc_api
-                        .sync_storage_maps(initial_block_num, None, account_id)
-                        .await
-                        .map_err(ClientError::RpcError)?
-                        .updates;
-
-                    // Collect non-oversized storage slots (value slots + small maps) that
-                    // can be replaced directly.
-                    let non_oversized_slots =
-                        Self::build_non_oversized_slots(&details.storage_details)?;
-
-                    account_updates.push_delta_update(AccountDeltaUpdate {
-                        header: details.header,
-                        code: details.code,
-                        vault_updates,
-                        storage_map_updates,
-                        non_oversized_slots,
-                    });
-
-                    processed_oversize_accounts.insert(account_id);
-                },
                 FetchedAccount::Private(..) => {
                     // Should not happen for public accounts, skip silently.
                 },
@@ -541,45 +480,6 @@ impl StateSync {
         }
 
         Ok(())
-    }
-
-    /// Builds storage slots from the non-oversized entries in the account's storage details.
-    /// Value slots are always included. Map slots are only included when `too_many_entries`
-    /// is false.
-    fn build_non_oversized_slots(
-        storage_details: &crate::rpc::domain::account::AccountStorageDetails,
-    ) -> Result<Vec<StorageSlot>, ClientError> {
-        let mut slots = Vec::new();
-        for slot_header in storage_details.header.slots() {
-            match slot_header.slot_type() {
-                StorageSlotType::Value => {
-                    slots.push(StorageSlot::with_value(
-                        slot_header.name().clone(),
-                        slot_header.value(),
-                    ));
-                },
-                StorageSlotType::Map => {
-                    let map_details = storage_details.find_map_details(slot_header.name());
-                    if let Some(map_details) = map_details.filter(|d| !d.too_many_entries) {
-                        let storage_map = map_details
-                            .entries
-                            .clone()
-                            .into_storage_map()
-                            .expect("non-oversized map entries should always be AllEntries variant")
-                            .map_err(|err| {
-                                ClientError::RpcError(crate::rpc::RpcError::InvalidResponse(
-                                    format!(
-                                        "invalid map entry for slot '{}': {err}",
-                                        slot_header.name(),
-                                    ),
-                                ))
-                            })?;
-                        slots.push(StorageSlot::with_map(slot_header.name().clone(), storage_map));
-                    }
-                },
-            }
-        }
-        Ok(slots)
     }
 
     /// Applies the changes received from the sync response to the notes and transactions tracked
