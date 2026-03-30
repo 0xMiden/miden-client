@@ -300,8 +300,10 @@ impl WebClient {
     ) -> Result<FeltArray, JsErr> {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
+        let foreign_accounts_vec: Vec<crate::models::foreign_account::ForeignAccount> =
+            foreign_accounts.into();
         let foreign_accounts_set: BTreeSet<NativeForeignAccount> =
-            foreign_accounts.__inner.iter().map(|a| a.clone().into()).collect();
+            foreign_accounts_vec.into_iter().map(Into::into).collect();
 
         let result = client
             .execute_program(

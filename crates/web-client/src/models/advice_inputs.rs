@@ -13,7 +13,7 @@ pub struct AdviceInputs(NativeAdviceInputs);
 impl AdviceInputs {
     /// `wasm_bindgen` requires an explicit constructor; `#[derive(Default)]` alone
     /// is not callable from JS.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new() -> AdviceInputs {
         AdviceInputs(NativeAdviceInputs::default())
     }
