@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use miden_agglayer::{AggLayerFaucet, EthAddressFormat, create_bridge_account};
+use miden_agglayer::{AggLayerFaucet, EthAddress, create_bridge_account};
 use miden_client::Deserializable;
 use miden_client::account::{AccountFile, AccountId, AccountStorageMode};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
@@ -21,7 +21,6 @@ use crate::tests::config::ClientConfig;
 pub mod agglayer_bridge_in_out;
 mod agglayer_test_utils;
 pub mod ger;
-mod utils;
 
 // AGGLAYER CONFIG
 // ================================================================================================
@@ -84,7 +83,7 @@ impl AgglayerConfig {
     }
 
     /// Returns the faucet's origin token address from its storage.
-    pub fn faucet_origin_token_address(&self) -> EthAddressFormat {
+    pub fn faucet_origin_token_address(&self) -> EthAddress {
         let info1 = self
             .faucet
             .account
@@ -101,10 +100,10 @@ impl AgglayerConfig {
         let felts = [info1[0], info1[1], info1[2], info1[3], info2[0]];
         let mut bytes = [0u8; 20];
         for (i, felt) in felts.iter().enumerate() {
-            let val = felt.as_int() as u32;
+            let val = felt.as_canonical_u64() as u32;
             bytes[i * 4..(i + 1) * 4].copy_from_slice(&val.to_le_bytes());
         }
-        EthAddressFormat::new(bytes)
+        EthAddress::new(bytes)
     }
 
     /// Returns the faucet's origin network from its storage.
@@ -116,7 +115,7 @@ impl AgglayerConfig {
             .storage()
             .get_item(AggLayerFaucet::conversion_info_2_slot())
             .expect("faucet should have conversion_info_2 slot");
-        info2[1].as_int() as u32
+        info2[1].as_canonical_u64() as u32
     }
 
     /// Returns the faucet's scale from its storage.
@@ -127,7 +126,7 @@ impl AgglayerConfig {
             .storage()
             .get_item(AggLayerFaucet::conversion_info_2_slot())
             .expect("faucet should have conversion_info_2 slot");
-        info2[2].as_int() as u8
+        info2[2].as_canonical_u64() as u8
     }
 
     /// Imports a single account (by ID) into the given client and keystore.

@@ -3,8 +3,18 @@ extern crate alloc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use miden_agglayer::claim_note::{Keccak256Output, ProofData, SmtNode};
-use miden_agglayer::{EthAddressFormat, EthAmount, ExitRoot, GlobalIndex, LeafData, MetadataHash};
+use miden_agglayer::{
+    EthAddress,
+    EthAmount,
+    EthEmbeddedAccountId,
+    ExitRoot,
+    GlobalIndex,
+    Keccak256Output,
+    LeafData,
+    MetadataHash,
+    ProofData,
+    SmtNode,
+};
 use miden_client::utils::hex_to_bytes;
 use miden_protocol::account::AccountId;
 use serde::Deserialize;
@@ -50,10 +60,10 @@ impl LeafValueVector {
     pub fn to_leaf_data(&self) -> LeafData {
         LeafData {
             origin_network: self.origin_network,
-            origin_token_address: EthAddressFormat::from_hex(&self.origin_token_address)
+            origin_token_address: EthAddress::from_hex(&self.origin_token_address)
                 .expect("valid origin token address hex"),
             destination_network: self.destination_network,
-            destination_address: EthAddressFormat::from_hex(&self.destination_address)
+            destination_address: EthAddress::from_hex(&self.destination_address)
                 .expect("valid destination address hex"),
             amount: EthAmount::from_uint_str(&self.amount).expect("valid amount uint string"),
             metadata_hash: MetadataHash::new(
@@ -145,9 +155,9 @@ const FOUNDRY_OUTPUT_JSON: &str = "test-vectors/claim_asset_vectors_local_tx.jso
 /// Panics if `forge` is not installed, the test fails, or the JSON output cannot be parsed.
 pub fn generate_claim_data_for_account(
     account_id: AccountId,
-    origin_token_address: Option<&EthAddressFormat>,
+    origin_token_address: Option<&EthAddress>,
 ) -> (ProofData, LeafData, ExitRoot) {
-    let destination_address = EthAddressFormat::from_account_id(account_id);
+    let destination_address: EthAddress = EthEmbeddedAccountId::from_account_id(account_id).into();
     let destination_hex = destination_address.to_hex();
     println!(
         "[foundry] Generating claim data for account {:?} (eth address: {})",
