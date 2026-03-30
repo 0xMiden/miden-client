@@ -1,7 +1,4 @@
 use js_export_macro::js_export;
-
-use crate::js_error_with_context;
-use crate::platform::JsErr;
 use miden_client::Word as NativeWord;
 use miden_client::note::{
     Note as NativeNote,
@@ -18,6 +15,7 @@ use miden_client::transaction::{
 };
 use miden_client::vm::AdviceMap as NativeAdviceMap;
 
+use crate::js_error_with_context;
 use crate::models::advice_map::AdviceMap;
 use crate::models::foreign_account::ForeignAccount;
 use crate::models::miden_arrays::{
@@ -34,6 +32,7 @@ use crate::models::transaction_request::note_and_args::NoteAndArgs;
 use crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag;
 use crate::models::transaction_script::TransactionScript;
 use crate::models::word::Word;
+use crate::platform::JsErr;
 
 /// A builder for a `TransactionRequest`.
 ///
