@@ -24,7 +24,9 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{AccountProof, AccountStorageDetails, AccountUpdateSummary};
+use super::domain::account::{
+    AccountProof, AccountStorageDetails, AccountStorageRequirements, AccountUpdateSummary,
+};
 use super::domain::{note::FetchedNote, nullifier::NullifierUpdate};
 use super::generated::rpc::account_request::AccountDetailRequest;
 use super::generated::rpc::AccountRequest;
@@ -43,7 +45,6 @@ use crate::rpc::generated::rpc::account_request::account_detail_request::Storage
 use crate::rpc::generated::rpc::BlockRange;
 use crate::rpc::domain::limits::RpcLimits;
 use crate::rpc::{AccountStateAt, generated as proto};
-use crate::rpc::domain::account::AccountStorageRequirements;
 
 mod api_client;
 use api_client::api_client_wrapper::ApiClient;
@@ -254,7 +255,7 @@ impl GrpcClient {
                 let account_details = account_response
                     .details
                     .ok_or(RpcError::ExpectedDataMissing("details in public account".to_owned()))?
-                    .into_domain(&BTreeMap::new())?;
+                    .into_domain(&BTreeMap::new(), &AccountStorageRequirements::default())?;
                 let storage_header = account_details.storage_details.header;
                 // This variable will hold the storage slots that are maps, below we will use it to
                 // actually fetch the storage maps details, since we now know the names of each
@@ -651,7 +652,7 @@ impl NodeRpcClient for GrpcClient {
                 response
                     .details
                     .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                    .into_domain(&known_codes_by_commitment)?,
+                    .into_domain(&known_codes_by_commitment, &storage_requirements)?,
             )
         } else {
             None

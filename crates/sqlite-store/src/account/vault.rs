@@ -11,7 +11,7 @@ use miden_client::store::{AccountSmtForest, StoreError};
 use miden_protocol::asset::AssetVaultKey;
 use miden_protocol::crypto::merkle::MerkleError;
 use rusqlite::types::Value;
-use rusqlite::{Connection, Transaction, params};
+use rusqlite::{Connection, OptionalExtension, Transaction, params};
 
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, insert_sql, subst, u64_to_value};
@@ -59,12 +59,12 @@ impl SqliteStore {
     // MUTATOR/WRITER METHODS
     // --------------------------------------------------------------------------------------------
 
-    /// Inserts assets into both latest and historical tables for a specific
-    /// (`account_id`, `nonce`).
+    /// Inserts assets into the latest tables only.
+    ///
+    /// Historical archival is handled separately by the caller when needed.
     pub(crate) fn insert_assets(
         tx: &Transaction<'_>,
         account_id: AccountId,
-        nonce: u64,
         assets: impl Iterator<Item = Asset>,
     ) -> Result<(), StoreError> {
         const LATEST_QUERY: &str = insert_sql!(
@@ -75,20 +75,9 @@ impl SqliteStore {
                 asset
             } | REPLACE
         );
-        const HISTORICAL_QUERY: &str = insert_sql!(
-            historical_account_assets {
-                account_id,
-                nonce,
-                vault_key,
-                faucet_id_prefix,
-                asset
-            } | REPLACE
-        );
 
         let mut latest_stmt = tx.prepare_cached(LATEST_QUERY).into_store_error()?;
-        let mut hist_stmt = tx.prepare_cached(HISTORICAL_QUERY).into_store_error()?;
         let account_id_hex = account_id.to_hex();
-        let nonce_val = u64_to_value(nonce);
 
         for asset in assets {
             let vault_key_word: Word = asset.vault_key().into();
@@ -99,16 +88,6 @@ impl SqliteStore {
             latest_stmt
                 .execute(params![&account_id_hex, &vault_key_hex, &faucet_prefix_hex, &asset_hex])
                 .into_store_error()?;
-
-            hist_stmt
-                .execute(params![
-                    &account_id_hex,
-                    &nonce_val,
-                    &vault_key_hex,
-                    &faucet_prefix_hex,
-                    &asset_hex,
-                ])
-                .into_store_error()?;
         }
 
         Ok(())
@@ -117,8 +96,8 @@ impl SqliteStore {
     /// Applies vault delta changes to the account state, updating fungible and non-fungible assets.
     ///
     /// The function updates the SMT forest with all asset changes and verifies that the resulting
-    /// vault root matches the expected final state. It deletes removed assets from latest and
-    /// writes tombstones to historical, then inserts updated assets.
+    /// vault root matches the expected final state. It archives old values from latest to
+    /// historical, deletes removed assets from latest, then inserts updated assets.
     pub(crate) fn apply_account_vault_delta(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,
@@ -204,8 +183,8 @@ impl SqliteStore {
         Ok(())
     }
 
-    /// Persists vault delta changes to the database: deletes removed assets from latest,
-    /// writes tombstones to historical, and inserts updated assets into both tables.
+    /// Persists vault delta changes: archives old values from latest to historical,
+    /// then updates latest (deletes removed assets, inserts/updates changed assets).
     pub(crate) fn persist_vault_delta(
         tx: &Transaction<'_>,
         account_id_hex: &str,
@@ -213,43 +192,17 @@ impl SqliteStore {
         removed_vault_keys: &[AssetVaultKey],
         updated_assets: &[Asset],
     ) -> Result<(), StoreError> {
-        // Delete removed assets from latest
-        const DELETE_LATEST_QUERY: &str =
-            "DELETE FROM latest_account_assets WHERE account_id = ? AND vault_key IN rarray(?)";
-
-        tx.execute(
-            DELETE_LATEST_QUERY,
-            params![
-                account_id_hex,
-                Rc::new(
-                    removed_vault_keys
-                        .iter()
-                        .map(|k| Value::from(Word::from(*k).to_hex()))
-                        .collect::<Vec<Value>>(),
-                ),
-            ],
-        )
-        .into_store_error()?;
-
-        // Write tombstones to historical for removed assets
-        const HISTORICAL_TOMBSTONE_QUERY: &str = "INSERT OR REPLACE INTO historical_account_assets \
-             (account_id, nonce, vault_key, faucet_id_prefix, asset) VALUES (?, ?, ?, ?, NULL)";
-        let mut tombstone_stmt =
-            tx.prepare_cached(HISTORICAL_TOMBSTONE_QUERY).into_store_error()?;
-        for vault_key in removed_vault_keys {
-            let vault_key_word: Word = (*vault_key).into();
-            let faucet_prefix_hex = vault_key.faucet_id_prefix().to_hex();
-            tombstone_stmt
-                .execute(params![
-                    account_id_hex,
-                    nonce_val,
-                    vault_key_word.to_hex(),
-                    faucet_prefix_hex
-                ])
-                .into_store_error()?;
-        }
-
-        // Insert updated assets into latest and historical
+        const READ_OLD_ASSET: &str =
+            "SELECT asset FROM latest_account_assets WHERE account_id = ? AND vault_key = ?";
+        const HISTORICAL_INSERT: &str = insert_sql!(
+            historical_account_assets {
+                account_id,
+                replaced_at_nonce,
+                vault_key,
+                faucet_id_prefix,
+                old_asset
+            } | REPLACE
+        );
         const LATEST_INSERT: &str = insert_sql!(
             latest_account_assets {
                 account_id,
@@ -258,37 +211,86 @@ impl SqliteStore {
                 asset
             } | REPLACE
         );
-        const HISTORICAL_INSERT: &str = insert_sql!(
-            historical_account_assets {
-                account_id,
-                nonce,
-                vault_key,
-                faucet_id_prefix,
-                asset
-            } | REPLACE
-        );
 
-        let mut latest_stmt = tx.prepare_cached(LATEST_INSERT).into_store_error()?;
         let mut hist_stmt = tx.prepare_cached(HISTORICAL_INSERT).into_store_error()?;
+        let mut latest_stmt = tx.prepare_cached(LATEST_INSERT).into_store_error()?;
 
-        for asset in updated_assets {
-            let vault_key_word: Word = asset.vault_key().into();
+        // Archive and delete removed assets
+        for vault_key in removed_vault_keys {
+            let vault_key_word: Word = (*vault_key).into();
             let vault_key_hex = vault_key_word.to_hex();
-            let faucet_prefix_hex = asset.faucet_id_prefix().to_hex();
-            let asset_hex = Word::from(*asset).to_hex();
+            let faucet_prefix_hex = vault_key.faucet_id_prefix().to_hex();
 
-            latest_stmt
-                .execute(params![account_id_hex, &vault_key_hex, &faucet_prefix_hex, &asset_hex])
-                .into_store_error()?;
+            // Read old asset value from latest (should exist since we're removing it)
+            let old_asset: Option<String> = tx
+                .query_row(READ_OLD_ASSET, params![account_id_hex, &vault_key_hex], |row| {
+                    row.get(0)
+                })
+                .optional()
+                .into_store_error()?
+                .flatten();
 
+            // Archive old value to historical
             hist_stmt
                 .execute(params![
                     account_id_hex,
                     nonce_val,
                     &vault_key_hex,
                     &faucet_prefix_hex,
-                    &asset_hex,
+                    old_asset,
                 ])
+                .into_store_error()?;
+        }
+
+        // Batch delete removed assets from latest
+        if !removed_vault_keys.is_empty() {
+            const DELETE_LATEST_QUERY: &str =
+                "DELETE FROM latest_account_assets WHERE account_id = ? AND vault_key IN rarray(?)";
+            tx.execute(
+                DELETE_LATEST_QUERY,
+                params![
+                    account_id_hex,
+                    Rc::new(
+                        removed_vault_keys
+                            .iter()
+                            .map(|k| Value::from(Word::from(*k).to_hex()))
+                            .collect::<Vec<Value>>(),
+                    ),
+                ],
+            )
+            .into_store_error()?;
+        }
+
+        // Archive old values and insert updated assets
+        for asset in updated_assets {
+            let vault_key_word: Word = asset.vault_key().into();
+            let vault_key_hex = vault_key_word.to_hex();
+            let faucet_prefix_hex = asset.faucet_id_prefix().to_hex();
+            let asset_hex = Word::from(*asset).to_hex();
+
+            // Read old asset value from latest (NULL if asset is new)
+            let old_asset: Option<String> = tx
+                .query_row(READ_OLD_ASSET, params![account_id_hex, &vault_key_hex], |row| {
+                    row.get(0)
+                })
+                .optional()
+                .into_store_error()?
+                .flatten();
+
+            // Archive old value to historical (NULL old_asset = asset was new)
+            hist_stmt
+                .execute(params![
+                    account_id_hex,
+                    nonce_val,
+                    &vault_key_hex,
+                    &faucet_prefix_hex,
+                    old_asset,
+                ])
+                .into_store_error()?;
+
+            // Insert/update in latest
+            latest_stmt
+                .execute(params![account_id_hex, &vault_key_hex, &faucet_prefix_hex, &asset_hex])
                 .into_store_error()?;
         }
 
