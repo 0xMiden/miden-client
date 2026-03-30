@@ -898,10 +898,11 @@ test.describe("MidenClient API - Mock Chain", () => {
       const walletId = wallet.id().toString();
 
       // Public accounts created via the SDK are local-only until a block commits
-      // an update for them. Submit a minimal transaction so the mock chain tracks
-      // this account and a restored client can fetch it by ID.
+      // an update for them. Submit a minimal transaction and prove a block so
+      // the serialized mock chain can later fetch this account by ID.
       const request = new window.TransactionRequestBuilder().build();
       await client.transactions.submit(wallet.id(), request);
+      client.proveBlock();
       await client.sync();
 
       return {

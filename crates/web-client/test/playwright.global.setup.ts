@@ -36,7 +36,7 @@ export function getRpcUrl(): string {
       return "https://rpc.testnet.miden.io";
     case "localhost":
     default:
-      return `http://127.0.0.1:${MIDEN_NODE_PORT}`;
+      return `http://localhost:${MIDEN_NODE_PORT}`;
   }
 }
 
@@ -59,7 +59,7 @@ export function getProverUrl(): string | undefined {
       return "https://tx-prover.testnet.miden.io";
     case "localhost":
     default:
-      return `http://127.0.0.1:${REMOTE_TX_PROVER_PORT}`;
+      return `http://localhost:${REMOTE_TX_PROVER_PORT}`;
   }
 }
 
@@ -81,7 +81,7 @@ export const test = base.extend<{ forEachTest: void }>({
         console.error("PUPPETEER ERROR:", err);
       });
 
-      await page.goto("http://127.0.0.1:8080");
+      await page.goto("http://localhost:8080");
 
       await page.evaluate(
         async ({ rpcUrl, proverUrl, storeName, remoteProverTimeoutMs }) => {

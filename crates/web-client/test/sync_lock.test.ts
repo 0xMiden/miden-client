@@ -430,7 +430,7 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
       const rpcUrl = getRpcUrl();
       const crossTabStoreName = `CrossTabTestStore_${RUN_ID}`;
       const setupPage = async (page: Page) => {
-        await page.goto("http://127.0.0.1:8080");
+        await page.goto("http://localhost:8080");
         await page.evaluate(
           async ({ rpcUrl, storeName }) => {
             const sdkExports = await import("./index.js");
@@ -499,7 +499,7 @@ test.describe("Cross-Tab Sync Lock Tests", () => {
       const rpcUrl = getRpcUrl();
       const rapidStoreName = `RapidCrossTabStore_${RUN_ID}`;
       const setupPage = async (page: Page) => {
-        await page.goto("http://127.0.0.1:8080");
+        await page.goto("http://localhost:8080");
         await page.evaluate(
           async ({ rpcUrl, storeName }) => {
             const sdkExports = await import("./index.js");
