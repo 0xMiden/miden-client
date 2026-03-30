@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::Write;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::num::{NonZeroU32, NonZeroU64};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ::rand::{Rng, random};
@@ -266,7 +267,11 @@ impl NodeBuilder {
                     block_producer_url,
                     validator_url,
                     ntx_builder_url,
-                    grpc_options: GrpcOptionsExternal::default(),
+                    grpc_options: GrpcOptionsExternal {
+                        burst_size: NonZeroU32::new(10_000).unwrap(),
+                        replenish_n_per_second_per_ip: NonZeroU64::new(10_000).unwrap(),
+                        ..GrpcOptionsExternal::default()
+                    },
                 }
                 .serve()
                 .await
