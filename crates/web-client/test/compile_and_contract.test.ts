@@ -599,8 +599,13 @@ test.describe("transactions.execute()", () => {
 // ════════════════════════════════════════════════════════════════
 
 test.describe("transactions.executeProgram()", () => {
-  test("reads updated state after a mutating transaction", async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === "nodejs", "browser-only: uses page.evaluate");
+  test("reads updated state after a mutating transaction", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "nodejs",
+      "browser-only: uses page.evaluate"
+    );
 
     const result = await page.evaluate(
       async ({ code, slotName }) => {

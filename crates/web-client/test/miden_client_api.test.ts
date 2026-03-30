@@ -90,8 +90,13 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(faucet.isPublic()).toBe(true);
   });
 
-  test("accounts.insert stores a pre-built account", async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === "nodejs", "browser-only: uses page.evaluate");
+  test("accounts.insert stores a pre-built account", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "nodejs",
+      "browser-only: uses page.evaluate"
+    );
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
 
