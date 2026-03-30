@@ -138,9 +138,7 @@ pub struct NoteSyncInfo {
     pub blocks: Vec<NoteSyncBlock>,
 }
 
-fn convert_note_sync_record(
-    note: proto::note::NoteSyncRecord,
-) -> Result<CommittedNote, RpcError> {
+fn convert_note_sync_record(note: proto::note::NoteSyncRecord) -> Result<CommittedNote, RpcError> {
     let note_id: NoteId = note
         .note_id
         .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.note_id)))?
