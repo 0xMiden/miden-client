@@ -55,6 +55,7 @@
 - [ExportNoteOptions](interfaces/ExportNoteOptions.md)
 - [FaucetCreateOptions](interfaces/FaucetCreateOptions.md)
 - [FetchPrivateNotesOptions](interfaces/FetchPrivateNotesOptions.md)
+- [KeystoreResource](interfaces/KeystoreResource.md)
 - [MintOptions](interfaces/MintOptions.md)
 - [MockOptions](interfaces/MockOptions.md)
 - [NoteOptions](interfaces/NoteOptions.md)
