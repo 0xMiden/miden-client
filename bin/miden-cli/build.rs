@@ -10,7 +10,6 @@ use miden_client::account::component::{
     AuthSingleSigAcl,
     BasicFungibleFaucet,
     BasicWallet,
-    FeltSchema,
     MIDEN_PACKAGE_EXTENSION,
     NoAuth,
     SchemaType,
@@ -45,31 +44,7 @@ fn main() {
     build_package("basic-wallet", basic_wallet_library(), &basic_wallet_metadata, None);
 
     // Basic fungible faucet
-    //
-    // NOTE: We use a custom schema instead of `BasicFungibleFaucet::metadata_slot_schema()`
-    // because the upstream schema defines `token_supply` as a `felt` field with a default,
-    // but the CLI's `process_packages` prompts interactively for all schema requirements
-    // regardless of defaults. Using `void` for the supply field (which is managed internally
-    // by the faucet) avoids prompting the user for a value they shouldn't set.
-    let faucet_metadata_schema = (
-        BasicFungibleFaucet::metadata_slot().clone(),
-        StorageSlotSchema::value(
-            "Token metadata",
-            [
-                FeltSchema::new_void(),
-                FeltSchema::felt("max_supply"),
-                FeltSchema::u8("decimals"),
-                FeltSchema::new_typed(SchemaType::token_symbol(), "symbol"),
-            ],
-        ),
-    );
-    let basic_faucet_metadata =
-        AccountComponentMetadata::new(BasicFungibleFaucet::NAME, [AccountType::FungibleFaucet])
-            .with_description("Basic fungible faucet component for minting and burning tokens")
-            .with_storage_schema(
-                StorageSchema::new([faucet_metadata_schema])
-                    .expect("storage schema should be valid"),
-            );
+    let basic_faucet_metadata = BasicFungibleFaucet::component_metadata();
     build_package(
         "basic-fungible-faucet",
         basic_fungible_faucet_library(),

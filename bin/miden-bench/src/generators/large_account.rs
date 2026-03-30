@@ -110,7 +110,7 @@ end
 /// Creates a large account with the specified configuration (used in tests)
 #[cfg(test)]
 fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account, AuthSecretKey)> {
-    use miden_client::account::component::BasicWallet;
+    use miden_client::account::component::{AccountComponentMetadata, BasicWallet};
 
     let sk =
         AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut ChaCha20Rng::from_seed(config.seed));
@@ -145,12 +145,9 @@ fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account,
     .map_err(|e| anyhow::anyhow!("Failed to create reader component: {e}"))?;
 
     // Wallet component: provides standard wallet operations (no storage slots)
-    let wallet_component = AccountComponent::new(
-        basic_wallet_library(),
-        vec![],
-        BasicWallet::component_metadata(),
-    )
-    .expect("basic wallet component should satisfy account component requirements");
+    let wallet_component =
+        AccountComponent::new(basic_wallet_library(), vec![], BasicWallet::component_metadata())
+            .expect("basic wallet component should satisfy account component requirements");
 
     let account = AccountBuilder::new(config.seed)
         .with_auth_component(AuthSingleSig::new(

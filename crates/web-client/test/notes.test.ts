@@ -277,10 +277,7 @@ test.describe("get_consumable_notes", () => {
         page,
         targetAccountId
       );
-      const consumableSender = await getConsumableNotes(
-        page,
-        senderAccountId
-      );
+      const consumableSender = await getConsumableNotes(page, senderAccountId);
       expect(consumableSender.length).toBe(1);
       expect(consumableSender[0].consumability[0].consumableAfterBlock).toBe(
         recallHeight

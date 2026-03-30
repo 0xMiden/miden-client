@@ -524,6 +524,12 @@ fn process_packages(
                 continue;
             }
 
+            if let Some(default_value) = &requirement.default_value {
+                // Use the schema's default value without prompting the user
+                value_entries.insert(value_name, default_value.clone().into());
+                continue;
+            }
+
             let description = requirement.description.unwrap_or("[No description]".into());
             println!(
                 "Enter value for '{value_name}' - {description} (type: {}): ",

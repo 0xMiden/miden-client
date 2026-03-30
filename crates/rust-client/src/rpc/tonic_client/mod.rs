@@ -4,7 +4,12 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::error::Error;
+use core::pin::Pin;
+
 use miden_protocol::asset::{Asset, AssetVault};
+use miden_protocol::vm::FutureMaybeSend;
+
+type RpcFuture<T> = Pin<Box<dyn FutureMaybeSend<T>>>;
 
 use miden_protocol::account::{
     Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot, StorageSlotType,
@@ -18,7 +23,6 @@ use miden_protocol::crypto::merkle::smt::SmtProof;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_protocol::utils::serde::Deserializable;
-use miden_protocol::vm::FutureMaybeSend;
 use miden_protocol::{EMPTY_WORD, Word};
 use miden_tx::utils::serde::Serializable;
 use miden_tx::utils::sync::RwLock;
@@ -227,15 +231,11 @@ impl GrpcClient {
     /// Returns the first successful gRPC response. If the call keeps failing after retries are
     /// exhausted, or if the error is not retryable, this returns the corresponding [`RpcError`]
     /// for the provided [`RpcEndpoint`].
-    async fn call_with_retry<T, F, Fut>(
+    async fn call_with_retry<T: Send + 'static>(
         &self,
         endpoint: RpcEndpoint,
-        mut call: F,
-    ) -> Result<tonic::Response<T>, RpcError>
-    where
-        F: FnMut(ApiClient) -> Fut,
-        Fut: FutureMaybeSend<Result<tonic::Response<T>, Status>>,
-    {
+        mut call: impl FnMut(ApiClient) -> RpcFuture<Result<tonic::Response<T>, Status>>,
+    ) -> Result<tonic::Response<T>, RpcError> {
         let mut retry_state = retry::RetryState::new(self.max_retries, self.retry_interval_ms);
 
         loop {
@@ -300,7 +300,7 @@ impl GrpcClient {
         let account_response = self
             .call_with_retry(RpcEndpoint::GetAccount, |mut rpc_api| {
                 let request = account_request.clone();
-                async move { rpc_api.get_account(request).await }
+                Box::pin(async move { rpc_api.get_account(request).await })
             })
             .await?
             .into_inner();
@@ -339,7 +339,7 @@ impl GrpcClient {
                 let response = self
                     .call_with_retry(RpcEndpoint::GetAccount, |mut rpc_api| {
                         let request = account_request.clone();
-                        async move { rpc_api.get_account(request).await }
+                        Box::pin(async move { rpc_api.get_account(request).await })
                     })
                     .await?;
                 response.into_inner().try_into()
@@ -477,7 +477,7 @@ impl NodeRpcClient for GrpcClient {
         let api_response = self
             .call_with_retry(RpcEndpoint::SubmitProvenTx, |mut rpc_api| {
                 let request = request.clone();
-                async move { rpc_api.submit_proven_transaction(request).await }
+                Box::pin(async move { rpc_api.submit_proven_transaction(request).await })
             })
             .await?;
 
@@ -497,8 +497,8 @@ impl NodeRpcClient for GrpcClient {
         info!("Calling GetBlockHeaderByNumber: {:?}", request);
 
         let api_response = self
-            .call_with_retry(RpcEndpoint::GetBlockHeaderByNumber, |mut rpc_api| async move {
-                rpc_api.get_block_header_by_number(request).await
+            .call_with_retry(RpcEndpoint::GetBlockHeaderByNumber, |mut rpc_api| {
+                Box::pin(async move { rpc_api.get_block_header_by_number(request).await })
             })
             .await?;
 
@@ -544,7 +544,7 @@ impl NodeRpcClient for GrpcClient {
             let api_response = self
                 .call_with_retry(RpcEndpoint::GetNotesById, |mut rpc_api| {
                     let request = request.clone();
-                    async move { rpc_api.get_notes_by_id(request).await }
+                    Box::pin(async move { rpc_api.get_notes_by_id(request).await })
                 })
                 .await?;
 
@@ -573,8 +573,8 @@ impl NodeRpcClient for GrpcClient {
         let request = proto::rpc::SyncChainMmrRequest { block_range };
 
         let response = self
-            .call_with_retry(RpcEndpoint::SyncChainMmr, |mut rpc_api| async move {
-                rpc_api.sync_chain_mmr(request).await
+            .call_with_retry(RpcEndpoint::SyncChainMmr, |mut rpc_api| {
+                Box::pin(async move { rpc_api.sync_chain_mmr(request).await })
             })
             .await?;
 
@@ -706,7 +706,7 @@ impl NodeRpcClient for GrpcClient {
         let response = self
             .call_with_retry(RpcEndpoint::GetAccount, |mut rpc_api| {
                 let request = request.clone();
-                async move { rpc_api.get_account(request).await }
+                Box::pin(async move { rpc_api.get_account(request).await })
             })
             .await?
             .into_inner();
@@ -760,7 +760,7 @@ impl NodeRpcClient for GrpcClient {
         let response = self
             .call_with_retry(RpcEndpoint::SyncNotes, |mut rpc_api| {
                 let request = request.clone();
-                async move { rpc_api.sync_notes(request).await }
+                Box::pin(async move { rpc_api.sync_notes(request).await })
             })
             .await?;
 
@@ -796,7 +796,7 @@ impl NodeRpcClient for GrpcClient {
                 let response = self
                     .call_with_retry(RpcEndpoint::SyncNullifiers, |mut rpc_api| {
                         let request = request.clone();
-                        async move { rpc_api.sync_nullifiers(request).await }
+                        Box::pin(async move { rpc_api.sync_nullifiers(request).await })
                     })
                     .await?;
                 let response = response.into_inner();
@@ -850,7 +850,7 @@ impl NodeRpcClient for GrpcClient {
             let response = self
                 .call_with_retry(RpcEndpoint::CheckNullifiers, |mut rpc_api| {
                     let request = request.clone();
-                    async move { rpc_api.check_nullifiers(request).await }
+                    Box::pin(async move { rpc_api.check_nullifiers(request).await })
                 })
                 .await?;
 
@@ -869,8 +869,8 @@ impl NodeRpcClient for GrpcClient {
         let request = proto::blockchain::BlockNumber { block_num: block_num.as_u32() };
 
         let response = self
-            .call_with_retry(RpcEndpoint::GetBlockByNumber, |mut rpc_api| async move {
-                rpc_api.get_block_by_number(request).await
+            .call_with_retry(RpcEndpoint::GetBlockByNumber, |mut rpc_api| {
+                Box::pin(async move { rpc_api.get_block_by_number(request).await })
             })
             .await?;
 
@@ -887,8 +887,8 @@ impl NodeRpcClient for GrpcClient {
         let request = proto::note::NoteScriptRoot { root: Some(root.into()) };
 
         let response = self
-            .call_with_retry(RpcEndpoint::GetNoteScriptByRoot, |mut rpc_api| async move {
-                rpc_api.get_note_script_by_root(request).await
+            .call_with_retry(RpcEndpoint::GetNoteScriptByRoot, |mut rpc_api| {
+                Box::pin(async move { rpc_api.get_note_script_by_root(request).await })
             })
             .await?;
 
@@ -922,7 +922,7 @@ impl NodeRpcClient for GrpcClient {
             let response = self
                 .call_with_retry(RpcEndpoint::SyncStorageMaps, |mut rpc_api| {
                     let request = request.clone();
-                    async move { rpc_api.sync_account_storage_maps(request).await }
+                    Box::pin(async move { rpc_api.sync_account_storage_maps(request).await })
                 })
                 .await?;
             let response = response.into_inner();
@@ -970,7 +970,7 @@ impl NodeRpcClient for GrpcClient {
             let response = self
                 .call_with_retry(RpcEndpoint::SyncAccountVault, |mut rpc_api| {
                     let request = request.clone();
-                    async move { rpc_api.sync_account_vault(request).await }
+                    Box::pin(async move { rpc_api.sync_account_vault(request).await })
                 })
                 .await?;
             let response = response.into_inner();
@@ -1016,7 +1016,7 @@ impl NodeRpcClient for GrpcClient {
         let response = self
             .call_with_retry(RpcEndpoint::SyncTransactions, |mut rpc_api| {
                 let request = request.clone();
-                async move { rpc_api.sync_transactions(request).await }
+                Box::pin(async move { rpc_api.sync_transactions(request).await })
             })
             .await?;
 
@@ -1037,8 +1037,8 @@ impl NodeRpcClient for GrpcClient {
 
         // Fetch limits from the node
         let response = self
-            .call_with_retry(RpcEndpoint::GetLimits, |mut rpc_api| async move {
-                rpc_api.get_limits(()).await
+            .call_with_retry(RpcEndpoint::GetLimits, |mut rpc_api| {
+                Box::pin(async move { rpc_api.get_limits(()).await })
             })
             .await?;
         let limits = RpcLimits::try_from(response.into_inner()).map_err(RpcError::from)?;

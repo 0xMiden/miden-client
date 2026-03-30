@@ -16,8 +16,7 @@ test.describe("swap transaction tests", () => {
     { flag: false, description: "swap transaction completes successfully" },
     {
       flag: true,
-      description:
-        "swap transaction with remote prover completes successfully",
+      description: "swap transaction with remote prover completes successfully",
     },
   ];
 

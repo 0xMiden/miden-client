@@ -24,6 +24,9 @@ repository   = "https://github.com/0xMiden/miden-client"
 rust-version = "1.93"
 version      = "0.14.0"
 
+[profile.dev]
+codegen-units = 16
+
 [profile.test-dev]
 inherits  = "dev"
 opt-level = 1
@@ -32,6 +35,13 @@ opt-level = 1
 codegen-units = 1
 lto           = true
 strip         = true
+
+[profile.release-test]
+codegen-units = 4
+debug         = true
+inherits      = "release"
+lto           = "thin"
+strip         = false
 
 [workspace.dependencies]
 # Workspace crates
