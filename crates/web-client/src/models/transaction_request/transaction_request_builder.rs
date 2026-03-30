@@ -1,4 +1,7 @@
 use js_export_macro::js_export;
+
+use crate::js_error_with_context;
+use crate::platform::JsErr;
 use miden_client::Word as NativeWord;
 use miden_client::note::{
     Note as NativeNote,
@@ -150,8 +153,12 @@ impl TransactionRequestBuilder {
     }
 
     /// Finalizes the builder into a `TransactionRequest`.
-    pub fn build(&self) -> TransactionRequest {
-        TransactionRequest(self.0.clone().build().unwrap())
+    pub fn build(&self) -> Result<TransactionRequest, JsErr> {
+        self.0
+            .clone()
+            .build()
+            .map(TransactionRequest)
+            .map_err(|err| js_error_with_context(err, "failed to build transaction request"))
     }
 }
 
