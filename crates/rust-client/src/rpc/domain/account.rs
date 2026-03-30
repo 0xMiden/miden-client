@@ -17,7 +17,6 @@ use miden_tx::utils::ToHex;
 use miden_tx::utils::serde::{Deserializable, Serializable};
 use thiserror::Error;
 
-use crate::alloc::borrow::ToOwned;
 use crate::alloc::string::ToString;
 use crate::rpc::RpcError;
 use crate::rpc::domain::MissingFieldHelper;
@@ -234,6 +233,7 @@ impl proto::rpc::account_response::AccountDetails {
     pub fn into_domain(
         self,
         known_account_codes: &BTreeMap<Word, AccountCode>,
+        storage_requirements: &AccountStorageRequirements,
     ) -> Result<AccountDetails, crate::rpc::RpcError> {
         use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
@@ -248,11 +248,42 @@ impl proto::rpc::account_response::AccountDetails {
             .ok_or(proto::rpc::account_response::AccountDetails::missing_field(stringify!(header)))?
             .try_into()?;
 
-        let storage_details = storage_details
+        let storage_details: AccountStorageDetails = storage_details
             .ok_or(proto::rpc::account_response::AccountDetails::missing_field(stringify!(
                 storage_details
             )))?
             .try_into()?;
+
+        // Validate that the returned proofs match the originally requested keys.
+        // The node returns hashed SMT keys, so we hash the raw keys and check
+        // they are present in the corresponding proofs.
+        for map_detail in &storage_details.map_details {
+            let requested_keys = storage_requirements
+                .inner()
+                .get(&map_detail.slot_name)
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+
+            if let StorageMapEntries::EntriesWithProofs(proofs) = &map_detail.entries {
+                if proofs.len() != requested_keys.len() {
+                    return Err(RpcError::InvalidResponse(format!(
+                        "expected {} proofs for storage map slot '{}', got {}",
+                        requested_keys.len(),
+                        map_detail.slot_name,
+                        proofs.len(),
+                    )));
+                }
+                for (proof, raw_key) in proofs.iter().zip(requested_keys.iter()) {
+                    let hashed_key = raw_key.hash().as_word();
+                    if proof.get(&hashed_key).is_none() {
+                        return Err(RpcError::InvalidResponse(format!(
+                            "proof for storage map key {} does not match the requested key",
+                            raw_key.to_hex(),
+                        )));
+                    }
+                }
+            }
+        }
 
         // If an account code was received, it means the previously known account code is no longer
         // valid. If it was not, it means we sent a code commitment that matched and so our code
@@ -333,8 +364,8 @@ impl TryFrom<proto::rpc::AccountStorageDetails> for AccountStorageDetails {
             .try_into()?;
         let map_details = value
             .map_details
-            .iter()
-            .map(|entry| entry.to_owned().try_into())
+            .into_iter()
+            .map(core::convert::TryInto::try_into)
             .collect::<Result<Vec<AccountStorageMapDetails>, RpcError>>()?;
 
         Ok(Self { header, map_details })
@@ -542,6 +573,21 @@ impl AccountProof {
             .map(|account_details| &account_details.storage_details.header)
     }
 
+    /// Returns the full storage details, if available (public accounts only).
+    pub fn storage_details(&self) -> Option<&AccountStorageDetails> {
+        self.state_headers.as_ref().map(|d| &d.storage_details)
+    }
+
+    /// Returns the storage map details for a specific slot, if available.
+    pub fn find_map_details(
+        &self,
+        slot_name: &StorageSlotName,
+    ) -> Option<&AccountStorageMapDetails> {
+        self.state_headers
+            .as_ref()
+            .and_then(|details| details.storage_details.find_map_details(slot_name))
+    }
+
     /// Returns the account code, if present.
     pub fn account_code(&self) -> Option<&AccountCode> {
         self.state_headers.as_ref().map(|headers| &headers.code)
@@ -578,14 +624,17 @@ impl TryFrom<proto::rpc::AccountResponse> for AccountProof {
     fn try_from(account_proof: proto::rpc::AccountResponse) -> Result<Self, Self::Error> {
         let Some(witness) = account_proof.witness else {
             return Err(RpcError::ExpectedDataMissing(
-                "GetAccountProof returned an account without witness".to_owned(),
+                "GetAccountProof returned an account without witness".to_string(),
             ));
         };
 
         let details: Option<AccountDetails> = {
             match account_proof.details {
                 None => None,
-                Some(details) => Some(details.into_domain(&BTreeMap::new())?),
+                Some(details) => Some(
+                    details
+                        .into_domain(&BTreeMap::new(), &AccountStorageRequirements::default())?,
+                ),
             }
         };
         AccountProof::new(witness.try_into()?, details)
@@ -623,6 +672,9 @@ impl TryFrom<proto::account::AccountWitness> for AccountWitness {
 
 /// Describes storage slots indices to be requested, as well as a list of keys for each of those
 /// slots.
+///
+/// Note: If no specific keys are provided for a slot, all entries are requested. Though the
+/// node may respond with `too_many_entries` if the map exceeds the response limit.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AccountStorageRequirements(BTreeMap<StorageSlotName, Vec<StorageMapKey>>);
 
