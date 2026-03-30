@@ -15,7 +15,7 @@ pub struct Rpo256;
 impl Rpo256 {
     /// Computes an RPO256 digest from the provided field elements.
     #[js_export(js_name = "hashElements")]
-    pub fn hash_elements(felt_array: &FeltArray) -> Word {
+    pub fn hash_elements(felt_array: FeltArray) -> Word {
         let felts: Vec<Felt> = felt_array.into();
         let native_felts: Vec<NativeFelt> = felts.iter().map(Into::into).collect();
 

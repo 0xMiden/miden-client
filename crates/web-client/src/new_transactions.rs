@@ -296,7 +296,7 @@ impl WebClient {
         account_id: &AccountId,
         tx_script: &TransactionScript,
         advice_inputs: &AdviceInputs,
-        foreign_accounts: &ForeignAccountArray,
+        foreign_accounts: ForeignAccountArray,
     ) -> Result<FeltArray, JsErr> {
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
