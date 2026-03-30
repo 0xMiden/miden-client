@@ -599,7 +599,9 @@ test.describe("transactions.execute()", () => {
 // ════════════════════════════════════════════════════════════════
 
 test.describe("transactions.executeProgram()", () => {
-  test("reads updated state after a mutating transaction", async ({ page }) => {
+  test("reads updated state after a mutating transaction", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "nodejs", "browser-only: uses page.evaluate");
+
     const result = await page.evaluate(
       async ({ code, slotName }) => {
         const client = await window.MidenClient.createMock();

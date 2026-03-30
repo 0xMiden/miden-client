@@ -324,14 +324,13 @@ test.describe("custom transaction tests", () => {
       // Creating Second Custom Transaction Request to Consume Custom Note
       // with Valid Transaction Script
       const transactionScript = await builder.compileTxScript(txScript);
-      const noteArgsFeltArray = new sdk.FeltArray(noteArgs);
-      const noteArgsCommitment = sdk.Rpo256.hashElements(noteArgsFeltArray);
+      const noteArgsCommitment = sdk.Rpo256.hashElements(new sdk.FeltArray(noteArgs));
 
       const noteAndArgs = new sdk.NoteAndArgs(customNote, noteArgsCommitment);
 
       const adviceMap = new sdk.AdviceMap();
-      const noteArgsCommitment2 = sdk.Rpo256.hashElements(noteArgsFeltArray);
-      adviceMap.insert(noteArgsCommitment2, noteArgsFeltArray);
+      const noteArgsCommitment2 = sdk.Rpo256.hashElements(new sdk.FeltArray(noteArgs));
+      adviceMap.insert(noteArgsCommitment2, new sdk.FeltArray(noteArgs));
 
       const transactionRequest2 = new sdk.TransactionRequestBuilder()
         .withInputNotes(new sdk.NoteAndArgsArray([noteAndArgs]))
@@ -452,14 +451,13 @@ test.describe("custom transaction tests", () => {
       `;
 
       const transactionScript = await builder.compileTxScript(txScript);
-      const noteArgsFeltArray = new sdk.FeltArray(noteArgs);
-      const noteArgsCommitment = sdk.Rpo256.hashElements(noteArgsFeltArray);
+      const noteArgsCommitment = sdk.Rpo256.hashElements(new sdk.FeltArray(noteArgs));
 
       const noteAndArgs = new sdk.NoteAndArgs(customNote, noteArgsCommitment);
 
       const adviceMap = new sdk.AdviceMap();
-      const noteArgsCommitment2 = sdk.Rpo256.hashElements(noteArgsFeltArray);
-      adviceMap.insert(noteArgsCommitment2, noteArgsFeltArray);
+      const noteArgsCommitment2 = sdk.Rpo256.hashElements(new sdk.FeltArray(noteArgs));
+      adviceMap.insert(noteArgsCommitment2, new sdk.FeltArray(noteArgs));
 
       const transactionRequest2 = new sdk.TransactionRequestBuilder()
         .withInputNotes(new sdk.NoteAndArgsArray([noteAndArgs]))
