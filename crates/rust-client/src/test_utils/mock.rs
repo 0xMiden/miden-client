@@ -325,8 +325,7 @@ impl NodeRpcClient for MockRpcApi {
             .into_iter()
             .map(|(bn, notes)| {
                 let block_header = self.get_block_by_num(bn);
-                let mmr_path =
-                    self.get_mmr().open(block_num.as_usize()).unwrap().merkle_path().clone();
+                let mmr_path = self.get_mmr().open(bn.as_usize()).unwrap().merkle_path().clone();
                 NoteSyncBlock { block_header, mmr_path, notes }
             })
             .collect();
