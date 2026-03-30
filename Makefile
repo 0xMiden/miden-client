@@ -144,6 +144,10 @@ SHARD_PARAMETER ?= ""
 integration-test-web-client: ## Run integration tests for the web client (with a chromium browser)
 	cd ./crates/web-client && yarn run test:clean -- --project=chromium $(SHARD_PARAMETER)
 
+.PHONY: integration-test-web-client-opt
+integration-test-web-client-opt: ## Run integration tests for the web client with optimized wasm build (chromium)
+	cd ./crates/web-client && yarn run test:clean:opt -- --project=chromium $(SHARD_PARAMETER)
+
 .PHONY: integration-test-web-client-webkit
 integration-test-web-client-webkit: ## Run integration tests for the web client (with webkit)
 	cd ./crates/web-client && yarn run test:clean -- --project=webkit
