@@ -52,8 +52,8 @@ impl AccountBuilder {
     /// (`"FungibleFaucet"`, `"NonFungibleFaucet"`,
     /// `"RegularAccountImmutableCode"`, `"RegularAccountUpdatableCode"`).
     #[wasm_bindgen(js_name = "accountType")]
-    pub fn account_type(mut self, account_type: JsValue) -> Result<AccountBuilder, JsValue> {
-        let at = parse_account_type(&account_type)?;
+    pub fn account_type(mut self, account_type: &JsValue) -> Result<AccountBuilder, JsValue> {
+        let at = parse_account_type(account_type)?;
         self.0 = self.0.account_type(at.into());
         Ok(self)
     }
@@ -111,15 +111,10 @@ impl AccountBuilder {
 /// value (0–3) or a string variant name.
 fn parse_account_type(value: &JsValue) -> Result<AccountType, JsValue> {
     if let Some(n) = value.as_f64() {
-        if n.fract() != 0.0 || n < 0.0 {
-            return Err(JsValue::from_str(&format!("accountType must be an integer 0–3, got {n}")));
-        }
-        match n as u32 {
-            0 => Ok(AccountType::FungibleFaucet),
-            1 => Ok(AccountType::NonFungibleFaucet),
-            2 => Ok(AccountType::RegularAccountImmutableCode),
-            3 => Ok(AccountType::RegularAccountUpdatableCode),
-            _ => Err(JsValue::from_str(&format!(
+        // Values 0–3 are exactly representable as f64; direct comparison is safe.
+        match account_type_from_f64(n) {
+            Some(at) => Ok(at),
+            None => Err(JsValue::from_str(&format!(
                 "Unknown account type: {n}. Expected 0 (FungibleFaucet), \
                  1 (NonFungibleFaucet), 2 (RegularAccountImmutableCode), \
                  or 3 (RegularAccountUpdatableCode)"
@@ -139,5 +134,23 @@ fn parse_account_type(value: &JsValue) -> Result<AccountType, JsValue> {
         }
     } else {
         Err(JsValue::from_str("accountType must be a number (0–3) or a string variant name"))
+    }
+}
+
+/// Maps a JS number (f64) to an `AccountType` variant. Returns `None` for
+/// unrecognised values. Small integers 0–3 are exactly representable in f64,
+/// so direct equality is correct here.
+#[allow(clippy::float_cmp)]
+fn account_type_from_f64(n: f64) -> Option<AccountType> {
+    if n == 0.0 {
+        Some(AccountType::FungibleFaucet)
+    } else if n == 1.0 {
+        Some(AccountType::NonFungibleFaucet)
+    } else if n == 2.0 {
+        Some(AccountType::RegularAccountImmutableCode)
+    } else if n == 3.0 {
+        Some(AccountType::RegularAccountUpdatableCode)
+    } else {
+        None
     }
 }
