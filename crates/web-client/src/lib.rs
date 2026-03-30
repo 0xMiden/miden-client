@@ -38,9 +38,9 @@ pub mod tags;
 pub mod transactions;
 pub mod utils;
 
+pub mod keystore_api;
 mod web_keystore;
 mod web_keystore_callbacks;
-pub mod keystore_api;
 mod web_keystore_db;
 use tracing::Level;
 use tracing_subscriber::layer::SubscriberExt;

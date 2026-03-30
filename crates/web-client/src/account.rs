@@ -153,5 +153,4 @@ impl WebClient {
             Err(JsValue::from_str("Client not initialized"))
         }
     }
-
 }

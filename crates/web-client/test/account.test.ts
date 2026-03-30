@@ -254,8 +254,7 @@ test.describe("account public commitments", () => {
       const signingInputs = window.SigningInputs.newBlind(message);
 
       for (const commitment of commitments) {
-        const retrievedSk =
-          await window.client.keystore.get(commitment);
+        const retrievedSk = await window.client.keystore.get(commitment);
         const signature = retrievedSk.signData(signingInputs);
 
         sk1Retrieved =
@@ -347,12 +346,12 @@ test.describe("getAccountByKeyCommitment tests", () => {
         window.AuthScheme.AuthRpoFalcon512
       );
 
-      const commitments = await client.keystore.getCommitments(
-        wallet.id()
-      );
+      const commitments = await client.keystore.getCommitments(wallet.id());
 
       const foundAccountId = await client.keystore.getAccountId(commitments[0]);
-      const foundAccount = foundAccountId ? await client.getAccount(foundAccountId) : undefined;
+      const foundAccount = foundAccountId
+        ? await client.getAccount(foundAccountId)
+        : undefined;
 
       return {
         createdAccountId: wallet.id().toString(),
@@ -374,8 +373,11 @@ test.describe("getAccountByKeyCommitment tests", () => {
       const randomSecretKey = window.AuthSecretKey.rpoFalconWithRNG(null);
       const randomCommitment = randomSecretKey.publicKey().toCommitment();
 
-      const foundAccountId = await client.keystore.getAccountId(randomCommitment);
-      const foundAccount = foundAccountId ? await client.getAccount(foundAccountId) : undefined;
+      const foundAccountId =
+        await client.keystore.getAccountId(randomCommitment);
+      const foundAccount = foundAccountId
+        ? await client.getAccount(foundAccountId)
+        : undefined;
 
       return {
         found: foundAccount !== undefined,
@@ -400,12 +402,14 @@ test.describe("getAccountByKeyCommitment tests", () => {
         window.AuthScheme.AuthRpoFalcon512
       );
 
-      const commitments2 = await client.keystore.getCommitments(
-        wallet2.id()
-      );
+      const commitments2 = await client.keystore.getCommitments(wallet2.id());
 
-      const foundAccountId = await client.keystore.getAccountId(commitments2[0]);
-      const foundAccount = foundAccountId ? await client.getAccount(foundAccountId) : undefined;
+      const foundAccountId = await client.keystore.getAccountId(
+        commitments2[0]
+      );
+      const foundAccount = foundAccountId
+        ? await client.getAccount(foundAccountId)
+        : undefined;
 
       return {
         wallet1Id: wallet1.id().toString(),
@@ -429,16 +433,16 @@ test.describe("getAccountByKeyCommitment tests", () => {
       );
 
       const additionalSecretKey = window.AuthSecretKey.ecdsaWithRNG(null);
-      await client.keystore.insert(
-        wallet.id(),
-        additionalSecretKey
-      );
+      await client.keystore.insert(wallet.id(), additionalSecretKey);
 
       const additionalCommitment = additionalSecretKey
         .publicKey()
         .toCommitment();
-      const foundAccountId = await client.keystore.getAccountId(additionalCommitment);
-      const foundAccount = foundAccountId ? await client.getAccount(foundAccountId) : undefined;
+      const foundAccountId =
+        await client.keystore.getAccountId(additionalCommitment);
+      const foundAccount = foundAccountId
+        ? await client.getAccount(foundAccountId)
+        : undefined;
 
       return {
         walletId: wallet.id().toString(),
@@ -464,12 +468,12 @@ test.describe("getAccountByKeyCommitment tests", () => {
         window.AuthScheme.AuthRpoFalcon512
       );
 
-      const commitments = await client.keystore.getCommitments(
-        faucet.id()
-      );
+      const commitments = await client.keystore.getCommitments(faucet.id());
 
       const foundAccountId = await client.keystore.getAccountId(commitments[0]);
-      const foundAccount = foundAccountId ? await client.getAccount(foundAccountId) : undefined;
+      const foundAccount = foundAccountId
+        ? await client.getAccount(foundAccountId)
+        : undefined;
 
       return {
         faucetId: faucet.id().toString(),

@@ -46,10 +46,7 @@ impl WebKeystoreApi {
     ///
     /// Returns the associated `AuthSecretKey` if found, or `null` if not found.
     #[wasm_bindgen]
-    pub async fn get(
-        &self,
-        pub_key_commitment: &Word,
-    ) -> Result<Option<AuthSecretKey>, JsValue> {
+    pub async fn get(&self, pub_key_commitment: &Word) -> Result<Option<AuthSecretKey>, JsValue> {
         let key = self
             .keystore
             .get_key((*pub_key_commitment.as_native()).into())
@@ -61,10 +58,7 @@ impl WebKeystoreApi {
 
     /// Removes a key from the keystore by its public key commitment.
     #[wasm_bindgen]
-    pub async fn remove(
-        &self,
-        pub_key_commitment: &Word,
-    ) -> Result<(), JsValue> {
+    pub async fn remove(&self, pub_key_commitment: &Word) -> Result<(), JsValue> {
         self.keystore
             .remove_key((*pub_key_commitment.as_native()).into())
             .await
@@ -73,10 +67,7 @@ impl WebKeystoreApi {
 
     /// Returns all public key commitments associated with the given account ID.
     #[wasm_bindgen(js_name = "getCommitments")]
-    pub async fn get_commitments(
-        &self,
-        account_id: &AccountId,
-    ) -> Result<Vec<Word>, JsValue> {
+    pub async fn get_commitments(&self, account_id: &AccountId) -> Result<Vec<Word>, JsValue> {
         Ok(self
             .keystore
             .get_account_key_commitments(account_id.as_native())
@@ -107,9 +98,7 @@ impl WebKeystoreApi {
             .keystore
             .get_account_id_by_key_commitment((*pub_key_commitment.as_native()).into())
             .await
-            .map_err(|err| {
-                js_error_with_context(err, "failed to get account by key commitment")
-            })?;
+            .map_err(|err| js_error_with_context(err, "failed to get account by key commitment"))?;
 
         Ok(account_id.map(Into::into))
     }
