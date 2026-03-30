@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
 use miden_agglayer::{
     AggLayerBridge,
-    EthAddressFormat,
+    EthAddress,
+    MetadataHash,
     create_agglayer_faucet,
     create_bridge_account,
-    faucet_registry_key,
 };
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_protocol::account::auth::{AuthScheme, AuthSecretKey};
@@ -15,6 +15,7 @@ use miden_protocol::account::{
     AccountComponentMetadata,
     AccountFile,
     AccountStorageMode,
+    AccountType,
     StorageMapKey,
 };
 use miden_protocol::{Felt, ONE, Word, ZERO};
@@ -54,13 +55,14 @@ pub fn create_agglayer_genesis_accounts() -> Result<AgglayerGenesisAccounts> {
 
     // 1. Create Bridge Admin
     let admin_secret =
-        AuthSecretKey::new_falcon512_rpo_with_rng(&mut get_rpo_random_coin(&mut rng));
+        AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut get_rpo_random_coin(&mut rng));
     let admin_account = build_wallet_account(&mut rng, &admin_secret)
         .context("failed to create bridge admin account")?;
     let admin_account = set_nonce_to_one(admin_account);
 
     // 2. Create GER Manager
-    let ger_secret = AuthSecretKey::new_falcon512_rpo_with_rng(&mut get_rpo_random_coin(&mut rng));
+    let ger_secret =
+        AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut get_rpo_random_coin(&mut rng));
     let ger_account = build_wallet_account(&mut rng, &ger_secret)
         .context("failed to create GER manager account")?;
     let ger_account = set_nonce_to_one(ger_account);
@@ -71,7 +73,7 @@ pub fn create_agglayer_genesis_accounts() -> Result<AgglayerGenesisAccounts> {
 
     // 4. Create Faucet
     let faucet_seed: Word = rng.random::<[u64; 4]>().map(Felt::new).into();
-    let origin_token_address = EthAddressFormat::new(TEST_ORIGIN_TOKEN_ADDRESS);
+    let origin_token_address = EthAddress::new(TEST_ORIGIN_TOKEN_ADDRESS);
     let faucet = create_agglayer_faucet(
         faucet_seed,
         "AGG",
@@ -81,6 +83,7 @@ pub fn create_agglayer_genesis_accounts() -> Result<AgglayerGenesisAccounts> {
         &origin_token_address,
         0, // origin_network (mainnet)
         0, // scale
+        MetadataHash::from_token_info("Test Token", "TEST", 18),
     );
 
     // Register the faucet in the bridge's faucet registry and set nonce to ONE
@@ -114,11 +117,16 @@ fn register_faucet_and_finalize(
 ) -> Result<Account> {
     let (id, vault, mut storage, code, ..) = bridge.into_parts();
 
-    let registry_key = StorageMapKey::new(faucet_registry_key(faucet_id));
+    let [suffix, prefix] = <[Felt; 2]>::from(faucet_id);
+    let registry_key = StorageMapKey::new(Word::new([suffix, prefix, ZERO, ZERO]));
     let registered_value = Word::new([ONE, ZERO, ZERO, ZERO]);
 
     storage
-        .set_map_item(AggLayerBridge::faucet_registry_slot_name(), registry_key, registered_value)
+        .set_map_item(
+            AggLayerBridge::faucet_registry_map_slot_name(),
+            registry_key,
+            registered_value,
+        )
         .context("failed to set faucet registry entry")?;
 
     Ok(Account::new_unchecked(id, vault, storage, code, ONE, None))
@@ -135,14 +143,14 @@ fn build_wallet_account(rng: &mut ChaCha20Rng, secret: &AuthSecretKey) -> Result
     let acc_component = AccountComponent::new(
         basic_wallet_library(),
         vec![],
-        AccountComponentMetadata::new("miden::testing::basic_wallet").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::basic_wallet", AccountType::all()),
     )
     .context("failed to create wallet component")?;
 
     let account = AccountBuilder::new(seed)
         .with_auth_component(AuthSingleSig::new(
             secret.public_key().to_commitment(),
-            AuthScheme::Falcon512Rpo,
+            AuthScheme::Falcon512Poseidon2,
         ))
         .with_component(acc_component)
         .storage_mode(AccountStorageMode::Public)

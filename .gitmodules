@@ -1,0 +1,9 @@
+[submodule "bin/integration-tests/foundry-vectors/lib/forge-std"]
+	path = bin/integration-tests/foundry-vectors/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "bin/integration-tests/foundry-vectors/lib/zkevm-contracts"]
+	path = bin/integration-tests/foundry-vectors/lib/zkevm-contracts
+	url = https://github.com/0xPolygonHermez/zkevm-contracts
+[submodule "bin/integration-tests/foundry-vectors/lib/openzeppelin-contracts-upgradeable"]
+	path = bin/integration-tests/foundry-vectors/lib/openzeppelin-contracts-upgradeable
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable
