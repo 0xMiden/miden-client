@@ -169,14 +169,15 @@ impl WebClient {
             let foreign_accounts_set: BTreeSet<NativeForeignAccount> =
                 foreign_accounts.__inner.iter().map(|a| a.clone().into()).collect();
 
-            let result = Box::pin(client.execute_program(
-                account_id.into(),
-                tx_script.into(),
-                advice_inputs.into(),
-                foreign_accounts_set,
-            ))
-            .await
-            .map_err(|err| js_error_with_context(err, "failed to execute program"))?;
+            let result = client
+                .execute_program(
+                    account_id.into(),
+                    tx_script.into(),
+                    advice_inputs.into(),
+                    foreign_accounts_set,
+                )
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to execute program"))?;
 
             let felt_vec: Vec<Felt> = result.iter().map(|f| Felt::from(*f)).collect();
             Ok(felt_vec.into())
