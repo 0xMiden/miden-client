@@ -1,6 +1,6 @@
 //! Account-related database operations.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use std::string::{String, ToString};
 use std::sync::{Arc, RwLock};
@@ -898,11 +898,11 @@ impl SqliteStore {
         )?;
 
         // Build a set of slot names that have map updates (for efficient lookup).
-        let updated_map_slot_names: std::collections::BTreeSet<&StorageSlotName> =
+        let updated_map_slot_names: BTreeSet<&StorageSlotName> =
             delta.storage_map_updates.iter().map(|u| &u.slot_name).collect();
 
         // Build a set of slot names in non_oversized_slots that are map-type slots.
-        let replaced_map_slot_names: std::collections::BTreeSet<&StorageSlotName> = delta
+        let replaced_map_slot_names: BTreeSet<&StorageSlotName> = delta
             .non_oversized_slots
             .iter()
             .filter(|s| matches!(s.content(), StorageSlotContent::Map(_)))
@@ -941,6 +941,15 @@ impl SqliteStore {
                     .collect();
                 let new_map_root =
                     smt_forest.update_storage_map_nodes(old_map_root, slot_updates.into_iter())?;
+
+                // Update the root in latest_account_storage so it stays consistent.
+                tx.execute(
+                    "UPDATE latest_account_storage SET slot_value = ? \
+                     WHERE account_id = ? AND slot_name = ?",
+                    params![new_map_root.to_hex(), &account_id_hex, slot_name.to_string()],
+                )
+                .into_store_error()?;
+
                 new_roots.push(new_map_root);
             } else {
                 // No changes to this map — keep old root.

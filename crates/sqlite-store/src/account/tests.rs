@@ -314,6 +314,7 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
 /// Tests that `apply_sync_account_delta` correctly applies vault upserts and storage map
 /// entry additions to an existing account.
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn apply_sync_account_delta_additions() -> anyhow::Result<()> {
     use miden_client::rpc::domain::account_vault::AccountVaultUpdate;
     use miden_client::rpc::domain::storage_map::StorageMapUpdate;
@@ -416,6 +417,28 @@ async fn apply_sync_account_delta_additions() -> anyhow::Result<()> {
         panic!("Expected map slot content");
     };
     assert_eq!(map.entries().count(), 1);
+
+    // Verify the stored root in latest_account_storage matches the actual map root.
+    let stored_root: String = store
+        .interact_with_connection({
+            let account_id_hex = account_id.to_hex();
+            let slot_name = map_slot_name.to_string();
+            move |conn| {
+                conn.query_row(
+                    "SELECT slot_value FROM latest_account_storage \
+                     WHERE account_id = ? AND slot_name = ?",
+                    params![&account_id_hex, &slot_name],
+                    |row| row.get(0),
+                )
+                .into_store_error()
+            }
+        })
+        .await?;
+    assert_eq!(
+        stored_root,
+        map_slot.value().to_hex(),
+        "stored root should match actual map root"
+    );
 
     Ok(())
 }
