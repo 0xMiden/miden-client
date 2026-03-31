@@ -106,6 +106,7 @@ const READ_METHODS = new Set([
   "getSetting",
   "getSyncHeight",
   "getTransactions",
+  "executeProgram",
   "listSettingKeys",
   "listTags",
 ]);

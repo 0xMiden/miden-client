@@ -1016,8 +1016,8 @@ export async function pruneAccountHistory(
 
           // Find the boundary: highest nonce whose commitment is not pending.
           const pendingCommitments = new Set(pendingMap[aid] ?? []);
-          const sorted = [...headers].sort(
-            (a, b) => (BigInt(b.nonce) > BigInt(a.nonce) ? 1 : -1)
+          const sorted = [...headers].sort((a, b) =>
+            BigInt(b.nonce) > BigInt(a.nonce) ? 1 : -1
           );
           const boundary = sorted.find(
             (h) => !pendingCommitments.has(h.accountCommitment)
