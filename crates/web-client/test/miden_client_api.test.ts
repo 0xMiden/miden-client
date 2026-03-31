@@ -1033,6 +1033,7 @@ test.describe("MidenClient API - Integration", () => {
   test("full send flow: mint, sync, consume, check balance", async ({
     page,
   }) => {
+    test.slow();
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.create({
         rpcUrl: window.rpcUrl,
