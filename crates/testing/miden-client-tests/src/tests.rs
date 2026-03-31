@@ -124,6 +124,10 @@ mod transport;
 /// stale.
 const TX_DISCARD_DELTA: u32 = 20;
 
+/// Number of storage map entries used to create accounts that exceed the `too_many_entries`
+/// threshold (default mock threshold is 1000).
+const NUM_STORAGE_MAP_ENTRIES_LARGE_ACCOUNT: u64 = 2001;
+
 // TESTS
 // ================================================================================================
 
@@ -2920,11 +2924,10 @@ async fn sync_storage_maps_pagination_from_middle() {
 /// internally handles the oversized storage maps.
 #[tokio::test]
 async fn sync_large_public_account() {
-    // 1. Create a public account with 10 storage map entries.
     let map_slot = StorageSlot::with_map(
         StorageSlotName::new("test::large_map").unwrap(),
         StorageMap::with_entries(
-            (1..=10u64)
+            (1..=NUM_STORAGE_MAP_ENTRIES_LARGE_ACCOUNT)
                 .map(|i| {
                     let w = Word::from([Felt::new(i), Felt::new(0), Felt::new(0), Felt::new(0)]);
                     (StorageMapKey::new(w), w)
@@ -3006,7 +3009,11 @@ async fn sync_large_public_account() {
     let StorageSlotContent::Map(map) = map_slot.content() else {
         panic!("expected map slot content");
     };
-    assert_eq!(map.entries().count(), 10, "all 10 map entries should be preserved after sync");
+    assert_eq!(
+        map.entries().count(),
+        usize::try_from(NUM_STORAGE_MAP_ENTRIES_LARGE_ACCOUNT).unwrap(),
+        "all map entries should be preserved after sync"
+    );
 }
 
 // HELPERS
