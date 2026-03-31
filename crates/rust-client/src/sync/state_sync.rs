@@ -410,17 +410,17 @@ impl StateSync {
         state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<(), ClientError> {
-        // Step 1: Apply the MMR delta to advance the partial MMR up to chain_tip - 1,
-        // then add the chain tip block as a new leaf.
+        // Step 1: Apply the MMR delta to advance the partial MMR up to chain_tip - 1.
         let mut new_authentication_nodes =
             current_partial_mmr.apply(sync_data.mmr_delta).map_err(StoreError::MmrError)?;
 
+        // Capture peaks before adding the chain tip leaf. The store persists these peaks
+        // alongside the block header; on reload it reconstructs the MMR from (peaks + add).
+        let new_peaks = current_partial_mmr.peaks();
+
+        // Add the chain tip block as a new leaf
         new_authentication_nodes
             .append(&mut current_partial_mmr.add(sync_data.chain_tip_header.commitment(), false));
-
-        // Store the chain tip block header. This is needed so that subsequent transactions
-        // can reference recent blocks from the store.
-        let new_peaks = current_partial_mmr.peaks();
         state_sync_update.block_updates.insert(
             sync_data.chain_tip_header.clone(),
             false,

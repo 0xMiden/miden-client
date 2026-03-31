@@ -1,5 +1,6 @@
 use miden_client::rpc::domain::note::{
-    NoteSyncBlock as NativeNoteSyncBlock, NoteSyncInfo as NativeNoteSyncInfo,
+    NoteSyncBlock as NativeNoteSyncBlock,
+    NoteSyncInfo as NativeNoteSyncInfo,
 };
 use wasm_bindgen::prelude::*;
 
