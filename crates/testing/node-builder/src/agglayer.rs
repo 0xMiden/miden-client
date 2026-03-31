@@ -18,6 +18,7 @@ use miden_protocol::account::{
     AccountType,
     StorageMapKey,
 };
+use miden_protocol::block::account_tree::AccountIdKey;
 use miden_protocol::crypto::hash::poseidon2::Poseidon2;
 use miden_protocol::{Felt, ONE, Word, ZERO};
 use miden_standards::account::auth::AuthSingleSig;
@@ -121,10 +122,9 @@ fn register_faucet_and_finalize(
 ) -> Result<Account> {
     let (id, vault, mut storage, code, ..) = bridge.into_parts();
 
-    let [suffix, prefix] = <[Felt; 2]>::from(faucet_id);
-
     // 1. Register in faucet_registry
-    let faucet_key = StorageMapKey::new(Word::new([ZERO, ZERO, suffix, prefix]));
+    let faucet_account_id_word = AccountIdKey::new(faucet_id).as_word();
+    let faucet_key = StorageMapKey::new(faucet_account_id_word);
     let registered_value = Word::new([ONE, ZERO, ZERO, ZERO]);
     storage
         .set_map_item(AggLayerBridge::faucet_registry_map_slot_name(), faucet_key, registered_value)
@@ -134,7 +134,7 @@ fn register_faucet_and_finalize(
     let addr_elements = origin_token_address.to_elements();
     let token_addr_hash = Poseidon2::hash_elements(&addr_elements);
     let token_key = StorageMapKey::new(token_addr_hash.into());
-    let faucet_value = Word::new([ZERO, ZERO, suffix, prefix]);
+    let faucet_value = faucet_account_id_word;
     storage
         .set_map_item(AggLayerBridge::token_registry_map_slot_name(), token_key, faucet_value)
         .context("failed to set token registry entry")?;
