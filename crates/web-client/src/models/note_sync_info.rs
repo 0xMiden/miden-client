@@ -43,7 +43,7 @@ impl NoteSyncInfo {
         self.0.block_from.as_u32()
     }
 
-    /// Returns the end of the scanned block range (chain tip when block_to was not specified).
+    /// Returns the end of the scanned block range (chain tip when `block_to` was not specified).
     #[wasm_bindgen(js_name = "blockTo")]
     pub fn block_to(&self) -> u32 {
         self.0.block_to.as_u32()
