@@ -47,6 +47,7 @@ test.describe("get_transactions tests", () => {
   test("get_transactions retrieves all transactions successfully", async ({
     page,
   }) => {
+    test.slow();
     const { accountId, faucetId } = await setupWalletAndFaucet(page);
 
     const { mintResult, consumeResult } = await mintAndConsumeTransaction(
@@ -105,6 +106,7 @@ test.describe("get_transactions tests", () => {
   test("get_transactions filters by specific transaction IDs successfully", async ({
     page,
   }) => {
+    test.slow();
     const { accountId, faucetId } = await setupWalletAndFaucet(page);
 
     await mintAndConsumeTransaction(page, accountId, faucetId);

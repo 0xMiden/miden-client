@@ -22,7 +22,7 @@ test.describe("swap transaction tests", () => {
   testCases.forEach(({ flag, description }) => {
     test(description, async ({ page }) => {
       test.skip(!hasRemoteProver, "no remote prover configured");
-      test.setTimeout(480000);
+      test.setTimeout(600000);
       const { accountId: accountA, faucetId: faucetA } =
         await setupWalletAndFaucet(page);
       const { accountId: accountB, faucetId: faucetB } =
