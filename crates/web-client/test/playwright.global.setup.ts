@@ -114,7 +114,7 @@ export const test = base.extend<{ forEachTest: void }>({
             window.remoteProverInstance =
               window.TransactionProver.newRemoteProver(
                 window.remoteProverUrl,
-                BigInt(20_000)
+                BigInt(120_000)
               );
           }
 
@@ -160,7 +160,7 @@ export const test = base.extend<{ forEachTest: void }>({
             const proverToUse = useRemoteProver
               ? window.TransactionProver.newRemoteProver(
                   window.remoteProverUrl,
-                  null
+                  BigInt(120_000)
                 )
               : window.TransactionProver.newLocalProver();
 

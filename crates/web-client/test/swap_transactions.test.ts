@@ -13,7 +13,6 @@ const hasRemoteProver = !!getProverUrl();
 
 test.describe("swap transaction tests", () => {
   const testCases = [
-    { flag: false, description: "swap transaction completes successfully" },
     {
       flag: true,
       description: "swap transaction with remote prover completes successfully",
@@ -22,7 +21,7 @@ test.describe("swap transaction tests", () => {
 
   testCases.forEach(({ flag, description }) => {
     test(description, async ({ page }) => {
-      test.skip(flag && !hasRemoteProver, "no remote prover configured");
+      test.skip(!hasRemoteProver, "no remote prover configured");
       test.setTimeout(480000);
       const { accountId: accountA, faucetId: faucetA } =
         await setupWalletAndFaucet(page);

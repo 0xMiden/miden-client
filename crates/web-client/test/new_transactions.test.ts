@@ -449,11 +449,8 @@ export const customTransaction = async (
 
       // Creating First Custom Transaction Request to Mint the Custom Note
 
-      const outputNote = window.OutputNote.full(note);
       let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnOutputNotes(
-          new window.MidenArrays.OutputNoteArray([outputNote])
-        )
+        .withOwnOutputNotes(new window.NoteArray([note]))
         .build();
 
       // Execute and Submit Transaction
@@ -580,15 +577,8 @@ const customTxWithMultipleNotes = async (
       let note1 = new window.Note(noteAssets1, noteMetadata, noteRecipient1);
       let note2 = new window.Note(noteAssets2, noteMetadata, noteRecipient2);
 
-      const notes = [
-        window.OutputNote.full(note1),
-        window.OutputNote.full(note2),
-      ];
-
-      const outputNotes = new window.MidenArrays.OutputNoteArray(notes);
-
       let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnOutputNotes(outputNotes)
+        .withOwnOutputNotes(new window.NoteArray([note1, note2]))
         .build();
 
       let transactionUpdate = await window.helpers.executeAndApplyTransaction(
@@ -1270,9 +1260,7 @@ export const counterAccountComponent = async (
     let note = new window.Note(noteAssets, noteMetadata, noteRecipient);
 
     let transactionRequest = new window.TransactionRequestBuilder()
-      .withOwnOutputNotes(
-        new window.MidenArrays.OutputNoteArray([window.OutputNote.full(note)])
-      )
+      .withOwnOutputNotes(new window.NoteArray([note]))
       .build();
 
     let transactionUpdate = await window.helpers.executeAndApplyTransaction(
