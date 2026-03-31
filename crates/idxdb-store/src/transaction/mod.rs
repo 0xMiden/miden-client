@@ -15,12 +15,9 @@ use miden_client::transaction::{
 use miden_client::utils::Deserializable;
 
 use super::IdxdbStore;
-use super::account::utils::{
-    apply_full_account_state,
-    apply_transaction_delta,
-    compute_storage_delta,
-    compute_vault_delta,
-};
+use miden_client::store::{compute_storage_delta, compute_vault_delta};
+
+use super::account::utils::{apply_full_account_state, apply_transaction_delta};
 use super::note::utils::apply_note_updates_tx;
 use crate::promise::await_js;
 

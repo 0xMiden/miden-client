@@ -12,7 +12,6 @@ use miden_client::account::{
     AccountDelta,
     AccountHeader,
     AccountId,
-    AccountIdPrefix,
     AccountStorage,
     Address,
     PartialAccount,
@@ -23,7 +22,7 @@ use miden_client::account::{
     StorageSlotName,
     StorageSlotType,
 };
-use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset};
+use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::store::{
     AccountRecord,
     AccountRecordData,
@@ -37,7 +36,6 @@ use miden_client::utils::Serializable;
 use miden_client::{AccountError, Word};
 use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
 use miden_protocol::asset::{AssetVaultKey, PartialVault};
-use miden_protocol::crypto::merkle::MerkleError;
 use rusqlite::types::Value;
 use rusqlite::{Connection, OptionalExtension, Transaction, named_params, params};
 
@@ -247,11 +245,7 @@ impl SqliteStore {
             .0;
 
         let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
-        match smt_forest.get_asset_and_witness(header.vault_root(), vault_key) {
-            Ok((asset, witness)) => Ok(Some((asset, witness))),
-            Err(StoreError::MerkleStoreError(MerkleError::UntrackedKey(_))) => Ok(None),
-            Err(err) => Err(err),
-        }
+        smt_forest.try_get_asset_and_witness(header.vault_root(), vault_key)
     }
 
     /// Retrieves a specific item from the account's storage map without loading the entire storage.
@@ -440,7 +434,7 @@ impl SqliteStore {
         smt_forest: &mut AccountSmtForest,
         init_account_state: &AccountHeader,
         final_account_state: &AccountHeader,
-        updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
+        old_vault_assets: &[Asset],
         old_map_roots: &BTreeMap<StorageSlotName, Word>,
         delta: &AccountDelta,
     ) -> Result<(), StoreError> {
@@ -455,7 +449,7 @@ impl SqliteStore {
             account_id,
             init_account_state,
             final_account_state,
-            updated_fungible_assets,
+            old_vault_assets,
             delta,
         )?;
 
@@ -475,7 +469,7 @@ impl SqliteStore {
 
         let default_map_root = StorageMap::default().root();
         let updated_storage_slots =
-            Self::apply_account_storage_delta(smt_forest, old_map_roots, delta)?;
+            miden_client::store::compute_storage_delta(smt_forest, old_map_roots, delta)?;
 
         // Update map roots in final_roots with new values from the delta
         for (slot_name, (new_root, slot_type)) in &updated_storage_slots {

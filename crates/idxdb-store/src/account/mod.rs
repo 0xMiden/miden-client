@@ -30,7 +30,6 @@ use miden_client::asset::{
     StorageSlotContent,
     StorageSlotHeader,
 };
-use miden_client::crypto::MerkleError;
 use miden_client::store::{
     AccountRecord,
     AccountRecordData,
@@ -529,19 +528,14 @@ impl IdxdbStore {
         account_id: AccountId,
         vault_key: AssetVaultKey,
     ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
-        let account_header = self
+        let header = self
             .get_account_header(account_id)
             .await?
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
         let smt_forest = self.smt_forest.read();
-
-        match smt_forest.get_asset_and_witness(account_header.vault_root(), vault_key) {
-            Ok(result) => Ok(Some(result)),
-            Err(StoreError::MerkleStoreError(MerkleError::UntrackedKey(_))) => Ok(None),
-            Err(e) => Err(e),
-        }
+        smt_forest.try_get_asset_and_witness(header.vault_root(), vault_key)
     }
 
     pub(crate) async fn get_account_map_item(
