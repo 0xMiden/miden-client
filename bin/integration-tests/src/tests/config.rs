@@ -1,5 +1,7 @@
 use std::env::temp_dir;
+use std::fmt;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -8,8 +10,8 @@ use miden_client::crypto::RpoRandomCoin;
 use miden_client::grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::note_transport::{
-    NOTE_TRANSPORT_DEFAULT_ENDPOINT,
     NOTE_TRANSPORT_DEVNET_ENDPOINT,
+    NOTE_TRANSPORT_TESTNET_ENDPOINT,
 };
 use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::testing::common::{FilesystemKeyStore, TestClient, create_test_store_path};
@@ -17,6 +19,51 @@ use miden_client::{DebugMode, Felt, RemoteTransactionProver};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::Rng;
 use uuid::Uuid;
+
+/// Identifies the note transport service to connect to.
+///
+/// Centralises the "devnet / testnet / custom-URL" resolution that was previously
+/// duplicated across `ClientConfig::default`, `BaseConfig::try_from` and
+/// `resolve_transport_endpoint` in the transport tests.
+#[derive(Clone, Debug)]
+pub enum NoteTransportEndpoint {
+    Devnet,
+    Testnet,
+    Custom(String),
+}
+
+impl NoteTransportEndpoint {
+    /// Returns the gRPC URL for this endpoint.
+    pub fn to_url(&self) -> String {
+        match self {
+            Self::Devnet => NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string(),
+            Self::Testnet => NOTE_TRANSPORT_TESTNET_ENDPOINT.to_string(),
+            Self::Custom(url) => url.clone(),
+        }
+    }
+}
+
+impl FromStr for NoteTransportEndpoint {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_lowercase().as_str() {
+            "devnet" => Self::Devnet,
+            "testnet" => Self::Testnet,
+            _ => Self::Custom(s.to_string()),
+        })
+    }
+}
+
+impl fmt::Display for NoteTransportEndpoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Devnet => write!(f, "devnet ({})", NOTE_TRANSPORT_DEVNET_ENDPOINT),
+            Self::Testnet => write!(f, "testnet ({})", NOTE_TRANSPORT_TESTNET_ENDPOINT),
+            Self::Custom(url) => write!(f, "{url}"),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
@@ -28,8 +75,8 @@ pub struct ClientConfig {
     /// default local prover.
     pub prover_endpoint: Option<String>,
     /// Optional note transport endpoint. If set, the client will connect to a note transport
-    /// service. Accepted values when resolving: "devnet", "testnet", or a custom URL.
-    pub note_transport_endpoint: Option<String>,
+    /// service.
+    pub note_transport_endpoint: Option<NoteTransportEndpoint>,
 }
 
 impl ClientConfig {
@@ -60,7 +107,10 @@ impl ClientConfig {
     }
 
     #[allow(clippy::return_self_not_must_use)]
-    pub fn with_note_transport_endpoint(mut self, note_transport_endpoint: Option<String>) -> Self {
+    pub fn with_note_transport_endpoint(
+        mut self,
+        note_transport_endpoint: Option<NoteTransportEndpoint>,
+    ) -> Self {
         self.note_transport_endpoint = note_transport_endpoint;
         self
     }
@@ -107,13 +157,14 @@ impl ClientConfig {
             builder = builder.prover(Arc::new(RemoteTransactionProver::new(prover_url)));
         }
 
-        if let Some(transport_url) = &self.note_transport_endpoint {
+        if let Some(transport) = &self.note_transport_endpoint {
+            let transport_url = transport.to_url();
             let transport_timeout = std::env::var("TEST_TIMEOUT")
                 .ok()
                 .and_then(|s| s.parse::<u64>().ok())
                 .unwrap_or(10_000);
             let nt_client = Arc::new(
-                GrpcNoteTransportClient::connect(transport_url.to_string(), transport_timeout)
+                GrpcNoteTransportClient::connect(transport_url.clone(), transport_timeout)
                     .await
                     .with_context(|| {
                         format!("failed to connect note transport at {transport_url}")
@@ -192,16 +243,12 @@ impl Default for ClientConfig {
         // Resolve note transport: TEST_MIDEN_NOTE_TRANSPORT_URL overrides network preset.
         let note_transport_endpoint =
             if let Ok(url) = std::env::var("TEST_MIDEN_NOTE_TRANSPORT_URL") {
-                match url.to_lowercase().as_str() {
-                    "testnet" => Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string()),
-                    "devnet" => Some(NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string()),
-                    _ => Some(url),
-                }
+                Some(url.parse::<NoteTransportEndpoint>().unwrap())
             } else {
                 // Network preset defaults
                 match network_lower.as_str() {
-                    "testnet" => Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string()),
-                    "devnet" => Some(NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string()),
+                    "testnet" => Some(NoteTransportEndpoint::Testnet),
+                    "devnet" => Some(NoteTransportEndpoint::Devnet),
                     _ => None,
                 }
             };

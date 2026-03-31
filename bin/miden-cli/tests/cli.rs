@@ -37,6 +37,7 @@ use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
 use miden_client::{self, Client, DebugMode, Felt};
 use miden_client_cli::MIDEN_DIR;
+use miden_client_cli::config::Network;
 use miden_client_sqlite_store::SqliteStore;
 use predicates::str::contains;
 use rand::Rng;
@@ -922,17 +923,11 @@ async fn new_wallet_with_deploy_flag() -> Result<()> {
 fn init_cli() -> (PathBuf, PathBuf, Endpoint) {
     // Try to read from env first or default to localhost.
     // Accepts "devnet", "testnet", "localhost", or a custom RPC endpoint string.
-    let network = std::env::var("TEST_MIDEN_NETWORK").unwrap_or_else(|_| "localhost".to_string());
-    let network_lower = network.to_lowercase();
-    let endpoint = if network_lower == "devnet" {
-        Endpoint::devnet()
-    } else if network_lower == "testnet" {
-        Endpoint::testnet()
-    } else if network_lower == "localhost" {
-        Endpoint::localhost()
-    } else {
-        Endpoint::try_from(network_lower.as_str()).unwrap()
-    };
+    let network: Network = std::env::var("TEST_MIDEN_NETWORK")
+        .unwrap_or_else(|_| "localhost".to_string())
+        .parse()
+        .unwrap();
+    let endpoint = Endpoint::try_from(network.to_rpc_endpoint().as_str()).unwrap();
 
     let store_path = create_test_store_path();
     let temp_dir = init_cli_with_store_path(&store_path, &endpoint);

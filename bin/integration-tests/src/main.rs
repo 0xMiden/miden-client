@@ -10,17 +10,13 @@ use std::time::{Duration, Instant};
 
 use clap::Parser;
 use miden_client::grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
-use miden_client::note_transport::{
-    NOTE_TRANSPORT_DEFAULT_ENDPOINT,
-    NOTE_TRANSPORT_DEVNET_ENDPOINT,
-};
 use miden_client::rpc::Endpoint;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::prelude::*;
 
-use crate::tests::config::ClientConfig;
+use crate::tests::config::{ClientConfig, NoteTransportEndpoint};
 
 mod generated_tests;
 mod tests;
@@ -182,7 +178,7 @@ struct BaseConfig {
     rpc_endpoint: Endpoint,
     timeout: u64,
     prover_endpoint: Option<String>,
-    note_transport_endpoint: Option<String>,
+    note_transport_endpoint: Option<NoteTransportEndpoint>,
     verbose: bool,
 }
 
@@ -224,16 +220,12 @@ impl TryFrom<Args> for BaseConfig {
 
         // Resolve note transport: explicit flag overrides network preset.
         let note_transport_endpoint = if let Some(url) = args.note_transport_url {
-            match url.to_lowercase().as_str() {
-                "testnet" => Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string()),
-                "devnet" => Some(NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string()),
-                _ => Some(url),
-            }
+            Some(url.parse::<NoteTransportEndpoint>().unwrap())
         } else {
             // Network preset defaults
             match &args.network {
-                Network::Testnet => Some(NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string()),
-                Network::Devnet => Some(NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string()),
+                Network::Testnet => Some(NoteTransportEndpoint::Testnet),
+                Network::Devnet => Some(NoteTransportEndpoint::Devnet),
                 _ => None,
             }
         };
@@ -622,7 +614,12 @@ fn run_tests_parallel(
         println!("  Prover:       {}", base_config.prover_endpoint.as_deref().unwrap_or("local"));
         println!(
             "  Transport:    {}",
-            base_config.note_transport_endpoint.as_deref().unwrap_or("none")
+            base_config
+                .note_transport_endpoint
+                .as_ref()
+                .map(|e| e.to_string())
+                .as_deref()
+                .unwrap_or("none")
         );
         println!("  Timeout:      {}ms", base_config.timeout);
         println!("─────────────────────────────────────────────────────────");
@@ -696,8 +693,8 @@ fn run_tests_parallel(
                 }
 
                 // Forward note transport URL if set
-                if let Some(ref transport_url) = note_transport_endpoint {
-                    cmd.arg("--note-transport-url").arg(transport_url);
+                if let Some(ref transport) = note_transport_endpoint {
+                    cmd.arg("--note-transport-url").arg(transport.to_url());
                 }
 
                 // Forward verbosity flag

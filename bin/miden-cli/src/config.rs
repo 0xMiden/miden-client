@@ -8,8 +8,8 @@ use figment::providers::{Format, Toml};
 use figment::value::{Dict, Map};
 use figment::{Figment, Metadata, Profile, Provider};
 use miden_client::note_transport::{
-    NOTE_TRANSPORT_DEFAULT_ENDPOINT,
     NOTE_TRANSPORT_DEVNET_ENDPOINT,
+    NOTE_TRANSPORT_TESTNET_ENDPOINT,
 };
 use miden_client::rpc::Endpoint;
 use serde::{Deserialize, Serialize};
@@ -434,7 +434,7 @@ pub struct NoteTransportConfig {
 impl Default for NoteTransportConfig {
     fn default() -> Self {
         Self {
-            endpoint: NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(),
+            endpoint: NOTE_TRANSPORT_TESTNET_ENDPOINT.to_string(),
             timeout_ms: 10000,
         }
     }

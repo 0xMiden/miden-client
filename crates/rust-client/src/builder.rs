@@ -187,7 +187,7 @@ where
                 TESTNET_PROVER_ENDPOINT.to_string(),
             ))),
             note_transport_config: Some(NoteTransportConfig {
-                endpoint: crate::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(),
+                endpoint: crate::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT.to_string(),
                 timeout_ms: NOTE_TRANSPORT_DEFAULT_TIMEOUT_MS,
             }),
             endpoint: Some(endpoint),

@@ -66,6 +66,7 @@ const WRITE_METHODS = new Set([
   "addAccountSecretKeyToWebStore",
   "addTag",
   "executeForSummary",
+  "executeProgram",
   "fetchAllPrivateNotes",
   "fetchPrivateNotes",
   "forceImportStore",
