@@ -95,13 +95,13 @@ jobs:
       - name: Add target
         run: |
           rustup target add ${{ matrix.target }}
-      - name: Build miden-client
+      - name: Build miden-client-cli
         run: |
-          BUILD_TARGET=${{ matrix.target }} make build-cli 
+          BUILD_TARGET=${{ matrix.target }} make build-cli
       - name: Prepare artifact
         run: |
           mv target/${{ matrix.target }}/release/miden-client miden-client-${{ matrix.target }}
-      - name: Attest miden-client
+      - name: Attest miden-client-cli
         uses: actions/attest-build-provenance@v3
         with:
           subject-path: miden-client-${{ matrix.target }}
