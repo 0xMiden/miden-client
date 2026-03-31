@@ -144,7 +144,8 @@ impl NodeBuilder {
             .await
             .with_context(|| "failed to create genesis block")?;
 
-        Store::bootstrap(&genesis_block, &self.data_directory)
+        let genesis_header = genesis_block.inner().header().clone();
+        Store::bootstrap(genesis_block, &self.data_directory)
             .with_context(|| "failed to bootstrap store")?;
 
         // Bootstrap the validator database with the genesis block header so that block
@@ -155,7 +156,7 @@ impl NodeBuilder {
                 .with_context(|| "failed to initialize validator database")?;
         validator_db
             .transact("bootstrap_validator", move |conn| {
-                miden_node_validator::db::upsert_block_header(conn, genesis_block.inner().header())
+                miden_node_validator::db::upsert_block_header(conn, &genesis_header)
             })
             .await
             .with_context(|| "failed to bootstrap validator with genesis block header")?;
@@ -322,6 +323,7 @@ impl NodeBuilder {
                         block_producer_listener,
                         ntx_builder_listener,
                         block_prover_url: None,
+                        max_concurrent_proofs: std::num::NonZeroUsize::new(1).unwrap(),
                         storage_options: StorageOptions::default(),
                         grpc_options: GrpcOptionsInternal::default(),
                     }

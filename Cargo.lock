@@ -3202,7 +3202,7 @@ dependencies = [
 [[package]]
 name = "miden-large-smt-backend-rocksdb"
 version = "0.14.0"
-source = "git+https://github.com/0xMiden/miden-node?rev=a329b4c7fc5592bd2844242f8a325084e76c9512#a329b4c7fc5592bd2844242f8a325084e76c9512"
+source = "git+https://github.com/0xMiden/miden-node?rev=08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea#08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea"
 dependencies = [
  "miden-crypto",
  "miden-node-rocksdb-cxx-linkage-fix",
@@ -3263,7 +3263,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.14.0"
-source = "git+https://github.com/0xMiden/miden-node?rev=a329b4c7fc5592bd2844242f8a325084e76c9512#a329b4c7fc5592bd2844242f8a325084e76c9512"
+source = "git+https://github.com/0xMiden/miden-node?rev=08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea#08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea"
 dependencies = [
  "anyhow",
  "futures",
@@ -3289,7 +3289,7 @@ dependencies = [
 [[package]]
 name = "miden-node-db"
 version = "0.14.0"
-source = "git+https://github.com/0xMiden/miden-node?rev=a329b4c7fc5592bd2844242f8a325084e76c9512#a329b4c7fc5592bd2844242f8a325084e76c9512"
+source = "git+https://github.com/0xMiden/miden-node?rev=08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea#08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea"
 dependencies = [
  "deadpool",
  "deadpool-diesel",
@@ -3303,7 +3303,7 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.14.0"
-source = "git+https://github.com/0xMiden/miden-node?rev=a329b4c7fc5592bd2844242f8a325084e76c9512#a329b4c7fc5592bd2844242f8a325084e76c9512"
+source = "git+https://github.com/0xMiden/miden-node?rev=08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea#08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea"
 dependencies = [
  "quote",
  "syn 2.0.117",
@@ -3312,7 +3312,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.14.0"
-source = "git+https://github.com/0xMiden/miden-node?rev=a329b4c7fc5592bd2844242f8a325084e76c9512#a329b4c7fc5592bd2844242f8a325084e76c9512"
+source = "git+https://github.com/0xMiden/miden-node?rev=08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea#08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3342,7 +3342,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.14.0"
-source = "git+https://github.com/0xMiden/miden-node?rev=a329b4c7fc5592bd2844242f8a325084e76c9512#a329b4c7fc5592bd2844242f8a325084e76c9512"
+source = "git+https://github.com/0xMiden/miden-node?rev=08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea#08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3366,7 +3366,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.14.0"
-source = "git+https://github.com/0xMiden/miden-node?rev=a329b4c7fc5592bd2844242f8a325084e76c9512#a329b4c7fc5592bd2844242f8a325084e76c9512"
+source = "git+https://github.com/0xMiden/miden-node?rev=08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea#08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea"
 dependencies = [
  "build-rs",
  "fs-err",
@@ -3378,12 +3378,12 @@ dependencies = [
 [[package]]
 name = "miden-node-rocksdb-cxx-linkage-fix"
 version = "0.14.0"
-source = "git+https://github.com/0xMiden/miden-node?rev=a329b4c7fc5592bd2844242f8a325084e76c9512#a329b4c7fc5592bd2844242f8a325084e76c9512"
+source = "git+https://github.com/0xMiden/miden-node?rev=08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea#08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea"
 
 [[package]]
 name = "miden-node-rpc"
 version = "0.14.0"
-source = "git+https://github.com/0xMiden/miden-node?rev=a329b4c7fc5592bd2844242f8a325084e76c9512#a329b4c7fc5592bd2844242f8a325084e76c9512"
+source = "git+https://github.com/0xMiden/miden-node?rev=08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea#08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea"
 dependencies = [
  "anyhow",
  "futures",
@@ -3410,7 +3410,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.14.0"
-source = "git+https://github.com/0xMiden/miden-node?rev=a329b4c7fc5592bd2844242f8a325084e76c9512#a329b4c7fc5592bd2844242f8a325084e76c9512"
+source = "git+https://github.com/0xMiden/miden-node?rev=08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea#08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3419,7 +3419,6 @@ dependencies = [
  "diesel",
  "diesel_migrations",
  "fs-err",
- "futures",
  "hex",
  "indexmap",
  "libsqlite3-sys",
@@ -3452,7 +3451,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.14.0"
-source = "git+https://github.com/0xMiden/miden-node?rev=a329b4c7fc5592bd2844242f8a325084e76c9512#a329b4c7fc5592bd2844242f8a325084e76c9512"
+source = "git+https://github.com/0xMiden/miden-node?rev=08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea#08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3486,7 +3485,7 @@ dependencies = [
 [[package]]
 name = "miden-node-validator"
 version = "0.14.0"
-source = "git+https://github.com/0xMiden/miden-node?rev=a329b4c7fc5592bd2844242f8a325084e76c9512#a329b4c7fc5592bd2844242f8a325084e76c9512"
+source = "git+https://github.com/0xMiden/miden-node?rev=08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea#08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -3602,7 +3601,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.14.0"
-source = "git+https://github.com/0xMiden/miden-node?rev=a329b4c7fc5592bd2844242f8a325084e76c9512#a329b4c7fc5592bd2844242f8a325084e76c9512"
+source = "git+https://github.com/0xMiden/miden-node?rev=08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea#08e47a4e8a1319e8d4bb39d522c8c4eda3d91cea"
 dependencies = [
  "build-rs",
  "fs-err",

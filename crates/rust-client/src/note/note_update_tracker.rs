@@ -307,9 +307,17 @@ impl NoteUpdateTracker {
         )?;
         let is_tracked_as_input_note =
             if let Some(input_note_record) = self.get_input_note_by_id(*committed_note.note_id()) {
+                // Use the tracked note's own metadata (which includes the correct attachment)
+                // rather than the sync response metadata (which only contains the header without
+                // attachment data). Fall back to the sync response metadata for notes that don't
+                // have metadata stored yet (e.g., imported notes without metadata).
+                let metadata = input_note_record
+                    .metadata()
+                    .cloned()
+                    .unwrap_or_else(|| committed_note.metadata());
+
                 // The note belongs to our locally tracked set of input notes
-                input_note_record
-                    .inclusion_proof_received(inclusion_proof.clone(), committed_note.metadata())?;
+                input_note_record.inclusion_proof_received(inclusion_proof.clone(), metadata)?;
                 input_note_record.block_header_received(block_header)?;
 
                 true

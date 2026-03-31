@@ -294,12 +294,25 @@ impl MockRpcApi {
                         || account_ids.contains(&note.metadata().sender()))
                 {
                     Some(NoteSyncRecord {
-                        note_index_in_block: u32::from(
-                            note.inclusion_proof().location().block_note_tree_index(),
+                        metadata_header: Some(crate::rpc::generated::note::NoteMetadataHeader {
+                            sender: Some(note.metadata().sender().into()),
+                            note_type: note.metadata().note_type() as i32,
+                            tag: note.metadata().tag().as_u32(),
+                            attachment_kind: 0,
+                            attachment_scheme: 0,
+                        }),
+                        inclusion_proof: Some(
+                            crate::rpc::generated::note::NoteInclusionInBlockProof {
+                                note_id: Some(note.id().into()),
+                                block_num: block_num.as_u32(),
+                                note_index_in_block: u32::from(
+                                    note.inclusion_proof().location().block_note_tree_index(),
+                                ),
+                                inclusion_path: Some(
+                                    note.inclusion_proof().note_path().clone().into(),
+                                ),
+                            },
                         ),
-                        note_id: Some(note.id().into()),
-                        metadata: Some(note.metadata().clone().into()),
-                        inclusion_path: Some(note.inclusion_proof().note_path().clone().into()),
                     })
                 } else {
                     None
@@ -366,10 +379,11 @@ impl NodeRpcClient for MockRpcApi {
         let notes = note_records
             .into_iter()
             .map(|note| {
-                let note_id: NoteId = note.note_id.unwrap().try_into().unwrap();
-                let note_index = u16::try_from(note.note_index_in_block).unwrap();
-                let merkle_path = note.inclusion_path.unwrap().try_into().unwrap();
-                let metadata = note.metadata.unwrap().try_into().unwrap();
+                let inclusion_proof = note.inclusion_proof.unwrap();
+                let note_id: NoteId = inclusion_proof.note_id.unwrap().try_into().unwrap();
+                let note_index = u16::try_from(inclusion_proof.note_index_in_block).unwrap();
+                let merkle_path = inclusion_proof.inclusion_path.unwrap().try_into().unwrap();
+                let metadata = note.metadata_header.unwrap().try_into().unwrap();
 
                 CommittedNote::new(note_id, note_index, merkle_path, metadata)
             })

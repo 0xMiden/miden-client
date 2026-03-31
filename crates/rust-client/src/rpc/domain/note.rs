@@ -88,6 +88,28 @@ impl TryFrom<proto::note::NoteHeader> for NoteHeader {
     }
 }
 
+/// Converts a proto `NoteMetadataHeader` into a domain `NoteMetadata`.
+///
+/// Since the header only contains fixed-size metadata (sender, `note_type`, tag) without the full
+/// attachment data, the resulting `NoteMetadata` will have a default attachment. This is suitable
+/// for `is_private()` checks and note filtering, but not for commitment verification (which
+/// requires the full metadata including attachment).
+impl TryFrom<proto::note::NoteMetadataHeader> for NoteMetadata {
+    type Error = RpcConversionError;
+
+    fn try_from(value: proto::note::NoteMetadataHeader) -> Result<Self, Self::Error> {
+        let sender = value
+            .sender
+            .ok_or_else(|| proto::note::NoteMetadataHeader::missing_field(stringify!(sender)))?
+            .try_into()?;
+        let note_type =
+            NoteType::try_from(u64::try_from(value.note_type).expect("invalid note type"))?;
+        let tag = NoteTag::new(value.tag);
+
+        Ok(NoteMetadata::new(sender, note_type).with_tag(tag))
+    }
+}
+
 impl TryFrom<proto::note::NoteInclusionInBlockProof> for NoteInclusionProof {
     type Error = RpcConversionError;
 
@@ -149,36 +171,44 @@ impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
             .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(mmr_path)))?
             .try_into()?;
 
-        // Validate and convert account note inclusions into an (AccountId, Word) tuple
+        // Validate and convert note inclusions from the new proto structure.
+        // Each NoteSyncRecord now contains a NoteMetadataHeader and a NoteInclusionInBlockProof.
         let mut notes = vec![];
         for note in value.notes {
-            let note_id: NoteId = note
-                .note_id
-                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.note_id)))?
-                .try_into()?;
+            let inclusion_proof = note.inclusion_proof.ok_or(
+                proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.inclusion_proof)),
+            )?;
 
-            let inclusion_path = note
-                .inclusion_path
+            let note_id: NoteId = inclusion_proof
+                .note_id
                 .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
-                    notes.inclusion_path
+                    notes.inclusion_proof.note_id
                 )))?
                 .try_into()?;
 
-            let metadata = note
-                .metadata
-                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.metadata)))?
-                .try_into()?;
-
-            let committed_note = CommittedNote::new(
-                note_id,
-                u16::try_from(note.note_index_in_block).map_err(|_| {
+            let note_index_in_block =
+                u16::try_from(inclusion_proof.note_index_in_block).map_err(|_| {
                     RpcConversionError::InvalidField(
                         "note_index_in_block value out of u16 range".into(),
                     )
-                })?,
-                inclusion_path,
-                metadata,
-            );
+                })?;
+
+            let inclusion_path = inclusion_proof
+                .inclusion_path
+                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
+                    notes.inclusion_proof.inclusion_path
+                )))?
+                .try_into()?;
+
+            let metadata: NoteMetadata = note
+                .metadata_header
+                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
+                    notes.metadata_header
+                )))?
+                .try_into()?;
+
+            let committed_note =
+                CommittedNote::new(note_id, note_index_in_block, inclusion_path, metadata);
 
             notes.push(committed_note);
         }
