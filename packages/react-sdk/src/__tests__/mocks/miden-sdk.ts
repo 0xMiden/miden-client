@@ -291,6 +291,35 @@ export const MockAccountId = {
   fromBech32: vi.fn((bech32: string) => createMockAccountId(bech32)),
 };
 
+// Mock FeltArray
+export const createMockFeltArray = (length: number = 16) => ({
+  length: vi.fn(() => length),
+  get: vi.fn((i: number) => ({
+    asInt: vi.fn(() => BigInt(i)),
+  })),
+});
+
+// Mock AdviceInputs
+export const MockAdviceInputs = class AdviceInputs {};
+
+// Mock ForeignAccount
+export const MockForeignAccount = Object.assign(class ForeignAccount {}, {
+  public: vi.fn(
+    (_id: unknown, _storage: unknown) => new (class ForeignAccount {})()
+  ),
+});
+
+// Mock ForeignAccountArray
+export const MockForeignAccountArray = class ForeignAccountArray {
+  accounts: unknown[];
+  constructor(accounts: unknown[] = []) {
+    this.accounts = accounts;
+  }
+};
+
+// Mock AccountStorageRequirements
+export const MockAccountStorageRequirements = class AccountStorageRequirements {};
+
 // Create a mock WebClient
 export const createMockWebClient = (
   overrides: Partial<MockWebClientType> = {}
@@ -360,6 +389,9 @@ export const createMockWebClient = (
     // Signer
     setSignCb: vi.fn(),
 
+    // Execute program
+    executeProgram: vi.fn().mockResolvedValue(createMockFeltArray()),
+
     // Cleanup
     free: vi.fn(),
   };
@@ -398,6 +430,7 @@ export type MockWebClientType = {
   exportNoteFile: ReturnType<typeof vi.fn>;
   importNoteFile: ReturnType<typeof vi.fn>;
   setSignCb: ReturnType<typeof vi.fn>;
+  executeProgram: ReturnType<typeof vi.fn>;
   free: ReturnType<typeof vi.fn>;
 };
 
@@ -446,6 +479,10 @@ export const createMockSdkModule = (
       uncommitted: vi.fn(() => ({})),
       ids: vi.fn((ids: unknown) => ({ ids })),
     },
+    AdviceInputs: MockAdviceInputs,
+    ForeignAccount: MockForeignAccount,
+    ForeignAccountArray: MockForeignAccountArray,
+    AccountStorageRequirements: MockAccountStorageRequirements,
     AccountFile: Object.assign(
       vi.fn().mockImplementation(() => createMockAccountFile()),
       {
