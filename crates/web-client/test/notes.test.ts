@@ -252,6 +252,7 @@ test.describe("get_consumable_notes", () => {
       description: "p2ide consume after block with remote prover",
     },
   ];
+  const RECALL_HEIGHT_DELTA = 50;
 
   p2ideTestCases.forEach(({ flag, description }) => {
     test(description, async ({ page }) => {
@@ -260,7 +261,7 @@ test.describe("get_consumable_notes", () => {
       const { accountId: senderAccountId, faucetId } =
         await setupWalletAndFaucet(page);
       const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
-      const recallHeight = (await getSyncHeight(page)) + 30;
+      const recallHeight = (await getSyncHeight(page)) + RECALL_HEIGHT_DELTA;
       await sendTransaction(
         page,
         senderAccountId,

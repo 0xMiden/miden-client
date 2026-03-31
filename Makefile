@@ -157,8 +157,9 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included (requires note transport service)
-	TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT=$(NOTE_TRANSPORT_ENDPOINT) TEST_WITH_NOTE_TRANSPORT=1 cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
-	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
+	# TODO: remove -j 4 once https://github.com/0xMiden/miden-node/issues/1856 is resolved
+	TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT=$(NOTE_TRANSPORT_ENDPOINT) TEST_WITH_NOTE_TRANSPORT=1 cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration -j 4
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -j 4 -- import_genesis_accounts_can_be_used_for_transactions
 
 .PHONY: test-dev
 test-dev: ## Run tests with debug assertions enabled via test-dev profile
