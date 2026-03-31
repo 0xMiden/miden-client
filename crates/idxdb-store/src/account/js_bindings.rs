@@ -166,7 +166,7 @@ extern "C" {
     pub fn idxdb_prune_account_history(
         db_id: &str,
         account_id: Option<String>,
-        pending_nonces_json: String,
+        pending_commitments_json: String,
     ) -> js_sys::Promise;
 }
 

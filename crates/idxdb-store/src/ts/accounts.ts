@@ -967,142 +967,22 @@ export async function lockAccount(dbId: string, accountId: string) {
 }
 
 /**
- * Rebuilds latest storage slots from historical data.
- * Groups by slotName, takes the entry with MAX(nonce) per slot.
- * Slots cannot be removed, so no tombstone filtering needed.
- */
-export async function rebuildLatestStorageSlots(
-  db: MidenDatabase,
-  accountId: string
-) {
-  await db.latestAccountStorages.where("accountId").equals(accountId).delete();
-  const allHist = await db.historicalAccountStorages
-    .where("accountId")
-    .equals(accountId)
-    .toArray();
-
-  // Group by slotName, take MAX(replacedAtNonce) per slot
-  const bySlot = new Map<string, (typeof allHist)[0]>();
-  for (const entry of allHist) {
-    const existing = bySlot.get(entry.slotName);
-    if (
-      !existing ||
-      BigInt(entry.replacedAtNonce) > BigInt(existing.replacedAtNonce)
-    ) {
-      bySlot.set(entry.slotName, entry);
-    }
-  }
-
-  if (bySlot.size > 0) {
-    const entries = [...bySlot.values()].map(
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      ({ replacedAtNonce, oldSlotValue, ...rest }) => ({
-        ...rest,
-        slotValue: oldSlotValue ?? "",
-      })
-    );
-    await db.latestAccountStorages.bulkPut(entries);
-  }
-}
-
-/**
- * Rebuilds latest storage map entries from historical data.
- * Groups by (slotName, key), takes the entry with MAX(nonce) per key.
- * Filters out tombstones (value === null).
- */
-export async function rebuildLatestStorageMapEntries(
-  db: MidenDatabase,
-  accountId: string
-) {
-  await db.latestStorageMapEntries
-    .where("accountId")
-    .equals(accountId)
-    .delete();
-  const allHist = await db.historicalStorageMapEntries
-    .where("accountId")
-    .equals(accountId)
-    .toArray();
-
-  // Group by (slotName, key), take MAX(replacedAtNonce) per key
-  const byKey = new Map<string, (typeof allHist)[0]>();
-  for (const entry of allHist) {
-    const compositeKey = `${entry.slotName}\0${entry.key}`;
-    const existing = byKey.get(compositeKey);
-    if (
-      !existing ||
-      BigInt(entry.replacedAtNonce) > BigInt(existing.replacedAtNonce)
-    ) {
-      byKey.set(compositeKey, entry);
-    }
-  }
-
-  // Filter out tombstones and strip replacedAtNonce
-  const entries = [...byKey.values()]
-    .filter((e) => e.oldValue !== null)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    .map(({ replacedAtNonce, oldValue, ...rest }) => ({
-      ...rest,
-      value: oldValue as string,
-    }));
-  if (entries.length > 0) {
-    await db.latestStorageMapEntries.bulkPut(entries);
-  }
-}
-
-/**
- * Rebuilds latest vault assets from historical data.
- * Groups by vaultKey, takes the entry with MAX(nonce) per key.
- * Filters out tombstones (asset === null).
- */
-export async function rebuildLatestVaultAssets(
-  db: MidenDatabase,
-  accountId: string
-) {
-  await db.latestAccountAssets.where("accountId").equals(accountId).delete();
-  const allHist = await db.historicalAccountAssets
-    .where("accountId")
-    .equals(accountId)
-    .toArray();
-
-  // Group by vaultKey, take MAX(replacedAtNonce) per key
-  const byKey = new Map<string, (typeof allHist)[0]>();
-  for (const entry of allHist) {
-    const existing = byKey.get(entry.vaultKey);
-    if (
-      !existing ||
-      BigInt(entry.replacedAtNonce) > BigInt(existing.replacedAtNonce)
-    ) {
-      byKey.set(entry.vaultKey, entry);
-    }
-  }
-
-  // Filter out tombstones and strip replacedAtNonce
-  const entries = [...byKey.values()]
-    .filter((e) => e.oldAsset !== null)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    .map(({ replacedAtNonce, oldAsset, ...rest }) => ({
-      ...rest,
-      asset: oldAsset as string,
-    }));
-  if (entries.length > 0) {
-    await db.latestAccountAssets.bulkPut(entries);
-  }
-}
-
-/**
  * Prunes old committed historical states for one or all accounts.
+ *
+ * `pendingCommitmentsJson` is a JSON-encoded `Record<accountId, commitment[]>`
+ * of `final_account_state` commitments from pending transactions.
  */
 export async function pruneAccountHistory(
   dbId: string,
   accountId: string | null,
-  pendingNoncesJson: string
+  pendingCommitmentsJson: string
 ): Promise<number> {
   try {
     const db = getDatabase(dbId);
     let totalDeleted = 0;
 
-    // Parse the pending-nonces map supplied by the Rust caller.
-    const pendingMap = JSON.parse(pendingNoncesJson) as Record<
+    // Parse the pending-commitments map supplied by the Rust caller.
+    const pendingMap = JSON.parse(pendingCommitmentsJson) as Record<
       string,
       string[]
     >;
@@ -1134,55 +1014,43 @@ export async function pruneAccountHistory(
             .equals(aid)
             .toArray();
 
-          if (headers.length <= 1) continue;
-
-          // Build set of pending nonces for this account.
-          const pending = new Set(
-            (pendingMap[aid] ?? []).map((n) => BigInt(n))
+          // Find the boundary: highest nonce whose commitment is not pending.
+          const pendingCommitments = new Set(pendingMap[aid] ?? []);
+          const sorted = [...headers].sort(
+            (a, b) => (BigInt(b.nonce) > BigInt(a.nonce) ? 1 : -1)
           );
-
-          // Collect all nonces, sorted descending.
-          const nonces = headers
-            .map((h) => BigInt(h.nonce))
-            .sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
-
-          // The boundary is the highest nonce that is NOT pending.
-          const boundaryNonce = nonces.find((n) => !pending.has(n));
-          if (boundaryNonce === undefined) continue;
-
-          // Everything below the boundary should be deleted.
-          // Since pending nonces always form a contiguous suffix above the boundary,
-          // there can't be any pending nonces below it.
-          const toDeleteNonces = nonces.filter((n) => n < boundaryNonce);
-          if (toDeleteNonces.length === 0) continue;
-
-          // Build a fast lookup from nonce → header for deletion.
-          const headerByNonce = new Map(
-            headers.map((h) => [BigInt(h.nonce), h])
+          const boundary = sorted.find(
+            (h) => !pendingCommitments.has(h.accountCommitment)
           );
+          if (!boundary) continue;
 
-          for (const nonce of toDeleteNonces) {
-            const old = headerByNonce.get(nonce)!;
-            const replacedAtNonce = old.replacedAtNonce;
+          const boundaryNonce = BigInt(boundary.nonce);
+
+          // Delete all historical entries with replaced_at_nonce <= boundary.
+          // These record state transitions up to the boundary, which we no longer
+          // need since the boundary is the oldest state we want to keep.
+          for (const oldHeader of headers) {
+            if (BigInt(oldHeader.replacedAtNonce) > boundaryNonce) continue;
 
             await db.historicalAccountHeaders
               .where("accountCommitment")
-              .equals(old.accountCommitment)
+              .equals(oldHeader.accountCommitment)
               .delete();
 
+            const rat = oldHeader.replacedAtNonce;
             const storageDeleted = await db.historicalAccountStorages
               .where("[accountId+replacedAtNonce]")
-              .equals([aid, replacedAtNonce])
+              .equals([aid, rat])
               .delete();
 
             const mapDeleted = await db.historicalStorageMapEntries
               .where("[accountId+replacedAtNonce]")
-              .equals([aid, replacedAtNonce])
+              .equals([aid, rat])
               .delete();
 
             const assetDeleted = await db.historicalAccountAssets
               .where("[accountId+replacedAtNonce]")
-              .equals([aid, replacedAtNonce])
+              .equals([aid, rat])
               .delete();
 
             totalDeleted += 1 + storageDeleted + mapDeleted + assetDeleted;

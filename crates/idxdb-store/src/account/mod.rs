@@ -677,7 +677,7 @@ impl IdxdbStore {
         &self,
         account_id: AccountId,
     ) -> Result<usize, StoreError> {
-        let pending_json = self.get_pending_nonces_json(Some(account_id)).await?;
+        let pending_json = self.get_pending_commitments_json(Some(account_id)).await?;
         let account_id_str = Some(account_id.to_string());
         let promise = idxdb_prune_account_history(self.db_id(), account_id_str, pending_json);
         let deleted: f64 = await_js(promise, "failed to prune account history").await?;
@@ -686,17 +686,18 @@ impl IdxdbStore {
 
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub(crate) async fn prune_all_accounts_history(&self) -> Result<usize, StoreError> {
-        let pending_json = self.get_pending_nonces_json(None).await?;
+        let pending_json = self.get_pending_commitments_json(None).await?;
         let promise = idxdb_prune_account_history(self.db_id(), None, pending_json);
         let deleted: f64 = await_js(promise, "failed to prune all account history").await?;
         Ok(deleted as usize)
     }
 
-    /// Returns a JSON-encoded `Record<accountId, nonce[]>` of nonces from pending
-    /// transactions.  When `filter_account` is `Some`, only that account is included.
-    async fn get_pending_nonces_json(
+    /// Returns a JSON-encoded `Record<accountId, commitment[]>` of `final_account_state`
+    /// commitments from pending transactions. When `target_account` is `Some`, only that
+    /// account is included.
+    async fn get_pending_commitments_json(
         &self,
-        filter_account: Option<AccountId>,
+        target_account: Option<AccountId>,
     ) -> Result<String, StoreError> {
         let uncommitted_txs = self.get_transactions(TransactionFilter::Uncommitted).await?;
 
@@ -708,24 +709,19 @@ impl IdxdbStore {
             }
 
             let tx_account_id = tx.details.account_id;
-            if let Some(filter) = filter_account
-                && tx_account_id != filter
+            if let Some(target) = target_account
+                && tx_account_id != target
             {
                 continue;
             }
 
-            // Resolve the commitment to a nonce via historical headers.
-            if let Some(header) =
-                self.get_account_header_by_commitment(tx.details.final_account_state).await?
-            {
-                map.entry(tx_account_id.to_string())
-                    .or_default()
-                    .push(header.nonce().as_int().to_string());
-            }
+            map.entry(tx_account_id.to_string())
+                .or_default()
+                .push(tx.details.final_account_state.to_hex());
         }
 
         serde_json::to_string(&map).map_err(|e| {
-            StoreError::DatabaseError(format!("failed to serialize pending nonces: {e}"))
+            StoreError::DatabaseError(format!("failed to serialize pending commitments: {e}"))
         })
     }
 }
