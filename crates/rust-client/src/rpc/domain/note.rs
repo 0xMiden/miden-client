@@ -128,10 +128,8 @@ pub struct NoteSyncBlock {
 /// no notes matched in the scanned range.
 #[derive(Debug)]
 pub struct NoteSyncInfo {
-    /// The start of the scanned block range (matches the request's `block_from`).
-    pub block_from: BlockNumber,
-    /// The end of the scanned block range. Equals the chain tip when the client sends
-    /// `block_to: None`, or the requested `block_to` otherwise.
+    /// The last block the node checked. Used as a cursor for pagination: if less than the
+    /// requested range end (or chain tip), the client should continue from this block.
     pub block_to: BlockNumber,
     /// Blocks containing matching notes, ordered by block number ascending.
     /// May be empty if no notes matched in the range.
@@ -171,7 +169,6 @@ impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
             .pagination_info
             .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(pagination_info)))?;
 
-        let block_from = BlockNumber::from(pagination_info.block_num);
         let block_to = BlockNumber::from(pagination_info.block_num);
 
         let blocks = value
@@ -202,7 +199,7 @@ impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
             })
             .collect::<Result<Vec<_>, RpcError>>()?;
 
-        Ok(NoteSyncInfo { block_from, block_to, blocks })
+        Ok(NoteSyncInfo { block_to, blocks })
     }
 }
 

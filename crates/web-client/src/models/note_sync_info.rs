@@ -38,13 +38,7 @@ pub struct NoteSyncInfo(NativeNoteSyncInfo);
 
 #[wasm_bindgen]
 impl NoteSyncInfo {
-    /// Returns the start of the scanned block range.
-    #[wasm_bindgen(js_name = "blockFrom")]
-    pub fn block_from(&self) -> u32 {
-        self.0.block_from.as_u32()
-    }
-
-    /// Returns the end of the scanned block range (chain tip when `block_to` was not specified).
+    /// Returns the last block checked by the node. Used as a cursor for pagination.
     #[wasm_bindgen(js_name = "blockTo")]
     pub fn block_to(&self) -> u32 {
         self.0.block_to.as_u32()
