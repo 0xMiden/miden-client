@@ -17,7 +17,6 @@ use miden_client::account::{
     PartialAccount,
     PartialStorage,
     PartialStorageMap,
-    StorageMap,
     StorageMapKey,
     StorageSlotName,
     StorageSlotType,
@@ -443,56 +442,33 @@ impl SqliteStore {
         // Archive old header and insert the new one
         Self::insert_account_header(tx, final_account_state, None, Some(init_account_state))?;
 
-        Self::apply_account_vault_delta(
-            tx,
+        // Compute all delta changes and update the SMT forest
+        let applied = miden_client::store::apply_account_delta_to_forest(
             smt_forest,
             account_id,
-            init_account_state,
-            final_account_state,
             old_vault_assets,
+            old_map_roots,
+            final_account_state.vault_root(),
             delta,
         )?;
 
-        // Build the final roots from the init state's registered roots:
-        // - Replace vault root with the final one
-        // - Replace changed map roots with their new values (done by apply_account_storage_delta)
-        // - Unchanged map roots continue as they were
-        let mut final_roots = smt_forest
-            .get_roots(&init_account_state.id())
-            .cloned()
-            .ok_or(StoreError::AccountDataNotFound(init_account_state.id()))?;
+        // Persist vault changes
+        Self::persist_vault_delta(
+            tx,
+            &account_id.to_hex(),
+            &u64_to_value(final_account_state.nonce().as_int()),
+            &applied.removed_vault_keys,
+            &applied.updated_assets,
+        )?;
 
-        // First element is always the vault root
-        if let Some(vault_root) = final_roots.first_mut() {
-            *vault_root = final_account_state.vault_root();
-        }
-
-        let default_map_root = StorageMap::default().root();
-        let updated_storage_slots =
-            miden_client::store::compute_storage_delta(smt_forest, old_map_roots, delta)?;
-
-        // Update map roots in final_roots with new values from the delta
-        for (slot_name, (new_root, slot_type)) in &updated_storage_slots {
-            if *slot_type == StorageSlotType::Map {
-                let old_root = old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
-                if let Some(root) = final_roots.iter_mut().find(|r| **r == old_root) {
-                    *root = *new_root;
-                } else {
-                    // New map slot not in the old roots — append it
-                    final_roots.push(*new_root);
-                }
-            }
-        }
-
+        // Persist storage changes
         Self::write_storage_delta(
             tx,
             account_id,
             final_account_state.nonce().as_int(),
-            &updated_storage_slots,
+            &applied.updated_storage_slots,
             delta,
         )?;
-
-        smt_forest.stage_roots(final_account_state.id(), final_roots);
 
         Ok(())
     }

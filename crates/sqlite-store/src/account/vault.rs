@@ -4,16 +4,15 @@ use std::rc::Rc;
 use std::vec::Vec;
 
 use miden_client::Word;
-use miden_client::account::{AccountDelta, AccountHeader, AccountId};
+use miden_client::account::{AccountDelta, AccountId};
 use miden_client::asset::Asset;
-use miden_client::store::{AccountSmtForest, StoreError};
+use miden_client::store::StoreError;
 use miden_protocol::asset::AssetVaultKey;
-use miden_protocol::crypto::merkle::MerkleError;
 use rusqlite::types::Value;
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 
 use crate::sql_error::SqlResultExt;
-use crate::{SqliteStore, insert_sql, subst, u64_to_value};
+use crate::{SqliteStore, insert_sql, subst};
 
 impl SqliteStore {
     // READER METHODS
@@ -87,53 +86,9 @@ impl SqliteStore {
         Ok(())
     }
 
-    /// Applies vault delta changes to the account state, updating fungible and non-fungible assets.
-    ///
-    /// The function updates the SMT forest with all asset changes and verifies that the resulting
-    /// vault root matches the expected final state. It archives old values from latest to
-    /// historical, deletes removed assets from latest, then inserts updated assets.
-    pub(crate) fn apply_account_vault_delta(
-        tx: &Transaction<'_>,
-        smt_forest: &mut AccountSmtForest,
-        account_id: AccountId,
-        init_account_state: &AccountHeader,
-        final_account_state: &AccountHeader,
-        old_vault_assets: &[Asset],
-        delta: &AccountDelta,
-    ) -> Result<(), StoreError> {
-        let nonce = final_account_state.nonce().as_int();
-        let account_id_hex = account_id.to_hex();
-        let nonce_val = u64_to_value(nonce);
-
-        let (updated_assets, removed_vault_keys) =
-            miden_client::store::compute_vault_delta(old_vault_assets, delta)?;
-
-        Self::persist_vault_delta(
-            tx,
-            &account_id_hex,
-            &nonce_val,
-            &removed_vault_keys,
-            &updated_assets,
-        )?;
-
-        let new_vault_root = smt_forest.update_asset_nodes(
-            init_account_state.vault_root(),
-            updated_assets.iter().copied(),
-            removed_vault_keys.iter().copied(),
-        )?;
-        if new_vault_root != final_account_state.vault_root() {
-            return Err(StoreError::MerkleStoreError(MerkleError::ConflictingRoots {
-                expected_root: final_account_state.vault_root(),
-                actual_root: new_vault_root,
-            }));
-        }
-
-        Ok(())
-    }
-
     /// Persists vault delta changes: archives old values from latest to historical,
     /// then updates latest (deletes removed assets, inserts/updates changed assets).
-    fn persist_vault_delta(
+    pub(crate) fn persist_vault_delta(
         tx: &Transaction<'_>,
         account_id_hex: &str,
         nonce_val: &rusqlite::types::Value,
