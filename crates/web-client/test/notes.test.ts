@@ -252,7 +252,7 @@ test.describe("get_consumable_notes", () => {
       description: "p2ide consume after block with remote prover",
     },
   ];
-  const RECALL_HEIGHT_DELTA = 50;
+  const RECALL_HEIGHT_DELTA = 500;
 
   p2ideTestCases.forEach(({ flag, description }) => {
     test(description, async ({ page }) => {
