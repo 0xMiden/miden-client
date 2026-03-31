@@ -872,8 +872,10 @@ export async function pruneAccountHistory(dbId, accountId, pendingNoncesJson) {
                 const boundaryNonce = nonces.find((n) => !pending.has(n));
                 if (boundaryNonce === undefined)
                     continue;
-                // Everything below the boundary (and not pending) should be deleted.
-                const toDeleteNonces = nonces.filter((n) => n < boundaryNonce && !pending.has(n));
+                // Everything below the boundary should be deleted.
+                // Since pending nonces always form a contiguous suffix above the boundary,
+                // there can't be any pending nonces below it.
+                const toDeleteNonces = nonces.filter((n) => n < boundaryNonce);
                 if (toDeleteNonces.length === 0)
                     continue;
                 // Build a fast lookup from nonce → header for deletion.

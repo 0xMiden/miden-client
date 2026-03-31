@@ -1020,11 +1020,8 @@ impl SqliteStore {
         // Collect entries to delete: everything below the boundary.
         // Since pending nonces always form a contiguous suffix above the boundary,
         // there can't be any pending nonces below it.
-        let entries_to_delete: Vec<(u64, u64)> = all_entries
-            .iter()
-            .copied()
-            .filter(|(n, _)| *n < boundary_nonce)
-            .collect();
+        let entries_to_delete: Vec<(u64, u64)> =
+            all_entries.iter().copied().filter(|(n, _)| *n < boundary_nonce).collect();
 
         if entries_to_delete.is_empty() {
             return Ok(0);
