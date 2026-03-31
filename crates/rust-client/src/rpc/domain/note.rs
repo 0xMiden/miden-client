@@ -167,14 +167,12 @@ impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
     type Error = RpcError;
 
     fn try_from(value: proto::rpc::SyncNotesResponse) -> Result<Self, Self::Error> {
-        let block_range = value
-            .block_range
-            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(block_range)))?;
+        let pagination_info = value
+            .pagination_info
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(pagination_info)))?;
 
-        let block_from = BlockNumber::from(block_range.block_from);
-        let block_to = BlockNumber::from(block_range.block_to.ok_or(
-            proto::rpc::SyncNotesResponse::missing_field(stringify!(block_range.block_to)),
-        )?);
+        let block_from = BlockNumber::from(pagination_info.block_num);
+        let block_to = BlockNumber::from(pagination_info.block_num);
 
         let blocks = value
             .blocks
