@@ -1321,7 +1321,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
 
     const MAP_KEY = new window.Word(new BigUint64Array([1n, 1n, 1n, 1n]));
     const FPI_STORAGE_VALUE = new window.Word(
-      new BigUint64Array([0n, 0n, 0n, 1n])
+      new BigUint64Array([1n, 0n, 0n, 0n])
     );
 
     let storageMap = new window.StorageMap();
