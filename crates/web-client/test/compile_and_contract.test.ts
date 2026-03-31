@@ -487,7 +487,7 @@ test.describe("transactions.execute()", () => {
         });
 
         // Execute the transaction
-        const txId = await client.transactions.execute({
+        const { txId } = await client.transactions.execute({
           account: account.id(),
           script,
         });
@@ -549,8 +549,10 @@ test.describe("transactions.execute()", () => {
         const updated = await client.accounts.get(account.id());
         const countWord = updated?.storage().getItem(slotName);
 
-        // The counter value is stored in the first felt of the word (index 0)
-        const countValue = Number(countWord?.toU64s()[0] ?? 0n);
+        // The counter is stored in the first felt of the word
+        const countValue = countWord
+          ? Number(countWord.toFelts()[0].asInt())
+          : 0;
 
         return { countValue };
       },
@@ -607,7 +609,7 @@ test.describe("transactions.execute()", () => {
         });
 
         // The key assertion: passing { id: foreignContract.id() } works
-        const txId = await client.transactions.execute({
+        const { txId } = await client.transactions.execute({
           account: wallet.id(),
           script,
           foreignAccounts: [{ id: foreignContract.id() }],
@@ -661,7 +663,7 @@ test.describe("transactions.execute()", () => {
         });
 
         // Pass the AccountId directly (not wrapped in { id })
-        const txId = await client.transactions.execute({
+        const { txId } = await client.transactions.execute({
           account: wallet.id(),
           script,
           foreignAccounts: [foreignContract.id()],

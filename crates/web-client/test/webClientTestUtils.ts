@@ -72,12 +72,10 @@ export const mintTransaction = async (
 
       return {
         transactionId: mintTransactionResult.executedTransaction().id().toHex(),
-        numOutputNotesCreated: mintTransactionResult
-          .createdRawOutputNotes()
-          .numNotes(),
+        numOutputNotesCreated: mintTransactionResult.createdNotes().numNotes(),
         nonce: mintTransactionResult.accountDelta().nonceDelta().toString(),
         createdNoteId: mintTransactionResult
-          .createdRawOutputNotes()
+          .createdNotes()
           .notes()[0]
           .id()
           .toString(),
@@ -145,7 +143,7 @@ export const mintPublicTransaction = async (
         transactionId: mintTransactionUpdate.executedTransaction().id().toHex(),
         numOutputNotesCreated: mintTransactionUpdate
           .executedTransaction()
-          .rawOutputNotes()
+          .outputNotes()
           .numNotes(),
         nonce: mintTransactionUpdate
           .executedTransaction()
@@ -154,7 +152,7 @@ export const mintPublicTransaction = async (
           .toString(),
         createdNoteId: mintTransactionUpdate
           .executedTransaction()
-          .rawOutputNotes()
+          .outputNotes()
           .notes()[0]
           .id()
           .toString(),
@@ -228,7 +226,7 @@ export const sendTransaction = async (
 
       let createdNote = mintTransactionUpdate
         .executedTransaction()
-        .rawOutputNotes()
+        .outputNotes()
         .notes()[0]
         .intoFull();
 
@@ -267,7 +265,7 @@ export const sendTransaction = async (
         );
       let sendCreatedNotes = sendTransactionUpdate
         .executedTransaction()
-        .rawOutputNotes()
+        .outputNotes()
         .notes();
       let sendCreatedNoteIds = sendCreatedNotes.map((note) =>
         note.id().toString()
@@ -793,7 +791,7 @@ export const mintAndConsumeTransaction = async (
 
       let createdNote = mintTransactionUpdate
         .executedTransaction()
-        .rawOutputNotes()
+        .outputNotes()
         .notes()[0]
         .intoFull();
 
@@ -831,7 +829,7 @@ export const mintAndConsumeTransaction = async (
             .toHex(),
           numOutputNotesCreated: mintTransactionUpdate
             .executedTransaction()
-            .rawOutputNotes()
+            .outputNotes()
             .numNotes(),
           nonce: mintTransactionUpdate
             .executedTransaction()
@@ -840,7 +838,7 @@ export const mintAndConsumeTransaction = async (
             .toString(),
           createdNoteId: mintTransactionUpdate
             .executedTransaction()
-            .rawOutputNotes()
+            .outputNotes()
             .notes()[0]
             .id()
             .toString(),
@@ -933,23 +931,12 @@ export const syncState = async (testingPage: Page) => {
     };
   });
 };
-export const clearStore = async (page: Page, storeName?: string) => {
-  await page.evaluate(
-    async ({ storeName }) => {
-      if (storeName) {
-        indexedDB.deleteDatabase(storeName);
-        return;
-      }
-
-      const databases = await indexedDB.databases();
-      for (const db of databases) {
-        if (db.name) {
-          indexedDB.deleteDatabase(db.name);
-        }
-      }
-    },
-    { storeName }
-  );
+export const clearStore = async (page: Page) => {
+  await page.evaluate(async () => {
+    if (window.storeName) {
+      indexedDB.deleteDatabase(window.storeName);
+    }
+  });
 };
 
 // Misc test utils

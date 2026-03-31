@@ -155,10 +155,6 @@ pub enum ClientError {
     NoteTagsLimitExceeded(u32),
     #[error("cannot track more accounts: the maximum of {0} tracked accounts has been reached")]
     AccountsLimitExceeded(u32),
-    #[error(
-        "unsupported authentication scheme ID {0}; supported schemes are: RpoFalcon512 (0) and EcdsaK256Keccak (1)"
-    )]
-    UnsupportedAuthSchemeId(u8),
     #[error("expected full account data for account {0}, but only partial data is available")]
     AccountRecordNotFull(AccountId),
     #[error("expected partial account data for account {0}, but full data was found")]

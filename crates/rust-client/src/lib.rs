@@ -214,19 +214,6 @@ pub mod auth {
 
     pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::Falcon512Poseidon2;
     pub const ECDSA_K256_KECCAK_SCHEME_ID: AuthSchemeId = AuthSchemeId::EcdsaK256Keccak;
-
-    /// Creates a new authentication secret key for the given scheme using the default RNG.
-    ///
-    /// # Errors
-    /// Returns an error if the given scheme is not supported.
-    #[cfg(feature = "std")]
-    pub fn new_auth_secret_key(scheme: AuthSchemeId) -> Result<AuthSecretKey, crate::ClientError> {
-        match scheme {
-            AuthSchemeId::Falcon512Poseidon2 => Ok(AuthSecretKey::new_falcon512_poseidon2()),
-            AuthSchemeId::EcdsaK256Keccak => Ok(AuthSecretKey::new_ecdsa_k256_keccak()),
-            _ => Err(crate::ClientError::UnsupportedAuthSchemeId(scheme.as_u8())),
-        }
-    }
 }
 
 /// Provides types for working with blocks within the Miden network.

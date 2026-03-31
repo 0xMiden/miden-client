@@ -49,7 +49,7 @@ format-check: ## Run format using nightly toolchain but only in check mode
 	yarn --silent eslint .
 
 .PHONY: lint
-lint: format toml clippy clippy-wasm typos-check rust-client-ts-lint web-client-check-methods ## Run all linting tasks at once (clippy, fixing, formatting, typos)
+lint: fix fix-wasm format toml clippy clippy-wasm typos-check rust-client-ts-lint web-client-check-methods ## Run all linting tasks at once (clippy, fixing, formatting, typos)
 
 .PHONY: toml
 toml: ## Runs Format for all TOML files
@@ -139,20 +139,17 @@ start-note-transport:
 
 .PHONY: integration-test
 integration-test: ## Run integration tests
-	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --cargo-profile release-test --test=integration
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
 
 .PHONY: integration-test-web-client
 SHARD_PARAMETER ?= ""
 integration-test-web-client: ## Run integration tests for the web client (with a chromium browser)
 	cd ./crates/web-client && yarn run test:clean -- --project=chromium $(SHARD_PARAMETER)
 
-.PHONY: integration-test-web-client-opt
-integration-test-web-client-opt: ## Run integration tests for the web client with optimized wasm build (chromium)
-	cd ./crates/web-client && yarn run test:clean:opt -- --project=chromium $(SHARD_PARAMETER)
 
 .PHONY: integration-test-web-client-webkit
-integration-test-web-client-webkit: ## Run integration tests for the web client (with webkit)
-	cd ./crates/web-client && yarn run test:clean -- --project=webkit
+integration-test-web-client-webkit: ## Run web client tests (webkit)
+	cd ./crates/web-client && yarn run test -- --project=webkit
 
 .PHONY: integration-test-remote-prover-web-client
 integration-test-remote-prover-web-client: ## Run integration tests for the web client with remote prover
@@ -160,8 +157,8 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included (requires note transport service)
-	TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT=$(NOTE_TRANSPORT_ENDPOINT) TEST_WITH_NOTE_TRANSPORT=1 cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --cargo-profile release-test --test=integration
-	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --cargo-profile release-test --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
+	TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT=$(NOTE_TRANSPORT_ENDPOINT) TEST_WITH_NOTE_TRANSPORT=1 cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
+	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
 
 .PHONY: test-dev
 test-dev: ## Run tests with debug assertions enabled via test-dev profile
@@ -173,7 +170,7 @@ integration-test-dev: ## Run integration tests with debug assertions enabled via
 
 .PHONY: integration-test-binary
 integration-test-binary: ## Run the integration tests using the standalone binary (requires note transport service)
-	TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT=$(NOTE_TRANSPORT_ENDPOINT) TEST_WITH_NOTE_TRANSPORT=1 cargo run --package miden-client-integration-tests --profile release-test --locked
+	TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT=$(NOTE_TRANSPORT_ENDPOINT) TEST_WITH_NOTE_TRANSPORT=1 cargo run --package miden-client-integration-tests --release --locked
 
 .PHONY: start-prover
 start-prover: ## Start the remote prover

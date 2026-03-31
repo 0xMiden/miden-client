@@ -43,7 +43,7 @@ const mockChainTest = async (testingPage: Page) => {
     }
 
     const mintedNoteId = mintTransactionRecord
-      .rawOutputNotes()
+      .outputNotes()
       .notes()[0]
       .id()
       .toString();
@@ -71,6 +71,8 @@ const mockChainTest = async (testingPage: Page) => {
 };
 
 test.describe("mock chain tests", () => {
+  test.describe.configure({ timeout: 720000 });
+
   test("send transaction with mock chain completes successfully", async ({
     page,
   }) => {

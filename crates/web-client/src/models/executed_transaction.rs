@@ -7,7 +7,7 @@ use super::account_header::AccountHeader;
 use super::account_id::AccountId;
 use super::block_header::BlockHeader;
 use super::input_notes::InputNotes;
-use super::raw_output_notes::RawOutputNotes;
+use super::output_notes::OutputNotes;
 use super::transaction_args::TransactionArgs;
 use super::transaction_id::TransactionId;
 
@@ -57,9 +57,9 @@ impl ExecutedTransaction {
         self.0.input_notes().into()
     }
 
-    /// Returns the raw output notes produced by the transaction.
-    #[wasm_bindgen(js_name = "rawOutputNotes")]
-    pub fn raw_output_notes(&self) -> RawOutputNotes {
+    /// Returns the output notes produced by the transaction.
+    #[wasm_bindgen(js_name = "outputNotes")]
+    pub fn output_notes(&self) -> OutputNotes {
         self.0.output_notes().into()
     }
 

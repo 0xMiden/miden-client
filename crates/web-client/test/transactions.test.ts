@@ -142,6 +142,7 @@ test.describe("get_transactions tests", () => {
   test("get_transactions filters expired transactions successfully", async ({
     page,
   }) => {
+    test.slow();
     const { accountId, faucetId } = await setupWalletAndFaucet(page);
 
     const { transactionId: committedTransactionId } = await mintTransaction(

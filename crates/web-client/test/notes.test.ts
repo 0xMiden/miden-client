@@ -260,10 +260,7 @@ test.describe("get_consumable_notes", () => {
       const { accountId: senderAccountId, faucetId } =
         await setupWalletAndFaucet(page);
       const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
-      // This flow proves multiple transactions before we inspect consumability.
-      // Keep the reclaim height comfortably ahead of the moving local chain tip so
-      // the sender still resolves to ConsumableAfter(...) under suite load.
-      const recallHeight = (await getSyncHeight(page)) + 200;
+      const recallHeight = (await getSyncHeight(page)) + 30;
       await sendTransaction(
         page,
         senderAccountId,
@@ -330,7 +327,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
         );
 
         let transactionRequest = new window.TransactionRequestBuilder()
-          .withOwnOutputNotes(new window.MidenArrays.NoteArray([p2IdNote]))
+          .withOwnOutputNotes(new window.NoteArray([p2IdNote]))
           .build();
 
         let transactionUpdate = await window.helpers.executeAndApplyTransaction(
@@ -344,7 +341,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
 
         let createdNoteId = transactionUpdate
           .executedTransaction()
-          .rawOutputNotes()
+          .outputNotes()
           .notes()[0]
           .id()
           .toString();
@@ -435,7 +432,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
         );
 
         let transactionRequest = new window.TransactionRequestBuilder()
-          .withOwnOutputNotes(new window.MidenArrays.NoteArray([p2IdeNote]))
+          .withOwnOutputNotes(new window.NoteArray([p2IdeNote]))
           .build();
 
         let transactionUpdate = await window.helpers.executeAndApplyTransaction(
@@ -449,7 +446,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
 
         let createdNoteId = transactionUpdate
           .executedTransaction()
-          .rawOutputNotes()
+          .outputNotes()
           .notes()[0]
           .id()
           .toString();

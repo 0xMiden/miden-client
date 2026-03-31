@@ -162,13 +162,12 @@ test.describe("getAccounts tests", () => {
 });
 
 test.describe("get public account with details", () => {
-  // FIXME: Skipped due to node returning internal error for this account's proof
-  test.fixme("assets and storage with too many assets/entries are retrieved", async ({
+  test("assets and storage with too many assets/entries are retrieved", async ({
     page,
   }) => {
     test.skip(
-      !isLocalhost(),
-      "This test requires a specific account that only exists in localhost genesis"
+      true,
+      "Temporarily skipped: node returns Internal error for large genesis account"
     );
     const [assetCount, balances, mapEntriesCount] = await page.evaluate(
       async () => {

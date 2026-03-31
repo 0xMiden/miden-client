@@ -18,7 +18,7 @@ export const testStandardFpi = async (page: Page): Promise<string> => {
     let felt4 = new window.Felt(15n);
     const MAP_KEY = window.Word.newFromFelts([felt1, felt2, felt3, felt4]);
     const FPI_STORAGE_VALUE = new window.Word(
-      new BigUint64Array([30n, 18n, 12n, 9n])
+      new BigUint64Array([9n, 12n, 18n, 30n])
     );
 
     let storageMap = new window.StorageMap();
@@ -100,7 +100,7 @@ export const testStandardFpi = async (page: Page): Promise<string> => {
                 # => [foreign_id_suffix, foreign_id_prefix, FOREIGN_PROC_ROOT, storage_item_index]
 
                 exec.tx::execute_foreign_procedure
-                push.9.12.18.30 assert_eqw
+                push.30.18.12.9 assert_eqw
             end
         `;
 

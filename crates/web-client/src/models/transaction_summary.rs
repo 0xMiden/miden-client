@@ -4,7 +4,7 @@ use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use super::account_delta::AccountDelta;
 use super::input_notes::InputNotes;
-use super::raw_output_notes::RawOutputNotes;
+use super::output_notes::OutputNotes;
 use super::word::Word;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
 
@@ -37,9 +37,9 @@ impl TransactionSummary {
         Ok(self.0.input_notes().into())
     }
 
-    /// Returns the raw output notes referenced by the summary.
-    #[wasm_bindgen(js_name = "rawOutputNotes")]
-    pub fn raw_output_notes(&self) -> Result<RawOutputNotes, JsValue> {
+    /// Returns the output notes referenced by the summary.
+    #[wasm_bindgen(js_name = "outputNotes")]
+    pub fn output_notes(&self) -> Result<OutputNotes, JsValue> {
         Ok(self.0.output_notes().into())
     }
 

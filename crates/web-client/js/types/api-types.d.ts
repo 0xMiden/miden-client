@@ -22,7 +22,7 @@ import type {
   NoteFile,
   NoteTag,
   Note,
-  RawOutputNote,
+  OutputNote,
   NoteExportFormat,
   StorageSlot,
   AccountComponent,
@@ -273,16 +273,41 @@ export interface TransactionOptions {
   prover?: TransactionProver;
 }
 
-export interface SendOptions extends TransactionOptions {
+export interface SendOptionsDefault extends TransactionOptions {
   account: AccountRef;
   to: AccountRef;
   token: AccountRef;
   amount: number | bigint;
   type?: NoteVisibility;
+  returnNote?: false;
   /** Block height after which the sender can reclaim the note. This is a block number, not wall-clock time. */
   reclaimAfter?: number;
   /** Block height until which the note is timelocked. This is a block number, not wall-clock time. */
   timelockUntil?: number;
+}
+
+export interface SendOptionsReturnNote extends TransactionOptions {
+  account: AccountRef;
+  to: AccountRef;
+  token: AccountRef;
+  amount: number | bigint;
+  type?: NoteVisibility;
+  returnNote: true;
+}
+
+/** @deprecated Use SendOptionsDefault or SendOptionsReturnNote instead */
+export type SendOptions = SendOptionsDefault | SendOptionsReturnNote;
+
+export interface SendResult {
+  txId: TransactionId;
+  note: Note | null;
+  result: TransactionResult;
+}
+
+/** Result of methods that previously returned bare TransactionId. */
+export interface TransactionSubmitResult {
+  txId: TransactionId;
+  result: TransactionResult;
 }
 
 export interface MintOptions extends TransactionOptions {
@@ -382,6 +407,7 @@ export interface ConsumeAllResult {
   txId: TransactionId | null;
   consumed: number;
   remaining: number;
+  result?: TransactionResult;
 }
 
 /**
@@ -482,12 +508,18 @@ export interface AccountsResource {
 }
 
 export interface TransactionsResource {
-  send(options: SendOptions): Promise<TransactionId>;
-  mint(options: MintOptions): Promise<TransactionId>;
-  consume(options: ConsumeOptions): Promise<TransactionId>;
-  swap(options: SwapOptions): Promise<TransactionId>;
+  send(
+    options: SendOptionsDefault
+  ): Promise<{ txId: TransactionId; note: null; result: TransactionResult }>;
+  send(
+    options: SendOptionsReturnNote
+  ): Promise<{ txId: TransactionId; note: Note; result: TransactionResult }>;
+  send(options: SendOptions): Promise<SendResult>;
+  mint(options: MintOptions): Promise<TransactionSubmitResult>;
+  consume(options: ConsumeOptions): Promise<TransactionSubmitResult>;
+  swap(options: SwapOptions): Promise<TransactionSubmitResult>;
   consumeAll(options: ConsumeAllOptions): Promise<ConsumeAllResult>;
-  execute(options: ExecuteOptions): Promise<TransactionId>;
+  execute(options: ExecuteOptions): Promise<TransactionSubmitResult>;
 
   preview(options: PreviewOptions): Promise<TransactionSummary>;
 
@@ -499,7 +531,7 @@ export interface TransactionsResource {
     account: AccountRef,
     request: TransactionRequest,
     options?: TransactionOptions
-  ): Promise<TransactionId>;
+  ): Promise<TransactionSubmitResult>;
 
   list(query?: TransactionQuery): Promise<TransactionRecord[]>;
 
@@ -630,10 +662,10 @@ export declare class MidenClient {
 // ════════════════════════════════════════════════════════════════
 
 /** Creates a P2ID (Pay-to-ID) note. */
-export declare function createP2IDNote(options: NoteOptions): Note;
+export declare function createP2IDNote(options: NoteOptions): OutputNote;
 
 /** Creates a P2IDE (Pay-to-ID with Expiration) note. */
-export declare function createP2IDENote(options: P2IDEOptions): Note;
+export declare function createP2IDENote(options: P2IDEOptions): OutputNote;
 
 /** Builds a swap tag for note matching. Returns a NoteTag (use `.asU32()` for the numeric value). */
 export declare function buildSwapTag(options: BuildSwapTagOptions): NoteTag;

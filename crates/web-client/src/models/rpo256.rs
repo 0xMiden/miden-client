@@ -1,5 +1,5 @@
 use miden_client::Felt as NativeFelt;
-use miden_client::crypto::{Poseidon2 as NativePoseidon2, Rpo256 as NativeRpo256};
+use miden_client::crypto::Rpo256 as NativeRpo256;
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;
@@ -20,20 +20,6 @@ impl Rpo256 {
         let native_felts: Vec<NativeFelt> = felts.iter().map(Into::into).collect();
 
         let native_digest = NativeRpo256::hash_elements(&native_felts);
-
-        native_digest.into()
-    }
-
-    /// Computes a Poseidon2 digest from the provided field elements.
-    ///
-    /// Use this for computing advice map commitments that will be verified
-    /// by `pipe_preimage_to_memory` in the Miden VM (which uses Poseidon2).
-    #[wasm_bindgen(js_name = "hashElementsPoseidon2")]
-    pub fn hash_elements_poseidon2(felt_array: &FeltArray) -> Word {
-        let felts: Vec<Felt> = felt_array.into();
-        let native_felts: Vec<NativeFelt> = felts.iter().map(Into::into).collect();
-
-        let native_digest = NativePoseidon2::hash_elements(&native_felts);
 
         native_digest.into()
     }

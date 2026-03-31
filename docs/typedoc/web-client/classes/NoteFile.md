@@ -235,17 +235,17 @@ Creates a `NoteFile` from a note ID.
 
 ***
 
-### fromRawOutputNote()
+### fromOutputNote()
 
-> `static` **fromRawOutputNote**(`note`): `NoteFile`
+> `static` **fromOutputNote**(`note`): `NoteFile`
 
-Creates a `NoteFile` from a raw output note, choosing details when present.
+Creates a `NoteFile` from an output note, choosing details when present.
 
 #### Parameters
 
 ##### note
 
-[`RawOutputNote`](RawOutputNote.md)
+`OutputNote`
 
 #### Returns
 

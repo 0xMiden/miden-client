@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::*;
 
 use super::input_note::InputNote;
 use super::note::Note;
-use super::raw_output_note::RawOutputNote;
+use super::output_note::OutputNote;
 use crate::js_error_with_context;
 use crate::models::note_details::NoteDetails;
 use crate::models::note_id::NoteId;
@@ -125,9 +125,9 @@ impl NoteFile {
         }
     }
 
-    /// Creates a `NoteFile` from a raw output note, choosing details when present.
-    #[wasm_bindgen(js_name = fromRawOutputNote)]
-    pub fn from_raw_output_note(note: &RawOutputNote) -> Self {
+    /// Creates a `NoteFile` from an output note, choosing details when present.
+    #[wasm_bindgen(js_name = "fromOutputNote")]
+    pub fn from_output_note(note: &OutputNote) -> Self {
         let native_note = note.note();
         match native_note.recipient() {
             Some(recipient) => {

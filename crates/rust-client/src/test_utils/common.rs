@@ -81,7 +81,11 @@ pub async fn insert_new_wallet_with_seed(
     init_seed: [u8; 32],
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
-    let key_pair = crate::auth::new_auth_secret_key(auth_scheme)?;
+    let key_pair = match auth_scheme {
+        AuthSchemeId::Falcon512Poseidon2 => AuthSecretKey::new_falcon512_poseidon2(),
+        AuthSchemeId::EcdsaK256Keccak => AuthSecretKey::new_ecdsa_k256_keccak(),
+        other => panic!("unsupported auth scheme: {}", other.as_u8()),
+    };
     let auth_component = AuthSingleSig::new(key_pair.public_key().to_commitment(), auth_scheme);
 
     let account = AccountBuilder::new(init_seed)
@@ -108,7 +112,11 @@ pub async fn insert_new_fungible_faucet(
     keystore: &FilesystemKeyStore,
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
-    let key_pair = crate::auth::new_auth_secret_key(auth_scheme)?;
+    let key_pair = match auth_scheme {
+        AuthSchemeId::Falcon512Poseidon2 => AuthSecretKey::new_falcon512_poseidon2(),
+        AuthSchemeId::EcdsaK256Keccak => AuthSecretKey::new_ecdsa_k256_keccak(),
+        other => panic!("unsupported auth scheme: {}", other.as_u8()),
+    };
     let auth_component = AuthSingleSig::new(key_pair.public_key().to_commitment(), auth_scheme);
 
     // we need to use an initial seed to create the faucet account
@@ -193,7 +201,7 @@ pub async fn wait_for_tx(client: &mut TestClient, transaction_id: TransactionId)
             TransactionStatus::Pending => {
                 // Cooldown between polling iterations to reduce pressure on the node's
                 // rate limiter when many integration tests poll concurrently.
-                tokio::time::sleep(Duration::from_secs(2)).await;
+                tokio::time::sleep(Duration::from_millis(500)).await;
             },
             TransactionStatus::Discarded(cause) => {
                 anyhow::bail!("transaction was discarded with cause: {cause:?}");
@@ -488,10 +496,6 @@ pub async fn execute_tx_and_consume_output_notes(
         .collect::<Vec<(Note, Option<NoteArgs>)>>();
 
     Box::pin(client.submit_new_transaction(executor, tx_request)).await.unwrap();
-
-    // Brief pause to allow the node to register the first transaction as in-flight before the
-    // second transaction references its output notes.
-    tokio::time::sleep(Duration::from_millis(500)).await;
 
     let tx_request = TransactionRequestBuilder::new().input_notes(output_notes).build().unwrap();
     Box::pin(client.submit_new_transaction(consumer, tx_request)).await.unwrap()

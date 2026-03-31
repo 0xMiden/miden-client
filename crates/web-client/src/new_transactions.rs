@@ -155,6 +155,14 @@ impl WebClient {
         transaction_result: &TransactionResult,
         prover: Option<TransactionProver>,
     ) -> Result<ProvenTransaction, JsValue> {
+        #[cfg(feature = "testing")]
+        if prover.is_none() && self.mock_rpc_api.is_some() {
+            return LocalTransactionProver::default()
+                .prove_dummy(transaction_result.native().executed_transaction().clone())
+                .map(Into::into)
+                .map_err(|err| js_error_with_context(err, "failed to prove transaction"));
+        }
+
         if let Some(client) = self.get_mut_inner() {
             let prover_arc =
                 prover.map_or_else(|| client.prover(), |custom_prover| custom_prover.get_prover());

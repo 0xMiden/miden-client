@@ -1,17 +1,17 @@
 use miden_client::transaction::RawOutputNotes as NativeRawOutputNotes;
 use wasm_bindgen::prelude::*;
 
-use super::raw_output_note::RawOutputNote;
+use super::output_note::OutputNote;
 use super::word::Word;
 
 /// Contains a list of output notes of a transaction. The list can be empty if the transaction does
 /// not produce any notes.
 #[derive(Clone)]
 #[wasm_bindgen]
-pub struct RawOutputNotes(pub(crate) NativeRawOutputNotes);
+pub struct OutputNotes(pub(crate) NativeRawOutputNotes);
 
 #[wasm_bindgen]
-impl RawOutputNotes {
+impl OutputNotes {
     /// Returns the commitment to all output notes.
     pub fn commitment(&self) -> Word {
         self.0.commitment().into()
@@ -32,12 +32,12 @@ impl RawOutputNotes {
 
     /// Returns the output note at the specified index.
     #[wasm_bindgen(js_name = "getNote")]
-    pub fn get_note(&self, index: u32) -> RawOutputNote {
+    pub fn get_note(&self, index: u32) -> OutputNote {
         self.0.get_note(index as usize).into()
     }
 
     /// Returns all output notes as a vector.
-    pub fn notes(&self) -> Vec<RawOutputNote> {
+    pub fn notes(&self) -> Vec<OutputNote> {
         self.0.iter().cloned().map(Into::into).collect()
     }
 }
@@ -45,14 +45,14 @@ impl RawOutputNotes {
 // CONVERSIONS
 // ================================================================================================
 
-impl From<NativeRawOutputNotes> for RawOutputNotes {
+impl From<NativeRawOutputNotes> for OutputNotes {
     fn from(native_notes: NativeRawOutputNotes) -> Self {
-        RawOutputNotes(native_notes)
+        OutputNotes(native_notes)
     }
 }
 
-impl From<&NativeRawOutputNotes> for RawOutputNotes {
+impl From<&NativeRawOutputNotes> for OutputNotes {
     fn from(native_notes: &NativeRawOutputNotes) -> Self {
-        RawOutputNotes(native_notes.clone())
+        OutputNotes(native_notes.clone())
     }
 }

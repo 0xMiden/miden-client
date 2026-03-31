@@ -1,303 +1,278 @@
-// Tests for import/export functionality using the mock chain (no running node required).
+// TODO: Rename this / figure out rebasing with the other feature which has import tests
 
 import test from "./playwright.global.setup";
-import { expect } from "@playwright/test";
-import { clearStore } from "./webClientTestUtils";
+import { Page, expect } from "@playwright/test";
+import {
+  clearStore,
+  createNewFaucet,
+  createNewWallet,
+  fundAccountFromFaucet,
+  getAccountBalance,
+  getInputNote,
+  setupConsumedNote,
+  setupMintedNote,
+  setupWalletAndFaucet,
+  StorageMode,
+} from "./webClientTestUtils";
+
+const exportDb = async (page: Page) => {
+  return await page.evaluate(async () => {
+    const db = await window.exportStore(window.storeName);
+    const serialized = JSON.stringify(db);
+    return serialized;
+  });
+};
+
+const importDb = async (db: any, page: Page) => {
+  return await page.evaluate(async (_db) => {
+    await window.importStore(window.storeName, _db);
+  }, db);
+};
+
+const getAccount = async (accountId: string, page: Page) => {
+  return await page.evaluate(async (_accountId) => {
+    const client = window.client;
+    const accountId = window.AccountId.fromHex(_accountId);
+    const account = await client.getAccount(accountId);
+    return {
+      accountId: account?.id().toString(),
+      accountCommitment: account?.to_commitment().toHex(),
+    };
+  }, accountId);
+};
+
+const exportAccount = async (testingPage: Page, accountId: string) => {
+  return await testingPage.evaluate(async (_accountId) => {
+    const client = window.client;
+    const accountId = window.AccountId.fromHex(_accountId);
+    const accountFile = await client.exportAccountFile(accountId);
+    return Array.from(accountFile.serialize());
+  }, accountId);
+};
+
+const importAccount = async (testingPage: Page, accountBytes: number[]) => {
+  return await testingPage.evaluate(async (_accountBytes) => {
+    const client = window.client;
+    const bytes = new Uint8Array(_accountBytes);
+    const accountFile = window.AccountFile.deserialize(bytes);
+    await client.importAccountFile(accountFile);
+  }, accountBytes);
+};
 
 test.describe("export and import the db", () => {
+  test.describe.configure({ timeout: 720000 });
   test("export db with an account, find the account when re-importing", async ({
     page,
   }) => {
-    const exported = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-      const wallet = await client.accounts.create();
-      const walletId = wallet.id().toString();
-      const storeData = await window.exportStore(client.storeIdentifier());
-      return {
-        walletId,
-        commitment: wallet.to_commitment().toHex(),
-        storeName: client.storeIdentifier(),
-        storeData,
-      };
-    });
+    const { accountCommitment: initialAccountCommitment, accountId } =
+      await setupWalletAndFaucet(page);
+    const dbDump = await exportDb(page);
 
-    await clearStore(page, exported.storeName);
+    await clearStore(page);
 
-    const restoredCommitment = await page.evaluate(
-      async ({ storeData, walletId }) => {
-        const client = await window.MidenClient.createMock();
-        await window.importStore(client.storeIdentifier(), storeData);
-        const restored = await client.accounts.get(walletId);
-        return restored?.to_commitment().toHex();
-      },
-      exported
-    );
+    await importDb(dbDump, page);
 
-    expect(restoredCommitment).toEqual(exported.commitment);
+    const { accountCommitment } = await getAccount(accountId, page);
+
+    expect(accountCommitment).toEqual(initialAccountCommitment);
   });
 });
 
 test.describe("export and import account", () => {
+  test.describe.configure({ timeout: 720000 });
   test("should export and import a private account", async ({ page }) => {
-    const exported = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-      const wallet = await client.accounts.create({
-        storage: "private",
-        mutable: false,
-        auth: "falcon",
-      });
-      const faucet = await client.accounts.create({
-        type: window.AccountType.FungibleFaucet,
-        symbol: "DAG",
-        decimals: 8,
-        maxSupply: 10_000_000n,
-      });
+    const walletSeed = new Uint8Array(32);
+    crypto.getRandomValues(walletSeed);
 
-      // Fund the wallet
-      await client.transactions.mint({
-        account: faucet,
-        to: wallet,
-        amount: 1000n,
-      });
-      await client.sync();
-      client.proveBlock();
-      await client.sync();
+    const mutable = false;
+    const storageMode = StorageMode.PRIVATE;
+    const authSchemeId = 2;
 
-      const walletId = wallet.id().toString();
-      const faucetId = faucet.id().toString();
-
-      const initialCommitment = (await client.accounts.get(walletId))
-        ?.to_commitment()
-        .toHex();
-      const initialBalance = (await client.accounts.get(walletId))
-        ?.vault()
-        .getBalance(window.AccountId.fromHex(faucetId));
-
-      // Export the account
-      const accountFile = await client.accounts.export(wallet);
-      const serialized = Array.from(accountFile.serialize());
-
-      return {
-        walletId,
-        faucetId,
-        serialized,
-        initialCommitment,
-        initialBalance: initialBalance?.toString(),
-        storeName: client.storeIdentifier(),
-      };
+    const initialWallet = await createNewWallet(page, {
+      storageMode,
+      mutable,
+      authSchemeId,
+      walletSeed,
     });
+    const faucet = await createNewFaucet(page);
 
-    await clearStore(page, exported.storeName);
+    const { targetAccountBalance: initialBalance } =
+      await fundAccountFromFaucet(page, initialWallet.id, faucet.id);
+    const { accountCommitment: initialCommitment } = await getAccount(
+      initialWallet.id,
+      page
+    );
+    const exportedAccount = await exportAccount(page, initialWallet.id);
+    await clearStore(page);
 
-    const restored = await page.evaluate(
-      async ({ walletId, faucetId, serialized }) => {
-        const client = await window.MidenClient.createMock();
-        const bytes = new Uint8Array(serialized);
-        const deserialized = window.AccountFile.deserialize(bytes);
-        await client.accounts.import({ file: deserialized });
+    await importAccount(page, exportedAccount);
 
-        const account = await client.accounts.get(walletId);
-        return {
-          restoredCommitment: account?.to_commitment().toHex(),
-          restoredBalance: account
-            ?.vault()
-            .getBalance(window.AccountId.fromHex(faucetId))
-            ?.toString(),
-        };
-      },
-      exported
+    const { accountCommitment: restoredCommitment } = await getAccount(
+      initialWallet.id,
+      page
     );
 
-    expect(restored.restoredCommitment).toEqual(exported.initialCommitment);
-    expect(restored.restoredBalance).toEqual(exported.initialBalance);
+    const restoredBalance = await getAccountBalance(
+      page,
+      initialWallet.id,
+      faucet.id
+    );
+
+    expect(restoredCommitment).toEqual(initialCommitment);
+    expect(restoredBalance.toString()).toEqual(initialBalance);
   });
 });
 
 test.describe("export and import note", () => {
+  test.describe.configure({ timeout: 720000 });
   const exportTypes = [
     ["Id", "NoteId"],
+    ["Full", "NoteWithProof"],
     ["Details", "NoteDetails"],
   ];
+
+  const exportNote = async (
+    testingPage: Page,
+    noteId: string,
+    exportType: string
+  ) => {
+    return await testingPage.evaluate(
+      async ({ noteId, exportType }) => {
+        const format =
+          window.NoteExportFormat[
+            exportType as keyof typeof window.NoteExportFormat
+          ];
+        const noteFile = await window.client.exportNoteFile(noteId, format);
+        return noteFile.noteType();
+      },
+      { noteId, exportType }
+    );
+  };
+
+  const exportNoteSerialized = async (
+    testingPage: Page,
+    noteId: string,
+    exportType: string
+  ) => {
+    return await testingPage.evaluate(
+      async ({ noteId, exportType }) => {
+        const format =
+          window.NoteExportFormat[
+            exportType as keyof typeof window.NoteExportFormat
+          ];
+        const noteFile = await window.client.exportNoteFile(noteId, format);
+        return noteFile.serialize();
+      },
+      { noteId, exportType }
+    );
+  };
+
+  const importSerializedNote = async (
+    testingPage: Page,
+    serializedNote: Uint8Array
+  ) => {
+    return await testingPage.evaluate(
+      async ({ serializedNote }) => {
+        const noteFile = window.NoteFile.deserialize(serializedNote);
+        const importedNoteId = await window.client.importNoteFile(noteFile);
+        return importedNoteId.toString();
+      },
+      { serializedNote }
+    );
+  };
 
   exportTypes.forEach(([exportType, expectedNoteType]) => {
     test(`export note as note file -- export type: ${exportType}`, async ({
       page,
     }) => {
-      const result = await page.evaluate(
-        async ({ exportType }) => {
-          const client = await window.MidenClient.createMock();
-          const wallet = await client.accounts.create();
-          const faucet = await client.accounts.create({
-            type: window.AccountType.FungibleFaucet,
-            symbol: "DAG",
-            decimals: 8,
-            maxSupply: 10_000_000n,
-          });
+      const { createdNoteId: noteId } = await setupMintedNote(page);
 
-          await client.transactions.mint({
-            account: faucet,
-            to: wallet,
-            amount: 500n,
-            type: "public",
-          });
-          await client.sync();
-          client.proveBlock();
-          await client.sync();
-
-          const notes = await client.notes.list();
-          const noteId = notes[0].id().toString();
-
-          const format =
-            window.NoteExportFormat[
-              exportType as keyof typeof window.NoteExportFormat
-            ];
-          const noteFile = await client.notes.export(noteId, { format });
-          return noteFile.noteType();
-        },
-        { exportType }
+      await expect(exportNote(page, noteId, exportType)).resolves.toBe(
+        expectedNoteType
       );
-
-      expect(result).toBe(expectedNoteType);
     });
   });
 
   test(`exporting non-existing note fails`, async ({ page }) => {
-    await page.evaluate(async () => {
-      await window.MidenClient.createMock();
-    });
-
-    // Random note id
+    // Random note id taken from testnet
     const noteId =
       "0x60b06dbb6c7435ab1d439df972e483bca43bc21654dce2611de98ec3896beaed";
-    await expect(
-      page.evaluate(
-        async ({ noteId }) => {
-          const client = await window.MidenClient.createMock();
-          const format = window.NoteExportFormat.Details;
-          return await client.notes.export(noteId, { format });
-        },
-        { noteId }
-      )
-    ).rejects.toThrowError("No output note found");
+    await expect(exportNote(page, noteId, "Full")).rejects.toThrowError(
+      "No output note found"
+    );
   });
 
   test(`exporting and then importing note`, async ({ page }) => {
-    const exported = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-      const wallet = await client.accounts.create();
-      const faucet = await client.accounts.create({
-        type: window.AccountType.FungibleFaucet,
-        symbol: "DAG",
-        decimals: 8,
-        maxSupply: 10_000_000n,
-      });
+    const { createdNoteId: noteId } = await setupMintedNote(page);
 
-      await client.transactions.mint({
-        account: faucet,
-        to: wallet,
-        amount: 500n,
-        type: "public",
-      });
-      await client.sync();
-      client.proveBlock();
-      await client.sync();
+    const serializedNoteFile = await exportNoteSerialized(page, noteId, "Full");
 
-      const notes = await client.notes.list();
-      const noteId = notes[0].id().toString();
-
-      // Export the note with Details format
-      const format = window.NoteExportFormat.Details;
-      const noteFile = await client.notes.export(noteId, { format });
-      const serialized = Array.from(noteFile.serialize());
-
-      return {
-        originalNoteId: noteId,
-        serialized,
-        storeName: client.storeIdentifier(),
-      };
-    });
-
-    await clearStore(page, exported.storeName);
-
-    const importedNoteId = await page.evaluate(async ({ serialized }) => {
-      const client = await window.MidenClient.createMock();
-      const bytes = new Uint8Array(serialized);
-      const deserialized = window.NoteFile.deserialize(bytes);
-      const noteId = await client.notes.import(deserialized);
-      return noteId.toString();
-    }, exported);
-
-    expect(importedNoteId).toBe(exported.originalNoteId);
-  });
-
-  test(`export output note`, async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-      const account1 = await client.accounts.create();
-      const account2 = await client.accounts.create();
-
-      const p2IdNote = window.Note.createP2IDNote(
-        account1.id(),
-        account2.id(),
-        new window.NoteAssets([]),
-        window.NoteType.Public,
-        new window.NoteAttachment()
+    // Clear store and assert that the output note cannot be found
+    await clearStore(page);
+    await expect(async () => {
+      return await page.evaluate(
+        async ({ noteId }) => {
+          return await window.client.getOutputNote(noteId);
+        },
+        { noteId }
       );
-      return window.NoteFile.fromRawOutputNote(
-        window.RawOutputNote.full(p2IdNote)
-      ).noteType();
-    });
+    }).rejects.toThrow("Note not found");
 
-    expect(result).toBe("NoteDetails");
+    await expect(importSerializedNote(page, serializedNoteFile)).resolves.toBe(
+      noteId
+    );
   });
 
   test(`export input note`, async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-      const wallet = await client.accounts.create();
-      const faucet = await client.accounts.create({
-        type: window.AccountType.FungibleFaucet,
-        symbol: "DAG",
-        decimals: 8,
-        maxSupply: 10_000_000n,
-      });
+    const { consumedNoteId: noteId } = await setupConsumedNote(page);
+    const exportInputNote = async () => {
+      return await page.evaluate(
+        async ({ noteId }) => {
+          const client = window.client;
+          const inputNoteRecord = await client.getInputNote(noteId);
+          return window.NoteFile.fromInputNote(
+            inputNoteRecord.toInputNote()
+          ).noteType();
+        },
+        { noteId }
+      );
+    };
 
-      // Mint
-      const mintTxId = await client.transactions.mint({
-        account: faucet,
-        to: wallet,
-        amount: 500n,
-        type: "public",
-      });
-      await client.sync();
-      client.proveBlock();
-      await client.sync();
+    await expect(exportInputNote()).resolves.toBe("NoteWithProof");
+  });
 
-      // Get the minted note ID
-      const txRecords = await client.transactions.list({
-        ids: [mintTxId.toHex()],
-      });
-      const mintedNoteId = txRecords[0]
-        .rawOutputNotes()
-        .notes()[0]
-        .id()
-        .toString();
+  test(`export output note`, async ({ page }) => {
+    const { consumedNoteId: noteId } = await setupConsumedNote(page);
+    const exportInputNote = async () => {
+      return await page.evaluate(
+        async ({ noteId }) => {
+          const client = window.client;
+          const account1 = await client.newWallet(
+            window.AccountStorageMode.private(),
+            true,
+            window.AuthScheme.AuthRpoFalcon512
+          );
+          const account2 = await client.newWallet(
+            window.AccountStorageMode.private(),
+            true,
+            window.AuthScheme.AuthRpoFalcon512
+          );
 
-      // Consume the note so it becomes an input note
-      await client.transactions.consume({
-        account: wallet,
-        notes: mintedNoteId,
-      });
-      client.proveBlock();
-      await client.sync();
+          const p2IdNote = window.Note.createP2IDNote(
+            account1.id(),
+            account2.id(),
+            new window.NoteAssets([]),
+            window.NoteType.Public,
+            new window.NoteAttachment()
+          );
+          return window.NoteFile.fromOutputNote(
+            window.OutputNote.full(p2IdNote)
+          ).noteType();
+        },
+        { noteId }
+      );
+    };
 
-      // Get the input note and export
-      const inputNoteRecord = await client.notes.get(mintedNoteId);
-      return window.NoteFile.fromInputNote(
-        inputNoteRecord.toInputNote()
-      ).noteType();
-    });
-
-    expect(result).toBe("NoteWithProof");
+    await expect(exportInputNote()).resolves.toBe("NoteDetails");
   });
 });

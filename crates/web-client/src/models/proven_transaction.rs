@@ -51,7 +51,7 @@ impl ProvenTransaction {
     }
 
     // Note: proven output notes are not exposed in the web client yet.
-    // The web client only exposes raw executed output notes via RawOutputNote/RawOutputNotes.
+    // The web client only exposes executed output notes via OutputNote/OutputNotes.
 
     /// Returns the commitment of the reference block.
     #[wasm_bindgen(js_name = "refBlockCommitment")]

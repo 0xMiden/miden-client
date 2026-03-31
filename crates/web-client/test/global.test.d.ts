@@ -43,10 +43,11 @@ import {
   NoteRecipient,
   NoteTag,
   NoteType,
+  OutputNote,
+  OutputNotesArray,
   Package,
   ProcedureThreshold,
   PublicKey,
-  RawOutputNote,
   Rpo256,
   RpcClient,
   Signature,
@@ -137,10 +138,11 @@ declare global {
     NoteScript: typeof NoteScript;
     NoteTag: typeof NoteTag;
     NoteType: typeof NoteType;
+    OutputNote: typeof OutputNote;
+    OutputNotesArray: typeof OutputNotesArray;
     Package: typeof Package;
     ProcedureThreshold: typeof ProcedureThreshold;
     PublicKey: typeof PublicKey;
-    RawOutputNote: typeof RawOutputNote;
     Rpo256: typeof Rpo256;
     Signature: typeof Signature;
     SigningInputs: typeof SigningInputs;

@@ -54,15 +54,15 @@ Returns the input notes referenced by the summary.
 
 ***
 
-### rawOutputNotes()
+### outputNotes()
 
-> **rawOutputNotes**(): `RawOutputNotes`
+> **outputNotes**(): `OutputNotes`
 
-Returns the raw output notes referenced by the summary.
+Returns the output notes referenced by the summary.
 
 #### Returns
 
-`RawOutputNotes`
+`OutputNotes`
 
 ***
 
