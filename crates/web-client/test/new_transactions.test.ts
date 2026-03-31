@@ -181,16 +181,11 @@ test.describe("custom transaction tests", () => {
       );
 
       // Creating NOTE_ARGS
-      const felt1 = new sdk.Felt(sdk.u64(9));
-      const felt2 = new sdk.Felt(sdk.u64(12));
-      const felt3 = new sdk.Felt(sdk.u64(18));
-      const felt4 = new sdk.Felt(sdk.u64(3));
-      const felt5 = new sdk.Felt(sdk.u64(3));
-      const felt6 = new sdk.Felt(sdk.u64(18));
-      const felt7 = new sdk.Felt(sdk.u64(12));
-      const felt8 = new sdk.Felt(sdk.u64(9));
-
-      const noteArgs = [felt1, felt2, felt3, felt4, felt5, felt6, felt7, felt8];
+      // Each FeltArray construction consumes the Felt objects (wasm_bindgen
+      // by-value), so we need a factory to create fresh instances each time.
+      const noteArgValues = [9, 12, 18, 3, 3, 18, 12, 9];
+      const makeNoteArgs = () =>
+        noteArgValues.map((v) => new sdk.Felt(sdk.u64(v)));
 
       const noteAssets = new sdk.NoteAssets([
         new sdk.FungibleAsset(faucet.id(), sdk.u64(10)),
@@ -202,7 +197,7 @@ test.describe("custom transaction tests", () => {
         sdk.NoteTag.withAccountTarget(wallet.id())
       );
 
-      const expectedNoteArgs = noteArgs.map((felt) => felt.asInt());
+      const expectedNoteArgs = makeNoteArgs().map((felt) => felt.asInt());
       const memAddress = "1000";
       const memAddress2 = "1004";
       const expectedNoteArg1 = expectedNoteArgs.slice(0, 4).join(".");
@@ -325,16 +320,16 @@ test.describe("custom transaction tests", () => {
       // with Valid Transaction Script
       const transactionScript = await builder.compileTxScript(txScript);
       const noteArgsCommitment = sdk.Rpo256.hashElements(
-        new sdk.FeltArray(noteArgs)
+        new sdk.FeltArray(makeNoteArgs())
       );
 
       const noteAndArgs = new sdk.NoteAndArgs(customNote, noteArgsCommitment);
 
       const adviceMap = new sdk.AdviceMap();
       const noteArgsCommitment2 = sdk.Rpo256.hashElements(
-        new sdk.FeltArray(noteArgs)
+        new sdk.FeltArray(makeNoteArgs())
       );
-      adviceMap.insert(noteArgsCommitment2, new sdk.FeltArray(noteArgs));
+      adviceMap.insert(noteArgsCommitment2, new sdk.FeltArray(makeNoteArgs()));
 
       const transactionRequest2 = new sdk.TransactionRequestBuilder()
         .withInputNotes(new sdk.NoteAndArgsArray([noteAndArgs]))
@@ -367,17 +362,10 @@ test.describe("custom transaction tests", () => {
         sdk.AuthScheme.AuthRpoFalcon512
       );
 
-      // Creating NOTE_ARGS
-      const noteArgs = [
-        new sdk.Felt(sdk.u64(9)),
-        new sdk.Felt(sdk.u64(12)),
-        new sdk.Felt(sdk.u64(18)),
-        new sdk.Felt(sdk.u64(3)),
-        new sdk.Felt(sdk.u64(3)),
-        new sdk.Felt(sdk.u64(18)),
-        new sdk.Felt(sdk.u64(12)),
-        new sdk.Felt(sdk.u64(9)),
-      ];
+      // Creating NOTE_ARGS (factory -- see comment in first custom transaction test)
+      const noteArgValues = [9, 12, 18, 3, 3, 18, 12, 9];
+      const makeNoteArgs = () =>
+        noteArgValues.map((v) => new sdk.Felt(sdk.u64(v)));
 
       const noteAssets = new sdk.NoteAssets([
         new sdk.FungibleAsset(faucet.id(), sdk.u64(10)),
@@ -389,7 +377,7 @@ test.describe("custom transaction tests", () => {
         sdk.NoteTag.withAccountTarget(wallet.id())
       );
 
-      const expectedNoteArgs = noteArgs.map((felt) => felt.asInt());
+      const expectedNoteArgs = makeNoteArgs().map((felt) => felt.asInt());
       const memAddress = "1000";
       const memAddress2 = "1004";
       const expectedNoteArg1 = expectedNoteArgs.slice(0, 4).join(".");
@@ -456,16 +444,16 @@ test.describe("custom transaction tests", () => {
 
       const transactionScript = await builder.compileTxScript(txScript);
       const noteArgsCommitment = sdk.Rpo256.hashElements(
-        new sdk.FeltArray(noteArgs)
+        new sdk.FeltArray(makeNoteArgs())
       );
 
       const noteAndArgs = new sdk.NoteAndArgs(customNote, noteArgsCommitment);
 
       const adviceMap = new sdk.AdviceMap();
       const noteArgsCommitment2 = sdk.Rpo256.hashElements(
-        new sdk.FeltArray(noteArgs)
+        new sdk.FeltArray(makeNoteArgs())
       );
-      adviceMap.insert(noteArgsCommitment2, new sdk.FeltArray(noteArgs));
+      adviceMap.insert(noteArgsCommitment2, new sdk.FeltArray(makeNoteArgs()));
 
       const transactionRequest2 = new sdk.TransactionRequestBuilder()
         .withInputNotes(new sdk.NoteAndArgsArray([noteAndArgs]))

@@ -82,8 +82,12 @@ export default defineConfig({
         "test/node/**", // Old format duplicates (ported to root test/)
         "test/remote_prover_transactions*", // Old browser format for chromium CI
       ],
-      // Skip specific browser-only tests by name
-      grepInvert: /exportStore|importStore/,
+      // Skip specific browser-only tests by name.
+      // Tests that request the `page` fixture must be listed here because
+      // Playwright launches the browser for the fixture BEFORE test.skip()
+      // in the test body can run.
+      grepInvert:
+        /exportStore|importStore|reads updated state after a mutating|accounts\.insert stores a pre-built/,
     },
 
     /* Test against mobile viewports. */
