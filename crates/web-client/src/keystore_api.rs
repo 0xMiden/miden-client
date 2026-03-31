@@ -9,10 +9,10 @@ use crate::models::auth_secret_key::AuthSecretKey;
 use crate::models::word::Word;
 use crate::{ClientAuth, js_error_with_context};
 
-/// A handle to the keystore, exposed to JavaScript as `client.keystore`.
+/// JavaScript API for the client's keystore.
 ///
-/// Provides methods for managing secret keys: inserting, retrieving, removing,
-/// and querying key-account mappings.
+/// Manages the association between accounts and their authentication secret keys,
+/// indexed by public key commitment.
 #[wasm_bindgen]
 pub struct WebKeystoreApi {
     keystore: Arc<ClientAuth>,
