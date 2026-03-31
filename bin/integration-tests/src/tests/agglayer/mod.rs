@@ -84,49 +84,20 @@ impl AgglayerConfig {
 
     /// Returns the faucet's origin token address from its storage.
     pub fn faucet_origin_token_address(&self) -> EthAddress {
-        let info1 = self
-            .faucet
-            .account
-            .storage()
-            .get_item(AggLayerFaucet::conversion_info_1_slot())
-            .expect("faucet should have conversion_info_1 slot");
-        let info2 = self
-            .faucet
-            .account
-            .storage()
-            .get_item(AggLayerFaucet::conversion_info_2_slot())
-            .expect("faucet should have conversion_info_2 slot");
-
-        let felts = [info1[0], info1[1], info1[2], info1[3], info2[0]];
-        let mut bytes = [0u8; 20];
-        for (i, felt) in felts.iter().enumerate() {
-            let val = felt.as_canonical_u64() as u32;
-            bytes[i * 4..(i + 1) * 4].copy_from_slice(&val.to_le_bytes());
-        }
-        EthAddress::new(bytes)
+        AggLayerFaucet::origin_token_address(&self.faucet.account)
+            .expect("faucet should have origin token address")
     }
 
     /// Returns the faucet's origin network from its storage.
     #[allow(dead_code)]
     pub fn faucet_origin_network(&self) -> u32 {
-        let info2 = self
-            .faucet
-            .account
-            .storage()
-            .get_item(AggLayerFaucet::conversion_info_2_slot())
-            .expect("faucet should have conversion_info_2 slot");
-        info2[1].as_canonical_u64() as u32
+        AggLayerFaucet::origin_network(&self.faucet.account)
+            .expect("faucet should have origin network")
     }
 
     /// Returns the faucet's scale from its storage.
     pub fn faucet_scale(&self) -> u8 {
-        let info2 = self
-            .faucet
-            .account
-            .storage()
-            .get_item(AggLayerFaucet::conversion_info_2_slot())
-            .expect("faucet should have conversion_info_2 slot");
-        info2[2].as_canonical_u64() as u8
+        AggLayerFaucet::scale(&self.faucet.account).expect("faucet should have scale")
     }
 
     /// Imports a single account (by ID) into the given client and keystore.
