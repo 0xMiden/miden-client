@@ -1,7 +1,7 @@
 use alloc::collections::BTreeMap;
 
 use miden_protocol::block::BlockHeader;
-use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
+use miden_protocol::note::{NoteId, Nullifier};
 
 use crate::ClientError;
 use crate::rpc::domain::note::CommittedNote;
@@ -300,22 +300,22 @@ impl NoteUpdateTracker {
         committed_note: &CommittedNote,
         block_header: &BlockHeader,
     ) -> Result<bool, ClientError> {
-        let inclusion_proof = NoteInclusionProof::new(
-            block_header.block_num(),
-            committed_note.note_index(),
-            committed_note.inclusion_path().clone(),
-        )?;
-        let is_tracked_as_input_note =
-            if let Some(input_note_record) = self.get_input_note_by_id(*committed_note.note_id()) {
-                // The note belongs to our locally tracked set of input notes
-                input_note_record
-                    .inclusion_proof_received(inclusion_proof.clone(), committed_note.metadata())?;
-                input_note_record.block_header_received(block_header)?;
+        let inclusion_proof = committed_note.inclusion_proof().clone();
 
-                true
-            } else {
-                false
-            };
+        let is_tracked_as_input_note = if let Some(input_note_record) =
+            self.get_input_note_by_id(*committed_note.note_id())
+        {
+            // The note belongs to our locally tracked set of input notes.
+            // Use the metadata already stored in the local record rather than from the sync
+            // response (which only provides a fixed-size header without attachment data).
+            let local_metadata = input_note_record.metadata().cloned();
+            input_note_record.inclusion_proof_received(inclusion_proof.clone(), local_metadata)?;
+            input_note_record.block_header_received(block_header)?;
+
+            true
+        } else {
+            false
+        };
 
         if let Some(output_note_record) = self.get_output_note_by_id(*committed_note.note_id()) {
             // The note belongs to our locally tracked set of output notes

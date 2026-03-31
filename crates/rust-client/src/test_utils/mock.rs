@@ -313,9 +313,9 @@ impl NodeRpcClient for MockRpcApi {
             if note_tags.contains(&note.metadata().tag()) && note_block > block_num {
                 let committed = CommittedNote::new(
                     note.id(),
-                    note.inclusion_proof().location().block_note_tree_index(),
-                    note.inclusion_proof().note_path().clone(),
-                    note.metadata().clone(),
+                    note.metadata().note_type(),
+                    note.metadata().tag(),
+                    note.inclusion_proof().clone(),
                 );
                 blocks_with_notes.entry(note_block).or_default().push(committed);
             }

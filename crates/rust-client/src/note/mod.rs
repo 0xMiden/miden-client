@@ -88,6 +88,7 @@ pub use miden_protocol::note::{
     NoteInclusionProof,
     NoteLocation,
     NoteMetadata,
+    NoteMetadataHeader,
     NoteRecipient,
     NoteScript,
     NoteStorage,

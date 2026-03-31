@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::crypto::merkle::{MerklePath, SparseMerklePath};
+use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::note::{
     Note,
     NoteAttachment,
@@ -139,29 +139,28 @@ pub struct NoteSyncInfo {
 }
 
 fn convert_note_sync_record(note: proto::note::NoteSyncRecord) -> Result<CommittedNote, RpcError> {
-    let note_id: NoteId = note
+    let metadata_header = note
+        .metadata_header
+        .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.metadata_header)))?;
+
+    let note_type =
+        NoteType::try_from(u64::try_from(metadata_header.note_type).expect("invalid note type"))?;
+    let tag = NoteTag::new(metadata_header.tag);
+
+    let proto_inclusion_proof = note
+        .inclusion_proof
+        .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.inclusion_proof)))?;
+
+    let note_id: NoteId = proto_inclusion_proof
         .note_id
-        .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.note_id)))?
+        .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
+            notes.inclusion_proof.note_id
+        )))?
         .try_into()?;
 
-    let inclusion_path = note
-        .inclusion_path
-        .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.inclusion_path)))?
-        .try_into()?;
+    let inclusion_proof: NoteInclusionProof = proto_inclusion_proof.try_into()?;
 
-    let metadata = note
-        .metadata
-        .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.metadata)))?
-        .try_into()?;
-
-    Ok(CommittedNote::new(
-        note_id,
-        u16::try_from(note.note_index_in_block).map_err(|_| {
-            RpcConversionError::InvalidField("note_index_in_block value out of u16 range".into())
-        })?,
-        inclusion_path,
-        metadata,
-    ))
+    Ok(CommittedNote::new(note_id, note_type, tag, inclusion_proof))
 }
 
 impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
@@ -212,48 +211,48 @@ impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
 // COMMITTED NOTE
 // ================================================================================================
 
-/// Represents a committed note, returned as part of a `SyncStateResponse`.
+/// Represents a committed note, returned as part of a `SyncNotesResponse`.
+///
+/// Contains only the note type and tag from the metadata header (fixed-size), rather than full
+/// [`NoteMetadata`], since the sync response no longer includes attachment data. Clients needing
+/// full metadata should source it from the local store (for tracked notes) or call `GetNotesById`
+/// (for public notes).
 #[derive(Debug, Clone)]
 pub struct CommittedNote {
     /// Note ID of the committed note.
     note_id: NoteId,
-    /// Note index for the note merkle tree.
-    note_index: u16,
-    /// Merkle path for the note merkle tree up to the block's note root.
-    inclusion_path: SparseMerklePath,
-    /// Note metadata.
-    metadata: NoteMetadata,
+    /// The note type (public, private, etc.).
+    note_type: NoteType,
+    /// The note tag used for filtering.
+    tag: NoteTag,
+    /// Inclusion proof for the note in the block.
+    inclusion_proof: NoteInclusionProof,
 }
 
 impl CommittedNote {
     pub fn new(
         note_id: NoteId,
-        note_index: u16,
-        inclusion_path: SparseMerklePath,
-        metadata: NoteMetadata,
+        note_type: NoteType,
+        tag: NoteTag,
+        inclusion_proof: NoteInclusionProof,
     ) -> Self {
-        Self {
-            note_id,
-            note_index,
-            inclusion_path,
-            metadata,
-        }
+        Self { note_id, note_type, tag, inclusion_proof }
     }
 
     pub fn note_id(&self) -> &NoteId {
         &self.note_id
     }
 
-    pub fn note_index(&self) -> u16 {
-        self.note_index
+    pub fn note_type(&self) -> NoteType {
+        self.note_type
     }
 
-    pub fn inclusion_path(&self) -> &SparseMerklePath {
-        &self.inclusion_path
+    pub fn tag(&self) -> NoteTag {
+        self.tag
     }
 
-    pub fn metadata(&self) -> NoteMetadata {
-        self.metadata.clone()
+    pub fn inclusion_proof(&self) -> &NoteInclusionProof {
+        &self.inclusion_proof
     }
 }
 

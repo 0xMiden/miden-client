@@ -9,7 +9,7 @@ use miden_protocol::account::{Account, AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
-use miden_protocol::note::{NoteId, NoteTag, Nullifier};
+use miden_protocol::note::{NoteId, NoteTag, NoteType, Nullifier};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -25,7 +25,7 @@ use crate::rpc::domain::transaction::{
 use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
 use crate::transaction::TransactionRecord;
 
-// SYNC STEP RESULT
+// STATE UPDATE DATA
 // ================================================================================================
 
 /// A block containing notes returned by `sync_notes`, with its MMR authentication path.
@@ -35,15 +35,13 @@ struct NoteBlock {
     notes: Vec<CommittedNote>,
 }
 
-/// The result of a single `sync_notes` call plus associated transaction data.
+/// All data fetched from the node needed to sync the client to the chain tip.
 ///
-/// Each call to `sync_state_step` produces one of these. The `blocks` field contains per-block
-/// data (header, MMR delta, notes) while the remaining fields cover the entire synced range.
-struct SyncStepResult {
-    /// The chain tip at the time of the response.
+/// Produced by [`StateSync::fetch_sync_data`], which calls `sync_chain_mmr` once
+/// and loops `sync_notes` until the full range is covered, plus `sync_transactions`.
+struct SyncUpdate {
+    /// The chain tip at the time of the response. The client advances to this block.
     chain_tip: BlockNumber,
-    /// The block number we advanced to.
-    advanced_to: BlockNumber,
     /// MMR delta covering the full range from `current_block` to `chain_tip`.
     mmr_delta: MmrDelta,
     /// Chain tip block header (needed to add the tip leaf to the MMR).
@@ -227,41 +225,32 @@ impl StateSync {
 
         let note_tags = Arc::new(note_tags);
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
-        let mut sync_results = Vec::new();
+        let sync_data = self
+            .fetch_sync_data(state_sync_update.block_num, &account_ids, &note_tags)
+            .await?;
 
-        loop {
-            let result = self
-                .sync_state_step(state_sync_update.block_num, &account_ids, &note_tags)
-                .await?;
-
-            if result.advanced_to == state_sync_update.block_num {
-                break; // No progress, we're at the tip
-            }
-
-            let reached_tip = result.chain_tip == result.advanced_to;
-            state_sync_update.block_num = result.advanced_to;
-            sync_results.push(result);
-
-            if reached_tip {
-                break;
-            }
+        // No progress — already at the tip.
+        if sync_data.chain_tip == state_sync_update.block_num {
+            return Ok(state_sync_update);
         }
 
-        // Fetch details for all public notes across all sync results.
-        let public_note_ids: Vec<NoteId> = sync_results
+        state_sync_update.block_num = sync_data.chain_tip;
+
+        // Fetch details for all public notes.
+        let public_note_ids: Vec<NoteId> = sync_data
+            .note_blocks
             .iter()
-            .flat_map(|r| r.note_blocks.iter().flat_map(|b| b.notes.iter()))
-            .filter(|n| !n.metadata().is_private())
+            .flat_map(|b| b.notes.iter())
+            .filter(|n| n.note_type() != NoteType::Private)
             .map(|n| *n.note_id())
             .collect();
 
         let public_note_records = self.fetch_public_note_details(&public_note_ids).await?;
 
-        // Collect account commitment updates across all results. Each account only needs
-        // to be checked once since GetAccount always returns the latest state.
-        let merged_commitment_updates: Vec<(AccountId, Word)> = sync_results
+        // Collect account commitment updates.
+        let merged_commitment_updates: Vec<(AccountId, Word)> = sync_data
+            .account_commitment_updates
             .iter()
-            .flat_map(|r| r.account_commitment_updates.iter())
             .map(|(id, w)| (*id, *w))
             .collect::<BTreeMap<_, _>>()
             .into_iter()
@@ -278,8 +267,8 @@ impl StateSync {
         // transitions.
         info!("Applying state transitions locally.");
 
-        self.apply_sync_results(
-            sync_results,
+        self.apply_sync_result(
+            sync_data,
             &public_note_records,
             &mut state_sync_update,
             current_partial_mmr,
@@ -295,28 +284,30 @@ impl StateSync {
     }
 
     /// Executes a single sync step:
-    /// 1. `sync_chain_mmr`: gets the MMR delta to the chain tip and discovers the chain tip.
-    /// 2. `sync_notes`: gets note blocks in the range, bounded by the chain tip.
-    /// 3. `sync_transactions`: gets transaction data for the range.
+    /// 1. `sync_chain_mmr` — gets the MMR delta to the chain tip and discovers the chain tip.
+    /// 2. `sync_notes` — loops until the full range to the chain tip is covered (handles truncated
+    ///    responses from payload limits).
+    /// 3. `sync_transactions` — gets transaction data for the full range.
     ///
-    /// Returns a [`SyncStepResult`] where `advanced_to == current_block_num` signals no progress.
-    async fn sync_state_step(
+    /// Returns a [`StateUpdateData`] where `chain_tip == current_block_num` signals no progress.
+    async fn fetch_sync_data(
         &self,
         current_block_num: BlockNumber,
         account_ids: &[AccountId],
         note_tags: &Arc<BTreeSet<NoteTag>>,
-    ) -> Result<SyncStepResult, ClientError> {
+    ) -> Result<SyncUpdate, ClientError> {
         info!("Performing sync state step.");
 
-        // Step 1: Get the MMR delta to the chain tip. This also tells us what the chain tip is.
-        let chain_mmr_info = self.rpc_api.sync_chain_mmr(current_block_num, None).await?;
+        // Step 1: Discover the chain tip, then fetch the MMR delta to it.
         let (chain_tip_header, _) = self.rpc_api.get_block_header_by_number(None, false).await?;
         let chain_tip = chain_tip_header.block_num();
 
+        let chain_mmr_info =
+            self.rpc_api.sync_chain_mmr(current_block_num, Some(chain_tip)).await?;
+
         if chain_tip == current_block_num {
-            return Ok(SyncStepResult {
+            return Ok(SyncUpdate {
                 chain_tip,
-                advanced_to: current_block_num,
                 mmr_delta: chain_mmr_info.mmr_delta,
                 chain_tip_header,
                 note_blocks: vec![],
@@ -326,39 +317,37 @@ impl StateSync {
             });
         }
 
-        // Step 2: Get note blocks, bounded by the chain tip we just learned.
-        let note_sync = self
-            .rpc_api
-            .sync_notes(current_block_num, Some(chain_tip), note_tags.as_ref())
-            .await?;
+        // Step 2: Loop sync_notes until we've covered the full range to the chain tip.
+        // Each response's `block_to` tells us how far the node scanned; if it's less
+        // than the chain tip, the response was truncated and we continue from there.
+        let mut note_blocks = Vec::new();
+        let mut cursor = current_block_num;
 
-        // If the last returned block is before the chain tip, the node hit its payload limit.
-        // In that case we only advance to the last returned block; the next iteration will
-        // pick up the remaining range.
-        let advanced_to = note_sync
-            .blocks
-            .last()
-            .map(|b| b.block_header.block_num())
-            .filter(|&bn| bn < chain_tip)
-            .unwrap_or(chain_tip);
+        loop {
+            let note_sync =
+                self.rpc_api.sync_notes(cursor, Some(chain_tip), note_tags.as_ref()).await?;
 
-        // Step 3: Gather transactions for tracked accounts over the range.
+            for block in note_sync.blocks {
+                note_blocks.push(NoteBlock {
+                    block_header: block.block_header,
+                    mmr_path: block.mmr_path,
+                    notes: block.notes,
+                });
+            }
+
+            cursor = note_sync.block_to;
+
+            if cursor >= chain_tip {
+                break;
+            }
+        }
+
+        // Step 3: Gather transactions for tracked accounts over the full range.
         let (account_commitment_updates, transactions, nullifiers) =
-            self.fetch_transaction_data(current_block_num, advanced_to, account_ids).await?;
+            self.fetch_transaction_data(current_block_num, chain_tip, account_ids).await?;
 
-        let note_blocks = note_sync
-            .blocks
-            .into_iter()
-            .map(|b| NoteBlock {
-                block_header: b.block_header,
-                mmr_path: b.mmr_path,
-                notes: b.notes,
-            })
-            .collect();
-
-        Ok(SyncStepResult {
+        Ok(SyncUpdate {
             chain_tip,
-            advanced_to,
             mmr_delta: chain_mmr_info.mmr_delta,
             chain_tip_header,
             note_blocks,
@@ -409,83 +398,68 @@ impl StateSync {
     /// Applies sync results to the local state update.
     ///
     /// For each result:
-    /// 1. Applies the MMR delta (advances the MMR to chain_tip - 1).
+    /// 1. Applies the MMR delta (advances the MMR to `chain_tip` - 1).
     /// 2. Adds the chain tip block as a new MMR leaf.
     /// 3. For each note block with relevant notes, tracks the block in the MMR using the
     ///    authentication path from the `sync_notes` response.
     /// 4. Processes note inclusions and transaction data.
-    async fn apply_sync_results(
+    async fn apply_sync_result(
         &self,
-        sync_results: Vec<SyncStepResult>,
+        sync_data: SyncUpdate,
         public_note_records: &BTreeMap<NoteId, InputNoteRecord>,
         state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<(), ClientError> {
-        for result in sync_results {
-            // Step 1: Apply the MMR delta to advance peaks up to chain_tip - 1.
-            let mut new_authentication_nodes =
-                current_partial_mmr.apply(result.mmr_delta).map_err(StoreError::MmrError)?;
+        // Step 1: Apply the MMR delta to advance the partial MMR up to chain_tip - 1,
+        // then add the chain tip block as a new leaf.
+        let mut new_authentication_nodes =
+            current_partial_mmr.apply(sync_data.mmr_delta).map_err(StoreError::MmrError)?;
 
-            // Step 2: Add the chain tip block as a new leaf (untracked by default).
-            let new_peaks = current_partial_mmr.peaks();
-            new_authentication_nodes
-                .append(&mut current_partial_mmr.add(result.chain_tip_header.commitment(), false));
+        new_authentication_nodes
+            .append(&mut current_partial_mmr.add(sync_data.chain_tip_header.commitment(), false));
 
-            // Always store the chain tip block header.
-            state_sync_update.block_updates.insert(
-                result.chain_tip_header,
-                false,
-                new_peaks,
-                new_authentication_nodes,
-            );
+        // Store the chain tip block header. This is needed so that subsequent transactions
+        // can reference recent blocks from the store.
+        let new_peaks = current_partial_mmr.peaks();
+        state_sync_update.block_updates.insert(
+            sync_data.chain_tip_header.clone(),
+            false,
+            new_peaks,
+            new_authentication_nodes,
+        );
 
-            // Step 3: Process each note block — screen notes and track relevant blocks.
-            for block in result.note_blocks {
-                let found_relevant_note = self
-                    .note_state_sync(
-                        &mut state_sync_update.note_updates,
-                        block.notes,
-                        &block.block_header,
-                        public_note_records,
-                    )
-                    .await?;
+        // Step 3: Process each note block — screen notes and track relevant blocks.
+        for block in sync_data.note_blocks {
+            let found_relevant_note = self
+                .note_state_sync(
+                    &mut state_sync_update.note_updates,
+                    block.notes,
+                    &block.block_header,
+                    public_note_records,
+                )
+                .await?;
 
-                if found_relevant_note {
-                    // Track this block in the partial MMR using the authentication path
-                    // from the sync_notes response.
-                    let block_num = block.block_header.block_num();
-                    current_partial_mmr
-                        .track(
-                            block_num.as_usize(),
-                            block.block_header.commitment(),
-                            &block.mmr_path,
-                        )
-                        .map_err(StoreError::MmrError)?;
+            if found_relevant_note {
+                let block_num = block.block_header.block_num();
+                current_partial_mmr
+                    .track(block_num.as_usize(), block.block_header.commitment(), &block.mmr_path)
+                    .map_err(StoreError::MmrError)?;
 
-                    let new_peaks = current_partial_mmr.peaks();
-                    state_sync_update.block_updates.insert(
-                        block.block_header,
-                        true,
-                        new_peaks,
-                        vec![],
-                    );
-                }
-            }
-
-            // Step 4: Apply range-wide transaction and nullifier data.
-            state_sync_update.note_updates.extend_nullifiers(result.nullifiers);
-
-            self.transaction_state_sync(
-                &mut state_sync_update.transaction_updates,
-                &state_sync_update
+                let new_peaks = current_partial_mmr.peaks();
+                state_sync_update
                     .block_updates
-                    .block_headers()
-                    .last()
-                    .expect("at least one block header should be stored")
-                    .0,
-                &result.transactions,
-            );
+                    .insert(block.block_header, true, new_peaks, vec![]);
+            }
         }
+
+        // Step 4: Apply transaction and nullifier data.
+        state_sync_update.note_updates.extend_nullifiers(sync_data.nullifiers);
+
+        self.transaction_state_sync(
+            &mut state_sync_update.transaction_updates,
+            &sync_data.chain_tip_header,
+            &sync_data.transactions,
+        );
 
         Ok(())
     }
@@ -579,7 +553,7 @@ impl StateSync {
         let mut found_relevant_note = false;
 
         for committed_note in note_inclusions {
-            let public_note = (!committed_note.metadata().is_private())
+            let public_note = (committed_note.note_type() != NoteType::Private)
                 .then(|| public_notes.get(committed_note.note_id()))
                 .flatten()
                 .cloned();
@@ -788,7 +762,12 @@ mod tests {
     use alloc::sync::Arc;
 
     use async_trait::async_trait;
+    use miden_protocol::assembly::DefaultSourceManager;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, PartialMmr};
+    use miden_protocol::note::{NoteTag, NoteType};
+    use miden_protocol::{Felt, Word};
+    use miden_standards::code_builder::CodeBuilder;
+    use miden_testing::MockChainBuilder;
 
     use super::*;
     use crate::testing::mock::MockRpcApi;
@@ -1123,26 +1102,11 @@ mod tests {
         assert_eq!(partial_mmr.forest(), forest_2);
     }
 
-    /// Verifies that the sync correctly processes notes committed in multiple blocks
-    /// (batched `SyncNotes` response) and tracks their blocks in the partial MMR.
-    ///
-    /// This test creates a faucet and mints notes in separate blocks (blocks 1, 2, 3),
-    /// so `sync_notes` returns multiple `NoteSyncBlock`s. It then verifies:
-    /// - The MMR is advanced to the chain tip
-    /// - Blocks containing relevant notes are tracked in the partial MMR via `track()`
-    /// - Note inclusion proofs are set correctly
-    /// - Block headers for note blocks are stored
-    #[tokio::test]
-    async fn sync_state_tracks_note_blocks_in_mmr() {
-        use alloc::sync::Arc;
-
-        use miden_protocol::assembly::DefaultSourceManager;
-        use miden_protocol::note::{NoteTag, NoteType};
-        use miden_protocol::{Felt, Word};
-        use miden_standards::code_builder::CodeBuilder;
-        use miden_testing::MockChainBuilder;
-
-        // Build a chain with a faucet.
+    /// Builds a mock chain with a faucet that mints `num_blocks` notes, one per block.
+    /// Returns the chain and the set of note tags for filtering.
+    async fn build_chain_with_mint_notes(
+        num_blocks: u64,
+    ) -> (miden_testing::MockChain, BTreeSet<NoteTag>) {
         let mut builder = MockChainBuilder::new();
         let faucet = builder
             .add_existing_basic_faucet(
@@ -1154,17 +1118,15 @@ mod tests {
                 None,
             )
             .unwrap();
-        let target = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
+        let _target = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
         let mut chain = builder.build().unwrap();
 
-        // Mint a note in each of 3 separate blocks (blocks 1, 2, 3).
-        // Each mint transaction produces a public output note committed in that block.
         let recipient: Word = [0u32, 1, 2, 3].into();
         let tag = NoteTag::default();
         let mut faucet_account = faucet.clone();
         let mut note_tags = BTreeSet::new();
 
-        for i in 0..3u64 {
+        for i in 0..num_blocks {
             let amount = Felt::new(100 + i);
             let source_manager = Arc::new(DefaultSourceManager::default());
             let tx_script_code = format!(
@@ -1207,7 +1169,6 @@ mod tests {
             .await
             .unwrap();
 
-            // Collect the output note's tag for sync filtering.
             for output_note in tx.output_notes().iter() {
                 note_tags.insert(output_note.metadata().tag());
             }
@@ -1217,6 +1178,21 @@ mod tests {
             chain.prove_next_block().unwrap();
         }
 
+        (chain, note_tags)
+    }
+
+    /// Verifies that the sync correctly processes notes committed in multiple blocks
+    /// (batched `SyncNotes` response) and tracks their blocks in the partial MMR.
+    ///
+    /// This test creates a faucet and mints notes in separate blocks (blocks 1, 2, 3),
+    /// so `sync_notes` returns multiple `NoteSyncBlock`s. It then verifies:
+    /// - The MMR is advanced to the chain tip
+    /// - Blocks containing relevant notes are tracked in the partial MMR via `track()`
+    /// - Note inclusion proofs are set correctly
+    /// - Block headers for note blocks are stored
+    #[tokio::test]
+    async fn sync_state_tracks_note_blocks_in_mmr() {
+        let (chain, note_tags) = build_chain_with_mint_notes(3).await;
         let mock_rpc = MockRpcApi::new(chain);
         let chain_tip = mock_rpc.get_chain_tip_block_num();
 
@@ -1233,31 +1209,31 @@ mod tests {
         let note_block_nums: BTreeSet<BlockNumber> =
             note_sync.blocks.iter().map(|b| b.block_header.block_num()).collect();
 
-        // Test that sync_state_step returns note blocks with valid MMR paths that
+        // Test that fetch_sync_data returns note blocks with valid MMR paths that
         // can be used to track blocks in the partial MMR.
         let state_sync = StateSync::new(Arc::new(mock_rpc.clone()), Arc::new(MockScreener), None);
 
         let genesis_peaks = mock_rpc.get_mmr().peaks_at(Forest::new(1)).unwrap();
         let mut partial_mmr = PartialMmr::from_peaks(genesis_peaks);
 
-        let result = state_sync
-            .sync_state_step(BlockNumber::GENESIS, &[], &Arc::new(note_tags.clone()))
+        let sync_data = state_sync
+            .fetch_sync_data(BlockNumber::GENESIS, &[], &Arc::new(note_tags.clone()))
             .await
             .unwrap();
 
         // Should have advanced to the chain tip.
-        assert_eq!(result.advanced_to, chain_tip);
-        assert!(!result.note_blocks.is_empty(), "should have note blocks");
+        assert_eq!(sync_data.chain_tip, chain_tip);
+        assert!(!sync_data.note_blocks.is_empty(), "should have note blocks");
 
         // Apply the MMR delta and add the chain tip block.
         let _auth_nodes: Vec<(InOrderIndex, Word)> =
-            partial_mmr.apply(result.mmr_delta).map_err(StoreError::MmrError).unwrap();
-        partial_mmr.add(result.chain_tip_header.commitment(), false);
+            partial_mmr.apply(sync_data.mmr_delta).map_err(StoreError::MmrError).unwrap();
+        partial_mmr.add(sync_data.chain_tip_header.commitment(), false);
 
         assert_eq!(partial_mmr.forest().num_leaves(), chain_tip.as_u32() as usize + 1);
 
         // Track each note block using the MMR path from the sync_notes response.
-        for block in &result.note_blocks {
+        for block in &sync_data.note_blocks {
             let bn = block.block_header.block_num();
             partial_mmr
                 .track(bn.as_usize(), block.block_header.commitment(), &block.mmr_path)

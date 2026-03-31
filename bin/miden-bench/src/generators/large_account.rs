@@ -20,7 +20,9 @@ pub struct SlotDescriptor {
 }
 
 #[cfg(test)]
-use miden_client::account::component::{AccountComponent, basic_wallet_library};
+use miden_client::account::component::{
+    AccountComponent, AccountComponentMetadata, basic_wallet_library,
+};
 #[cfg(test)]
 use miden_client::account::{
     Account,
