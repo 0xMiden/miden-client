@@ -449,8 +449,10 @@ export const customTransaction = async (
 
       // Creating First Custom Transaction Request to Mint the Custom Note
 
+      let noteArray = new window.NoteArray();
+      noteArray.push(note);
       let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnOutputNotes(new window.NoteArray([note]))
+        .withOwnOutputNotes(noteArray)
         .build();
 
       // Execute and Submit Transaction
