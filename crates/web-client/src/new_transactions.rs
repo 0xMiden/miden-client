@@ -4,6 +4,8 @@ use miden_client::ClientError;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::asset::FungibleAsset;
 use miden_client::note::{BlockNumber, Note as NativeNote};
+#[cfg(feature = "testing")]
+use miden_client::transaction::LocalTransactionProver;
 use miden_client::transaction::{
     ForeignAccount as NativeForeignAccount,
     PaymentNoteDescription,
