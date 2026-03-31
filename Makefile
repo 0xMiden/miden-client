@@ -202,7 +202,7 @@ install-tests: ## Install the tests binary
 build-cli:
 	cargo build --release --target $(BUILD_TARGET) -p miden-client-cli
 
-## Client library and tests binary in release mode
+## Build the CLI binary, client library and tests binary in release mode
 build: build-cli
 	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --exclude miden-client-cli --exclude testing-remote-prover --release
 	cargo build --package testing-remote-prover --release --locked
