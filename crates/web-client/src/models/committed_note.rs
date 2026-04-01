@@ -32,7 +32,7 @@ impl CommittedNote {
 
     /// Returns the note metadata, if available.
     pub fn metadata(&self) -> Option<NoteMetadata> {
-        self.0.metadata().map(|m| m.into())
+        self.0.metadata().map(Into::into)
     }
 
     /// Returns the inclusion proof for this note.

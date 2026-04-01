@@ -138,7 +138,7 @@ impl BlockUpdates {
         if let Some((_, existing_has_notes, _)) = self
             .block_headers
             .iter_mut()
-            .find(|(h, _, _)| h.block_num() == block_header.block_num())
+            .find(|(h, ..)| h.block_num() == block_header.block_num())
         {
             // Update the relevance flag but keep the original peaks, which were captured
             // at the correct MMR state for this block.

@@ -542,10 +542,9 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
     let (tip_header, ..) = &state_sync_update.block_updates.block_headers()[0];
     assert_eq!(tip_header.block_num(), rpc_api.get_chain_tip_block_num());
 
-    // Authentication nodes must be non-empty: they include nodes produced during
-    // the intermediate sync steps (blocks 1 and 4) via `extend_authentication_nodes`.
-    // These nodes are needed for the tracked genesis leaf's Merkle proof path, which
-    // changes as the tree grows.
+    // Authentication nodes must be non-empty: they include nodes produced by applying
+    // the MMR delta and adding the chain tip leaf. These nodes are needed for the
+    // tracked genesis leaf's Merkle proof path, which changes as the tree grows.
     assert!(
         !state_sync_update.block_updates.new_authentication_nodes().is_empty(),
         "expected authentication nodes from intermediate (skipped) blocks to be persisted"
