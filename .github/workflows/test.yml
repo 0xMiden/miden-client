@@ -343,6 +343,7 @@ jobs:
           make integration-test-web-client
         env:
           SHARD_PARAMETER: "--shard=${{ matrix.shard_index }}/${{ matrix.shard_total }}"
+          EXCLUDE_TEST_FILES: "transactions.test.ts" # TODO: Remove once sharding is better balanced
       - name: Stop test node
         if: always()
         run: make stop-node
@@ -398,6 +399,8 @@ jobs:
           pgrep -f testing-remote-prover || (echo "Failed to start prover" && exit 1)
       - name: Run remote prover tests
         run: make integration-test-remote-prover-web-client
+      - name: Run extra web client tests
+        run: cd ./crates/web-client && yarn playwright test --project=chromium test/transactions.test.ts
       - name: Stop test node
         if: always()
         run: make stop-node
