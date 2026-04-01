@@ -20,6 +20,10 @@ use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::Rng;
 use uuid::Uuid;
 
+const NETWORK_DEVNET: &str = "devnet";
+const NETWORK_TESTNET: &str = "testnet";
+const NETWORK_LOCALHOST: &str = "localhost";
+
 /// Identifies the note transport service to connect to.
 ///
 /// Centralises the "devnet / testnet / custom-URL" resolution that was previously
@@ -159,7 +163,7 @@ impl ClientConfig {
 
         if let Some(transport) = &self.note_transport_endpoint {
             let transport_url = transport.to_url();
-            let transport_timeout = std::env::var("TEST_TIMEOUT")
+            let transport_timeout = std::env::var("MIDEN_TEST_TIMEOUT")
                 .ok()
                 .and_then(|s| s.parse::<u64>().ok())
                 .unwrap_or(10_000);
@@ -196,46 +200,46 @@ impl Default for ClientConfig {
     /// Creates a default client config.
     ///
     /// `TEST_MIDEN_NETWORK` sets the top-level preset (defaults for all components):
-    /// - `testnet`: RPC testnet, remote prover testnet, note transport `transport.miden.io`
-    /// - `devnet`: RPC devnet, remote prover devnet, no note transport
-    /// - `localhost` (default): RPC localhost, local prover, no note transport
+    /// - `testnet`: RPC testnet, remote prover testnet, note transport testnet
+    /// - `devnet`: RPC devnet, remote prover devnet, note transport devnet
+    ///
+    /// When unset, only RPC defaults to localhost (local prover, no note transport).
     ///
     /// Individual env vars override specific components:
     /// - `TEST_MIDEN_RPC_URL`: overrides the RPC endpoint
     /// - `TEST_MIDEN_PROVER_URL`: overrides the prover (`local` forces local prover)
     /// - `TEST_MIDEN_NOTE_TRANSPORT_URL`: overrides the note transport endpoint
     fn default() -> Self {
-        let network =
-            std::env::var("TEST_MIDEN_NETWORK").unwrap_or_else(|_| "localhost".to_string());
-        let network_lower = network.to_lowercase();
+        let network = std::env::var("TEST_MIDEN_NETWORK").ok();
+        let network_lower = network.map(|n| n.to_lowercase());
 
         // Resolve RPC endpoint: TEST_MIDEN_RPC_URL overrides network preset.
+        // When no network is set, defaults to localhost.
         let endpoint = if let Ok(rpc_url) = std::env::var("TEST_MIDEN_RPC_URL") {
             Endpoint::try_from(rpc_url.as_str()).unwrap()
-        } else if network_lower == "devnet" {
-            Endpoint::devnet()
-        } else if network_lower == "testnet" {
-            Endpoint::testnet()
-        } else if network_lower == "localhost" {
-            Endpoint::localhost()
         } else {
-            Endpoint::try_from(network_lower.as_str()).unwrap()
+            match network_lower.as_deref() {
+                Some(NETWORK_DEVNET) => Endpoint::devnet(),
+                Some(NETWORK_TESTNET) => Endpoint::testnet(),
+                Some(NETWORK_LOCALHOST) | None => Endpoint::localhost(),
+                Some(custom) => Endpoint::try_from(custom).unwrap(),
+            }
         };
 
         // Resolve prover: TEST_MIDEN_PROVER_URL overrides network preset.
-        // "local" forces local prover. Named values resolve to their URLs.
+        // "localhost" forces local prover. Named values resolve to their URLs.
         let prover_endpoint = if let Ok(url) = std::env::var("TEST_MIDEN_PROVER_URL") {
             match url.to_lowercase().as_str() {
-                "local" => None,
-                "devnet" => Some(DEVNET_PROVER_ENDPOINT.to_string()),
-                "testnet" => Some(TESTNET_PROVER_ENDPOINT.to_string()),
+                NETWORK_LOCALHOST => None,
+                NETWORK_DEVNET => Some(DEVNET_PROVER_ENDPOINT.to_string()),
+                NETWORK_TESTNET => Some(TESTNET_PROVER_ENDPOINT.to_string()),
                 _ => Some(url),
             }
         } else {
             // Network preset defaults
-            match network_lower.as_str() {
-                "testnet" => Some(TESTNET_PROVER_ENDPOINT.to_string()),
-                "devnet" => Some(DEVNET_PROVER_ENDPOINT.to_string()),
+            match network_lower.as_deref() {
+                Some(NETWORK_TESTNET) => Some(TESTNET_PROVER_ENDPOINT.to_string()),
+                Some(NETWORK_DEVNET) => Some(DEVNET_PROVER_ENDPOINT.to_string()),
                 _ => None,
             }
         };
@@ -246,14 +250,17 @@ impl Default for ClientConfig {
                 Some(url.parse::<NoteTransportEndpoint>().unwrap())
             } else {
                 // Network preset defaults
-                match network_lower.as_str() {
-                    "testnet" => Some(NoteTransportEndpoint::Testnet),
-                    "devnet" => Some(NoteTransportEndpoint::Devnet),
+                match network_lower.as_deref() {
+                    Some(NETWORK_TESTNET) => Some(NoteTransportEndpoint::Testnet),
+                    Some(NETWORK_DEVNET) => Some(NoteTransportEndpoint::Devnet),
                     _ => None,
                 }
             };
 
-        let timeout_ms = 10000;
+        let timeout_ms = std::env::var("MIDEN_TEST_TIMEOUT")
+            .ok()
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(10_000);
 
         Self::new(endpoint, timeout_ms)
             .with_prover_endpoint(prover_endpoint)

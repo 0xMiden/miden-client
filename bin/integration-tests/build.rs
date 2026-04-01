@@ -22,62 +22,18 @@ const INTEGRATION_TESTS_HEADER: &str = r#"// Auto-generated integration tests
 // named test_*. Do not edit manually.
 "#;
 
-const INTEGRATION_TESTS_IMPORTS: &str = r#"use anyhow::{anyhow, Result};
-use miden_client_integration_tests::tests::config::ClientConfig;
-use miden_client::grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
-use miden_client::rpc::Endpoint;"#;
+const INTEGRATION_TESTS_IMPORTS: &str = r#"use anyhow::Result;
+use miden_client_integration_tests::tests::config::ClientConfig;"#;
 
 const TOKIO_TEST_WRAPPER: &str = r#"/// Auto-generated tokio test wrapper for {ORIGINAL_FUNCTION_NAME}
 #[tokio::test]
 async fn {TEST_FUNCTION_NAME}() -> Result<()> {{
-    // Use TEST_MIDEN_NETWORK to determine the endpoint (matches the binary's behavior).
-    // TEST_MIDEN_RPC_URL overrides the RPC endpoint from the network preset.
-    let network = std::env::var("TEST_MIDEN_NETWORK")
-        .unwrap_or_else(|_| "localhost".to_string());
-    let network_lower = network.to_lowercase();
-    let endpoint = if let Ok(rpc_url) = std::env::var("TEST_MIDEN_RPC_URL") {{
-        Endpoint::try_from(rpc_url.as_str())
-            .map_err(|e| anyhow!("Invalid RPC URL: {}", e))?
-    }} else if network_lower == "devnet" {{
-        Endpoint::devnet()
-    }} else if network_lower == "testnet" {{
-        Endpoint::testnet()
-    }} else if network_lower == "localhost" {{
-        Endpoint::localhost()
-    }} else {{
-        Endpoint::try_from(network_lower.as_str())
-            .map_err(|e| anyhow!("Invalid network: {}", e))?
-    }};
-    let timeout = std::env::var("TEST_TIMEOUT")
-        .unwrap_or_else(|_| "10000".to_string())
-        .parse::<u64>()
-        .map_err(|_| anyhow!("Invalid timeout value"))?;
-
-    // Resolve prover: TEST_MIDEN_PROVER_URL overrides network preset.
-    let prover_endpoint = if let Ok(url) = std::env::var("TEST_MIDEN_PROVER_URL") {{
-        let lower = url.to_lowercase();
-        if lower == "local" {{
-            None
-        }} else if lower == "devnet" {{
-            Some(DEVNET_PROVER_ENDPOINT.to_string())
-        }} else if lower == "testnet" {{
-            Some(TESTNET_PROVER_ENDPOINT.to_string())
-        }} else {{
-            Some(url)
-        }}
-    }} else if network_lower == "testnet" {{
-        Some(TESTNET_PROVER_ENDPOINT.to_string())
-    }} else if network_lower == "devnet" {{
-        Some(DEVNET_PROVER_ENDPOINT.to_string())
-    }} else {{
-        None
-    }};
-
-    // Note: note_transport_endpoint is NOT set here to avoid creating eager gRPC
-    // connections to the transport service for every test. Transport tests read
-    // TEST_MIDEN_NOTE_TRANSPORT_URL directly and configure transport on their own configs.
-    let client_config = ClientConfig::new(endpoint, timeout)
-        .with_prover_endpoint(prover_endpoint);
+    // ClientConfig::default() resolves TEST_MIDEN_NETWORK, TEST_MIDEN_RPC_URL,
+    // TEST_MIDEN_PROVER_URL, TEST_MIDEN_NOTE_TRANSPORT_URL, and MIDEN_TEST_TIMEOUT.
+    // Note transport is cleared here to avoid eager gRPC connections for every test;
+    // transport tests configure their own transport via TEST_MIDEN_NOTE_TRANSPORT_URL.
+    let client_config = ClientConfig::default()
+        .with_note_transport_endpoint(None);
     {ORIGINAL_FUNCTION_NAME}(client_config).await
 }}"#;
 
@@ -372,7 +328,7 @@ fn parse_test_function_name(line: &str) -> Option<String> {
 /// - `TEST_MIDEN_PROVER_URL` - Overrides the prover: "devnet", "testnet", "local", or a custom URL
 ///   (default: derived from network)
 /// - `TEST_MIDEN_NOTE_TRANSPORT_URL` - Used by transport tests directly (not in generated wrappers)
-/// - `TEST_TIMEOUT` - Test timeout in milliseconds (default: 10000)
+/// - `MIDEN_TEST_TIMEOUT` - Test timeout in milliseconds (default: 10000)
 fn generate_integration_tests(test_cases: &[TestCaseInfo]) -> String {
     let mut result = String::new();
 

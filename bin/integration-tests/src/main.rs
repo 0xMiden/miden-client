@@ -152,13 +152,13 @@ struct Args {
     #[arg(long, default_value = "3")]
     retry_count: usize,
 
-    /// Remote prover endpoint. Accepts "devnet", "testnet", "local", or a custom URL.
+    /// Remote prover endpoint. Accepts "devnet", "testnet", "localhost", or a custom URL.
     /// If unset, defaults based on --network (testnet/devnet use remote provers).
     #[arg(long, env = "TEST_MIDEN_PROVER_URL")]
     prover_url: Option<String>,
 
-    /// Note transport endpoint. Accepts "testnet" or a custom URL.
-    /// If unset, defaults based on --network (testnet uses transport.miden.io).
+    /// Note transport endpoint. Accepts "devnet", "testnet", or a custom URL.
+    /// If unset, defaults based on --network.
     #[arg(long, env = "TEST_MIDEN_NOTE_TRANSPORT_URL")]
     note_transport_url: Option<String>,
 
@@ -204,7 +204,7 @@ impl TryFrom<Args> for BaseConfig {
         // Resolve prover: explicit flag overrides network preset.
         let prover_endpoint = if let Some(url) = args.prover_url {
             match url.to_lowercase().as_str() {
-                "local" => None,
+                "localhost" => None,
                 "devnet" => Some(DEVNET_PROVER_ENDPOINT.to_string()),
                 "testnet" => Some(TESTNET_PROVER_ENDPOINT.to_string()),
                 _ => Some(url),
@@ -611,7 +611,10 @@ fn run_tests_parallel(
     if !is_retry {
         println!("─────────────────────────────────────────────────────────");
         println!("  RPC endpoint: {}", base_config.rpc_endpoint);
-        println!("  Prover:       {}", base_config.prover_endpoint.as_deref().unwrap_or("local"));
+        println!(
+            "  Prover:       {}",
+            base_config.prover_endpoint.as_deref().unwrap_or("localhost")
+        );
         println!(
             "  Transport:    {}",
             base_config
