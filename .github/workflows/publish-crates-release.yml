@@ -97,7 +97,7 @@ jobs:
           rustup target add ${{ matrix.target }}
       - name: Build miden-client-cli
         run: |
-          BUILD_TARGET=${{ matrix.target }} make build-cli
+          BUILD_TARGET=${{ matrix.target }} make build
       - name: Prepare artifact
         run: |
           mv target/${{ matrix.target }}/release/miden-client miden-client-${{ matrix.target }}

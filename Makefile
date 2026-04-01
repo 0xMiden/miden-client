@@ -198,12 +198,10 @@ install-tests: ## Install the tests binary
 
 ## Build the CLI binary. This is done separately in order to save time during
 ## artifact generation for releases.
-build-cli:
-	cargo build --release --target $(BUILD_TARGET) -p miden-client-cli
 
 ## Build the CLI binary, client library and tests binary in release mode
-build: build-cli
-	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --exclude miden-client-cli --exclude testing-remote-prover --release --locked
+build:
+	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --target $(BUILD_TARGET) --release --locked
 
 build-wasm: rust-client-ts-build ## Build the wasm packages (web client and idxdb store)
 	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown --locked
