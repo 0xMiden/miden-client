@@ -382,7 +382,7 @@ export const customTransaction = async (
                 # read first word
                 push.${memAddress}
                 # => [data_mem_address]
-                mem_loadw_be
+                mem_loadw_le
                 # => [NOTE_ARG_1]
 
                 push.${expectedNoteArg1} assert_eqw.err="First note argument didn't match expected"
@@ -391,26 +391,26 @@ export const customTransaction = async (
                 # read second word
                 push.${memAddress2}
                 # => [data_mem_address_2]
-                mem_loadw_be
+                mem_loadw_le
                 # => [NOTE_ARG_2]
 
                 push.${expectedNoteArg2} assert_eqw.err="Second note argument didn't match expected"
                 # => []
 
                 # store the note storage to memory starting at address 0
-                padw push.0 exec.active_note::get_storage
-                # => [num_storage_items, storage_ptr, EMPTY_WORD]
+                push.0 exec.active_note::get_storage
+                # => [num_storage_items, storage_ptr]
 
                 # make sure the number of storage items is 2
                 eq.2 assert.err="P2ID script expects exactly 2 note storage items"
-                # => [storage_ptr, EMPTY_WORD]
+                # => [storage_ptr]
 
-                # read the target account id from the note storage
-                mem_loadw_be drop drop
-                # => [target_account_id_prefix, target_account_id_suffix]
+                # read the target account ID from the note storage
+                dup add.1 mem_load swap mem_load
+                # => [target_account_id_suffix, target_account_id_prefix]
 
                 exec.active_account::get_id
-                # => [account_id_prefix, account_id_suffix, target_account_id_prefix, target_account_id_suffix, ...]
+                # => [account_id_suffix, account_id_prefix, target_account_id_suffix, target_account_id_prefix]
 
                 # ensure account_id = target_account_id, fails otherwise
                 exec.account_id::is_equal assert.err="P2ID's target account address and transaction address do not match"
