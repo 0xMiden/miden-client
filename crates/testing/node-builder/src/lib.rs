@@ -11,7 +11,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use ::rand::{Rng, random};
 use anyhow::{Context, Result};
 use miden_node_block_producer::{
-    BlockProducer, DEFAULT_MAX_BATCHES_PER_BLOCK, DEFAULT_MAX_TXS_PER_BATCH,
+    BlockProducer,
+    DEFAULT_MAX_BATCHES_PER_BLOCK,
+    DEFAULT_MAX_TXS_PER_BATCH,
     DEFAULT_MEMPOOL_TX_CAPACITY,
 };
 use miden_node_ntx_builder::NtxBuilderConfig;
@@ -22,8 +24,14 @@ use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_node_validator::{Validator, ValidatorSigner};
 use miden_protocol::account::auth::{AuthScheme, AuthSecretKey};
 use miden_protocol::account::{
-    Account, AccountBuilder, AccountComponent, AccountComponentMetadata, AccountFile, AccountType,
-    StorageMap, StorageMapKey,
+    Account,
+    AccountBuilder,
+    AccountComponent,
+    AccountComponentMetadata,
+    AccountFile,
+    AccountType,
+    StorageMap,
+    StorageMapKey,
 };
 use miden_protocol::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_protocol::block::FeeParameters;

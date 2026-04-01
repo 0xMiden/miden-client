@@ -50,7 +50,7 @@ use miden_tx::utils::serde::{Deserializable, Serializable};
 
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::rpc::{RPC_LIMITS_STORE_SETTING, RpcLimits};
-use crate::sync::{NoteTagRecord, StateSyncUpdate};
+use crate::sync::{NoteTagRecord, SyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStatusVariant, TransactionStoreUpdate};
 
 /// Contains [`ClientDataStore`] to automatically implement [`DataStore`] for anything that
@@ -427,11 +427,11 @@ pub trait Store: Send + Sync {
     /// - Removing note tags that are no longer relevant.
     /// - Updating transactions in the store, marking as `committed` or `discarded`.
     ///   - In turn, validating private account's state transitions. If a private account's
-    ///     commitment locally does not match the `StateSyncUpdate` information, the account may be
+    ///     commitment locally does not match the `SyncUpdate` information, the account may be
     ///     locked.
     /// - Storing new MMR authentication nodes.
     /// - Updating the tracked public accounts.
-    async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError>;
+    async fn apply_state_sync(&self, state_sync_update: SyncUpdate) -> Result<(), StoreError>;
 
     // TRANSPORT
     // --------------------------------------------------------------------------------------------

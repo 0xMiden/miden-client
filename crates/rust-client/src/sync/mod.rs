@@ -78,12 +78,7 @@ mod state_sync;
 pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
 
 mod state_sync_update;
-pub use state_sync_update::{
-    AccountUpdates,
-    BlockUpdates,
-    StateSyncUpdate,
-    TransactionUpdateTracker,
-};
+pub use state_sync_update::{AccountUpdates, BlockUpdates, SyncUpdate, TransactionUpdateTracker};
 
 /// Client synchronization methods.
 impl<AUTH> Client<AUTH>
@@ -188,7 +183,7 @@ where
     /// Applies the state sync update to the store and prunes the irrelevant block headers.
     ///
     /// See [`crate::Store::apply_state_sync()`] for what the update implies.
-    pub async fn apply_state_sync(&mut self, update: StateSyncUpdate) -> Result<(), ClientError> {
+    pub async fn apply_state_sync(&mut self, update: SyncUpdate) -> Result<(), ClientError> {
         self.store.apply_state_sync(update).await?;
 
         // Remove irrelevant block headers

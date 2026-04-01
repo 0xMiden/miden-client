@@ -12,7 +12,7 @@ use miden_protocol::note::{NoteId, NoteTag, NoteType, Nullifier};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
-use super::{AccountUpdates, StateSyncUpdate};
+use super::{AccountUpdates, SyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::NodeRpcClient;
@@ -28,17 +28,14 @@ use crate::transaction::TransactionRecord;
 // ================================================================================================
 
 /// All data fetched from the node needed to sync the client to the chain tip.
-///
-/// Produced by [`StateSync::fetch_sync_data`], which calls `sync_chain_mmr` once
-/// and loops `sync_notes` until the full range is covered, plus `sync_transactions`.
-struct SyncUpdate {
-    /// The chain tip at the time of the response. The client advances to this block.
+struct NodeSyncData {
+    /// The chain tip at the time of the response.
     chain_tip: BlockNumber,
     /// MMR delta covering the full range from `current_block` to `chain_tip`.
     mmr_delta: MmrDelta,
-    /// Chain tip block header (needed to add the tip leaf to the MMR).
+    /// Chain tip block header.
     chain_tip_header: BlockHeader,
-    /// Blocks with matching notes. Each carries an MMR path for tracking.
+    /// Blocks with matching notes that the client is interested in.
     note_blocks: Vec<NoteSyncBlock>,
     /// Account commitment updates for the synced range.
     account_commitment_updates: Vec<(AccountId, Word)>,
@@ -195,7 +192,7 @@ impl StateSync {
         &self,
         current_partial_mmr: &mut PartialMmr,
         input: StateSyncInput,
-    ) -> Result<StateSyncUpdate, ClientError> {
+    ) -> Result<SyncUpdate, ClientError> {
         let StateSyncInput {
             accounts,
             note_tags,
@@ -207,7 +204,7 @@ impl StateSync {
             .map_err(|_| ClientError::InvalidPartialMmrForest)?
             .into();
 
-        let mut state_sync_update = StateSyncUpdate {
+        let mut state_sync_update = SyncUpdate {
             block_num,
             note_updates: NoteUpdateTracker::new(input_notes, output_notes),
             transaction_updates: TransactionUpdateTracker::new(uncommitted_transactions),
@@ -272,13 +269,13 @@ impl StateSync {
     ///    responses).
     /// 4. `sync_transactions` — gets transaction data for the full range.
     ///
-    /// Returns a [`SyncUpdate`] where `chain_tip == current_block_num` signals no progress.
+    /// Returns a [`NodeSyncData`] where `chain_tip == current_block_num` signals no progress.
     async fn fetch_sync_data(
         &self,
         current_block_num: BlockNumber,
         account_ids: &[AccountId],
         note_tags: &Arc<BTreeSet<NoteTag>>,
-    ) -> Result<SyncUpdate, ClientError> {
+    ) -> Result<NodeSyncData, ClientError> {
         info!("Fetching sync data from node.");
 
         // Step 1: Discover the chain tip.
@@ -286,7 +283,7 @@ impl StateSync {
         let chain_tip = chain_tip_header.block_num();
 
         if chain_tip == current_block_num {
-            return Ok(SyncUpdate {
+            return Ok(NodeSyncData {
                 chain_tip,
                 mmr_delta: MmrDelta {
                     forest: Forest::new(current_block_num.as_usize()),
@@ -326,7 +323,7 @@ impl StateSync {
         let (account_commitment_updates, transactions, nullifiers) =
             self.fetch_transaction_data(current_block_num, chain_tip, account_ids).await?;
 
-        Ok(SyncUpdate {
+        Ok(NodeSyncData {
             chain_tip,
             mmr_delta: chain_mmr_info.mmr_delta,
             chain_tip_header,
@@ -383,9 +380,9 @@ impl StateSync {
     /// 3. Applies transaction and nullifier updates.
     async fn apply_sync_result(
         &self,
-        sync_data: SyncUpdate,
+        sync_data: NodeSyncData,
         public_note_records: &BTreeMap<NoteId, InputNoteRecord>,
-        state_sync_update: &mut StateSyncUpdate,
+        state_sync_update: &mut SyncUpdate,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<(), ClientError> {
         // Advance the partial MMR: apply delta (up to chain_tip - 1), capture peaks for
@@ -596,7 +593,7 @@ impl StateSync {
     /// The `state_sync_update` parameter will be updated to track the new discarded transactions.
     async fn nullifiers_state_sync(
         &self,
-        state_sync_update: &mut StateSyncUpdate,
+        state_sync_update: &mut SyncUpdate,
         current_block_num: BlockNumber,
     ) -> Result<(), ClientError> {
         // To receive information about added nullifiers, we reduce them to the higher 16 bits
