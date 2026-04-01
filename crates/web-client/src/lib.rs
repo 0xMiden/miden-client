@@ -38,6 +38,7 @@ pub mod tags;
 pub mod transactions;
 pub mod utils;
 
+pub mod keystore_api;
 mod web_keystore;
 mod web_keystore_callbacks;
 mod web_keystore_db;
@@ -121,11 +122,20 @@ impl WebClient {
         self.inner.as_mut()
     }
 
-    pub(crate) fn keystore(&self) -> Result<&Arc<ClientAuth>, JsValue> {
+    pub(crate) fn inner_keystore(&self) -> Result<&Arc<ClientAuth>, JsValue> {
         self.inner
             .as_ref()
             .and_then(|c| c.authenticator())
             .ok_or_else(|| JsValue::from_str("Client not initialized"))
+    }
+
+    /// Returns a `WebKeystoreApi` handle for managing secret keys.
+    ///
+    /// The returned object can be used from JavaScript as `client.keystore`.
+    #[wasm_bindgen(getter)]
+    pub fn keystore(&self) -> Result<keystore_api::WebKeystoreApi, JsValue> {
+        let ks = self.inner_keystore()?.clone();
+        Ok(keystore_api::WebKeystoreApi::new(ks))
     }
 
     /// Creates a new `WebClient` instance with the specified configuration.

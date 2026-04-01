@@ -15,6 +15,7 @@
 * Added `NoteScreener` constructor via `Client::note_screener()` and improved note consumability checks with batch note screening support ([#1803](https://github.com/0xMiden/miden-client/pull/1803), [#1814](https://github.com/0xMiden/miden-client/pull/1814)).
 * [FEATURE][web] Added `getAccountProof` method to the web client's `RpcClient`, allowing lightweight retrieval of account header, storage slot values, and code via a single RPC call. Refactored the `NodeRpcClient::get_account_proof` signature to allow requesting just private account proofs ([#1794](https://github.com/0xMiden/miden-client/pull/1794), [#1814](https://github.com/0xMiden/miden-client/pull/1814)).
 * Added `getAccountByKeyCommitment` method to `WebClient` for retrieving accounts by public key commitment ([#1729](https://github.com/0xMiden/miden-client/pull/1729)).
+* [BREAKING][removal][web] Removed `addAccountSecretKeyToWebStore`, `getAccountAuthByPubKeyCommitment`, `getPublicKeyCommitmentsOfAccount`, and `getAccountByKeyCommitment` from `WebClient`. Use the new `client.keystore` sub-object instead (e.g. `client.keystore.insert()`, `client.keystore.get()`, `client.keystore.getCommitments()`, `client.keystore.getAccountId()` + `client.getAccount()`). ([#1947](https://github.com/0xMiden/miden-client/pull/1947)).
 * Added automatic registration of note scripts required by network transactions (NTX). The client now checks the node's script registry before submitting a transaction and registers any missing scripts via a separate registration transaction ([#1840](https://github.com/0xMiden/miden-client/pull/1840)).
 * Added automatic retry for rate-limited (`ResourceExhausted`) and transiently unavailable RPC calls in `GrpcClient`, with up to 5 attempts and `retry-after` header support ([#1928](https://github.com/0xMiden/miden-client/pull/1928)).
 
@@ -54,6 +55,7 @@
 * [FEATURE][web] Added `TransactionRequestBuilder.withExpirationDelta()` for expiring manual transaction requests ([#1904](https://github.com/0xMiden/miden-client/pull/1904))
 * [FEATURE][web] Added `accounts.insert({ account, overwrite? })` to `MidenClient` for inserting pre-built `Account` objects into the local store. Enables external signer integrations that build accounts via `AccountBuilder` with custom auth commitments ([#1922](https://github.com/0xMiden/miden-client/pull/1922)).
 * [FEATURE][web] Exposed `executeProgram` (view call) to the JS side, allowing local execution of a transaction script against an account and inspection of the 16-element stack output without submitting to the network. Added `AdviceInputs` constructor and reverse `From` conversions. ([#1859](https://github.com/0xMiden/miden-client/issues/1859))
+* [FEATURE][web] Added `client.keystore` sub-object API for managing secret keys. Methods: `insert(accountId, secretKey)`, `get(pubKeyCommitment)`, `remove(pubKeyCommitment)`, `getCommitments(accountId)`, `getAccountId(pubKeyCommitment)`. Also available on `MidenClient` as a resource (`client.keystore`). ([#1947](https://github.com/0xMiden/miden-client/pull/1947))
 
 ### Fixes
 

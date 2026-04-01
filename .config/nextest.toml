@@ -5,12 +5,14 @@ retries        = { backoff = "exponential", count = 2, delay = "1s", jitter = tr
 slow-timeout   = { period = "3m", terminate-after = 2 }
 status-level   = "skip"
 
+# TODO: Running this with default settings causes machines to get thrashed, so for now we are reducing 
+# this a bit arbitrarily; revisit this
 [test-groups.integration]
 max-threads = 5
 
 [[profile.default.overrides]]
 filter           = "package(miden-client-unit-tests)"
-threads-required = 2
+threads-required = 3
 
 [[profile.default.overrides]]
 filter     = "binary(integration)"
