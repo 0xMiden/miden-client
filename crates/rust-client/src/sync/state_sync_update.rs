@@ -116,7 +116,11 @@ impl BlockUpdates {
         Self { block_headers, new_authentication_nodes }
     }
 
-    /// Adds a new block header and its corresponding data to this [`BlockUpdates`].
+    /// Adds or updates a block header and its corresponding data in this [`BlockUpdates`].
+    ///
+    /// If the block header already exists (same block number), the entry is updated:
+    /// `has_client_notes` is OR-ed and the peaks are replaced. Otherwise a new entry is
+    /// appended.
     ///
     /// # Parameters
     /// - `block_header`: The block header to add.
@@ -131,7 +135,17 @@ impl BlockUpdates {
         peaks: MmrPeaks,
         new_authentication_nodes: Vec<(InOrderIndex, Word)>,
     ) {
-        self.block_headers.push((block_header, has_client_notes, peaks));
+        if let Some((_, existing_has_notes, _)) = self
+            .block_headers
+            .iter_mut()
+            .find(|(h, _, _)| h.block_num() == block_header.block_num())
+        {
+            // Update the relevance flag but keep the original peaks, which were captured
+            // at the correct MMR state for this block.
+            *existing_has_notes |= has_client_notes;
+        } else {
+            self.block_headers.push((block_header, has_client_notes, peaks));
+        }
 
         self.new_authentication_nodes.reserve(new_authentication_nodes.len());
         self.new_authentication_nodes.extend(new_authentication_nodes);
