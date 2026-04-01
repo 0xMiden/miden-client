@@ -8,7 +8,7 @@ use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{Forest, MmrDelta, PartialMmr};
-use miden_protocol::note::{NoteId, NoteTag, NoteType, Nullifier};
+use miden_protocol::note::{NoteId, NoteMetadata, NoteTag, NoteType, Nullifier};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -236,6 +236,10 @@ impl StateSync {
 
         let public_note_records = self.fetch_public_note_details(&public_note_ids).await?;
 
+        // Fetch full metadata for notes with attachments (the sync response only provides
+        // the NoteMetadataHeader which lacks the actual attachment data).
+        let attachment_metadata = self.fetch_attachment_metadata(&sync_data.note_blocks).await?;
+
         self.account_state_sync(
             &mut state_sync_update.account_updates,
             &accounts,
@@ -249,6 +253,7 @@ impl StateSync {
         self.apply_sync_result(
             sync_data,
             &public_note_records,
+            &attachment_metadata,
             &mut state_sync_update,
             current_partial_mmr,
         )
@@ -311,10 +316,11 @@ impl StateSync {
             let note_sync =
                 self.rpc_api.sync_notes(cursor, Some(chain_tip), note_tags.as_ref()).await?;
 
+            let empty_response = note_sync.blocks.is_empty();
             note_blocks.extend(note_sync.blocks);
-            cursor = note_sync.block_to;
+            cursor = note_sync.block_to + 1;
 
-            if cursor >= chain_tip {
+            if cursor >= chain_tip || empty_response {
                 break;
             }
         }
@@ -382,6 +388,7 @@ impl StateSync {
         &self,
         sync_data: NodeSyncData,
         public_note_records: &BTreeMap<NoteId, InputNoteRecord>,
+        attachment_metadata: &BTreeMap<NoteId, NoteMetadata>,
         state_sync_update: &mut SyncUpdate,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<(), ClientError> {
@@ -410,6 +417,7 @@ impl StateSync {
                     block.notes,
                     &block.block_header,
                     public_note_records,
+                    attachment_metadata,
                 )
                 .await?;
 
@@ -537,6 +545,7 @@ impl StateSync {
         note_inclusions: Vec<CommittedNote>,
         block_header: &BlockHeader,
         public_notes: &BTreeMap<NoteId, InputNoteRecord>,
+        attachment_metadata: &BTreeMap<NoteId, NoteMetadata>,
     ) -> Result<bool, ClientError> {
         // `found_relevant_note` tracks whether we want to persist the block header in the end
         let mut found_relevant_note = false;
@@ -552,8 +561,11 @@ impl StateSync {
                     // Only mark the downloaded block header as relevant if we are talking about
                     // an input note (output notes get marked as committed but we don't need the
                     // block for anything there)
-                    found_relevant_note |= note_updates
-                        .apply_committed_note_state_transitions(&committed_note, block_header)?;
+                    found_relevant_note |= note_updates.apply_committed_note_state_transitions(
+                        &committed_note,
+                        block_header,
+                        attachment_metadata,
+                    )?;
                 },
                 NoteUpdateAction::Insert(public_note) => {
                     found_relevant_note = true;
@@ -584,6 +596,34 @@ impl StateSync {
         let return_notes = self.rpc_api.get_public_note_records(query_notes, None).await?;
 
         Ok(return_notes.into_iter().map(|note| (note.id(), note)).collect())
+    }
+
+    /// Fetches full [`NoteMetadata`] for committed notes that have attachments.
+    ///
+    /// The sync response only provides a `NoteMetadataHeader` (sender, type, tag, attachment
+    /// kind) but not the actual attachment data. For notes with attachments, the full metadata
+    /// must be fetched via `GetNotesById`.
+    async fn fetch_attachment_metadata(
+        &self,
+        note_blocks: &[NoteSyncBlock],
+    ) -> Result<BTreeMap<NoteId, NoteMetadata>, ClientError> {
+        let note_ids: Vec<NoteId> = note_blocks
+            .iter()
+            .flat_map(|b| b.notes.iter())
+            .filter(|n| n.needs_metadata_fetch())
+            .map(|n| *n.note_id())
+            .collect();
+
+        if note_ids.is_empty() {
+            return Ok(BTreeMap::new());
+        }
+
+        info!("Fetching full metadata for {} notes with attachments.", note_ids.len());
+
+        let fetched_notes =
+            self.rpc_api.get_notes_by_id(&note_ids).await.map_err(ClientError::RpcError)?;
+
+        Ok(fetched_notes.into_iter().map(|n| (n.id(), n.metadata().clone())).collect())
     }
 
     /// Collects the nullifier tags for the notes that were updated in the sync response and uses

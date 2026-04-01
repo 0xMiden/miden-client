@@ -36,7 +36,7 @@ extern "C" {
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = applyStateSync)]
-    pub fn idxdb_apply_state_sync(db_id: &str, state_update: JsStateSyncUpdate) -> js_sys::Promise;
+    pub fn idxdb_apply_state_sync(db_id: &str, state_update: JsSyncUpdate) -> js_sys::Promise;
 
     // DELETES
     // --------------------------------------------------------------------------------------------
@@ -57,7 +57,7 @@ extern "C" {
 /// under sync.js
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Clone)]
-pub struct JsStateSyncUpdate {
+pub struct JsSyncUpdate {
     /// The block number for this update.
     #[wasm_bindgen(js_name = "blockNum")]
     pub block_num: u32,

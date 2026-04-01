@@ -311,10 +311,12 @@ impl NodeRpcClient for MockRpcApi {
         for note in self.mock_chain.read().committed_notes().values() {
             let note_block = note.inclusion_proof().location().block_num();
             if note_tags.contains(&note.metadata().tag()) && note_block > block_num {
+                let metadata = note.metadata().clone();
                 let committed = CommittedNote::new(
                     note.id(),
-                    note.metadata().note_type(),
-                    note.metadata().tag(),
+                    metadata.note_type(),
+                    metadata.tag(),
+                    Some(metadata),
                     note.inclusion_proof().clone(),
                 );
                 blocks_with_notes.entry(note_block).or_default().push(committed);

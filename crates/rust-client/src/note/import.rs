@@ -13,7 +13,15 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use miden_protocol::block::BlockNumber;
-use miden_protocol::note::{Note, NoteDetails, NoteFile, NoteId, NoteInclusionProof, NoteTag};
+use miden_protocol::note::{
+    Note,
+    NoteDetails,
+    NoteFile,
+    NoteId,
+    NoteInclusionProof,
+    NoteMetadata,
+    NoteTag,
+};
 use miden_tx::auth::TransactionAuthenticator;
 
 use crate::rpc::RpcError;
@@ -323,7 +331,7 @@ where
             });
 
             match committed_notes_data.remove(&note_record.id()) {
-                Some(Some((tag, inclusion_proof))) => {
+                Some(Some((tag, sync_metadata, inclusion_proof))) => {
                     // FIXME: We should be able to build the mmr only once (outside the for loop).
                     // For some reason this leads to error, probably related to:
                     // https://github.com/0xMiden/miden-client/issues/1205
@@ -335,12 +343,12 @@ where
                         )
                         .await?;
 
-                    // Use the metadata already stored in the note record (if available).
-                    // The sync response only provides a fixed-size header without attachment
-                    // data, so full metadata must come from the local record.
-                    let local_metadata = note_record.metadata().cloned();
+                    // Resolve metadata: prefer the local record (may have attachment data),
+                    // then fall back to sync response metadata (available for no-attachment
+                    // notes).
+                    let metadata = note_record.metadata().cloned().or(sync_metadata);
                     let note_changed =
-                        note_record.inclusion_proof_received(inclusion_proof, local_metadata)?;
+                        note_record.inclusion_proof_received(inclusion_proof, metadata)?;
 
                     if note_record.block_header_received(&block_header)? | note_changed {
                         self.store
@@ -369,7 +377,10 @@ where
         mut request_block_num: BlockNumber,
         // Expected notes with their tags
         expected_notes: Vec<(NoteId, &NoteTag)>,
-    ) -> Result<BTreeMap<NoteId, Option<(NoteTag, NoteInclusionProof)>>, ClientError> {
+    ) -> Result<
+        BTreeMap<NoteId, Option<(NoteTag, Option<NoteMetadata>, NoteInclusionProof)>>,
+        ClientError,
+    > {
         let tracked_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
         let mut retrieved_proofs = BTreeMap::new();
         let current_block_num = self.get_sync_height().await?;
@@ -395,23 +406,45 @@ where
 
                     retrieved_proofs.insert(
                         *sync_note.note_id(),
-                        Some((sync_note.tag(), sync_note.inclusion_proof().clone())),
+                        Some((
+                            sync_note.tag(),
+                            sync_note.metadata().cloned(),
+                            sync_note.inclusion_proof().clone(),
+                        )),
                     );
                 }
             }
 
-            // We might have reached the chain tip without having found some notes, bail if so
-            if sync_notes.block_to == request_block_num {
-                break;
-            }
-
-            // Advance to the last block we received or the end of the scanned range
-            request_block_num = sync_notes
-                .blocks
-                .last()
-                .map(|b| b.block_header.block_num())
-                .unwrap_or(sync_notes.block_to);
+            // Advance past the last block the node checked. Adding 1 avoids
+            // re-requesting the same range on the next iteration.
+            request_block_num = sync_notes.block_to + 1;
         }
+
+        // Fetch full metadata for notes with attachments (the sync response only provides
+        // the NoteMetadataHeader which lacks the actual attachment data).
+        let notes_needing_fetch: Vec<NoteId> = retrieved_proofs
+            .iter()
+            .filter_map(|(id, data)| match data {
+                Some((_, None, _)) => Some(*id),
+                _ => None,
+            })
+            .collect();
+
+        if !notes_needing_fetch.is_empty() {
+            let fetched_notes = self
+                .rpc_api
+                .get_notes_by_id(&notes_needing_fetch)
+                .await
+                .map_err(ClientError::RpcError)?;
+
+            for fetched_note in fetched_notes {
+                let note_id = fetched_note.id();
+                if let Some(Some((_, metadata, _))) = retrieved_proofs.get_mut(&note_id) {
+                    *metadata = Some(fetched_note.metadata().clone());
+                }
+            }
+        }
+
         Ok(retrieved_proofs)
     }
 }
