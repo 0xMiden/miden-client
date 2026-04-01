@@ -224,8 +224,6 @@ impl StateSync {
 
         state_sync_update.block_num = sync_data.chain_tip;
 
-        // TODO: fetch_public_note_details should take an iterator or btreeset down to the RPC call
-        // (this would be a breaking change so it should be done separately)
         let public_note_ids: Vec<NoteId> = sync_data
             .note_blocks
             .iter()
@@ -622,12 +620,12 @@ impl StateSync {
         let metadata_map: BTreeMap<NoteId, NoteMetadata> =
             fetched_notes.into_iter().map(|n| (n.id(), n.metadata().clone())).collect();
 
-        for block in note_blocks.iter_mut() {
-            for note in block.notes.iter_mut() {
-                if note.metadata().is_none() {
-                    if let Some(metadata) = metadata_map.get(note.note_id()) {
-                        note.set_metadata(metadata.clone());
-                    }
+        for block in &mut *note_blocks {
+            for note in &mut block.notes {
+                if note.metadata().is_none()
+                    && let Some(metadata) = metadata_map.get(note.note_id())
+                {
+                    note.set_metadata(metadata.clone());
                 }
             }
         }
