@@ -199,8 +199,7 @@ install-tests: ## Install the tests binary
 ## Build the CLI binary. This is done separately in order to save time during
 ## artifact generation for releases.
 
-## Build the CLI binary, client library and tests binary in release mode
-build:
+build: ## Build the CLI binary, client library and tests binary in release mode
 	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --target $(BUILD_TARGET) --release --locked
 
 build-wasm: rust-client-ts-build ## Build the wasm packages (web client and idxdb store)
