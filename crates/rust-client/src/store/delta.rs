@@ -134,9 +134,6 @@ pub fn apply_account_delta_to_forest(
         .cloned()
         .ok_or(StoreError::AccountDataNotFound(account_id))?;
 
-    // Vault must be updated before storage: when vault and storage maps share the
-    // same root (e.g., both empty), the find-and-replace loop below would match
-    // final_roots[0] (the vault root) instead of the intended map root entry.
     let (updated_assets, removed_vault_keys) = compute_vault_delta(old_vault_assets, delta)?;
     let old_vault_root = final_roots[0];
     let new_vault_root = smt_forest.update_asset_nodes(
@@ -154,7 +151,7 @@ pub fn apply_account_delta_to_forest(
 
     final_roots[0] = new_vault_root;
 
-    // Compute storage delta via SMT forest (after vault to avoid shared-root conflicts)
+    // Compute storage delta via SMT forest
     let updated_storage_slots = compute_storage_delta(smt_forest, old_map_roots, delta)?;
 
     // Update map roots in final_roots with new values from the delta
