@@ -1,16 +1,21 @@
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
-use miden_protocol::account::{
-    AccountDelta, AccountId, AccountIdPrefix, StorageMap, StorageSlotName, StorageSlotType,
-};
+use miden_protocol::Word;
 use miden_protocol::account::delta::NonFungibleDeltaAction;
+use miden_protocol::account::{
+    AccountDelta,
+    AccountId,
+    AccountIdPrefix,
+    StorageMap,
+    StorageSlotName,
+    StorageSlotType,
+};
 use miden_protocol::asset::{Asset, AssetVaultKey, FungibleAsset};
 use miden_protocol::crypto::merkle::MerkleError;
-use miden_protocol::Word;
 
-use super::smt_forest::AccountSmtForest;
 use super::StoreError;
+use super::smt_forest::AccountSmtForest;
 
 /// Computes updated storage slot roots from the delta using the SMT forest.
 ///
@@ -169,5 +174,9 @@ pub fn apply_account_delta_to_forest(
     // Stage roots for later commit/discard
     smt_forest.stage_roots(account_id, final_roots);
 
-    Ok(AppliedAccountDelta { updated_storage_slots, updated_assets, removed_vault_keys })
+    Ok(AppliedAccountDelta {
+        updated_storage_slots,
+        updated_assets,
+        removed_vault_keys,
+    })
 }

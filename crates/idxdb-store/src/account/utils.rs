@@ -3,8 +3,16 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::account::{
-    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountStorage, Address,
-    StorageSlotContent, StorageSlotName, StorageSlotType,
+    Account,
+    AccountCode,
+    AccountDelta,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    Address,
+    StorageSlotContent,
+    StorageSlotName,
+    StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault, AssetVaultKey};
 use miden_client::store::{AccountStatus, StoreError};
@@ -163,7 +171,6 @@ pub fn parse_account_address_idxdb_object(
 
     Ok((address, native_account_id))
 }
-
 
 /// Applies a transaction's account delta atomically in a single Dexie transaction.
 ///

@@ -6,7 +6,12 @@ use std::string::ToString;
 use std::vec::Vec;
 
 use miden_client::account::{
-    AccountDelta, AccountId, StorageSlot, StorageSlotContent, StorageSlotName, StorageSlotType,
+    AccountDelta,
+    AccountId,
+    StorageSlot,
+    StorageSlotContent,
+    StorageSlotName,
+    StorageSlotType,
 };
 use miden_client::store::StoreError;
 use miden_client::{EMPTY_WORD, Word};
@@ -277,5 +282,4 @@ impl SqliteStore {
 
         Ok(())
     }
-
 }
