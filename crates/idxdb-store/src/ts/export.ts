@@ -16,7 +16,10 @@ async function recursivelyTransformForExport(
 ): Promise<any> {
   switch (obj.type) {
     case "Uint8Array":
-      return Array.from(obj.value);
+      return {
+        __type: "Uint8Array" as const,
+        data: uint8ArrayToBase64(obj.value),
+      };
     case "Blob":
       return {
         __type: "Blob" as const,
