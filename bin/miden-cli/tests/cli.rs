@@ -37,6 +37,7 @@ use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::utils::Serializable;
 use miden_client::{self, Client, DebugMode, Felt};
 use miden_client_cli::MIDEN_DIR;
+use miden_client_cli::config::Network;
 use miden_client_sqlite_store::SqliteStore;
 use predicates::str::contains;
 use rand::Rng;
@@ -851,7 +852,8 @@ async fn list_addresses_remove() -> Result<()> {
 
     // Remove the Unspecified wallet from the account
     let mut remove_address_cmd = cargo_bin_cmd!("miden-client");
-    let unspecified_wallet_address = regex::Regex::new(r"mlcl1[0-9a-z]+")
+    // Match any bech32 Miden address (HRP varies by network: mlcl, mdev, mtst, mm, etc.)
+    let unspecified_wallet_address = regex::Regex::new(r"m[a-z]{1,4}1[0-9a-z]+")
         .unwrap()
         .find(&formatted_output)
         .unwrap()
@@ -919,11 +921,13 @@ async fn new_wallet_with_deploy_flag() -> Result<()> {
 /// Initializes a CLI with the network in the config file and returns the store path and the temp
 /// directory where the CLI is running.
 fn init_cli() -> (PathBuf, PathBuf, Endpoint) {
-    // Try to read from env first or default to localhost
-    let endpoint = match std::env::var("TEST_MIDEN_RPC_ENDPOINT") {
-        Ok(endpoint) => Endpoint::try_from(endpoint.as_str()).unwrap(),
-        Err(_) => Endpoint::localhost(),
-    };
+    // Try to read from env first or default to localhost.
+    // Accepts "devnet", "testnet", "localhost", or a custom RPC endpoint string.
+    let network: Network = std::env::var("TEST_MIDEN_NETWORK")
+        .unwrap_or_else(|_| "localhost".to_string())
+        .parse()
+        .unwrap();
+    let endpoint = Endpoint::try_from(network.to_rpc_endpoint().as_str()).unwrap();
 
     let store_path = create_test_store_path();
     let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
