@@ -572,7 +572,7 @@ impl NodeRpcClient for GrpcClient {
 
         let request = proto::rpc::SyncChainMmrRequest {
             block_range,
-            finality: proto::rpc::Finality::Unspecified as i32,
+            finality: proto::rpc::Finality::Committed as i32,
         };
 
         let response = self
