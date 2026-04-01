@@ -227,7 +227,8 @@ impl StateSync {
 
         state_sync_update.block_num = sync_data.chain_tip;
 
-        // Fetch details for all public notes.
+        // TODO: fetch_public_note_details should take an iterator or btreeset down to the RPC call
+        // (this would be a breaking change so it should be done separately)
         let public_note_ids: Vec<NoteId> = sync_data
             .note_blocks
             .iter()
@@ -245,6 +246,9 @@ impl StateSync {
         )
         .await?;
 
+        // Apply local changes. These involve updating the MMR and applying state transitions
+        // to notes based on the received information.
+        info!("Applying state transitions locally.");
         self.apply_sync_result(
             sync_data,
             &public_note_records,
@@ -261,11 +265,12 @@ impl StateSync {
         Ok(state_sync_update)
     }
 
-    /// Executes a single sync step:
-    /// 1. `sync_chain_mmr` — gets the MMR delta to the chain tip and discovers the chain tip.
-    /// 2. `sync_notes` — loops until the full range to the chain tip is covered (handles truncated
-    ///    responses from payload limits).
-    /// 3. `sync_transactions` — gets transaction data for the full range.
+    /// Fetches the sync data from the node by calling the following endpoints:
+    /// 1. `get_block_header_by_number` — gets the chain tip block header.
+    /// 2. `sync_chain_mmr` — gets the MMR delta to the chain tip.
+    /// 3. `sync_notes` — loops until the full range to the chain tip is covered (handles paginated
+    ///    responses).
+    /// 4. `sync_transactions` — gets transaction data for the full range.
     ///
     /// Returns a [`SyncUpdate`] where `chain_tip == current_block_num` signals no progress.
     async fn fetch_sync_data(

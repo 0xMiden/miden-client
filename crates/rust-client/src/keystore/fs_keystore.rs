@@ -79,7 +79,7 @@ impl KeyIndex {
     /// Saves the index to disk atomically (write to temp file, then rename).
     fn write_to_file(&self, keys_directory: &Path) -> Result<(), KeyStoreError> {
         let index_path = keys_directory.join(INDEX_FILE_NAME);
-        let temp_path = keys_directory.join(format!(".{INDEX_FILE_NAME}.tmp"));
+        let temp_path = std::env::temp_dir().join(INDEX_FILE_NAME);
 
         let contents = serde_json::to_string_pretty(self).map_err(|err| {
             KeyStoreError::StorageError(format!("error serializing index: {err:?}"))
