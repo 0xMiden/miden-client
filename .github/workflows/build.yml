@@ -1,7 +1,7 @@
 name: Build
 on:
   push:
-    branches: [main, next]
+    branches: [main, next, "release/**"]
     paths-ignore:
       - "**.md"
       - "**.txt"
@@ -36,7 +36,7 @@ jobs:
         with:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          save-if: ${{ github.event_name != 'pull_request' }}
       - name: make - build
         run: make build
   build-wasm:

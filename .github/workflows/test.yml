@@ -3,7 +3,7 @@ permissions:
   contents: read
 on:
   push:
-    branches: [main, next]
+    branches: [main, next, "release/**"]
     paths-ignore:
       - "**.md"
       - "**.txt"
@@ -126,6 +126,7 @@ jobs:
         with:
           path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-node-builder-
       - name: Install Rust
         if: steps.cache-node-builder.outputs.cache-hit != 'true'
         run: rustup update --no-self-update
@@ -151,6 +152,7 @@ jobs:
         with:
           path: ~/.cargo/bin/miden-note-transport-node-bin
           key: ${{ runner.os }}-note-transport-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-note-transport-
       - name: Install Rust
         if: steps.cache-note-transport.outputs.cache-hit != 'true'
         run: rustup update --no-self-update
@@ -169,6 +171,7 @@ jobs:
         with:
           path: target/release/testing-remote-prover
           key: ${{ runner.os }}-prover-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-prover-
       - name: Install Rust
         if: steps.cache-remote-prover.outputs.cache-hit != 'true'
         run: rustup update --no-self-update
@@ -205,11 +208,13 @@ jobs:
         with:
           path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-node-builder-
       - name: Restore note-transport binary
         uses: actions/cache/restore@v4
         with:
           path: ~/.cargo/bin/miden-note-transport-node-bin
           key: ${{ runner.os }}-note-transport-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-note-transport-
       - name: Start test node
         run: |
           RUST_LOG=none target/release/testing-node-builder &
@@ -248,7 +253,7 @@ jobs:
         with:
           shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          save-if: ${{ github.event_name != 'pull_request' }}
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -333,6 +338,7 @@ jobs:
         with:
           path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-node-builder-
       - name: Start test node
         run: |
           RUST_LOG=none target/release/testing-node-builder &
@@ -381,11 +387,13 @@ jobs:
         with:
           path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-node-builder-
       - name: Restore remote-prover binary
         uses: actions/cache/restore@v4
         with:
           path: target/release/testing-remote-prover
           key: ${{ runner.os }}-prover-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-prover-
       - name: Start test node
         run: |
           RUST_LOG=none target/release/testing-node-builder &
