@@ -415,8 +415,10 @@ impl StateSync {
                 let block_pos = block.block_header.block_num().as_usize();
 
                 // Collect authentication nodes added by track() so the store can persist
-                // them.
-                let track_auth_nodes = if !current_partial_mmr.is_tracked(block_pos) {
+                // them. Skip if already tracked (from a previous sync).
+                let track_auth_nodes = if current_partial_mmr.is_tracked(block_pos) {
+                    vec![]
+                } else {
                     let nodes_before: BTreeMap<_, _> =
                         current_partial_mmr.nodes().map(|(k, v)| (*k, *v)).collect();
                     current_partial_mmr
@@ -427,8 +429,6 @@ impl StateSync {
                         .filter(|(k, _)| !nodes_before.contains_key(k))
                         .map(|(k, v)| (*k, *v))
                         .collect()
-                } else {
-                    vec![]
                 };
 
                 state_sync_update.block_updates.insert(
