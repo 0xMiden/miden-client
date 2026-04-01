@@ -20,7 +20,7 @@ NOTE_TRANSPORT_ENDPOINT=http://127.0.0.1:57292
 
 .PHONY: clippy
 clippy: ## Run Clippy with configs
-	cargo +nightly clippy --workspace $(EXCLUDE_WASM_PACKAGES) --features "testing std" --all-targets --release -- -D warnings
+	cargo +nightly clippy --workspace $(EXCLUDE_WASM_PACKAGES) --features "testing std" --all-targets -- -D warnings
 
 .PHONY: clippy-wasm
 clippy-wasm: rust-client-ts-build ## Run Clippy for the wasm packages (web client and idxdb store)

@@ -12,7 +12,6 @@ concurrency:
 
 env:
   CARGO_PROFILE_DEV_DEBUG: 0
-  RUST_CACHE_KEY: rust-cache-2026.02.18
 
 jobs:
   unused_deps:
@@ -85,12 +84,6 @@ jobs:
         run: |
           rustup update --no-self-update nightly
           rustup +nightly component add clippy
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-release
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: false
       - name: make - clippy
         run: make clippy
 
