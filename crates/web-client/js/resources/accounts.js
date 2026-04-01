@@ -122,7 +122,9 @@ export class AccountsResource {
     if (!account) {
       throw new Error(`Account not found: ${id.toString()}`);
     }
-    const keys = await this.#inner.keystore.getCommitments(id);
+    const keys = this.#inner.keystore
+      ? await this.#inner.keystore.getCommitments(id)
+      : await this.#inner.getPublicKeyCommitmentsOfAccount(id);
     return {
       account,
       vault: account.vault(),
