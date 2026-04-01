@@ -16,11 +16,16 @@ import {
 export * from "../Cargo.toml";
 
 export const AccountType = Object.freeze({
-  MutableWallet: "MutableWallet",
-  ImmutableWallet: "ImmutableWallet",
-  FungibleFaucet: "FungibleFaucet",
-  ImmutableContract: "ImmutableContract",
-  MutableContract: "MutableContract",
+  // WASM-compatible numeric values — usable with AccountBuilder directly
+  FungibleFaucet: 0,
+  NonFungibleFaucet: 1,
+  RegularAccountImmutableCode: 2,
+  RegularAccountUpdatableCode: 3,
+  // SDK-friendly aliases (same numeric values as their WASM equivalents)
+  MutableWallet: 3,
+  ImmutableWallet: 2,
+  ImmutableContract: 2,
+  MutableContract: 3,
 });
 
 export const AuthScheme = Object.freeze({
@@ -106,6 +111,7 @@ const READ_METHODS = new Set([
   "getTransactions",
   "listSettingKeys",
   "listTags",
+  "executeProgram",
 ]);
 
 // Suppress unused-variable warnings — these sets exist solely for the CI lint check.

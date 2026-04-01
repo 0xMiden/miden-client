@@ -21,9 +21,8 @@ NOTE_TRANSPORT_ENDPOINT=http://127.0.0.1:57292
 # --- Linting -------------------------------------------------------------------------------------
 
 .PHONY: clippy
-clippy: ## Run Clippy with configs. We need two separate commands because the `testing-remote-prover` cannot be built along with the rest of the workspace. This is because they use different versions of the `miden-tx` crate which aren't compatible with each other.
-	cargo clippy --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --all-targets -- -D warnings
-	cargo clippy --package testing-remote-prover --all-targets -- -D warnings
+clippy: ## Run Clippy with configs
+	cargo clippy --workspace $(EXCLUDE_WASM_PACKAGES) --all-targets -- -D warnings
 
 .PHONY: clippy-wasm
 clippy-wasm: rust-client-ts-build ## Run Clippy for the wasm packages (web client and idxdb store)
@@ -204,9 +203,7 @@ build-cli:
 
 ## Build the CLI binary, client library and tests binary in release mode
 build: build-cli
-	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --exclude miden-client-cli --exclude testing-remote-prover --release
-	cargo build --package testing-remote-prover --release --locked
-	cargo build --package miden-client-integration-tests --release --locked
+	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --exclude miden-client-cli --exclude testing-remote-prover --release --locked
 
 build-wasm: rust-client-ts-build ## Build the wasm packages (web client and idxdb store)
 	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown --locked

@@ -21,20 +21,28 @@ export class AccountsResource {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
 
-    if (opts?.type === "FungibleFaucet") {
+    const type = opts?.type;
+
+    if (
+      type === 0 ||
+      type === 1 ||
+      type === "FungibleFaucet" ||
+      type === "NonFungibleFaucet"
+    ) {
       const storageMode = resolveStorageMode(opts.storage ?? "public", wasm);
       const authScheme = resolveAuthScheme(opts.auth, wasm);
       return await this.#inner.newFaucet(
         storageMode,
-        false,
+        type === 1 || type === "NonFungibleFaucet",
         opts.symbol,
         opts.decimals,
         BigInt(opts.maxSupply),
         authScheme
       );
     } else if (
-      opts?.type === "ImmutableContract" ||
-      opts?.type === "MutableContract"
+      type === "ImmutableContract" ||
+      type === "MutableContract" ||
+      opts?.components // Contracts are distinguished from wallets by having components
     ) {
       return await this.#createContract(opts, wasm);
     } else {
@@ -58,7 +66,8 @@ export class AccountsResource {
     if (!opts.auth)
       throw new Error("Contract creation requires an 'auth' (AuthSecretKey)");
 
-    const mutable = opts.type === "MutableContract";
+    // Default to immutable when type is omitted (safer for contracts)
+    const mutable = opts.type === "MutableContract" || opts.type === 3;
     const accountTypeEnum = mutable
       ? wasm.AccountType.RegularAccountUpdatableCode
       : wasm.AccountType.RegularAccountImmutableCode;
@@ -80,6 +89,11 @@ export class AccountsResource {
 
     await this.#inner.newAccountWithSecretKey(account, opts.auth);
     return account;
+  }
+
+  async insert({ account, overwrite = false }) {
+    this.#client.assertNotTerminated();
+    await this.#inner.newAccount(account, overwrite);
   }
 
   async getOrImport(ref) {

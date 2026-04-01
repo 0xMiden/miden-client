@@ -16,11 +16,11 @@ Auth secret key. Required.
 
 ***
 
-### components?
+### components
 
-> `optional` **components**: `AccountComponent`[]
+> **components**: `AccountComponent`[]
 
-Pre-compiled AccountComponent instances.
+Pre-compiled AccountComponent instances. Required for contracts.
 
 ***
 
@@ -40,6 +40,8 @@ Storage mode. Defaults to "public" for contracts.
 
 ***
 
-### type
+### type?
 
-> **type**: `"ImmutableContract"` \| `"MutableContract"`
+> `optional` **type**: [`AccountTypeValue`](../type-aliases/AccountTypeValue.md)
+
+Use `AccountType.ImmutableContract` or `AccountType.MutableContract`.
