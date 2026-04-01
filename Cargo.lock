@@ -2979,8 +2979,10 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
+ "miden-agglayer",
  "miden-client",
  "miden-client-sqlite-store",
+ "miden-protocol",
  "num_cpus",
  "rand 0.9.2",
  "regex",
@@ -3015,12 +3017,17 @@ dependencies = [
 name = "miden-client-unit-tests"
 version = "0.14.0"
 dependencies = [
+ "anyhow",
+ "miden-agglayer",
  "miden-client",
  "miden-client-sqlite-store",
  "miden-protocol",
  "miden-standards",
  "miden-testing",
+ "miden-tx",
  "rand 0.9.2",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 
@@ -3879,6 +3886,7 @@ name = "node-builder"
 version = "0.14.0"
 dependencies = [
  "anyhow",
+ "miden-agglayer",
  "miden-node-block-producer",
  "miden-node-ntx-builder",
  "miden-node-rpc",

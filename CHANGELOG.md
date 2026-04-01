@@ -20,8 +20,7 @@
 * Added automatic retry for rate-limited (`ResourceExhausted`) and transiently unavailable RPC calls in `GrpcClient`, with up to 5 attempts and `retry-after` header support ([#1928](https://github.com/0xMiden/miden-client/pull/1928)).
 
 ### Changes
-
-* [BREAKING] Incremented MSRV to 1.91([#1798](https://github.com/0xMiden/miden-client/pull/1798)).
+* [BREAKING] Incremented MSRV to 1.91 ([#1798](https://github.com/0xMiden/miden-client/pull/1798)).
 * [BREAKING] Replaced `AuthFalcon512Rpo`/`AuthEcdsaK256Keccak` with unified  `AuthSingleSig`, changed `StorageMapKey` from a type alias to a newtype, renamed note constructors to associated methods (`P2idNote::create`, `SwapNote::create`, `P2ideNote::create`), and started requiring `AccountComponentMetadata` in `AccountComponent::new`([#1798](https://github.com/0xMiden/miden-client/pull/1798)).
 * Included Partial states in `NoteFilter::Unspent` for output notes ([#1817](https://github.com/0xMiden/miden-client/pull/1817)).
 * [BREAKING][arch][web] Replaced the `WebClient` class with a new `MidenClient` resource-based API as the primary web SDK entry point. `WebClient` is still available as `WasmWebClient` for low-level access but is no longer part of the public API. All documentation has been updated to use `MidenClient`. Migration: replace `WebClient.createClient(rpcUrl, noteTransportUrl, seed, storeName)` with `MidenClient.create({ rpcUrl, noteTransportUrl, seed, storeName })`, and replace direct method calls (e.g. `client.newWallet(...)`, `client.submitNewTransaction(...)`, `client.getAccounts()`) with resource methods (e.g. `client.accounts.create()`, `client.transactions.send(...)`, `client.accounts.list()`). ([#1762](https://github.com/0xMiden/miden-client/pull/1762)).
