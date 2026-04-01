@@ -12,15 +12,9 @@ import { defineConfig, devices } from "@playwright/test";
  * See https://playwright.dev/docs/test-configuration.
  */
 
-// Test files that are excluded from sharded runs and instead run in the remote prover job
-const excludedTestFiles = process.env.EXCLUDE_TEST_FILES
-  ? process.env.EXCLUDE_TEST_FILES.split(",").map((f) => `**/${f.trim()}`)
-  : undefined;
-
 export default defineConfig({
   timeout: 240_000,
   testDir: "./test",
-  testIgnore: excludedTestFiles,
   /* Run tests in files in parallel */
   fullyParallel: process.env.REMOTE_PROVER ? false : true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
