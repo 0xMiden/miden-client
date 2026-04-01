@@ -344,8 +344,12 @@ export const customTransaction = async (
 
       let memAddress = "1000";
       let memAddress2 = "1004";
-      let expectedNoteArg1 = window.Word.newFromFelts(noteArgs.slice(0, 4)).toHex();
-      let expectedNoteArg2 = window.Word.newFromFelts(noteArgs.slice(4, 8)).toHex();
+      let expectedNoteArg1 = window.Word.newFromFelts(
+        noteArgs.slice(0, 4)
+      ).toHex();
+      let expectedNoteArg2 = window.Word.newFromFelts(
+        noteArgs.slice(4, 8)
+      ).toHex();
 
       let noteScript = `
             # Custom P2ID note script
