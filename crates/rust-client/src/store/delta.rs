@@ -134,9 +134,9 @@ pub fn apply_account_delta_to_forest(
         .cloned()
         .ok_or(StoreError::AccountDataNotFound(account_id))?;
 
-    // Vault must be updated before storage to avoid SmtForest shared-root issues:
-    // when vault and storage maps start from the same empty root, updating storage
-    // first would modify the tree that vault also needs.
+    // Vault must be updated before storage: when vault and storage maps share the
+    // same root (e.g., both empty), the find-and-replace loop below would match
+    // final_roots[0] (the vault root) instead of the intended map root entry.
     let (updated_assets, removed_vault_keys) = compute_vault_delta(old_vault_assets, delta)?;
     let old_vault_root = final_roots[0];
     let new_vault_root = smt_forest.update_asset_nodes(
