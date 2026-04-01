@@ -44,16 +44,16 @@ miden-testing   = { default-features = false, version = "0.14" }
 miden-tx        = { default-features = false, version = "0.14" }
 
 # Miden node dependencies (from git branch until compatible crates.io release)
-miden-node-block-producer = { git = "https://github.com/0xMiden/miden-node", rev = "a7abf73f" }
-miden-node-ntx-builder = { git = "https://github.com/0xMiden/miden-node", rev = "a7abf73f" }
-miden-node-proto = { git = "https://github.com/0xMiden/miden-node", rev = "a7abf73f" }
-miden-node-proto-build = { default-features = false, git = "https://github.com/0xMiden/miden-node", rev = "a7abf73f" }
-miden-node-rpc = { git = "https://github.com/0xMiden/miden-node", rev = "a7abf73f" }
-miden-node-store = { git = "https://github.com/0xMiden/miden-node", rev = "a7abf73f" }
-miden-node-utils = { git = "https://github.com/0xMiden/miden-node", rev = "a7abf73f" }
-miden-node-validator = { git = "https://github.com/0xMiden/miden-node", rev = "a7abf73f" }
+miden-node-block-producer = { git = "https://github.com/0xMiden/miden-node", rev = "d5fbaae2" }
+miden-node-ntx-builder = { git = "https://github.com/0xMiden/miden-node", rev = "d5fbaae2" }
+miden-node-proto = { git = "https://github.com/0xMiden/miden-node", rev = "d5fbaae2" }
+miden-node-proto-build = { default-features = false, git = "https://github.com/0xMiden/miden-node", rev = "d5fbaae2" }
+miden-node-rpc = { git = "https://github.com/0xMiden/miden-node", rev = "d5fbaae2" }
+miden-node-store = { git = "https://github.com/0xMiden/miden-node", rev = "d5fbaae2" }
+miden-node-utils = { git = "https://github.com/0xMiden/miden-node", rev = "d5fbaae2" }
+miden-node-validator = { git = "https://github.com/0xMiden/miden-node", rev = "d5fbaae2" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-remote-prover-client = { default-features = false, features = ["tx-prover"], git = "https://github.com/0xMiden/miden-node", rev = "a7abf73f" }
+miden-remote-prover-client = { default-features = false, features = ["tx-prover"], git = "https://github.com/0xMiden/miden-node", rev = "d5fbaae2" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
