@@ -25,10 +25,6 @@ const NETWORK_TESTNET: &str = "testnet";
 const NETWORK_LOCALHOST: &str = "localhost";
 
 /// Identifies the note transport service to connect to.
-///
-/// Centralises the "devnet / testnet / custom-URL" resolution that was previously
-/// duplicated across `ClientConfig::default`, `BaseConfig::try_from` and
-/// `resolve_transport_endpoint` in the transport tests.
 #[derive(Clone, Debug)]
 pub enum NoteTransportEndpoint {
     Devnet,

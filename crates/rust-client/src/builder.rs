@@ -200,7 +200,7 @@ where
     /// This automatically configures:
     /// - **RPC**: `https://rpc.devnet.miden.io`
     /// - **Prover**: Remote prover at `https://tx-prover.devnet.miden.io`
-    /// - **Note transport**: `https://transport.devnet.miden.io`
+    /// - **Note transport**: [`note_transport::NOTE_TRANSPORT_DEVNET_ENDPOINT`]
     ///
     /// You still need to provide:
     /// - A store (via `.store()`)
