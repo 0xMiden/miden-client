@@ -443,7 +443,7 @@ impl SqliteStore {
         Self::insert_account_header(tx, final_account_state, None, Some(init_account_state))?;
 
         // Compute all delta changes and update the SMT forest
-        let applied = miden_client::store::apply_account_delta_to_forest(
+        let applied_delta = miden_client::store::apply_account_delta_to_forest(
             smt_forest,
             account_id,
             old_vault_assets,
@@ -457,8 +457,8 @@ impl SqliteStore {
             tx,
             &account_id.to_hex(),
             &u64_to_value(final_account_state.nonce().as_int()),
-            &applied.removed_vault_keys,
-            &applied.updated_assets,
+            &applied_delta.removed_vault_keys,
+            &applied_delta.updated_assets,
         )?;
 
         // Persist storage changes
@@ -466,7 +466,7 @@ impl SqliteStore {
             tx,
             account_id,
             final_account_state.nonce().as_int(),
-            &applied.updated_storage_slots,
+            &applied_delta.updated_storage_slots,
             delta,
         )?;
 

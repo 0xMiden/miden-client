@@ -126,7 +126,7 @@ impl IdxdbStore {
 
             let final_header = executed_tx.final_account();
 
-            let applied = {
+            let applied_delta = {
                 let mut smt_forest = self.smt_forest.write();
                 apply_account_delta_to_forest(
                     &mut smt_forest,
@@ -142,9 +142,9 @@ impl IdxdbStore {
                 self.db_id(),
                 account_id,
                 final_header,
-                &applied.updated_storage_slots,
-                &applied.updated_assets,
-                &applied.removed_vault_keys,
+                &applied_delta.updated_storage_slots,
+                &applied_delta.updated_assets,
+                &applied_delta.removed_vault_keys,
                 delta,
             )
             .await
