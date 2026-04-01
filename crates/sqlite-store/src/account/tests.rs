@@ -1309,16 +1309,15 @@ async fn get_account_header_by_commitment_returns_historical() -> anyhow::Result
     assert_eq!(header.nonce().as_canonical_u64(), 0);
     assert_eq!(header.to_commitment(), initial_commitment);
 
-    // Look up the post-delta commitment — should find the nonce-1 state in historical
+    // Look up the post-delta commitment — should NOT be in historical (it's the current
+    // latest state, not an old one that was replaced)
     let lookup = post_delta_commitment;
-    let header = store
+    let result = store
         .interact_with_connection(move |conn| {
             SqliteStore::get_account_header_by_commitment(conn, lookup)
         })
-        .await?
-        .expect("Post-delta commitment should exist in historical");
-    assert_eq!(header.nonce().as_canonical_u64(), 1);
-    assert_eq!(header.to_commitment(), post_delta_commitment);
+        .await?;
+    assert!(result.is_none(), "Post-delta commitment should not be in historical");
 
     Ok(())
 }

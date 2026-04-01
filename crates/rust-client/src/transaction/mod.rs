@@ -470,33 +470,8 @@ where
         advice_inputs: AdviceInputs,
         foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
     ) -> Result<[Felt; 16], ClientError> {
-        let (fpi_block_number, foreign_account_inputs) =
-            self.retrieve_foreign_account_inputs(foreign_accounts).await?;
-
-        let block_ref = if let Some(block_number) = fpi_block_number {
-            block_number
-        } else {
-            self.get_sync_height().await?
-        };
-
-        let account_record = self
-            .store
-            .get_account(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))?;
-
-        let account: Account = account_record.try_into()?;
-
-        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
-
-        data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
-
-        // Ensure code is loaded on MAST store
-        data_store.mast_store().load_account_code(account.code());
-
-        for fpi_account in &foreign_account_inputs {
-            data_store.mast_store().load_account_code(fpi_account.code());
-        }
+        let (data_store, block_ref) =
+            self.prepare_program_execution(account_id, foreign_accounts).await?;
 
         Ok(self
             .build_executor(&data_store)?
@@ -514,33 +489,8 @@ where
         advice_inputs: AdviceInputs,
         foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
     ) -> Result<[Felt; 16], ClientError> {
-        let (fpi_block_number, foreign_account_inputs) =
-            self.retrieve_foreign_account_inputs(foreign_accounts).await?;
-
-        let block_ref = if let Some(block_number) = fpi_block_number {
-            block_number
-        } else {
-            self.get_sync_height().await?
-        };
-
-        let account_record = self
-            .store
-            .get_account(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))?;
-
-        let account: Account = account_record.try_into()?;
-
-        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
-
-        data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
-
-        // Ensure code is loaded on MAST store
-        data_store.mast_store().load_account_code(account.code());
-
-        for fpi_account in &foreign_account_inputs {
-            data_store.mast_store().load_account_code(fpi_account.code());
-        }
+        let (data_store, block_ref) =
+            self.prepare_program_execution(account_id, foreign_accounts).await?;
 
         Ok(self
             .build_dap_executor(&data_store)?
@@ -830,6 +780,45 @@ where
         }
 
         Ok((Some(block_num), return_foreign_account_inputs))
+    }
+
+    /// Prepares the data store and block reference for program execution.
+    ///
+    /// This is shared setup for both `execute_program` and `execute_program_with_dap`.
+    async fn prepare_program_execution(
+        &mut self,
+        account_id: AccountId,
+        foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
+    ) -> Result<(ClientDataStore, BlockNumber), ClientError> {
+        let (fpi_block_number, foreign_account_inputs) =
+            self.retrieve_foreign_account_inputs(foreign_accounts).await?;
+
+        let block_ref = if let Some(block_number) = fpi_block_number {
+            block_number
+        } else {
+            self.get_sync_height().await?
+        };
+
+        let account_record = self
+            .store
+            .get_account(account_id)
+            .await?
+            .ok_or(ClientError::AccountDataNotFound(account_id))?;
+
+        let account: Account = account_record.try_into()?;
+
+        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
+
+        data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
+
+        // Ensure code is loaded on MAST store
+        data_store.mast_store().load_account_code(account.code());
+
+        for fpi_account in &foreign_account_inputs {
+            data_store.mast_store().load_account_code(fpi_account.code());
+        }
+
+        Ok((data_store, block_ref))
     }
 
     /// Creates a transaction executor configured with the client's runtime options,
