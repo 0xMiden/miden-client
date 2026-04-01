@@ -236,10 +236,6 @@ impl StateSync {
 
         let public_note_records = self.fetch_public_note_details(&public_note_ids).await?;
 
-        // Fetch full metadata for notes with attachments (the sync response only provides
-        // the NoteMetadataHeader which lacks the actual attachment data).
-        let attachment_metadata = self.fetch_attachment_metadata(&sync_data.note_blocks).await?;
-
         self.account_state_sync(
             &mut state_sync_update.account_updates,
             &accounts,
@@ -253,7 +249,6 @@ impl StateSync {
         self.apply_sync_result(
             sync_data,
             &public_note_records,
-            &attachment_metadata,
             &mut state_sync_update,
             current_partial_mmr,
         )
@@ -272,7 +267,9 @@ impl StateSync {
     /// 2. `sync_chain_mmr` — gets the MMR delta to the chain tip.
     /// 3. `sync_notes` — loops until the full range to the chain tip is covered (handles paginated
     ///    responses).
-    /// 4. `sync_transactions` — gets transaction data for the full range.
+    /// 4. `get_notes_by_id` — fetches full metadata for notes with attachments (the sync response
+    ///    only provides a header without the attachment data).
+    /// 5. `sync_transactions` — gets transaction data for the full range.
     ///
     /// Returns a [`NodeSyncData`] where `chain_tip == current_block_num` signals no progress.
     async fn fetch_sync_data(
@@ -325,7 +322,11 @@ impl StateSync {
             }
         }
 
-        // Step 3: Gather transactions for tracked accounts over the full range.
+        // Step 3: Fetch full metadata for notes with attachments. The sync response only
+        // provides a NoteMetadataHeader; the actual attachment data is fetched via GetNotesById.
+        self.fill_attachment_metadata(&mut note_blocks).await?;
+
+        // Step 4: Gather transactions for tracked accounts over the full range.
         let (account_commitment_updates, transactions, nullifiers) =
             self.fetch_transaction_data(current_block_num, chain_tip, account_ids).await?;
 
@@ -388,7 +389,6 @@ impl StateSync {
         &self,
         sync_data: NodeSyncData,
         public_note_records: &BTreeMap<NoteId, InputNoteRecord>,
-        attachment_metadata: &BTreeMap<NoteId, NoteMetadata>,
         state_sync_update: &mut SyncUpdate,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<(), ClientError> {
@@ -417,7 +417,6 @@ impl StateSync {
                     block.notes,
                     &block.block_header,
                     public_note_records,
-                    attachment_metadata,
                 )
                 .await?;
 
@@ -545,7 +544,6 @@ impl StateSync {
         note_inclusions: Vec<CommittedNote>,
         block_header: &BlockHeader,
         public_notes: &BTreeMap<NoteId, InputNoteRecord>,
-        attachment_metadata: &BTreeMap<NoteId, NoteMetadata>,
     ) -> Result<bool, ClientError> {
         // `found_relevant_note` tracks whether we want to persist the block header in the end
         let mut found_relevant_note = false;
@@ -561,11 +559,8 @@ impl StateSync {
                     // Only mark the downloaded block header as relevant if we are talking about
                     // an input note (output notes get marked as committed but we don't need the
                     // block for anything there)
-                    found_relevant_note |= note_updates.apply_committed_note_state_transitions(
-                        &committed_note,
-                        block_header,
-                        attachment_metadata,
-                    )?;
+                    found_relevant_note |= note_updates
+                        .apply_committed_note_state_transitions(&committed_note, block_header)?;
                 },
                 NoteUpdateAction::Insert(public_note) => {
                     found_relevant_note = true;
@@ -598,24 +593,25 @@ impl StateSync {
         Ok(return_notes.into_iter().map(|note| (note.id(), note)).collect())
     }
 
-    /// Fetches full [`NoteMetadata`] for committed notes that have attachments.
+    /// Fetches full [`NoteMetadata`] for committed notes that have attachments and fills it
+    /// in on the notes directly.
     ///
     /// The sync response only provides a `NoteMetadataHeader` (sender, type, tag, attachment
     /// kind) but not the actual attachment data. For notes with attachments, the full metadata
-    /// must be fetched via `GetNotesById`.
-    async fn fetch_attachment_metadata(
+    /// must be fetched via `GetNotesById` and set on the committed notes.
+    async fn fill_attachment_metadata(
         &self,
-        note_blocks: &[NoteSyncBlock],
-    ) -> Result<BTreeMap<NoteId, NoteMetadata>, ClientError> {
+        note_blocks: &mut [NoteSyncBlock],
+    ) -> Result<(), ClientError> {
         let note_ids: Vec<NoteId> = note_blocks
             .iter()
             .flat_map(|b| b.notes.iter())
-            .filter(|n| n.needs_metadata_fetch())
+            .filter(|n| n.metadata().is_none())
             .map(|n| *n.note_id())
             .collect();
 
         if note_ids.is_empty() {
-            return Ok(BTreeMap::new());
+            return Ok(());
         }
 
         info!("Fetching full metadata for {} notes with attachments.", note_ids.len());
@@ -623,7 +619,20 @@ impl StateSync {
         let fetched_notes =
             self.rpc_api.get_notes_by_id(&note_ids).await.map_err(ClientError::RpcError)?;
 
-        Ok(fetched_notes.into_iter().map(|n| (n.id(), n.metadata().clone())).collect())
+        let metadata_map: BTreeMap<NoteId, NoteMetadata> =
+            fetched_notes.into_iter().map(|n| (n.id(), n.metadata().clone())).collect();
+
+        for block in note_blocks.iter_mut() {
+            for note in block.notes.iter_mut() {
+                if note.metadata().is_none() {
+                    if let Some(metadata) = metadata_map.get(note.note_id()) {
+                        note.set_metadata(metadata.clone());
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Collects the nullifier tags for the notes that were updated in the sync response and uses

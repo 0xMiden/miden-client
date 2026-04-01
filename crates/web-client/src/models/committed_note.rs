@@ -2,9 +2,11 @@ use miden_client::rpc::domain::note::CommittedNote as NativeCommittedNote;
 use wasm_bindgen::prelude::*;
 
 use super::note_id::NoteId;
+use super::note_inclusion_proof::NoteInclusionProof;
+use super::note_metadata::NoteMetadata;
 use super::note_type::NoteType;
 
-/// Represents a note committed on chain, as returned by `syncNotes`.
+/// Represents a note committed on chain.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct CommittedNote(NativeCommittedNote);
@@ -26,6 +28,17 @@ impl CommittedNote {
     /// Returns the note tag.
     pub fn tag(&self) -> u32 {
         self.0.tag().as_u32()
+    }
+
+    /// Returns the note metadata, if available.
+    pub fn metadata(&self) -> Option<NoteMetadata> {
+        self.0.metadata().map(|m| m.into())
+    }
+
+    /// Returns the inclusion proof for this note.
+    #[wasm_bindgen(js_name = "inclusionProof")]
+    pub fn inclusion_proof(&self) -> NoteInclusionProof {
+        self.0.inclusion_proof().into()
     }
 }
 

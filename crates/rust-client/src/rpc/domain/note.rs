@@ -229,8 +229,8 @@ impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
 ///
 /// The sync response provides a `NoteMetadataHeader` (sender, type, tag, attachment kind/scheme)
 /// but not the actual attachment data. For notes without attachments, full [`NoteMetadata`] can be
-/// constructed directly. For notes with attachments, metadata is `None` and must be fetched via
-/// `GetNotesById`.
+/// constructed directly from the header. For notes with attachments, the full metadata is fetched
+/// via `GetNotesById`.
 #[derive(Debug, Clone)]
 pub struct CommittedNote {
     /// Note ID of the committed note.
@@ -239,8 +239,9 @@ pub struct CommittedNote {
     note_type: NoteType,
     /// The note tag used for filtering.
     tag: NoteTag,
-    /// Full note metadata. Present when the note has no attachment; `None` when the note
-    /// has an attachment (the attachment data must be fetched separately).
+    /// Full note metadata. Initially `None` for notes with attachments (since the sync
+    /// response only provides a header), but filled in via [`Self::set_metadata`] after
+    /// fetching the full data from the node.
     metadata: Option<NoteMetadata>,
     /// Inclusion proof for the note in the block.
     inclusion_proof: NoteInclusionProof,
@@ -275,15 +276,16 @@ impl CommittedNote {
         self.tag
     }
 
-    /// Returns the full note metadata if available. `None` for notes with attachments
-    /// whose data hasn't been fetched yet.
+    /// Returns the full note metadata, or `None` if the note has an attachment whose
+    /// metadata has not yet been resolved via [`Self::set_metadata`].
     pub fn metadata(&self) -> Option<&NoteMetadata> {
         self.metadata.as_ref()
     }
 
-    /// Returns `true` if the note has an attachment that requires fetching via `GetNotesById`.
-    pub fn needs_metadata_fetch(&self) -> bool {
-        self.metadata.is_none()
+    /// Sets the metadata for this note, typically after fetching it via `GetNotesById`
+    /// for notes whose sync response only included a `NoteMetadataHeader`.
+    pub fn set_metadata(&mut self, metadata: NoteMetadata) {
+        self.metadata = Some(metadata);
     }
 
     pub fn inclusion_proof(&self) -> &NoteInclusionProof {
