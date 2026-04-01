@@ -160,7 +160,8 @@ where
     /// This automatically configures:
     /// - **RPC**: [`Endpoint::testnet()`]
     /// - **Prover**: Remote prover at [`TESTNET_PROVER_ENDPOINT`]
-    /// - **Note transport**: [`NOTE_TRANSPORT_TESTNET_ENDPOINT`](crate::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT)
+    /// - **Note transport**:
+    ///   [`NOTE_TRANSPORT_TESTNET_ENDPOINT`](crate::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT)
     ///
     /// You still need to provide:
     /// - A store (via `.store()`)
@@ -200,7 +201,8 @@ where
     /// This automatically configures:
     /// - **RPC**: [`Endpoint::devnet()`]
     /// - **Prover**: Remote prover at [`DEVNET_PROVER_ENDPOINT`]
-    /// - **Note transport**: [`NOTE_TRANSPORT_DEVNET_ENDPOINT`](crate::note_transport::NOTE_TRANSPORT_DEVNET_ENDPOINT)
+    /// - **Note transport**:
+    ///   [`NOTE_TRANSPORT_DEVNET_ENDPOINT`](crate::note_transport::NOTE_TRANSPORT_DEVNET_ENDPOINT)
     ///
     /// You still need to provide:
     /// - A store (via `.store()`)
