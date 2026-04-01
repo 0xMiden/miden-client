@@ -60,7 +60,7 @@ impl WebClient {
             return Err(from_str_err("Non-fungible faucets are not supported yet"));
         }
 
-        let keystore = self.keystore().await?;
+        let keystore = self.get_keystore().await?;
 
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
@@ -144,7 +144,7 @@ impl WebClient {
         init_seed: Option<Vec<u8>>,
     ) -> Result<Account, JsErr> {
         self.maybe_sync_before_account_creation().await;
-        let keystore = self.keystore().await?;
+        let keystore = self.get_keystore().await?;
 
         let (new_account, key_pair) =
             generate_wallet(storage_mode, mutable, init_seed, auth_scheme).await?;
@@ -203,7 +203,7 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to insert new account"))?;
         }
 
-        let keystore = self.keystore().await?;
+        let keystore = self.get_keystore().await?;
         let native_secret_key: AuthSecretKey = secret_key.into();
 
         keystore
@@ -220,7 +220,7 @@ impl WebClient {
         account_id: &AccountId,
         secret_key: &WebAuthSecretKey,
     ) -> Result<(), JsErr> {
-        let keystore = self.keystore().await?;
+        let keystore = self.get_keystore().await?;
         let native_secret_key: AuthSecretKey = secret_key.into();
         let native_account_id = account_id.into();
 

@@ -120,11 +120,10 @@ test.describe("account public commitments", () => {
       const sk1 = sdk.AuthSecretKey.ecdsaWithRNG(null);
       const sk2 = sdk.AuthSecretKey.rpoFalconWithRNG(null);
 
-      await client.addAccountSecretKeyToWebStore(accountId, sk1);
-      await client.addAccountSecretKeyToWebStore(accountId, sk2);
+      await client.keystore.insert(accountId, sk1);
+      await client.keystore.insert(accountId, sk2);
 
-      const commitments =
-        await client.getPublicKeyCommitmentsOfAccount(accountId);
+      const commitments = await client.keystore.getCommitments(accountId);
 
       return { commitmentsLength: commitments.length };
     });
@@ -143,12 +142,11 @@ test.describe("account public commitments", () => {
       const sk2 = sdk.AuthSecretKey.rpoFalconWithRNG(null);
       const sk3 = sdk.AuthSecretKey.rpoFalconWithRNG(null);
 
-      await client.addAccountSecretKeyToWebStore(accountId, sk1);
-      await client.addAccountSecretKeyToWebStore(accountId, sk2);
-      await client.addAccountSecretKeyToWebStore(accountId, sk3);
+      await client.keystore.insert(accountId, sk1);
+      await client.keystore.insert(accountId, sk2);
+      await client.keystore.insert(accountId, sk3);
 
-      const commitments =
-        await client.getPublicKeyCommitmentsOfAccount(accountId);
+      const commitments = await client.keystore.getCommitments(accountId);
 
       let sk1Retrieved = false;
       let sk2Retrieved = false;
@@ -158,8 +156,7 @@ test.describe("account public commitments", () => {
       const signingInputs = sdk.SigningInputs.newBlind(message);
 
       for (const commitment of commitments) {
-        const retrievedSk =
-          await client.getAccountAuthByPubKeyCommitment(commitment);
+        const retrievedSk = await client.keystore.get(commitment);
         const signature = retrievedSk.signData(signingInputs);
 
         sk1Retrieved =
@@ -183,8 +180,7 @@ test.describe("account public commitments", () => {
       );
       let commitmentsLength;
       try {
-        const commitments =
-          await client.getPublicKeyCommitmentsOfAccount(accountId);
+        const commitments = await client.keystore.getCommitments(accountId);
         commitmentsLength = commitments.length;
       } catch (e) {
         // On napi (SQLite), querying commitments for an account not in the store
@@ -207,9 +203,7 @@ test.describe("account public commitments", () => {
         true,
         sdk.AuthScheme.AuthRpoFalcon512
       );
-      const commitments = await client.getPublicKeyCommitmentsOfAccount(
-        account.id()
-      );
+      const commitments = await client.keystore.getCommitments(account.id());
       return { commitmentsLength: commitments.length };
     });
     expect(result.commitmentsLength).toBe(1);
@@ -226,11 +220,11 @@ test.describe("account public commitments", () => {
       const sk1 = sdk.AuthSecretKey.ecdsaWithRNG(null);
       const sk2 = sdk.AuthSecretKey.rpoFalconWithRNG(null);
 
-      await client.addAccountSecretKeyToWebStore(accountId1, sk1);
-      await client.addAccountSecretKeyToWebStore(accountId1, sk2);
+      await client.keystore.insert(accountId1, sk1);
+      await client.keystore.insert(accountId1, sk2);
 
       const account1Commitments =
-        await client.getPublicKeyCommitmentsOfAccount(accountId1);
+        await client.keystore.getCommitments(accountId1);
 
       const accountId2 = sdk.AccountId.fromHex(
         "0x79817bcc6fb9f99027c2245f6979ef"
@@ -238,10 +232,10 @@ test.describe("account public commitments", () => {
 
       const sk3 = sdk.AuthSecretKey.rpoFalconWithRNG(null);
 
-      await client.addAccountSecretKeyToWebStore(accountId2, sk3);
+      await client.keystore.insert(accountId2, sk3);
 
       const account2Commitments =
-        await client.getPublicKeyCommitmentsOfAccount(accountId2);
+        await client.keystore.getCommitments(accountId2);
 
       return {
         account1CommitmentsLength: account1Commitments.length,
@@ -265,13 +259,12 @@ test.describe("getAccountByKeyCommitment tests", () => {
         sdk.AuthScheme.AuthRpoFalcon512
       );
 
-      const commitments = await client.getPublicKeyCommitmentsOfAccount(
-        wallet.id()
-      );
+      const commitments = await client.keystore.getCommitments(wallet.id());
 
-      const foundAccount = await client.getAccountByKeyCommitment(
-        commitments[0]
-      );
+      const foundAccountId = await client.keystore.getAccountId(commitments[0]);
+      const foundAccount = foundAccountId
+        ? await client.getAccount(foundAccountId)
+        : undefined;
 
       return {
         foundAccountDefined: foundAccount !== undefined,
@@ -288,8 +281,11 @@ test.describe("getAccountByKeyCommitment tests", () => {
       const randomSecretKey = sdk.AuthSecretKey.rpoFalconWithRNG(null);
       const randomCommitment = randomSecretKey.publicKey().toCommitment();
 
-      const foundAccount =
-        await client.getAccountByKeyCommitment(randomCommitment);
+      const foundAccountId =
+        await client.keystore.getAccountId(randomCommitment);
+      const foundAccount = foundAccountId
+        ? await client.getAccount(foundAccountId)
+        : undefined;
 
       return { isUndefined: foundAccount === undefined };
     });
@@ -309,13 +305,14 @@ test.describe("getAccountByKeyCommitment tests", () => {
         sdk.AuthScheme.AuthRpoFalcon512
       );
 
-      const commitments2 = await client.getPublicKeyCommitmentsOfAccount(
-        wallet2.id()
-      );
+      const commitments2 = await client.keystore.getCommitments(wallet2.id());
 
-      const foundAccount = await client.getAccountByKeyCommitment(
+      const foundAccountId = await client.keystore.getAccountId(
         commitments2[0]
       );
+      const foundAccount = foundAccountId
+        ? await client.getAccount(foundAccountId)
+        : undefined;
 
       return {
         foundAccountId: foundAccount.id().toString(),
@@ -336,16 +333,16 @@ test.describe("getAccountByKeyCommitment tests", () => {
       );
 
       const additionalSecretKey = sdk.AuthSecretKey.ecdsaWithRNG(null);
-      await client.addAccountSecretKeyToWebStore(
-        wallet.id(),
-        additionalSecretKey
-      );
+      await client.keystore.insert(wallet.id(), additionalSecretKey);
 
       const additionalCommitment = additionalSecretKey
         .publicKey()
         .toCommitment();
-      const foundAccount =
-        await client.getAccountByKeyCommitment(additionalCommitment);
+      const foundAccountId =
+        await client.keystore.getAccountId(additionalCommitment);
+      const foundAccount = foundAccountId
+        ? await client.getAccount(foundAccountId)
+        : undefined;
 
       return {
         foundAccountDefined: foundAccount !== undefined,
@@ -368,13 +365,12 @@ test.describe("getAccountByKeyCommitment tests", () => {
         sdk.AuthScheme.AuthRpoFalcon512
       );
 
-      const commitments = await client.getPublicKeyCommitmentsOfAccount(
-        faucet.id()
-      );
+      const commitments = await client.keystore.getCommitments(faucet.id());
 
-      const foundAccount = await client.getAccountByKeyCommitment(
-        commitments[0]
-      );
+      const foundAccountId = await client.keystore.getAccountId(commitments[0]);
+      const foundAccount = foundAccountId
+        ? await client.getAccount(foundAccountId)
+        : undefined;
 
       return {
         foundAccountId: foundAccount.id().toString(),

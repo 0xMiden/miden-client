@@ -121,7 +121,7 @@ impl WebClient {
         &self,
         pub_key_commitment: &Word,
     ) -> Result<AuthSecretKey, JsErr> {
-        let keystore = self.keystore().await?;
+        let keystore = self.get_keystore().await?;
 
         let auth_secret_key = keystore
             .get_key((*pub_key_commitment.as_native()).into())
@@ -141,7 +141,7 @@ impl WebClient {
         &self,
         account_id: &AccountId,
     ) -> Result<Vec<Word>, JsErr> {
-        let keystore = self.keystore().await?;
+        let keystore = self.get_keystore().await?;
         Ok(keystore
             .get_account_key_commitments(account_id.as_native())
             .await
@@ -197,7 +197,7 @@ impl WebClient {
         &self,
         pub_key_commitment: &Word,
     ) -> Result<Option<Account>, JsErr> {
-        let keystore = self.keystore().await?;
+        let keystore = self.get_keystore().await?;
 
         let account_id = keystore
             .get_account_id_by_key_commitment((*pub_key_commitment.as_native()).into())

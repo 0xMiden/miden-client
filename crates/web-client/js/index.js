@@ -68,7 +68,6 @@ const SYNC_METHODS = new Set([
 ]);
 
 const WRITE_METHODS = new Set([
-  "addAccountSecretKeyToWebStore",
   "addTag",
   "executeForSummary",
   "fetchAllPrivateNotes",
@@ -94,8 +93,6 @@ const READ_METHODS = new Set([
   "exportNoteFile",
   "exportStore",
   "getAccount",
-  "getAccountAuthByPubKeyCommitment",
-  "getAccountByKeyCommitment",
   "getAccountCode",
   "getAccountStorage",
   "getAccountVault",
@@ -105,7 +102,6 @@ const READ_METHODS = new Set([
   "getInputNotes",
   "getOutputNote",
   "getOutputNotes",
-  "getPublicKeyCommitmentsOfAccount",
   "getSetting",
   "getSyncHeight",
   "getTransactions",
@@ -603,16 +599,6 @@ class WebClient {
     return this._serializeWasmCall(async () => {
       const wasmWebClient = await this.getWasmWebClient();
       return await wasmWebClient.newAccountWithSecretKey(account, secretKey);
-    });
-  }
-
-  async addAccountSecretKeyToWebStore(accountId, secretKey) {
-    return this._serializeWasmCall(async () => {
-      const wasmWebClient = await this.getWasmWebClient();
-      return await wasmWebClient.addAccountSecretKeyToWebStore(
-        accountId,
-        secretKey
-      );
     });
   }
 

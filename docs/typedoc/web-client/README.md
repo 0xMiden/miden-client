@@ -56,6 +56,7 @@
 - [FaucetCreateOptions](interfaces/FaucetCreateOptions.md)
 - [FetchPrivateNotesOptions](interfaces/FetchPrivateNotesOptions.md)
 - [InsertAccountOptions](interfaces/InsertAccountOptions.md)
+- [KeystoreResource](interfaces/KeystoreResource.md)
 - [MintOptions](interfaces/MintOptions.md)
 - [MockOptions](interfaces/MockOptions.md)
 - [NoteOptions](interfaces/NoteOptions.md)

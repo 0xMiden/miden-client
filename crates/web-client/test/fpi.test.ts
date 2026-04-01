@@ -70,10 +70,7 @@ test.describe("fpi test", () => {
 
       let foreignAccountId = getItemAccountBuilderResult.account.id();
 
-      await intClient.addAccountSecretKeyToWebStore(
-        foreignAccountId,
-        secretKey
-      );
+      await intClient.keystore.insert(foreignAccountId, secretKey);
       await intClient.newAccount(getItemAccountBuilderResult.account, false);
       await intClient.syncState();
 

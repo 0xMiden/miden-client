@@ -77,6 +77,13 @@ impl<T> AsyncCell<T> {
     pub async fn lock(&self) -> std::cell::RefMut<'_, T> {
         self.0.borrow_mut()
     }
+
+    /// Synchronous shared borrow (browser-only, single-threaded).
+    ///
+    /// Used by `#[wasm_bindgen(getter)]` methods that cannot be async.
+    pub fn borrow(&self) -> std::cell::Ref<'_, T> {
+        self.0.borrow()
+    }
 }
 
 #[cfg(feature = "nodejs")]

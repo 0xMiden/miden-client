@@ -67,6 +67,8 @@ pub mod transactions;
 pub mod utils;
 
 #[cfg(feature = "browser")]
+pub mod keystore_api;
+#[cfg(feature = "browser")]
 mod web_keystore;
 #[cfg(feature = "browser")]
 mod web_keystore_callbacks;
@@ -189,7 +191,7 @@ impl WebClient {
         self.inner.lock().await
     }
 
-    pub(crate) async fn keystore(&self) -> Result<Arc<ClientAuth>, JsErr> {
+    pub(crate) async fn get_keystore(&self) -> Result<Arc<ClientAuth>, JsErr> {
         let guard = self.inner.lock().await;
         guard
             .as_ref()
@@ -203,6 +205,20 @@ impl WebClient {
 #[cfg(feature = "browser")]
 #[wasm_bindgen]
 impl WebClient {
+    /// Returns a `WebKeystoreApi` handle for managing secret keys.
+    ///
+    /// The returned object can be used from JavaScript as `client.keystore`.
+    #[wasm_bindgen(getter)]
+    pub fn keystore(&self) -> Result<keystore_api::WebKeystoreApi, JsValue> {
+        let guard = self.inner.borrow();
+        let ks = guard
+            .as_ref()
+            .and_then(|c| c.authenticator())
+            .cloned()
+            .ok_or_else(|| JsValue::from_str("Client not initialized"))?;
+        Ok(keystore_api::WebKeystoreApi::new(ks))
+    }
+
     /// Creates a new `WebClient` instance with the specified configuration.
     ///
     /// # Arguments

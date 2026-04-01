@@ -834,6 +834,19 @@ export interface SettingsResource {
   listKeys(): Promise<string[]>;
 }
 
+export interface KeystoreResource {
+  /** Inserts a secret key into the keystore, associating it with the given account ID. */
+  insert(accountId: AccountId, secretKey: AuthSecretKey): Promise<void>;
+  /** Retrieves a secret key by its public key commitment. Returns null if not found. */
+  get(pubKeyCommitment: Word): Promise<AuthSecretKey | null>;
+  /** Removes a key from the keystore by its public key commitment. */
+  remove(pubKeyCommitment: Word): Promise<void>;
+  /** Returns all public key commitments associated with the given account ID. */
+  getCommitments(accountId: AccountId): Promise<Word[]>;
+  /** Returns the account ID associated with a public key commitment, or null if not found. */
+  getAccountId(pubKeyCommitment: Word): Promise<AccountId | null>;
+}
+
 // ════════════════════════════════════════════════════════════════
 // MidenClient
 // ════════════════════════════════════════════════════════════════
@@ -852,6 +865,7 @@ export declare class MidenClient {
   readonly tags: TagsResource;
   readonly settings: SettingsResource;
   readonly compile: CompilerResource;
+  readonly keystore: KeystoreResource;
 
   /** Syncs the client state with the Miden node. */
   sync(options?: { timeout?: number }): Promise<SyncSummary>;

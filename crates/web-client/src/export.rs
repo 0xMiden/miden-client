@@ -46,7 +46,7 @@ impl WebClient {
 
     #[js_export(js_name = "exportAccountFile")]
     pub async fn export_account_file(&self, account_id: AccountId) -> Result<AccountFile, JsErr> {
-        let keystore = self.keystore().await?;
+        let keystore = self.get_keystore().await?;
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
         let account = client

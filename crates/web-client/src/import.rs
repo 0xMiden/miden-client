@@ -19,7 +19,7 @@ use crate::{WebClient, js_error_with_context};
 impl WebClient {
     #[js_export(js_name = "importAccountFile")]
     pub async fn import_account_file(&self, account_file: AccountFile) -> Result<String, JsErr> {
-        let keystore = self.keystore().await?;
+        let keystore = self.get_keystore().await?;
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
         let account_data: NativeAccountFile = account_file.into();
@@ -49,7 +49,7 @@ impl WebClient {
         mutable: bool,
         auth_scheme: AuthScheme,
     ) -> Result<Account, JsErr> {
-        let keystore = self.keystore().await?;
+        let keystore = self.get_keystore().await?;
 
         let (generated_acct, key_pair) =
             generate_wallet(&AccountStorageMode::public(), mutable, Some(init_seed), auth_scheme)
