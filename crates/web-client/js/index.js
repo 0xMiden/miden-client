@@ -16,11 +16,16 @@ import {
 export * from "../Cargo.toml";
 
 export const AccountType = Object.freeze({
-  MutableWallet: "MutableWallet",
-  ImmutableWallet: "ImmutableWallet",
-  FungibleFaucet: "FungibleFaucet",
-  ImmutableContract: "ImmutableContract",
-  MutableContract: "MutableContract",
+  // WASM-compatible numeric values — usable with AccountBuilder directly
+  FungibleFaucet: 0,
+  NonFungibleFaucet: 1,
+  RegularAccountImmutableCode: 2,
+  RegularAccountUpdatableCode: 3,
+  // SDK-friendly aliases (same numeric values as their WASM equivalents)
+  MutableWallet: 3,
+  ImmutableWallet: 2,
+  ImmutableContract: 2,
+  MutableContract: 3,
 });
 
 export const AuthScheme = Object.freeze({
@@ -63,7 +68,6 @@ const SYNC_METHODS = new Set([
 ]);
 
 const WRITE_METHODS = new Set([
-  "addAccountSecretKeyToWebStore",
   "addTag",
   "executeForSummary",
   "fetchAllPrivateNotes",
@@ -91,8 +95,6 @@ const READ_METHODS = new Set([
   "exportNoteFile",
   "exportStore",
   "getAccount",
-  "getAccountAuthByPubKeyCommitment",
-  "getAccountByKeyCommitment",
   "getAccountCode",
   "getAccountStorage",
   "getAccountVault",
@@ -102,13 +104,13 @@ const READ_METHODS = new Set([
   "getInputNotes",
   "getOutputNote",
   "getOutputNotes",
-  "getPublicKeyCommitmentsOfAccount",
   "getSetting",
   "getSyncHeight",
   "getTransactions",
   "executeProgram",
   "listSettingKeys",
   "listTags",
+  "executeProgram",
 ]);
 
 // Suppress unused-variable warnings — these sets exist solely for the CI lint check.
@@ -600,16 +602,6 @@ class WebClient {
     return this._serializeWasmCall(async () => {
       const wasmWebClient = await this.getWasmWebClient();
       return await wasmWebClient.newAccountWithSecretKey(account, secretKey);
-    });
-  }
-
-  async addAccountSecretKeyToWebStore(accountId, secretKey) {
-    return this._serializeWasmCall(async () => {
-      const wasmWebClient = await this.getWasmWebClient();
-      return await wasmWebClient.addAccountSecretKeyToWebStore(
-        accountId,
-        secretKey
-      );
     });
   }
 

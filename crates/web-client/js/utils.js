@@ -124,22 +124,29 @@ export function resolveAuthScheme(scheme, wasm) {
 }
 
 /**
- * Resolves a simplified AccountType string to a boolean `mutable` flag
+ * Resolves an AccountType value to a boolean `mutable` flag
  * for the underlying WASM `newWallet()` / `importPublicAccountFromSeed()` calls.
  *
- * @param {string | undefined} accountType - "MutableWallet", "ImmutableWallet", or undefined.
- *   Defaults to mutable wallet when undefined.
+ * Accepts the numeric WASM enum values (2 = immutable, 3 = mutable) or the
+ * legacy string aliases ("MutableWallet", "ImmutableWallet"). Defaults to
+ * mutable when undefined.
+ *
+ * @param {number | string | undefined} accountType
  * @returns {boolean} Whether the account code is mutable.
  */
 export function resolveAccountMutability(accountType) {
-  if (accountType == null || accountType === "MutableWallet") {
+  if (
+    accountType == null ||
+    accountType === "MutableWallet" ||
+    accountType === 3
+  ) {
     return true;
   }
-  if (accountType === "ImmutableWallet") {
+  if (accountType === "ImmutableWallet" || accountType === 2) {
     return false;
   }
   throw new Error(
-    `Unknown wallet account type: "${accountType}". Expected "MutableWallet" or "ImmutableWallet".`
+    `Unknown wallet account type: "${accountType}". Expected AccountType.MutableWallet (3) or AccountType.ImmutableWallet (2).`
   );
 }
 
