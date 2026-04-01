@@ -37,9 +37,7 @@ use miden_client::store::{
     AccountStatus,
     AccountStorageFilter,
     StoreError,
-    TransactionFilter,
 };
-use miden_client::transaction::TransactionStatus;
 use miden_client::utils::Serializable;
 use miden_client::{AccountError, Word};
 
@@ -672,56 +670,21 @@ impl IdxdbStore {
         })
     }
 
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss
+    )]
     pub(crate) async fn prune_account_history(
         &self,
         account_id: AccountId,
+        up_to_nonce: u64,
     ) -> Result<usize, StoreError> {
-        let pending_json = self.get_pending_commitments_json(Some(account_id)).await?;
-        let account_id_str = Some(account_id.to_string());
-        let promise = idxdb_prune_account_history(self.db_id(), account_id_str, pending_json);
+        let account_id_str = account_id.to_string();
+        // Nonce values fit in f64 without precision loss (< 2^53)
+        let promise = idxdb_prune_account_history(self.db_id(), account_id_str, up_to_nonce as f64);
+        // Deleted count from JS is a non-negative integer that fits in usize
         let deleted: f64 = await_js(promise, "failed to prune account history").await?;
         Ok(deleted as usize)
-    }
-
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    pub(crate) async fn prune_all_accounts_history(&self) -> Result<usize, StoreError> {
-        let pending_json = self.get_pending_commitments_json(None).await?;
-        let promise = idxdb_prune_account_history(self.db_id(), None, pending_json);
-        let deleted: f64 = await_js(promise, "failed to prune all account history").await?;
-        Ok(deleted as usize)
-    }
-
-    /// Returns a JSON-encoded `Record<accountId, commitment[]>` of `final_account_state`
-    /// commitments from pending transactions. When `target_account` is `Some`, only that
-    /// account is included.
-    async fn get_pending_commitments_json(
-        &self,
-        target_account: Option<AccountId>,
-    ) -> Result<String, StoreError> {
-        let uncommitted_txs = self.get_transactions(TransactionFilter::Uncommitted).await?;
-
-        let mut map: BTreeMap<String, Vec<String>> = BTreeMap::new();
-
-        for tx in &uncommitted_txs {
-            if !matches!(tx.status, TransactionStatus::Pending) {
-                continue;
-            }
-
-            let tx_account_id = tx.details.account_id;
-            if let Some(target) = target_account
-                && tx_account_id != target
-            {
-                continue;
-            }
-
-            map.entry(tx_account_id.to_string())
-                .or_default()
-                .push(tx.details.final_account_state.to_hex());
-        }
-
-        serde_json::to_string(&map).map_err(|e| {
-            StoreError::DatabaseError(format!("failed to serialize pending commitments: {e}"))
-        })
     }
 }

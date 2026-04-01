@@ -154,29 +154,26 @@ impl WebClient {
         }
     }
 
+    /// Prunes historical account states for the specified account up to the given nonce.
+    ///
+    /// Deletes all historical entries with `replaced_at_nonce <= up_to_nonce` and any
+    /// orphaned account code.
+    ///
+    /// Returns the total number of rows deleted, including historical entries and orphaned
+    /// account code.
     #[wasm_bindgen(js_name = "pruneAccountHistory")]
-    #[allow(clippy::cast_possible_truncation)]
-    pub async fn prune_account_history(&mut self, account_id: &AccountId) -> Result<u32, JsValue> {
+    pub async fn prune_account_history(
+        &mut self,
+        account_id: &AccountId,
+        up_to_nonce: u32,
+    ) -> Result<u32, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let deleted = client
-                .prune_account_history(account_id.into())
+                .prune_account_history(account_id.into(), u64::from(up_to_nonce))
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to prune account history"))?;
-            Ok(deleted as u32)
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
-    }
-
-    #[wasm_bindgen(js_name = "pruneAllAccountHistory")]
-    #[allow(clippy::cast_possible_truncation)]
-    pub async fn prune_all_accounts_history(&mut self) -> Result<u32, JsValue> {
-        if let Some(client) = self.get_mut_inner() {
-            let deleted = client
-                .prune_all_accounts_history()
-                .await
-                .map_err(|err| js_error_with_context(err, "failed to prune all account history"))?;
-            Ok(deleted as u32)
+            // Safety: on wasm32 usize is 32 bits, so this conversion is infallible
+            Ok(u32::try_from(deleted).expect("deleted count should fit in u32"))
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }

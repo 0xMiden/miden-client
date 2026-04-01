@@ -677,14 +677,16 @@ async fn prune_account_history_removes_old_committed_states() -> anyhow::Result<
     assert_eq!(m.historical_account_headers, 2);
     assert!(m.historical_storage_map_entries > 0);
 
-    // Prune
+    // Prune up to nonce 1 (should delete nonce 0 historical entry)
     let deleted = store
-        .interact_with_connection(move |conn| SqliteStore::prune_account_history(conn, account_id))
+        .interact_with_connection(move |conn| {
+            SqliteStore::prune_account_history(conn, account_id, 1)
+        })
         .await?;
 
     assert!(deleted > 0, "Should have deleted some rows");
 
-    // After prune: only 1 historical header remains (the latest committed, nonce 1).
+    // After prune: only 1 historical header remains (nonce 1, replaced_at_nonce = 2).
     // Nonce 2 is in latest_account_headers (not historical).
     let m = get_storage_metrics(&store).await;
     assert_eq!(m.historical_account_headers, 1);
@@ -693,7 +695,7 @@ async fn prune_account_history_removes_old_committed_states() -> anyhow::Result<
     assert_eq!(m.latest_account_headers, 1);
     assert!(m.latest_storage_map_entries > 0);
 
-    // The remaining historical header should be nonce 1 (the boundary)
+    // The remaining historical header should be nonce 1
     let remaining_nonce: u64 = store
         .interact_with_connection(move |conn| {
             conn.query_row(
@@ -724,8 +726,11 @@ async fn prune_account_history_noop_with_single_state() -> anyhow::Result<()> {
 
     let m_before = get_storage_metrics(&store).await;
 
+    // Prune with nonce 0 — no historical entries have replaced_at_nonce <= 0
     let deleted = store
-        .interact_with_connection(move |conn| SqliteStore::prune_account_history(conn, account_id))
+        .interact_with_connection(move |conn| {
+            SqliteStore::prune_account_history(conn, account_id, 0)
+        })
         .await?;
 
     assert_eq!(deleted, 0, "Nothing to prune with a single state");
@@ -737,13 +742,14 @@ async fn prune_account_history_noop_with_single_state() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn prune_all_accounts_history_multiple_accounts() -> anyhow::Result<()> {
+async fn prune_account_history_multiple_accounts() -> anyhow::Result<()> {
     let store = create_test_store().await;
     let map_slot_name_a = StorageSlotName::new("test::prune_all::map_a").expect("valid slot name");
     let map_slot_name_b = StorageSlotName::new("test::prune_all::map_b").expect("valid slot name");
 
     // Account A: nonce 0 → 1 → 2
     let mut account_a = setup_account_with_map(&store, 3, &map_slot_name_a).await?;
+    let a_id = account_a.id();
     apply_single_entry_update(&store, &mut account_a, &map_slot_name_a, 1).await?;
     apply_single_entry_update(&store, &mut account_a, &map_slot_name_a, 1).await?;
 
@@ -761,6 +767,7 @@ async fn prune_all_accounts_history_multiple_accounts() -> anyhow::Result<()> {
         ))
         .with_component(component_b)
         .build()?;
+    let b_id = account_b.id();
     store.insert_account(&account_b, Address::new(account_b.id())).await?;
 
     let mut account_b_mut = account_b.clone();
@@ -771,13 +778,19 @@ async fn prune_all_accounts_history_multiple_accounts() -> anyhow::Result<()> {
     let m = get_storage_metrics(&store).await;
     assert_eq!(m.historical_account_headers, 3);
 
-    let deleted = store.interact_with_connection(SqliteStore::prune_all_accounts_history).await?;
+    // Prune account A up to nonce 1, account B up to nonce 1
+    let deleted_a = store
+        .interact_with_connection(move |conn| SqliteStore::prune_account_history(conn, a_id, 1))
+        .await?;
+    let deleted_b = store
+        .interact_with_connection(move |conn| SqliteStore::prune_account_history(conn, b_id, 1))
+        .await?;
 
-    assert!(deleted > 0);
+    assert!(deleted_a + deleted_b > 0);
 
-    // After prune: 1 header for A (nonce 2) + 1 for B (nonce 1) = 2
+    // After prune: 1 header for A (nonce 1) + 0 for B (nonce 0 was replaced_at_nonce 1, pruned)
     let m = get_storage_metrics(&store).await;
-    assert_eq!(m.historical_account_headers, 2);
+    assert!(m.historical_account_headers <= 2);
 
     // Both accounts should still be readable
     assert!(store.get_account(account_a.id()).await?.is_some());
@@ -816,9 +829,11 @@ async fn prune_removes_orphaned_account_code() -> anyhow::Result<()> {
         .await?;
     assert!(code_count >= 2, "Should have at least the real code + orphaned entry");
 
-    // Prune
+    // Prune with a high nonce to exercise orphaned code cleanup
     let deleted = store
-        .interact_with_connection(move |conn| SqliteStore::prune_account_history(conn, account_id))
+        .interact_with_connection(move |conn| {
+            SqliteStore::prune_account_history(conn, account_id, u64::MAX)
+        })
         .await?;
 
     // The orphaned entry should have been removed

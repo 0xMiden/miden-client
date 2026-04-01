@@ -11,7 +11,7 @@ test.describe("prune_account_history tests", () => {
     await mintTransaction(page, accountId, faucetId);
     await mintTransaction(page, accountId, faucetId);
 
-    // Prune faucet history and verify the account is still intact
+    // Prune faucet history up to nonce 1 and verify the account is still intact
     const result = await page.evaluate(async (_faucetId: string) => {
       const client = window.client;
       const faucetAccountId = window.AccountId.fromHex(_faucetId);
@@ -20,8 +20,8 @@ test.describe("prune_account_history tests", () => {
       const accountBefore = await client.getAccount(faucetAccountId);
       const commitmentBefore = accountBefore!.to_commitment().toHex();
 
-      // Prune
-      const deleted = await client.pruneAccountHistory(faucetAccountId);
+      // Prune up to nonce 1
+      const deleted = await client.pruneAccountHistory(faucetAccountId, 1);
 
       // Verify account is still fully readable after pruning
       const accountAfter = await client.getAccount(faucetAccountId);
@@ -42,9 +42,7 @@ test.describe("prune_account_history tests", () => {
     expect(Number(result.nonce)).toBeGreaterThanOrEqual(2);
   });
 
-  test("prune is a no-op for accounts with a single state", async ({
-    page,
-  }) => {
+  test("prune is a no-op when nonce is 0", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = window.client;
 
@@ -55,7 +53,8 @@ test.describe("prune_account_history tests", () => {
         window.AuthScheme.AuthRpoFalcon512
       );
 
-      const deleted = await client.pruneAccountHistory(wallet.id());
+      // Prune with nonce 0 — nothing should be deleted
+      const deleted = await client.pruneAccountHistory(wallet.id(), 0);
       const accountAfter = await client.getAccount(wallet.id());
 
       return {
@@ -68,47 +67,6 @@ test.describe("prune_account_history tests", () => {
     expect(result.accountExists).toBe(true);
   });
 
-  test("prunes all account history across multiple accounts", async ({
-    page,
-  }) => {
-    const { accountId, faucetId } = await setupWalletAndFaucet(page);
-
-    // Mint — advances faucet nonce, creating historical entries
-    await mintTransaction(page, accountId, faucetId);
-    await mintTransaction(page, accountId, faucetId);
-
-    const result = await page.evaluate(
-      async ({
-        _accountId,
-        _faucetId,
-      }: {
-        _accountId: string;
-        _faucetId: string;
-      }) => {
-        const client = window.client;
-        const walletId = window.AccountId.fromHex(_accountId);
-        const faucetAccountId = window.AccountId.fromHex(_faucetId);
-
-        const deleted = await client.pruneAllAccountHistory();
-
-        // Both accounts should still be readable
-        const wallet = await client.getAccount(walletId);
-        const faucet = await client.getAccount(faucetAccountId);
-
-        return {
-          deleted,
-          walletExists: wallet !== null && wallet !== undefined,
-          faucetExists: faucet !== null && faucet !== undefined,
-        };
-      },
-      { _accountId: accountId, _faucetId: faucetId }
-    );
-
-    expect(result.deleted).toBeGreaterThan(0);
-    expect(result.walletExists).toBe(true);
-    expect(result.faucetExists).toBe(true);
-  });
-
   test("can send a transaction after pruning account history", async ({
     page,
   }) => {
@@ -119,11 +77,11 @@ test.describe("prune_account_history tests", () => {
     await mintTransaction(page, accountId, faucetId);
     await mintTransaction(page, accountId, faucetId);
 
-    // Prune faucet history
+    // Prune faucet history up to nonce 1
     await page.evaluate(async (_faucetId: string) => {
       const client = window.client;
       const faucetAccountId = window.AccountId.fromHex(_faucetId);
-      await client.pruneAccountHistory(faucetAccountId);
+      await client.pruneAccountHistory(faucetAccountId, 1);
     }, faucetId);
 
     // Mint again — this should succeed if pruning didn't break anything

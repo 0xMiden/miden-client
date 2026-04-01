@@ -260,10 +260,9 @@ pub trait Store: Send + Sync {
     /// block.
     async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError>;
 
-    /// Prunes old committed historical account states for the specified account.
+    /// Prunes historical account states for the specified account up to the given nonce.
     ///
-    /// Keeps the latest committed state and all pending (uncommitted) states needed for
-    /// transaction rollback. Removes all older committed historical entries from the
+    /// Deletes all historical entries with `replaced_at_nonce <= up_to_nonce` from the
     /// historical tables (headers, storage, storage map entries, and assets).
     ///
     /// Also removes orphaned `account_code` entries that are no longer referenced by any
@@ -271,16 +270,11 @@ pub trait Store: Send + Sync {
     ///
     /// Returns the total number of rows deleted, including historical entries and orphaned
     /// account code.
-    async fn prune_account_history(&self, account_id: AccountId) -> Result<usize, StoreError>;
-
-    /// Prunes old committed historical account states for all accounts in the store.
-    ///
-    /// This is equivalent to calling [`prune_account_history`](Store::prune_account_history)
-    /// for every account, but executes in a single transaction for efficiency.
-    ///
-    /// Returns the total number of rows deleted across all accounts, including historical
-    /// entries and orphaned account code.
-    async fn prune_all_accounts_history(&self) -> Result<usize, StoreError>;
+    async fn prune_account_history(
+        &self,
+        account_id: AccountId,
+        up_to_nonce: u64,
+    ) -> Result<usize, StoreError>;
 
     // ACCOUNT
     // --------------------------------------------------------------------------------------------

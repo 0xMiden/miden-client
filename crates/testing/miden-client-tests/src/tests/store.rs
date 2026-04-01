@@ -214,8 +214,8 @@ async fn prune_account_history_after_committed_transactions() {
     // Record faucet state before pruning
     let faucet_before = client.get_account(faucet_id).await.unwrap().unwrap();
 
-    // Prune faucet history — should remove nonce 0 and 1, keep nonce 2
-    let deleted = client.prune_account_history(faucet_id).await.unwrap();
+    // Prune faucet history up to nonce 1 — should remove nonce 0, keep nonce 1 and 2
+    let deleted = client.prune_account_history(faucet_id, 1).await.unwrap();
     assert!(deleted > 0, "Should have pruned old committed states");
 
     // Verify: account is still fully readable and unchanged
@@ -235,50 +235,6 @@ async fn prune_account_history_after_committed_transactions() {
         .find(|(h, _)| h.id() == faucet_id)
         .expect("Faucet should still appear in headers");
     assert_eq!(header.nonce().as_int(), 2, "Latest nonce should be 2");
-}
-
-#[tokio::test]
-async fn prune_all_accounts_history_through_client() {
-    let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
-
-    let wallet = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
-    let faucet = insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
-    let faucet_id = faucet.id();
-
-    mock_rpc_api.prove_block();
-    client.sync_state().await.unwrap();
-
-    // Mint #1 and commit — creates first historical entry for faucet (nonce 0)
-    let fungible_asset = FungibleAsset::new(faucet_id, 100).unwrap();
-    let tx_request = TransactionRequestBuilder::new()
-        .build_mint_fungible_asset(fungible_asset, wallet.id(), NoteType::Public, client.rng())
-        .unwrap();
-    Box::pin(client.submit_new_transaction(faucet_id, tx_request)).await.unwrap();
-
-    mock_rpc_api.prove_block();
-    client.sync_state().await.unwrap();
-
-    // Mint #2 and commit — creates second historical entry for faucet (nonce 1).
-    // Now historical has nonces [0, 1], so nonce 0 can be pruned (below boundary 1).
-    let fungible_asset_2 = FungibleAsset::new(faucet_id, 200).unwrap();
-    let tx_request_2 = TransactionRequestBuilder::new()
-        .build_mint_fungible_asset(fungible_asset_2, wallet.id(), NoteType::Public, client.rng())
-        .unwrap();
-    Box::pin(client.submit_new_transaction(faucet_id, tx_request_2)).await.unwrap();
-
-    mock_rpc_api.prove_block();
-    client.sync_state().await.unwrap();
-
-    let deleted = client.prune_all_accounts_history().await.unwrap();
-    assert!(deleted > 0, "Should have pruned at least one old state");
-
-    // Both accounts still readable
-    assert!(client.get_account(wallet.id()).await.unwrap().is_some());
-    assert!(client.get_account(faucet_id).await.unwrap().is_some());
 }
 
 const SLOT_A_NAME: &str = "test::pruning::slot_a";
@@ -445,8 +401,8 @@ async fn prune_preserves_unmodified_storage_slots() {
     //   replaced_at=2: old B=2
     // Slot C was NEVER modified, so it has no entry in historical tables.
 
-    // Prune old history
-    let deleted = client.prune_account_history(account_id).await.unwrap();
+    // Prune old history up to nonce 1
+    let deleted = client.prune_account_history(account_id, 1).await.unwrap();
     assert!(deleted > 0, "Should have pruned old committed states");
 
     // Verify all slot values are correct after pruning

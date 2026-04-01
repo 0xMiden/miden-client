@@ -1689,8 +1689,8 @@ pub async fn test_prune_account_history(client_config: ClientConfig) -> Result<(
     // Record faucet state before pruning.
     let faucet_before = client.get_account(faucet_id).await?.unwrap();
 
-    // Prune faucet history — should remove old committed states.
-    let deleted = client.prune_account_history(faucet_id).await?;
+    // Prune faucet history up to nonce 1 — should remove old committed states.
+    let deleted = client.prune_account_history(faucet_id, 1).await?;
     assert!(deleted > 0, "Should have pruned old committed states");
 
     // Account should still be fully readable and unchanged.
@@ -1701,17 +1701,11 @@ pub async fn test_prune_account_history(client_config: ClientConfig) -> Result<(
         "Account state should be identical after pruning"
     );
 
-    // Prune all — should be a no-op for already-pruned faucet, but exercises the code path.
-    let deleted_all = client.prune_all_accounts_history().await?;
     // Both accounts should still be readable.
     assert!(client.get_account(wallet_id).await?.is_some());
     assert!(client.get_account(faucet_id).await?.is_some());
 
-    info!(
-        deleted_single = deleted,
-        deleted_all = deleted_all,
-        "Prune account history test completed"
-    );
+    info!(deleted_single = deleted, "Prune account history test completed");
 
     Ok(())
 }

@@ -1,6 +1,6 @@
 //! Account-related database operations.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::string::{String, ToString};
 use std::sync::{Arc, RwLock};
@@ -1043,111 +1043,18 @@ impl SqliteStore {
         Ok(deleted)
     }
 
-    /// Prunes old committed historical states for a single account.
+    /// Prunes historical account states for a single account up to the given nonce.
     pub fn prune_account_history(
         conn: &mut Connection,
         account_id: AccountId,
+        up_to_nonce: u64,
     ) -> Result<usize, StoreError> {
-        let pending = Self::get_pending_commitments(conn)?;
-        let empty = HashSet::new();
-        let commitments = pending.get(&account_id).unwrap_or(&empty);
-        let boundary = Self::get_last_committed_nonce(conn, account_id, commitments)?;
-
         let tx = conn.transaction().into_store_error()?;
-        let mut deleted = 0;
-        if let Some(boundary_nonce) = boundary {
-            deleted += Self::prune_account_history_for(&tx, account_id, boundary_nonce)?;
-        }
-        deleted += Self::prune_orphaned_account_code(&tx)?;
-        tx.commit().into_store_error()?;
-
-        Ok(deleted)
-    }
-
-    /// Prunes old committed historical states for all accounts.
-    pub fn prune_all_accounts_history(conn: &mut Connection) -> Result<usize, StoreError> {
-        let account_ids: Vec<String> = conn
-            .prepare("SELECT id FROM latest_account_headers")
-            .into_store_error()?
-            .query_map([], |row| row.get(0))
-            .into_store_error()?
-            .filter_map(Result::ok)
-            .collect();
-
-        let pending = Self::get_pending_commitments(conn)?;
-
-        let tx = conn.transaction().into_store_error()?;
-        let mut total_deleted: usize = 0;
-
-        for account_id_hex in &account_ids {
-            let account_id = AccountId::from_hex(account_id_hex)
-                .map_err(|e| StoreError::ParsingError(e.to_string()))?;
-            let empty = HashSet::new();
-            let commitments = pending.get(&account_id).unwrap_or(&empty);
-            if let Some(boundary) = Self::get_last_committed_nonce(&tx, account_id, commitments)? {
-                total_deleted += Self::prune_account_history_for(&tx, account_id, boundary)?;
-            }
-        }
-
+        let deleted = Self::prune_account_history_for(&tx, account_id, up_to_nonce)?;
         let orphaned = Self::prune_orphaned_account_code(&tx)?;
         tx.commit().into_store_error()?;
 
-        Ok(total_deleted + orphaned)
-    }
-
-    /// Returns `final_account_state` commitments from pending transactions, grouped by
-    /// account ID.
-    fn get_pending_commitments(
-        conn: &Connection,
-    ) -> Result<HashMap<AccountId, HashSet<String>>, StoreError> {
-        use miden_client::utils::Deserializable;
-
-        let mut stmt = conn
-            .prepare("SELECT details FROM transactions WHERE status_variant = 0")
-            .into_store_error()?;
-
-        let mut result: HashMap<AccountId, HashSet<String>> = HashMap::new();
-
-        for bytes in stmt
-            .query_map([], |row| row.get::<_, Vec<u8>>(0))
-            .into_store_error()?
-            .filter_map(Result::ok)
-        {
-            if let Ok(details) =
-                miden_client::transaction::TransactionDetails::read_from_bytes(&bytes)
-            {
-                result
-                    .entry(details.account_id)
-                    .or_default()
-                    .insert(details.final_account_state.to_hex());
-            }
-        }
-
-        Ok(result)
-    }
-
-    /// Returns the last committed nonce for an account — i.e., the highest historical
-    /// nonce whose commitment does not belong to a pending transaction.
-    fn get_last_committed_nonce(
-        conn: &Connection,
-        account_id: AccountId,
-        pending_commitments: &HashSet<String>,
-    ) -> Result<Option<u64>, StoreError> {
-        let account_id_hex = account_id.to_hex();
-
-        conn.prepare(
-            "SELECT nonce, account_commitment FROM historical_account_headers \
-             WHERE id = ? ORDER BY nonce DESC",
-        )
-        .into_store_error()?
-        .query_map(params![&account_id_hex], |row| {
-            Ok((column_value_as_u64(row, 0)?, row.get::<_, String>(1)?))
-        })
-        .into_store_error()?
-        .filter_map(Result::ok)
-        .find(|(_, commitment)| !pending_commitments.contains(commitment))
-        .map(|(nonce, _)| Ok(nonce))
-        .transpose()
+        Ok(deleted + orphaned)
     }
 
     fn remove_address_internal(tx: &Transaction<'_>, address: &Address) -> Result<(), StoreError> {
