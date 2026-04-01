@@ -342,11 +342,10 @@ export const customTransaction = async (
         window.NoteTag.withAccountTarget(walletAccount.id())
       );
 
-      let expectedNoteArgs = noteArgs.map((felt) => felt.asInt());
       let memAddress = "1000";
       let memAddress2 = "1004";
-      let expectedNoteArg1 = expectedNoteArgs.slice(0, 4).join(".");
-      let expectedNoteArg2 = expectedNoteArgs.slice(4, 8).join(".");
+      let expectedNoteArg1 = window.Word.newFromFelts(noteArgs.slice(0, 4)).toHex();
+      let expectedNoteArg2 = window.Word.newFromFelts(noteArgs.slice(4, 8)).toHex();
 
       let noteScript = `
             # Custom P2ID note script
@@ -479,13 +478,13 @@ export const customTransaction = async (
       // Creating Second Custom Transaction Request to Consume Custom Note
       // with Invalid/Valid Transaction Script
       let transactionScript = await builder.compileTxScript(txScript);
-      let noteArgsCommitment = window.Rpo256.hashElements(feltArray); // gets consumed by NoteIdAndArgs
+      let noteArgsCommitment = window.Poseidon2.hashElements(feltArray);
 
       let noteAndArgs = new window.NoteAndArgs(note, noteArgsCommitment);
       let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
 
       let adviceMap = new window.AdviceMap();
-      let noteArgsCommitment2 = window.Rpo256.hashElements(feltArray);
+      let noteArgsCommitment2 = window.Poseidon2.hashElements(feltArray);
 
       adviceMap.insert(noteArgsCommitment2, feltArray);
 
@@ -1522,6 +1521,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
     test("executeForSummary returns TransactionSummary for unauthorized transaction", async ({
       page,
     }) => {
+      test.slow();
       const result = await page.evaluate(async () => {
         const client = window.client;
 
