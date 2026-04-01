@@ -854,7 +854,7 @@ export const customAccountComponent = async (
         .withComponent(mappingAccountComponent)
         .build();
 
-      await client.addAccountSecretKeyToWebStore(
+      await client.keystore.insert(
         accountBuilderResult.account.id(),
         secretKey
       );
@@ -1380,7 +1380,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       .storageMode(window.AccountStorageMode.public())
       .build();
 
-    await client.addAccountSecretKeyToWebStore(
+    await client.keystore.insert(
       bumpItemAccountBuilderResult.account.id(),
       secretKey
     );
@@ -1563,7 +1563,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
 
         // Register the approver keys with the multisig account
         for (const key of approverKeys) {
-          await client.addAccountSecretKeyToWebStore(multisigAccountId, key);
+          await client.keystore.insert(multisigAccountId, key);
         }
 
         const targetAccount = await client.newWallet(

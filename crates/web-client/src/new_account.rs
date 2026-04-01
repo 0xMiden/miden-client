@@ -14,7 +14,6 @@ use super::models::account_storage_mode::AccountStorageMode;
 use super::models::auth::AuthScheme;
 use super::models::auth_secret_key::AuthSecretKey as WebAuthSecretKey;
 use crate::helpers::generate_wallet;
-use crate::models::account_id::AccountId;
 use crate::{WebClient, js_error_with_context};
 
 impl WebClient {
@@ -45,7 +44,7 @@ impl WebClient {
         init_seed: Option<Vec<u8>>,
     ) -> Result<Account, JsValue> {
         self.maybe_sync_before_account_creation().await;
-        let keystore = self.keystore()?.clone();
+        let keystore = self.inner_keystore()?.clone();
         if let Some(client) = self.get_mut_inner() {
             let (new_account, key_pair) =
                 generate_wallet(storage_mode, mutable, init_seed, auth_scheme).await?;
@@ -81,7 +80,7 @@ impl WebClient {
             return Err(JsValue::from_str("Non-fungible faucets are not supported yet"));
         }
 
-        let keystore = self.keystore()?.clone();
+        let keystore = self.inner_keystore()?.clone();
 
         if let Some(client) = self.get_mut_inner() {
             let mut seed = [0u8; 32];
@@ -193,7 +192,7 @@ impl WebClient {
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to insert new account"))?;
 
-            let keystore = self.keystore()?;
+            let keystore = self.inner_keystore()?;
             let native_secret_key: AuthSecretKey = secret_key.into();
 
             keystore
@@ -205,23 +204,5 @@ impl WebClient {
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }
-    }
-
-    #[wasm_bindgen(js_name = "addAccountSecretKeyToWebStore")]
-    pub async fn add_account_secret_key_to_web_store(
-        &mut self,
-        account_id: &AccountId,
-        secret_key: &WebAuthSecretKey,
-    ) -> Result<(), JsValue> {
-        let keystore = self.keystore()?;
-        let native_secret_key: AuthSecretKey = secret_key.into();
-        let native_account_id = account_id.into();
-
-        keystore
-            .add_key(&native_secret_key, native_account_id)
-            .await
-            .map_err(|err| err.to_string())?;
-
-        Ok(())
     }
 }

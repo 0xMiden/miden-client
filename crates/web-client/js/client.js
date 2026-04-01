@@ -4,6 +4,7 @@ import { NotesResource } from "./resources/notes.js";
 import { TagsResource } from "./resources/tags.js";
 import { SettingsResource } from "./resources/settings.js";
 import { CompilerResource } from "./resources/compiler.js";
+import { KeystoreResource } from "./resources/keystore.js";
 import { hashSeed } from "./utils.js";
 
 /**
@@ -35,6 +36,7 @@ export class MidenClient {
     this.tags = new TagsResource(inner, getWasm, this);
     this.settings = new SettingsResource(inner, getWasm, this);
     this.compile = new CompilerResource(inner, getWasm, this);
+    this.keystore = new KeystoreResource(inner, this);
   }
 
   /**
