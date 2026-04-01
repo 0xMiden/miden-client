@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 
 use async_trait::async_trait;
 use miden_protocol::Word;
-use miden_protocol::account::{Account, AccountHeader, AccountId};
+use miden_protocol::account::{AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrDelta, MmrPeaks, PartialMmr};
 use miden_protocol::note::{NoteId, NoteTag, Nullifier};
@@ -16,6 +16,7 @@ use super::{AccountUpdates, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::NodeRpcClient;
+use crate::rpc::domain::account::FetchedAccount;
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::sync::StateSyncInfo;
 use crate::rpc::domain::transaction::{
@@ -405,11 +406,10 @@ impl StateSync {
     }
 
     /// Compares the state of tracked accounts with the updates received from the node. The method
-    /// updates the `state_sync_update` field with the details of the accounts that need to be
-    /// updated.
+    /// Updates the `account_updates` with the details of the accounts that need to be updated.
     ///
     /// The account updates might include:
-    /// * Public accounts that have been updated in the node.
+    /// * Public accounts that have been updated in the node (full or delta-based).
     /// * Network accounts that have been updated in the node and are being tracked by the client.
     /// * Private accounts that have been marked as mismatched because the current commitment
     ///   doesn't match the one received from the node. The client will need to handle these cases
@@ -423,8 +423,7 @@ impl StateSync {
         let (public_accounts, private_accounts): (Vec<_>, Vec<_>) =
             accounts.iter().partition(|account_header| !account_header.id().is_private());
 
-        let updated_public_accounts = self
-            .get_updated_public_accounts(account_commitment_updates, &public_accounts)
+        self.sync_public_accounts(account_updates, account_commitment_updates, &public_accounts)
             .await?;
 
         let mismatched_private_accounts = account_commitment_updates
@@ -437,35 +436,50 @@ impl StateSync {
             .copied()
             .collect::<Vec<_>>();
 
-        account_updates
-            .extend(AccountUpdates::new(updated_public_accounts, mismatched_private_accounts));
+        account_updates.extend(AccountUpdates::new(Vec::new(), mismatched_private_accounts));
 
         Ok(())
     }
 
-    /// Queries the node for the latest state of the public accounts that don't match the current
-    /// state of the client.
-    async fn get_updated_public_accounts(
+    /// Queries the node for updated public accounts and populates `account_updates`.
+    ///
+    /// For each mismatched public account, calls `get_account_details` (which internally
+    /// handles oversized maps and vaults) and adds the full account to the update list.
+    async fn sync_public_accounts(
         &self,
-        account_updates: &[(AccountId, Word)],
+        account_updates: &mut AccountUpdates,
+        commitment_updates: &[(AccountId, Word)],
         current_public_accounts: &[&AccountHeader],
-    ) -> Result<Vec<Account>, ClientError> {
-        let mut mismatched_public_accounts = vec![];
-
-        for (id, commitment) in account_updates {
-            // check if this updated account state is tracked by the client
-            if let Some(account) = current_public_accounts
+    ) -> Result<(), ClientError> {
+        for (id, commitment) in commitment_updates {
+            let Some(local_account) = current_public_accounts
                 .iter()
                 .find(|acc| *id == acc.id() && *commitment != acc.to_commitment())
-            {
-                mismatched_public_accounts.push(*account);
+            else {
+                continue;
+            };
+
+            let response = self
+                .rpc_api
+                .get_account_details(local_account.id())
+                .await
+                .map_err(ClientError::RpcError)?;
+
+            match response {
+                FetchedAccount::Public(account, _) => {
+                    let account = *account;
+                    // Only update if the account is newer.
+                    if account.nonce().as_int() > local_account.nonce().as_int() {
+                        account_updates.extend(AccountUpdates::new(vec![account], Vec::new()));
+                    }
+                },
+                FetchedAccount::Private(..) => {
+                    // Should not happen for public accounts, skip silently.
+                },
             }
         }
 
-        self.rpc_api
-            .get_updated_public_accounts(&mismatched_public_accounts)
-            .await
-            .map_err(ClientError::RpcError)
+        Ok(())
     }
 
     /// Applies the changes received from the sync response to the notes and transactions tracked

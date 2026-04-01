@@ -40,6 +40,7 @@
 //! For further details and examples, see the documentation for the individual methods in the
 //! [`NodeRpcClient`] trait.
 
+use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
@@ -51,13 +52,15 @@ use domain::note::{FetchedNote, NoteSyncInfo};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::ChainMmrInfo;
 use miden_protocol::Word;
-use miden_protocol::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_protocol::account::{Account, AccountCode, AccountId};
 use miden_protocol::address::NetworkId;
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
 use miden_protocol::crypto::merkle::smt::SmtProof;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
+
+use crate::rpc::domain::storage_map::StorageMapInfo;
 
 /// Contains domain types related to RPC requests and responses, as well as utility functions
 /// for dealing with them.
@@ -84,7 +87,6 @@ pub use tonic_client::GrpcClient;
 
 use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::rpc::domain::account_vault::AccountVaultInfo;
-use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
@@ -281,32 +283,18 @@ pub trait NodeRpcClient: Send + Sync {
         Ok(public_notes)
     }
 
-    /// Fetches the public accounts that have been updated since the last known state of the
-    /// accounts.
+    /// Fetches the full state of a public account.
     ///
-    /// The `local_accounts` parameter is a list of account headers that the client has
-    /// stored locally and that it wants to check for updates. If an account is private or didn't
-    /// change, it is ignored and will not be included in the returned list.
-    /// The default implementation of this method uses [`NodeRpcClient::get_account_details`].
-    async fn get_updated_public_accounts(
-        &self,
-        local_accounts: &[&AccountHeader],
-    ) -> Result<Vec<Account>, RpcError> {
-        let mut public_accounts = vec![];
-
-        for local_account in local_accounts {
-            let response = self.get_account_details(local_account.id()).await?;
-
-            if let FetchedAccount::Public(account, _) = response {
-                let account = *account;
-                // We should only return an account if it's newer, otherwise we ignore it
-                if account.nonce().as_int() > local_account.nonce().as_int() {
-                    public_accounts.push(account);
-                }
-            }
+    /// This is a convenience wrapper around `get_account_details` that returns the [`Account`]
+    /// directly. Oversized maps and vaults are handled internally by `get_account_details`.
+    async fn get_full_public_account(&self, account_id: AccountId) -> Result<Account, RpcError> {
+        let response = self.get_account_details(account_id).await?;
+        match response {
+            FetchedAccount::Public(account, _) => Ok(*account),
+            FetchedAccount::Private(..) => Err(RpcError::ExpectedDataMissing(
+                "expected public account but got private".to_owned(),
+            )),
         }
-
-        Ok(public_accounts)
     }
 
     /// Given a block number, fetches the block header corresponding to that height from the node

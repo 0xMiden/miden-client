@@ -306,8 +306,9 @@ impl TransactionUpdateTracker {
 
 /// Contains account changes to apply to the store after a sync request.
 #[derive(Debug, Clone, Default)]
+#[allow(clippy::struct_field_names)]
 pub struct AccountUpdates {
-    /// Updated public accounts.
+    /// Full state for public accounts.
     updated_public_accounts: Vec<Account>,
     /// Account commitments received from the network that don't match the currently
     /// locally-tracked state of the private accounts.
@@ -330,7 +331,7 @@ impl AccountUpdates {
         }
     }
 
-    /// Returns the updated public accounts.
+    /// Returns the updated public accounts (full state).
     pub fn updated_public_accounts(&self) -> &[Account] {
         &self.updated_public_accounts
     }
