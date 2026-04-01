@@ -158,9 +158,9 @@ where
     /// Creates a `ClientBuilder` pre-configured for Miden testnet.
     ///
     /// This automatically configures:
-    /// - **RPC**: `https://rpc.testnet.miden.io`
-    /// - **Prover**: Remote prover at `https://tx-prover.testnet.miden.io`
-    /// - **Note transport**: `https://transport.miden.io`
+    /// - **RPC**: [`Endpoint::testnet()`]
+    /// - **Prover**: Remote prover at [`TESTNET_PROVER_ENDPOINT`]
+    /// - **Note transport**: [`NOTE_TRANSPORT_TESTNET_ENDPOINT`](crate::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT)
     ///
     /// You still need to provide:
     /// - A store (via `.store()`)
@@ -198,9 +198,9 @@ where
     /// Creates a `ClientBuilder` pre-configured for Miden devnet.
     ///
     /// This automatically configures:
-    /// - **RPC**: `https://rpc.devnet.miden.io`
-    /// - **Prover**: Remote prover at `https://tx-prover.devnet.miden.io`
-    /// - **Note transport**: `NOTE_TRANSPORT_DEVNET_ENDPOINT`
+    /// - **RPC**: [`Endpoint::devnet()`]
+    /// - **Prover**: Remote prover at [`DEVNET_PROVER_ENDPOINT`]
+    /// - **Note transport**: [`NOTE_TRANSPORT_DEVNET_ENDPOINT`](crate::note_transport::NOTE_TRANSPORT_DEVNET_ENDPOINT)
     ///
     /// You still need to provide:
     /// - A store (via `.store()`)
