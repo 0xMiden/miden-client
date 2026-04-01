@@ -3,7 +3,7 @@ permissions:
   contents: read
 on:
   push:
-    branches: [main, next]
+    branches: [main, next, "release/**"]
     paths-ignore:
       - "**.md"
       - "**.txt"
@@ -253,7 +253,7 @@ jobs:
         with:
           shared-key: rust-wasm
           prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
+          save-if: ${{ github.event_name != 'pull_request' }}
 
       - name: Install Node.js
         uses: actions/setup-node@v4
