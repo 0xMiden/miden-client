@@ -3,11 +3,11 @@ use miden_client::account::{Account, AccountBuilder, AccountType};
 use miden_client::auth::{AuthSchemeId as NativeAuthScheme, AuthSecretKey, AuthSingleSig};
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
-use wasm_bindgen::JsValue;
 
 use crate::js_error_with_context;
 use crate::models::account_storage_mode::AccountStorageMode;
 use crate::models::auth::AuthScheme;
+use crate::platform::{JsErr, from_str_err};
 
 // HELPERS
 // ================================================================================================
@@ -23,13 +23,13 @@ pub(crate) async fn generate_wallet(
     mutable: bool,
     seed: Option<Vec<u8>>,
     auth_scheme: AuthScheme,
-) -> Result<(Account, AuthSecretKey), JsValue> {
+) -> Result<(Account, AuthSecretKey), JsErr> {
     let mut rng = match seed {
         Some(seed_bytes) => {
             // Attempt to convert the seed slice into a 32-byte array.
             let seed_array: [u8; 32] = seed_bytes
                 .try_into()
-                .map_err(|_| JsValue::from_str("Seed must be exactly 32 bytes"))?;
+                .map_err(|_| from_str_err("Seed must be exactly 32 bytes"))?;
             StdRng::from_seed(seed_array)
         },
         None => StdRng::from_os_rng(),
@@ -57,7 +57,7 @@ pub(crate) async fn generate_wallet(
         },
         _ => {
             let message = format!("unsupported auth scheme: {native_scheme:?}");
-            return Err(JsValue::from_str(&message));
+            return Err(from_str_err(&message));
         },
     };
 

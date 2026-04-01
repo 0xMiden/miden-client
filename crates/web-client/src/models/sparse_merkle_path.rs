@@ -1,20 +1,21 @@
+use js_export_macro::js_export;
 use miden_client::crypto::SparseMerklePath as NativeSparseMerklePath;
-use wasm_bindgen::prelude::*;
 
 use super::word::Word;
+use crate::platform::{JsU64, js_u64_to_u64};
 
 /// Represents a sparse Merkle path.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct SparseMerklePath(NativeSparseMerklePath);
 
-#[wasm_bindgen]
+#[js_export]
 impl SparseMerklePath {
     /// Returns the empty nodes mask used by this path.
-    #[wasm_bindgen(js_name = "emptyNodesMask")]
-    pub fn empty_nodes_mask(&self) -> u64 {
+    #[js_export(js_name = "emptyNodesMask")]
+    pub fn empty_nodes_mask(&self) -> JsU64 {
         let (mask, _siblings) = self.0.clone().into_parts();
-        mask
+        mask as JsU64
     }
 
     /// Returns the sibling nodes that make up the path.
@@ -24,8 +25,10 @@ impl SparseMerklePath {
     }
 
     /// Verifies the path against a root.
-    pub fn verify(&self, index: u64, node: &Word, root: &Word) -> bool {
-        self.0.verify(index, node.clone().into(), &root.clone().into()).is_ok()
+    pub fn verify(&self, index: JsU64, node: &Word, root: &Word) -> bool {
+        self.0
+            .verify(js_u64_to_u64(index), node.clone().into(), &root.clone().into())
+            .is_ok()
     }
 }
 

@@ -68,6 +68,7 @@ const SYNC_METHODS = new Set([
 ]);
 
 const WRITE_METHODS = new Set([
+  "addAccountSecretKeyToWebStore",
   "addTag",
   "executeForSummary",
   "executeProgram",
@@ -91,6 +92,8 @@ const WRITE_METHODS = new Set([
 const READ_METHODS = new Set([
   "accountReader",
   "exportAccountFile",
+  "getAccountAuthByPubKeyCommitment",
+  "getAccountByKeyCommitment",
   "exportNoteFile",
   "exportStore",
   "getAccount",
@@ -103,6 +106,7 @@ const READ_METHODS = new Set([
   "getInputNotes",
   "getOutputNote",
   "getOutputNotes",
+  "getPublicKeyCommitmentsOfAccount",
   "getSetting",
   "getSyncHeight",
   "getTransactions",

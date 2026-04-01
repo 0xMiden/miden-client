@@ -1,34 +1,34 @@
+use js_export_macro::js_export;
 use miden_client::vm::Package as NativePackage;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::library::Library;
 use crate::models::program::Program;
-use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
+use crate::platform::{JsBytes, JsErr, from_str_err};
+use crate::utils::{deserialize_from_bytes, serialize_to_bytes};
 
 /// Compiled VM package containing libraries and metadata.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct Package(NativePackage);
 
-#[wasm_bindgen]
+#[js_export]
 impl Package {
     /// Serializes the package into bytes.
-    pub fn serialize(&self) -> Uint8Array {
-        serialize_to_uint8array(&self.0)
+    pub fn serialize(&self) -> JsBytes {
+        serialize_to_bytes(&self.0)
     }
 
     /// Deserializes a package from bytes.
-    pub fn deserialize(bytes: &Uint8Array) -> Result<Package, JsValue> {
-        deserialize_from_uint8array::<NativePackage>(bytes).map(Package)
+    pub fn deserialize(bytes: JsBytes) -> Result<Package, JsErr> {
+        deserialize_from_bytes::<NativePackage>(&bytes).map(Package)
     }
 
     /// Returns the underlying library of a `Package`.
     /// Fails if the package is not a library.
-    #[wasm_bindgen(js_name = "asLibrary")]
-    pub fn as_library(&self) -> Result<Library, JsValue> {
+    #[js_export(js_name = "asLibrary")]
+    pub fn as_library(&self) -> Result<Library, JsErr> {
         if !self.0.is_library() {
-            return Err(JsValue::from_str("Package does not contain a library"));
+            return Err(from_str_err("Package does not contain a library"));
         }
 
         let native_library = self.0.unwrap_library();
@@ -37,10 +37,10 @@ impl Package {
 
     /// Returns the underlying program of a `Package`.
     /// Fails if the package is not a program.
-    #[wasm_bindgen(js_name = "asProgram")]
-    pub fn as_program(&self) -> Result<Program, JsValue> {
+    #[js_export(js_name = "asProgram")]
+    pub fn as_program(&self) -> Result<Program, JsErr> {
         if !self.0.is_program() {
-            return Err(JsValue::from_str("Package does not contain a program"));
+            return Err(from_str_err("Package does not contain a program"));
         }
 
         let native_program = self.0.unwrap_program();

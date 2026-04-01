@@ -71,7 +71,6 @@
 - [SendPrivateOptions](interfaces/SendPrivateOptions.md)
 - [SendResult](interfaces/SendResult.md)
 - [SettingsResource](interfaces/SettingsResource.md)
-- [StoreSnapshot](interfaces/StoreSnapshot.md)
 - [SwapOptions](interfaces/SwapOptions.md)
 - [TagsResource](interfaces/TagsResource.md)
 - [TransactionOptions](interfaces/TransactionOptions.md)

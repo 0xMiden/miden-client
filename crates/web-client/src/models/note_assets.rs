@@ -1,6 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::asset::Asset as NativeAsset;
 use miden_client::note::NoteAssets as NativeNoteAssets;
-use wasm_bindgen::prelude::*;
 
 use super::fungible_asset::FungibleAsset;
 
@@ -13,13 +13,13 @@ use super::fungible_asset::FungibleAsset;
 /// hashing the assets. Note that the same list of assets can result in two different commitments if
 /// the asset ordering is different.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteAssets(NativeNoteAssets);
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteAssets {
     /// Creates a new asset list for a note.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new(assets_array: Option<Vec<FungibleAsset>>) -> NoteAssets {
         let assets = assets_array.unwrap_or_default();
         let native_assets: Vec<NativeAsset> = assets.into_iter().map(Into::into).collect();
@@ -32,7 +32,7 @@ impl NoteAssets {
     }
 
     /// Returns all fungible assets contained in the note.
-    #[wasm_bindgen(js_name = "fungibleAssets")]
+    #[js_export(js_name = "fungibleAssets")]
     pub fn fungible_assets(&self) -> Vec<FungibleAsset> {
         self.0
             .iter()

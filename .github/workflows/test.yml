@@ -347,6 +347,40 @@ jobs:
         if: always()
         run: make stop-node
 
+  test-web-client-nodejs:
+    name: Web client tests (Node.js)
+    runs-on: ubuntu-24.04
+    needs: [build-node-builder]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        run: rustup update --no-self-update
+      - name: Add Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-release
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: false
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Restore node-builder binary
+        uses: actions/cache/restore@v4
+        with:
+          path: target/release/testing-node-builder
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+      - name: Start test node
+        run: |
+          RUST_LOG=none target/release/testing-node-builder &
+          sleep 4
+          pgrep -f testing-node-builder || (echo "Failed to start node" && exit 1)
+      - name: Run Node.js web client tests
+        run: make test-web-client-nodejs
+      - name: Stop test node
+        if: always()
+        run: make stop-node
+
   integration-tests-remote-prover-web-client:
     name: Integration tests for remote prover
     runs-on: ubuntu-24.04

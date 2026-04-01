@@ -68,14 +68,16 @@ export class MidenClient {
         options?.storeName,
         options.keystore.getKey,
         options.keystore.insertKey,
-        options.keystore.sign
+        options.keystore.sign,
+        options?.debugMode
       );
     } else {
       inner = await WebClientClass.createClient(
         rpcUrl,
         options?.noteTransportUrl,
         seed,
-        options?.storeName
+        options?.storeName,
+        options?.debugMode
       );
     }
 
@@ -185,9 +187,9 @@ export class MidenClient {
    *
    * @returns {string} The store identifier.
    */
-  storeIdentifier() {
+  async storeIdentifier() {
     this.assertNotTerminated();
-    return this.#inner.storeIdentifier();
+    return await this.#inner.storeIdentifier();
   }
 
   // ── Mock-only methods ──

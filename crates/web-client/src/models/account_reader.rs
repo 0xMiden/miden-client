@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
+use js_export_macro::js_export;
 use miden_client::account::{AccountReader as NativeAccountReader, StorageMapKey, StorageSlotName};
-use wasm_bindgen::prelude::*;
 
 use super::account_header::AccountHeader;
 use super::account_id::AccountId;
@@ -10,12 +10,13 @@ use super::address::Address;
 use super::felt::Felt;
 use super::word::Word;
 use crate::js_error_with_context;
+use crate::platform::JsErr;
 
 /// Provides lazy access to account data.
 ///
 /// `AccountReader` executes queries lazily - each method call fetches fresh data
 /// from storage, ensuring you always see the current state.
-#[wasm_bindgen]
+#[js_export]
 pub struct AccountReader(NativeAccountReader);
 
 impl From<NativeAccountReader> for AccountReader {
@@ -24,10 +25,10 @@ impl From<NativeAccountReader> for AccountReader {
     }
 }
 
-#[wasm_bindgen]
+#[js_export]
 impl AccountReader {
     /// Returns the account ID.
-    #[wasm_bindgen(js_name = "accountId")]
+    #[js_export(js_name = "accountId")]
     pub fn account_id(&self) -> AccountId {
         self.0.account_id().into()
     }
@@ -36,7 +37,7 @@ impl AccountReader {
     // --------------------------------------------------------------------------------------------
 
     /// Retrieves the current account nonce.
-    pub async fn nonce(&self) -> Result<Felt, JsValue> {
+    pub async fn nonce(&self) -> Result<Felt, JsErr> {
         self.0
             .nonce()
             .await
@@ -45,7 +46,7 @@ impl AccountReader {
     }
 
     /// Retrieves the account commitment (hash of the full state).
-    pub async fn commitment(&self) -> Result<Word, JsValue> {
+    pub async fn commitment(&self) -> Result<Word, JsErr> {
         self.0
             .commitment()
             .await
@@ -54,8 +55,8 @@ impl AccountReader {
     }
 
     /// Retrieves the storage commitment (root of the storage tree).
-    #[wasm_bindgen(js_name = "storageCommitment")]
-    pub async fn storage_commitment(&self) -> Result<Word, JsValue> {
+    #[js_export(js_name = "storageCommitment")]
+    pub async fn storage_commitment(&self) -> Result<Word, JsErr> {
         self.0
             .storage_commitment()
             .await
@@ -64,8 +65,8 @@ impl AccountReader {
     }
 
     /// Retrieves the vault root (root of the asset vault tree).
-    #[wasm_bindgen(js_name = "vaultRoot")]
-    pub async fn vault_root(&self) -> Result<Word, JsValue> {
+    #[js_export(js_name = "vaultRoot")]
+    pub async fn vault_root(&self) -> Result<Word, JsErr> {
         self.0
             .vault_root()
             .await
@@ -74,8 +75,8 @@ impl AccountReader {
     }
 
     /// Retrieves the code commitment (hash of the account code).
-    #[wasm_bindgen(js_name = "codeCommitment")]
-    pub async fn code_commitment(&self) -> Result<Word, JsValue> {
+    #[js_export(js_name = "codeCommitment")]
+    pub async fn code_commitment(&self) -> Result<Word, JsErr> {
         self.0
             .code_commitment()
             .await
@@ -84,7 +85,7 @@ impl AccountReader {
     }
 
     /// Retrieves the account header.
-    pub async fn header(&self) -> Result<AccountHeader, JsValue> {
+    pub async fn header(&self) -> Result<AccountHeader, JsErr> {
         let (header, _) = self
             .0
             .header()
@@ -94,7 +95,7 @@ impl AccountReader {
     }
 
     /// Retrieves the account status.
-    pub async fn status(&self) -> Result<AccountStatus, JsValue> {
+    pub async fn status(&self) -> Result<AccountStatus, JsErr> {
         self.0
             .status()
             .await
@@ -106,7 +107,7 @@ impl AccountReader {
     // --------------------------------------------------------------------------------------------
 
     /// Retrieves the addresses associated with this account.
-    pub async fn addresses(&self) -> Result<Vec<Address>, JsValue> {
+    pub async fn addresses(&self) -> Result<Vec<Address>, JsErr> {
         self.0
             .addresses()
             .await
@@ -120,8 +121,8 @@ impl AccountReader {
     /// Retrieves the balance of a fungible asset in the account's vault.
     ///
     /// Returns 0 if the asset is not present in the vault.
-    #[wasm_bindgen(js_name = "getBalance")]
-    pub async fn get_balance(&self, faucet_id: &AccountId) -> Result<u64, JsValue> {
+    #[js_export(js_name = "getBalance")]
+    pub async fn get_balance(&self, faucet_id: &AccountId) -> Result<u64, JsErr> {
         self.0
             .get_balance(faucet_id.into())
             .await
@@ -135,8 +136,8 @@ impl AccountReader {
     ///
     /// For `Value` slots, returns the stored word.
     /// For `Map` slots, returns the map root.
-    #[wasm_bindgen(js_name = "getStorageItem")]
-    pub async fn get_storage_item(&self, slot_name: &str) -> Result<Word, JsValue> {
+    #[js_export(js_name = "getStorageItem")]
+    pub async fn get_storage_item(&self, slot_name: String) -> Result<Word, JsErr> {
         let slot_name = StorageSlotName::new(slot_name)
             .map_err(|err| js_error_with_context(err, "invalid slot name"))?;
 
@@ -148,8 +149,8 @@ impl AccountReader {
     }
 
     /// Retrieves a value from a storage map slot by name and key.
-    #[wasm_bindgen(js_name = "getStorageMapItem")]
-    pub async fn get_storage_map_item(&self, slot_name: &str, key: &Word) -> Result<Word, JsValue> {
+    #[js_export(js_name = "getStorageMapItem")]
+    pub async fn get_storage_map_item(&self, slot_name: String, key: &Word) -> Result<Word, JsErr> {
         let slot_name = StorageSlotName::new(slot_name)
             .map_err(|err| js_error_with_context(err, "invalid slot name"))?;
 

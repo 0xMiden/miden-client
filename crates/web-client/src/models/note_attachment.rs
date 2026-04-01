@@ -1,3 +1,4 @@
+use js_export_macro::js_export;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::note::{
     NetworkAccountTarget as NativeNetworkAccountTarget,
@@ -6,7 +7,6 @@ use miden_client::note::{
 };
 use miden_client::{Felt as NativeFelt, Word as NativeWord};
 use miden_protocol::note::NoteAttachmentContent;
-use wasm_bindgen::prelude::*;
 
 use super::account_id::AccountId;
 use super::felt::Felt;
@@ -14,6 +14,7 @@ use super::note_attachment_kind::NoteAttachmentKind;
 use super::note_execution_hint::NoteExecutionHint;
 use super::word::Word;
 use crate::models::miden_arrays::FeltArray;
+use crate::platform::{JsErr, from_str_err};
 
 // NOTE ATTACHMENT SCHEME
 // ================================================================================================
@@ -23,13 +24,13 @@ use crate::models::miden_arrays::FeltArray;
 /// Value `0` is reserved to signal that the scheme is none or absent. Whenever the kind of
 /// attachment is not standardized or interoperability is unimportant, this none value can be used.
 #[derive(Clone, Copy)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteAttachmentScheme(NativeNoteAttachmentScheme);
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteAttachmentScheme {
     /// Creates a new `NoteAttachmentScheme` from a u32.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new(scheme: u32) -> NoteAttachmentScheme {
         NoteAttachmentScheme(NativeNoteAttachmentScheme::new(scheme))
     }
@@ -40,13 +41,13 @@ impl NoteAttachmentScheme {
     }
 
     /// Returns true if the attachment scheme is the reserved value that signals an absent scheme.
-    #[wasm_bindgen(js_name = "isNone")]
+    #[js_export(js_name = "isNone")]
     pub fn is_none(&self) -> bool {
         self.0.is_none()
     }
 
     /// Returns the note attachment scheme as a u32.
-    #[wasm_bindgen(js_name = "asU32")]
+    #[js_export(js_name = "asU32")]
     pub fn as_u32(&self) -> u32 {
         self.0.as_u32()
     }
@@ -73,50 +74,50 @@ impl From<&NoteAttachmentScheme> for NativeNoteAttachmentScheme {
 /// For example, a network account target attachment indicates that the note should
 /// be consumed by a specific network account.
 #[derive(Clone, Default)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteAttachment(NativeNoteAttachment);
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteAttachment {
     /// Creates a default (empty) note attachment.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new() -> NoteAttachment {
         NoteAttachment(NativeNoteAttachment::default())
     }
 
     /// Creates a new note attachment with Word content from the provided word.
-    #[wasm_bindgen(js_name = "newWord")]
+    #[js_export(js_name = "newWord")]
     pub fn new_word(scheme: &NoteAttachmentScheme, word: &Word) -> NoteAttachment {
         let native_word: NativeWord = word.into();
         NoteAttachment(NativeNoteAttachment::new_word(scheme.into(), native_word))
     }
 
     /// Creates a new note attachment with Array content from the provided elements.
-    #[wasm_bindgen(js_name = "newArray")]
+    #[js_export(js_name = "newArray")]
     pub fn new_array(
         scheme: &NoteAttachmentScheme,
-        elements: &FeltArray,
-    ) -> Result<NoteAttachment, JsValue> {
-        let native_elements: Vec<NativeFelt> = elements.into();
+        elements: FeltArray,
+    ) -> Result<NoteAttachment, JsErr> {
+        let native_elements: Vec<NativeFelt> = super::felt::felt_array_to_native_vec(&elements);
         NativeNoteAttachment::new_array(scheme.into(), native_elements)
             .map(NoteAttachment)
-            .map_err(|e| JsValue::from_str(&e.to_string()))
+            .map_err(|e| from_str_err(&e.to_string()))
     }
 
     /// Returns the attachment scheme.
-    #[wasm_bindgen(js_name = "attachmentScheme")]
+    #[js_export(js_name = "attachmentScheme")]
     pub fn attachment_scheme(&self) -> NoteAttachmentScheme {
         self.0.attachment_scheme().into()
     }
 
     /// Returns the attachment kind.
-    #[wasm_bindgen(js_name = "attachmentKind")]
+    #[js_export(js_name = "attachmentKind")]
     pub fn attachment_kind(&self) -> NoteAttachmentKind {
         self.0.attachment_kind().into()
     }
 
     /// Returns the content as a Word if the attachment kind is Word, otherwise None.
-    #[wasm_bindgen(js_name = "asWord")]
+    #[js_export(js_name = "asWord")]
     pub fn as_word(&self) -> Option<Word> {
         match self.0.content() {
             NoteAttachmentContent::Word(word) => Some((*word).into()),
@@ -125,7 +126,7 @@ impl NoteAttachment {
     }
 
     /// Returns the content as an array of Felts if the attachment kind is Array, otherwise None.
-    #[wasm_bindgen(js_name = "asArray")]
+    #[js_export(js_name = "asArray")]
     pub fn as_array(&self) -> Option<FeltArray> {
         match self.0.content() {
             NoteAttachmentContent::Array(array) => {
@@ -148,14 +149,14 @@ impl NoteAttachment {
     ///
     /// # Errors
     /// Returns an error if the target account is not a network account.
-    #[wasm_bindgen(js_name = "newNetworkAccountTarget")]
+    #[js_export(js_name = "newNetworkAccountTarget")]
     pub fn new_network_account_target(
         target_id: &AccountId,
         exec_hint: &NoteExecutionHint,
-    ) -> Result<NoteAttachment, JsValue> {
+    ) -> Result<NoteAttachment, JsErr> {
         let native_account_id: NativeAccountId = target_id.into();
         let native_target = NativeNetworkAccountTarget::new(native_account_id, exec_hint.into())
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+            .map_err(|e| from_str_err(&e.to_string()))?;
         let native_attachment: NativeNoteAttachment = native_target.into();
         Ok(NoteAttachment(native_attachment))
     }

@@ -1,5 +1,5 @@
+use js_export_macro::js_export;
 use miden_client::note::NoteHeader as NativeNoteHeader;
-use wasm_bindgen::prelude::*;
 
 use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
@@ -9,10 +9,10 @@ use super::word::Word;
 ///
 /// See `NoteId` and `NoteMetadata` for additional details.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteHeader(NativeNoteHeader);
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteHeader {
     // TODO: new()
 

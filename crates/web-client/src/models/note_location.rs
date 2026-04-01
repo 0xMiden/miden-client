@@ -1,21 +1,21 @@
+use js_export_macro::js_export;
 use miden_client::note::NoteLocation as NativeNoteLocation;
-use wasm_bindgen::prelude::*;
 
 /// Contains information about the location of a note.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteLocation(NativeNoteLocation);
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteLocation {
     /// Returns the block height containing the note.
-    #[wasm_bindgen(js_name = "blockNum")]
+    #[js_export(js_name = "blockNum")]
     pub fn block_num(&self) -> u32 {
         self.0.block_num().as_u32()
     }
 
     /// Returns the index of the note leaf within the block's note tree.
-    #[wasm_bindgen(js_name = "nodeIndexInBlock")]
+    #[js_export(js_name = "nodeIndexInBlock")]
     pub fn node_index_in_block(&self) -> u16 {
         self.0.node_index_in_block()
     }

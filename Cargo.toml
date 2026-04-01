@@ -6,6 +6,7 @@ members = [
   "bin/miden-bench",
   "bin/miden-cli",
   "crates/idxdb-store",
+  "crates/js-export-macro",
   "crates/rust-client",
   "crates/sqlite-store",
   "crates/testing/miden-client-tests",
@@ -58,6 +59,9 @@ async-trait = { version = "0.1" }
 chrono      = { version = "0.4" }
 hex         = { version = "0.4" }
 miette      = { features = ["fancy"], version = "7.6" }
+napi        = { default-features = false, features = ["async", "napi8"], version = "3" }
+napi-build  = { version = "2" }
+napi-derive = { default-features = false, version = "3" }
 rand        = { version = "0.9" }
 serde       = { features = ["derive"], version = "1.0" }
 thiserror   = { default-features = false, version = "2.0" }

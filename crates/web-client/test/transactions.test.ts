@@ -1,260 +1,241 @@
-// FIXME: Re-visit this
 // @ts-nocheck
-import test from "./playwright.global.setup";
-import {
-  consumeTransaction,
-  mintAndConsumeTransaction,
-  mintTransaction,
-  setupWalletAndFaucet,
-} from "./webClientTestUtils";
-import { Page, expect } from "@playwright/test";
+import { test, expect } from "./test-setup";
 
 // GET_TRANSACTIONS TESTS
 // =======================================================================================================
 
-interface GetAllTransactionsResult {
-  transactionIds: string[];
-  uncommittedTransactionIds: string[];
-}
-
-const getAllTransactions = async (
-  page: Page
-): Promise<GetAllTransactionsResult> => {
-  return await page.evaluate(async () => {
-    const client = window.client;
-
-    let transactions = await client.getTransactions(
-      window.TransactionFilter.all()
-    );
-    let uncommittedTransactions = await client.getTransactions(
-      window.TransactionFilter.uncommitted()
-    );
-    let transactionIds = transactions.map((transaction) =>
-      transaction.id().toHex()
-    );
-    let uncommittedTransactionIds = uncommittedTransactions.map((transaction) =>
-      transaction.id().toHex()
-    );
-
-    return {
-      transactionIds: transactionIds,
-      uncommittedTransactionIds: uncommittedTransactionIds,
-    };
-  });
-};
-
 test.describe("get_transactions tests", () => {
   test("get_transactions retrieves all transactions successfully", async ({
-    page,
+    run,
   }) => {
-    const { accountId, faucetId } = await setupWalletAndFaucet(page);
+    const result = await run(async ({ client, sdk, helpers }) => {
+      const { wallet, faucet } = await helpers.setupWalletAndFaucet();
+      const { mintTransactionId, consumeTransactionId } =
+        await helpers.mockMintAndConsume(wallet.id(), faucet.id());
 
-    const { mintResult, consumeResult } = await mintAndConsumeTransaction(
-      page,
-      accountId,
-      faucetId
-    );
+      const transactions = await client.getTransactions(
+        sdk.TransactionFilter.all()
+      );
+      const transactionIds = transactions.map((tx) => tx.id().toHex());
+      const uncommitted = await client.getTransactions(
+        sdk.TransactionFilter.uncommitted()
+      );
 
-    const result = await getAllTransactions(page);
+      return {
+        transactionIds,
+        mintTransactionId,
+        consumeTransactionId,
+        uncommittedLength: uncommitted.length,
+      };
+    });
 
-    expect(result.transactionIds).toContain(mintResult.transactionId);
-    expect(result.transactionIds).toContain(consumeResult.transactionId);
-    expect(result.uncommittedTransactionIds.length).toEqual(0);
+    expect(result.transactionIds).toContain(result.mintTransactionId);
+    expect(result.transactionIds).toContain(result.consumeTransactionId);
+    expect(result.uncommittedLength).toEqual(0);
   });
 
   test("get_transactions retrieves uncommitted transactions successfully", async ({
-    page,
+    run,
   }) => {
-    const { accountId, faucetId } = await setupWalletAndFaucet(page);
-    const { mintResult, consumeResult } = await mintAndConsumeTransaction(
-      page,
-      accountId,
-      faucetId
-    );
-    const { transactionId: uncommittedTransactionId } = await mintTransaction(
-      page,
-      accountId,
-      faucetId,
-      false,
-      false
-    );
+    const result = await run(async ({ client, sdk, helpers }) => {
+      const { wallet, faucet } = await helpers.setupWalletAndFaucet();
+      const { mintTransactionId, consumeTransactionId } =
+        await helpers.mockMintAndConsume(wallet.id(), faucet.id());
+      const { transactionId: uncommittedTransactionId } =
+        await helpers.mockMint(wallet.id(), faucet.id(), { skipSync: true });
 
-    const result = await getAllTransactions(page);
+      const transactions = await client.getTransactions(
+        sdk.TransactionFilter.all()
+      );
+      const transactionIds = transactions.map((tx) => tx.id().toHex());
+      const uncommitted = await client.getTransactions(
+        sdk.TransactionFilter.uncommitted()
+      );
+      const uncommittedTransactionIds = uncommitted.map((tx) =>
+        tx.id().toHex()
+      );
 
-    expect(result.transactionIds).toContain(mintResult.transactionId);
-    expect(result.transactionIds).toContain(consumeResult.transactionId);
-    expect(result.transactionIds).toContain(uncommittedTransactionId);
+      return {
+        transactionIds,
+        mintTransactionId,
+        consumeTransactionId,
+        uncommittedTransactionId,
+        uncommittedTransactionIds,
+      };
+    });
+
+    expect(result.transactionIds).toContain(result.mintTransactionId);
+    expect(result.transactionIds).toContain(result.consumeTransactionId);
+    expect(result.transactionIds).toContain(result.uncommittedTransactionId);
     expect(result.transactionIds.length).toEqual(3);
 
     expect(result.uncommittedTransactionIds).toContain(
-      uncommittedTransactionId
+      result.uncommittedTransactionId
     );
     expect(result.uncommittedTransactionIds.length).toEqual(1);
   });
 
   test("get_transactions retrieves no transactions successfully", async ({
-    page,
+    run,
   }) => {
-    const result = await getAllTransactions(page);
+    const result = await run(async ({ client, sdk }) => {
+      const transactions = await client.getTransactions(
+        sdk.TransactionFilter.all()
+      );
+      const uncommitted = await client.getTransactions(
+        sdk.TransactionFilter.uncommitted()
+      );
 
-    expect(result.transactionIds.length).toEqual(0);
-    expect(result.uncommittedTransactionIds.length).toEqual(0);
+      return {
+        transactionsLength: transactions.length,
+        uncommittedLength: uncommitted.length,
+      };
+    });
+
+    expect(result.transactionsLength).toEqual(0);
+    expect(result.uncommittedLength).toEqual(0);
   });
 
   test("get_transactions filters by specific transaction IDs successfully", async ({
-    page,
+    run,
   }) => {
-    const { accountId, faucetId } = await setupWalletAndFaucet(page);
+    const result = await run(async ({ client, sdk, helpers }) => {
+      const { wallet, faucet } = await helpers.setupWalletAndFaucet();
+      await helpers.mockMintAndConsume(wallet.id(), faucet.id());
 
-    await mintAndConsumeTransaction(page, accountId, faucetId);
-
-    const result = await page.evaluate(async () => {
-      const client = window.client;
-
-      let allTransactions = await client.getTransactions(
-        window.TransactionFilter.all()
+      const allTransactions = await client.getTransactions(
+        sdk.TransactionFilter.all()
       );
-      const allTxLength = allTransactions.length;
-      let firstTransactionId = allTransactions[0].id();
+      const firstTransactionId = allTransactions[0].id();
       const firstTxIdHex = firstTransactionId.toHex();
 
-      const filter = window.TransactionFilter.ids([firstTransactionId]);
-      let filteredTransactions = await client.getTransactions(filter);
+      const filter = sdk.TransactionFilter.ids([firstTransactionId]);
+      const filteredTransactions = await client.getTransactions(filter);
       const filteredTransactionIds = filteredTransactions.map((tx) =>
         tx.id().toHex()
       );
 
       return {
-        allTransactionsCount: allTxLength,
-        filteredTransactionIds: filteredTransactionIds,
-        originalTransactionId: firstTxIdHex,
+        allLength: allTransactions.length,
+        filteredLength: filteredTransactionIds.length,
+        filteredTransactionIds,
+        firstTxIdHex,
       };
     });
 
-    expect(result.allTransactionsCount).toEqual(2);
-    expect(result.filteredTransactionIds.length).toEqual(1);
-    expect(result.filteredTransactionIds).toContain(
-      result.originalTransactionId
-    );
+    expect(result.allLength).toEqual(2);
+    expect(result.filteredLength).toEqual(1);
+    expect(result.filteredTransactionIds).toContain(result.firstTxIdHex);
   });
 
   test("get_transactions filters expired transactions successfully", async ({
-    page,
+    run,
   }) => {
-    const { accountId, faucetId } = await setupWalletAndFaucet(page);
+    const result = await run(async ({ client, sdk, helpers }) => {
+      const { wallet, faucet } = await helpers.setupWalletAndFaucet();
 
-    const { transactionId: committedTransactionId } = await mintTransaction(
-      page,
-      accountId,
-      faucetId
-    );
-
-    const { transactionId: uncommittedTransactionId } = await mintTransaction(
-      page,
-      accountId,
-      faucetId,
-      false,
-      false
-    );
-
-    const result = await page.evaluate(async () => {
-      const client = window.client;
-
-      let allTransactions = await client.getTransactions(
-        window.TransactionFilter.all()
+      const { transactionId: committedTransactionId } = await helpers.mockMint(
+        wallet.id(),
+        faucet.id()
       );
-      let allTransactionIds = allTransactions.map((tx) => tx.id().toHex());
-      let currentBlockNum = allTransactions[0].blockNum();
 
-      let futureBlockNum = currentBlockNum + 10;
-      let futureExpiredFilter =
-        window.TransactionFilter.expiredBefore(futureBlockNum);
-      let futureExpiredTransactions =
-        await client.getTransactions(futureExpiredFilter);
-      let futureExpiredTransactionIds = futureExpiredTransactions.map((tx) =>
+      const { transactionId: uncommittedTransactionId } =
+        await helpers.mockMint(wallet.id(), faucet.id(), { skipSync: true });
+
+      const allTransactions = await client.getTransactions(
+        sdk.TransactionFilter.all()
+      );
+      const allTransactionIds = allTransactions.map((tx) => tx.id().toHex());
+      // Use the committed transaction's blockNum (the one with blockNum > 0)
+      const committedTx = allTransactions.find((tx) => tx.blockNum() > 0);
+      const currentBlockNum = committedTx.blockNum();
+
+      const futureBlockNum = currentBlockNum + 10;
+      const futureExpiredTransactions = await client.getTransactions(
+        sdk.TransactionFilter.expiredBefore(futureBlockNum)
+      );
+      const futureExpiredTransactionIds = futureExpiredTransactions.map((tx) =>
         tx.id().toHex()
       );
 
-      let pastBlockNum = currentBlockNum - 10;
-      let pastExpiredFilter =
-        window.TransactionFilter.expiredBefore(pastBlockNum);
-      let pastExpiredTransactions =
-        await client.getTransactions(pastExpiredFilter);
-      let pastExpiredTransactionIds = pastExpiredTransactions.map((tx) =>
+      // Ensure pastBlockNum doesn't go negative — on mock chain, block numbers
+      // start low (e.g. 1) and negative values overflow to large unsigned ints.
+      const pastBlockNum = Math.max(0, currentBlockNum - 10);
+      const pastExpiredTransactions = await client.getTransactions(
+        sdk.TransactionFilter.expiredBefore(pastBlockNum)
+      );
+      const pastExpiredTransactionIds = pastExpiredTransactions.map((tx) =>
         tx.id().toHex()
       );
 
       return {
-        currentBlockNum: currentBlockNum,
-        futureBlockNum: futureBlockNum,
-        pastBlockNum: pastBlockNum,
-        allTransactionIds: allTransactionIds,
-        futureExpiredTransactionIds: futureExpiredTransactionIds,
-        pastExpiredTransactionIds: pastExpiredTransactionIds,
+        futureExpiredTransactionIds,
+        pastExpiredTransactionIds,
+        allTransactionIds,
+        committedTransactionId,
+        uncommittedTransactionId,
       };
     });
 
     expect(result.futureExpiredTransactionIds.length).toEqual(1);
     expect(result.futureExpiredTransactionIds).toContain(
-      uncommittedTransactionId
+      result.uncommittedTransactionId
     );
     expect(result.pastExpiredTransactionIds.length).toEqual(0);
     expect(result.allTransactionIds.length).toEqual(2);
-    expect(result.allTransactionIds).toContain(committedTransactionId);
-    expect(result.allTransactionIds).toContain(uncommittedTransactionId);
+    expect(result.allTransactionIds).toContain(result.committedTransactionId);
+    expect(result.allTransactionIds).toContain(result.uncommittedTransactionId);
   });
 });
 
 // COMPILE_TX_SCRIPT TESTS
 // =======================================================================================================
 
-interface CompileTxScriptResult {
-  scriptRoot: string;
-}
-
-export const compileTxScript = async (
-  page: Page,
-  script: string
-): Promise<CompileTxScriptResult> => {
-  return await page.evaluate(async (_script: string) => {
-    const client = window.client;
-
-    let walletAccount = await client.newWallet(
-      window.AccountStorageMode.private(),
-      true,
-      window.AuthScheme.AuthRpoFalcon512
-    );
-
-    let builder = client.createCodeBuilder();
-    const compiledScript = builder.compileNoteScript(_script);
-
-    return {
-      scriptRoot: compiledScript.root().toHex(),
-    };
-  }, script);
-};
-
 test.describe("compile_tx_script tests", () => {
-  test("compile_tx_script compiles script successfully", async ({ page }) => {
-    const script = `
-            begin
-                push.0 push.0
-                # => [0, 0]
-                assert_eq
-            end
-        `;
-    const result = await compileTxScript(page, script);
+  test("compile_tx_script compiles script successfully", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
+      await client.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
 
-    expect(result.scriptRoot.length).toBeGreaterThan(1);
+      const builder = await client.createCodeBuilder();
+      const compiledScript = builder.compileNoteScript(`
+        begin
+          push.0 push.0
+          assert_eq
+        end
+      `);
+
+      return { rootHexLength: compiledScript.root().toHex().length };
+    });
+
+    expect(result.rootHexLength).toBeGreaterThan(1);
   });
 
   test("compile_tx_script does not compile script successfully", async ({
-    page,
+    run,
   }) => {
-    const script = "fakeScript";
+    const result = await run(async ({ client, sdk }) => {
+      await client.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
 
-    await expect(compileTxScript(page, script)).rejects.toThrow(
-      /failed to compile note script:/
-    );
+      const builder = await client.createCodeBuilder();
+
+      let errorMessage = null;
+      try {
+        builder.compileNoteScript("fakeScript");
+      } catch (e) {
+        errorMessage = String(e);
+      }
+
+      return { errorMessage };
+    });
+
+    expect(result.errorMessage).toMatch(/failed to compile note script:/);
   });
 });

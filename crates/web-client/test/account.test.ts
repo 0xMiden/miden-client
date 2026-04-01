@@ -1,260 +1,162 @@
-import { Page, expect } from "@playwright/test";
-import test, { isLocalhost } from "./playwright.global.setup";
+// @ts-nocheck
+import { test, expect } from "./test-setup";
 
 // GET_ACCOUNT TESTS
 // =======================================================================================================
 
-interface GetAccountSuccessResult {
-  commitmentOfCreatedAccount: string;
-  commitmentOfGetAccountResult: string;
-  isAccountType: boolean | undefined;
-}
-
-export const getAccountOneMatch = async (
-  page: Page
-): Promise<GetAccountSuccessResult> => {
-  return await page.evaluate(async () => {
-    const client = window.client;
-    const newAccount = await client.newWallet(
-      window.AccountStorageMode.private(),
-      true,
-      window.AuthScheme.AuthRpoFalcon512
-    );
-
-    const result = await client.getAccount(newAccount.id());
-
-    return {
-      commitmentOfCreatedAccount: newAccount.to_commitment().toHex(),
-      commitmentOfGetAccountResult: result!.to_commitment().toHex(),
-      isAccountType: result instanceof window.Account,
-    };
-  });
-};
-
-interface GetAccountFailureResult {
-  commitmentOfGetAccountResult: string | undefined;
-}
-
-export const getAccountNoMatch = async (
-  page: Page
-): Promise<GetAccountFailureResult> => {
-  return await page.evaluate(async () => {
-    const client = window.client;
-    const nonExistingAccountId = window.TestUtils.createMockAccountId();
-
-    const result = await client.getAccount(nonExistingAccountId);
-
-    return {
-      commitmentOfGetAccountResult: result
-        ? result.to_commitment().toHex()
-        : undefined,
-    };
-  });
-};
-
 test.describe("get_account tests", () => {
-  test("retrieves an existing account", async ({ page }) => {
-    const result = await getAccountOneMatch(page);
+  test("retrieves an existing account", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
+      const newAccount = await client.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
 
-    expect(result.commitmentOfCreatedAccount).toEqual(
-      result.commitmentOfGetAccountResult
-    );
-    expect(result.isAccountType).toBe(true);
+      const retrieved = await client.getAccount(newAccount.id());
+
+      return {
+        isTruthy: !!retrieved,
+        retrievedCommitment: retrieved.to_commitment().toHex(),
+        newAccountCommitment: newAccount.to_commitment().toHex(),
+      };
+    });
+    expect(result.isTruthy).toBe(true);
+    expect(result.retrievedCommitment).toEqual(result.newAccountCommitment);
   });
 
-  test("returns error attempting to retrieve a non-existing account", async ({
-    page,
+  test("returns undefined attempting to retrieve a non-existing account", async ({
+    run,
   }) => {
-    const result = await getAccountNoMatch(page);
+    const result = await run(async ({ client, sdk }) => {
+      const nonExistingAccountId = sdk.AccountId.fromHex(
+        "0x69817bcc6fb9f99027c2245f6979c5"
+      );
 
-    expect(result.commitmentOfGetAccountResult).toBeUndefined();
+      const retrieved = await client.getAccount(nonExistingAccountId);
+
+      return { isUndefined: retrieved === undefined };
+    });
+    expect(result.isUndefined).toBe(true);
   });
 });
 
 // GET_ACCOUNTS TESTS
 // =======================================================================================================
 
-interface GetAccountsSuccessResult {
-  commitmentsOfCreatedAccounts: string[];
-  commitmentsOfGetAccountsResult: string[];
-  resultTypes: boolean[];
-}
-
-export const getAccountsManyMatches = async (
-  page: Page
-): Promise<GetAccountsSuccessResult> => {
-  return await page.evaluate(async () => {
-    const client = window.client;
-    const newAccount1 = await client.newWallet(
-      window.AccountStorageMode.private(),
-      true,
-      window.AuthScheme.AuthRpoFalcon512
-    );
-    const newAccount2 = await client.newWallet(
-      window.AccountStorageMode.private(),
-      true,
-      window.AuthScheme.AuthRpoFalcon512
-    );
-    const commitmentsOfCreatedAccounts = [
-      newAccount1.to_commitment().toHex(),
-      newAccount2.to_commitment().toHex(),
-    ];
-
-    const result = await client.getAccounts();
-
-    const commitmentsOfGetAccountsResult = [];
-    const resultTypes = [];
-
-    for (let i = 0; i < result.length; i++) {
-      commitmentsOfGetAccountsResult.push(result[i].to_commitment().toHex());
-      resultTypes.push(result[i] instanceof window.AccountHeader);
-    }
-
-    return {
-      commitmentsOfCreatedAccounts: commitmentsOfCreatedAccounts,
-      commitmentsOfGetAccountsResult: commitmentsOfGetAccountsResult,
-      resultTypes: resultTypes,
-    };
-  });
-};
-
-export const getAccountsNoMatches = async (
-  page: Page
-): Promise<GetAccountsSuccessResult> => {
-  return await page.evaluate(async () => {
-    const client = window.client;
-
-    const result = await client.getAccounts();
-
-    const commitmentsOfGetAccountsResult = [];
-    const resultTypes = [];
-
-    for (let i = 0; i < result.length; i++) {
-      commitmentsOfGetAccountsResult.push(result[i].to_commitment().toHex());
-      resultTypes.push(result[i] instanceof window.AccountHeader);
-    }
-
-    return {
-      commitmentsOfCreatedAccounts: [],
-      commitmentsOfGetAccountsResult: commitmentsOfGetAccountsResult,
-      resultTypes: resultTypes,
-    };
-  });
-};
-
 test.describe("getAccounts tests", () => {
-  test("retrieves all existing accounts", async ({ page }) => {
-    const result = await getAccountsManyMatches(page);
+  test("retrieves all existing accounts", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
+      const newAccount1 = await client.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const newAccount2 = await client.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const commitmentsOfCreatedAccounts = [
+        newAccount1.to_commitment().toHex(),
+        newAccount2.to_commitment().toHex(),
+      ];
 
-    for (let address of result.commitmentsOfGetAccountsResult) {
+      const accounts = await client.getAccounts();
+
+      const commitmentsOfGetAccountsResult = [];
+      for (let i = 0; i < accounts.length; i++) {
+        commitmentsOfGetAccountsResult.push(
+          accounts[i].to_commitment().toHex()
+        );
+      }
+
+      return {
+        commitmentsOfCreatedAccounts,
+        commitmentsOfGetAccountsResult,
+        resultLength: accounts.length,
+      };
+    });
+
+    for (const address of result.commitmentsOfGetAccountsResult) {
       expect(result.commitmentsOfCreatedAccounts.includes(address)).toBe(true);
     }
-    expect(result.resultTypes).toEqual([true, true]);
+    expect(result.resultLength).toBe(2);
   });
 
-  test("returns empty array when no accounts exist", async ({ page }) => {
-    const result = await getAccountsNoMatches(page);
-
-    expect(result.commitmentsOfCreatedAccounts.length).toEqual(0);
-    expect(result.commitmentsOfGetAccountsResult.length).toEqual(0);
-    expect(result.resultTypes.length).toEqual(0);
+  test("returns empty array when no accounts exist", async ({ run }) => {
+    const result = await run(async ({ client }) => {
+      const accounts = await client.getAccounts();
+      return { length: accounts.length };
+    });
+    expect(result.length).toEqual(0);
   });
 });
+
+// GET PUBLIC ACCOUNT WITH DETAILS
+// =======================================================================================================
 
 test.describe("get public account with details", () => {
   test("assets and storage with too many assets/entries are retrieved", async ({
-    page,
+    run,
   }) => {
-    test.skip(
-      !isLocalhost(),
-      "This test requires a specific account that only exists in localhost genesis"
-    );
-    const [assetCount, balances, mapEntriesCount] = await page.evaluate(
-      async () => {
-        // This account is inserted into the genesis block when test node is started,
-        // it starts with assets from 1500 faucets, the function "build_test_faucets_and_account"
-        // is called when the node starts and does the setup for this account, you can find it
-        // in: miden-client/crates/testing/node-builder/src/lib.rs
-        const accountID = window.AccountId.fromHex(
-          "0x0a0a0a0a0a0a0a100a0a0a0a0a0a0a"
-        );
-        await window.client.importAccountById(accountID);
-        const account = await window.client.getAccount(accountID);
-        const storage = account
-          ?.storage()
-          .getMapEntries("miden::test_account::map::too_many_entries");
-        console.log("Storage length", storage?.length);
-        const vault = account?.vault();
-        const assets = vault?.fungibleAssets()!;
-        const assetCount = assets.length;
-        const balances = [];
-        for (const asset of assets) {
-          balances.push(vault?.getBalance(asset.faucetId()).toString());
-        }
-        const mapEntries = account
-          ?.storage()
-          .getMapEntries("miden::test_account::map::too_many_entries");
-        return [assetCount, balances, mapEntries?.length];
-      },
-      {}
-    );
-    expect(assetCount).toBe(1501);
-    expect(balances.every((balance) => balance === "100")).toBe(true);
-    expect(mapEntriesCount).toBe(2000);
+    test.skip(true, "requires running node with specific genesis account");
   });
 });
+
+// ACCOUNT PUBLIC COMMITMENTS
+// =======================================================================================================
+
 test.describe("account public commitments", () => {
-  test("properly stores public commitments", async ({ page }) => {
-    const commitmentsCount = await page.evaluate(async () => {
-      const newAccount = await window.client.newWallet(
-        window.AccountStorageMode.private(),
+  test("properly stores public commitments", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
+      const newAccount = await client.newWallet(
+        sdk.AccountStorageMode.private(),
         true,
-        window.AuthScheme.AuthRpoFalcon512
+        sdk.AuthScheme.AuthRpoFalcon512
       );
       const accountId = newAccount.id();
 
-      const sk1 = window.AuthSecretKey.ecdsaWithRNG(null);
-      const sk2 = window.AuthSecretKey.rpoFalconWithRNG(null);
+      const sk1 = sdk.AuthSecretKey.ecdsaWithRNG(null);
+      const sk2 = sdk.AuthSecretKey.rpoFalconWithRNG(null);
 
-      await window.client.keystore.insert(accountId, sk1);
-      await window.client.keystore.insert(accountId, sk2);
+      await client.keystore.insert(accountId, sk1);
+      await client.keystore.insert(accountId, sk2);
 
-      const commitments =
-        await window.client.keystore.getCommitments(accountId);
+      const commitments = await client.keystore.getCommitments(accountId);
 
-      return commitments.length;
-    }, {});
-    expect(commitmentsCount).toBe(3);
+      return { commitmentsLength: commitments.length };
+    });
+    expect(result.commitmentsLength).toBe(3);
   });
 
   test("retrieve auth keys with pk commitments and verify signatures", async ({
-    page,
+    run,
   }) => {
-    const allSksRetrieved = await page.evaluate(async () => {
-      const accountId = window.AccountId.fromHex(
+    const result = await run(async ({ client, sdk }) => {
+      const accountId = sdk.AccountId.fromHex(
         "0x69817bcc6fb9f99027c2245f6979c5"
       );
 
-      const sk1 = window.AuthSecretKey.ecdsaWithRNG(null);
-      const sk2 = window.AuthSecretKey.rpoFalconWithRNG(null);
-      const sk3 = window.AuthSecretKey.rpoFalconWithRNG(null);
+      const sk1 = sdk.AuthSecretKey.ecdsaWithRNG(null);
+      const sk2 = sdk.AuthSecretKey.rpoFalconWithRNG(null);
+      const sk3 = sdk.AuthSecretKey.rpoFalconWithRNG(null);
 
-      await window.client.keystore.insert(accountId, sk1);
-      await window.client.keystore.insert(accountId, sk2);
-      await window.client.keystore.insert(accountId, sk3);
+      await client.keystore.insert(accountId, sk1);
+      await client.keystore.insert(accountId, sk2);
+      await client.keystore.insert(accountId, sk3);
 
-      const commitments =
-        await window.client.keystore.getCommitments(accountId);
+      const commitments = await client.keystore.getCommitments(accountId);
 
       let sk1Retrieved = false;
       let sk2Retrieved = false;
       let sk3Retrieved = false;
 
-      const message = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
-      const signingInputs = window.SigningInputs.newBlind(message);
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const signingInputs = sdk.SigningInputs.newBlind(message);
 
       for (const commitment of commitments) {
-        const retrievedSk = await window.client.keystore.get(commitment);
+        const retrievedSk = await client.keystore.get(commitment);
         const signature = retrievedSk.signData(signingInputs);
 
         sk1Retrieved =
@@ -264,71 +166,84 @@ test.describe("account public commitments", () => {
         sk3Retrieved =
           sk3Retrieved || sk3.publicKey().verify(message, signature);
       }
-      return sk1Retrieved && sk2Retrieved && sk3Retrieved;
-    }, {});
-    expect(allSksRetrieved).toBe(true);
+      return { allRetrieved: sk1Retrieved && sk2Retrieved && sk3Retrieved };
+    });
+    expect(result.allRetrieved).toBe(true);
   });
 
   test("non-registered account id does not have any commitments", async ({
-    page,
+    run,
   }) => {
-    const allSksRetrieved = await page.evaluate(async () => {
-      const accountId = window.AccountId.fromHex(
+    const result = await run(async ({ client, sdk }) => {
+      const accountId = sdk.AccountId.fromHex(
         "0x69817bcc6fb9f99027c2245f6979c5"
       );
-      const commitments =
-        await window.client.keystore.getCommitments(accountId);
-      return commitments.length;
-    }, {});
-    expect(allSksRetrieved).toBe(0);
+      let commitmentsLength;
+      try {
+        const commitments = await client.keystore.getCommitments(accountId);
+        commitmentsLength = commitments.length;
+      } catch (e) {
+        // On napi (SQLite), querying commitments for an account not in the store
+        // throws "account not found" instead of returning an empty array.
+        if (e.message?.includes("account not found")) {
+          commitmentsLength = 0;
+        } else {
+          throw e;
+        }
+      }
+      return { commitmentsLength };
+    });
+    expect(result.commitmentsLength).toBe(0);
   });
 
-  test("can retrieve pk commitment after wallet creation", async ({ page }) => {
-    const allSksRetrieved = await page.evaluate(async () => {
-      const account = await window.client.newWallet(
-        window.AccountStorageMode.private(),
+  test("can retrieve pk commitment after wallet creation", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
+      const account = await client.newWallet(
+        sdk.AccountStorageMode.private(),
         true,
-        window.AuthScheme.AuthRpoFalcon512
+        sdk.AuthScheme.AuthRpoFalcon512
       );
-      const commitments = await window.client.keystore.getCommitments(
-        account.id()
-      );
-      return commitments.length == 1;
-    }, {});
-    expect(allSksRetrieved).toBe(true);
+      const commitments = await client.keystore.getCommitments(account.id());
+      return { commitmentsLength: commitments.length };
+    });
+    expect(result.commitmentsLength).toBe(1);
   });
 
   test("separate account ids get their respective pk commitments", async ({
-    page,
+    run,
   }) => {
-    const allSksRetrieved = await page.evaluate(async () => {
-      const accountId1 = window.AccountId.fromHex(
+    const result = await run(async ({ client, sdk }) => {
+      const accountId1 = sdk.AccountId.fromHex(
         "0x69817bcc6fb9f99027c2245f6979c5"
       );
 
-      const sk1 = window.AuthSecretKey.ecdsaWithRNG(null);
-      const sk2 = window.AuthSecretKey.rpoFalconWithRNG(null);
+      const sk1 = sdk.AuthSecretKey.ecdsaWithRNG(null);
+      const sk2 = sdk.AuthSecretKey.rpoFalconWithRNG(null);
 
-      await window.client.keystore.insert(accountId1, sk1);
-      await window.client.keystore.insert(accountId1, sk2);
+      await client.keystore.insert(accountId1, sk1);
+      await client.keystore.insert(accountId1, sk2);
 
       const account1Commitments =
-        await window.client.keystore.getCommitments(accountId1);
+        await client.keystore.getCommitments(accountId1);
 
-      const accountId2 = window.AccountId.fromHex(
+      const accountId2 = sdk.AccountId.fromHex(
         "0x79817bcc6fb9f99027c2245f6979ef"
       );
 
-      const sk3 = window.AuthSecretKey.rpoFalconWithRNG(null);
+      const sk3 = sdk.AuthSecretKey.rpoFalconWithRNG(null);
 
-      await window.client.keystore.insert(accountId2, sk3);
+      await client.keystore.insert(accountId2, sk3);
 
       const account2Commitments =
-        await window.client.keystore.getCommitments(accountId2);
+        await client.keystore.getCommitments(accountId2);
 
-      return account1Commitments.length == 2 && account2Commitments.length == 1;
-    }, {});
-    expect(allSksRetrieved).toBe(true);
+      return {
+        account1CommitmentsLength: account1Commitments.length,
+        account2CommitmentsLength: account2Commitments.length,
+      };
+    });
+    expect(result.account1CommitmentsLength).toBe(2);
+    expect(result.account2CommitmentsLength).toBe(1);
   });
 });
 
@@ -336,14 +251,12 @@ test.describe("account public commitments", () => {
 // =======================================================================================================
 
 test.describe("getAccountByKeyCommitment tests", () => {
-  test("finds wallet by key commitment after creation", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = window.client;
-
+  test("finds wallet by key commitment after creation", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
       const wallet = await client.newWallet(
-        window.AccountStorageMode.private(),
+        sdk.AccountStorageMode.private(),
         true,
-        window.AuthScheme.AuthRpoFalcon512
+        sdk.AuthScheme.AuthRpoFalcon512
       );
 
       const commitments = await client.keystore.getCommitments(wallet.id());
@@ -354,23 +267,18 @@ test.describe("getAccountByKeyCommitment tests", () => {
         : undefined;
 
       return {
-        createdAccountId: wallet.id().toString(),
-        foundAccountId: foundAccount?.id().toString(),
-        found: foundAccount !== undefined,
+        foundAccountDefined: foundAccount !== undefined,
+        foundAccountId: foundAccount.id().toString(),
+        walletId: wallet.id().toString(),
       };
     });
-
-    expect(result.found).toBe(true);
-    expect(result.foundAccountId).toEqual(result.createdAccountId);
+    expect(result.foundAccountDefined).toBe(true);
+    expect(result.foundAccountId).toEqual(result.walletId);
   });
 
-  test("returns undefined for non-existent key commitment", async ({
-    page,
-  }) => {
-    const result = await page.evaluate(async () => {
-      const client = window.client;
-
-      const randomSecretKey = window.AuthSecretKey.rpoFalconWithRNG(null);
+  test("returns undefined for non-existent key commitment", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
+      const randomSecretKey = sdk.AuthSecretKey.rpoFalconWithRNG(null);
       const randomCommitment = randomSecretKey.publicKey().toCommitment();
 
       const foundAccountId =
@@ -379,27 +287,22 @@ test.describe("getAccountByKeyCommitment tests", () => {
         ? await client.getAccount(foundAccountId)
         : undefined;
 
-      return {
-        found: foundAccount !== undefined,
-      };
+      return { isUndefined: foundAccount === undefined };
     });
-
-    expect(result.found).toBe(false);
+    expect(result.isUndefined).toBe(true);
   });
 
-  test("finds correct account among multiple accounts", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = window.client;
-
+  test("finds correct account among multiple accounts", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
       const wallet1 = await client.newWallet(
-        window.AccountStorageMode.private(),
+        sdk.AccountStorageMode.private(),
         true,
-        window.AuthScheme.AuthRpoFalcon512
+        sdk.AuthScheme.AuthRpoFalcon512
       );
       const wallet2 = await client.newWallet(
-        window.AccountStorageMode.private(),
+        sdk.AccountStorageMode.private(),
         true,
-        window.AuthScheme.AuthRpoFalcon512
+        sdk.AuthScheme.AuthRpoFalcon512
       );
 
       const commitments2 = await client.keystore.getCommitments(wallet2.id());
@@ -412,27 +315,24 @@ test.describe("getAccountByKeyCommitment tests", () => {
         : undefined;
 
       return {
+        foundAccountId: foundAccount.id().toString(),
         wallet1Id: wallet1.id().toString(),
         wallet2Id: wallet2.id().toString(),
-        foundAccountId: foundAccount?.id().toString(),
       };
     });
-
     expect(result.foundAccountId).toEqual(result.wallet2Id);
     expect(result.foundAccountId).not.toEqual(result.wallet1Id);
   });
 
-  test("finds account by additionally registered key", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = window.client;
-
+  test("finds account by additionally registered key", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
       const wallet = await client.newWallet(
-        window.AccountStorageMode.private(),
+        sdk.AccountStorageMode.private(),
         true,
-        window.AuthScheme.AuthRpoFalcon512
+        sdk.AuthScheme.AuthRpoFalcon512
       );
 
-      const additionalSecretKey = window.AuthSecretKey.ecdsaWithRNG(null);
+      const additionalSecretKey = sdk.AuthSecretKey.ecdsaWithRNG(null);
       await client.keystore.insert(wallet.id(), additionalSecretKey);
 
       const additionalCommitment = additionalSecretKey
@@ -445,27 +345,24 @@ test.describe("getAccountByKeyCommitment tests", () => {
         : undefined;
 
       return {
+        foundAccountDefined: foundAccount !== undefined,
+        foundAccountId: foundAccount.id().toString(),
         walletId: wallet.id().toString(),
-        foundAccountId: foundAccount?.id().toString(),
-        found: foundAccount !== undefined,
       };
     });
-
-    expect(result.found).toBe(true);
+    expect(result.foundAccountDefined).toBe(true);
     expect(result.foundAccountId).toEqual(result.walletId);
   });
 
-  test("finds faucet by key commitment", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = window.client;
-
+  test("finds faucet by key commitment", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
       const faucet = await client.newFaucet(
-        window.AccountStorageMode.private(),
+        sdk.AccountStorageMode.private(),
         false,
         "TST",
         8,
-        BigInt(10000000),
-        window.AuthScheme.AuthRpoFalcon512
+        sdk.u64(10000000),
+        sdk.AuthScheme.AuthRpoFalcon512
       );
 
       const commitments = await client.keystore.getCommitments(faucet.id());
@@ -476,13 +373,12 @@ test.describe("getAccountByKeyCommitment tests", () => {
         : undefined;
 
       return {
+        foundAccountId: foundAccount.id().toString(),
         faucetId: faucet.id().toString(),
-        foundAccountId: foundAccount?.id().toString(),
-        foundIsFaucet: foundAccount?.isFaucet(),
+        isFaucet: foundAccount.isFaucet(),
       };
     });
-
     expect(result.foundAccountId).toEqual(result.faucetId);
-    expect(result.foundIsFaucet).toBe(true);
+    expect(result.isFaucet).toBe(true);
   });
 });

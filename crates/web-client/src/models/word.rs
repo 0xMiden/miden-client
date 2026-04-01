@@ -1,88 +1,92 @@
+use js_export_macro::js_export;
 use miden_client::{Felt as NativeFelt, Word as NativeWord};
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use super::felt::Felt;
-use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
+use crate::platform::{JsBytes, JsErr, JsU64, from_str_err, js_u64_to_u64};
+use crate::utils::{deserialize_from_bytes, serialize_to_bytes};
 
-#[wasm_bindgen]
 #[derive(Clone)]
+#[js_export]
 pub struct Word(NativeWord);
 
-#[wasm_bindgen]
+#[js_export]
 impl Word {
-    /// Creates a word from four u64 values.
-    #[wasm_bindgen(constructor)]
-    pub fn new(u64_vec: Vec<u64>) -> Word {
-        let fixed_array_u64: [u64; 4] = u64_vec.try_into().unwrap();
-
+    /// Creates a word from four numeric values.
+    #[js_export(constructor)]
+    pub fn new(u64_vec: Vec<JsU64>) -> Word {
+        assert!(u64_vec.len() == 4, "Word requires exactly 4 elements, got {}", u64_vec.len());
+        let fixed_array_u64: [u64; 4] = u64_vec
+            .iter()
+            .map(|&v| js_u64_to_u64(v))
+            .collect::<Vec<u64>>()
+            .try_into()
+            .expect("Word requires exactly 4 elements");
         let native_felt_vec: [NativeFelt; 4] = fixed_array_u64
             .iter()
             .map(|&v| NativeFelt::new(v))
             .collect::<Vec<NativeFelt>>()
             .try_into()
-            .unwrap();
+            .expect("Word requires exactly 4 field elements");
+        Word(native_felt_vec.into())
+    }
 
-        let native_word: NativeWord = native_felt_vec.into();
-
-        Word(native_word)
+    /// Returns the word as an array of numeric values.
+    #[js_export(js_name = "toU64s")]
+    pub fn to_u64s(&self) -> Vec<JsU64> {
+        self.0.iter().map(|f| NativeFelt::as_int(f) as JsU64).collect()
     }
 
     /// Creates a Word from a hex string.
-    /// Fails if the provided string is not a valid hex representation of a Word.
-    #[wasm_bindgen(js_name = "fromHex")]
-    pub fn from_hex(hex: &str) -> Result<Word, JsValue> {
-        let native_word = NativeWord::try_from(hex).map_err(|err| {
-            JsValue::from_str(&format!("Error instantiating Word from hex: {err}"))
-        })?;
+    #[js_export(js_name = "fromHex")]
+    pub fn from_hex(hex: String) -> Result<Word, JsErr> {
+        let native_word = NativeWord::try_from(hex.as_str())
+            .map_err(|err| from_str_err(&format!("Error instantiating Word from hex: {err}")))?;
         Ok(Word(native_word))
     }
 
     /// Creates a word from four field elements.
-    #[wasm_bindgen(js_name = "newFromFelts")]
+    #[js_export(js_name = "newFromFelts")]
     #[allow(clippy::needless_pass_by_value)]
     pub fn new_from_felts(felt_vec: Vec<Felt>) -> Word {
+        assert!(
+            felt_vec.len() == 4,
+            "Word requires exactly 4 field elements, got {}",
+            felt_vec.len()
+        );
         let native_felt_vec: [NativeFelt; 4] = felt_vec
             .iter()
             .map(|felt: &Felt| felt.into())
             .collect::<Vec<NativeFelt>>()
             .try_into()
-            .unwrap();
-
-        let native_word: NativeWord = native_felt_vec.into();
-
-        Word(native_word)
+            .expect("Word requires exactly 4 field elements");
+        Word(native_felt_vec.into())
     }
 
     /// Returns the hex representation of the word.
-    #[wasm_bindgen(js_name = "toHex")]
+    #[js_export(js_name = "toHex")]
     pub fn to_hex(&self) -> String {
         self.0.to_hex()
     }
 
     /// Serializes the word into bytes.
-    pub fn serialize(&self) -> Uint8Array {
-        serialize_to_uint8array(&self.0)
+    pub fn serialize(&self) -> JsBytes {
+        serialize_to_bytes(&self.0)
     }
 
     /// Deserializes a word from bytes.
-    pub fn deserialize(bytes: &Uint8Array) -> Result<Word, JsValue> {
-        let native_word = deserialize_from_uint8array::<NativeWord>(bytes)?;
+    pub fn deserialize(bytes: JsBytes) -> Result<Word, JsErr> {
+        let native_word = deserialize_from_bytes::<NativeWord>(&bytes)?;
         Ok(Word(native_word))
     }
 
-    /// Returns the word as an array of u64 values.
-    #[wasm_bindgen(js_name = "toU64s")]
-    pub fn to_u64s(&self) -> Vec<u64> {
-        self.0.iter().map(NativeFelt::as_int).collect::<Vec<u64>>()
-    }
-
     /// Returns the word as an array of field elements.
-    #[wasm_bindgen(js_name = "toFelts")]
+    #[js_export(js_name = "toFelts")]
     pub fn to_felts(&self) -> Vec<Felt> {
         self.0.iter().map(|felt| Felt::from(*felt)).collect::<Vec<Felt>>()
     }
+}
 
+impl Word {
     pub(crate) fn as_native(&self) -> &NativeWord {
         &self.0
     }
@@ -114,3 +118,5 @@ impl From<&Word> for NativeWord {
         word.0
     }
 }
+
+impl_napi_from_value!(Word);

@@ -88,7 +88,7 @@ export function useSwap(): UseSwapResult {
 
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
-          const txRequest = client.newSwapTransactionRequest(
+          const txRequest = await client.newSwapTransactionRequest(
             accountIdObj,
             offeredFaucetIdObj,
             BigInt(options.offeredAmount),

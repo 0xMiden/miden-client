@@ -1,10 +1,10 @@
+use js_export_macro::js_export;
 use miden_client::Word as NativeWord;
 use miden_client::note::{
     NoteRecipient as NativeNoteRecipient,
     NoteScript as NativeNoteScript,
     NoteStorage as NativeNoteStorage,
 };
-use wasm_bindgen::prelude::*;
 
 use super::note_script::NoteScript;
 use super::note_storage::NoteStorage;
@@ -21,13 +21,13 @@ use crate::models::miden_arrays::NoteRecipientArray as RecipientArray;
 /// Recipient is computed as a nested hash of the serial number, the script root, and the storage
 /// commitment, ensuring the recipient digest binds all three pieces of data together.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteRecipient(NativeNoteRecipient);
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteRecipient {
     /// Creates a note recipient from its serial number, script, and storage.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new(
         serial_num: &Word,
         note_script: &NoteScript,
@@ -48,7 +48,7 @@ impl NoteRecipient {
     }
 
     /// Returns the serial number that prevents double spends.
-    #[wasm_bindgen(js_name = "serialNum")]
+    #[js_export(js_name = "serialNum")]
     pub fn serial_num(&self) -> Word {
         self.0.serial_num().into()
     }
@@ -93,6 +93,9 @@ impl From<&NoteRecipient> for NativeNoteRecipient {
 
 impl From<&RecipientArray> for Vec<NativeNoteRecipient> {
     fn from(recipient_array: &RecipientArray) -> Self {
-        recipient_array.__inner.iter().map(NativeNoteRecipient::from).collect()
+        let items: Vec<NoteRecipient> = recipient_array.into();
+        items.into_iter().map(NativeNoteRecipient::from).collect()
     }
 }
+
+impl_napi_from_value!(NoteRecipient);

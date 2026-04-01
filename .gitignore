@@ -47,6 +47,15 @@ packages/react-sdk/dist/
 !packages/vite-plugin/**
 packages/vite-plugin/dist/
 packages/vite-plugin/node_modules/
+!packages/node-sdk-darwin-arm64/
+!packages/node-sdk-darwin-arm64/**
+packages/node-sdk-darwin-arm64/*.node
+!packages/node-sdk-darwin-x64/
+!packages/node-sdk-darwin-x64/**
+packages/node-sdk-darwin-x64/*.node
+!packages/node-sdk-linux-x64-gnu/
+!packages/node-sdk-linux-x64-gnu/**
+packages/node-sdk-linux-x64-gnu/*.node
 keystore/
 
 # Ignore files that spawn using `cargo run`
@@ -63,3 +72,4 @@ crates/web-client/playwright-report
 # JS metadata generated from idxdb-store TypeScript build
 crates/idxdb-store/src/js/**/*.d.ts
 crates/idxdb-store/src/js/**/*.js.map
+.claude/scheduled_tasks.lock

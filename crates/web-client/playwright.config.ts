@@ -40,6 +40,13 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
       testMatch: "*.test.ts",
+      testIgnore: [
+        "test/node/**",
+        "test/shared/**",
+        // Node.js-only tests (use napi-specific JS wrapper)
+        "test/compile_and_contract*",
+        "test/miden_client_api*",
+      ],
     },
 
     // {
@@ -50,6 +57,37 @@ export default defineConfig({
     {
       name: "webkit",
       use: { ...devices["Desktop Safari"] },
+      testIgnore: [
+        "test/node/**",
+        "test/shared/**",
+        // Node.js-only tests (use napi-specific JS wrapper)
+        "test/compile_and_contract*",
+        "test/miden_client_api*",
+      ],
+    },
+
+    {
+      name: "nodejs",
+      testDir: "./test",
+      testMatch: "**/*.test.ts",
+      // Skip browser-only and WASM-specific tests
+      testIgnore: [
+        "test/store_isolation*",
+        "test/sync_lock*",
+        "test/import_export*",
+        "test/remote_keystore*",
+        "test/package*", // TestUtils (createMockSerialized*) is browser-only
+        "test/miden_array*", // WASM array .length() method not available in Node.js
+        "test/shared/**", // Old format duplicates (ported to root test/)
+        "test/node/**", // Old format duplicates (ported to root test/)
+        "test/remote_prover_transactions*", // Old browser format for chromium CI
+      ],
+      // Skip specific browser-only tests by name.
+      // Tests that request the `page` fixture must be listed here because
+      // Playwright launches the browser for the fixture BEFORE test.skip()
+      // in the test body can run.
+      grepInvert:
+        /exportStore|importStore|reads updated state after a mutating|accounts\.insert stores a pre-built/,
     },
 
     /* Test against mobile viewports. */
@@ -75,9 +113,14 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   // FIXME: Modularise test server constants (localhost, port)
-  webServer: {
-    command: "npx http-server ./dist -p 8080",
-    url: "http://127.0.0.1:8080",
-    reuseExistingServer: true,
-  },
+  // Skip webServer when running only Node.js tests (no browser/dist needed)
+  ...(process.env.SKIP_WEB_SERVER
+    ? {}
+    : {
+        webServer: {
+          command: "npx http-server ./dist -p 8080",
+          url: "http://127.0.0.1:8080",
+          reuseExistingServer: true,
+        },
+      }),
 });
