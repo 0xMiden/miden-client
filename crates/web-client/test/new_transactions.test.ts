@@ -345,8 +345,8 @@ export const customTransaction = async (
       let expectedNoteArgs = noteArgs.map((felt) => felt.asInt());
       let memAddress = "1000";
       let memAddress2 = "1004";
-      let expectedNoteArg1 = expectedNoteArgs.slice(0, 4).reverse().join(".");
-      let expectedNoteArg2 = expectedNoteArgs.slice(4, 8).reverse().join(".");
+      let expectedNoteArg1 = expectedNoteArgs.slice(0, 4).join(".");
+      let expectedNoteArg2 = expectedNoteArgs.slice(4, 8).join(".");
 
       let noteScript = `
             # Custom P2ID note script
@@ -425,8 +425,8 @@ export const customTransaction = async (
       let compiledNoteScript = builder.compileNoteScript(noteScript);
       let noteStorage = new window.NoteStorage(
         new window.MidenArrays.FeltArray([
-          walletAccount.id().prefix(),
           walletAccount.id().suffix(),
+          walletAccount.id().prefix(),
         ])
       );
 

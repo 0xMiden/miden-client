@@ -57,6 +57,7 @@ test.describe("get_input_note", () => {
   });
 
   test("retrieve an input note that does exist", async ({ page }) => {
+    test.slow();
     const { consumedNoteId } = await setupConsumedNote(page);
 
     // Test both the existing client method and new RpcClient
@@ -87,6 +88,7 @@ test.describe("get_input_note", () => {
   });
 
   test("get note script by root", async ({ page }) => {
+    test.slow();
     await setupWalletAndFaucet(page);
 
     // First, we need to get a note script root from an existing note
@@ -135,6 +137,7 @@ test.describe("get_input_note", () => {
   test("sync notes by tag and check nullifier commit height", async ({
     page,
   }) => {
+    test.slow();
     const { consumedNoteId } = await setupConsumedNote(page, true);
 
     const result = await page.evaluate(async (_consumedNoteId: string) => {
@@ -185,6 +188,7 @@ test.describe("get_input_note", () => {
 
 test.describe("get_input_notes", () => {
   test("note exists, note filter all", async ({ page }) => {
+    test.slow();
     const { consumedNoteId } = await setupConsumedNote(page);
     const { noteIds } = await getInputNotes(page);
     expect(noteIds.length).toBeGreaterThanOrEqual(1);
