@@ -26,7 +26,6 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use miden_protocol::Word;
 use miden_protocol::account::{
     Account,
     AccountCode,
@@ -46,6 +45,7 @@ use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, Partia
 use miden_protocol::errors::AccountError;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::TransactionId;
+use miden_protocol::{Felt, Word};
 use miden_tx::utils::{Deserializable, Serializable};
 
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
@@ -273,7 +273,7 @@ pub trait Store: Send + Sync {
     async fn prune_account_history(
         &self,
         account_id: AccountId,
-        up_to_nonce: u64,
+        up_to_nonce: Felt,
     ) -> Result<usize, StoreError>;
 
     // ACCOUNT

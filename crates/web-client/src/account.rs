@@ -170,7 +170,7 @@ impl WebClient {
     ) -> Result<u32, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let deleted = client
-                .prune_account_history(account_id.into(), up_to_nonce.as_int())
+                .prune_account_history(account_id.into(), up_to_nonce.into())
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to prune account history"))?;
             // SAFETY: on wasm32 usize is 32 bits, so this conversion is infallible

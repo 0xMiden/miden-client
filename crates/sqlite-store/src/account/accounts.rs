@@ -34,7 +34,7 @@ use miden_client::store::{
 };
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::Serializable;
-use miden_client::{AccountError, Word};
+use miden_client::{AccountError, Felt, Word};
 use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
 use miden_protocol::asset::{AssetVaultKey, PartialVault};
 use miden_protocol::crypto::merkle::MerkleError;
@@ -982,11 +982,11 @@ impl SqliteStore {
     pub fn prune_account_history(
         conn: &mut Connection,
         account_id: AccountId,
-        up_to_nonce: u64,
+        up_to_nonce: Felt,
     ) -> Result<usize, StoreError> {
         let tx = conn.transaction().into_store_error()?;
         let account_id_hex = account_id.to_hex();
-        let boundary_val = u64_to_value(up_to_nonce);
+        let boundary_val = u64_to_value(up_to_nonce.as_int());
         let mut total_deleted: usize = 0;
 
         // Collect code commitments from headers we are about to delete.

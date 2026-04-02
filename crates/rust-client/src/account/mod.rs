@@ -36,6 +36,7 @@
 
 use alloc::vec::Vec;
 
+use miden_protocol::Felt;
 use miden_protocol::account::auth::PublicKey;
 pub use miden_protocol::account::{
     Account,
@@ -401,7 +402,7 @@ impl<AUTH> Client<AUTH> {
     pub async fn prune_account_history(
         &self,
         account_id: AccountId,
-        up_to_nonce: u64,
+        up_to_nonce: Felt,
     ) -> Result<usize, ClientError> {
         Ok(self.store.prune_account_history(account_id, up_to_nonce).await?)
     }

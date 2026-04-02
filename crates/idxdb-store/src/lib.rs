@@ -14,7 +14,6 @@ use alloc::vec::Vec;
 
 use base64::Engine;
 use base64::engine::general_purpose;
-use miden_client::Word;
 use miden_client::account::{
     Account,
     AccountCode,
@@ -46,6 +45,7 @@ use miden_client::store::{
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
 use miden_client::utils::RwLock;
+use miden_client::{Felt, Word};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use wasm_bindgen::prelude::*;
@@ -287,7 +287,7 @@ impl Store for IdxdbStore {
     async fn prune_account_history(
         &self,
         account_id: AccountId,
-        up_to_nonce: u64,
+        up_to_nonce: Felt,
     ) -> Result<usize, StoreError> {
         self.prune_account_history(account_id, up_to_nonce).await
     }

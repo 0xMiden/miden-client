@@ -680,7 +680,7 @@ async fn prune_account_history_removes_old_committed_states() -> anyhow::Result<
     // Prune up to nonce 1 (should delete nonce 0 historical entry)
     let deleted = store
         .interact_with_connection(move |conn| {
-            SqliteStore::prune_account_history(conn, account_id, 1)
+            SqliteStore::prune_account_history(conn, account_id, Felt::new(1))
         })
         .await?;
 
@@ -729,7 +729,7 @@ async fn prune_account_history_noop_with_single_state() -> anyhow::Result<()> {
     // Prune with nonce 0: no historical entries have replaced_at_nonce <= 0
     let deleted = store
         .interact_with_connection(move |conn| {
-            SqliteStore::prune_account_history(conn, account_id, 0)
+            SqliteStore::prune_account_history(conn, account_id, Felt::new(0))
         })
         .await?;
 
@@ -780,10 +780,14 @@ async fn prune_account_history_multiple_accounts() -> anyhow::Result<()> {
 
     // Prune account A up to nonce 1, account B up to nonce 1
     let deleted_a = store
-        .interact_with_connection(move |conn| SqliteStore::prune_account_history(conn, a_id, 1))
+        .interact_with_connection(move |conn| {
+            SqliteStore::prune_account_history(conn, a_id, Felt::new(1))
+        })
         .await?;
     let deleted_b = store
-        .interact_with_connection(move |conn| SqliteStore::prune_account_history(conn, b_id, 1))
+        .interact_with_connection(move |conn| {
+            SqliteStore::prune_account_history(conn, b_id, Felt::new(1))
+        })
         .await?;
 
     assert!(deleted_a + deleted_b > 0);
@@ -854,7 +858,7 @@ async fn prune_removes_orphaned_account_code() -> anyhow::Result<()> {
     // is deleted, and since no other header references it, the code should be removed.
     let deleted = store
         .interact_with_connection(move |conn| {
-            SqliteStore::prune_account_history(conn, account_id, 1)
+            SqliteStore::prune_account_history(conn, account_id, Felt::new(1))
         })
         .await?;
     assert!(deleted > 0);

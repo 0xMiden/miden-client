@@ -39,7 +39,7 @@ use miden_client::store::{
     StoreError,
 };
 use miden_client::utils::Serializable;
-use miden_client::{AccountError, Word};
+use miden_client::{AccountError, Felt, Word};
 
 use super::IdxdbStore;
 use crate::account::js_bindings::idxdb_get_account_addresses;
@@ -673,12 +673,12 @@ impl IdxdbStore {
     pub(crate) async fn prune_account_history(
         &self,
         account_id: AccountId,
-        up_to_nonce: u64,
+        up_to_nonce: Felt,
     ) -> Result<usize, StoreError> {
         let promise = idxdb_prune_account_history(
             self.db_id(),
             account_id.to_string(),
-            up_to_nonce.to_string(),
+            up_to_nonce.as_int().to_string(),
         );
         await_js(promise, "failed to prune account history").await
     }

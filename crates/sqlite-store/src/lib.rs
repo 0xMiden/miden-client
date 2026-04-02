@@ -50,6 +50,7 @@ use miden_client::store::{
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
+use miden_protocol::Felt;
 use miden_protocol::account::StorageMapWitness;
 use miden_protocol::asset::AssetVaultKey;
 use rusqlite::Connection;
@@ -286,7 +287,7 @@ impl Store for SqliteStore {
     async fn prune_account_history(
         &self,
         account_id: AccountId,
-        up_to_nonce: u64,
+        up_to_nonce: Felt,
     ) -> Result<usize, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::prune_account_history(conn, account_id, up_to_nonce)

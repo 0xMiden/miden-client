@@ -220,7 +220,7 @@ async fn prune_account_history_with_pending_transaction() {
     // Prune up to nonce 1 while tx2 is still pending.
     // This should remove nonce-0 historical entries but must preserve nonce-1 entries
     // (which tx2's undo would need if the transaction were discarded).
-    let deleted = client.prune_account_history(faucet_id, 1).await.unwrap();
+    let deleted = client.prune_account_history(faucet_id, Felt::new(1)).await.unwrap();
     assert!(deleted > 0, "Should have pruned nonce-0 historical entries");
 
     // Now commit tx2, this must succeed
@@ -412,7 +412,7 @@ async fn prune_preserves_unmodified_storage_slots() {
     // Slot C was NEVER modified, so it has no entry in historical tables.
 
     // Prune old history up to nonce 1
-    let deleted = client.prune_account_history(account_id, 1).await.unwrap();
+    let deleted = client.prune_account_history(account_id, Felt::new(1)).await.unwrap();
     assert!(deleted > 0, "Should have pruned old committed states");
 
     // Verify all slot values are correct after pruning
