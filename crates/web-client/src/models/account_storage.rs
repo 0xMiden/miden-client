@@ -37,13 +37,11 @@ impl AccountStorage {
         let slot = self.0.slots().iter().find(|s| s.name() == &name)?;
 
         match slot.content() {
-            StorageSlotContent::Value(_) => {
-                self.0.get_item(&name).ok().map(Into::into)
-            }
+            StorageSlotContent::Value(_) => self.0.get_item(&name).ok().map(Into::into),
             StorageSlotContent::Map(map) => {
                 // Return first entry's value instead of the useless commitment hash
                 map.entries().next().map(|(_, value)| value.into())
-            }
+            },
         }
     }
 
@@ -84,16 +82,14 @@ impl AccountStorage {
         let slot = self.0.slots().iter().find(|s| s.name() == &slot_name)?;
 
         match slot.content() {
-            StorageSlotContent::Value(_) => {
-                self.0.get_item(&slot_name).ok().map(Into::into)
-            }
+            StorageSlotContent::Value(_) => self.0.get_item(&slot_name).ok().map(Into::into),
             StorageSlotContent::Map(map) => {
                 if let Some(k) = key {
                     self.0.get_map_item(&slot_name, k.into()).ok().map(Into::into)
                 } else {
                     map.entries().next().map(|(_, value)| value.into())
                 }
-            }
+            },
         }
     }
 
