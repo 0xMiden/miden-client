@@ -48,6 +48,10 @@ impl AccountStorage {
     /// Returns the first felt of a storage slot as a number.
     /// Works for both Value and Map slots (for maps, returns first entry's first felt).
     #[wasm_bindgen(js_name = "getNumber")]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "JS numbers are f64; Miden felts fit in 2^63"
+    )]
     pub fn get_number(&self, slot_name: &str) -> Option<f64> {
         let word = self.get_item(slot_name)?;
         let native_word: miden_client::Word = word.into();
@@ -74,9 +78,8 @@ impl AccountStorage {
     /// - For Map slots: returns the value at the given key, or the first entry's value if no key.
     #[wasm_bindgen(js_name = "readValue")]
     pub fn read_value(&self, slot_name: &str, key: Option<Word>) -> Option<Word> {
-        let slot_name = match StorageSlotName::new(slot_name) {
-            Ok(name) => name,
-            Err(_) => return None,
+        let Ok(slot_name) = StorageSlotName::new(slot_name) else {
+            return None;
         };
 
         let slot = self.0.slots().iter().find(|s| s.name() == &slot_name)?;
@@ -96,6 +99,10 @@ impl AccountStorage {
     /// Convenience: read a storage value and return the first felt as a number.
     /// Handles both Value and Map slots.
     #[wasm_bindgen(js_name = "readNumber")]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "JS numbers are f64; Miden felts fit in 2^63"
+    )]
     pub fn read_number(&self, slot_name: &str, key: Option<Word>) -> Option<f64> {
         let word = self.read_value(slot_name, key)?;
         let native_word: miden_client::Word = word.into();
