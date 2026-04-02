@@ -43,15 +43,15 @@ miden-standards = { default-features = false, version = "0.14" }
 miden-testing   = { default-features = false, version = "0.14" }
 miden-tx        = { default-features = false, version = "0.14" }
 
-# Miden node dependencies (from git branch until compatible crates.io release)
-miden-node-block-producer        = { git = "https://github.com/0xMiden/miden-node", branch = "tomasarrachea-fix-anauthenticated-note-batches" }
-miden-node-ntx-builder           = { git = "https://github.com/0xMiden/miden-node", branch = "tomasarrachea-fix-anauthenticated-note-batches" }
-miden-node-proto                 = { git = "https://github.com/0xMiden/miden-node", branch = "tomasarrachea-fix-anauthenticated-note-batches" }
-miden-node-proto-build           = { default-features = false, git = "https://github.com/0xMiden/miden-node", branch = "tomasarrachea-fix-anauthenticated-note-batches" }
-miden-node-rpc                   = { git = "https://github.com/0xMiden/miden-node", branch = "tomasarrachea-fix-anauthenticated-note-batches" }
-miden-node-store                 = { git = "https://github.com/0xMiden/miden-node", branch = "tomasarrachea-fix-anauthenticated-note-batches" }
-miden-node-utils                 = { git = "https://github.com/0xMiden/miden-node", branch = "tomasarrachea-fix-anauthenticated-note-batches" }
-miden-node-validator             = { git = "https://github.com/0xMiden/miden-node", branch = "tomasarrachea-fix-anauthenticated-note-batches" }
+# Miden node dependencies
+miden-node-block-producer        = { version = "0.14" }
+miden-node-ntx-builder           = { version = "0.14" }
+miden-node-proto                 = { version = "0.14" }
+miden-node-proto-build           = { default-features = false, version = "0.14" }
+miden-node-rpc                   = { version = "0.14" }
+miden-node-store                 = { version = "0.14" }
+miden-node-utils                 = { version = "0.14" }
+miden-node-validator             = { version = "0.14" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
 miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.14" }
 
