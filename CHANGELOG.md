@@ -4,6 +4,9 @@
 
 ### Enhancements
 
+* [BREAKING][behavior][web] `getItem()` on a `StorageMap` slot now returns the first entry's value instead of the map commitment hash. Previously, calling `getItem` on a map slot silently returned a meaningless 256-bit hash ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
+* [FEATURE][web] Added `getNumber(slotName)` convenience method on `AccountStorage` — returns the first felt as a JavaScript number. Works for both `Value` and `StorageMap` slots ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
+* [FEATURE][web] Added `readValue(slotName, key?)` and `readNumber(slotName, key?)` smart read methods on `AccountStorage` that handle both `Value` and `StorageMap` slots. For maps, accepts an optional `Word` key; without a key, returns the first entry ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)) ([#1737](https://github.com/0xMiden/miden-client/pull/1737), [#1809](https://github.com/0xMiden/miden-client/pull/1809)).
 * Added typed error parsing for node RPC endpoints, enabling programmatic error handling instead of string parsing ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).
 * Added `--rpc-status` flag to `miden-client info` command to display RPC node status information including node version, genesis commitment, store status, and block producer status; also added `get_status_unversioned` to `NodeRpcClient` trait ([#1742](https://github.com/0xMiden/miden-client/pull/1742)).
