@@ -36,6 +36,7 @@
 
 use alloc::vec::Vec;
 
+use miden_protocol::Felt;
 use miden_protocol::account::auth::PublicKey;
 pub use miden_protocol::account::{
     Account,
@@ -389,6 +390,21 @@ impl<AUTH> Client<AUTH> {
     /// ```
     pub fn account_reader(&self, account_id: AccountId) -> AccountReader {
         AccountReader::new(self.store.clone(), account_id)
+    }
+
+    /// Prunes historical account states for the specified account up to the given nonce.
+    ///
+    /// Deletes all historical entries with `replaced_at_nonce <= up_to_nonce` and any
+    /// orphaned account code.
+    ///
+    /// Returns the total number of rows deleted, including historical entries and orphaned
+    /// account code.
+    pub async fn prune_account_history(
+        &self,
+        account_id: AccountId,
+        up_to_nonce: Felt,
+    ) -> Result<usize, ClientError> {
+        Ok(self.store.prune_account_history(account_id, up_to_nonce).await?)
     }
 }
 

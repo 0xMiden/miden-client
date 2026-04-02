@@ -26,7 +26,6 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use miden_protocol::Word;
 use miden_protocol::account::{
     Account,
     AccountCode,
@@ -46,6 +45,7 @@ use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, Partia
 use miden_protocol::errors::AccountError;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::TransactionId;
+use miden_protocol::{Felt, Word};
 use miden_tx::utils::{Deserializable, Serializable};
 
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
@@ -259,6 +259,22 @@ pub trait Store: Send + Sync {
     /// Removes block headers that do not contain any client notes and aren't the genesis or last
     /// block.
     async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError>;
+
+    /// Prunes historical account states for the specified account up to the given nonce.
+    ///
+    /// Deletes all historical entries with `replaced_at_nonce <= up_to_nonce` from the
+    /// historical tables (headers, storage, storage map entries, and assets).
+    ///
+    /// Also removes orphaned `account_code` entries that are no longer referenced by any
+    /// account header.
+    ///
+    /// Returns the total number of rows deleted, including historical entries and orphaned
+    /// account code.
+    async fn prune_account_history(
+        &self,
+        account_id: AccountId,
+        up_to_nonce: Felt,
+    ) -> Result<usize, StoreError>;
 
     // ACCOUNT
     // --------------------------------------------------------------------------------------------

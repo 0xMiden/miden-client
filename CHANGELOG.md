@@ -17,6 +17,7 @@
 * Added `getAccountByKeyCommitment` method to `WebClient` for retrieving accounts by public key commitment ([#1729](https://github.com/0xMiden/miden-client/pull/1729)).
 * [BREAKING][removal][web] Removed `addAccountSecretKeyToWebStore`, `getAccountAuthByPubKeyCommitment`, `getPublicKeyCommitmentsOfAccount`, and `getAccountByKeyCommitment` from `WebClient`. Use the new `client.keystore` sub-object instead (e.g. `client.keystore.insert()`, `client.keystore.get()`, `client.keystore.getCommitments()`, `client.keystore.getAccountId()` + `client.getAccount()`). ([#1947](https://github.com/0xMiden/miden-client/pull/1947)).
 * Added automatic registration of note scripts required by network transactions (NTX). The client now checks the node's script registry before submitting a transaction and registers any missing scripts via a separate registration transaction ([#1840](https://github.com/0xMiden/miden-client/pull/1840)).
+* Added client methods to prune account history (commitments of previous nonces, alongside its orphaned account code) ([#1886](https://github.com/0xMiden/miden-client/pull/1886)).
 
 ### Changes
 

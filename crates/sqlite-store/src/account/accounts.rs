@@ -34,7 +34,7 @@ use miden_client::store::{
 };
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::Serializable;
-use miden_client::{AccountError, Word};
+use miden_client::{AccountError, Felt, Word};
 use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
 use miden_protocol::asset::{AssetVaultKey, PartialVault};
 use miden_protocol::crypto::merkle::MerkleError;
@@ -972,6 +972,96 @@ impl SqliteStore {
             .into_store_error()?;
 
         Ok(())
+    }
+
+    /// Prunes historical account states for a single account up to the given nonce.
+    ///
+    /// Deletes all historical entries with `replaced_at_nonce <= up_to_nonce`
+    /// (see DESIGN.md for why this threshold is safe), then removes any account
+    /// code that was only referenced by the deleted headers.
+    pub fn prune_account_history(
+        conn: &mut Connection,
+        account_id: AccountId,
+        up_to_nonce: Felt,
+    ) -> Result<usize, StoreError> {
+        let tx = conn.transaction().into_store_error()?;
+        let account_id_hex = account_id.to_hex();
+        let boundary_val = u64_to_value(up_to_nonce.as_int());
+        let mut total_deleted: usize = 0;
+
+        // Collect code commitments from headers we are about to delete.
+        let candidate_code_commitments: Vec<String> = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT DISTINCT code_commitment FROM historical_account_headers \
+                     WHERE id = ? AND replaced_at_nonce <= ?",
+                )
+                .into_store_error()?;
+            let rows = stmt
+                .query_map(params![&account_id_hex, &boundary_val], |row| row.get(0))
+                .into_store_error()?;
+            rows.collect::<Result<Vec<String>, _>>().into_store_error()?
+        };
+
+        // Delete historical entries.
+        total_deleted += tx
+            .execute(
+                "DELETE FROM historical_account_headers \
+                 WHERE id = ? AND replaced_at_nonce <= ?",
+                params![&account_id_hex, &boundary_val],
+            )
+            .into_store_error()?;
+
+        total_deleted += tx
+            .execute(
+                "DELETE FROM historical_account_storage \
+                 WHERE account_id = ? AND replaced_at_nonce <= ?",
+                params![&account_id_hex, &boundary_val],
+            )
+            .into_store_error()?;
+
+        total_deleted += tx
+            .execute(
+                "DELETE FROM historical_storage_map_entries \
+                 WHERE account_id = ? AND replaced_at_nonce <= ?",
+                params![&account_id_hex, &boundary_val],
+            )
+            .into_store_error()?;
+
+        total_deleted += tx
+            .execute(
+                "DELETE FROM historical_account_assets \
+                 WHERE account_id = ? AND replaced_at_nonce <= ?",
+                params![&account_id_hex, &boundary_val],
+            )
+            .into_store_error()?;
+
+        // Delete orphaned code: only check commitments from the deleted headers,
+        // and only if they are not referenced by any remaining header or foreign code.
+        for commitment in &candidate_code_commitments {
+            let still_referenced: bool = tx
+                .query_row(
+                    "SELECT EXISTS(
+                        SELECT 1 FROM latest_account_headers WHERE code_commitment = ?1
+                        UNION ALL
+                        SELECT 1 FROM historical_account_headers WHERE code_commitment = ?1
+                        UNION ALL
+                        SELECT 1 FROM foreign_account_code WHERE code_commitment = ?1
+                    )",
+                    params![commitment],
+                    |row| row.get(0),
+                )
+                .into_store_error()?;
+
+            if !still_referenced {
+                total_deleted += tx
+                    .execute("DELETE FROM account_code WHERE commitment = ?", params![commitment])
+                    .into_store_error()?;
+            }
+        }
+
+        tx.commit().into_store_error()?;
+        Ok(total_deleted)
     }
 
     fn remove_address_internal(tx: &Transaction<'_>, address: &Address) -> Result<(), StoreError> {
