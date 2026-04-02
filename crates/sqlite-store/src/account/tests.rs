@@ -665,10 +665,10 @@ async fn prune_account_history_removes_old_committed_states() -> anyhow::Result<
     let mut account = setup_account_with_map(&store, 5, &map_slot_name).await?;
     let account_id = account.id();
 
-    // Apply delta 1 (nonce 0→1, delta increment = 1)
+    // Apply delta 1 (nonce 0 to 1, delta increment = 1)
     apply_single_entry_update(&store, &mut account, &map_slot_name, 1).await?;
 
-    // Apply delta 2 (nonce 1→2, delta increment = 1)
+    // Apply delta 2 (nonce 1 to 2, delta increment = 1)
     apply_single_entry_update(&store, &mut account, &map_slot_name, 1).await?;
 
     // Before prune: 2 historical headers (nonce 0, 1).
@@ -726,7 +726,7 @@ async fn prune_account_history_noop_with_single_state() -> anyhow::Result<()> {
 
     let m_before = get_storage_metrics(&store).await;
 
-    // Prune with nonce 0 — no historical entries have replaced_at_nonce <= 0
+    // Prune with nonce 0: no historical entries have replaced_at_nonce <= 0
     let deleted = store
         .interact_with_connection(move |conn| {
             SqliteStore::prune_account_history(conn, account_id, 0)
@@ -747,13 +747,13 @@ async fn prune_account_history_multiple_accounts() -> anyhow::Result<()> {
     let map_slot_name_a = StorageSlotName::new("test::prune_all::map_a").expect("valid slot name");
     let map_slot_name_b = StorageSlotName::new("test::prune_all::map_b").expect("valid slot name");
 
-    // Account A: nonce 0 → 1 → 2
+    // Account A: nonce 0  to 1  to 2
     let mut account_a = setup_account_with_map(&store, 3, &map_slot_name_a).await?;
     let a_id = account_a.id();
     apply_single_entry_update(&store, &mut account_a, &map_slot_name_a, 1).await?;
     apply_single_entry_update(&store, &mut account_a, &map_slot_name_a, 1).await?;
 
-    // Account B: different seed → different account. We need a different builder seed.
+    // Account B: different seed  to different account. We need a different builder seed.
     let component_b = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_empty_map(map_slot_name_b.clone())],
@@ -1098,7 +1098,7 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
 /// Verifies that undoing the only state (nonce 0) of an account removes it entirely from both
 /// latest and historical tables.
 ///
-/// The account is created with assets so the vault root is non-trivial — the SMT forest
+/// The account is created with assets so the vault root is non-trivial: the SMT forest
 /// only ref-counts non-empty roots, so `pop_roots` after undo would underflow on an empty vault.
 #[tokio::test]
 async fn undo_account_state_deletes_account_entirely() -> anyhow::Result<()> {
@@ -1310,7 +1310,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
         AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
     )?;
 
-    // Build with build() at nonce 0 — no initial assets
+    // Build with build() at nonce 0: no initial assets
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
@@ -1461,11 +1461,11 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     let m = get_storage_metrics(&store).await;
     assert_eq!(
         m.latest_storage_map_entries, 2,
-        "C should NOT be resurrected — only A and B should be in latest"
+        "C should NOT be resurrected: only A and B should be in latest"
     );
     assert_eq!(
         m.latest_account_assets, 1,
-        "Y should NOT be resurrected — only X should be in latest"
+        "Y should NOT be resurrected: only X should be in latest"
     );
 
     // Also verify the header reverted to the post-update nonce
@@ -1493,7 +1493,7 @@ async fn get_account_header_by_commitment_returns_historical() -> anyhow::Result
     let post_delta_commitment = account.to_commitment();
     assert_ne!(initial_commitment, post_delta_commitment);
 
-    // Look up the initial commitment — should find the nonce-0 state in historical
+    // Look up the initial commitment: should find the nonce-0 state in historical
     let lookup = initial_commitment;
     let header = store
         .interact_with_connection(move |conn| {
@@ -1504,7 +1504,7 @@ async fn get_account_header_by_commitment_returns_historical() -> anyhow::Result
     assert_eq!(header.nonce().as_int(), 0);
     assert_eq!(header.to_commitment(), initial_commitment);
 
-    // Look up the post-delta commitment — should NOT be in historical (it's the current
+    // Look up the post-delta commitment: should NOT be in historical (it's the current
     // latest state, not an old one that was replaced)
     let lookup = post_delta_commitment;
     let result = store
@@ -1710,7 +1710,7 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
     let m = get_storage_metrics(&store).await;
     assert_eq!(m.latest_storage_map_entries, 2, "Initial: 2 map entries");
 
-    // Build in-memory state at nonce 1 with {A, B, C, D} — C and D are genuinely new
+    // Build in-memory state at nonce 1 with {A, B, C, D}: C and D are genuinely new
     let mut storage_delta_add = AccountStorageDelta::new();
     storage_delta_add.set_map_item(
         map_slot_name.clone(),

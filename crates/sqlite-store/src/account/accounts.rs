@@ -974,21 +974,36 @@ impl SqliteStore {
         Ok(())
     }
 
-    /// Prunes historical account state for a single account up to `boundary_nonce`.
+    /// Prunes historical account states for a single account up to the given nonce.
     ///
-    /// Deletes all historical entries with `replaced_at_nonce <= boundary_nonce`
-    /// (see DESIGN.md for why this threshold is safe).
-    ///
-    /// Returns the total number of historical rows deleted.
-    pub(crate) fn prune_account_history_for(
-        tx: &Transaction<'_>,
+    /// Deletes all historical entries with `replaced_at_nonce <= up_to_nonce`
+    /// (see DESIGN.md for why this threshold is safe), then removes any account
+    /// code that was only referenced by the deleted headers.
+    pub fn prune_account_history(
+        conn: &mut Connection,
         account_id: AccountId,
-        boundary_nonce: u64,
+        up_to_nonce: u64,
     ) -> Result<usize, StoreError> {
+        let tx = conn.transaction().into_store_error()?;
         let account_id_hex = account_id.to_hex();
-        let boundary_val = u64_to_value(boundary_nonce);
+        let boundary_val = u64_to_value(up_to_nonce);
         let mut total_deleted: usize = 0;
 
+        // Collect code commitments from headers we are about to delete.
+        let candidate_code_commitments: Vec<String> = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT DISTINCT code_commitment FROM historical_account_headers \
+                     WHERE id = ? AND replaced_at_nonce <= ?",
+                )
+                .into_store_error()?;
+            let rows = stmt
+                .query_map(params![&account_id_hex, &boundary_val], |row| row.get(0))
+                .into_store_error()?;
+            rows.collect::<Result<Vec<String>, _>>().into_store_error()?
+        };
+
+        // Delete historical entries.
         total_deleted += tx
             .execute(
                 "DELETE FROM historical_account_headers \
@@ -1021,40 +1036,32 @@ impl SqliteStore {
             )
             .into_store_error()?;
 
-        Ok(total_deleted)
-    }
+        // Delete orphaned code: only check commitments from the deleted headers,
+        // and only if they are not referenced by any remaining header or foreign code.
+        for commitment in &candidate_code_commitments {
+            let still_referenced: bool = tx
+                .query_row(
+                    "SELECT EXISTS(
+                        SELECT 1 FROM latest_account_headers WHERE code_commitment = ?1
+                        UNION ALL
+                        SELECT 1 FROM historical_account_headers WHERE code_commitment = ?1
+                        UNION ALL
+                        SELECT 1 FROM foreign_account_code WHERE code_commitment = ?1
+                    )",
+                    params![commitment],
+                    |row| row.get(0),
+                )
+                .into_store_error()?;
 
-    /// Removes `account_code` entries that are not referenced by any account header
-    /// (latest or historical).
-    pub(crate) fn prune_orphaned_account_code(tx: &Transaction<'_>) -> Result<usize, StoreError> {
-        let deleted = tx
-            .execute(
-                "DELETE FROM account_code WHERE commitment NOT IN (
-                    SELECT code_commitment FROM latest_account_headers
-                    UNION
-                    SELECT code_commitment FROM historical_account_headers
-                    UNION
-                    SELECT code_commitment FROM foreign_account_code
-                )",
-                [],
-            )
-            .into_store_error()?;
+            if !still_referenced {
+                total_deleted += tx
+                    .execute("DELETE FROM account_code WHERE commitment = ?", params![commitment])
+                    .into_store_error()?;
+            }
+        }
 
-        Ok(deleted)
-    }
-
-    /// Prunes historical account states for a single account up to the given nonce.
-    pub fn prune_account_history(
-        conn: &mut Connection,
-        account_id: AccountId,
-        up_to_nonce: u64,
-    ) -> Result<usize, StoreError> {
-        let tx = conn.transaction().into_store_error()?;
-        let deleted = Self::prune_account_history_for(&tx, account_id, up_to_nonce)?;
-        let orphaned = Self::prune_orphaned_account_code(&tx)?;
         tx.commit().into_store_error()?;
-
-        Ok(deleted + orphaned)
+        Ok(total_deleted)
     }
 
     fn remove_address_internal(tx: &Transaction<'_>, address: &Address) -> Result<(), StoreError> {
