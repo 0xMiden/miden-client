@@ -6,7 +6,7 @@ test.describe("prune_account_history tests", () => {
   test("prunes old committed states for a single account", async ({ page }) => {
     const { accountId, faucetId } = await setupWalletAndFaucet(page);
 
-    // Mint twice — each mint advances the faucet nonce (0 → 1 → 2),
+    // Mint twice : each mint advances the faucet nonce (0  to 1  to 2),
     // creating historical entries at each step.
     await mintTransaction(page, accountId, faucetId);
     await mintTransaction(page, accountId, faucetId);
@@ -46,14 +46,14 @@ test.describe("prune_account_history tests", () => {
     const result = await page.evaluate(async () => {
       const client = window.client;
 
-      // Create a wallet but don't transact — it has only one historical state
+      // Create a wallet but don't transact : it has only one historical state
       const wallet = await client.newWallet(
         window.AccountStorageMode.private(),
         true,
         window.AuthScheme.AuthRpoFalcon512
       );
 
-      // Prune with nonce 0 — nothing should be deleted
+      // Prune with nonce 0 : nothing should be deleted
       const deleted = await client.pruneAccountHistory(wallet.id(), 0);
       const accountAfter = await client.getAccount(wallet.id());
 
@@ -84,7 +84,7 @@ test.describe("prune_account_history tests", () => {
       await client.pruneAccountHistory(faucetAccountId, 1);
     }, faucetId);
 
-    // Mint again — this should succeed if pruning didn't break anything
+    // Mint again : this should succeed if pruning didn't break anything
     await mintTransaction(page, accountId, faucetId);
 
     const result = await page.evaluate(

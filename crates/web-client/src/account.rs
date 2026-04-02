@@ -8,6 +8,7 @@ use crate::models::account_reader::AccountReader;
 use crate::models::account_storage::AccountStorage;
 use crate::models::address::Address;
 use crate::models::asset_vault::AssetVault;
+use crate::models::felt::Felt;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -165,14 +166,14 @@ impl WebClient {
     pub async fn prune_account_history(
         &mut self,
         account_id: &AccountId,
-        up_to_nonce: u32,
+        up_to_nonce: &Felt,
     ) -> Result<u32, JsValue> {
         if let Some(client) = self.get_mut_inner() {
             let deleted = client
-                .prune_account_history(account_id.into(), u64::from(up_to_nonce))
+                .prune_account_history(account_id.into(), up_to_nonce.as_int())
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to prune account history"))?;
-            // Safety: on wasm32 usize is 32 bits, so this conversion is infallible
+            // SAFETY: on wasm32 usize is 32 bits, so this conversion is infallible
             Ok(u32::try_from(deleted).expect("deleted count should fit in u32"))
         } else {
             Err(JsValue::from_str("Client not initialized"))

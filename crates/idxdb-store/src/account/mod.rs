@@ -670,21 +670,16 @@ impl IdxdbStore {
         })
     }
 
-    #[allow(
-        clippy::cast_precision_loss,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss
-    )]
     pub(crate) async fn prune_account_history(
         &self,
         account_id: AccountId,
         up_to_nonce: u64,
     ) -> Result<usize, StoreError> {
-        let account_id_str = account_id.to_string();
-        // Nonce values fit in f64 without precision loss (< 2^53)
-        let promise = idxdb_prune_account_history(self.db_id(), account_id_str, up_to_nonce as f64);
-        // Deleted count from JS is a non-negative integer that fits in usize
-        let deleted: f64 = await_js(promise, "failed to prune account history").await?;
-        Ok(deleted as usize)
+        let promise = idxdb_prune_account_history(
+            self.db_id(),
+            account_id.to_string(),
+            up_to_nonce.to_string(),
+        );
+        await_js(promise, "failed to prune account history").await
     }
 }
