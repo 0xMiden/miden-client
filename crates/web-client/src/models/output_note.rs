@@ -1,4 +1,4 @@
-use miden_client::note::Note as NativeNote;
+use miden_client::note::{Note as NativeNote, PartialNote as NativePartialNote};
 use miden_client::transaction::RawOutputNote as NativeRawOutputNote;
 use wasm_bindgen::prelude::*;
 
@@ -6,6 +6,7 @@ use super::note::Note;
 use super::note_assets::NoteAssets;
 use super::note_id::NoteId;
 use super::note_metadata::NoteMetadata;
+use super::partial_note::PartialNote;
 use super::word::Word;
 use crate::models::miden_arrays::OutputNoteArray;
 
@@ -20,6 +21,12 @@ impl OutputNote {
     pub fn full(note: &Note) -> OutputNote {
         let native_note: NativeNote = note.into();
         OutputNote(NativeRawOutputNote::Full(native_note))
+    }
+
+    /// Wraps a partial note containing assets and recipient only.
+    pub fn partial(partial_note: &PartialNote) -> OutputNote {
+        let native_partial_note: NativePartialNote = partial_note.into();
+        OutputNote(NativeRawOutputNote::Partial(native_partial_note))
     }
 
     /// Returns the assets if they are present.

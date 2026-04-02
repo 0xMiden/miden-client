@@ -84,8 +84,8 @@ const setupMockClient = async (page: Page) => {
     window._mockFaucetId = faucet.id();
 
     return {
-      accountId: account.id().toHex(),
-      faucetId: faucet.id().toHex(),
+      accountId: account.id().toString(),
+      faucetId: faucet.id().toString(),
     };
   });
 };

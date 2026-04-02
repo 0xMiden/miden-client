@@ -170,7 +170,7 @@ impl GrpcClient {
     }
 
     /// Sets the maximum number of retry attempts for rate-limited or transiently unavailable
-    /// requests. Defaults to 5.
+    /// requests. Defaults to [`retry::DEFAULT_MAX_RETRIES`].
     #[must_use]
     pub fn with_max_retries(mut self, max_retries: u32) -> Self {
         self.max_retries = max_retries;
@@ -178,7 +178,7 @@ impl GrpcClient {
     }
 
     /// Sets the fallback retry interval in milliseconds, used when the server does not provide
-    /// a `retry-after` header. Defaults to 250ms.
+    /// a `retry-after` header. Defaults to [`retry::DEFAULT_RETRY_INTERVAL_MS`].
     #[must_use]
     pub fn with_retry_interval_ms(mut self, retry_interval_ms: u64) -> Self {
         self.retry_interval_ms = retry_interval_ms;

@@ -8,7 +8,7 @@ status-level   = "skip"
 # TODO: Running this with default settings causes machines to get thrashed, so for now we are reducing 
 # this a bit arbitrarily; revisit this
 [test-groups.integration]
-max-threads = 5
+max-threads = 7
 
 [[profile.default.overrides]]
 filter           = "package(miden-client-unit-tests)"
