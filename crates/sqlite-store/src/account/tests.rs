@@ -804,47 +804,82 @@ async fn prune_removes_orphaned_account_code() -> anyhow::Result<()> {
     let store = create_test_store().await;
     let map_slot_name = StorageSlotName::new("test::prune_code::map").expect("valid slot name");
 
-    // Insert account (nonce 0)
-    let account = setup_account_with_map(&store, 2, &map_slot_name).await?;
+    // Insert account with map entries (nonce 0), then apply a delta (nonce 0 to 1).
+    // The delta creates a historical header at nonce 0 whose code_commitment points
+    // to the original account code.
+    let mut account = setup_account_with_map(&store, 2, &map_slot_name).await?;
     let account_id = account.id();
+    apply_single_entry_update(&store, &mut account, &map_slot_name, 1).await?;
 
-    // Insert an orphaned account_code entry that isn't referenced by any header.
+    // Simulate the nonce-1 state having a different code commitment by updating
+    // the latest header's code_commitment directly. This makes the nonce-0
+    // historical header the only reference to the original code.
+    let original_code_commitment: String = store
+        .interact_with_connection(move |conn| {
+            conn.query_row(
+                "SELECT code_commitment FROM historical_account_headers WHERE id = ?",
+                params![account_id.to_hex()],
+                |row| row.get(0),
+            )
+            .into_store_error()
+        })
+        .await?;
+
+    // Insert a fake code entry for the latest header so the original code becomes
+    // orphaned when we prune the historical header.
     store
         .interact_with_connection(|conn| {
             conn.execute(
                 "INSERT INTO account_code (commitment, code) VALUES (?, ?)",
-                params!["orphaned_commitment_hex", vec![0u8; 16]],
+                params!["new_code_commitment", vec![0u8; 16]],
+            )
+            .into_store_error()?;
+            conn.execute(
+                "UPDATE latest_account_headers SET code_commitment = ? WHERE id = ?",
+                params!["new_code_commitment", account_id.to_hex()],
             )
             .into_store_error()?;
             Ok(())
         })
         .await?;
 
-    // Verify orphaned entry exists
-    let code_count: usize = store
+    let code_count_before: usize = store
         .interact_with_connection(|conn| {
             conn.query_row("SELECT COUNT(*) FROM account_code", [], |r| r.get(0))
                 .into_store_error()
         })
         .await?;
-    assert!(code_count >= 2, "Should have at least the real code + orphaned entry");
 
-    // Prune with a high nonce to exercise orphaned code cleanup
+    // Prune nonce-0 history: the historical header referencing original_code_commitment
+    // is deleted, and since no other header references it, the code should be removed.
     let deleted = store
         .interact_with_connection(move |conn| {
-            SqliteStore::prune_account_history(conn, account_id, u64::MAX)
+            SqliteStore::prune_account_history(conn, account_id, 1)
         })
         .await?;
+    assert!(deleted > 0);
 
-    // The orphaned entry should have been removed
+    // Verify the original code was removed
+    let original_still_exists: bool = store
+        .interact_with_connection(move |conn| {
+            conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM account_code WHERE commitment = ?)",
+                params![original_code_commitment],
+                |row| row.get(0),
+            )
+            .into_store_error()
+        })
+        .await?;
+    assert!(!original_still_exists, "Original code should be removed after pruning");
+
+    // The new code should still exist
     let code_count_after: usize = store
         .interact_with_connection(|conn| {
             conn.query_row("SELECT COUNT(*) FROM account_code", [], |r| r.get(0))
                 .into_store_error()
         })
         .await?;
-    assert_eq!(code_count_after, code_count - 1, "Orphaned code entry should be removed");
-    assert!(deleted > 0);
+    assert_eq!(code_count_after, code_count_before - 1);
 
     Ok(())
 }
