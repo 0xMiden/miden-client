@@ -83,6 +83,6 @@ should_panic_without_expect = "allow" # We don't care about the specific panic m
 # End of pedantic lints.
 
 [patch.crates-io]
-miden-crypto = { path = "/Users/ignacioamigo/crates/crypto/miden-crypto" }
-miden-field = { path = "/Users/ignacioamigo/crates/crypto/miden-field" }
+miden-crypto      = { path = "/Users/ignacioamigo/crates/crypto/miden-crypto" }
+miden-field       = { path = "/Users/ignacioamigo/crates/crypto/miden-field" }
 miden-serde-utils = { path = "/Users/ignacioamigo/crates/crypto/miden-serde-utils" }
