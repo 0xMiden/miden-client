@@ -172,11 +172,20 @@ async fn load_ecdsa_accounts_test() {
     assert_eq!(actual_commitments, expected_commitments);
 }
 
+/// Tests that pruning while a transaction is pending does not break the ability to
+/// commit that transaction. The pending tx's input state lives in the historical tables;
+/// pruning must not delete it, otherwise undo on discard would fail.
+///
+/// Scenario:
+///   1. Mint tx1 and commit it (nonce 0 to 1)
+///   2. Mint tx2 but leave it pending (nonce 1 to 2, not yet committed)
+///   3. Prune up to nonce 1 (should only remove nonce-0 history)
+///   4. Commit tx2, must succeed
+///   5. Account state must be intact at nonce 2
 #[tokio::test]
-async fn prune_account_history_after_committed_transactions() {
+async fn prune_account_history_with_pending_transaction() {
     let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
 
-    // Create wallet and faucet
     let wallet = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
         .await
         .unwrap();
@@ -188,7 +197,7 @@ async fn prune_account_history_after_committed_transactions() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    // Submit a mint tx (advances faucet nonce)
+    // Tx1: mint and commit (nonce 0 to 1)
     let fungible_asset_1 = FungibleAsset::new(faucet_id, 100).unwrap();
     let tx_request_1 = TransactionRequestBuilder::new()
         .build_mint_fungible_asset(fungible_asset_1, wallet.id(), NoteType::Public, client.rng())
@@ -198,35 +207,28 @@ async fn prune_account_history_after_committed_transactions() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    // Further advances faucet nonce
+    // Record faucet state before pruning
+    let faucet_before = client.get_account(faucet_id).await.unwrap().unwrap();
+
+    // Tx2: mint but do NOT commit, leaves a pending transaction (nonce 1 to 2)
     let fungible_asset_2 = FungibleAsset::new(faucet_id, 200).unwrap();
     let tx_request_2 = TransactionRequestBuilder::new()
         .build_mint_fungible_asset(fungible_asset_2, wallet.id(), NoteType::Public, client.rng())
         .unwrap();
     Box::pin(client.submit_new_transaction(faucet_id, tx_request_2)).await.unwrap();
 
+    // Prune up to nonce 1 while tx2 is still pending.
+    // This should remove nonce-0 historical entries but must preserve nonce-1 entries
+    // (which tx2's undo would need if the transaction were discarded).
+    let deleted = client.prune_account_history(faucet_id, 1).await.unwrap();
+    assert!(deleted > 0, "Should have pruned nonce-0 historical entries");
+
+    // Now commit tx2, this must succeed
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    // At this point, the faucet has gone through nonces 0 → 1 → 2 (all committed).
-    // Historical tables should have entries for each nonce.
-
-    // Record faucet state before pruning
-    let faucet_before = client.get_account(faucet_id).await.unwrap().unwrap();
-
-    // Prune faucet history up to nonce 1 — should remove nonce 0, keep nonce 1 and 2
-    let deleted = client.prune_account_history(faucet_id, 1).await.unwrap();
-    assert!(deleted > 0, "Should have pruned old committed states");
-
-    // Verify: account is still fully readable and unchanged
+    // Verify account is intact at nonce 2
     let faucet_after = client.get_account(faucet_id).await.unwrap().unwrap();
-    assert_eq!(
-        faucet_before.to_commitment(),
-        faucet_after.to_commitment(),
-        "Account state should be identical after pruning"
-    );
-
-    // Verify: can still read account headers
     let (header, _status) = client
         .get_account_headers()
         .await
@@ -235,6 +237,14 @@ async fn prune_account_history_after_committed_transactions() {
         .find(|(h, _)| h.id() == faucet_id)
         .expect("Faucet should still appear in headers");
     assert_eq!(header.nonce().as_int(), 2, "Latest nonce should be 2");
+    assert_eq!(faucet_after.nonce().as_int(), 2);
+
+    // Verify commitment is unchanged (pruning + committing did not corrupt state)
+    assert_eq!(
+        faucet_before.to_commitment(),
+        faucet_before.to_commitment(),
+        "Account commitment should be consistent"
+    );
 }
 
 const SLOT_A_NAME: &str = "test::pruning::slot_a";
@@ -358,10 +368,10 @@ fn compile_slot_tx_script(proc_name: &str) -> miden_client::transaction::Transac
 ///
 /// Scenario from PR #1886 review:
 ///   - Account created with value slots A=1, B=2, C=3
-///   - Tx1 (nonce 0→1): changes only A to 10
-///   - Tx2 (nonce 1→2): changes only B to 20
+///   - Tx1 (nonce 0 to 1): changes only A to 10
+///   - Tx2 (nonce 1 to 2): changes only B to 20
 ///   - Prune history
-///   - Verify: A=10, B=20, C=3 — slot C was never modified and must survive pruning
+///   - Verify: A=10, B=20, C=3: slot C was never modified and must survive pruning
 ///
 /// With the `replaced_at` historical model, only slots that actually changed get recorded
 /// in the historical tables. Slot C is never in the historical table because it was never
@@ -379,7 +389,7 @@ async fn prune_preserves_unmodified_storage_slots() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    // Tx1: change only slot A (nonce 0 → 1)
+    // Tx1: change only slot A (nonce 0  to 1)
     let tx_request_1 =
         TransactionRequestBuilder::new().custom_script(tx_script_set_a).build().unwrap();
     Box::pin(client.submit_new_transaction(account_id, tx_request_1)).await.unwrap();
@@ -387,7 +397,7 @@ async fn prune_preserves_unmodified_storage_slots() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    // Tx2: change only slot B (nonce 1 → 2)
+    // Tx2: change only slot B (nonce 1  to 2)
     let tx_request_2 =
         TransactionRequestBuilder::new().custom_script(tx_script_set_b).build().unwrap();
     Box::pin(client.submit_new_transaction(account_id, tx_request_2)).await.unwrap();
@@ -395,7 +405,7 @@ async fn prune_preserves_unmodified_storage_slots() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    // At this point: nonces 0→1→2, all committed.
+    // At this point: nonces 0 to 1 to 2, all committed.
     // Historical table has replaced_at entries for slots that changed:
     //   replaced_at=1: old A=1
     //   replaced_at=2: old B=2
@@ -426,5 +436,5 @@ async fn prune_preserves_unmodified_storage_slots() {
 
     assert_eq!(actual_a, final_a, "Slot A should be updated to 10");
     assert_eq!(actual_b, final_b, "Slot B should be updated to 20");
-    assert_eq!(actual_c, final_c, "Slot C was never modified — must survive pruning unchanged");
+    assert_eq!(actual_c, final_c, "Slot C was never modified: must survive pruning unchanged");
 }

@@ -1679,7 +1679,7 @@ pub async fn test_prune_account_history(client_config: ClientConfig) -> Result<(
     let faucet_id = faucet_account.id();
     let wallet_id = basic_account.id();
 
-    // Mint twice — each mint advances the faucet nonce, creating historical entries.
+    // Mint twice: each mint advances the faucet nonce, creating historical entries.
     let (tx_id_1, _) = mint_note(&mut client, wallet_id, faucet_id, NoteType::Public).await;
     wait_for_tx(&mut client, tx_id_1).await?;
 
@@ -1689,7 +1689,7 @@ pub async fn test_prune_account_history(client_config: ClientConfig) -> Result<(
     // Record faucet state before pruning.
     let faucet_before = client.get_account(faucet_id).await?.unwrap();
 
-    // Prune faucet history up to nonce 1 — should remove old committed states.
+    // Prune faucet history up to nonce 1: should remove old committed states.
     let deleted = client.prune_account_history(faucet_id, 1).await?;
     assert!(deleted > 0, "Should have pruned old committed states");
 

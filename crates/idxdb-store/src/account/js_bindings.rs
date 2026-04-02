@@ -164,7 +164,7 @@ extern "C" {
     pub fn idxdb_prune_account_history(
         db_id: &str,
         account_id: String,
-        up_to_nonce: f64,
+        up_to_nonce: String,
     ) -> js_sys::Promise;
 }
 
