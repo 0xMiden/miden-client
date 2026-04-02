@@ -828,7 +828,7 @@ async fn prune_removes_orphaned_account_code() -> anyhow::Result<()> {
     // Insert a fake code entry for the latest header so the original code becomes
     // orphaned when we prune the historical header.
     store
-        .interact_with_connection(|conn| {
+        .interact_with_connection(move |conn| {
             conn.execute(
                 "INSERT INTO account_code (commitment, code) VALUES (?, ?)",
                 params!["new_code_commitment", vec![0u8; 16]],

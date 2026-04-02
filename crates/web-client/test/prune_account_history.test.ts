@@ -21,7 +21,10 @@ test.describe("prune_account_history tests", () => {
       const commitmentBefore = accountBefore!.to_commitment().toHex();
 
       // Prune up to nonce 1
-      const deleted = await client.pruneAccountHistory(faucetAccountId, 1);
+      const deleted = await client.pruneAccountHistory(
+        faucetAccountId,
+        new window.Felt(1n)
+      );
 
       // Verify account is still fully readable after pruning
       const accountAfter = await client.getAccount(faucetAccountId);
@@ -54,7 +57,10 @@ test.describe("prune_account_history tests", () => {
       );
 
       // Prune with nonce 0 : nothing should be deleted
-      const deleted = await client.pruneAccountHistory(wallet.id(), 0);
+      const deleted = await client.pruneAccountHistory(
+        wallet.id(),
+        new window.Felt(0n)
+      );
       const accountAfter = await client.getAccount(wallet.id());
 
       return {
@@ -81,7 +87,7 @@ test.describe("prune_account_history tests", () => {
     await page.evaluate(async (_faucetId: string) => {
       const client = window.client;
       const faucetAccountId = window.AccountId.fromHex(_faucetId);
-      await client.pruneAccountHistory(faucetAccountId, 1);
+      await client.pruneAccountHistory(faucetAccountId, new window.Felt(1n));
     }, faucetId);
 
     // Mint again : this should succeed if pruning didn't break anything
