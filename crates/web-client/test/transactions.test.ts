@@ -1,5 +1,5 @@
 // @ts-nocheck
-import test from "./playwright.global.setup";
+import test, { mockTest } from "./playwright.global.setup";
 import { Page, expect } from "@playwright/test";
 
 // GET_TRANSACTIONS TESTS
@@ -116,203 +116,208 @@ const getAllTransactions = async (page: Page) => {
   });
 };
 
-test.describe("get_transactions tests", () => {
-  test("get_transactions retrieves all transactions successfully", async ({
-    page,
-  }) => {
-    await setupMockClient(page);
-    const { mintTxId, consumeTxId } = await mockMintAndConsume(
-      page,
-      null,
-      null,
-      null
-    );
-
-    const result = await getAllTransactions(page);
-
-    expect(result.transactionIds).toContain(mintTxId);
-    expect(result.transactionIds).toContain(consumeTxId);
-    expect(result.uncommittedTransactionIds.length).toEqual(0);
-  });
-
-  test("get_transactions retrieves uncommitted transactions successfully", async ({
-    page,
-  }) => {
-    await setupMockClient(page);
-
-    // Committed mint+consume
-    const { mintTxId, consumeTxId } = await mockMintAndConsume(
-      page,
-      null,
-      null,
-      null
-    );
-
-    // Uncommitted mint (no proveBlock/sync)
-    const uncommittedTxId = await page.evaluate(async () => {
-      const client = window._mockClient;
-      const accountId = window._mockAccountId;
-      const faucetId = window._mockFaucetId;
-
-      const mintRequest = await client.newMintTransactionRequest(
-        accountId,
-        faucetId,
-        window.NoteType.Public,
-        BigInt(1000)
+mockTest.describe("get_transactions tests", () => {
+  mockTest(
+    "get_transactions retrieves all transactions successfully",
+    async ({ page }) => {
+      await setupMockClient(page);
+      const { mintTxId, consumeTxId } = await mockMintAndConsume(
+        page,
+        null,
+        null,
+        null
       );
 
-      const txId = await client.submitNewTransaction(faucetId, mintRequest);
-      return txId.toHex();
-    });
+      const result = await getAllTransactions(page);
 
-    const result = await getAllTransactions(page);
+      expect(result.transactionIds).toContain(mintTxId);
+      expect(result.transactionIds).toContain(consumeTxId);
+      expect(result.uncommittedTransactionIds.length).toEqual(0);
+    }
+  );
 
-    expect(result.transactionIds).toContain(mintTxId);
-    expect(result.transactionIds).toContain(consumeTxId);
-    expect(result.transactionIds).toContain(uncommittedTxId);
-    expect(result.transactionIds.length).toEqual(3);
+  mockTest(
+    "get_transactions retrieves uncommitted transactions successfully",
+    async ({ page }) => {
+      await setupMockClient(page);
 
-    expect(result.uncommittedTransactionIds).toContain(uncommittedTxId);
-    expect(result.uncommittedTransactionIds.length).toEqual(1);
-  });
-
-  test("get_transactions retrieves no transactions successfully", async ({
-    page,
-  }) => {
-    await setupMockClient(page);
-    const result = await getAllTransactions(page);
-
-    expect(result.transactionIds.length).toEqual(0);
-    expect(result.uncommittedTransactionIds.length).toEqual(0);
-  });
-
-  test("get_transactions filters by specific transaction IDs successfully", async ({
-    page,
-  }) => {
-    await setupMockClient(page);
-    await mockMintAndConsume(page, null, null, null);
-
-    const result = await page.evaluate(async () => {
-      const client = window._mockClient;
-
-      let allTransactions = await client.getTransactions(
-        window.TransactionFilter.all()
-      );
-      const allTxLength = allTransactions.length;
-      let firstTransactionId = allTransactions[0].id();
-      const firstTxIdHex = firstTransactionId.toHex();
-
-      const filter = window.TransactionFilter.ids([firstTransactionId]);
-      let filteredTransactions = await client.getTransactions(filter);
-      const filteredTransactionIds = filteredTransactions.map((tx) =>
-        tx.id().toHex()
+      // Committed mint+consume
+      const { mintTxId, consumeTxId } = await mockMintAndConsume(
+        page,
+        null,
+        null,
+        null
       );
 
-      return {
-        allTransactionsCount: allTxLength,
-        filteredTransactionIds,
-        originalTransactionId: firstTxIdHex,
-      };
-    });
+      // Uncommitted mint (no proveBlock/sync)
+      const uncommittedTxId = await page.evaluate(async () => {
+        const client = window._mockClient;
+        const accountId = window._mockAccountId;
+        const faucetId = window._mockFaucetId;
 
-    expect(result.allTransactionsCount).toEqual(2);
-    expect(result.filteredTransactionIds.length).toEqual(1);
-    expect(result.filteredTransactionIds).toContain(
-      result.originalTransactionId
-    );
-  });
+        const mintRequest = await client.newMintTransactionRequest(
+          accountId,
+          faucetId,
+          window.NoteType.Public,
+          BigInt(1000)
+        );
 
-  test("get_transactions filters expired transactions successfully", async ({
-    page,
-  }) => {
-    await setupMockClient(page);
+        const txId = await client.submitNewTransaction(faucetId, mintRequest);
+        return txId.toHex();
+      });
 
-    // Advance the chain so block numbers are large enough for subtraction in filters.
-    await page.evaluate(async () => {
-      const client = window._mockClient;
-      for (let i = 0; i < 15; i++) {
+      const result = await getAllTransactions(page);
+
+      expect(result.transactionIds).toContain(mintTxId);
+      expect(result.transactionIds).toContain(consumeTxId);
+      expect(result.transactionIds).toContain(uncommittedTxId);
+      expect(result.transactionIds.length).toEqual(3);
+
+      expect(result.uncommittedTransactionIds).toContain(uncommittedTxId);
+      expect(result.uncommittedTransactionIds.length).toEqual(1);
+    }
+  );
+
+  mockTest(
+    "get_transactions retrieves no transactions successfully",
+    async ({ page }) => {
+      await setupMockClient(page);
+      const result = await getAllTransactions(page);
+
+      expect(result.transactionIds.length).toEqual(0);
+      expect(result.uncommittedTransactionIds.length).toEqual(0);
+    }
+  );
+
+  mockTest(
+    "get_transactions filters by specific transaction IDs successfully",
+    async ({ page }) => {
+      await setupMockClient(page);
+      await mockMintAndConsume(page, null, null, null);
+
+      const result = await page.evaluate(async () => {
+        const client = window._mockClient;
+
+        let allTransactions = await client.getTransactions(
+          window.TransactionFilter.all()
+        );
+        const allTxLength = allTransactions.length;
+        let firstTransactionId = allTransactions[0].id();
+        const firstTxIdHex = firstTransactionId.toHex();
+
+        const filter = window.TransactionFilter.ids([firstTransactionId]);
+        let filteredTransactions = await client.getTransactions(filter);
+        const filteredTransactionIds = filteredTransactions.map((tx) =>
+          tx.id().toHex()
+        );
+
+        return {
+          allTransactionsCount: allTxLength,
+          filteredTransactionIds,
+          originalTransactionId: firstTxIdHex,
+        };
+      });
+
+      expect(result.allTransactionsCount).toEqual(2);
+      expect(result.filteredTransactionIds.length).toEqual(1);
+      expect(result.filteredTransactionIds).toContain(
+        result.originalTransactionId
+      );
+    }
+  );
+
+  mockTest(
+    "get_transactions filters expired transactions successfully",
+    async ({ page }) => {
+      await setupMockClient(page);
+
+      // Advance the chain so block numbers are large enough for subtraction in filters.
+      await page.evaluate(async () => {
+        const client = window._mockClient;
+        for (let i = 0; i < 15; i++) {
+          await client.proveBlock();
+        }
+        await client.syncState();
+      });
+
+      // Committed mint
+      const committedTxId = await page.evaluate(async () => {
+        const client = window._mockClient;
+        const accountId = window._mockAccountId;
+        const faucetId = window._mockFaucetId;
+
+        const mintRequest = await client.newMintTransactionRequest(
+          accountId,
+          faucetId,
+          window.NoteType.Public,
+          BigInt(1000)
+        );
+
+        const txId = await client.submitNewTransaction(faucetId, mintRequest);
         await client.proveBlock();
-      }
-      await client.syncState();
-    });
+        await client.syncState();
+        return txId.toHex();
+      });
 
-    // Committed mint
-    const committedTxId = await page.evaluate(async () => {
-      const client = window._mockClient;
-      const accountId = window._mockAccountId;
-      const faucetId = window._mockFaucetId;
+      // Uncommitted mint
+      const uncommittedTxId = await page.evaluate(async () => {
+        const client = window._mockClient;
+        const accountId = window._mockAccountId;
+        const faucetId = window._mockFaucetId;
 
-      const mintRequest = await client.newMintTransactionRequest(
-        accountId,
-        faucetId,
-        window.NoteType.Public,
-        BigInt(1000)
-      );
+        const mintRequest = await client.newMintTransactionRequest(
+          accountId,
+          faucetId,
+          window.NoteType.Public,
+          BigInt(1000)
+        );
 
-      const txId = await client.submitNewTransaction(faucetId, mintRequest);
-      await client.proveBlock();
-      await client.syncState();
-      return txId.toHex();
-    });
+        const txId = await client.submitNewTransaction(faucetId, mintRequest);
+        return txId.toHex();
+      });
 
-    // Uncommitted mint
-    const uncommittedTxId = await page.evaluate(async () => {
-      const client = window._mockClient;
-      const accountId = window._mockAccountId;
-      const faucetId = window._mockFaucetId;
+      const result = await page.evaluate(async () => {
+        const client = window._mockClient;
 
-      const mintRequest = await client.newMintTransactionRequest(
-        accountId,
-        faucetId,
-        window.NoteType.Public,
-        BigInt(1000)
-      );
+        let allTransactions = await client.getTransactions(
+          window.TransactionFilter.all()
+        );
+        let allTransactionIds = allTransactions.map((tx) => tx.id().toHex());
+        let currentBlockNum = allTransactions[0].blockNum();
 
-      const txId = await client.submitNewTransaction(faucetId, mintRequest);
-      return txId.toHex();
-    });
+        let futureBlockNum = currentBlockNum + 100;
+        let futureExpiredFilter =
+          window.TransactionFilter.expiredBefore(futureBlockNum);
+        let futureExpiredTransactions =
+          await client.getTransactions(futureExpiredFilter);
+        let futureExpiredTransactionIds = futureExpiredTransactions.map((tx) =>
+          tx.id().toHex()
+        );
 
-    const result = await page.evaluate(async () => {
-      const client = window._mockClient;
+        let pastBlockNum = currentBlockNum - 10;
+        let pastExpiredFilter =
+          window.TransactionFilter.expiredBefore(pastBlockNum);
+        let pastExpiredTransactions =
+          await client.getTransactions(pastExpiredFilter);
+        let pastExpiredTransactionIds = pastExpiredTransactions.map((tx) =>
+          tx.id().toHex()
+        );
 
-      let allTransactions = await client.getTransactions(
-        window.TransactionFilter.all()
-      );
-      let allTransactionIds = allTransactions.map((tx) => tx.id().toHex());
-      let currentBlockNum = allTransactions[0].blockNum();
+        return {
+          allTransactionIds,
+          futureExpiredTransactionIds,
+          pastExpiredTransactionIds,
+        };
+      });
 
-      let futureBlockNum = currentBlockNum + 100;
-      let futureExpiredFilter =
-        window.TransactionFilter.expiredBefore(futureBlockNum);
-      let futureExpiredTransactions =
-        await client.getTransactions(futureExpiredFilter);
-      let futureExpiredTransactionIds = futureExpiredTransactions.map((tx) =>
-        tx.id().toHex()
-      );
-
-      let pastBlockNum = currentBlockNum - 10;
-      let pastExpiredFilter =
-        window.TransactionFilter.expiredBefore(pastBlockNum);
-      let pastExpiredTransactions =
-        await client.getTransactions(pastExpiredFilter);
-      let pastExpiredTransactionIds = pastExpiredTransactions.map((tx) =>
-        tx.id().toHex()
-      );
-
-      return {
-        allTransactionIds,
-        futureExpiredTransactionIds,
-        pastExpiredTransactionIds,
-      };
-    });
-
-    expect(result.futureExpiredTransactionIds.length).toEqual(1);
-    expect(result.futureExpiredTransactionIds).toContain(uncommittedTxId);
-    expect(result.pastExpiredTransactionIds.length).toEqual(0);
-    expect(result.allTransactionIds.length).toEqual(2);
-    expect(result.allTransactionIds).toContain(committedTxId);
-    expect(result.allTransactionIds).toContain(uncommittedTxId);
-  });
+      expect(result.futureExpiredTransactionIds.length).toEqual(1);
+      expect(result.futureExpiredTransactionIds).toContain(uncommittedTxId);
+      expect(result.pastExpiredTransactionIds.length).toEqual(0);
+      expect(result.allTransactionIds.length).toEqual(2);
+      expect(result.allTransactionIds).toContain(committedTxId);
+      expect(result.allTransactionIds).toContain(uncommittedTxId);
+    }
+  );
 });
 
 // COMPILE_TX_SCRIPT TESTS

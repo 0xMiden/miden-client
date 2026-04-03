@@ -123,8 +123,7 @@ impl IdxdbStore {
                 .iter()
                 .map(|(vault_key, _)| vault_key.to_string())
                 .collect();
-            let old_vault_assets =
-                self.get_vault_assets(account_id, vault_keys).await?;
+            let old_vault_assets = self.get_vault_assets(account_id, vault_keys).await?;
             let map_slot_names: Vec<String> =
                 delta.storage().maps().map(|(slot_name, _)| slot_name.to_string()).collect();
             let old_map_roots = self.get_storage_map_roots(account_id, map_slot_names).await?;

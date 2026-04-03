@@ -1,5 +1,5 @@
 // @ts-nocheck
-import test from "./playwright.global.setup";
+import { mockTest as test } from "./playwright.global.setup";
 import { Page, expect } from "@playwright/test";
 
 const mockChainTest = async (testingPage: Page) => {

@@ -280,10 +280,7 @@ const V1_STORES: Record<string, string> = {
     "accountId",
     "[accountId+replacedAtNonce]"
   ),
-  [Table.LatestAccountAssets]: indexes(
-    "[accountId+vaultKey]",
-    "accountId"
-  ),
+  [Table.LatestAccountAssets]: indexes("[accountId+vaultKey]", "accountId"),
   [Table.HistoricalAccountAssets]: indexes(
     "[accountId+replacedAtNonce+vaultKey]",
     "accountId",

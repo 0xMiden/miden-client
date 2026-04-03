@@ -1,5 +1,5 @@
 // @ts-nocheck
-import test from "./playwright.global.setup";
+import { mockTest as test } from "./playwright.global.setup";
 import { expect } from "@playwright/test";
 
 // ════════════════════════════════════════════════════════════════

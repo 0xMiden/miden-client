@@ -69,13 +69,8 @@ impl SqliteStore {
         account_id: AccountId,
         assets: impl Iterator<Item = Asset>,
     ) -> Result<(), StoreError> {
-        const LATEST_QUERY: &str = insert_sql!(
-            latest_account_assets {
-                account_id,
-                vault_key,
-                asset
-            } | REPLACE
-        );
+        const LATEST_QUERY: &str =
+            insert_sql!(latest_account_assets { account_id, vault_key, asset } | REPLACE);
 
         let mut latest_stmt = tx.prepare_cached(LATEST_QUERY).into_store_error()?;
         let account_id_hex = account_id.to_hex();
@@ -201,13 +196,8 @@ impl SqliteStore {
                 old_asset
             } | REPLACE
         );
-        const LATEST_INSERT: &str = insert_sql!(
-            latest_account_assets {
-                account_id,
-                vault_key,
-                asset
-            } | REPLACE
-        );
+        const LATEST_INSERT: &str =
+            insert_sql!(latest_account_assets { account_id, vault_key, asset } | REPLACE);
 
         let mut hist_stmt = tx.prepare_cached(HISTORICAL_INSERT).into_store_error()?;
         let mut latest_stmt = tx.prepare_cached(LATEST_INSERT).into_store_error()?;
@@ -227,12 +217,7 @@ impl SqliteStore {
 
             // Archive old value to historical
             hist_stmt
-                .execute(params![
-                    account_id_hex,
-                    nonce_val,
-                    &vault_key_hex,
-                    old_asset,
-                ])
+                .execute(params![account_id_hex, nonce_val, &vault_key_hex, old_asset,])
                 .into_store_error()?;
         }
 
@@ -271,12 +256,7 @@ impl SqliteStore {
 
             // Archive old value to historical (NULL old_asset = asset was new)
             hist_stmt
-                .execute(params![
-                    account_id_hex,
-                    nonce_val,
-                    &vault_key_hex,
-                    old_asset,
-                ])
+                .execute(params![account_id_hex, nonce_val, &vault_key_hex, old_asset,])
                 .into_store_error()?;
 
             // Insert/update in latest

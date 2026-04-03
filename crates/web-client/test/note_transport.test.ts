@@ -1,4 +1,4 @@
-import test from "./playwright.global.setup";
+import { mockTest as test } from "./playwright.global.setup";
 import { Page, expect } from "@playwright/test";
 
 test("transport basic", async ({ page }) => {
