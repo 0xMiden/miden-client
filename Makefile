@@ -141,6 +141,7 @@ start-note-transport:
 integration-test: ## Run integration tests
 	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
 
+
 .PHONY: integration-test-web-client
 SHARD_PARAMETER ?= ""
 integration-test-web-client: ## Run integration tests for the web client (with a chromium browser)
