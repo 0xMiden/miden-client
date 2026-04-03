@@ -27,6 +27,7 @@ const mockMintAndConsume = async (
       );
 
       const mintTxId = await client.submitNewTransaction(faucetId, mintRequest);
+      const mintTxIdHex = mintTxId.toHex();
       await client.proveBlock();
       await client.syncState();
 
@@ -43,6 +44,7 @@ const mockMintAndConsume = async (
         accountId,
         consumeRequest
       );
+      const consumeTxIdHex = consumeTxId.toHex();
 
       if (commit) {
         await client.proveBlock();
@@ -50,8 +52,8 @@ const mockMintAndConsume = async (
       }
 
       return {
-        mintTxId: mintTxId.toHex(),
-        consumeTxId: consumeTxId.toHex(),
+        mintTxId: mintTxIdHex,
+        consumeTxId: consumeTxIdHex,
       };
     },
     { commit }
