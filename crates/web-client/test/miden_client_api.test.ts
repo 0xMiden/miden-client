@@ -9,88 +9,90 @@ import { expect } from "@playwright/test";
 mockTest.describe("MidenClient API - Mock Chain", () => {
   mockTest.describe.configure({ timeout: 720000 });
 
-  mockTest("full flow: create accounts, mint, consume, check balance", async ({
-    page,
-  }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
+  mockTest(
+    "full flow: create accounts, mint, consume, check balance",
+    async ({ page }) => {
+      const result = await page.evaluate(async () => {
+        const client = await window.MidenClient.createMock();
 
-      const wallet = await client.accounts.create();
-      const faucet = await client.accounts.create({
-        type: window.AccountType.FungibleFaucet,
-        symbol: "DAG",
-        decimals: 8,
-        maxSupply: 10_000_000n,
+        const wallet = await client.accounts.create();
+        const faucet = await client.accounts.create({
+          type: window.AccountType.FungibleFaucet,
+          symbol: "DAG",
+          decimals: 8,
+          maxSupply: 10_000_000n,
+        });
+
+        // Mint tokens to the wallet
+        const { txId: mintTxId } = await client.transactions.mint({
+          account: faucet,
+          to: wallet,
+          amount: 1000n,
+        });
+
+        client.proveBlock();
+        await client.sync();
+
+        // Retrieve the minted note ID from the transaction record
+        const txRecords = await client.transactions.list({
+          ids: [mintTxId.toHex()],
+        });
+        const mintedNoteId = txRecords[0]
+          .outputNotes()
+          .notes()[0]
+          .id()
+          .toString();
+
+        // Consume the minted note
+        const { txId: consumeTxId } = await client.transactions.consume({
+          account: wallet,
+          notes: mintedNoteId,
+        });
+
+        client.proveBlock();
+        await client.sync();
+
+        // Check balance
+        const walletAccount = await client.accounts.get(wallet);
+        const balance = walletAccount.vault().getBalance(faucet.id());
+
+        return {
+          walletId: wallet.id().toString(),
+          faucetId: faucet.id().toString(),
+          mintTxId: mintTxId.toHex(),
+          consumeTxId: consumeTxId.toHex(),
+          balance: balance.toString(),
+        };
       });
 
-      // Mint tokens to the wallet
-      const { txId: mintTxId } = await client.transactions.mint({
-        account: faucet,
-        to: wallet,
-        amount: 1000n,
+      expect(result.walletId).toBeDefined();
+      expect(result.faucetId).toBeDefined();
+      expect(result.mintTxId).toBeDefined();
+      expect(result.consumeTxId).toBeDefined();
+      expect(result.balance).toBe("1000");
+    }
+  );
+
+  mockTest(
+    "accounts.create defaults to private mutable wallet",
+    async ({ page }) => {
+      const result = await page.evaluate(async () => {
+        const client = await window.MidenClient.createMock();
+
+        const wallet = await client.accounts.create();
+
+        return {
+          isFaucet: wallet.isFaucet(),
+          isRegularAccount: wallet.isRegularAccount(),
+          isUpdatable: wallet.isUpdatable(),
+        };
       });
 
-      client.proveBlock();
-      await client.sync();
-
-      // Retrieve the minted note ID from the transaction record
-      const txRecords = await client.transactions.list({
-        ids: [mintTxId.toHex()],
-      });
-      const mintedNoteId = txRecords[0]
-        .outputNotes()
-        .notes()[0]
-        .id()
-        .toString();
-
-      // Consume the minted note
-      const { txId: consumeTxId } = await client.transactions.consume({
-        account: wallet,
-        notes: mintedNoteId,
-      });
-
-      client.proveBlock();
-      await client.sync();
-
-      // Check balance
-      const walletAccount = await client.accounts.get(wallet);
-      const balance = walletAccount.vault().getBalance(faucet.id());
-
-      return {
-        walletId: wallet.id().toString(),
-        faucetId: faucet.id().toString(),
-        mintTxId: mintTxId.toHex(),
-        consumeTxId: consumeTxId.toHex(),
-        balance: balance.toString(),
-      };
-    });
-
-    expect(result.walletId).toBeDefined();
-    expect(result.faucetId).toBeDefined();
-    expect(result.mintTxId).toBeDefined();
-    expect(result.consumeTxId).toBeDefined();
-    expect(result.balance).toBe("1000");
-  });
-
-  mockTest("accounts.create defaults to private mutable wallet", async ({
-    page,
-  }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-
-      const wallet = await client.accounts.create();
-
-      return {
-        isFaucet: wallet.isFaucet(),
-        isRegularAccount: wallet.isRegularAccount(),
-        isUpdatable: wallet.isUpdatable(),
-      };
-    });
-
-    expect(result.isFaucet).toBe(false);
-    expect(result.isRegularAccount).toBe(true);
-    expect(result.isUpdatable).toBe(true);
-  });
+      expect(result.isFaucet).toBe(false);
+      expect(result.isRegularAccount).toBe(true);
+      expect(result.isUpdatable).toBe(true);
+    }
+  );
 
   mockTest("accounts.create faucet", async ({ page }) => {
     const result = await page.evaluate(async () => {
@@ -176,21 +178,22 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
     expect(result.fetchedId).toBe(result.originalId);
   });
 
-  mockTest("accounts.get returns null for nonexistent account", async ({
-    page,
-  }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-      // Create a wallet to get a valid-looking hex ID, then look up a different one
-      const wallet = await client.accounts.create();
-      // Use the wallet's own ID (which exists)
-      const found = await client.accounts.get(wallet);
-      return { isNull: found === null, hasId: found?.id() != null };
-    });
+  mockTest(
+    "accounts.get returns null for nonexistent account",
+    async ({ page }) => {
+      const result = await page.evaluate(async () => {
+        const client = await window.MidenClient.createMock();
+        // Create a wallet to get a valid-looking hex ID, then look up a different one
+        const wallet = await client.accounts.create();
+        // Use the wallet's own ID (which exists)
+        const found = await client.accounts.get(wallet);
+        return { isNull: found === null, hasId: found?.id() != null };
+      });
 
-    expect(result.isNull).toBe(false);
-    expect(result.hasId).toBe(true);
-  });
+      expect(result.isNull).toBe(false);
+      expect(result.hasId).toBe(true);
+    }
+  );
 
   mockTest("transactions.list with no query returns all", async ({ page }) => {
     const result = await page.evaluate(async () => {
@@ -296,39 +299,40 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
     expect(result.fetchedNoteId).toBe(result.noteId);
   });
 
-  mockTest("transactions.submit with custom TransactionRequest", async ({
-    page,
-  }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-      const wallet = await client.accounts.create();
-      const faucet = await client.accounts.create({
-        type: window.AccountType.FungibleFaucet,
-        symbol: "DAG",
-        decimals: 8,
-        maxSupply: 10_000_000n,
+  mockTest(
+    "transactions.submit with custom TransactionRequest",
+    async ({ page }) => {
+      const result = await page.evaluate(async () => {
+        const client = await window.MidenClient.createMock();
+        const wallet = await client.accounts.create();
+        const faucet = await client.accounts.create({
+          type: window.AccountType.FungibleFaucet,
+          symbol: "DAG",
+          decimals: 8,
+          maxSupply: 10_000_000n,
+        });
+
+        // Build a custom TransactionRequest using low-level _WebClient
+        const lowLevel = await window.MockWasmWebClient.createClient();
+        const mintRequest = lowLevel.newMintTransactionRequest(
+          wallet.id(),
+          faucet.id(),
+          window.NoteType.Public,
+          BigInt(500)
+        );
+
+        // Submit the pre-built request through the high-level API
+        const { txId } = await client.transactions.submit(faucet, mintRequest);
+
+        return {
+          txId: txId.toHex(),
+        };
       });
 
-      // Build a custom TransactionRequest using low-level _WebClient
-      const lowLevel = await window.MockWasmWebClient.createClient();
-      const mintRequest = lowLevel.newMintTransactionRequest(
-        wallet.id(),
-        faucet.id(),
-        window.NoteType.Public,
-        BigInt(500)
-      );
-
-      // Submit the pre-built request through the high-level API
-      const { txId } = await client.transactions.submit(faucet, mintRequest);
-
-      return {
-        txId: txId.toHex(),
-      };
-    });
-
-    expect(result.txId).toBeDefined();
-    expect(result.txId.length).toBeGreaterThan(0);
-  });
+      expect(result.txId).toBeDefined();
+      expect(result.txId.length).toBeGreaterThan(0);
+    }
+  );
 
   mockTest("exportStore and importStore round-trip", async ({ page }) => {
     const result = await page.evaluate(async () => {
@@ -504,73 +508,80 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
     expect(result.txId).toBeNull();
   });
 
-  mockTest("consumeAll with no consumable notes returns early", async ({
-    page,
-  }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-      const wallet = await client.accounts.create();
+  mockTest(
+    "consumeAll with no consumable notes returns early",
+    async ({ page }) => {
+      const result = await page.evaluate(async () => {
+        const client = await window.MidenClient.createMock();
+        const wallet = await client.accounts.create();
 
-      const result = await client.transactions.consumeAll({
-        account: wallet,
-      });
-      return {
-        consumed: result.consumed,
-        remaining: result.remaining,
-        txId: result.txId,
-      };
-    });
-
-    expect(result.consumed).toBe(0);
-    expect(result.remaining).toBe(0);
-    expect(result.txId).toBeNull();
-  });
-
-  mockTest("accounts.getDetails returns full account info", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-      const wallet = await client.accounts.create();
-
-      const details = await client.accounts.getDetails(wallet);
-      return {
-        hasAccount: details.account != null,
-        hasVault: details.vault != null,
-        hasStorage: details.storage != null,
-        hasKeys: Array.isArray(details.keys),
-      };
-    });
-
-    expect(result.hasAccount).toBe(true);
-    expect(result.hasVault).toBe(true);
-    expect(result.hasStorage).toBe(true);
-    expect(result.hasKeys).toBe(true);
-  });
-
-  mockTest("notes.listSent returns output notes after mint", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-      const wallet = await client.accounts.create();
-      const faucet = await client.accounts.create({
-        type: window.AccountType.FungibleFaucet,
-        symbol: "DAG",
-        decimals: 8,
-        maxSupply: 10_000_000n,
+        const result = await client.transactions.consumeAll({
+          account: wallet,
+        });
+        return {
+          consumed: result.consumed,
+          remaining: result.remaining,
+          txId: result.txId,
+        };
       });
 
-      await client.transactions.mint({
-        account: faucet,
-        to: wallet,
-        amount: 500n,
+      expect(result.consumed).toBe(0);
+      expect(result.remaining).toBe(0);
+      expect(result.txId).toBeNull();
+    }
+  );
+
+  mockTest(
+    "accounts.getDetails returns full account info",
+    async ({ page }) => {
+      const result = await page.evaluate(async () => {
+        const client = await window.MidenClient.createMock();
+        const wallet = await client.accounts.create();
+
+        const details = await client.accounts.getDetails(wallet);
+        return {
+          hasAccount: details.account != null,
+          hasVault: details.vault != null,
+          hasStorage: details.storage != null,
+          hasKeys: Array.isArray(details.keys),
+        };
       });
-      client.proveBlock();
-      await client.sync();
 
-      const sent = await client.notes.listSent();
-      return { sentCount: sent.length };
-    });
+      expect(result.hasAccount).toBe(true);
+      expect(result.hasVault).toBe(true);
+      expect(result.hasStorage).toBe(true);
+      expect(result.hasKeys).toBe(true);
+    }
+  );
 
-    expect(result.sentCount).toBeGreaterThanOrEqual(1);
-  });
+  mockTest(
+    "notes.listSent returns output notes after mint",
+    async ({ page }) => {
+      const result = await page.evaluate(async () => {
+        const client = await window.MidenClient.createMock();
+        const wallet = await client.accounts.create();
+        const faucet = await client.accounts.create({
+          type: window.AccountType.FungibleFaucet,
+          symbol: "DAG",
+          decimals: 8,
+          maxSupply: 10_000_000n,
+        });
+
+        await client.transactions.mint({
+          account: faucet,
+          to: wallet,
+          amount: 500n,
+        });
+        client.proveBlock();
+        await client.sync();
+
+        const sent = await client.notes.listSent();
+        return { sentCount: sent.length };
+      });
+
+      expect(result.sentCount).toBeGreaterThanOrEqual(1);
+    }
+  );
 
   mockTest("notes.listAvailable returns consumable notes", async ({ page }) => {
     const result = await page.evaluate(async () => {
@@ -785,68 +796,72 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
     expect(result.hasFile).toBe(true);
   });
 
-  mockTest("transactions.preview returns a TransactionSummary", async ({
-    page,
-  }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-      const wallet = await client.accounts.create();
-      const faucet = await client.accounts.create({
-        type: window.AccountType.FungibleFaucet,
-        symbol: "DAG",
-        decimals: 8,
-        maxSupply: 10_000_000n,
+  mockTest(
+    "transactions.preview returns a TransactionSummary",
+    async ({ page }) => {
+      const result = await page.evaluate(async () => {
+        const client = await window.MidenClient.createMock();
+        const wallet = await client.accounts.create();
+        const faucet = await client.accounts.create({
+          type: window.AccountType.FungibleFaucet,
+          symbol: "DAG",
+          decimals: 8,
+          maxSupply: 10_000_000n,
+        });
+
+        const summary = await client.transactions.preview({
+          operation: "mint",
+          account: faucet,
+          to: wallet,
+          amount: 1000n,
+        });
+
+        return {
+          hasSummary: summary != null,
+          hasOutputNotes: typeof summary.outputNotes === "function",
+          outputNotesCount: summary.outputNotes().numNotes(),
+          hasAccountDelta: typeof summary.accountDelta === "function",
+        };
       });
 
-      const summary = await client.transactions.preview({
-        operation: "mint",
-        account: faucet,
-        to: wallet,
-        amount: 1000n,
+      expect(result.hasSummary).toBe(true);
+      expect(result.hasOutputNotes).toBe(true);
+      expect(result.outputNotesCount).toBeGreaterThan(0);
+      expect(result.hasAccountDelta).toBe(true);
+    }
+  );
+
+  mockTest(
+    "standalone createP2IDNote creates a valid note",
+    async ({ page }) => {
+      const result = await page.evaluate(async () => {
+        const client = await window.MidenClient.createMock();
+        const wallet = await client.accounts.create();
+        const faucet = await client.accounts.create({
+          type: window.AccountType.FungibleFaucet,
+          symbol: "DAG",
+          decimals: 8,
+          maxSupply: 10_000_000n,
+        });
+
+        const note = window.createP2IDNote({
+          from: faucet,
+          to: wallet,
+          assets: { token: faucet, amount: 100n },
+        });
+
+        return {
+          hasNote: note != null,
+          hasId: typeof note.id === "function",
+          hasAssets: typeof note.assets === "function",
+        };
       });
 
-      return {
-        hasSummary: summary != null,
-        hasOutputNotes: typeof summary.outputNotes === "function",
-        outputNotesCount: summary.outputNotes().numNotes(),
-        hasAccountDelta: typeof summary.accountDelta === "function",
-      };
-    });
-
-    expect(result.hasSummary).toBe(true);
-    expect(result.hasOutputNotes).toBe(true);
-    expect(result.outputNotesCount).toBeGreaterThan(0);
-    expect(result.hasAccountDelta).toBe(true);
-  });
-
-  mockTest("standalone createP2IDNote creates a valid note", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-      const wallet = await client.accounts.create();
-      const faucet = await client.accounts.create({
-        type: window.AccountType.FungibleFaucet,
-        symbol: "DAG",
-        decimals: 8,
-        maxSupply: 10_000_000n,
-      });
-
-      const note = window.createP2IDNote({
-        from: faucet,
-        to: wallet,
-        assets: { token: faucet, amount: 100n },
-      });
-
-      return {
-        hasNote: note != null,
-        hasId: typeof note.id === "function",
-        hasAssets: typeof note.assets === "function",
-      };
-    });
-
-    expect(result.hasNote).toBe(true);
-    expect(result.hasId).toBe(true);
-    expect(result.hasAssets).toBe(true);
-  });
+      expect(result.hasNote).toBe(true);
+      expect(result.hasId).toBe(true);
+      expect(result.hasAssets).toBe(true);
+    }
+  );
 
   mockTest("standalone buildSwapTag returns a NoteTag", async ({ page }) => {
     const result = await page.evaluate(async () => {
@@ -885,53 +900,55 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
     expect(result.fitsU32).toBe(true);
   });
 
-  mockTest("accounts.getOrImport returns existing account without importing", async ({
-    page,
-  }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-      const wallet = await client.accounts.create({ storage: "public" });
-      const walletId = wallet.id().toString();
+  mockTest(
+    "accounts.getOrImport returns existing account without importing",
+    async ({ page }) => {
+      const result = await page.evaluate(async () => {
+        const client = await window.MidenClient.createMock();
+        const wallet = await client.accounts.create({ storage: "public" });
+        const walletId = wallet.id().toString();
 
-      // getOrImport should return the already-local account
-      const fetched = await client.accounts.getOrImport(walletId);
+        // getOrImport should return the already-local account
+        const fetched = await client.accounts.getOrImport(walletId);
 
-      return {
-        fetchedId: fetched.id().toString(),
-        originalId: walletId,
-      };
-    });
-
-    expect(result.fetchedId).toBe(result.originalId);
-  });
-
-  mockTest("accounts.getOrImport works across serialized mock chain", async ({
-    page,
-  }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-      const wallet = await client.accounts.create({ storage: "public" });
-      const walletId = wallet.id().toString();
-
-      // Serialize chain so the second client sees the same blocks
-      const chain = client.serializeMockChain();
-
-      // Create a fresh mock client with the same chain
-      const client2 = await window.MidenClient.createMock({
-        serializedMockChain: chain,
+        return {
+          fetchedId: fetched.id().toString(),
+          originalId: walletId,
+        };
       });
 
-      // getOrImport should return the account (either from local store or network)
-      const imported = await client2.accounts.getOrImport(walletId);
+      expect(result.fetchedId).toBe(result.originalId);
+    }
+  );
 
-      return {
-        importedId: imported.id().toString(),
-        originalId: walletId,
-      };
-    });
+  mockTest(
+    "accounts.getOrImport works across serialized mock chain",
+    async ({ page }) => {
+      const result = await page.evaluate(async () => {
+        const client = await window.MidenClient.createMock();
+        const wallet = await client.accounts.create({ storage: "public" });
+        const walletId = wallet.id().toString();
 
-    expect(result.importedId).toBe(result.originalId);
-  });
+        // Serialize chain so the second client sees the same blocks
+        const chain = client.serializeMockChain();
+
+        // Create a fresh mock client with the same chain
+        const client2 = await window.MidenClient.createMock({
+          serializedMockChain: chain,
+        });
+
+        // getOrImport should return the account (either from local store or network)
+        const imported = await client2.accounts.getOrImport(walletId);
+
+        return {
+          importedId: imported.id().toString(),
+          originalId: walletId,
+        };
+      });
+
+      expect(result.importedId).toBe(result.originalId);
+    }
+  );
 
   mockTest("serializeMockChain and restore", async ({ page }) => {
     const result = await page.evaluate(async () => {
@@ -996,105 +1013,107 @@ nodeTest.describe("MidenClient API - Integration", () => {
     expect(result.syncHeight).toBeGreaterThanOrEqual(0);
   });
 
-  nodeTest("accounts.create wallet and faucet via integration", async ({
-    page,
-  }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.create({
-        rpcUrl: window.rpcUrl,
-        storeName: "miden_client_api_accounts_test",
-      });
-      await client.sync();
+  nodeTest(
+    "accounts.create wallet and faucet via integration",
+    async ({ page }) => {
+      const result = await page.evaluate(async () => {
+        const client = await window.MidenClient.create({
+          rpcUrl: window.rpcUrl,
+          storeName: "miden_client_api_accounts_test",
+        });
+        await client.sync();
 
-      const wallet = await client.accounts.create();
-      const faucet = await client.accounts.create({
-        type: window.AccountType.FungibleFaucet,
-        symbol: "DAG",
-        decimals: 8,
-        maxSupply: 10_000_000n,
-      });
+        const wallet = await client.accounts.create();
+        const faucet = await client.accounts.create({
+          type: window.AccountType.FungibleFaucet,
+          symbol: "DAG",
+          decimals: 8,
+          maxSupply: 10_000_000n,
+        });
 
-      const accounts = await client.accounts.list();
+        const accounts = await client.accounts.list();
 
-      return {
-        walletIsFaucet: wallet.isFaucet(),
-        walletIsUpdatable: wallet.isUpdatable(),
-        faucetIsFaucet: faucet.isFaucet(),
-        accountCount: accounts.length,
-      };
-    });
-
-    expect(result.walletIsFaucet).toBe(false);
-    expect(result.walletIsUpdatable).toBe(true);
-    expect(result.faucetIsFaucet).toBe(true);
-    expect(result.accountCount).toBe(2);
-  });
-
-  nodeTest("full send flow: mint, sync, consume, check balance", async ({
-    page,
-  }) => {
-    test.slow();
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.create({
-        rpcUrl: window.rpcUrl,
-        storeName: "miden_client_api_send_test",
-      });
-      await client.sync();
-
-      const wallet = await client.accounts.create();
-      const faucet = await client.accounts.create({
-        type: window.AccountType.FungibleFaucet,
-        symbol: "DAG",
-        decimals: 8,
-        maxSupply: 10_000_000n,
+        return {
+          walletIsFaucet: wallet.isFaucet(),
+          walletIsUpdatable: wallet.isUpdatable(),
+          faucetIsFaucet: faucet.isFaucet(),
+          accountCount: accounts.length,
+        };
       });
 
-      // Mint tokens
-      const { txId: mintTxId } = await client.transactions.mint({
-        account: faucet,
-        to: wallet,
-        amount: 1000n,
-        type: "public",
+      expect(result.walletIsFaucet).toBe(false);
+      expect(result.walletIsUpdatable).toBe(true);
+      expect(result.faucetIsFaucet).toBe(true);
+      expect(result.accountCount).toBe(2);
+    }
+  );
+
+  nodeTest(
+    "full send flow: mint, sync, consume, check balance",
+    async ({ page }) => {
+      test.slow();
+      const result = await page.evaluate(async () => {
+        const client = await window.MidenClient.create({
+          rpcUrl: window.rpcUrl,
+          storeName: "miden_client_api_send_test",
+        });
+        await client.sync();
+
+        const wallet = await client.accounts.create();
+        const faucet = await client.accounts.create({
+          type: window.AccountType.FungibleFaucet,
+          symbol: "DAG",
+          decimals: 8,
+          maxSupply: 10_000_000n,
+        });
+
+        // Mint tokens
+        const { txId: mintTxId } = await client.transactions.mint({
+          account: faucet,
+          to: wallet,
+          amount: 1000n,
+          type: "public",
+        });
+
+        // Wait for mint to be confirmed
+        await client.transactions.waitFor(mintTxId.toHex(), {
+          timeout: 30_000,
+          interval: 1_000,
+        });
+
+        // Consume the minted notes
+        const consumable = await client.notes.listAvailable({
+          account: wallet,
+        });
+
+        const { txId: consumeTxId } = await client.transactions.consume({
+          account: wallet,
+          notes: consumable,
+        });
+
+        await client.transactions.waitFor(consumeTxId.toHex(), {
+          timeout: 30_000,
+          interval: 1_000,
+        });
+
+        // Check balance
+        const walletAccount = await client.accounts.get(wallet);
+        const balance = walletAccount.vault().getBalance(faucet.id());
+
+        return {
+          mintTxId: mintTxId.toHex(),
+          consumeTxId: consumeTxId.toHex(),
+          balance: balance.toString(),
+          consumedCount: consumable.length,
+        };
       });
 
-      // Wait for mint to be confirmed
-      await client.transactions.waitFor(mintTxId.toHex(), {
-        timeout: 30_000,
-        interval: 1_000,
-      });
-
-      // Consume the minted notes
-      const consumable = await client.notes.listAvailable({
-        account: wallet,
-      });
-
-      const { txId: consumeTxId } = await client.transactions.consume({
-        account: wallet,
-        notes: consumable,
-      });
-
-      await client.transactions.waitFor(consumeTxId.toHex(), {
-        timeout: 30_000,
-        interval: 1_000,
-      });
-
-      // Check balance
-      const walletAccount = await client.accounts.get(wallet);
-      const balance = walletAccount.vault().getBalance(faucet.id());
-
-      return {
-        mintTxId: mintTxId.toHex(),
-        consumeTxId: consumeTxId.toHex(),
-        balance: balance.toString(),
-        consumedCount: consumable.length,
-      };
-    });
-
-    expect(result.mintTxId).toBeDefined();
-    expect(result.consumeTxId).toBeDefined();
-    expect(result.balance).toBe("1000");
-    expect(result.consumedCount).toBeGreaterThanOrEqual(1);
-  });
+      expect(result.mintTxId).toBeDefined();
+      expect(result.consumeTxId).toBeDefined();
+      expect(result.balance).toBe("1000");
+      expect(result.consumedCount).toBeGreaterThanOrEqual(1);
+    }
+  );
 
   nodeTest("transactions.list queries work correctly", async ({ page }) => {
     const result = await page.evaluate(async () => {
