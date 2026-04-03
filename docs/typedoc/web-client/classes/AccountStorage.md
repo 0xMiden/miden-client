@@ -54,7 +54,9 @@ Returns the commitment to the full account storage.
 
 > **getItem**(`slot_name`): [`Word`](Word.md)
 
-Returns the value stored at the given slot name, if any.
+Returns the value stored at the given slot name.
+For Value slots: returns the stored Word directly.
+For Map slots: returns the first entry's value (NOT the commitment hash).
 
 #### Parameters
 
@@ -110,6 +112,25 @@ Returns the value for a key in the map stored at the given slot, if any.
 
 ***
 
+### getNumber()
+
+> **getNumber**(`slot_name`): `number`
+
+Returns the first felt of a storage slot as a number.
+Works for both Value and Map slots (for maps, returns first entry's first felt).
+
+#### Parameters
+
+##### slot\_name
+
+`string`
+
+#### Returns
+
+`number`
+
+***
+
 ### getSlotNames()
 
 > **getSlotNames**(): `string`[]
@@ -119,3 +140,50 @@ Returns the names of all storage slots on this account.
 #### Returns
 
 `string`[]
+
+***
+
+### readNumber()
+
+> **readNumber**(`slot_name`, `key?`): `number`
+
+Convenience: read a storage value and return the first felt as a number.
+Handles both Value and Map slots.
+
+#### Parameters
+
+##### slot\_name
+
+`string`
+
+##### key?
+
+[`Word`](Word.md)
+
+#### Returns
+
+`number`
+
+***
+
+### readValue()
+
+> **readValue**(`slot_name`, `key?`): [`Word`](Word.md)
+
+Smart read: returns the actual stored value regardless of slot type.
+- For Value slots: returns the stored Word directly.
+- For Map slots: returns the value at the given key, or the first entry's value if no key.
+
+#### Parameters
+
+##### slot\_name
+
+`string`
+
+##### key?
+
+[`Word`](Word.md)
+
+#### Returns
+
+[`Word`](Word.md)
