@@ -52,7 +52,7 @@ use crate::rpc::domain::limits::RpcLimits;
 use crate::rpc::{AccountStateAt, generated as proto};
 
 mod api_client;
-mod retry;
+pub mod retry;
 
 use api_client::api_client_wrapper::ApiClient;
 
