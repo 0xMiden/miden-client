@@ -1,15 +1,15 @@
 // @ts-nocheck
-import { mockTest as test } from "./playwright.global.setup";
+import nodeTest, { mockTest } from "./playwright.global.setup";
 import { expect } from "@playwright/test";
 
 // ════════════════════════════════════════════════════════════════
 // Mock chain tests — no node needed, self-contained
 // ════════════════════════════════════════════════════════════════
 
-test.describe("MidenClient API - Mock Chain", () => {
-  test.describe.configure({ timeout: 720000 });
+mockTest.describe("MidenClient API - Mock Chain", () => {
+  mockTest.describe.configure({ timeout: 720000 });
 
-  test("full flow: create accounts, mint, consume, check balance", async ({
+  mockTest("full flow: create accounts, mint, consume, check balance", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -72,7 +72,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.balance).toBe("1000");
   });
 
-  test("accounts.create defaults to private mutable wallet", async ({
+  mockTest("accounts.create defaults to private mutable wallet", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -92,7 +92,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.isUpdatable).toBe(true);
   });
 
-  test("accounts.create faucet", async ({ page }) => {
+  mockTest("accounts.create faucet", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
 
@@ -114,7 +114,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.isPublic).toBe(true);
   });
 
-  test("accounts.insert stores a pre-built account", async ({ page }) => {
+  mockTest("accounts.insert stores a pre-built account", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
 
@@ -146,7 +146,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.isPublic).toBe(true);
   });
 
-  test("accounts.list returns created accounts", async ({ page }) => {
+  mockTest("accounts.list returns created accounts", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
 
@@ -160,7 +160,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.count).toBe(2);
   });
 
-  test("accounts.get returns account by hex string", async ({ page }) => {
+  mockTest("accounts.get returns account by hex string", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -176,7 +176,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.fetchedId).toBe(result.originalId);
   });
 
-  test("accounts.get returns null for nonexistent account", async ({
+  mockTest("accounts.get returns null for nonexistent account", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -192,7 +192,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.hasId).toBe(true);
   });
 
-  test("transactions.list with no query returns all", async ({ page }) => {
+  mockTest("transactions.list with no query returns all", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -216,7 +216,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.count).toBe(1);
   });
 
-  test("transactions.list with uncommitted query", async ({ page }) => {
+  mockTest("transactions.list with uncommitted query", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -257,7 +257,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.uncommittedAfter).toBe(0);
   });
 
-  test("notes.list and notes.get", async ({ page }) => {
+  mockTest("notes.list and notes.get", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -296,7 +296,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.fetchedNoteId).toBe(result.noteId);
   });
 
-  test("transactions.submit with custom TransactionRequest", async ({
+  mockTest("transactions.submit with custom TransactionRequest", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -330,7 +330,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.txId.length).toBeGreaterThan(0);
   });
 
-  test("exportStore and importStore round-trip", async ({ page }) => {
+  mockTest("exportStore and importStore round-trip", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
 
@@ -358,7 +358,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.foundInImport).toBe(true);
   });
 
-  test("usesMockChain and proveBlock", async ({ page }) => {
+  mockTest("usesMockChain and proveBlock", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const isMock = client.usesMockChain();
@@ -372,7 +372,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.isMock).toBe(true);
   });
 
-  test("terminate prevents further operations", async ({ page }) => {
+  mockTest("terminate prevents further operations", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       client.terminate();
@@ -389,7 +389,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.message).toContain("terminated");
   });
 
-  test("consumeAll consumes all available notes", async ({ page }) => {
+  mockTest("consumeAll consumes all available notes", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -429,7 +429,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.hasTxId).toBe(true);
   });
 
-  test("consumeAll with maxNotes limits consumption", async ({ page }) => {
+  mockTest("consumeAll with maxNotes limits consumption", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -469,7 +469,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.hasTxId).toBe(true);
   });
 
-  test("consumeAll with maxNotes: 0 returns early", async ({ page }) => {
+  mockTest("consumeAll with maxNotes: 0 returns early", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -504,7 +504,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.txId).toBeNull();
   });
 
-  test("consumeAll with no consumable notes returns early", async ({
+  mockTest("consumeAll with no consumable notes returns early", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -526,7 +526,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.txId).toBeNull();
   });
 
-  test("accounts.getDetails returns full account info", async ({ page }) => {
+  mockTest("accounts.getDetails returns full account info", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -546,7 +546,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.hasKeys).toBe(true);
   });
 
-  test("notes.listSent returns output notes after mint", async ({ page }) => {
+  mockTest("notes.listSent returns output notes after mint", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -572,7 +572,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.sentCount).toBeGreaterThanOrEqual(1);
   });
 
-  test("notes.listAvailable returns consumable notes", async ({ page }) => {
+  mockTest("notes.listAvailable returns consumable notes", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -598,7 +598,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.availableCount).toBeGreaterThanOrEqual(1);
   });
 
-  test("terminate prevents resource operations", async ({ page }) => {
+  mockTest("terminate prevents resource operations", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       client.terminate();
@@ -628,7 +628,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     }
   });
 
-  test("error on invalid note type string", async ({ page }) => {
+  mockTest("error on invalid note type string", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -656,7 +656,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.message).toContain("Unknown note type");
   });
 
-  test("error on invalid storage mode string", async ({ page }) => {
+  mockTest("error on invalid storage mode string", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
 
@@ -674,7 +674,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.message).toContain("Unknown storage mode");
   });
 
-  test("error on null account reference", async ({ page }) => {
+  mockTest("error on null account reference", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
 
@@ -690,7 +690,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.message).toContain("null or undefined");
   });
 
-  test("accounts.export returns a valid AccountFile", async ({ page }) => {
+  mockTest("accounts.export returns a valid AccountFile", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create({ storage: "public" });
@@ -711,7 +711,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.serializeLength).toBeGreaterThan(0);
   });
 
-  test("notes.export returns a valid NoteFile", async ({ page }) => {
+  mockTest("notes.export returns a valid NoteFile", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -753,7 +753,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.serializeLength).toBeGreaterThan(0);
   });
 
-  test("notes.export with id format", async ({ page }) => {
+  mockTest("notes.export with id format", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -785,7 +785,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.hasFile).toBe(true);
   });
 
-  test("transactions.preview returns a TransactionSummary", async ({
+  mockTest("transactions.preview returns a TransactionSummary", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -819,7 +819,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.hasAccountDelta).toBe(true);
   });
 
-  test("standalone createP2IDNote creates a valid note", async ({ page }) => {
+  mockTest("standalone createP2IDNote creates a valid note", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const wallet = await client.accounts.create();
@@ -848,7 +848,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.hasAssets).toBe(true);
   });
 
-  test("standalone buildSwapTag returns a NoteTag", async ({ page }) => {
+  mockTest("standalone buildSwapTag returns a NoteTag", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
       const faucetA = await client.accounts.create({
@@ -885,7 +885,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.fitsU32).toBe(true);
   });
 
-  test("accounts.getOrImport returns existing account without importing", async ({
+  mockTest("accounts.getOrImport returns existing account without importing", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -905,7 +905,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.fetchedId).toBe(result.originalId);
   });
 
-  test("accounts.getOrImport works across serialized mock chain", async ({
+  mockTest("accounts.getOrImport works across serialized mock chain", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -933,7 +933,7 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(result.importedId).toBe(result.originalId);
   });
 
-  test("serializeMockChain and restore", async ({ page }) => {
+  mockTest("serializeMockChain and restore", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
 
@@ -975,8 +975,8 @@ test.describe("MidenClient API - Mock Chain", () => {
 // Integration tests — require running node
 // ════════════════════════════════════════════════════════════════
 
-test.describe("MidenClient API - Integration", () => {
-  test("MidenClient.create and sync", async ({ page }) => {
+nodeTest.describe("MidenClient API - Integration", () => {
+  nodeTest("MidenClient.create and sync", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.create({
         rpcUrl: window.rpcUrl,
@@ -996,7 +996,7 @@ test.describe("MidenClient API - Integration", () => {
     expect(result.syncHeight).toBeGreaterThanOrEqual(0);
   });
 
-  test("accounts.create wallet and faucet via integration", async ({
+  nodeTest("accounts.create wallet and faucet via integration", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -1030,7 +1030,7 @@ test.describe("MidenClient API - Integration", () => {
     expect(result.accountCount).toBe(2);
   });
 
-  test("full send flow: mint, sync, consume, check balance", async ({
+  nodeTest("full send flow: mint, sync, consume, check balance", async ({
     page,
   }) => {
     test.slow();
@@ -1096,7 +1096,7 @@ test.describe("MidenClient API - Integration", () => {
     expect(result.consumedCount).toBeGreaterThanOrEqual(1);
   });
 
-  test("transactions.list queries work correctly", async ({ page }) => {
+  nodeTest("transactions.list queries work correctly", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.create({
         rpcUrl: window.rpcUrl,
@@ -1144,7 +1144,7 @@ test.describe("MidenClient API - Integration", () => {
     expect(result.uncommittedCount).toBeGreaterThanOrEqual(0);
   });
 
-  test("notes.list with status filter", async ({ page }) => {
+  nodeTest("notes.list with status filter", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.create({
         rpcUrl: window.rpcUrl,
