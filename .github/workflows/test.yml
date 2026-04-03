@@ -125,7 +125,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target/release/testing-node-builder
-          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
       - name: Install Rust
         if: steps.cache-node-builder.outputs.cache-hit != 'true'
         run: rustup update --no-self-update
@@ -143,20 +143,25 @@ jobs:
   build-note-transport:
     name: Build note-transport
     runs-on: ubuntu-24.04
+    outputs:
+      note_transport_rev: ${{ steps.note-transport-rev.outputs.rev }}
     steps:
       - uses: actions/checkout@v6
+      - name: Resolve note-transport revision
+        id: note-transport-rev
+        run: echo "rev=$(git ls-remote https://github.com/0xMiden/miden-note-transport HEAD | cut -f1)" >> "$GITHUB_OUTPUT"
       - name: Restore note-transport binary
         id: cache-note-transport
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/miden-note-transport-node-bin
-          key: ${{ runner.os }}-note-transport-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-note-transport-${{ steps.note-transport-rev.outputs.rev }}
       - name: Install Rust
         if: steps.cache-note-transport.outputs.cache-hit != 'true'
         run: rustup update --no-self-update
       - name: Install note-transport
         if: steps.cache-note-transport.outputs.cache-hit != 'true'
-        run: cargo install --git https://github.com/0xMiden/miden-note-transport --locked
+        run: cargo install --git https://github.com/0xMiden/miden-note-transport --rev ${{ steps.note-transport-rev.outputs.rev }} --locked
 
   build-remote-prover:
     name: Build remote-prover
@@ -168,7 +173,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target/release/testing-remote-prover
-          key: ${{ runner.os }}-prover-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-prover-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/prover/**/*') }}
       - name: Install Rust
         if: steps.cache-remote-prover.outputs.cache-hit != 'true'
         run: rustup update --no-self-update
@@ -204,12 +209,12 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: target/release/testing-node-builder
-          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
       - name: Restore note-transport binary
         uses: actions/cache/restore@v4
         with:
           path: ~/.cargo/bin/miden-note-transport-node-bin
-          key: ${{ runner.os }}-note-transport-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-note-transport-${{ needs.build-note-transport.outputs.note_transport_rev }}
       - name: Start test node
         run: |
           RUST_LOG=none target/release/testing-node-builder &
@@ -329,7 +334,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: target/release/testing-node-builder
-          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
       - name: Start test node
         run: |
           RUST_LOG=none target/release/testing-node-builder &
@@ -377,7 +382,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: target/release/testing-remote-prover
-          key: ${{ runner.os }}-prover-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-prover-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/prover/**/*') }}
       - name: Start test node
         run: |
           RUST_LOG=none target/release/testing-node-builder &
