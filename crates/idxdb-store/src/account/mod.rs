@@ -385,12 +385,12 @@ impl IdxdbStore {
     pub(super) async fn get_vault_assets(
         &self,
         account_id: AccountId,
-        faucet_id_prefixes: Vec<String>,
+        vault_keys: Vec<String>,
     ) -> Result<Vec<Asset>, StoreError> {
         let promise = idxdb_get_account_vault_assets(
             self.db_id(),
             account_id.to_string(),
-            faucet_id_prefixes,
+            vault_keys,
         );
         let vault_assets_idxdb: Vec<AccountAssetIdxdbObject> =
             await_js(promise, "failed to fetch vault assets").await?;

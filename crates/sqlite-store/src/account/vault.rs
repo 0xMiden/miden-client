@@ -5,7 +5,7 @@ use std::rc::Rc;
 use std::vec::Vec;
 
 use miden_client::Word;
-use miden_client::account::{AccountDelta, AccountHeader, AccountId, AccountIdPrefix};
+use miden_client::account::{AccountDelta, AccountHeader, AccountId};
 use miden_client::asset::{Asset, FungibleAsset, NonFungibleDeltaAction};
 use miden_client::store::{AccountSmtForest, StoreError};
 use miden_protocol::asset::AssetVaultKey;
@@ -26,20 +26,20 @@ impl SqliteStore {
         conn: &Connection,
         account_id: AccountId,
         delta: &AccountDelta,
-    ) -> Result<BTreeMap<AccountIdPrefix, FungibleAsset>, StoreError> {
-        let fungible_faucet_prefixes = delta
+    ) -> Result<BTreeMap<AssetVaultKey, FungibleAsset>, StoreError> {
+        let vault_keys = delta
             .vault()
             .fungible()
             .iter()
-            .map(|(vault_key, _)| Value::Text(vault_key.faucet_id().prefix().to_hex()))
+            .map(|(vault_key, _)| Value::Text(vault_key.to_string()))
             .collect::<Vec<Value>>();
 
-        const QUERY: &str = "SELECT vault_key, asset FROM latest_account_assets WHERE account_id = ? AND faucet_id_prefix IN rarray(?)";
+        const QUERY: &str = "SELECT vault_key, asset FROM latest_account_assets WHERE account_id = ? AND vault_key IN rarray(?)";
 
         Ok(conn
             .prepare(QUERY)
             .into_store_error()?
-            .query_map(params![account_id.to_hex(), Rc::new(fungible_faucet_prefixes)], |row| {
+            .query_map(params![account_id.to_hex(), Rc::new(vault_keys)], |row| {
                 let vault_key: String = row.get(0)?;
                 let asset: String = row.get(1)?;
                 Ok((vault_key, asset))
@@ -54,7 +54,7 @@ impl SqliteStore {
             .collect::<Result<Vec<Asset>, StoreError>>()?
             .into_iter()
             // SAFETY: all retrieved assets should be fungible
-            .map(|asset| (asset.faucet_id().prefix(), asset.unwrap_fungible()))
+            .map(|asset| (asset.vault_key(), asset.unwrap_fungible()))
             .collect())
     }
 
@@ -73,7 +73,6 @@ impl SqliteStore {
             latest_account_assets {
                 account_id,
                 vault_key,
-                faucet_id_prefix,
                 asset
             } | REPLACE
         );
@@ -83,11 +82,10 @@ impl SqliteStore {
 
         for asset in assets {
             let vault_key_hex = asset.vault_key().to_string();
-            let faucet_prefix_hex = asset.faucet_id().prefix().to_hex();
             let asset_hex = asset.to_value_word().to_hex();
 
             latest_stmt
-                .execute(params![&account_id_hex, &vault_key_hex, &faucet_prefix_hex, &asset_hex])
+                .execute(params![&account_id_hex, &vault_key_hex, &asset_hex])
                 .into_store_error()?;
         }
 
@@ -105,7 +103,7 @@ impl SqliteStore {
         account_id: AccountId,
         init_account_state: &AccountHeader,
         final_account_state: &AccountHeader,
-        mut updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
+        mut updated_fungible_assets: BTreeMap<AssetVaultKey, FungibleAsset>,
         delta: &AccountDelta,
     ) -> Result<(), StoreError> {
         let nonce = final_account_state.nonce().as_canonical_u64();
@@ -122,7 +120,7 @@ impl SqliteStore {
         for (vault_key, delta) in delta.vault().fungible().iter() {
             let delta_asset = FungibleAsset::new(vault_key.faucet_id(), delta.unsigned_abs())?;
 
-            let asset = match updated_fungible_assets.remove(&vault_key.faucet_id().prefix()) {
+            let asset = match updated_fungible_assets.remove(vault_key) {
                 Some(asset) => {
                     // If the asset exists, update it accordingly.
                     if *delta >= 0 {
@@ -200,7 +198,6 @@ impl SqliteStore {
                 account_id,
                 replaced_at_nonce,
                 vault_key,
-                faucet_id_prefix,
                 old_asset
             } | REPLACE
         );
@@ -208,7 +205,6 @@ impl SqliteStore {
             latest_account_assets {
                 account_id,
                 vault_key,
-                faucet_id_prefix,
                 asset
             } | REPLACE
         );
@@ -219,7 +215,6 @@ impl SqliteStore {
         // Archive and delete removed assets
         for vault_key in removed_vault_keys {
             let vault_key_hex = vault_key.to_string();
-            let faucet_prefix_hex = vault_key.faucet_id().prefix().to_hex();
 
             // Read old asset value from latest (should exist since we're removing it)
             let old_asset: Option<String> = tx
@@ -236,7 +231,6 @@ impl SqliteStore {
                     account_id_hex,
                     nonce_val,
                     &vault_key_hex,
-                    &faucet_prefix_hex,
                     old_asset,
                 ])
                 .into_store_error()?;
@@ -264,7 +258,6 @@ impl SqliteStore {
         // Archive old values and insert updated assets
         for asset in updated_assets {
             let vault_key_hex = asset.vault_key().to_string();
-            let faucet_prefix_hex = asset.faucet_id().prefix().to_hex();
             let asset_hex = asset.to_value_word().to_hex();
 
             // Read old asset value from latest (NULL if asset is new)
@@ -282,14 +275,13 @@ impl SqliteStore {
                     account_id_hex,
                     nonce_val,
                     &vault_key_hex,
-                    &faucet_prefix_hex,
                     old_asset,
                 ])
                 .into_store_error()?;
 
             // Insert/update in latest
             latest_stmt
-                .execute(params![account_id_hex, &vault_key_hex, &faucet_prefix_hex, &asset_hex])
+                .execute(params![account_id_hex, &vault_key_hex, &asset_hex])
                 .into_store_error()?;
         }
 

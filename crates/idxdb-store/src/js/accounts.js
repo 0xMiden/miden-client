@@ -143,15 +143,15 @@ export async function getAccountStorageMaps(dbId, accountId) {
         logWebStoreError(error, `Error fetching account storage maps for account ${accountId}`);
     }
 }
-export async function getAccountVaultAssets(dbId, accountId, faucetIdPrefixes) {
+export async function getAccountVaultAssets(dbId, accountId, vaultKeys) {
     try {
         const db = getDatabase(dbId);
         let query = db.latestAccountAssets.where("accountId").equals(accountId);
         let records;
-        if (faucetIdPrefixes.length) {
-            const prefixSet = new Set(faucetIdPrefixes);
+        if (vaultKeys.length) {
+            const keySet = new Set(vaultKeys);
             records = await query
-                .and((record) => prefixSet.has(record.faucetIdPrefix))
+                .and((record) => keySet.has(record.vaultKey))
                 .toArray();
         }
         else {
@@ -247,7 +247,6 @@ export async function upsertVaultAssets(dbId, accountId, assets) {
         const latestEntries = assets.map((asset) => ({
             accountId,
             vaultKey: asset.vaultKey,
-            faucetIdPrefix: asset.faucetIdPrefix,
             asset: asset.asset,
         }));
         await db.latestAccountAssets.bulkPut(latestEntries);
@@ -328,7 +327,6 @@ export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots
                     accountId,
                     replacedAtNonce: nonce,
                     vaultKey: entry.vaultKey,
-                    faucetIdPrefix: entry.faucetIdPrefix,
                     oldAsset: oldAsset?.asset ?? null,
                 });
                 // "" means removal
@@ -342,7 +340,6 @@ export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots
                     await db.latestAccountAssets.put({
                         accountId,
                         vaultKey: entry.vaultKey,
-                        faucetIdPrefix: entry.faucetIdPrefix,
                         asset: entry.asset,
                     });
                 }
@@ -471,7 +468,6 @@ async function archiveAndReplaceVaultAssets(db, accountId, nonce, newAssets) {
             accountId,
             replacedAtNonce: nonce,
             vaultKey: asset.vaultKey,
-            faucetIdPrefix: asset.faucetIdPrefix,
             oldAsset: asset.asset,
         });
     }
@@ -482,7 +478,6 @@ async function archiveAndReplaceVaultAssets(db, accountId, nonce, newAssets) {
                 accountId,
                 replacedAtNonce: nonce,
                 vaultKey: asset.vaultKey,
-                faucetIdPrefix: asset.faucetIdPrefix,
                 oldAsset: null,
             });
         }
@@ -492,7 +487,6 @@ async function archiveAndReplaceVaultAssets(db, accountId, nonce, newAssets) {
         await db.latestAccountAssets.bulkPut(newAssets.map((asset) => ({
             accountId,
             vaultKey: asset.vaultKey,
-            faucetIdPrefix: asset.faucetIdPrefix,
             asset: asset.asset,
         })));
     }
@@ -551,7 +545,6 @@ async function restoreAssetsFromHistorical(db, accountId, nonce) {
             await db.latestAccountAssets.put({
                 accountId: asset.accountId,
                 vaultKey: asset.vaultKey,
-                faucetIdPrefix: asset.faucetIdPrefix,
                 asset: asset.oldAsset,
             });
         }

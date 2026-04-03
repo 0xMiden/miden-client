@@ -71,7 +71,7 @@ const V1_STORES = {
     [Table.HistoricalAccountStorage]: indexes("[accountId+replacedAtNonce+slotName]", "accountId", "[accountId+replacedAtNonce]"),
     [Table.LatestStorageMapEntries]: indexes("[accountId+slotName+key]", "accountId", "[accountId+slotName]"),
     [Table.HistoricalStorageMapEntries]: indexes("[accountId+replacedAtNonce+slotName+key]", "accountId", "[accountId+replacedAtNonce]"),
-    [Table.LatestAccountAssets]: indexes("[accountId+vaultKey]", "accountId", "faucetIdPrefix"),
+    [Table.LatestAccountAssets]: indexes("[accountId+vaultKey]", "accountId"),
     [Table.HistoricalAccountAssets]: indexes("[accountId+replacedAtNonce+vaultKey]", "accountId", "[accountId+replacedAtNonce]"),
     [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
     [Table.AccountKeyMapping]: indexes("[accountIdHex+pubKeyCommitmentHex]", "accountIdHex", "pubKeyCommitmentHex"),

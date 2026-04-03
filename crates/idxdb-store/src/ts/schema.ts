@@ -110,7 +110,6 @@ export interface IHistoricalStorageMapEntry {
 export interface ILatestAccountAsset {
   accountId: string;
   vaultKey: string;
-  faucetIdPrefix: string;
   asset: string;
 }
 
@@ -118,7 +117,6 @@ export interface IHistoricalAccountAsset {
   accountId: string;
   replacedAtNonce: string;
   vaultKey: string;
-  faucetIdPrefix: string;
   oldAsset: string | null;
 }
 
@@ -243,7 +241,6 @@ export interface ISetting {
 
 export interface JsVaultAsset {
   vaultKey: string;
-  faucetIdPrefix: string;
   asset: string;
 }
 
@@ -285,8 +282,7 @@ const V1_STORES: Record<string, string> = {
   ),
   [Table.LatestAccountAssets]: indexes(
     "[accountId+vaultKey]",
-    "accountId",
-    "faucetIdPrefix"
+    "accountId"
   ),
   [Table.HistoricalAccountAssets]: indexes(
     "[accountId+replacedAtNonce+vaultKey]",

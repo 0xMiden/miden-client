@@ -34,7 +34,6 @@ describe("Account delta and undo operations", () => {
   const MAP_SLOT_NAME = "metadata";
   const MAP_KEY = "0xmkey1";
   const VAULT_KEY = "0xvk1";
-  const FAUCET_PREFIX = "0xfaucet1";
 
   it("undo restores previous account state", async () => {
     const dbId = uniqueDbName();
@@ -48,7 +47,7 @@ describe("Account delta and undo operations", () => {
       "1", // nonce
       [{ slotName: SLOT_NAME, slotValue: SLOT_VALUE_N1, slotType: 0 }], // updatedSlots
       [{ slotName: MAP_SLOT_NAME, key: MAP_KEY, value: MAP_VALUE_N1 }], // changedMapEntries
-      [{ vaultKey: VAULT_KEY, faucetIdPrefix: FAUCET_PREFIX, asset: ASSET_N1 }], // changedAssets
+      [{ vaultKey: VAULT_KEY, asset: ASSET_N1 }], // changedAssets
       CODE_ROOT, // codeRoot
       STORAGE_ROOT_N1, // storageRoot
       VAULT_ROOT_N1, // vaultRoot
@@ -63,7 +62,7 @@ describe("Account delta and undo operations", () => {
       "2", // nonce
       [{ slotName: SLOT_NAME, slotValue: SLOT_VALUE_N2, slotType: 0 }], // updatedSlots
       [{ slotName: MAP_SLOT_NAME, key: MAP_KEY, value: MAP_VALUE_N2 }], // changedMapEntries
-      [{ vaultKey: VAULT_KEY, faucetIdPrefix: FAUCET_PREFIX, asset: ASSET_N2 }], // changedAssets
+      [{ vaultKey: VAULT_KEY, asset: ASSET_N2 }], // changedAssets
       CODE_ROOT, // codeRoot
       STORAGE_ROOT_N2, // storageRoot
       VAULT_ROOT_N2, // vaultRoot

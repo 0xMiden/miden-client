@@ -52,7 +52,7 @@ use crate::rpc::domain::limits::RpcLimits;
 use crate::rpc::{AccountStateAt, generated as proto};
 
 mod api_client;
-pub mod retry;
+mod retry;
 
 use api_client::api_client_wrapper::ApiClient;
 
@@ -170,7 +170,7 @@ impl GrpcClient {
     }
 
     /// Sets the maximum number of retry attempts for rate-limited or transiently unavailable
-    /// requests. Defaults to [`retry::DEFAULT_MAX_RETRIES`].
+    /// requests. Defaults to `4`.
     #[must_use]
     pub fn with_max_retries(mut self, max_retries: u32) -> Self {
         self.max_retries = max_retries;
@@ -178,7 +178,7 @@ impl GrpcClient {
     }
 
     /// Sets the fallback retry interval in milliseconds, used when the server does not provide
-    /// a `retry-after` header. Defaults to [`retry::DEFAULT_RETRY_INTERVAL_MS`].
+    /// a `retry-after` header. Defaults to `100` ms.
     #[must_use]
     pub fn with_retry_interval_ms(mut self, retry_interval_ms: u64) -> Self {
         self.retry_interval_ms = retry_interval_ms;

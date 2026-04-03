@@ -117,14 +117,14 @@ impl IdxdbStore {
             )?;
         } else {
             // Delta path: load only targeted data, avoid loading full Account.
-            let fungible_faucet_prefixes: Vec<String> = delta
+            let vault_keys: Vec<String> = delta
                 .vault()
                 .fungible()
                 .iter()
-                .map(|(faucet_id, _)| faucet_id.faucet_id().prefix().to_hex())
+                .map(|(vault_key, _)| vault_key.to_string())
                 .collect();
             let old_vault_assets =
-                self.get_vault_assets(account_id, fungible_faucet_prefixes).await?;
+                self.get_vault_assets(account_id, vault_keys).await?;
             let map_slot_names: Vec<String> =
                 delta.storage().maps().map(|(slot_name, _)| slot_name.to_string()).collect();
             let old_map_roots = self.get_storage_map_roots(account_id, map_slot_names).await?;

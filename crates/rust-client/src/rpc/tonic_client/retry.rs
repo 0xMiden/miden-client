@@ -7,10 +7,10 @@ use tracing::warn;
 // ================================================================================================
 
 /// Default maximum number of retry attempts for rate-limited requests.
-pub const DEFAULT_MAX_RETRIES: u32 = 4;
+pub(super) const DEFAULT_MAX_RETRIES: u32 = 4;
 
 /// Default fallback delay (in milliseconds) when no `retry-after` header is present.
-pub const DEFAULT_RETRY_INTERVAL_MS: u64 = 100;
+pub(super) const DEFAULT_RETRY_INTERVAL_MS: u64 = 100;
 
 // RETRY STATE
 // ================================================================================================

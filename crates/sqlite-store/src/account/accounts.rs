@@ -12,7 +12,6 @@ use miden_client::account::{
     AccountDelta,
     AccountHeader,
     AccountId,
-    AccountIdPrefix,
     AccountStorage,
     Address,
     PartialAccount,
@@ -440,7 +439,7 @@ impl SqliteStore {
         smt_forest: &mut AccountSmtForest,
         init_account_state: &AccountHeader,
         final_account_state: &AccountHeader,
-        updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
+        updated_fungible_assets: BTreeMap<AssetVaultKey, FungibleAsset>,
         old_map_roots: &BTreeMap<StorageSlotName, Word>,
         delta: &AccountDelta,
     ) -> Result<(), StoreError> {
@@ -700,8 +699,8 @@ impl SqliteStore {
         // Restore assets with non-NULL old values
         tx.execute(
             "INSERT OR REPLACE INTO latest_account_assets \
-             (account_id, vault_key, faucet_id_prefix, asset) \
-             SELECT account_id, vault_key, faucet_id_prefix, old_asset \
+             (account_id, vault_key, asset) \
+             SELECT account_id, vault_key, old_asset \
              FROM historical_account_assets \
              WHERE account_id = ? AND replaced_at_nonce = ? AND old_asset IS NOT NULL",
             params![account_id_hex, nonce_val],
@@ -767,8 +766,8 @@ impl SqliteStore {
         .into_store_error()?;
         tx.execute(
             "INSERT OR REPLACE INTO historical_account_assets \
-             (account_id, replaced_at_nonce, vault_key, faucet_id_prefix, old_asset) \
-             SELECT account_id, ?, vault_key, faucet_id_prefix, asset \
+             (account_id, replaced_at_nonce, vault_key, old_asset) \
+             SELECT account_id, ?, vault_key, asset \
              FROM latest_account_assets WHERE account_id = ?",
             params![&nonce_val, &account_id_hex],
         )
@@ -815,8 +814,8 @@ impl SqliteStore {
         .into_store_error()?;
         tx.execute(
             "INSERT OR IGNORE INTO historical_account_assets \
-             (account_id, replaced_at_nonce, vault_key, faucet_id_prefix, old_asset) \
-             SELECT account_id, ?, vault_key, faucet_id_prefix, NULL \
+             (account_id, replaced_at_nonce, vault_key, old_asset) \
+             SELECT account_id, ?, vault_key, NULL \
              FROM latest_account_assets WHERE account_id = ?",
             params![&nonce_val, &account_id_hex],
         )

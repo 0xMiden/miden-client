@@ -227,6 +227,15 @@ test.describe("get_transactions tests", () => {
   }) => {
     await setupMockClient(page);
 
+    // Advance the chain so block numbers are large enough for subtraction in filters.
+    await page.evaluate(async () => {
+      const client = window._mockClient;
+      for (let i = 0; i < 15; i++) {
+        await client.proveBlock();
+      }
+      await client.syncState();
+    });
+
     // Committed mint
     const committedTxId = await page.evaluate(async () => {
       const client = window._mockClient;

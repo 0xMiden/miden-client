@@ -5,10 +5,10 @@ retries        = { backoff = "exponential", count = 2, delay = "1s", jitter = tr
 slow-timeout   = { period = "3m", terminate-after = 2 }
 status-level   = "skip"
 
-# TODO: Running this with default settings causes machines to get thrashed, so for now we are reducing 
-# this a bit arbitrarily; revisit this
+# The integration tests all share a node instance, so cap concurrency to reduce
+# pressure on the node until the node-side contention issue is resolved.
 [test-groups.integration]
-max-threads = 7
+max-threads = 5
 
 [[profile.default.overrides]]
 filter           = "package(miden-client-unit-tests)"
