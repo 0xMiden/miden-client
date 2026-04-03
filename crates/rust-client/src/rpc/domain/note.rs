@@ -241,7 +241,7 @@ impl CommittedNoteMetadata {
 
 /// Represents a committed note, returned as part of a `SyncNotesResponse`.
 ///
-/// The sync response provides a [`NoteMetadataHeader`] but not the actual attachment data.
+/// The sync response provides a [`NoteMetadataHeader`](crate::note::NoteMetadataHeader) but not the actual attachment data.
 /// For notes without attachments, full [`NoteMetadata`] is available immediately. For notes
 /// with attachments, the metadata starts as [`CommittedNoteMetadata::Header`] until the full
 /// data is fetched via `GetNotesById`.
