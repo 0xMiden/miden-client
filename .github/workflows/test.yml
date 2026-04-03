@@ -254,6 +254,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: yarn
+          cache-dependency-path: |
+            crates/web-client/yarn.lock
+            crates/idxdb-store/src/yarn.lock
 
       - name: Install dependencies
         run: ./scripts/retry-yarn-install.sh crates/web-client
@@ -273,7 +277,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ./crates/web-client/dist
-          key: ${{ runner.os }}-dist-${{ hashFiles('**/yarn.lock', './crates/web-client/src/**/*.ts', './crates/web-client/src/**/*.rs', 'Cargo.lock') }}
+          key: ${{ runner.os }}-dist-${{ hashFiles('Cargo.lock', 'crates/web-client/package.json', 'crates/web-client/yarn.lock', 'crates/web-client/rollup.config.js', 'crates/web-client/clean.js', 'crates/web-client/js/**/*', 'crates/web-client/src/**/*', 'crates/idxdb-store/src/package.json', 'crates/idxdb-store/src/yarn.lock', 'crates/idxdb-store/src/tsconfig*.json', 'crates/idxdb-store/src/ts/**/*') }}
           restore-keys: ${{ runner.os }}-dist-
 
       - name: Build project
@@ -305,17 +309,6 @@ jobs:
         shard_total: [10]
     steps:
       - uses: actions/checkout@v6
-      - name: Install Rust
-        run: |
-          rustup update --no-self-update
-          rustup target add wasm32-unknown-unknown
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-wasm
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: false
-
       - name: Fetch dist folder
         uses: actions/download-artifact@v4
         with:
@@ -326,6 +319,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: yarn
+          cache-dependency-path: crates/web-client/yarn.lock
+      - name: Install dependencies
+        run: ./scripts/retry-yarn-install.sh crates/web-client
       - name: Configure setuid sandbox
         run: . ./scripts/configure-sandbox.sh
       - name: Restore node-builder binary
@@ -340,7 +337,8 @@ jobs:
           pgrep -f testing-node-builder || (echo "Failed to start node" && exit 1)
       - name: Run web client tests
         run: |
-          make integration-test-web-client
+          cd ./crates/web-client
+          yarn run test:ci -- --project=chromium $SHARD_PARAMETER
         env:
           SHARD_PARAMETER: "--shard=${{ matrix.shard_index }}/${{ matrix.shard_total }}"
       - name: Stop test node
@@ -353,20 +351,14 @@ jobs:
     needs: [build-web-client-dist-folder, build-node-builder, build-remote-prover]
     steps:
       - uses: actions/checkout@v6
-      - name: Install Rust
-        run: |
-          rustup update --no-self-update
-          rustup target add wasm32-unknown-unknown
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-wasm
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: false
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: yarn
+          cache-dependency-path: crates/web-client/yarn.lock
+      - name: Install dependencies
+        run: ./scripts/retry-yarn-install.sh crates/web-client
 
       - name: Fetch dist folder
         uses: actions/download-artifact@v4
@@ -397,7 +389,9 @@ jobs:
           sleep 4
           pgrep -f testing-remote-prover || (echo "Failed to start prover" && exit 1)
       - name: Run remote prover tests
-        run: make integration-test-remote-prover-web-client
+        run: |
+          cd ./crates/web-client
+          yarn run test:ci:remote_prover
       - name: Stop test node
         if: always()
         run: make stop-node
