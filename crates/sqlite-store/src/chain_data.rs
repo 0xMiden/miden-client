@@ -99,6 +99,21 @@ impl SqliteStore {
             .collect()
     }
 
+    pub(crate) fn get_tracked_block_header_numbers(
+        conn: &mut Connection,
+    ) -> Result<BTreeSet<usize>, StoreError> {
+        const QUERY: &str = "SELECT block_num FROM block_headers WHERE has_client_notes=true";
+        conn.prepare(QUERY)
+            .into_store_error()?
+            .query_map(params![], |row| row.get::<_, u32>(0))
+            .into_store_error()?
+            .map(|result| {
+                let block_num: u32 = result.into_store_error()?;
+                Ok(block_num as usize)
+            })
+            .collect()
+    }
+
     pub(crate) fn get_partial_blockchain_nodes(
         conn: &mut Connection,
         filter: &PartialBlockchainFilter,

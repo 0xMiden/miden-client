@@ -219,6 +219,12 @@ pub trait Store: Send + Sync {
     /// Retrieves a list of [`BlockHeader`] that include relevant notes to the client.
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError>;
 
+    /// Retrieves the block numbers of block headers that include relevant notes to the client.
+    ///
+    /// This is a lightweight alternative to [`Store::get_tracked_block_headers`] that avoids
+    /// deserializing full block headers when only the block numbers are needed.
+    async fn get_tracked_block_header_numbers(&self) -> Result<BTreeSet<usize>, StoreError>;
+
     /// Retrieves all MMR authentication nodes based on [`PartialBlockchainFilter`].
     async fn get_partial_blockchain_nodes(
         &self,
@@ -510,11 +516,7 @@ pub trait Store: Send + Sync {
         current_partial_mmr.add(current_block.commitment(), has_client_notes);
 
         // Build tracked_leaves from blocks that have client notes.
-        let tracked_headers = self.get_tracked_block_headers().await?;
-        let mut tracked_leaves = alloc::collections::BTreeSet::new();
-        for header in &tracked_headers {
-            tracked_leaves.insert(header.block_num().as_usize());
-        }
+        let mut tracked_leaves = self.get_tracked_block_header_numbers().await?;
 
         // Also track the latest leaf if it is relevant (it has client notes) _and_ the forest
         // actually has a single leaf tree bit.
