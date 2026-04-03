@@ -8,7 +8,7 @@ use miden_client::Word;
 use miden_client::account::AccountId;
 use miden_client::note::{BlockNumber, NoteTag};
 use miden_client::store::{AccountSmtForest, StoreError};
-use miden_client::sync::{NoteTagRecord, NoteTagSource, SyncUpdate};
+use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
 use miden_client::utils::{Deserializable, Serializable};
 use rusqlite::{Connection, Transaction, params};
 
@@ -100,9 +100,9 @@ impl SqliteStore {
     pub(super) fn apply_state_sync(
         conn: &mut Connection,
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
-        state_sync_update: SyncUpdate,
+        state_sync_update: StateSyncUpdate,
     ) -> Result<(), StoreError> {
-        let SyncUpdate {
+        let StateSyncUpdate {
             block_num,
             block_updates,
             note_updates,

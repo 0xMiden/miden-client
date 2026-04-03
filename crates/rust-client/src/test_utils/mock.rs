@@ -29,7 +29,13 @@ use crate::rpc::domain::account::{
     StorageMapEntry,
 };
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
-use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncBlock, NoteSyncInfo};
+use crate::rpc::domain::note::{
+    CommittedNote,
+    CommittedNoteMetadata,
+    FetchedNote,
+    NoteSyncBlock,
+    NoteSyncInfo,
+};
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::sync::ChainMmrInfo;
@@ -307,19 +313,17 @@ impl NodeRpcClient for MockRpcApi {
         let chain_tip = self.get_chain_tip_block_num();
 
         // Collect all blocks with matching notes after block_num
-        let mut blocks_with_notes: BTreeMap<BlockNumber, Vec<CommittedNote>> = BTreeMap::new();
+        let mut blocks_with_notes: BTreeMap<BlockNumber, BTreeMap<NoteId, CommittedNote>> =
+            BTreeMap::new();
         for note in self.mock_chain.read().committed_notes().values() {
             let note_block = note.inclusion_proof().location().block_num();
             if note_tags.contains(&note.metadata().tag()) && note_block > block_num {
-                let metadata = note.metadata().clone();
                 let committed = CommittedNote::new(
                     note.id(),
-                    metadata.note_type(),
-                    metadata.tag(),
-                    Some(metadata),
+                    CommittedNoteMetadata::Full(note.metadata().clone()),
                     note.inclusion_proof().clone(),
                 );
-                blocks_with_notes.entry(note_block).or_default().push(committed);
+                blocks_with_notes.entry(note_block).or_default().insert(note.id(), committed);
             }
         }
 
@@ -354,7 +358,11 @@ impl NodeRpcClient for MockRpcApi {
             .get_delta(Forest::new(from_forest), Forest::new(target_block.as_usize()))
             .unwrap();
 
-        Ok(ChainMmrInfo { mmr_delta })
+        Ok(ChainMmrInfo {
+            block_from,
+            block_to: target_block,
+            mmr_delta,
+        })
     }
 
     /// Retrieves the block header for the specified block number. If the block number is not

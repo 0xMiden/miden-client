@@ -5,7 +5,7 @@ use miden_client::Word;
 use miden_client::account::AccountId;
 use miden_client::note::{BlockNumber, NoteId, NoteTag};
 use miden_client::store::StoreError;
-use miden_client::sync::{BlockUpdates, NoteTagRecord, NoteTagSource, SyncUpdate};
+use miden_client::sync::{BlockUpdates, NoteTagRecord, NoteTagSource, StateSyncUpdate};
 use miden_client::utils::{Deserializable, Serializable};
 
 use super::IdxdbStore;
@@ -20,7 +20,7 @@ use crate::promise::{await_js, await_js_value};
 mod js_bindings;
 pub use js_bindings::JsAccountUpdate;
 use js_bindings::{
-    JsSyncUpdate,
+    JsStateSyncUpdate,
     idxdb_add_note_tag,
     idxdb_apply_state_sync,
     idxdb_get_note_tags,
@@ -110,9 +110,9 @@ impl IdxdbStore {
 
     pub(super) async fn apply_state_sync(
         &self,
-        state_sync_update: SyncUpdate,
+        state_sync_update: StateSyncUpdate,
     ) -> Result<(), StoreError> {
-        let SyncUpdate {
+        let StateSyncUpdate {
             block_num,
             block_updates,
             note_updates,
@@ -193,7 +193,7 @@ impl IdxdbStore {
             }
         }
 
-        let state_update = JsSyncUpdate {
+        let state_update = JsStateSyncUpdate {
             block_num: block_num.as_u32(),
             flattened_new_block_headers: flatten_nested_u8_vec(block_headers_as_bytes),
             new_block_nums: block_nums,

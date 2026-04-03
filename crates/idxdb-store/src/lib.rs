@@ -42,7 +42,7 @@ use miden_client::store::{
     StoreError,
     TransactionFilter,
 };
-use miden_client::sync::{NoteTagRecord, SyncUpdate};
+use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
 use miden_client::utils::RwLock;
 use miden_client::{Felt, Word};
@@ -177,7 +177,7 @@ impl Store for IdxdbStore {
         self.get_sync_height().await
     }
 
-    async fn apply_state_sync(&self, state_sync_update: SyncUpdate) -> Result<(), StoreError> {
+    async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError> {
         self.apply_state_sync(state_sync_update).await
     }
 

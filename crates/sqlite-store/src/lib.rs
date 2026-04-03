@@ -48,7 +48,7 @@ use miden_client::store::{
     StoreError,
     TransactionFilter,
 };
-use miden_client::sync::{NoteTagRecord, SyncUpdate};
+use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
 use miden_protocol::Felt;
 use miden_protocol::account::StorageMapWitness;
@@ -180,7 +180,7 @@ impl Store for SqliteStore {
         self.interact_with_connection(SqliteStore::get_sync_height).await
     }
 
-    async fn apply_state_sync(&self, state_sync_update: SyncUpdate) -> Result<(), StoreError> {
+    async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError> {
         let smt_forest = self.smt_forest.clone();
         self.interact_with_connection(move |conn| {
             SqliteStore::apply_state_sync(conn, &smt_forest, state_sync_update)

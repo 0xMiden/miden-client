@@ -19,7 +19,7 @@ use crate::transaction::{DiscardCause, TransactionRecord, TransactionStatus};
 
 /// Contains all information needed to apply the update in the store after syncing with the node.
 #[derive(Default)]
-pub struct SyncUpdate {
+pub struct StateSyncUpdate {
     /// The block number of the last block that was synced.
     pub block_num: BlockNumber,
     /// New blocks and authentication nodes.
@@ -32,8 +32,8 @@ pub struct SyncUpdate {
     pub account_updates: AccountUpdates,
 }
 
-impl From<&SyncUpdate> for SyncSummary {
-    fn from(value: &SyncUpdate) -> Self {
+impl From<&StateSyncUpdate> for SyncSummary {
+    fn from(value: &StateSyncUpdate) -> Self {
         let new_public_note_ids = value
             .note_updates
             .updated_input_notes()

@@ -28,7 +28,7 @@ impl NoteSyncBlock {
 
     /// Returns the committed notes in this block.
     pub fn notes(&self) -> Vec<CommittedNote> {
-        self.0.notes.iter().map(Into::into).collect()
+        self.0.notes.values().map(Into::into).collect()
     }
 }
 

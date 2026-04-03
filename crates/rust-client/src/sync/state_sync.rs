@@ -8,11 +8,11 @@ use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{Forest, MmrDelta, PartialMmr};
-use miden_protocol::note::{NoteId, NoteMetadata, NoteTag, NoteType, Nullifier};
+use miden_protocol::note::{NoteId, NoteTag, NoteType, Nullifier};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
-use super::{AccountUpdates, SyncUpdate};
+use super::{AccountUpdates, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::NodeRpcClient;
@@ -27,8 +27,13 @@ use crate::transaction::TransactionRecord;
 // STATE UPDATE DATA
 // ================================================================================================
 
-/// All data fetched from the node needed to sync the client to the chain tip.
-struct NodeSyncData {
+/// Raw data fetched from the node needed to sync the client to the chain tip.
+///
+/// Aggregates the responses of `get_block_header_by_number`, `sync_chain_mmr`, `sync_notes`,
+/// and `sync_transactions`. This may contain more data than a particular
+/// client needs to store — it is filtered and transformed into a [`StateSyncUpdate`] before being
+/// applied.
+struct RawStateSyncData {
     /// The chain tip at the time of the response.
     chain_tip: BlockNumber,
     /// MMR delta covering the full range from `current_block` to `chain_tip`.
@@ -192,7 +197,7 @@ impl StateSync {
         &self,
         current_partial_mmr: &mut PartialMmr,
         input: StateSyncInput,
-    ) -> Result<SyncUpdate, ClientError> {
+    ) -> Result<StateSyncUpdate, ClientError> {
         let StateSyncInput {
             accounts,
             note_tags,
@@ -204,7 +209,7 @@ impl StateSync {
             .map_err(|_| ClientError::InvalidPartialMmrForest)?
             .into();
 
-        let mut state_sync_update = SyncUpdate {
+        let mut state_sync_update = StateSyncUpdate {
             block_num,
             note_updates: NoteUpdateTracker::new(input_notes, output_notes),
             transaction_updates: TransactionUpdateTracker::new(uncommitted_transactions),
@@ -213,7 +218,7 @@ impl StateSync {
 
         let note_tags = Arc::new(note_tags);
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
-        let sync_data = self
+        let mut sync_data = self
             .fetch_sync_data(state_sync_update.block_num, &account_ids, &note_tags)
             .await?;
 
@@ -224,15 +229,33 @@ impl StateSync {
 
         state_sync_update.block_num = sync_data.chain_tip;
 
+        // Fetch public note details. This calls get_notes_by_id which returns full metadata.
         let public_note_ids: Vec<NoteId> = sync_data
             .note_blocks
             .iter()
-            .flat_map(|b| b.notes.iter())
+            .flat_map(|b| b.notes.values())
             .filter(|n| n.note_type() != NoteType::Private)
             .map(|n| *n.note_id())
             .collect();
 
         let public_note_records = self.fetch_public_note_details(&public_note_ids).await?;
+
+        // Fill metadata from the already-fetched public notes (avoids a redundant
+        // get_notes_by_id call for public notes with attachments).
+        for record in public_note_records.values() {
+            if let Some(metadata) = record.metadata() {
+                for block in &mut sync_data.note_blocks {
+                    if let Some(note) = block.notes.get_mut(&record.id())
+                        && note.metadata().is_none()
+                    {
+                        note.set_metadata(metadata.clone());
+                    }
+                }
+            }
+        }
+
+        // Fetch attachment metadata for remaining notes (private notes with attachments).
+        self.fill_attachment_metadata(&mut sync_data.note_blocks).await?;
 
         self.account_state_sync(
             &mut state_sync_update.account_updates,
@@ -265,17 +288,15 @@ impl StateSync {
     /// 2. `sync_chain_mmr` — gets the MMR delta to the chain tip.
     /// 3. `sync_notes` — loops until the full range to the chain tip is covered (handles paginated
     ///    responses).
-    /// 4. `get_notes_by_id` — fetches full metadata for notes with attachments (the sync response
-    ///    only provides a header without the attachment data).
-    /// 5. `sync_transactions` — gets transaction data for the full range.
+    /// 4. `sync_transactions` — gets transaction data for the full range.
     ///
-    /// Returns a [`NodeSyncData`] where `chain_tip == current_block_num` signals no progress.
+    /// Returns a [`RawStateSyncData`] where `chain_tip == current_block_num` signals no progress.
     async fn fetch_sync_data(
         &self,
         current_block_num: BlockNumber,
         account_ids: &[AccountId],
         note_tags: &Arc<BTreeSet<NoteTag>>,
-    ) -> Result<NodeSyncData, ClientError> {
+    ) -> Result<RawStateSyncData, ClientError> {
         info!("Fetching sync data from node.");
 
         // Step 1: Discover the chain tip.
@@ -283,7 +304,7 @@ impl StateSync {
         let chain_tip = chain_tip_header.block_num();
 
         if chain_tip == current_block_num {
-            return Ok(NodeSyncData {
+            return Ok(RawStateSyncData {
                 chain_tip,
                 mmr_delta: MmrDelta {
                     forest: Forest::new(current_block_num.as_usize()),
@@ -320,15 +341,11 @@ impl StateSync {
             }
         }
 
-        // Step 3: Fetch full metadata for notes with attachments. The sync response only
-        // provides a NoteMetadataHeader; the actual attachment data is fetched via GetNotesById.
-        self.fill_attachment_metadata(&mut note_blocks).await?;
-
-        // Step 4: Gather transactions for tracked accounts over the full range.
+        // Step 3: Gather transactions for tracked accounts over the full range.
         let (account_commitment_updates, transactions, nullifiers) =
             self.fetch_transaction_data(current_block_num, chain_tip, account_ids).await?;
 
-        Ok(NodeSyncData {
+        Ok(RawStateSyncData {
             chain_tip,
             mmr_delta: chain_mmr_info.mmr_delta,
             chain_tip_header,
@@ -385,9 +402,9 @@ impl StateSync {
     /// 3. Applies transaction and nullifier updates.
     async fn apply_sync_result(
         &self,
-        sync_data: NodeSyncData,
+        sync_data: RawStateSyncData,
         public_note_records: &BTreeMap<NoteId, InputNoteRecord>,
-        state_sync_update: &mut SyncUpdate,
+        state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<(), ClientError> {
         // Advance the partial MMR: apply delta (up to chain_tip - 1), capture peaks for
@@ -539,14 +556,14 @@ impl StateSync {
     async fn note_state_sync(
         &self,
         note_updates: &mut NoteUpdateTracker,
-        note_inclusions: Vec<CommittedNote>,
+        note_inclusions: BTreeMap<NoteId, CommittedNote>,
         block_header: &BlockHeader,
         public_notes: &BTreeMap<NoteId, InputNoteRecord>,
     ) -> Result<bool, ClientError> {
         // `found_relevant_note` tracks whether we want to persist the block header in the end
         let mut found_relevant_note = false;
 
-        for committed_note in note_inclusions {
+        for (_, committed_note) in note_inclusions {
             let public_note = (committed_note.note_type() != NoteType::Private)
                 .then(|| public_notes.get(committed_note.note_id()))
                 .flatten()
@@ -591,19 +608,19 @@ impl StateSync {
         Ok(return_notes.into_iter().map(|note| (note.id(), note)).collect())
     }
 
-    /// Fetches full [`NoteMetadata`] for committed notes that have attachments and fills it
-    /// in on the notes directly.
+    /// Fetches full [`NoteMetadata`] for committed notes that have attachments and sets it
+    /// on the notes directly.
     ///
-    /// The sync response only provides a `NoteMetadataHeader` (sender, type, tag, attachment
-    /// kind) but not the actual attachment data. For notes with attachments, the full metadata
-    /// must be fetched via `GetNotesById` and set on the committed notes.
+    /// The sync response only provides header fields (sender, type, tag, attachment kind)
+    /// but not the actual attachment data. For notes with attachments, the full metadata
+    /// must be fetched via `GetNotesById`.
     async fn fill_attachment_metadata(
         &self,
         note_blocks: &mut [NoteSyncBlock],
     ) -> Result<(), ClientError> {
         let note_ids: Vec<NoteId> = note_blocks
             .iter()
-            .flat_map(|b| b.notes.iter())
+            .flat_map(|b| b.notes.values())
             .filter(|n| n.metadata().is_none())
             .map(|n| *n.note_id())
             .collect();
@@ -617,15 +634,11 @@ impl StateSync {
         let fetched_notes =
             self.rpc_api.get_notes_by_id(&note_ids).await.map_err(ClientError::RpcError)?;
 
-        let metadata_map: BTreeMap<NoteId, NoteMetadata> =
-            fetched_notes.into_iter().map(|n| (n.id(), n.metadata().clone())).collect();
-
-        for block in &mut *note_blocks {
-            for note in &mut block.notes {
-                if note.metadata().is_none()
-                    && let Some(metadata) = metadata_map.get(note.note_id())
-                {
-                    note.set_metadata(metadata.clone());
+        for fetched_note in fetched_notes {
+            let note_id = fetched_note.id();
+            for block in &mut *note_blocks {
+                if let Some(note) = block.notes.get_mut(&note_id) {
+                    note.set_metadata(fetched_note.metadata().clone());
                 }
             }
         }
@@ -640,7 +653,7 @@ impl StateSync {
     /// The `state_sync_update` parameter will be updated to track the new discarded transactions.
     async fn nullifiers_state_sync(
         &self,
-        state_sync_update: &mut SyncUpdate,
+        state_sync_update: &mut StateSyncUpdate,
         current_block_num: BlockNumber,
     ) -> Result<(), ClientError> {
         // To receive information about added nullifiers, we reduce them to the higher 16 bits

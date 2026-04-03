@@ -399,7 +399,7 @@ where
                     break;
                 }
 
-                for sync_note in &block.notes {
+                for sync_note in block.notes.values() {
                     if !expected_notes.iter().any(|(id, _)| id == sync_note.note_id()) {
                         continue;
                     }
