@@ -968,6 +968,101 @@ export async function lockAccount(dbId: string, accountId: string) {
 }
 
 /**
+ * Prunes historical account states for a single account up to the given nonce.
+ *
+ * Deletes all historical entries with `replacedAtNonce <= upToNonce` and any
+ * orphaned account code. Mirrors the SQLite implementation.
+ */
+export async function pruneAccountHistory(
+  dbId: string,
+  accountId: string,
+  upToNonce: string
+): Promise<number> {
+  try {
+    const db = getDatabase(dbId);
+    let totalDeleted = 0;
+    const boundaryNonce = BigInt(upToNonce);
+
+    await db.dexie.transaction(
+      "rw",
+      [
+        db.historicalAccountHeaders,
+        db.historicalAccountStorages,
+        db.historicalStorageMapEntries,
+        db.historicalAccountAssets,
+        db.accountCodes,
+        db.latestAccountHeaders,
+        db.foreignAccountCode,
+      ],
+      async () => {
+        // Nonces are stored as strings so we cannot use index range queries
+        // (lexicographic ordering would be wrong). Filter in JS instead.
+        const headers = await db.historicalAccountHeaders
+          .where("id")
+          .equals(accountId)
+          .toArray();
+
+        const toPrune = headers.filter(
+          (h) => BigInt(h.replacedAtNonce) <= boundaryNonce
+        );
+
+        // Collect code roots from headers we are about to delete.
+        const candidateCodeRoots = new Set(toPrune.map((h) => h.codeRoot));
+
+        for (const h of toPrune) {
+          await db.historicalAccountHeaders
+            .where("accountCommitment")
+            .equals(h.accountCommitment)
+            .delete();
+
+          const rat = h.replacedAtNonce;
+          totalDeleted += 1;
+          totalDeleted += await db.historicalAccountStorages
+            .where("[accountId+replacedAtNonce]")
+            .equals([accountId, rat])
+            .delete();
+          totalDeleted += await db.historicalStorageMapEntries
+            .where("[accountId+replacedAtNonce]")
+            .equals([accountId, rat])
+            .delete();
+          totalDeleted += await db.historicalAccountAssets
+            .where("[accountId+replacedAtNonce]")
+            .equals([accountId, rat])
+            .delete();
+        }
+
+        // Delete orphaned code: only check roots from the deleted headers,
+        // and only if they are not referenced by any remaining header or foreign code.
+        if (candidateCodeRoots.size > 0) {
+          const latestHeaders = await db.latestAccountHeaders.toArray();
+          const remainingHistorical =
+            await db.historicalAccountHeaders.toArray();
+          const foreignCodes = await db.foreignAccountCode.toArray();
+
+          const referencedCodeRoots = new Set<string>();
+          for (const h of latestHeaders) referencedCodeRoots.add(h.codeRoot);
+          for (const h of remainingHistorical)
+            referencedCodeRoots.add(h.codeRoot);
+          for (const f of foreignCodes) referencedCodeRoots.add(f.codeRoot);
+
+          for (const root of candidateCodeRoots) {
+            if (!referencedCodeRoots.has(root)) {
+              await db.accountCodes.where("root").equals(root).delete();
+              totalDeleted += 1;
+            }
+          }
+        }
+      }
+    );
+
+    return totalDeleted;
+  } catch (error) {
+    logWebStoreError(error, `Error pruning account history for ${accountId}`);
+    throw error;
+  }
+}
+
+/**
  * Undoes discarded account states by restoring old values from historical
  * back to latest. Non-null old values overwrite latest; null old values
  * (entries that didn't exist before that nonce) cause deletion from latest.

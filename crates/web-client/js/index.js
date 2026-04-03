@@ -70,6 +70,7 @@ const SYNC_METHODS = new Set([
 const WRITE_METHODS = new Set([
   "addTag",
   "executeForSummary",
+  "executeProgram",
   "fetchAllPrivateNotes",
   "fetchPrivateNotes",
   "forceImportStore",
@@ -79,6 +80,7 @@ const WRITE_METHODS = new Set([
   "importPublicAccountFromSeed",
   "insertAccountAddress",
   "newAccount",
+  "pruneAccountHistory",
   "removeAccountAddress",
   "removeTag",
   "removeSetting",

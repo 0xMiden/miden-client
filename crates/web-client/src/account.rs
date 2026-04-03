@@ -8,6 +8,7 @@ use crate::models::account_reader::AccountReader;
 use crate::models::account_storage::AccountStorage;
 use crate::models::address::Address;
 use crate::models::asset_vault::AssetVault;
+use crate::models::felt::Felt;
 use crate::{WebClient, js_error_with_context};
 
 #[wasm_bindgen]
@@ -149,6 +150,31 @@ impl WebClient {
                 js_error_with_context(err, "failed to remove address from account")
             })?;
             Ok(())
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
+    /// Prunes historical account states for the specified account up to the given nonce.
+    ///
+    /// Deletes all historical entries with `replaced_at_nonce <= up_to_nonce` and any
+    /// orphaned account code.
+    ///
+    /// Returns the total number of rows deleted, including historical entries and orphaned
+    /// account code.
+    #[wasm_bindgen(js_name = "pruneAccountHistory")]
+    pub async fn prune_account_history(
+        &mut self,
+        account_id: &AccountId,
+        up_to_nonce: &Felt,
+    ) -> Result<u32, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let deleted = client
+                .prune_account_history(account_id.into(), up_to_nonce.into())
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to prune account history"))?;
+            // SAFETY: on wasm32 usize is 32 bits, so this conversion is infallible
+            Ok(u32::try_from(deleted).expect("deleted count should fit in u32"))
         } else {
             Err(JsValue::from_str("Client not initialized"))
         }

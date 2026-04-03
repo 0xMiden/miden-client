@@ -656,6 +656,241 @@ async fn account_reader_addresses_access() -> anyhow::Result<()> {
     Ok(())
 }
 
+// ACCOUNT HISTORY PRUNE TESTS
+// ================================================================================================
+
+#[tokio::test]
+async fn prune_account_history_removes_old_committed_states() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+    let map_slot_name = StorageSlotName::new("test::prune::map").expect("valid slot name");
+
+    // Insert account with 5 map entries (nonce 0)
+    let mut account = setup_account_with_map(&store, 5, &map_slot_name).await?;
+    let account_id = account.id();
+
+    // Apply delta 1 (nonce 0 to 1, delta increment = 1)
+    apply_single_entry_update(&store, &mut account, &map_slot_name, 1).await?;
+
+    // Apply delta 2 (nonce 1 to 2, delta increment = 1)
+    apply_single_entry_update(&store, &mut account, &map_slot_name, 1).await?;
+
+    // Before prune: 2 historical headers (nonce 0, 1).
+    // The latest state (nonce 2) is in latest_account_headers, not historical.
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(m.historical_account_headers, 2);
+    assert!(m.historical_storage_map_entries > 0);
+
+    // Prune up to nonce 1 (should delete nonce 0 historical entry)
+    let deleted = store
+        .interact_with_connection(move |conn| {
+            SqliteStore::prune_account_history(conn, account_id, Felt::new(1))
+        })
+        .await?;
+
+    assert!(deleted > 0, "Should have deleted some rows");
+
+    // After prune: only 1 historical header remains (nonce 1, replaced_at_nonce = 2).
+    // Nonce 2 is in latest_account_headers (not historical).
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(m.historical_account_headers, 1);
+
+    // Latest tables should be untouched
+    assert_eq!(m.latest_account_headers, 1);
+    assert!(m.latest_storage_map_entries > 0);
+
+    // The remaining historical header should be nonce 1
+    let remaining_nonce: u64 = store
+        .interact_with_connection(move |conn| {
+            conn.query_row(
+                "SELECT nonce FROM historical_account_headers WHERE id = ?",
+                params![account_id.to_hex()],
+                |row| crate::column_value_as_u64(row, 0),
+            )
+            .into_store_error()
+        })
+        .await?;
+    assert_eq!(remaining_nonce, 1);
+
+    // Account data should still be fully readable
+    let account_record = store.get_account(account_id).await?;
+    assert!(account_record.is_some());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn prune_account_history_noop_with_single_state() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+    let map_slot_name = StorageSlotName::new("test::prune_noop::map").expect("valid slot name");
+
+    // Insert account (nonce 0 only)
+    let account = setup_account_with_map(&store, 3, &map_slot_name).await?;
+    let account_id = account.id();
+
+    let m_before = get_storage_metrics(&store).await;
+
+    // Prune with nonce 0: no historical entries have replaced_at_nonce <= 0
+    let deleted = store
+        .interact_with_connection(move |conn| {
+            SqliteStore::prune_account_history(conn, account_id, Felt::new(0))
+        })
+        .await?;
+
+    assert_eq!(deleted, 0, "Nothing to prune with a single state");
+
+    let m_after = get_storage_metrics(&store).await;
+    assert_eq!(m_before.historical_account_headers, m_after.historical_account_headers);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn prune_account_history_multiple_accounts() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+    let map_slot_name_a = StorageSlotName::new("test::prune_all::map_a").expect("valid slot name");
+    let map_slot_name_b = StorageSlotName::new("test::prune_all::map_b").expect("valid slot name");
+
+    // Account A: nonce 0  to 1  to 2
+    let mut account_a = setup_account_with_map(&store, 3, &map_slot_name_a).await?;
+    let a_id = account_a.id();
+    apply_single_entry_update(&store, &mut account_a, &map_slot_name_a, 1).await?;
+    apply_single_entry_update(&store, &mut account_a, &map_slot_name_a, 1).await?;
+
+    // Account B: different seed  to different account. We need a different builder seed.
+    let component_b = AccountComponent::new(
+        basic_wallet_library(),
+        vec![StorageSlot::with_empty_map(map_slot_name_b.clone())],
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+    )?;
+    let account_b = AccountBuilder::new([1; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Poseidon2,
+        ))
+        .with_component(component_b)
+        .build()?;
+    let b_id = account_b.id();
+    store.insert_account(&account_b, Address::new(account_b.id())).await?;
+
+    let mut account_b_mut = account_b.clone();
+    apply_single_entry_update(&store, &mut account_b_mut, &map_slot_name_b, 1).await?;
+
+    // Before prune: 2 headers for A (nonce 0, 1) + 1 for B (nonce 0) = 3.
+    // Latest states are in latest_account_headers, not historical.
+    let m = get_storage_metrics(&store).await;
+    assert_eq!(m.historical_account_headers, 3);
+
+    // Prune account A up to nonce 1, account B up to nonce 1
+    let deleted_a = store
+        .interact_with_connection(move |conn| {
+            SqliteStore::prune_account_history(conn, a_id, Felt::new(1))
+        })
+        .await?;
+    let deleted_b = store
+        .interact_with_connection(move |conn| {
+            SqliteStore::prune_account_history(conn, b_id, Felt::new(1))
+        })
+        .await?;
+
+    assert!(deleted_a + deleted_b > 0);
+
+    // After prune: 1 header for A (nonce 1) + 0 for B (nonce 0 was replaced_at_nonce 1, pruned)
+    let m = get_storage_metrics(&store).await;
+    assert!(m.historical_account_headers <= 2);
+
+    // Both accounts should still be readable
+    assert!(store.get_account(account_a.id()).await?.is_some());
+    assert!(store.get_account(account_b.id()).await?.is_some());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn prune_removes_orphaned_account_code() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+    let map_slot_name = StorageSlotName::new("test::prune_code::map").expect("valid slot name");
+
+    // Insert account with map entries (nonce 0), then apply a delta (nonce 0 to 1).
+    // The delta creates a historical header at nonce 0 whose code_commitment points
+    // to the original account code.
+    let mut account = setup_account_with_map(&store, 2, &map_slot_name).await?;
+    let account_id = account.id();
+    apply_single_entry_update(&store, &mut account, &map_slot_name, 1).await?;
+
+    // Simulate the nonce-1 state having a different code commitment by updating
+    // the latest header's code_commitment directly. This makes the nonce-0
+    // historical header the only reference to the original code.
+    let original_code_commitment: String = store
+        .interact_with_connection(move |conn| {
+            conn.query_row(
+                "SELECT code_commitment FROM historical_account_headers WHERE id = ?",
+                params![account_id.to_hex()],
+                |row| row.get(0),
+            )
+            .into_store_error()
+        })
+        .await?;
+
+    // Insert a fake code entry for the latest header so the original code becomes
+    // orphaned when we prune the historical header.
+    store
+        .interact_with_connection(move |conn| {
+            conn.execute(
+                "INSERT INTO account_code (commitment, code) VALUES (?, ?)",
+                params!["new_code_commitment", vec![0u8; 16]],
+            )
+            .into_store_error()?;
+            conn.execute(
+                "UPDATE latest_account_headers SET code_commitment = ? WHERE id = ?",
+                params!["new_code_commitment", account_id.to_hex()],
+            )
+            .into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    let code_count_before: usize = store
+        .interact_with_connection(|conn| {
+            conn.query_row("SELECT COUNT(*) FROM account_code", [], |r| r.get(0))
+                .into_store_error()
+        })
+        .await?;
+
+    // Prune nonce-0 history: the historical header referencing original_code_commitment
+    // is deleted, and since no other header references it, the code should be removed.
+    let deleted = store
+        .interact_with_connection(move |conn| {
+            SqliteStore::prune_account_history(conn, account_id, Felt::new(1))
+        })
+        .await?;
+    assert!(deleted > 0);
+
+    // Verify the original code was removed
+    let original_still_exists: bool = store
+        .interact_with_connection(move |conn| {
+            conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM account_code WHERE commitment = ?)",
+                params![original_code_commitment],
+                |row| row.get(0),
+            )
+            .into_store_error()
+        })
+        .await?;
+    assert!(!original_still_exists, "Original code should be removed after pruning");
+
+    // The new code should still exist
+    let code_count_after: usize = store
+        .interact_with_connection(|conn| {
+            conn.query_row("SELECT COUNT(*) FROM account_code", [], |r| r.get(0))
+                .into_store_error()
+        })
+        .await?;
+    assert_eq!(code_count_after, code_count_before - 1);
+
+    Ok(())
+}
+
 // TEST HELPERS
 // ================================================================================================
 
@@ -798,7 +1033,7 @@ async fn apply_single_entry_update(
     Ok(())
 }
 
-// UNDO & COMMITMENT LOOKUP TESTS (issue #1768)
+// UNDO & COMMITMENT LOOKUP TESTS
 // ================================================================================================
 
 /// Verifies that `undo_account_state` correctly reverts the latest tables to the previous state.
@@ -905,7 +1140,7 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
 /// Verifies that undoing the only state (nonce 0) of an account removes it entirely from both
 /// latest and historical tables.
 ///
-/// The account is created with assets so the vault root is non-trivial — the SMT forest
+/// The account is created with assets so the vault root is non-trivial: the SMT forest
 /// only ref-counts non-empty roots, so `pop_roots` after undo would underflow on an empty vault.
 #[tokio::test]
 async fn undo_account_state_deletes_account_entirely() -> anyhow::Result<()> {
@@ -1117,7 +1352,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
         AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
-    // Build with build() at nonce 0 — no initial assets
+    // Build with build() at nonce 0: no initial assets
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
@@ -1266,11 +1501,11 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     let m = get_storage_metrics(&store).await;
     assert_eq!(
         m.latest_storage_map_entries, 2,
-        "C should NOT be resurrected — only A and B should be in latest"
+        "C should NOT be resurrected: only A and B should be in latest"
     );
     assert_eq!(
         m.latest_account_assets, 1,
-        "Y should NOT be resurrected — only X should be in latest"
+        "Y should NOT be resurrected: only X should be in latest"
     );
 
     // Also verify the header reverted to the post-update nonce
@@ -1298,7 +1533,7 @@ async fn get_account_header_by_commitment_returns_historical() -> anyhow::Result
     let post_delta_commitment = account.to_commitment();
     assert_ne!(initial_commitment, post_delta_commitment);
 
-    // Look up the initial commitment — should find the nonce-0 state in historical
+    // Look up the initial commitment: should find the nonce-0 state in historical
     let lookup = initial_commitment;
     let header = store
         .interact_with_connection(move |conn| {
@@ -1309,7 +1544,7 @@ async fn get_account_header_by_commitment_returns_historical() -> anyhow::Result
     assert_eq!(header.nonce().as_canonical_u64(), 0);
     assert_eq!(header.to_commitment(), initial_commitment);
 
-    // Look up the post-delta commitment — should NOT be in historical (it's the current
+    // Look up the post-delta commitment: should NOT be in historical (it's the current
     // latest state, not an old one that was replaced)
     let lookup = post_delta_commitment;
     let result = store
@@ -1515,7 +1750,7 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
     let m = get_storage_metrics(&store).await;
     assert_eq!(m.latest_storage_map_entries, 2, "Initial: 2 map entries");
 
-    // Build in-memory state at nonce 1 with {A, B, C, D} — C and D are genuinely new
+    // Build in-memory state at nonce 1 with {A, B, C, D}: C and D are genuinely new
     let mut storage_delta_add = AccountStorageDelta::new();
     storage_delta_add.set_map_item(
         map_slot_name.clone(),
