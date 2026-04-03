@@ -2281,7 +2281,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "tokio",
  "tower-service",
  "tracing",
@@ -3541,9 +3541,9 @@ dependencies = [
 
 [[package]]
 name = "miden-protocol"
-version = "0.14.0"
+version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38c30a20ea30071544a827d0daa12e343e444c1e314d1a4560c43f2d6c7b43c6"
+checksum = "bd686db021e95cb56d177682bb1cfa12d420df181e920319bf357b1d0d1bb8ac"
 dependencies = [
  "bech32",
  "fs-err",
@@ -3631,9 +3631,9 @@ dependencies = [
 
 [[package]]
 name = "miden-standards"
-version = "0.14.0"
+version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "612af5b544a25e318d89dca9ac958d436f9a8b209be4dda6ee2df0c21c58548e"
+checksum = "8a6c5e502d8238cae12df242a17f9d3f04b65ea78f632d23e29d0a40c378e1cc"
 dependencies = [
  "fs-err",
  "miden-assembly",
@@ -3649,9 +3649,9 @@ dependencies = [
 
 [[package]]
 name = "miden-testing"
-version = "0.14.0"
+version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "982fb99a73d12abc6088562be1f606f24cbb2673e832ba872bf86d6add566638"
+checksum = "2668173cd3d4c6ddb9b3144b009e69b19530c22d74b059d0b5fa90c54aeb4519"
 dependencies = [
  "anyhow",
  "itertools 0.14.0",
@@ -3672,9 +3672,9 @@ dependencies = [
 
 [[package]]
 name = "miden-tx"
-version = "0.14.0"
+version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18e32f06ec896176724bbb29de6c655f856e5444319cd3824c921511cde24f87"
+checksum = "94791510725ce5c499e710ede6406a7f4229a1664328dfbc105c21e84d93048c"
 dependencies = [
  "miden-processor",
  "miden-protocol",
@@ -4796,7 +4796,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
  "heck",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "petgraph 0.8.3",
@@ -4817,7 +4817,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27c6023962132f4b30eb4c172c91ce92d933da334c59c23cddee82358ddafb0b"
 dependencies = [
  "anyhow",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.117",

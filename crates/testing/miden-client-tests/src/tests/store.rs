@@ -288,15 +288,15 @@ async fn build_three_slot_account(
 
     let slot_a = StorageSlot::with_value(
         a_name,
-        [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
+        [Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)].into(),
     );
     let slot_b = StorageSlot::with_value(
         b_name,
-        [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(2)].into(),
+        [Felt::new(2), Felt::new(0), Felt::new(0), Felt::new(0)].into(),
     );
     let slot_c = StorageSlot::with_value(
         c_name,
-        [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(3)].into(),
+        [Felt::new(3), Felt::new(0), Felt::new(0), Felt::new(0)].into(),
     );
 
     let component_code = CodeBuilder::default()
@@ -430,9 +430,9 @@ async fn prune_preserves_unmodified_storage_slots() {
     let actual_b = storage.get(&b_name).expect("slot B should exist").value();
     let actual_c = storage.get(&c_name).expect("slot C should exist").value();
 
-    let final_a: Word = [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(10)].into();
-    let final_b: Word = [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(20)].into();
-    let final_c: Word = [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(3)].into();
+    let final_a: Word = [Felt::new(10), Felt::new(0), Felt::new(0), Felt::new(0)].into();
+    let final_b: Word = [Felt::new(20), Felt::new(0), Felt::new(0), Felt::new(0)].into();
+    let final_c: Word = [Felt::new(3), Felt::new(0), Felt::new(0), Felt::new(0)].into();
 
     assert_eq!(actual_a, final_a, "Slot A should be updated to 10");
     assert_eq!(actual_b, final_b, "Slot B should be updated to 20");

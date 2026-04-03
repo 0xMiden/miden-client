@@ -2,7 +2,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::{env, fs};
 
-use miden_client::account::AccountType;
 use miden_client::account::component::{
     AccountComponentMetadata,
     AuthMultisig,
@@ -12,9 +11,6 @@ use miden_client::account::component::{
     BasicWallet,
     MIDEN_PACKAGE_EXTENSION,
     NoAuth,
-    SchemaType,
-    StorageSchema,
-    StorageSlotSchema,
     basic_fungible_faucet_library,
     basic_wallet_library,
     multisig_library,
@@ -66,29 +62,7 @@ fn main() {
     build_package("no-auth", no_auth_library(), &no_auth_metadata, Some("auth"));
 
     // Multisig auth
-    //
-    // NOTE: We use a custom schema for `approver_schemes` because the upstream
-    // `approver_auth_scheme_slot_schema()` defines the map value as
-    // `SchemaType::auth_scheme()` (a felt type), but the type registry expects
-    // felt-types-as-words in the format `[0, 0, 0, <felt>]` while the actual
-    // storage uses `[felt, 0, 0, 0]`. Using `native_word()` avoids this
-    // validation mismatch.
-    let approver_schemes_schema = (
-        AuthMultisig::approver_scheme_ids_slot().clone(),
-        StorageSlotSchema::map("Approver scheme IDs", SchemaType::u32(), SchemaType::native_word()),
-    );
-    let multisig_metadata = AccountComponentMetadata::new(AuthMultisig::NAME, AccountType::all())
-        .with_description("Multisig authentication component using hybrid signature schemes")
-        .with_storage_schema(
-            StorageSchema::new([
-                AuthMultisig::threshold_config_slot_schema(),
-                AuthMultisig::approver_public_keys_slot_schema(),
-                approver_schemes_schema,
-                AuthMultisig::executed_transactions_slot_schema(),
-                AuthMultisig::procedure_thresholds_slot_schema(),
-            ])
-            .expect("storage schema should be valid"),
-        );
+    let multisig_metadata = AuthMultisig::component_metadata();
     build_package("multisig-auth", multisig_library(), &multisig_metadata, Some("auth"));
 
     // ACL auth
