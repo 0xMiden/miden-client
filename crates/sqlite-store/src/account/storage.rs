@@ -8,13 +8,12 @@ use std::vec::Vec;
 use miden_client::account::{
     AccountDelta,
     AccountId,
-    StorageMap,
     StorageSlot,
     StorageSlotContent,
     StorageSlotName,
     StorageSlotType,
 };
-use miden_client::store::{AccountSmtForest, StoreError};
+use miden_client::store::StoreError;
 use miden_client::{EMPTY_WORD, Word};
 use rusqlite::types::Value;
 use rusqlite::{OptionalExtension, Transaction, params};
@@ -282,36 +281,5 @@ impl SqliteStore {
         }
 
         Ok(())
-    }
-
-    /// Applies storage delta changes to the account state, computing new roots via the SMT forest.
-    ///
-    /// Value-type slot updates are taken directly from the delta. For map-type slots, the old
-    /// root is used to update the SMT forest with the delta entries, producing the new root.
-    /// Full storage maps are never loaded into memory — the `AccountSmtForest` handles all
-    /// Merkle tree operations.
-    pub(crate) fn apply_account_storage_delta(
-        smt_forest: &mut AccountSmtForest,
-        old_map_roots: &BTreeMap<StorageSlotName, Word>,
-        delta: &AccountDelta,
-    ) -> Result<BTreeMap<StorageSlotName, (Word, StorageSlotType)>, StoreError> {
-        let mut updated_slots: BTreeMap<StorageSlotName, (Word, StorageSlotType)> = delta
-            .storage()
-            .values()
-            .map(|(slot_name, value)| (slot_name.clone(), (*value, StorageSlotType::Value)))
-            .collect();
-
-        let default_map_root = StorageMap::default().root();
-
-        for (slot_name, map_delta) in delta.storage().maps() {
-            let old_root = old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
-            let entries: Vec<_> =
-                map_delta.entries().iter().map(|(key, value)| (*key.inner(), *value)).collect();
-
-            let new_root = smt_forest.update_storage_map_nodes(old_root, entries.into_iter())?;
-            updated_slots.insert(slot_name.clone(), (new_root, StorageSlotType::Map));
-        }
-
-        Ok(updated_slots)
     }
 }

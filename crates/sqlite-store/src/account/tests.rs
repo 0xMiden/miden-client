@@ -168,7 +168,7 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
                 &mut smt_forest,
                 &account.into(),
                 &final_state,
-                BTreeMap::default(),
+                &[],
                 &BTreeMap::new(),
                 &delta,
             )?;
@@ -278,7 +278,7 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
                 &mut smt_forest,
                 &account.into(),
                 &final_state,
-                fungible_assets,
+                &fungible_assets,
                 &old_map_roots,
                 &delta,
             )?;
@@ -1017,7 +1017,7 @@ async fn apply_single_entry_update(
                 &mut smt_forest,
                 &prev_header,
                 &final_header,
-                BTreeMap::default(),
+                &[],
                 &old_map_roots,
                 &delta,
             )?;
@@ -1084,7 +1084,7 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
                 &mut smt_forest,
                 &prev_header,
                 &final_header,
-                BTreeMap::default(),
+                &[],
                 &old_map_roots,
                 &delta,
             )?;
@@ -1257,7 +1257,7 @@ async fn lock_account_affects_latest_and_historical() -> anyhow::Result<()> {
                 &mut smt_forest,
                 &prev_header,
                 &final_header,
-                BTreeMap::default(),
+                &[],
                 &old_map_roots,
                 &delta,
             )?;
@@ -1387,7 +1387,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
                 &mut smt_forest,
                 &prev_header_0,
                 &final_header_1,
-                BTreeMap::default(),
+                &[],
                 &BTreeMap::new(),
                 &delta_1,
             )?;
@@ -1466,7 +1466,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
                 &mut smt_forest,
                 &prev_header,
                 &final_header,
-                BTreeMap::default(),
+                &[],
                 &old_map_roots,
                 &delta_next,
             )?;
@@ -1613,7 +1613,7 @@ async fn undo_multiple_nonces_at_once() -> anyhow::Result<()> {
                 &mut smt_forest,
                 &prev_header_0,
                 &final_header_1,
-                BTreeMap::default(),
+                &[],
                 &old_map_roots,
                 &delta_1,
             )?;
@@ -1655,7 +1655,7 @@ async fn undo_multiple_nonces_at_once() -> anyhow::Result<()> {
                 &mut smt_forest,
                 &prev_header_1,
                 &final_header_2,
-                BTreeMap::default(),
+                &[],
                 &old_map_roots,
                 &delta_2,
             )?;
