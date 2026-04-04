@@ -1,5 +1,5 @@
-use miden_client::rpc::domain::note::CommittedNote as NativeCommittedNote;
 use miden_client::note::NoteMetadata as NativeNoteMetadata;
+use miden_client::rpc::domain::note::CommittedNote as NativeCommittedNote;
 use wasm_bindgen::prelude::*;
 
 use super::account_id::AccountId;
