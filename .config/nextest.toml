@@ -8,7 +8,7 @@ status-level   = "skip"
 # The integration tests all share a node instance, so cap concurrency to reduce
 # pressure on the node until the node-side contention issue is resolved.
 [test-groups.integration]
-max-threads = 3
+max-threads = 2
 
 [[profile.default.overrides]]
 filter           = "package(miden-client-unit-tests)"
