@@ -46,7 +46,7 @@ use miden_protocol::errors::AccountError;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::TransactionId;
 use miden_protocol::{Felt, Word};
-use miden_tx::utils::{Deserializable, Serializable};
+use miden_tx::utils::serde::{Deserializable, Serializable};
 
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::rpc::{RPC_LIMITS_STORE_SETTING, RpcLimits};
@@ -218,6 +218,12 @@ pub trait Store: Send + Sync {
 
     /// Retrieves a list of [`BlockHeader`] that include relevant notes to the client.
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError>;
+
+    /// Retrieves the block numbers of block headers that include relevant notes to the client.
+    ///
+    /// This is a lightweight alternative to [`Store::get_tracked_block_headers`] that avoids
+    /// deserializing full block headers when only the block numbers are needed.
+    async fn get_tracked_block_header_numbers(&self) -> Result<BTreeSet<usize>, StoreError>;
 
     /// Retrieves all MMR authentication nodes based on [`PartialBlockchainFilter`].
     async fn get_partial_blockchain_nodes(
@@ -509,9 +515,15 @@ pub trait Store: Send + Sync {
         let has_client_notes = has_client_notes.into();
         current_partial_mmr.add(current_block.commitment(), has_client_notes);
 
-        // Only track the latest leaf if it is relevant (it has client notes) _and_ the forest
-        // actually has a single leaf tree bit
-        let track_latest = has_client_notes && current_partial_mmr.forest().has_single_leaf_tree();
+        // Build tracked_leaves from blocks that have client notes.
+        let mut tracked_leaves = self.get_tracked_block_header_numbers().await?;
+
+        // Also track the latest leaf if it is relevant (it has client notes) _and_ the forest
+        // actually has a single leaf tree bit.
+        if has_client_notes && current_partial_mmr.forest().has_single_leaf_tree() {
+            let latest_leaf = current_partial_mmr.forest().num_leaves().saturating_sub(1);
+            tracked_leaves.insert(latest_leaf);
+        }
 
         let tracked_nodes = self
             .get_partial_blockchain_nodes(PartialBlockchainFilter::Forest(
@@ -520,7 +532,7 @@ pub trait Store: Send + Sync {
             .await?;
 
         let current_partial_mmr =
-            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, track_latest);
+            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, tracked_leaves)?;
 
         Ok(current_partial_mmr)
     }

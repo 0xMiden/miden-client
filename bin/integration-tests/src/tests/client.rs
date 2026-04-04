@@ -8,24 +8,18 @@ use miden_client::account::{
     AccountBuilder,
     AccountId,
     AccountStorageMode,
+    AccountType,
     StorageMap,
     StorageMapKey,
     StorageSlot,
     StorageSlotName,
 };
-use miden_client::assembly::{
-    CodeBuilder,
-    DefaultSourceManager,
-    MastForest,
-    Module,
-    ModuleKind,
-    Path,
-};
+use miden_client::assembly::{CodeBuilder, DefaultSourceManager, Module, ModuleKind, Path};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteFile, NoteScript, NoteType};
+use miden_client::note::{NoteFile, NoteType};
 use miden_client::rpc::AccountStateAt;
 use miden_client::rpc::domain::account::{
     AccountStorageRequirements,
@@ -51,7 +45,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{ClientError, Deserializable, Felt, Serializable, Word};
+use miden_client::{ClientError, Felt, Word};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use tracing::info;
 
@@ -1357,7 +1351,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let mut storage_map = StorageMap::new();
     storage_map.insert(
         StorageMapKey::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into()),
-        [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
+        [Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)].into(),
     )?;
 
     let map_slot_name =
@@ -1456,19 +1450,9 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .await
         .unwrap();
 
-    // Remove debug decorators from original note script, as they are not persisted on submission
-    // (https://github.com/0xMiden/miden-base/issues/1812)
-    let mut mast = (*note.script().mast()).clone();
-    mast.strip_decorators();
-
-    // normalize CSR storage to match deserialized form
-    let mast_bytes = mast.to_bytes();
-    let mast = MastForest::read_from_bytes(&mast_bytes)?;
-    let note_script = NoteScript::from_parts(Arc::new(mast), note.script().entrypoint());
-
     assert_eq!(node_nullifier.nullifier, nullifier);
     assert_eq!(node_nullifier_proof.leaf().entries().first().unwrap().0, nullifier.as_word());
-    assert_eq!(note_script, retrieved_note_script);
+    assert_eq!(note.script().root(), retrieved_note_script.root());
     assert!(!sync_storage_maps.updates.is_empty());
     assert!(!account_vault_info.updates.is_empty());
     assert!(!transactions_info.transaction_records.is_empty());
@@ -1593,14 +1577,13 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     let component = AccountComponent::new(
         component_code,
         vec![map_slot],
-        AccountComponentMetadata::new("miden::testing::map_key_filtering")
-            .with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::map_key_filtering", AccountType::all()),
     )
     .map_err(|err| anyhow::anyhow!(err))?;
 
-    let key_pair = AuthSecretKey::new_falcon512_rpo();
+    let key_pair = AuthSecretKey::new_falcon512_poseidon2();
     let auth_component: AccountComponent =
-        AuthSingleSig::new(key_pair.public_key().to_commitment(), AuthSchemeId::Falcon512Rpo)
+        AuthSingleSig::new(key_pair.public_key().to_commitment(), AuthSchemeId::Falcon512Poseidon2)
             .into();
 
     let account = AccountBuilder::new(Default::default())

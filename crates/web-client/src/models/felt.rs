@@ -19,7 +19,7 @@ impl Felt {
     /// Returns the integer representation of the field element.
     #[wasm_bindgen(js_name = "asInt")]
     pub fn as_int(&self) -> u64 {
-        self.0.as_int()
+        self.0.as_canonical_u64()
     }
 
     /// Returns the string representation of the field element.

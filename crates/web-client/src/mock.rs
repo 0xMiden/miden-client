@@ -94,7 +94,6 @@ impl WebClient {
                 )
             })
     }
-
     #[wasm_bindgen(js_name = "proveBlock")]
     pub fn prove_block(&mut self) -> Result<(), JsValue> {
         match self.mock_rpc_api.as_ref() {

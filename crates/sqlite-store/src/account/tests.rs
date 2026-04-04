@@ -51,12 +51,15 @@ async fn account_code_insertion_no_duplicates() -> anyhow::Result<()> {
     let account_component = AccountComponent::new(
         component_code,
         vec![],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
     let account_code = AccountCode::from_components(
         &[
-            AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Rpo)
-                .into(),
+            AuthSingleSig::new(
+                PublicKeyCommitment::from(EMPTY_WORD),
+                AuthSchemeId::Falcon512Poseidon2,
+            )
+            .into(),
             account_component,
         ],
         AccountType::RegularAccountUpdatableCode,
@@ -113,7 +116,7 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
             StorageSlot::with_empty_map(map_slot_name.clone()),
             StorageSlot::with_empty_map(map_slot_b_name.clone()),
         ],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     // Create and insert an account
@@ -121,7 +124,7 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build()?;
@@ -142,7 +145,7 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
             FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?, 100)?
                 .into(),
             NonFungibleAsset::new(&NonFungibleAssetDetails::new(
-                AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET)?.prefix(),
+                AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET)?,
                 NON_FUNGIBLE_ASSET_DATA.into(),
             )?)?
             .into(),
@@ -221,14 +224,14 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
             StorageSlot::with_value(value_slot_name.clone(), [ZERO, ZERO, ZERO, ONE].into()),
             StorageSlot::with_map(map_slot_name.clone(), dummy_map),
         ],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     // Create and insert an account
     let assets: Vec<Asset> = vec![
         FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?, 100)?.into(),
         NonFungibleAsset::new(&NonFungibleAssetDetails::new(
-            AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET)?.prefix(),
+            AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET)?,
             NON_FUNGIBLE_ASSET_DATA.into(),
         )?)?
         .into(),
@@ -237,7 +240,7 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .with_assets(assets.clone())
@@ -322,14 +325,14 @@ async fn get_account_storage_item_success() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_value(value_slot_name.clone(), test_value.into())],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build_existing()?;
@@ -355,14 +358,14 @@ async fn get_account_storage_item_not_found() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_empty_value(value_slot_name)],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build_existing()?;
@@ -396,14 +399,14 @@ async fn get_account_map_item_success() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_map(map_slot_name.clone(), storage_map)],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build_existing()?;
@@ -430,14 +433,14 @@ async fn get_account_map_item_value_slot_error() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_empty_value(value_slot_name.clone())],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build_existing()?;
@@ -461,14 +464,14 @@ async fn get_account_code() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
         vec![],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build_existing()?;
@@ -514,14 +517,14 @@ async fn account_reader_nonce_and_status() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
         vec![],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build()?;
@@ -590,14 +593,14 @@ async fn account_reader_storage_access() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_value(value_slot_name.clone(), test_value.into())],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build_existing()?;
@@ -627,14 +630,14 @@ async fn account_reader_addresses_access() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         basic_wallet_library(),
         vec![],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
         .build_existing()?;
@@ -757,13 +760,13 @@ async fn prune_account_history_multiple_accounts() -> anyhow::Result<()> {
     let component_b = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_empty_map(map_slot_name_b.clone())],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
     let account_b = AccountBuilder::new([1; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(component_b)
         .build()?;
@@ -961,14 +964,14 @@ async fn setup_account_with_map(
     let component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_map(map_slot_name.clone(), map)],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(component)
         .build()?;
@@ -1128,7 +1131,7 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
         .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account_id))
         .await?
         .expect("account should still exist after undo");
-    assert_eq!(header.nonce().as_int(), 0);
+    assert_eq!(header.nonce().as_canonical_u64(), 0);
     assert_eq!(header.to_commitment(), initial_commitment);
 
     Ok(())
@@ -1155,14 +1158,14 @@ async fn undo_account_state_deletes_account_entirely() -> anyhow::Result<()> {
     let component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_map(map_slot_name.clone(), map)],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(component)
         .with_assets(vec![
@@ -1346,7 +1349,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     let component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_map(map_slot_name.clone(), initial_map)],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     // Build with build() at nonce 0: no initial assets
@@ -1354,7 +1357,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(component)
         .build()?;
@@ -1365,7 +1368,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     // Step 1+2: Apply delta at nonce 1 adding assets X and Y
     let asset_x = FungibleAsset::new(faucet_id, 100)?;
     let asset_y = NonFungibleAsset::new(&NonFungibleAssetDetails::new(
-        nf_faucet_id.prefix(),
+        nf_faucet_id,
         NON_FUNGIBLE_ASSET_DATA.into(),
     )?)?;
 
@@ -1411,7 +1414,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
 
     let mut account_updated = account_nonce1.clone();
     account_updated.apply_delta(&delta_remove)?;
-    let updated_nonce = account_updated.nonce().as_int();
+    let updated_nonce = account_updated.nonce().as_canonical_u64();
 
     // Call update_account_state with the updated state
     let smt_forest = store.smt_forest.clone();
@@ -1439,10 +1442,8 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
         [Felt::new(999), ZERO, ZERO, ZERO].into(),
     )?;
 
-    let asset_z = NonFungibleAsset::new(&NonFungibleAssetDetails::new(
-        nf_faucet_id.prefix(),
-        vec![5, 6, 7, 8],
-    )?)?;
+    let asset_z =
+        NonFungibleAsset::new(&NonFungibleAssetDetails::new(nf_faucet_id, vec![5, 6, 7, 8])?)?;
     let vault_delta_next = AccountVaultDelta::from_iters(vec![asset_z.into()], []);
 
     let delta_next = AccountDelta::new(account_id, storage_delta_next, vault_delta_next, ONE)?;
@@ -1512,7 +1513,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
         .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account_id))
         .await?
         .expect("account should exist");
-    assert_eq!(header.nonce().as_int(), updated_nonce);
+    assert_eq!(header.nonce().as_canonical_u64(), updated_nonce);
 
     Ok(())
 }
@@ -1540,7 +1541,7 @@ async fn get_account_header_by_commitment_returns_historical() -> anyhow::Result
         })
         .await?
         .expect("Initial commitment should exist in historical");
-    assert_eq!(header.nonce().as_int(), 0);
+    assert_eq!(header.nonce().as_canonical_u64(), 0);
     assert_eq!(header.to_commitment(), initial_commitment);
 
     // Look up the post-delta commitment: should NOT be in historical (it's the current
@@ -1630,7 +1631,7 @@ async fn undo_multiple_nonces_at_once() -> anyhow::Result<()> {
         [Felt::new(2000), ZERO, ZERO, ZERO].into(),
     )?;
     let asset_2 = NonFungibleAsset::new(&NonFungibleAssetDetails::new(
-        nf_faucet_id.prefix(),
+        nf_faucet_id,
         NON_FUNGIBLE_ASSET_DATA.into(),
     )?)?;
     let vault_delta_2 = AccountVaultDelta::from_iters(vec![asset_2.into()], []);
@@ -1698,7 +1699,7 @@ async fn undo_multiple_nonces_at_once() -> anyhow::Result<()> {
         .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account_id))
         .await?
         .expect("account should exist after undo");
-    assert_eq!(header.nonce().as_int(), 0);
+    assert_eq!(header.nonce().as_canonical_u64(), 0);
     assert_eq!(header.to_commitment(), initial_commitment);
 
     Ok(())
@@ -1730,14 +1731,14 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
     let component = AccountComponent::new(
         basic_wallet_library(),
         vec![StorageSlot::with_map(map_slot_name.clone(), initial_map)],
-        AccountComponentMetadata::new("miden::testing::dummy_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::RegularAccountImmutableCode)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(component)
         .build()?;
@@ -1836,7 +1837,7 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
         .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account_id))
         .await?
         .expect("account should exist after undo");
-    assert_eq!(header.nonce().as_int(), 0);
+    assert_eq!(header.nonce().as_canonical_u64(), 0);
 
     Ok(())
 }

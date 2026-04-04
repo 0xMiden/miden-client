@@ -261,7 +261,7 @@ impl MockRpcApi {
                         let storage_map_info = StorageMapUpdate {
                             block_num: block_number,
                             slot_name: slot_name.clone(),
-                            key: *key.inner(),
+                            key: *key,
                             value: *value,
                         };
                         updates.push(storage_map_info);
@@ -295,7 +295,7 @@ impl MockRpcApi {
                 {
                     Some(NoteSyncRecord {
                         note_index_in_block: u32::from(
-                            note.inclusion_proof().location().node_index_in_block(),
+                            note.inclusion_proof().location().block_note_tree_index(),
                         ),
                         note_id: Some(note.id().into()),
                         metadata: Some(note.metadata().clone().into()),
@@ -378,7 +378,7 @@ impl NodeRpcClient for MockRpcApi {
         Ok(NoteSyncInfo {
             chain_tip: self.get_chain_tip_block_num(),
             block_header: next_block,
-            mmr_path: self.get_mmr().open(block_num.as_usize()).unwrap().merkle_path,
+            mmr_path: self.get_mmr().open(block_num.as_usize()).unwrap().merkle_path().clone(),
             notes,
         })
     }
@@ -470,23 +470,30 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Returns the node's tracked account details for the specified account ID.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        let summary = self
-            .account_commitment_updates
-            .read()
-            .iter()
-            .rev()
-            .find_map(|(block_num, updates)| {
-                updates.get(&account_id).map(|commitment| AccountUpdateSummary {
-                    commitment: *commitment,
-                    last_block_num: *block_num,
-                })
-            })
-            .unwrap();
+        let summary =
+            self.account_commitment_updates
+                .read()
+                .iter()
+                .rev()
+                .find_map(|(block_num, updates)| {
+                    updates.get(&account_id).map(|commitment| AccountUpdateSummary {
+                        commitment: *commitment,
+                        last_block_num: *block_num,
+                    })
+                });
 
         if let Ok(account) = self.mock_chain.read().committed_account(account_id) {
+            let summary = summary.unwrap_or_else(|| AccountUpdateSummary {
+                commitment: account.to_commitment(),
+                last_block_num: BlockNumber::GENESIS,
+            });
             Ok(FetchedAccount::new_public(account.clone(), summary))
-        } else {
+        } else if let Some(summary) = summary {
             Ok(FetchedAccount::new_private(account_id, summary))
+        } else {
+            Err(RpcError::ExpectedDataMissing(format!(
+                "account {account_id} not found in mock commitment updates or mock chain"
+            )))
         }
     }
 

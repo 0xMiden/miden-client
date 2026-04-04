@@ -26,7 +26,7 @@ use miden_client::note::{
 };
 use miden_client::store::{InputNoteState, TransactionFilter};
 use miden_client::testing::common::*;
-use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
+use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::{Client, ClientRng, Word};
 use rand::RngCore;
 use tracing::info;
@@ -62,14 +62,14 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         &mut client,
         AccountStorageMode::Private,
         &authenticator_1,
-        AuthSchemeId::Falcon512Rpo,
+        AuthSchemeId::Falcon512Poseidon2,
     )
     .await?;
     let (target, ..) = insert_new_wallet(
         &mut client_2,
         AccountStorageMode::Private,
         &authenticator_2,
-        AuthSchemeId::Falcon512Rpo,
+        AuthSchemeId::Falcon512Poseidon2,
     )
     .await?;
 
@@ -80,7 +80,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         &mut client,
         AccountStorageMode::Private,
         &authenticator_1,
-        AuthSchemeId::Falcon512Rpo,
+        AuthSchemeId::Falcon512Poseidon2,
     )
     .await?;
 
@@ -102,10 +102,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         create_pass_through_note(sender.id(), target.id(), asset.into(), client.rng())?;
 
     let tx_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![
-            OutputNote::Full(pass_through_note_1.clone()),
-            OutputNote::Full(pass_through_note_2.clone()),
-        ])
+        .own_output_notes(vec![pass_through_note_1.clone(), pass_through_note_2.clone()])
         .build()?;
 
     execute_tx_and_sync(&mut client, sender.id(), tx_request).await?;
@@ -207,7 +204,8 @@ async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
         .with_allow_unauthorized_output_notes(true);
 
     let auth_component =
-        AuthSingleSigAcl::new(pub_key.into(), AuthSchemeId::Falcon512Rpo, acl_config).unwrap();
+        AuthSingleSigAcl::new(pub_key.into(), AuthSchemeId::Falcon512Poseidon2, acl_config)
+            .unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -238,15 +236,20 @@ fn create_pass_through_note(
 ) -> Result<(Note, NoteDetails)> {
     let note_script = get_pass_through_note_script();
 
-    let asset_word: Word = asset.into();
+    let asset_key: Word = asset.to_key_word();
+    let asset_value: Word = asset.to_value_word();
 
     let target_recipient = P2idNoteStorage::new(target).into_recipient(rng.draw_word());
 
     let inputs = NoteStorage::new(vec![
-        asset_word[0],
-        asset_word[1],
-        asset_word[2],
-        asset_word[3],
+        asset_key[0],
+        asset_key[1],
+        asset_key[2],
+        asset_key[3],
+        asset_value[0],
+        asset_value[1],
+        asset_value[2],
+        asset_value[3],
         target_recipient.digest()[0],
         target_recipient.digest()[1],
         target_recipient.digest()[2],

@@ -1,7 +1,6 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use miden_client::Word;
 use miden_client::account::{StorageMap, StorageSlot};
 use miden_client::asset::Asset;
 use miden_client::utils::Serializable;
@@ -51,7 +50,7 @@ extern "C" {
     pub fn idxdb_get_account_vault_assets(
         db_id: &str,
         account_id: String,
-        faucet_id_prefixes: Vec<String>,
+        vault_keys: Vec<String>,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountAddresses)]
@@ -178,9 +177,6 @@ pub struct JsVaultAsset {
     /// The vault key associated with the asset.
     #[wasm_bindgen(js_name = "vaultKey")]
     pub vault_key: String,
-    /// Asset's faucet ID prefix.
-    #[wasm_bindgen(js_name = "faucetIdPrefix")]
-    pub faucet_id_prefix: String,
     /// Word representing the asset.
     #[wasm_bindgen(js_name = "asset")]
     pub asset: String,
@@ -189,9 +185,8 @@ pub struct JsVaultAsset {
 impl JsVaultAsset {
     pub fn from_asset(asset: &Asset) -> Self {
         Self {
-            vault_key: Word::from(asset.vault_key()).to_hex(),
-            faucet_id_prefix: asset.faucet_id_prefix().to_hex(),
-            asset: Word::from(asset).to_hex(),
+            vault_key: asset.vault_key().to_string(),
+            asset: asset.to_value_word().to_hex(),
         }
     }
 }

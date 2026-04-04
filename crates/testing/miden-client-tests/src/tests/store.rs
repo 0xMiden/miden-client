@@ -38,10 +38,10 @@ use crate::tests::{create_test_client, insert_new_fungible_faucet, insert_new_wa
 fn create_account_data(account_id: u128) -> AccountFile {
     let account = Account::mock(
         account_id,
-        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Rpo),
+        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Poseidon2),
     );
 
-    AccountFile::new(account.clone(), vec![AuthSecretKey::new_falcon512_rpo()])
+    AccountFile::new(account.clone(), vec![AuthSecretKey::new_falcon512_poseidon2()])
 }
 
 fn create_ecdsa_account_data(account_id: u128) -> AccountFile {
@@ -50,7 +50,7 @@ fn create_ecdsa_account_data(account_id: u128) -> AccountFile {
         AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::EcdsaK256Keccak),
     );
 
-    AccountFile::new(account.clone(), vec![AuthSecretKey::new_falcon512_rpo()])
+    AccountFile::new(account.clone(), vec![AuthSecretKey::new_falcon512_poseidon2()])
 }
 
 pub fn create_initial_accounts_data() -> Vec<AccountFile> {
@@ -82,7 +82,7 @@ pub async fn try_add_account() {
 
     let account = Account::mock(
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Rpo),
+        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Poseidon2),
     );
 
     // The mock account has nonce 1, we need it to be 0 for the test.
@@ -236,8 +236,8 @@ async fn prune_account_history_with_pending_transaction() {
         .into_iter()
         .find(|(h, _)| h.id() == faucet_id)
         .expect("Faucet should still appear in headers");
-    assert_eq!(header.nonce().as_int(), 2, "Latest nonce should be 2");
-    assert_eq!(faucet_after.nonce().as_int(), 2);
+    assert_eq!(header.nonce().as_canonical_u64(), 2, "Latest nonce should be 2");
+    assert_eq!(faucet_after.nonce().as_canonical_u64(), 2);
 
     // Verify commitment is unchanged (pruning + committing did not corrupt state)
     assert_eq!(
@@ -288,15 +288,15 @@ async fn build_three_slot_account(
 
     let slot_a = StorageSlot::with_value(
         a_name,
-        [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
+        [Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)].into(),
     );
     let slot_b = StorageSlot::with_value(
         b_name,
-        [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(2)].into(),
+        [Felt::new(2), Felt::new(0), Felt::new(0), Felt::new(0)].into(),
     );
     let slot_c = StorageSlot::with_value(
         c_name,
-        [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(3)].into(),
+        [Felt::new(3), Felt::new(0), Felt::new(0), Felt::new(0)].into(),
     );
 
     let component_code = CodeBuilder::default()
@@ -306,11 +306,11 @@ async fn build_three_slot_account(
     let component = AccountComponent::new(
         component_code,
         vec![slot_a, slot_b, slot_c],
-        AccountComponentMetadata::new("test::pruning::slots_component").with_supports_all_types(),
+        AccountComponentMetadata::new("test::pruning::slots_component", AccountType::all()),
     )
     .unwrap();
 
-    let key_pair = AuthSecretKey::new_falcon512_rpo();
+    let key_pair = AuthSecretKey::new_falcon512_poseidon2();
     let pub_key = key_pair.public_key();
 
     let mut init_seed = [0u8; 32];
@@ -321,7 +321,7 @@ async fn build_three_slot_account(
         .storage_mode(AccountStorageMode::Public)
         .with_auth_component(AuthSingleSig::new(
             pub_key.to_commitment(),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(BasicWallet)
         .with_component(component)
@@ -430,9 +430,9 @@ async fn prune_preserves_unmodified_storage_slots() {
     let actual_b = storage.get(&b_name).expect("slot B should exist").value();
     let actual_c = storage.get(&c_name).expect("slot C should exist").value();
 
-    let final_a: Word = [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(10)].into();
-    let final_b: Word = [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(20)].into();
-    let final_c: Word = [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(3)].into();
+    let final_a: Word = [Felt::new(10), Felt::new(0), Felt::new(0), Felt::new(0)].into();
+    let final_b: Word = [Felt::new(20), Felt::new(0), Felt::new(0), Felt::new(0)].into();
+    let final_c: Word = [Felt::new(3), Felt::new(0), Felt::new(0), Felt::new(0)].into();
 
     assert_eq!(actual_a, final_a, "Slot A should be updated to 10");
     assert_eq!(actual_b, final_b, "Slot B should be updated to 20");

@@ -48,6 +48,7 @@ import {
   Package,
   ProcedureThreshold,
   PublicKey,
+  Poseidon2,
   Rpo256,
   RpcClient,
   Signature,
@@ -143,6 +144,7 @@ declare global {
     Package: typeof Package;
     ProcedureThreshold: typeof ProcedureThreshold;
     PublicKey: typeof PublicKey;
+    Poseidon2: typeof Poseidon2;
     Rpo256: typeof Rpo256;
     Signature: typeof Signature;
     SigningInputs: typeof SigningInputs;

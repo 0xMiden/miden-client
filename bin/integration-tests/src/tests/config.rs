@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use miden_client::builder::ClientBuilder;
-use miden_client::crypto::RpoRandomCoin;
+use miden_client::crypto::RandomCoin;
 use miden_client::grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::note_transport::{
@@ -137,7 +137,7 @@ impl ClientConfig {
         let mut rng = rand::rng();
         let coin_seed: [u64; 4] = rng.random();
 
-        let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
+        let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
 
         let keystore = FilesystemKeyStore::new(auth_path.clone()).with_context(|| {
             format!("failed to create keystore at path: {}", auth_path.to_string_lossy())

@@ -311,6 +311,11 @@ impl Store for SqliteStore {
         self.interact_with_connection(SqliteStore::get_tracked_block_headers).await
     }
 
+    async fn get_tracked_block_header_numbers(&self) -> Result<BTreeSet<usize>, StoreError> {
+        self.interact_with_connection(SqliteStore::get_tracked_block_header_numbers)
+            .await
+    }
+
     async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
