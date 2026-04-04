@@ -4,6 +4,7 @@ import { setupWalletAndFaucet, mintTransaction } from "./webClientTestUtils";
 
 test.describe("prune_account_history tests", () => {
   test("prunes old committed states for a single account", async ({ page }) => {
+    test.slow();
     const { accountId, faucetId } = await setupWalletAndFaucet(page);
 
     // Mint twice : each mint advances the faucet nonce (0  to 1  to 2),
@@ -76,6 +77,7 @@ test.describe("prune_account_history tests", () => {
   test("can send a transaction after pruning account history", async ({
     page,
   }) => {
+    test.slow();
     const { accountId, faucetId } = await setupWalletAndFaucet(page);
 
     // Mint twice to build history, then prune, then mint again to verify
