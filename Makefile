@@ -6,6 +6,8 @@ help: ## Show description of all commands
 
 # --- Variables -----------------------------------------------------------------------------------
 
+# The build target defaults to rust's host.
+BUILD_TARGET ?= $(shell rustc -vV | grep host | awk '{print $$2}')
 FEATURES_CLIENT=--features "std"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
@@ -199,8 +201,11 @@ install-tests: ## Install the tests binary
 
 # --- Building ------------------------------------------------------------------------------------
 
+## Build the CLI binary. This is done separately in order to save time during
+## artifact generation for releases.
+
 build: ## Build the CLI binary, client library and tests binary in release mode
-	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --release --locked
+	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --target $(BUILD_TARGET) --release --locked
 
 build-wasm: rust-client-ts-build ## Build the wasm packages (web client and idxdb store)
 	cargo build --package miden-client-web --package miden-idxdb-store --target wasm32-unknown-unknown --locked
