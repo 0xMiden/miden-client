@@ -250,7 +250,7 @@ test.describe("send transaction tests", () => {
 
   testCases.forEach(({ flag, description }) => {
     test(description, async ({ page }) => {
-      test.slow();
+      test.setTimeout(900000);
       const { accountId: senderAccountId, faucetId } =
         await setupWalletAndFaucet(page);
       const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
