@@ -157,7 +157,9 @@ test.describe("get_input_note", () => {
       const syncInfo = await rpcClient.syncNotes(0, undefined, [tag]);
       const blocks = syncInfo.blocks();
       const syncedNotes = syncInfo.notes();
-      const syncedNoteIds = syncedNotes.map((synced) => synced.noteId().toString());
+      const syncedNoteIds = syncedNotes.map((synced) =>
+        synced.noteId().toString()
+      );
       const syncedBlockNoteIds = blocks.flatMap((block) =>
         block.notes().map((synced) => synced.noteId().toString())
       );
@@ -210,7 +212,9 @@ test.describe("get_input_note", () => {
     expect(result.firstSyncedNoteSender).toEqual(
       result.firstSyncedNoteMetadataSender
     );
-    expect(result.firstSyncedNoteIndex).toEqual(result.firstSyncedNoteProofIndex);
+    expect(result.firstSyncedNoteIndex).toEqual(
+      result.firstSyncedNoteProofIndex
+    );
     expect(result.noteNullifierHex).toMatch(/^0x[0-9a-fA-F]+$/);
     expect(result.noteNullifierWord).toEqual(result.noteNullifierHex);
     expect(result.commitHeight).not.toBeUndefined();
