@@ -1051,7 +1051,7 @@ nodeTest.describe("MidenClient API - Integration", () => {
   nodeTest(
     "full send flow: mint, sync, consume, check balance",
     async ({ page }) => {
-      test.slow();
+      nodeTest.slow();
       const result = await page.evaluate(async () => {
         const client = await window.MidenClient.create({
           rpcUrl: window.rpcUrl,
