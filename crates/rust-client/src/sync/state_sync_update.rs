@@ -129,6 +129,11 @@ impl BlockUpdates {
         peaks: MmrPeaks,
         new_authentication_nodes: Vec<(InOrderIndex, Word)>,
     ) {
+        debug_assert!(
+            !self.block_headers.iter().any(|(h, ..)| h.block_num() == block_header.block_num()),
+            "block {} already inserted",
+            block_header.block_num()
+        );
         self.block_headers.push((block_header, has_client_notes, peaks));
 
         self.new_authentication_nodes.reserve(new_authentication_nodes.len());
