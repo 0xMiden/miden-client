@@ -13,7 +13,7 @@ import {
   _setWasm as _setStandaloneWasm,
   _setWebClient as _setStandaloneWebClient,
 } from "./standalone.js";
-import { installStorageView, StorageView, wordToNumber } from "./storageView.js";
+import { installStorageView, StorageView, wordToBigInt, wordToNumber } from "./storageView.js";
 export * from "../Cargo.toml";
 
 export const AccountType = Object.freeze({
@@ -47,7 +47,7 @@ export const StorageMode = Object.freeze({
 
 export { MidenClient };
 export { createP2IDNote, createP2IDENote, buildSwapTag };
-export { StorageView, wordToNumber };
+export { StorageView, wordToBigInt, wordToNumber };
 
 // Internal exports — used by integration tests that need direct access to the low-level WebClient proxy.
 export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };

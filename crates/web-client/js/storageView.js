@@ -91,16 +91,17 @@ export class StorageView {
   }
 
   /**
-   * Convenience: read the first felt of a storage slot as a JavaScript number.
+   * Convenience: read the first felt of a storage slot as a BigInt.
    * Works for both Value and StorageMap slots.
+   * Returns BigInt to avoid f64 precision loss on u64-backed felt values.
    *
    * @param {string} slotName
-   * @returns {number | undefined}
+   * @returns {bigint | undefined}
    */
   getNumber(slotName) {
     const word = this.getItem(slotName);
     if (!word) return undefined;
-    return wordToNumber(word);
+    return wordToBigInt(word);
   }
 
   /**
@@ -125,23 +126,36 @@ export class StorageView {
 }
 
 /**
- * Convert a Word's first felt to a JavaScript number.
+ * Convert a Word's first felt to a BigInt.
+ * Uses BigInt to preserve full u64 precision (felts are u64-backed).
  * Handles the little-endian byte order of felt serialization.
  *
  * @param {import("../Cargo.toml").Word} word
- * @returns {number}
+ * @returns {bigint}
  */
-export function wordToNumber(word) {
+export function wordToBigInt(word) {
   try {
     const hex = word.toHex();
     // First felt = first 16 hex chars after "0x", little-endian byte order
     const feltHex = hex.slice(2, 18);
     const bytes = feltHex.match(/../g);
-    if (!bytes) return 0;
-    return Number(BigInt("0x" + bytes.reverse().join("")));
+    if (!bytes) return 0n;
+    return BigInt("0x" + bytes.reverse().join(""));
   } catch {
-    return 0;
+    return 0n;
   }
+}
+
+/**
+ * Convert a Word's first felt to a JavaScript number.
+ * WARNING: May lose precision for values > Number.MAX_SAFE_INTEGER.
+ * Prefer wordToBigInt() for exact values.
+ *
+ * @param {import("../Cargo.toml").Word} word
+ * @returns {number}
+ */
+export function wordToNumber(word) {
+  return Number(wordToBigInt(word));
 }
 
 /**
