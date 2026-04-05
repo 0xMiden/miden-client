@@ -74,7 +74,8 @@ export class StorageView {
         value: e.value,
         word: this.#hexToWord(e.value),
       }));
-      const firstWord = parsedEntries.length > 0 ? parsedEntries[0].word : undefined;
+      const firstWord =
+        parsedEntries.length > 0 ? parsedEntries[0].word : undefined;
       return new StorageResult(firstWord, true, parsedEntries);
     }
 

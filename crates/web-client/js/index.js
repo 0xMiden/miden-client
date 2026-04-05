@@ -13,7 +13,13 @@ import {
   _setWasm as _setStandaloneWasm,
   _setWebClient as _setStandaloneWebClient,
 } from "./standalone.js";
-import { installStorageView, StorageView, StorageResult, wordToBigInt, wordToNumber } from "./storageView.js";
+import {
+  installStorageView,
+  StorageView,
+  StorageResult,
+  wordToBigInt,
+  wordToNumber,
+} from "./storageView.js";
 export * from "../Cargo.toml";
 
 export const AccountType = Object.freeze({
