@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::net::SocketAddr;
+use std::num::{NonZeroU32, NonZeroU64};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -17,7 +18,7 @@ use miden_node_block_producer::{
 };
 use miden_node_ntx_builder::NtxBuilderConfig;
 use miden_node_rpc::Rpc;
-use miden_node_store::{GenesisState, Store};
+use miden_node_store::{DEFAULT_MAX_CONCURRENT_PROOFS, GenesisState, Store};
 use miden_node_utils::clap::{GrpcOptionsExternal, GrpcOptionsInternal, StorageOptions};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_node_validator::{Validator, ValidatorSigner};
@@ -144,7 +145,8 @@ impl NodeBuilder {
             .await
             .with_context(|| "failed to create genesis block")?;
 
-        Store::bootstrap(&genesis_block, &self.data_directory)
+        let genesis_header = genesis_block.inner().header().clone();
+        Store::bootstrap(genesis_block, &self.data_directory)
             .with_context(|| "failed to bootstrap store")?;
 
         // Bootstrap the validator database with the genesis block header so that block
@@ -155,7 +157,7 @@ impl NodeBuilder {
                 .with_context(|| "failed to initialize validator database")?;
         validator_db
             .transact("bootstrap_validator", move |conn| {
-                miden_node_validator::db::upsert_block_header(conn, genesis_block.inner().header())
+                miden_node_validator::db::upsert_block_header(conn, &genesis_header)
             })
             .await
             .with_context(|| "failed to bootstrap validator with genesis block header")?;
@@ -266,7 +268,11 @@ impl NodeBuilder {
                     block_producer_url,
                     validator_url,
                     ntx_builder_url,
-                    grpc_options: GrpcOptionsExternal::default(),
+                    grpc_options: GrpcOptionsExternal {
+                        burst_size: NonZeroU32::new(10_000).unwrap(),
+                        replenish_n_per_second_per_ip: NonZeroU64::new(10_000).unwrap(),
+                        ..GrpcOptionsExternal::default()
+                    },
                 }
                 .serve()
                 .await
@@ -324,6 +330,7 @@ impl NodeBuilder {
                         block_prover_url: None,
                         storage_options: StorageOptions::default(),
                         grpc_options: GrpcOptionsInternal::default(),
+                        max_concurrent_proofs: DEFAULT_MAX_CONCURRENT_PROOFS,
                     }
                     .serve()
                     .await

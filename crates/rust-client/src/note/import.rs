@@ -382,45 +382,45 @@ where
                 break;
             }
 
-            let sync_notes =
+            let mut sync_notes =
                 self.rpc_api.sync_notes(request_block_num, None, &tracked_tags).await?;
 
-            for sync_note in sync_notes.notes {
-                if !expected_notes.iter().any(|(id, _)| id == sync_note.note_id()) {
-                    continue;
-                }
+            // Fetch full metadata for all notes with attachments in the sync response.
+            // This fetches all notes with missing metadata (not just the ones we're interested
+            // in) to avoid revealing which specific notes the client cares about.
+            super::fill_attachment_metadata(self.rpc_api.as_ref(), &mut sync_notes.blocks).await?;
 
-                // This means that a note with the same id was found.
-                // Therefore, we should mark the note as committed.
-                let note_block_num = sync_notes.block_header.block_num();
+            for block in &sync_notes.blocks {
+                let note_block_num = block.block_header.block_num();
 
                 if note_block_num > current_block_num {
                     break;
                 }
 
-                let note_inclusion_proof = NoteInclusionProof::new(
-                    note_block_num,
-                    sync_note.note_index(),
-                    sync_note.inclusion_path().clone(),
-                )?;
+                for sync_note in block.notes.values() {
+                    if !expected_notes.iter().any(|(id, _)| id == sync_note.note_id()) {
+                        continue;
+                    }
 
-                retrieved_proofs.insert(
-                    *sync_note.note_id(),
-                    Some((sync_note.metadata(), note_inclusion_proof)),
-                );
+                    let metadata = sync_note
+                        .metadata()
+                        .cloned()
+                        .expect("metadata should be available after fill_attachment_metadata");
+                    retrieved_proofs.insert(
+                        *sync_note.note_id(),
+                        Some((metadata, sync_note.inclusion_proof().clone())),
+                    );
+                }
             }
 
-            // We might have reached the chain tip without having found some notes, bail if so
-            if sync_notes.block_header.block_num() == sync_notes.chain_tip {
-                break;
-            }
-
-            // This means that a note with the same id was not found.
-            // Therefore, we should request again for sync_notes with the same note_tag
-            // and with the block_num of the last block header
-            // (sync_notes.block_header.unwrap()).
-            request_block_num = sync_notes.block_header.block_num();
+            // Advance past the last block the node checked. Adding 1 avoids
+            // re-requesting the same range on the next iteration.
+            request_block_num = sync_notes.block_to + 1;
         }
-        Ok(retrieved_proofs)
+
+        retrieved_proofs
+            .into_iter()
+            .map(|(note_id, data)| Ok((note_id, data)))
+            .collect()
     }
 }

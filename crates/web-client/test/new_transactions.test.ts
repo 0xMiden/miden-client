@@ -268,7 +268,8 @@ test.describe("send transaction tests", () => {
         page,
         targetAccountId,
         faucetId,
-        createdSendNotes[0]
+        createdSendNotes[0],
+        flag
       );
       const result = await sendTransactionTest(
         page,
