@@ -30,9 +30,8 @@ impl NoteStateHandler for InvalidNoteState {
     fn inclusion_proof_received(
         &self,
         inclusion_proof: NoteInclusionProof,
-        metadata: Option<NoteMetadata>,
+        metadata: NoteMetadata,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
-        let metadata = metadata.unwrap_or_else(|| self.metadata.clone());
         Ok(Some(UnverifiedNoteState { metadata, inclusion_proof }.into()))
     }
 

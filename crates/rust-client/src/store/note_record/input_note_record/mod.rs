@@ -206,7 +206,7 @@ impl InputNoteRecord {
     pub(crate) fn inclusion_proof_received(
         &mut self,
         inclusion_proof: NoteInclusionProof,
-        metadata: Option<NoteMetadata>,
+        metadata: NoteMetadata,
     ) -> Result<bool, NoteRecordError> {
         let new_state = self.state.inclusion_proof_received(inclusion_proof, metadata)?;
         if let Some(new_state) = new_state {

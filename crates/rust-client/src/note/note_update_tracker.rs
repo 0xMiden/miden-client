@@ -4,6 +4,7 @@ use miden_protocol::block::BlockHeader;
 use miden_protocol::note::{NoteId, Nullifier};
 
 use crate::ClientError;
+use crate::rpc::RpcError;
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::store::{InputNoteRecord, OutputNoteRecord};
@@ -304,13 +305,12 @@ impl NoteUpdateTracker {
 
         let is_tracked_as_input_note =
             if let Some(input_note_record) = self.get_input_note_by_id(*committed_note.note_id()) {
-                // Resolve metadata: prefer the local record's metadata (which may include
-                // attachment data), fall back to the committed note's metadata (which includes
-                // fetched attachment data if applicable).
-                let metadata = input_note_record
-                    .metadata()
-                    .cloned()
-                    .or_else(|| committed_note.metadata().cloned());
+                let metadata = committed_note.metadata().cloned().ok_or_else(|| {
+                    ClientError::RpcError(RpcError::ExpectedDataMissing(format!(
+                        "full metadata for committed note {}",
+                        committed_note.note_id()
+                    )))
+                })?;
                 input_note_record.inclusion_proof_received(inclusion_proof.clone(), metadata)?;
                 input_note_record.block_header_received(block_header)?;
 

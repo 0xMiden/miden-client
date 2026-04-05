@@ -33,14 +33,8 @@ impl NoteStateHandler for ExpectedNoteState {
     fn inclusion_proof_received(
         &self,
         inclusion_proof: NoteInclusionProof,
-        metadata: Option<NoteMetadata>,
+        metadata: NoteMetadata,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
-        // Prefer the provided metadata; fall back to the locally stored metadata (if any).
-        let metadata = metadata.or_else(|| self.metadata.clone()).ok_or_else(|| {
-            NoteRecordError::StateTransitionError(
-                "Cannot transition to Unverified without metadata".to_string(),
-            )
-        })?;
         Ok(Some(UnverifiedNoteState { metadata, inclusion_proof }.into()))
     }
 
