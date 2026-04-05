@@ -580,7 +580,11 @@ impl SqliteStore {
         }
 
         // Step 4: Restore old header from the earliest discarded nonce
-        let min_nonce = *nonces.last().unwrap();
+        let min_nonce = *nonces.last().ok_or_else(|| {
+            StoreError::ParsingError(format!(
+                "nonces list for account {account_id_hex} is empty"
+            ))
+        })?;
         let min_nonce_val = u64_to_value(min_nonce);
 
         let old_header_exists: bool = tx
