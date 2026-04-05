@@ -28,31 +28,11 @@ impl AccountStorage {
         self.0.to_commitment().into()
     }
 
-    /// Returns the value stored at the given slot name.
-    /// For Value slots: returns the stored Word directly.
-    /// For Map slots: returns the first entry's value (NOT the commitment hash).
+    /// Returns the value stored at the given slot name, if any.
     #[wasm_bindgen(js_name = "getItem")]
     pub fn get_item(&self, slot_name: &str) -> Option<Word> {
-        let name = StorageSlotName::new(slot_name).ok()?;
-        let slot = self.0.slots().iter().find(|s| s.name() == &name)?;
-
-        match slot.content() {
-            StorageSlotContent::Value(_) => self.0.get_item(&name).ok().map(Into::into),
-            StorageSlotContent::Map(map) => {
-                // Return first entry's value instead of the useless commitment hash
-                map.entries().next().map(|(_, value)| value.into())
-            },
-        }
-    }
-
-    /// Returns the first felt of a storage slot as a number.
-    /// Works for both Value and Map slots (for maps, returns first entry's first felt).
-    #[wasm_bindgen(js_name = "getNumber")]
-    #[allow(clippy::cast_precision_loss)]
-    pub fn get_number(&self, slot_name: &str) -> Option<f64> {
-        let word = self.get_item(slot_name)?;
-        let native_word: miden_client::Word = word.into();
-        Some(native_word[0].as_int() as f64)
+        let slot_name = StorageSlotName::new(slot_name).ok()?;
+        self.0.get_item(&slot_name).ok().map(Into::into)
     }
 
     /// Returns the names of all storage slots on this account.
@@ -68,39 +48,6 @@ impl AccountStorage {
             Ok(slot_name) => self.0.get_map_item(&slot_name, key.into()).ok().map(Into::into),
             Err(_) => None,
         }
-    }
-
-    /// Smart read: returns the actual stored value regardless of slot type.
-    /// - For Value slots: returns the stored Word directly.
-    /// - For Map slots: returns the value at the given key, or the first entry's value if no key.
-    #[wasm_bindgen(js_name = "readValue")]
-    pub fn read_value(&self, slot_name: &str, key: Option<Word>) -> Option<Word> {
-        let Ok(slot_name) = StorageSlotName::new(slot_name) else {
-            return None;
-        };
-
-        let slot = self.0.slots().iter().find(|s| s.name() == &slot_name)?;
-
-        match slot.content() {
-            StorageSlotContent::Value(_) => self.0.get_item(&slot_name).ok().map(Into::into),
-            StorageSlotContent::Map(map) => {
-                if let Some(k) = key {
-                    self.0.get_map_item(&slot_name, k.into()).ok().map(Into::into)
-                } else {
-                    map.entries().next().map(|(_, value)| value.into())
-                }
-            },
-        }
-    }
-
-    /// Convenience: read a storage value and return the first felt as a number.
-    /// Handles both Value and Map slots.
-    #[wasm_bindgen(js_name = "readNumber")]
-    #[allow(clippy::cast_precision_loss)]
-    pub fn read_number(&self, slot_name: &str, key: Option<Word>) -> Option<f64> {
-        let word = self.read_value(slot_name, key)?;
-        let native_word: miden_client::Word = word.into();
-        Some(native_word[0].as_int() as f64)
     }
 
     /// Get all key-value pairs from the map slot identified by `slot_name`.
