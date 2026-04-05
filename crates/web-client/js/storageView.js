@@ -6,23 +6,31 @@
  * instead of the map commitment hash. This makes the most common usage pattern
  * work correctly without requiring knowledge of `getMapItem`.
  *
+ * Note on StorageMap ordering: Miden storage maps are Merkle-based, so iteration
+ * order is determined by key hashes, not insertion order. "First entry" means the
+ * first entry returned by the underlying iterator — this is deterministic for a
+ * given map state but not meaningful as an ordering concept.
+ *
  * The raw WASM AccountStorage is still accessible via `.raw` for advanced use cases
- * that need the original behavior (e.g., comparing map roots).
+ * that need the original behavior (e.g., comparing map commitment roots).
  */
 export class StorageView {
   /** @type {import("../Cargo.toml").AccountStorage} */
   #storage;
+  #WordClass;
 
   /**
    * @param {import("../Cargo.toml").AccountStorage} wasmStorage
+   * @param {typeof import("../Cargo.toml").Word} WordClass
    */
-  constructor(wasmStorage) {
+  constructor(wasmStorage, WordClass) {
     this.#storage = wasmStorage;
+    this.#WordClass = WordClass;
   }
 
   /**
    * The raw WASM AccountStorage, for cases where you need the original
-   * primitive behavior (e.g., reading map commitment roots).
+   * primitive behavior (e.g., reading map commitment roots via raw.getItem()).
    */
   get raw() {
     return this.#storage;
@@ -56,7 +64,7 @@ export class StorageView {
    * @returns {import("../Cargo.toml").Word | undefined}
    */
   getItem(slotName) {
-    // Try to get map entries first — if it returns entries, this is a StorageMap
+    // Try to get map entries — if it returns an array, this is a StorageMap
     const entries = this.#storage.getMapEntries(slotName);
     if (entries !== undefined && entries !== null) {
       // It's a StorageMap — return the first entry's value as a Word
@@ -66,7 +74,7 @@ export class StorageView {
       return undefined; // Empty map
     }
 
-    // Not a map (or getMapEntries isn't available) — use the raw getItem for Value slots
+    // Not a map — use the raw getItem for Value slots
     return this.#storage.getItem(slotName);
   }
 
@@ -91,37 +99,34 @@ export class StorageView {
   }
 
   /**
-   * Convenience: read the first felt of a storage slot as a BigInt.
+   * Convenience: read the first felt of a storage slot as a JavaScript number.
    * Works for both Value and StorageMap slots.
-   * Returns BigInt to avoid f64 precision loss on u64-backed felt values.
+   *
+   * Note: Felts are u64-backed. Values above Number.MAX_SAFE_INTEGER (2^53 - 1)
+   * will lose precision. Use `wordToBigInt(storage.getItem(slotName))` for exact
+   * large values.
    *
    * @param {string} slotName
-   * @returns {bigint | undefined}
+   * @returns {number | undefined}
    */
   getNumber(slotName) {
     const word = this.getItem(slotName);
     if (!word) return undefined;
-    return wordToBigInt(word);
+    return wordToNumber(word);
   }
 
   /**
    * Parse a JsStorageMapEntry's value hex string into a Word.
-   * @param {Object} entry - { root: string, key: string, value: string }
+   * @param {{ key: string, value: string }} entry
    * @returns {import("../Cargo.toml").Word | undefined}
    */
   #parseEntryValue(entry) {
-    if (!entry || !entry.value) return undefined;
-    // entry.value is a hex string — we need to convert it to a Word
-    // Use the WASM Word.fromHex if available, otherwise return the raw hex
+    if (!entry?.value || !this.#WordClass) return undefined;
     try {
-      // The StorageView is created after WASM loads, so we can access Word dynamically
-      if (this._WordClass) {
-        return this._WordClass.fromHex(entry.value);
-      }
+      return this.#WordClass.fromHex(entry.value);
     } catch {
-      // fromHex might fail — fall back
+      return undefined;
     }
-    return undefined;
   }
 }
 
@@ -148,8 +153,8 @@ export function wordToBigInt(word) {
 
 /**
  * Convert a Word's first felt to a JavaScript number.
- * WARNING: May lose precision for values > Number.MAX_SAFE_INTEGER.
- * Prefer wordToBigInt() for exact values.
+ * WARNING: May lose precision for values > Number.MAX_SAFE_INTEGER (2^53 - 1).
+ * Use wordToBigInt() when exact large values matter.
  *
  * @param {import("../Cargo.toml").Word} word
  * @returns {number}
@@ -169,12 +174,10 @@ export function installStorageView(wasmModule) {
   if (!AccountProto || !AccountProto.storage) return;
 
   const originalStorage = AccountProto.storage;
+  const WordClass = wasmModule.Word;
 
   AccountProto.storage = function () {
     const raw = originalStorage.call(this);
-    const view = new StorageView(raw);
-    // Give the view access to the Word class for hex parsing
-    view._WordClass = wasmModule.Word;
-    return view;
+    return new StorageView(raw, WordClass);
   };
 }
