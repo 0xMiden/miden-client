@@ -330,7 +330,7 @@ where
             });
 
             match committed_notes_data.remove(&note_record.id()) {
-                Some(Some((tag, metadata, inclusion_proof))) => {
+                Some(Some((metadata, inclusion_proof))) => {
                     // FIXME: We should be able to build the mmr only once (outside the for loop).
                     // For some reason this leads to error, probably related to:
                     // https://github.com/0xMiden/miden-client/issues/1205
@@ -342,6 +342,7 @@ where
                         )
                         .await?;
 
+                    let tag = metadata.tag();
                     let note_changed =
                         note_record.inclusion_proof_received(inclusion_proof, metadata)?;
 
@@ -372,8 +373,7 @@ where
         mut request_block_num: BlockNumber,
         // Expected notes with their tags
         expected_notes: Vec<(NoteId, &NoteTag)>,
-    ) -> Result<BTreeMap<NoteId, Option<(NoteTag, NoteMetadata, NoteInclusionProof)>>, ClientError>
-    {
+    ) -> Result<BTreeMap<NoteId, Option<(NoteMetadata, NoteInclusionProof)>>, ClientError> {
         let tracked_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
         let mut retrieved_proofs = BTreeMap::new();
         let current_block_num = self.get_sync_height().await?;
@@ -408,7 +408,7 @@ where
                         .expect("metadata should be available after fill_attachment_metadata");
                     retrieved_proofs.insert(
                         *sync_note.note_id(),
-                        Some((sync_note.tag(), metadata, sync_note.inclusion_proof().clone())),
+                        Some((metadata, sync_note.inclusion_proof().clone())),
                     );
                 }
             }
@@ -420,19 +420,7 @@ where
 
         retrieved_proofs
             .into_iter()
-            .map(|(note_id, data)| {
-                let data = data
-                    .map(|(tag, metadata, inclusion_proof)| {
-                        Ok::<(NoteTag, NoteMetadata, NoteInclusionProof), ClientError>((
-                            tag,
-                            metadata,
-                            inclusion_proof,
-                        ))
-                    })
-                    .transpose()?;
-
-                Ok((note_id, data))
-            })
+            .map(|(note_id, data)| Ok((note_id, data)))
             .collect()
     }
 }
