@@ -80,8 +80,8 @@ export declare class StorageResult {
   /** Renders as the numeric value. Makes `{result}` work in JSX. */
   toString(): string;
 
-  /** Returns the numeric value. */
-  toJSON(): number;
+  /** Returns the value as a string for JSON precision safety. */
+  toJSON(): string;
 
   /** Allows arithmetic: `+result`, `result * 2`. */
   valueOf(): number;

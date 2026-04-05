@@ -65,7 +65,9 @@ export class StorageView {
    * @returns {StorageResult | undefined}
    */
   getItem(slotName) {
-    // Check if this is a StorageMap by trying getMapEntries
+    // Detect slot type by trying getMapEntries. For maps this loads ALL entries,
+    // which may be expensive for large maps. If this becomes a bottleneck, a
+    // lighter slot-type-check method could be added to the WASM AccountStorage.
     const entries = this.#storage.getMapEntries(slotName);
     if (entries !== undefined && entries !== null) {
       // StorageMap — build result from entries
@@ -170,7 +172,7 @@ export class StorageResult {
   /**
    * @param {Word | undefined} word — the primary Word value
    * @param {boolean} isMap — whether this came from a StorageMap slot
-   * @param {Array<{key: string, value: string, word: import("../Cargo.toml").Word | undefined}> | undefined} entries
+   * @param {Array<{key: string, value: string, word: Word | undefined}> | undefined} entries
    */
   constructor(word, isMap, entries) {
     this.#word = word;
@@ -263,10 +265,11 @@ export class StorageResult {
   }
 
   /**
-   * JSON serialization — returns the numeric value.
+   * JSON serialization — returns the value as a string to avoid
+   * precision loss for large u64 felt values.
    */
   toJSON() {
-    return this.toNumber();
+    return this.toBigInt().toString();
   }
 
   /**
@@ -289,6 +292,9 @@ export class StorageResult {
 export function wordToBigInt(word) {
   try {
     const hex = word.toHex();
+    // Word.toHex() returns "0x" + 64 hex chars (4 felts × 16 hex chars each).
+    // Each felt is serialized as 8 little-endian bytes, so we take the first 16
+    // hex chars (first felt) and reverse the byte pairs to get the integer value.
     const feltHex = hex.slice(2, 18);
     const bytes = feltHex.match(/../g);
     if (!bytes) return 0n;
