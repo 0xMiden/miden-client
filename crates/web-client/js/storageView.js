@@ -15,8 +15,8 @@ export class StorageView {
   #WordClass;
 
   /**
-   * @param {import("../Cargo.toml").AccountStorage} wasmStorage
-   * @param {typeof import("../Cargo.toml").Word} WordClass
+   * @param {AccountStorage} wasmStorage
+   * @param {typeof Word} WordClass
    */
   constructor(wasmStorage, WordClass) {
     this.#storage = wasmStorage;
@@ -90,8 +90,8 @@ export class StorageView {
    * Delegates directly to the raw WASM method.
    *
    * @param {string} slotName
-   * @param {import("../Cargo.toml").Word} key
-   * @returns {import("../Cargo.toml").Word | undefined}
+   * @param {Word} key
+   * @returns {Word | undefined}
    */
   getMapItem(slotName, key) {
     return this.#storage.getMapItem(slotName, key);
@@ -117,7 +117,7 @@ export class StorageView {
    * This is the raw protocol-level value. For reading stored data, use `getItem()`.
    *
    * @param {string} slotName
-   * @returns {import("../Cargo.toml").Word | undefined}
+   * @returns {Word | undefined}
    */
   getCommitment(slotName) {
     return this.#storage.getItem(slotName);
@@ -139,7 +139,7 @@ export class StorageView {
 
   /**
    * @param {string} hex
-   * @returns {import("../Cargo.toml").Word | undefined}
+   * @returns {Word | undefined}
    */
   #hexToWord(hex) {
     if (!hex || !this.#WordClass) return undefined;
@@ -168,7 +168,7 @@ export class StorageResult {
   #entries;
 
   /**
-   * @param {import("../Cargo.toml").Word | undefined} word — the primary Word value
+   * @param {Word | undefined} word — the primary Word value
    * @param {boolean} isMap — whether this came from a StorageMap slot
    * @param {Array<{key: string, value: string, word: import("../Cargo.toml").Word | undefined}> | undefined} entries
    */
@@ -204,7 +204,7 @@ export class StorageResult {
   /**
    * The first Felt of the stored Word.
    * Returns the WASM Felt object — use .asInt() to get its BigInt value.
-   * @returns {import("../Cargo.toml").Felt | undefined}
+   * @returns {Felt | undefined}
    */
   felt() {
     if (!this.#word) return undefined;
@@ -272,7 +272,7 @@ export class StorageResult {
  * Uses BigInt to preserve full u64 precision (felts are u64-backed).
  * Handles the little-endian byte order of felt serialization.
  *
- * @param {import("../Cargo.toml").Word} word
+ * @param {Word} word
  * @returns {bigint}
  */
 export function wordToBigInt(word) {
@@ -292,7 +292,7 @@ export function wordToBigInt(word) {
  * WARNING: May lose precision for values > Number.MAX_SAFE_INTEGER (2^53 - 1).
  * Use wordToBigInt() when exact large values matter.
  *
- * @param {import("../Cargo.toml").Word} word
+ * @param {Word} word
  * @returns {number}
  */
 export function wordToNumber(word) {
