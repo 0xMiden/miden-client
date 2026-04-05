@@ -42,7 +42,7 @@ impl CommittedNote {
 
     /// Returns the note sender, even when only header metadata is available.
     pub fn sender(&self) -> AccountId {
-        self.0.committed_metadata().sender().into()
+        self.0.sender().into()
     }
 
     /// Returns the note tag.
@@ -57,7 +57,7 @@ impl CommittedNote {
     pub fn metadata(&self) -> NoteMetadata {
         self.0.metadata().map_or_else(
             || {
-                NativeNoteMetadata::new(self.0.committed_metadata().sender(), self.0.note_type())
+                NativeNoteMetadata::new(self.0.sender(), self.0.note_type())
                     .with_tag(self.0.tag())
                     .into()
             },

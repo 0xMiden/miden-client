@@ -198,41 +198,20 @@ impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
 /// until the full metadata is fetched via `GetNotesById`.
 #[derive(Debug, Clone)]
 pub enum CommittedNoteMetadata {
-    /// Full metadata is available (note has no attachment, or attachment was already fetched).
+    /// Full metadata is available (no attachment, or attachment was already fetched).
     Full(NoteMetadata),
     /// Only the header fields are available; the attachment data has not been fetched yet.
+    // Ideally this would wrap `NoteMetadataHeader` directly, but it lacks a public
+    // constructor in the protocol crate.
     Header {
         sender: AccountId,
         note_type: NoteType,
         tag: NoteTag,
+        attachment_kind: NoteAttachmentKind,
     },
 }
 
 impl CommittedNoteMetadata {
-    /// Returns the note type, available in both variants.
-    pub fn note_type(&self) -> NoteType {
-        match self {
-            Self::Full(m) => m.note_type(),
-            Self::Header { note_type, .. } => *note_type,
-        }
-    }
-
-    /// Returns the note tag, available in both variants.
-    pub fn tag(&self) -> NoteTag {
-        match self {
-            Self::Full(m) => m.tag(),
-            Self::Header { tag, .. } => *tag,
-        }
-    }
-
-    /// Returns the sender, available in both variants.
-    pub fn sender(&self) -> AccountId {
-        match self {
-            Self::Full(m) => m.sender(),
-            Self::Header { sender, .. } => *sender,
-        }
-    }
-
     /// Returns the full metadata if available.
     pub fn metadata(&self) -> Option<&NoteMetadata> {
         match self {
@@ -273,11 +252,24 @@ impl CommittedNote {
     }
 
     pub fn note_type(&self) -> NoteType {
-        self.metadata.note_type()
+        match &self.metadata {
+            CommittedNoteMetadata::Full(m) => m.note_type(),
+            CommittedNoteMetadata::Header { note_type, .. } => *note_type,
+        }
     }
 
     pub fn tag(&self) -> NoteTag {
-        self.metadata.tag()
+        match &self.metadata {
+            CommittedNoteMetadata::Full(m) => m.tag(),
+            CommittedNoteMetadata::Header { tag, .. } => *tag,
+        }
+    }
+
+    pub fn sender(&self) -> AccountId {
+        match &self.metadata {
+            CommittedNoteMetadata::Full(m) => m.sender(),
+            CommittedNoteMetadata::Header { sender, .. } => *sender,
+        }
     }
 
     /// Returns the full note metadata, or `None` if only the header is available.
@@ -328,7 +320,7 @@ impl TryFrom<proto::note::NoteSyncRecord> for CommittedNote {
         let metadata = if attachment_kind == NoteAttachmentKind::None {
             CommittedNoteMetadata::Full(NoteMetadata::new(sender, note_type).with_tag(tag))
         } else {
-            CommittedNoteMetadata::Header { sender, note_type, tag }
+            CommittedNoteMetadata::Header { sender, note_type, tag, attachment_kind }
         };
 
         let proto_inclusion_proof = note.inclusion_proof.ok_or(

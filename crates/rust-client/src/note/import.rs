@@ -382,8 +382,13 @@ where
                 break;
             }
 
-            let sync_notes =
+            let mut sync_notes =
                 self.rpc_api.sync_notes(request_block_num, None, &tracked_tags).await?;
+
+            // Fetch full metadata for all notes with attachments in the sync response.
+            // This fetches all notes with missing metadata (not just the ones we're interested
+            // in) to avoid revealing which specific notes the client cares about.
+            super::fill_attachment_metadata(self.rpc_api.as_ref(), &mut sync_notes.blocks).await?;
 
             for block in &sync_notes.blocks {
                 let note_block_num = block.block_header.block_num();
@@ -397,13 +402,13 @@ where
                         continue;
                     }
 
+                    let metadata = sync_note
+                        .metadata()
+                        .cloned()
+                        .expect("metadata should be available after fill_attachment_metadata");
                     retrieved_proofs.insert(
                         *sync_note.note_id(),
-                        Some((
-                            sync_note.tag(),
-                            sync_note.metadata().cloned(),
-                            sync_note.inclusion_proof().clone(),
-                        )),
+                        Some((sync_note.tag(), metadata, sync_note.inclusion_proof().clone())),
                     );
                 }
             }
@@ -413,42 +418,11 @@ where
             request_block_num = sync_notes.block_to + 1;
         }
 
-        // Fetch full metadata for notes with attachments (the sync response only provides
-        // the NoteMetadataHeader which lacks the actual attachment data).
-        let notes_needing_fetch: Vec<NoteId> = retrieved_proofs
-            .iter()
-            .filter_map(|(id, data)| match data {
-                Some((_, None, _)) => Some(*id),
-                _ => None,
-            })
-            .collect();
-
-        if !notes_needing_fetch.is_empty() {
-            let fetched_notes = self
-                .rpc_api
-                .get_notes_by_id(&notes_needing_fetch)
-                .await
-                .map_err(ClientError::RpcError)?;
-
-            for fetched_note in fetched_notes {
-                let note_id = fetched_note.id();
-                if let Some(Some((_, metadata, _))) = retrieved_proofs.get_mut(&note_id) {
-                    *metadata = Some(fetched_note.metadata().clone());
-                }
-            }
-        }
-
         retrieved_proofs
             .into_iter()
             .map(|(note_id, data)| {
                 let data = data
                     .map(|(tag, metadata, inclusion_proof)| {
-                        let metadata = metadata.ok_or_else(|| {
-                            ClientError::RpcError(RpcError::ExpectedDataMissing(format!(
-                                "full metadata for committed note {note_id}"
-                            )))
-                        })?;
-
                         Ok::<(NoteTag, NoteMetadata, NoteInclusionProof), ClientError>((
                             tag,
                             metadata,

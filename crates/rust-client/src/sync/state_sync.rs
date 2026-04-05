@@ -608,42 +608,12 @@ impl StateSync {
         Ok(return_notes.into_iter().map(|note| (note.id(), note)).collect())
     }
 
-    /// Fetches full [`NoteMetadata`] for committed notes that have attachments and sets it
-    /// on the notes directly.
-    ///
-    /// The sync response only provides header fields (sender, type, tag, attachment kind)
-    /// but not the actual attachment data. For notes with attachments, the full metadata
-    /// must be fetched via `GetNotesById`.
+    /// Fetches full [`NoteMetadata`] for committed notes that have attachments.
     async fn fill_attachment_metadata(
         &self,
         note_blocks: &mut [NoteSyncBlock],
     ) -> Result<(), ClientError> {
-        let note_ids: Vec<NoteId> = note_blocks
-            .iter()
-            .flat_map(|b| b.notes.values())
-            .filter(|n| n.metadata().is_none())
-            .map(|n| *n.note_id())
-            .collect();
-
-        if note_ids.is_empty() {
-            return Ok(());
-        }
-
-        info!("Fetching full metadata for {} notes with attachments.", note_ids.len());
-
-        let fetched_notes =
-            self.rpc_api.get_notes_by_id(&note_ids).await.map_err(ClientError::RpcError)?;
-
-        for fetched_note in fetched_notes {
-            let note_id = fetched_note.id();
-            for block in &mut *note_blocks {
-                if let Some(note) = block.notes.get_mut(&note_id) {
-                    note.set_metadata(fetched_note.metadata().clone());
-                }
-            }
-        }
-
-        Ok(())
+        crate::note::fill_attachment_metadata(self.rpc_api.as_ref(), note_blocks).await
     }
 
     /// Collects the nullifier tags for the notes that were updated in the sync response and uses

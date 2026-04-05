@@ -116,18 +116,12 @@ impl BlockUpdates {
         Self { block_headers, new_authentication_nodes }
     }
 
-    /// Adds or updates a block header and its corresponding data in this [`BlockUpdates`].
+    /// Adds a block header and its corresponding data to this [`BlockUpdates`].
     ///
-    /// If the block header already exists (same block number), the entry is updated:
-    /// `has_client_notes` is OR-ed and the peaks are replaced. Otherwise a new entry is
-    /// appended.
+    /// # Panics
     ///
-    /// # Parameters
-    /// - `block_header`: The block header to add.
-    /// - `has_client_notes`: Whether this block contains input notes that the client could use.
-    /// - `peaks`: The MMR peaks after including `block_header`.
-    /// - `new_authentication_nodes`: Authentication (MMR) nodes produced while adding
-    ///   `block_header` to the client's MMR.
+    /// Panics in debug builds if a block with the same block number has already been inserted.
+    /// Each block should only be added once during a sync cycle.
     pub fn insert(
         &mut self,
         block_header: BlockHeader,
@@ -135,17 +129,7 @@ impl BlockUpdates {
         peaks: MmrPeaks,
         new_authentication_nodes: Vec<(InOrderIndex, Word)>,
     ) {
-        if let Some((_, existing_has_notes, _)) = self
-            .block_headers
-            .iter_mut()
-            .find(|(h, ..)| h.block_num() == block_header.block_num())
-        {
-            // Update the relevance flag but keep the original peaks, which were captured
-            // at the correct MMR state for this block.
-            *existing_has_notes |= has_client_notes;
-        } else {
-            self.block_headers.push((block_header, has_client_notes, peaks));
-        }
+        self.block_headers.push((block_header, has_client_notes, peaks));
 
         self.new_authentication_nodes.reserve(new_authentication_nodes.len());
         self.new_authentication_nodes.extend(new_authentication_nodes);
