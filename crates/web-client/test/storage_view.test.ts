@@ -1,10 +1,41 @@
 import { expect } from "@playwright/test";
 import test from "./playwright.global.setup";
 
+// Shared MASM code that works with the MockChain assembler
+const VALUE_SLOT_CODE = (slotName: string) => `
+  use miden::protocol::active_account
+  use miden::protocol::native_account
+  use miden::core::word
+  use miden::core::sys
+
+  const SLOT = word("${slotName}")
+
+  pub proc get_value
+    push.SLOT[0..2] exec.active_account::get_item
+    exec.sys::truncate_stack
+  end
+
+  pub proc set_value
+    push.SLOT[0..2] exec.native_account::set_item
+    exec.sys::truncate_stack
+  end
+`;
+
+const MAP_SLOT_CODE = (slotName: string) => `
+  use miden::protocol::active_account
+  use miden::core::word
+  use miden::core::sys
+
+  const MAP_SLOT = word("${slotName}")
+
+  pub proc get_map_value
+    push.MAP_SLOT[0..2] exec.active_account::get_map_item
+    exec.sys::truncate_stack
+  end
+`;
+
 // STORAGE VIEW TESTS
 // =======================================================================================================
-// Tests that account.storage() returns a StorageView with correct behavior
-// for both Value and StorageMap slots.
 
 test.describe("StorageView", () => {
   test("getItem() on a Value slot returns a StorageResult with correct toNumber()", async ({
@@ -15,9 +46,10 @@ test.describe("StorageView", () => {
 
       const SLOT_NAME = "test::counter";
       const code = `
-        use.miden::protocol::active_account
-        use.miden::protocol::native_account
-        use.miden::core::sys
+        use miden::protocol::active_account
+        use miden::protocol::native_account
+        use miden::core::word
+        use miden::core::sys
 
         const COUNTER_SLOT = word("${SLOT_NAME}")
 
@@ -80,7 +112,7 @@ test.describe("StorageView", () => {
     expect(result.str).toBe("0");
     expect(result.json).toBe("0");
     expect(result.valueOf).toBe(0);
-    expect(result.hasEntries).toBe(false); // undefined for Value slots
+    expect(result.hasEntries).toBe(false);
     expect(result.hasWord).toBe(true);
     expect(result.hasFelts).toBe(4);
   });
@@ -92,18 +124,21 @@ test.describe("StorageView", () => {
       const client = await window.MidenClient.createMock();
 
       const SLOT_NAME = "test::balances";
+      const code = `
+        use miden::protocol::active_account
+        use miden::core::word
+        use miden::core::sys
+
+        const MAP_SLOT = word("${SLOT_NAME}")
+
+        pub proc get_balance
+          push.MAP_SLOT[0..2] exec.active_account::get_map_item
+          exec.sys::truncate_stack
+        end
+      `;
+
       const component = await client.compile.component({
-        code: `
-          use.miden::protocol::active_account
-          use.miden::core::sys
-
-          const MAP_SLOT = word("${SLOT_NAME}")
-
-          pub proc get_balance
-            push.MAP_SLOT[0..2] exec.active_account::get_map_item
-            exec.sys::truncate_stack
-          end
-        `,
+        code,
         slots: [window.StorageSlot.map(SLOT_NAME, new window.StorageMap())],
       });
 
@@ -126,14 +161,13 @@ test.describe("StorageView", () => {
         isMap: item?.isMap,
         entriesType: item?.entries !== undefined ? "array" : "undefined",
         entriesLength: item?.entries?.length,
-        // Empty map — toNumber should be 0
         number: item?.toNumber(),
       };
     });
 
     expect(result.isMap).toBe(true);
     expect(result.entriesType).toBe("array");
-    expect(result.entriesLength).toBe(0); // Empty map
+    expect(result.entriesLength).toBe(0);
     expect(result.number).toBe(0);
   });
 
@@ -142,18 +176,21 @@ test.describe("StorageView", () => {
       const client = await window.MidenClient.createMock();
 
       const SLOT_NAME = "test::value";
+      const code = `
+        use miden::protocol::active_account
+        use miden::core::word
+        use miden::core::sys
+
+        const SLOT = word("${SLOT_NAME}")
+
+        pub proc read
+          push.SLOT[0..2] exec.active_account::get_item
+          exec.sys::truncate_stack
+        end
+      `;
+
       const component = await client.compile.component({
-        code: `
-          use.miden::protocol::active_account
-          use.miden::core::sys
-
-          const SLOT = word("${SLOT_NAME}")
-
-          pub proc read
-            push.SLOT[0..2] exec.active_account::get_item
-            exec.sys::truncate_stack
-          end
-        `,
+        code,
         slots: [window.StorageSlot.emptyValue(SLOT_NAME)],
       });
 
@@ -190,18 +227,21 @@ test.describe("StorageView", () => {
       const client = await window.MidenClient.createMock();
 
       const SLOT_NAME = "test::num";
+      const code = `
+        use miden::protocol::active_account
+        use miden::core::word
+        use miden::core::sys
+
+        const SLOT = word("${SLOT_NAME}")
+
+        pub proc read
+          push.SLOT[0..2] exec.active_account::get_item
+          exec.sys::truncate_stack
+        end
+      `;
+
       const component = await client.compile.component({
-        code: `
-          use.miden::protocol::active_account
-          use.miden::core::sys
-
-          const SLOT = word("${SLOT_NAME}")
-
-          pub proc read
-            push.SLOT[0..2] exec.active_account::get_item
-            exec.sys::truncate_stack
-          end
-        `,
+        code,
         slots: [window.StorageSlot.emptyValue(SLOT_NAME)],
       });
 
