@@ -13,6 +13,13 @@ import {
   _setWasm as _setStandaloneWasm,
   _setWebClient as _setStandaloneWebClient,
 } from "./standalone.js";
+import {
+  installStorageView,
+  StorageView,
+  StorageResult,
+  wordToBigInt,
+  wordToNumber,
+} from "./storageView.js";
 export * from "../Cargo.toml";
 
 export const AccountType = Object.freeze({
@@ -46,6 +53,7 @@ export const StorageMode = Object.freeze({
 
 export { MidenClient };
 export { createP2IDNote, createP2IDENote, buildSwapTag };
+export { StorageView, StorageResult, wordToBigInt, wordToNumber };
 
 // Internal exports — used by integration tests that need direct access to the low-level WebClient proxy.
 export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
@@ -173,6 +181,9 @@ const ensureWasm = async () => {
         }
         // Set WASM module for standalone utilities
         _setStandaloneWasm(module);
+        // Install StorageView: account.storage() now returns a developer-friendly
+        // wrapper that makes getItem() work correctly for StorageMap slots.
+        installStorageView(module);
       }
       return module;
     });
