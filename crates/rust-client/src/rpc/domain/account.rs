@@ -662,7 +662,8 @@ impl TryFrom<proto::account::AccountWitness> for AccountWitness {
             .ok_or(proto::account::AccountWitness::missing_field(stringify!(witness_id)))?
             .try_into()?;
 
-        let witness = AccountWitness::new(account_id, state_commitment, merkle_path).unwrap();
+        let witness = AccountWitness::new(account_id, state_commitment, merkle_path)
+            .map_err(|err| RpcError::InvalidResponse(format!("{err}")))?;
         Ok(witness)
     }
 }
