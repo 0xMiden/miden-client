@@ -535,11 +535,11 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
     // Blocks 1 and 4 had matching note tags but the screener discarded them,
     // so `include_block` was false for those steps.
     assert_eq!(
-        state_sync_update.block_updates.block_headers().len(),
+        state_sync_update.block_updates.block_headers().count(),
         1,
         "expected only the chain tip block header to be stored"
     );
-    let (tip_header, ..) = &state_sync_update.block_updates.block_headers()[0];
+    let (tip_header, ..) = state_sync_update.block_updates.block_headers().next().unwrap();
     assert_eq!(tip_header.block_num(), rpc_api.get_chain_tip_block_num());
 
     // Authentication nodes must be non-empty: they include nodes produced by applying
