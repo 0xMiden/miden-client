@@ -15,6 +15,7 @@ use miden_client_sqlite_store::ClientBuilderSqliteExt;
 
 mod commands;
 use commands::account::AccountCmd;
+use commands::call::CallCmd;
 use commands::clear_config::ClearConfigCmd;
 use commands::exec::ExecCmd;
 use commands::export::ExportCmd;
@@ -403,6 +404,7 @@ pub enum Command {
     Swap(SwapCmd),
     ConsumeNotes(ConsumeNotesCmd),
     Exec(ExecCmd),
+    Call(CallCmd),
 }
 
 /// CLI entry point.
@@ -463,6 +465,7 @@ impl Cli {
             Command::Address(addresses) => addresses.execute(client).await,
             Command::Transaction(transaction) => transaction.execute(client).await,
             Command::Exec(execute_program) => Box::pin(execute_program.execute(client)).await,
+            Command::Call(call) => Box::pin(call.execute(client)).await,
             Command::Export(cmd) => cmd.execute(client, keystore).await,
             Command::Mint(mint) => Box::pin(mint.execute(client)).await,
             Command::Send(send) => Box::pin(send.execute(client)).await,
