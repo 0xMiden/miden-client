@@ -59,6 +59,9 @@ export declare class StorageResult {
   /** The underlying Word value. */
   get word(): Word | undefined;
 
+  /** Returns all four Felts of the stored Word. Pass-through to Word.toFelts(). */
+  toFelts(): Felt[];
+
   /** The first Felt of the stored Word. */
   felt(): Felt | undefined;
 

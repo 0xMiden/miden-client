@@ -202,6 +202,17 @@ export class StorageResult {
   }
 
   /**
+   * Returns all four Felts of the stored Word as an array.
+   * Pass-through to Word.toFelts() — ensures code that expects a Word-like
+   * object (e.g., `result.toFelts()[0].asInt()`) works on StorageResult.
+   * @returns {Felt[]}
+   */
+  toFelts() {
+    if (!this.#word) return [];
+    return this.#word.toFelts();
+  }
+
+  /**
    * The first Felt of the stored Word.
    * Returns the WASM Felt object — use .asInt() to get its BigInt value.
    * @returns {Felt | undefined}
