@@ -48,7 +48,7 @@ mod foreign;
 pub use foreign::ForeignAccount;
 pub(crate) use foreign::account_proof_into_inputs;
 
-use crate::store::InputNoteRecord;
+use crate::store::{InputNoteRecord, NoteRecordError};
 
 // TRANSACTION REQUEST
 // ================================================================================================
@@ -256,12 +256,7 @@ impl TransactionRequest {
             }
 
             let authenticated_note_id = authenticated_note_record.id();
-            input_notes.insert(
-                authenticated_note_id,
-                authenticated_note_record
-                    .try_into()
-                    .expect("Authenticated note record should be convertible to InputNote"),
-            );
+            input_notes.insert(authenticated_note_id, authenticated_note_record.try_into()?);
         }
 
         // Add unauthenticated input notes to the input notes map.
@@ -504,6 +499,8 @@ pub enum TransactionRequestError {
     StorageMapError(#[from] StorageMapError),
     #[error("asset vault error")]
     AssetVaultError(#[from] AssetVaultError),
+    #[error("note record conversion error")]
+    NoteRecordError(#[from] NoteRecordError),
     #[error(
         "unsupported authentication scheme ID {0}; supported schemes are: RpoFalcon512 (0) and EcdsaK256Keccak (1)"
     )]
