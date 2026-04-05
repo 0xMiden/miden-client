@@ -360,12 +360,11 @@ fn parse_partial_blockchain_nodes_columns(
 fn parse_partial_blockchain_nodes(
     serialized_partial_blockchain_node_parts: &SerializedPartialBlockchainNodeParts,
 ) -> Result<(InOrderIndex, Word), StoreError> {
+    let id_usize = usize::try_from(serialized_partial_blockchain_node_parts.id)
+        .map_err(|e| StoreError::ParsingError(format!("partial blockchain node id is too large: {e}")))?;
     let id = InOrderIndex::new(
-        NonZeroUsize::new(
-            usize::try_from(serialized_partial_blockchain_node_parts.id)
-                .expect("id is u64, should not fail"),
-        )
-        .unwrap(),
+        NonZeroUsize::new(id_usize)
+            .ok_or_else(|| StoreError::ParsingError("partial blockchain node id cannot be zero".to_string()))?,
     );
     let node: Word = Word::try_from(&serialized_partial_blockchain_node_parts.node)?;
     Ok((id, node))
