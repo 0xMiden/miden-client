@@ -44,6 +44,7 @@
 * Added an `InputNoteReader` accessible through `client.input_note_reader()` that allows for lazy iterator over all the consumed input notes ([#1843](https://github.com/0xMiden/miden-client/pull/1843), ([#1925](https://github.com/0xMiden/miden-client/pull/1925))).
 * Removed miden-cli template TOMLs in favor of direct serialization into packages ([#1879](https://github.com/0xMiden/miden-client/pull/1879)).
 * [BREAKING] Updated `SyncState` to fetch multiple note updates (([#1941](https://github.com/0xMiden/node/pull/1941))).
+* Unified test environment variables across Rust and web client test suites. `TEST_MIDEN_NETWORK` now acts as a preset that configures all components (RPC, prover, note transport) for `devnet`/`testnet`/`localhost`. Individual env vars (`TEST_MIDEN_RPC_URL`, `TEST_MIDEN_PROVER_URL`, `TEST_MIDEN_NOTE_TRANSPORT_URL`) override specific components. Removed `TEST_MIDEN_RPC_ENDPOINT`, `TEST_WITH_NOTE_TRANSPORT`, `TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT`, and `REMOTE_PROVER` ([#1939](https://github.com/0xMiden/miden-client/pull/1939)).
 
 ### Features
 
