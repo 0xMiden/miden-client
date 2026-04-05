@@ -28,11 +28,31 @@ impl AccountStorage {
         self.0.to_commitment().into()
     }
 
-    /// Returns the value stored at the given slot name, if any.
+    /// Returns the value stored at the given slot name.
+    /// For Value slots: returns the stored Word directly.
+    /// For Map slots: returns the first entry's value (NOT the commitment hash).
     #[wasm_bindgen(js_name = "getItem")]
     pub fn get_item(&self, slot_name: &str) -> Option<Word> {
-        let slot_name = StorageSlotName::new(slot_name).ok()?;
-        self.0.get_item(&slot_name).ok().map(Into::into)
+        let name = StorageSlotName::new(slot_name).ok()?;
+        let slot = self.0.slots().iter().find(|s| s.name() == &name)?;
+
+        match slot.content() {
+            StorageSlotContent::Value(_) => {
+                self.0.get_item(&name).ok().map(Into::into)
+            }
+            StorageSlotContent::Map(map) => {
+                map.entries().next().map(|(_, value)| value.into())
+            }
+        }
+    }
+
+    /// Returns the first felt of a storage slot as a number.
+    /// Works for both Value and Map slots.
+    #[wasm_bindgen(js_name = "getNumber")]
+    pub fn get_number(&self, slot_name: &str) -> Option<f64> {
+        let word = self.get_item(slot_name)?;
+        let native_word: miden_client::Word = word.into();
+        Some(native_word[0].as_int() as f64)
     }
 
     /// Returns the names of all storage slots on this account.
