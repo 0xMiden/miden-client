@@ -10,6 +10,16 @@
  * The raw WASM AccountStorage is still accessible via `.raw` for advanced use cases
  * that need the original behavior (e.g., comparing map commitment roots).
  */
+/** @param {string} hex @param {typeof Word} WordClass @returns {Word | undefined} */
+function hexToWord(hex, WordClass) {
+  if (!hex || !WordClass) return undefined;
+  try {
+    return WordClass.fromHex(hex);
+  } catch {
+    return undefined;
+  }
+}
+
 export class StorageView {
   #storage;
   #WordClass;
@@ -65,26 +75,24 @@ export class StorageView {
    * @returns {StorageResult | undefined}
    */
   getItem(slotName) {
-    // Detect slot type by trying getMapEntries. For maps this loads ALL entries,
-    // which may be expensive for large maps. If this becomes a bottleneck, a
-    // lighter slot-type-check method could be added to the WASM AccountStorage.
-    const entries = this.#storage.getMapEntries(slotName);
-    if (entries !== undefined && entries !== null) {
-      // StorageMap — build result from entries
-      const parsedEntries = entries.map((e) => ({
-        key: e.key,
-        value: e.value,
-        word: this.#hexToWord(e.value),
-      }));
+    // Type detection + value retrieval in one pass.
+    // We call getMapEntries to detect maps, but defer parsing the entries
+    // until .entries is actually accessed (lazy). Only the first entry's
+    // Word is parsed eagerly for the convenience methods (toNumber, etc.).
+    const rawEntries = this.#storage.getMapEntries(slotName);
+    if (rawEntries !== undefined && rawEntries !== null) {
+      // StorageMap — parse only the first entry eagerly
       const firstWord =
-        parsedEntries.length > 0 ? parsedEntries[0].word : undefined;
-      return new StorageResult(firstWord, true, parsedEntries);
+        rawEntries.length > 0
+          ? hexToWord(rawEntries[0].value, this.#WordClass)
+          : undefined;
+      return new StorageResult(firstWord, true, rawEntries, this.#WordClass);
     }
 
     // Value slot — use raw getItem
     const word = this.#storage.getItem(slotName);
     if (!word) return undefined;
-    return new StorageResult(word, false, undefined);
+    return new StorageResult(word, false, undefined, this.#WordClass);
   }
 
   /**
@@ -138,19 +146,6 @@ export class StorageView {
   getNumber(slotName) {
     return this.getItem(slotName)?.toNumber();
   }
-
-  /**
-   * @param {string} hex
-   * @returns {Word | undefined}
-   */
-  #hexToWord(hex) {
-    if (!hex || !this.#WordClass) return undefined;
-    try {
-      return this.#WordClass.fromHex(hex);
-    } catch {
-      return undefined;
-    }
-  }
 }
 
 /**
@@ -167,17 +162,21 @@ export class StorageView {
 export class StorageResult {
   #word;
   #isMap;
-  #entries;
+  #rawEntries; // Raw JsStorageMapEntry[] from WASM — parsed lazily
+  #parsedEntries; // Parsed entries with Word objects — created on first .entries access
+  #WordClass;
 
   /**
-   * @param {Word | undefined} word — the primary Word value
+   * @param {Word | undefined} word — the primary Word value (first entry for maps)
    * @param {boolean} isMap — whether this came from a StorageMap slot
-   * @param {Array<{key: string, value: string, word: Word | undefined}> | undefined} entries
+   * @param {Array | undefined} rawEntries — raw WASM entries (parsed lazily on .entries access)
+   * @param {typeof Word} WordClass — Word constructor for hex parsing
    */
-  constructor(word, isMap, entries) {
+  constructor(word, isMap, rawEntries, WordClass) {
     this.#word = word;
     this.#isMap = isMap;
-    this.#entries = entries;
+    this.#rawEntries = rawEntries;
+    this.#WordClass = WordClass;
   }
 
   /** True if this slot is a StorageMap. */
@@ -186,12 +185,23 @@ export class StorageResult {
   }
 
   /**
-   * All entries from a StorageMap slot.
+   * All entries from a StorageMap slot (lazily parsed on first access).
    * Each entry has { key: string (hex), value: string (hex), word: Word | undefined }.
    * Returns undefined for Value slots.
    */
   get entries() {
-    return this.#entries;
+    if (!this.#isMap) return undefined;
+    if (this.#parsedEntries) return this.#parsedEntries;
+    if (!this.#rawEntries) return [];
+
+    // Parse entries lazily — only when the user actually accesses .entries
+    this.#parsedEntries = this.#rawEntries.map((e) => ({
+      key: e.key,
+      value: e.value,
+      word: hexToWord(e.value, this.#WordClass),
+    }));
+    this.#rawEntries = undefined; // Free raw entries
+    return this.#parsedEntries;
   }
 
   /**
