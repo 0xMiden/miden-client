@@ -106,6 +106,24 @@ export class StorageView {
   }
 
   /**
+   * Returns the commitment root of a storage slot as a Word.
+   *
+   * For Value slots, this is the stored Word itself.
+   * For StorageMap slots, this is the Merkle root hash of the map — useful for:
+   * - Verifying state hasn't changed between transactions
+   * - Merkle inclusion proofs against the account state
+   * - Comparing map state across accounts or sync cycles
+   *
+   * This is the raw protocol-level value. For reading stored data, use `getItem()`.
+   *
+   * @param {string} slotName
+   * @returns {import("../Cargo.toml").Word | undefined}
+   */
+  getCommitment(slotName) {
+    return this.#storage.getItem(slotName);
+  }
+
+  /**
    * Convenience: read the first felt of a storage slot as a JavaScript number.
    * Works for both Value and StorageMap slots.
    *
