@@ -202,6 +202,17 @@ export class StorageResult {
   }
 
   /**
+   * The first Felt of the stored Word.
+   * Returns the WASM Felt object — use .asInt() to get its BigInt value.
+   * @returns {import("../Cargo.toml").Felt | undefined}
+   */
+  felt() {
+    if (!this.#word) return undefined;
+    const felts = this.#word.toFelts();
+    return felts?.[0];
+  }
+
+  /**
    * First felt as a JavaScript number.
    * WARNING: May lose precision for values > Number.MAX_SAFE_INTEGER (2^53 - 1).
    * Use .toBigInt() for exact large values.
