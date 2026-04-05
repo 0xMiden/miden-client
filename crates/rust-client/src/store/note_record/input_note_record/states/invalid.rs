@@ -39,7 +39,13 @@ impl NoteStateHandler for InvalidNoteState {
         &self,
         nullifier_block_height: BlockNumber,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
-        Ok(Some(ConsumedExternalNoteState { nullifier_block_height }.into()))
+        Ok(Some(
+            ConsumedExternalNoteState {
+                nullifier_block_height,
+                consumed_tx_order: None,
+            }
+            .into(),
+        ))
     }
 
     fn block_header_received(
@@ -51,7 +57,7 @@ impl NoteStateHandler for InvalidNoteState {
             .invalid_inclusion_proof
             .note_path()
             .verify(
-                self.invalid_inclusion_proof.location().node_index_in_block().into(),
+                self.invalid_inclusion_proof.location().block_note_tree_index().into(),
                 compute_note_commitment(note_id, &self.metadata),
                 &block_header.note_root(),
             )
@@ -102,18 +108,18 @@ impl NoteStateHandler for InvalidNoteState {
     }
 }
 
-impl miden_tx::utils::Serializable for InvalidNoteState {
-    fn write_into<W: miden_tx::utils::ByteWriter>(&self, target: &mut W) {
+impl miden_tx::utils::serde::Serializable for InvalidNoteState {
+    fn write_into<W: miden_tx::utils::serde::ByteWriter>(&self, target: &mut W) {
         self.metadata.write_into(target);
         self.invalid_inclusion_proof.write_into(target);
         self.block_note_root.write_into(target);
     }
 }
 
-impl miden_tx::utils::Deserializable for InvalidNoteState {
-    fn read_from<R: miden_tx::utils::ByteReader>(
+impl miden_tx::utils::serde::Deserializable for InvalidNoteState {
+    fn read_from<R: miden_tx::utils::serde::ByteReader>(
         source: &mut R,
-    ) -> Result<Self, miden_tx::utils::DeserializationError> {
+    ) -> Result<Self, miden_tx::utils::serde::DeserializationError> {
         let metadata = NoteMetadata::read_from(source)?;
         let invalid_inclusion_proof = NoteInclusionProof::read_from(source)?;
         let block_note_root = Word::read_from(source)?;

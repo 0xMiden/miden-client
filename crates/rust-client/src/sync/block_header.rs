@@ -8,38 +8,39 @@ use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, Partia
 use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
-use crate::store::StoreError;
+use crate::store::{BlockRelevance, StoreError};
 use crate::{Client, ClientError};
 
 /// Network information management methods.
 impl<AUTH> Client<AUTH> {
-    /// Attempts to retrieve the genesis block from the store. If not found,
-    /// it requests it from the node and store it.
-    pub async fn ensure_genesis_in_place(&mut self) -> Result<BlockHeader, ClientError> {
-        let genesis = if let Some((block, _)) = self.store.get_block_header_by_num(0.into()).await?
-        {
-            block
-        } else {
-            let genesis = self.retrieve_and_store_genesis().await?;
-            self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
-            genesis
-        };
-
-        Ok(genesis)
+    /// Retrieves a block header by its block number from the store.
+    ///
+    /// Returns `None` if the block header is not found in the store.
+    pub async fn get_block_header_by_num(
+        &self,
+        block_num: BlockNumber,
+    ) -> Result<Option<(BlockHeader, BlockRelevance)>, ClientError> {
+        self.store.get_block_header_by_num(block_num).await.map_err(Into::into)
     }
 
-    /// Calls `get_block_header_by_number` requesting the genesis block and storing it
-    /// in the local database.
-    async fn retrieve_and_store_genesis(&mut self) -> Result<BlockHeader, ClientError> {
-        let (genesis_block, _) = self
+    /// Ensures that the genesis block is available. If the genesis commitment is already
+    /// cached in the RPC client, returns early. Otherwise, fetches the genesis block from
+    /// the node, stores it, and sets the commitment in the RPC client.
+    pub async fn ensure_genesis_in_place(&mut self) -> Result<(), ClientError> {
+        if self.rpc_api.has_genesis_commitment().is_some() {
+            return Ok(());
+        }
+
+        let (genesis, _) = self
             .rpc_api
             .get_block_header_by_number(Some(BlockNumber::GENESIS), false)
             .await?;
 
         let blank_mmr_peaks = MmrPeaks::new(Forest::empty(), vec![])
             .expect("Blank MmrPeaks should not fail to instantiate");
-        self.store.insert_block_header(&genesis_block, blank_mmr_peaks, false).await?;
-        Ok(genesis_block)
+        self.store.insert_block_header(&genesis, blank_mmr_peaks, false).await?;
+        self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+        Ok(())
     }
 
     /// Fetches from the store the current view of the chain's [`PartialMmr`].
@@ -73,12 +74,13 @@ impl<AUTH> Client<AUTH> {
         // Fetch the block header and MMR proof from the node
         let (block_header, path_nodes) =
             fetch_block_header(self.rpc_api.clone(), block_num, current_partial_mmr).await?;
+        let tracked_nodes = authenticated_block_nodes(&block_header, path_nodes);
 
         // Insert header and MMR nodes
         self.store
             .insert_block_header(&block_header, current_partial_mmr.peaks(), true)
             .await?;
-        self.store.insert_partial_blockchain_nodes(&path_nodes).await?;
+        self.store.insert_partial_blockchain_nodes(&tracked_nodes).await?;
 
         Ok(block_header)
     }
@@ -115,6 +117,19 @@ pub(crate) fn adjust_merkle_path_for_forest(
     path_nodes
 }
 
+fn authenticated_block_nodes(
+    block_header: &BlockHeader,
+    mut path_nodes: Vec<(InOrderIndex, Word)>,
+) -> Vec<(InOrderIndex, Word)> {
+    let mut nodes = Vec::with_capacity(path_nodes.len() + 1);
+    nodes.push((
+        InOrderIndex::from_leaf_pos(block_header.block_num().as_usize()),
+        block_header.commitment(),
+    ));
+    nodes.append(&mut path_nodes);
+    nodes
+}
+
 pub(crate) async fn fetch_block_header(
     rpc_api: Arc<dyn NodeRpcClient>,
     block_num: BlockNumber,
@@ -125,7 +140,7 @@ pub(crate) async fn fetch_block_header(
     // Trim merkle path to keep nodes relevant to our current PartialMmr since the node's MMR
     // might be of a forest arbitrarily higher
     let path_nodes = adjust_merkle_path_for_forest(
-        &mmr_proof.merkle_path,
+        mmr_proof.merkle_path(),
         block_num,
         current_partial_mmr.forest(),
     );
@@ -141,12 +156,13 @@ pub(crate) async fn fetch_block_header(
 
 #[cfg(test)]
 mod tests {
-    use miden_protocol::block::BlockNumber;
+    use miden_protocol::block::{BlockHeader, BlockNumber};
     use miden_protocol::crypto::merkle::MerklePath;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, Mmr, PartialMmr};
+    use miden_protocol::transaction::TransactionKernel;
     use miden_protocol::{Felt, Word};
 
-    use super::adjust_merkle_path_for_forest;
+    use super::{adjust_merkle_path_for_forest, authenticated_block_nodes};
 
     fn word(n: u64) -> Word {
         Word::new([Felt::new(n), Felt::new(0), Felt::new(0), Felt::new(0)])
@@ -180,7 +196,7 @@ mod tests {
 
         let proof = mmr.open_at(leaf_pos, large_forest).expect("valid proof");
         let adjusted_nodes =
-            adjust_merkle_path_for_forest(&proof.merkle_path, block_num, small_forest);
+            adjust_merkle_path_for_forest(proof.merkle_path(), block_num, small_forest);
         let adjusted_path = MerklePath::new(adjusted_nodes.iter().map(|(_, n)| *n).collect());
 
         let peaks = mmr.peaks_at(small_forest).unwrap();
@@ -242,13 +258,27 @@ mod tests {
         let next_sibling = idx.sibling();
         let rightmost = InOrderIndex::from_leaf_pos(small_leaves - 1);
         assert!(next_sibling <= rightmost);
-        assert!(proof.merkle_path.depth() as usize > expected_depth);
+        assert!(proof.merkle_path().depth() as usize > expected_depth);
 
         let adjusted = adjust_merkle_path_for_forest(
-            &proof.merkle_path,
+            proof.merkle_path(),
             BlockNumber::from(u32::try_from(leaf_pos).unwrap()),
             small_forest,
         );
         assert_eq!(adjusted.len(), expected_depth);
+    }
+
+    #[test]
+    fn authenticated_block_nodes_include_leaf_commitment() {
+        let block_header = BlockHeader::mock(4, None, None, &[], TransactionKernel.to_commitment());
+        let path_nodes = vec![
+            (InOrderIndex::from_leaf_pos(4).sibling(), word(10)),
+            (InOrderIndex::from_leaf_pos(4).parent().sibling(), word(11)),
+        ];
+
+        let nodes = authenticated_block_nodes(&block_header, path_nodes.clone());
+
+        assert_eq!(nodes[0], (InOrderIndex::from_leaf_pos(4), block_header.commitment()));
+        assert_eq!(&nodes[1..], path_nodes.as_slice());
     }
 }

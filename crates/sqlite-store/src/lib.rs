@@ -27,6 +27,7 @@ use miden_client::account::{
     AccountId,
     AccountStorage,
     Address,
+    StorageMapKey,
     StorageSlotName,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness};
@@ -35,6 +36,7 @@ use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, NoteTag, Nullifier};
 use miden_client::store::{
     AccountRecord,
+    AccountSmtForest,
     AccountStatus,
     AccountStorageFilter,
     BlockRelevance,
@@ -48,20 +50,18 @@ use miden_client::store::{
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
+use miden_protocol::Felt;
 use miden_protocol::account::StorageMapWitness;
 use miden_protocol::asset::AssetVaultKey;
 use rusqlite::Connection;
 use rusqlite::types::Value;
 use sql_error::SqlResultExt;
 
-use crate::smt_forest::AccountSmtForest;
-
 mod account;
 mod builder;
 mod chain_data;
 mod db_management;
 mod note;
-mod smt_forest;
 mod sql_error;
 mod sync;
 mod transaction;
@@ -77,6 +77,7 @@ pub use builder::ClientBuilderSqliteExt;
 /// Current table definitions can be found at `store.sql` migration file.
 pub struct SqliteStore {
     pub(crate) pool: Pool,
+    database_filepath: String,
     smt_forest: Arc<RwLock<AccountSmtForest>>,
 }
 
@@ -86,6 +87,7 @@ impl SqliteStore {
 
     /// Returns a new instance of [Store] instantiated with the specified configuration options.
     pub async fn new(database_filepath: PathBuf) -> Result<Self, StoreError> {
+        let database_filepath_str = database_filepath.to_string_lossy().into_owned();
         let sqlite_pool_manager = SqlitePoolManager::new(database_filepath);
         let pool = Pool::builder(sqlite_pool_manager)
             .build()
@@ -100,6 +102,7 @@ impl SqliteStore {
 
         let store = SqliteStore {
             pool,
+            database_filepath: database_filepath_str,
             smt_forest: Arc::new(RwLock::new(AccountSmtForest::new())),
         };
 
@@ -147,6 +150,10 @@ impl SqliteStore {
 // This way, the actual implementations are grouped by entity types in their own sub-modules
 #[async_trait::async_trait]
 impl Store for SqliteStore {
+    fn identifier(&self) -> &str {
+        &self.database_filepath
+    }
+
     fn get_current_timestamp(&self) -> Option<u64> {
         Some(current_timestamp_u64())
     }
@@ -215,6 +222,27 @@ impl Store for SqliteStore {
             .await
     }
 
+    async fn get_input_note_by_offset(
+        &self,
+        filter: NoteFilter,
+        consumer: AccountId,
+        block_start: Option<BlockNumber>,
+        block_end: Option<BlockNumber>,
+        offset: u32,
+    ) -> Result<Option<InputNoteRecord>, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_input_note_by_offset(
+                conn,
+                &filter,
+                consumer,
+                block_start,
+                block_end,
+                offset,
+            )
+        })
+        .await
+    }
+
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError> {
         let notes = notes.to_vec();
         self.interact_with_connection(move |conn| SqliteStore::upsert_input_notes(conn, &notes))
@@ -256,6 +284,17 @@ impl Store for SqliteStore {
         self.interact_with_connection(SqliteStore::prune_irrelevant_blocks).await
     }
 
+    async fn prune_account_history(
+        &self,
+        account_id: AccountId,
+        up_to_nonce: Felt,
+    ) -> Result<usize, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::prune_account_history(conn, account_id, up_to_nonce)
+        })
+        .await
+    }
+
     async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
@@ -270,6 +309,11 @@ impl Store for SqliteStore {
 
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError> {
         self.interact_with_connection(SqliteStore::get_tracked_block_headers).await
+    }
+
+    async fn get_tracked_block_header_numbers(&self) -> Result<BTreeSet<usize>, StoreError> {
+        self.interact_with_connection(SqliteStore::get_tracked_block_header_numbers)
+            .await
     }
 
     async fn get_partial_blockchain_nodes(
@@ -361,6 +405,16 @@ impl Store for SqliteStore {
             .await
     }
 
+    async fn get_account_code(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<AccountCode>, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_account_code_by_id(conn, account_id)
+        })
+        .await
+    }
+
     async fn upsert_foreign_account_code(
         &self,
         account_id: AccountId,
@@ -438,7 +492,7 @@ impl Store for SqliteStore {
         &self,
         account_id: AccountId,
         slot_name: StorageSlotName,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let smt_forest = self.smt_forest.clone();
 

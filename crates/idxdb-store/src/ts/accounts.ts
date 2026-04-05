@@ -1,22 +1,22 @@
 import {
   getDatabase,
   IAccount,
-  IAccountAsset,
-  IAccountStorage,
-  ITrackedAccount,
-  IStorageMapEntry,
   JsStorageMapEntry,
   JsStorageSlot,
   JsVaultAsset,
+  MidenDatabase,
 } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
-import type { Transaction } from "dexie";
+
+function seedToBase64(seed: Uint8Array | undefined): string | undefined {
+  return seed ? uint8ArrayToBase64(seed) : undefined;
+}
 
 export async function getAccountIds(dbId: string) {
   try {
     const db = getDatabase(dbId);
-    const tracked = await db.trackedAccounts.toArray();
-    return tracked.map((entry) => entry.id);
+    const records = await db.latestAccountHeaders.toArray();
+    return records.map((entry) => entry.id);
   } catch (error) {
     logWebStoreError(error, "Error while fetching account IDs");
   }
@@ -27,43 +27,19 @@ export async function getAccountIds(dbId: string) {
 export async function getAllAccountHeaders(dbId: string) {
   try {
     const db = getDatabase(dbId);
-    const latestRecordsMap: Map<string, IAccount> = new Map();
+    const records = await db.latestAccountHeaders.toArray();
 
-    await db.accounts.each((record) => {
-      const existingRecord = latestRecordsMap.get(record.id);
-      if (
-        !existingRecord ||
-        BigInt(record.nonce) > BigInt(existingRecord.nonce)
-      ) {
-        latestRecordsMap.set(record.id, record);
-      }
-    });
-
-    const latestRecords = Array.from(latestRecordsMap.values());
-
-    const resultObject = await Promise.all(
-      latestRecords.map((record) => {
-        let accountSeedBase64: string | undefined = undefined;
-        if (record.accountSeed) {
-          const seedAsBytes = new Uint8Array(record.accountSeed);
-          if (seedAsBytes.length > 0) {
-            accountSeedBase64 = uint8ArrayToBase64(seedAsBytes);
-          }
-        }
-
-        return {
-          id: record.id,
-          nonce: record.nonce,
-          vaultRoot: record.vaultRoot,
-          storageRoot: record.storageRoot || "",
-          codeRoot: record.codeRoot || "",
-          accountSeed: accountSeedBase64,
-          locked: record.locked,
-          committed: record.committed,
-          accountCommitment: record.accountCommitment || "",
-        };
-      })
-    );
+    const resultObject = records.map((record) => ({
+      id: record.id,
+      nonce: record.nonce,
+      vaultRoot: record.vaultRoot,
+      storageRoot: record.storageRoot || "",
+      codeRoot: record.codeRoot || "",
+      accountSeed: seedToBase64(record.accountSeed),
+      locked: record.locked,
+      committed: record.committed,
+      accountCommitment: record.accountCommitment || "",
+    }));
 
     return resultObject;
   } catch (error) {
@@ -74,45 +50,25 @@ export async function getAllAccountHeaders(dbId: string) {
 export async function getAccountHeader(dbId: string, accountId: string) {
   try {
     const db = getDatabase(dbId);
-    const allMatchingRecords = await db.accounts
+    const record = await db.latestAccountHeaders
       .where("id")
       .equals(accountId)
-      .toArray();
+      .first();
 
-    if (allMatchingRecords.length === 0) {
+    if (!record) {
       console.log("No account header record found for given ID.");
       return null;
     }
 
-    const sortedRecords = allMatchingRecords.sort((a, b) => {
-      const bigIntA = BigInt(a.nonce);
-      const bigIntB = BigInt(b.nonce);
-      return bigIntA > bigIntB ? -1 : bigIntA < bigIntB ? 1 : 0;
-    });
-
-    const mostRecentRecord: IAccount | undefined = sortedRecords[0];
-
-    if (mostRecentRecord === undefined) {
-      return null;
-    }
-
-    let accountSeedBase64: string | undefined = undefined;
-
-    if (mostRecentRecord.accountSeed) {
-      if (mostRecentRecord.accountSeed.length > 0) {
-        accountSeedBase64 = uint8ArrayToBase64(mostRecentRecord.accountSeed);
-      }
-    }
-    const AccountHeader = {
-      id: mostRecentRecord.id,
-      nonce: mostRecentRecord.nonce,
-      vaultRoot: mostRecentRecord.vaultRoot,
-      storageRoot: mostRecentRecord.storageRoot,
-      codeRoot: mostRecentRecord.codeRoot,
-      accountSeed: accountSeedBase64,
-      locked: mostRecentRecord.locked,
+    return {
+      id: record.id,
+      nonce: record.nonce,
+      vaultRoot: record.vaultRoot,
+      storageRoot: record.storageRoot,
+      codeRoot: record.codeRoot,
+      accountSeed: seedToBase64(record.accountSeed),
+      locked: record.locked,
     };
-    return AccountHeader;
   } catch (error) {
     logWebStoreError(
       error,
@@ -127,36 +83,24 @@ export async function getAccountHeaderByCommitment(
 ) {
   try {
     const db = getDatabase(dbId);
-    const allMatchingRecords = await db.accounts
+    const record = await db.historicalAccountHeaders
       .where("accountCommitment")
       .equals(accountCommitment)
-      .toArray();
+      .first();
 
-    if (allMatchingRecords.length == 0) {
+    if (!record) {
       return undefined;
     }
 
-    const matchingRecord: IAccount | undefined = allMatchingRecords[0];
-
-    if (matchingRecord === undefined) {
-      console.log("No account header record found for given commitment.");
-      return null;
-    }
-
-    let accountSeedBase64: string | undefined = undefined;
-    if (matchingRecord.accountSeed) {
-      accountSeedBase64 = uint8ArrayToBase64(matchingRecord.accountSeed);
-    }
-    const AccountHeader = {
-      id: matchingRecord.id,
-      nonce: matchingRecord.nonce,
-      vaultRoot: matchingRecord.vaultRoot,
-      storageRoot: matchingRecord.storageRoot,
-      codeRoot: matchingRecord.codeRoot,
-      accountSeed: accountSeedBase64,
-      locked: matchingRecord.locked,
+    return {
+      id: record.id,
+      nonce: record.nonce,
+      vaultRoot: record.vaultRoot,
+      storageRoot: record.storageRoot,
+      codeRoot: record.codeRoot,
+      accountSeed: seedToBase64(record.accountSeed),
+      locked: record.locked,
     };
-    return AccountHeader;
   } catch (error) {
     logWebStoreError(
       error,
@@ -192,90 +136,82 @@ export async function getAccountCode(dbId: string, codeRoot: string) {
 
 export async function getAccountStorage(
   dbId: string,
-  storageCommitment: string
+  accountId: string,
+  slotNames: string[]
 ) {
   try {
     const db = getDatabase(dbId);
-    const allMatchingRecords = await db.accountStorages
-      .where("commitment")
-      .equals(storageCommitment)
-      .toArray();
+    let query = db.latestAccountStorages.where("accountId").equals(accountId);
 
-    const slots = allMatchingRecords.map((record) => {
-      return {
-        slotName: record.slotName,
-        slotValue: record.slotValue,
-        slotType: record.slotType,
-      };
-    });
-    return slots;
+    let allMatchingRecords;
+    if (slotNames.length) {
+      const nameSet = new Set(slotNames);
+      allMatchingRecords = await query
+        .and((record) => nameSet.has(record.slotName))
+        .toArray();
+    } else {
+      allMatchingRecords = await query.toArray();
+    }
+
+    return allMatchingRecords.map((record) => ({
+      slotName: record.slotName,
+      slotValue: record.slotValue,
+      slotType: record.slotType,
+    }));
   } catch (error) {
     logWebStoreError(
       error,
-      `Error fetching account storage for commitment ${storageCommitment}`
+      `Error fetching account storage for account ${accountId}`
     );
   }
 }
 
-export async function getAccountStorageMaps(dbId: string, roots: string[]) {
+export async function getAccountStorageMaps(dbId: string, accountId: string) {
   try {
     const db = getDatabase(dbId);
-    const allMatchingRecords = await db.storageMapEntries
-      .where("root")
-      .anyOf(roots)
+    const allMatchingRecords = await db.latestStorageMapEntries
+      .where("accountId")
+      .equals(accountId)
       .toArray();
 
     return allMatchingRecords;
   } catch (error) {
     logWebStoreError(
       error,
-      `Error fetching account storage maps for roots ${roots.join(", ")}`
+      `Error fetching account storage maps for account ${accountId}`
     );
   }
 }
 
-export async function getAccountVaultAssets(dbId: string, vaultRoot: string) {
+export async function getAccountVaultAssets(
+  dbId: string,
+  accountId: string,
+  vaultKeys: string[]
+) {
   try {
     const db = getDatabase(dbId);
-    const allMatchingRecords = await db.accountAssets
-      .where("root")
-      .equals(vaultRoot)
-      .toArray();
+    let query = db.latestAccountAssets.where("accountId").equals(accountId);
 
-    const assets = allMatchingRecords.map((record) => {
-      return {
-        asset: record.asset,
-      };
-    });
+    let records;
+    if (vaultKeys.length) {
+      const keySet = new Set(vaultKeys);
+      records = await query
+        .and((record) => keySet.has(record.vaultKey))
+        .toArray();
+    } else {
+      records = await query.toArray();
+    }
 
-    return assets;
+    return records.map((record) => ({
+      vaultKey: record.vaultKey,
+      asset: record.asset,
+    }));
   } catch (error: unknown) {
     logWebStoreError(
       error,
-      `Error fetching account vault for root ${vaultRoot}`
+      `Error fetching account vault for account ${accountId}`
     );
   }
-}
-
-export async function getAccountAuthByPubKeyCommitment(
-  dbId: string,
-  pubKeyCommitmentHex: string
-) {
-  const db = getDatabase(dbId);
-  const accountSecretKey = await db.accountAuths
-    .where("pubKeyCommitmentHex")
-    .equals(pubKeyCommitmentHex)
-    .first();
-
-  if (!accountSecretKey) {
-    throw new Error("Account auth not found in cache.");
-  }
-
-  const data = {
-    secretKey: accountSecretKey.secretKeyHex,
-  };
-
-  return data;
 }
 
 export async function getAccountAddresses(dbId: string, accountId: string) {
@@ -320,21 +256,26 @@ export async function upsertAccountCode(
 
 export async function upsertAccountStorage(
   dbId: string,
-  storageSlots: JsStorageSlot[],
-  tx?: Transaction
+  accountId: string,
+  storageSlots: JsStorageSlot[]
 ) {
   try {
     const db = getDatabase(dbId);
-    let processedSlots = storageSlots.map((slot) => {
-      return {
-        commitment: slot.commitment,
-        slotName: slot.slotName,
-        slotValue: slot.slotValue,
-        slotType: slot.slotType,
-      } as IAccountStorage;
-    });
+    await db.latestAccountStorages
+      .where("accountId")
+      .equals(accountId)
+      .delete();
 
-    await (tx || db).accountStorages.bulkPut(processedSlots);
+    if (storageSlots.length === 0) return;
+
+    const latestEntries = storageSlots.map((slot) => ({
+      accountId,
+      slotName: slot.slotName,
+      slotValue: slot.slotValue,
+      slotType: slot.slotType,
+    }));
+
+    await db.latestAccountStorages.bulkPut(latestEntries);
   } catch (error) {
     logWebStoreError(error, `Error inserting storage slots`);
   }
@@ -342,20 +283,27 @@ export async function upsertAccountStorage(
 
 export async function upsertStorageMapEntries(
   dbId: string,
-  entries: JsStorageMapEntry[],
-  tx?: Transaction
+  accountId: string,
+  entries: JsStorageMapEntry[]
 ) {
   try {
     const db = getDatabase(dbId);
-    let processedEntries = entries.map((entry) => {
-      return {
-        root: entry.root,
-        key: entry.key,
-        value: entry.value,
-      } as IStorageMapEntry;
-    });
 
-    await (tx || db).storageMapEntries.bulkPut(processedEntries);
+    await db.latestStorageMapEntries
+      .where("accountId")
+      .equals(accountId)
+      .delete();
+
+    if (entries.length === 0) return;
+
+    const latestEntries = entries.map((entry) => ({
+      accountId,
+      slotName: entry.slotName,
+      key: entry.key,
+      value: entry.value,
+    }));
+
+    await db.latestStorageMapEntries.bulkPut(latestEntries);
   } catch (error) {
     logWebStoreError(error, `Error inserting storage map entries`);
   }
@@ -363,23 +311,500 @@ export async function upsertStorageMapEntries(
 
 export async function upsertVaultAssets(
   dbId: string,
-  assets: JsVaultAsset[],
-  tx?: Transaction
+  accountId: string,
+  assets: JsVaultAsset[]
 ) {
   try {
     const db = getDatabase(dbId);
-    let processedAssets = assets.map((asset) => {
-      return {
-        root: asset.root,
-        vaultKey: asset.vaultKey,
-        faucetIdPrefix: asset.faucetIdPrefix,
-        asset: asset.asset,
-      } as IAccountAsset;
-    });
 
-    await (tx || db).accountAssets.bulkPut(processedAssets);
+    await db.latestAccountAssets.where("accountId").equals(accountId).delete();
+
+    if (assets.length === 0) return;
+
+    const latestEntries = assets.map((asset) => ({
+      accountId,
+      vaultKey: asset.vaultKey,
+      asset: asset.asset,
+    }));
+
+    await db.latestAccountAssets.bulkPut(latestEntries);
   } catch (error: unknown) {
     logWebStoreError(error, `Error inserting assets`);
+  }
+}
+
+export async function applyTransactionDelta(
+  dbId: string,
+  accountId: string,
+  nonce: string,
+  updatedSlots: JsStorageSlot[],
+  changedMapEntries: JsStorageMapEntry[],
+  changedAssets: JsVaultAsset[],
+  codeRoot: string,
+  storageRoot: string,
+  vaultRoot: string,
+  committed: boolean,
+  commitment: string
+) {
+  try {
+    const db = getDatabase(dbId);
+
+    await db.dexie.transaction(
+      "rw",
+      [
+        db.latestAccountStorages,
+        db.historicalAccountStorages,
+        db.latestStorageMapEntries,
+        db.historicalStorageMapEntries,
+        db.latestAccountAssets,
+        db.historicalAccountAssets,
+        db.latestAccountHeaders,
+        db.historicalAccountHeaders,
+      ],
+      async () => {
+        // Apply storage delta: read old → archive → write new
+        for (const slot of updatedSlots) {
+          const oldSlot = await db.latestAccountStorages
+            .where("[accountId+slotName]")
+            .equals([accountId, slot.slotName])
+            .first();
+
+          await db.historicalAccountStorages.put({
+            accountId,
+            replacedAtNonce: nonce,
+            slotName: slot.slotName,
+            oldSlotValue: oldSlot?.slotValue ?? null,
+            slotType: slot.slotType,
+          });
+
+          await db.latestAccountStorages.put({
+            accountId,
+            slotName: slot.slotName,
+            slotValue: slot.slotValue,
+            slotType: slot.slotType,
+          });
+        }
+
+        // Process map entries: read old → archive → update latest
+        for (const entry of changedMapEntries) {
+          const oldEntry = await db.latestStorageMapEntries
+            .where("[accountId+slotName+key]")
+            .equals([accountId, entry.slotName, entry.key])
+            .first();
+
+          await db.historicalStorageMapEntries.put({
+            accountId,
+            replacedAtNonce: nonce,
+            slotName: entry.slotName,
+            key: entry.key,
+            oldValue: oldEntry?.value ?? null,
+          });
+
+          // "" means removal
+          if (entry.value === "") {
+            await db.latestStorageMapEntries
+              .where("[accountId+slotName+key]")
+              .equals([accountId, entry.slotName, entry.key])
+              .delete();
+          } else {
+            await db.latestStorageMapEntries.put({
+              accountId,
+              slotName: entry.slotName,
+              key: entry.key,
+              value: entry.value,
+            });
+          }
+        }
+
+        // Apply vault delta: read old → archive → update latest
+        for (const entry of changedAssets) {
+          const oldAsset = await db.latestAccountAssets
+            .where("[accountId+vaultKey]")
+            .equals([accountId, entry.vaultKey])
+            .first();
+
+          await db.historicalAccountAssets.put({
+            accountId,
+            replacedAtNonce: nonce,
+            vaultKey: entry.vaultKey,
+            oldAsset: oldAsset?.asset ?? null,
+          });
+
+          // "" means removal
+          if (entry.asset === "") {
+            await db.latestAccountAssets
+              .where("[accountId+vaultKey]")
+              .equals([accountId, entry.vaultKey])
+              .delete();
+          } else {
+            await db.latestAccountAssets.put({
+              accountId,
+              vaultKey: entry.vaultKey,
+              asset: entry.asset,
+            });
+          }
+        }
+
+        // Archive old header and write new header
+        const oldHeader = await db.latestAccountHeaders
+          .where("id")
+          .equals(accountId)
+          .first();
+
+        if (oldHeader) {
+          await db.historicalAccountHeaders.put({
+            id: accountId,
+            replacedAtNonce: nonce,
+            codeRoot: oldHeader.codeRoot,
+            storageRoot: oldHeader.storageRoot,
+            vaultRoot: oldHeader.vaultRoot,
+            nonce: oldHeader.nonce,
+            committed: oldHeader.committed,
+            accountSeed: oldHeader.accountSeed,
+            accountCommitment: oldHeader.accountCommitment,
+            locked: oldHeader.locked,
+          });
+        }
+
+        await db.latestAccountHeaders.put({
+          id: accountId,
+          codeRoot,
+          storageRoot,
+          vaultRoot,
+          nonce,
+          committed,
+          accountSeed: undefined,
+          accountCommitment: commitment,
+          locked: false,
+        } as IAccount);
+      }
+    );
+  } catch (error) {
+    logWebStoreError(error, `Error applying transaction delta`);
+  }
+}
+
+async function archiveAndReplaceStorageSlots(
+  db: MidenDatabase,
+  accountId: string,
+  nonce: string,
+  newSlots: JsStorageSlot[]
+) {
+  const oldSlots = await db.latestAccountStorages
+    .where("accountId")
+    .equals(accountId)
+    .toArray();
+
+  // Archive every old slot
+  for (const slot of oldSlots) {
+    await db.historicalAccountStorages.put({
+      accountId,
+      replacedAtNonce: nonce,
+      slotName: slot.slotName,
+      oldSlotValue: slot.slotValue,
+      slotType: slot.slotType,
+    });
+  }
+
+  // Write NULL markers for genuinely new slots (no old value to archive)
+  const oldSlotNames = new Set(oldSlots.map((s) => s.slotName));
+  for (const slot of newSlots) {
+    if (!oldSlotNames.has(slot.slotName)) {
+      await db.historicalAccountStorages.put({
+        accountId,
+        replacedAtNonce: nonce,
+        slotName: slot.slotName,
+        oldSlotValue: null,
+        slotType: slot.slotType,
+      });
+    }
+  }
+
+  // Replace latest
+  await db.latestAccountStorages.where("accountId").equals(accountId).delete();
+  if (newSlots.length > 0) {
+    await db.latestAccountStorages.bulkPut(
+      newSlots.map((slot) => ({
+        accountId,
+        slotName: slot.slotName,
+        slotValue: slot.slotValue,
+        slotType: slot.slotType,
+      }))
+    );
+  }
+}
+
+async function archiveAndReplaceMapEntries(
+  db: MidenDatabase,
+  accountId: string,
+  nonce: string,
+  newEntries: JsStorageMapEntry[]
+) {
+  const oldEntries = await db.latestStorageMapEntries
+    .where("accountId")
+    .equals(accountId)
+    .toArray();
+
+  for (const entry of oldEntries) {
+    await db.historicalStorageMapEntries.put({
+      accountId,
+      replacedAtNonce: nonce,
+      slotName: entry.slotName,
+      key: entry.key,
+      oldValue: entry.value,
+    });
+  }
+
+  const oldKeys = new Set(oldEntries.map((e) => `${e.slotName}\0${e.key}`));
+  for (const entry of newEntries) {
+    if (!oldKeys.has(`${entry.slotName}\0${entry.key}`)) {
+      await db.historicalStorageMapEntries.put({
+        accountId,
+        replacedAtNonce: nonce,
+        slotName: entry.slotName,
+        key: entry.key,
+        oldValue: null,
+      });
+    }
+  }
+
+  await db.latestStorageMapEntries
+    .where("accountId")
+    .equals(accountId)
+    .delete();
+  if (newEntries.length > 0) {
+    await db.latestStorageMapEntries.bulkPut(
+      newEntries.map((entry) => ({
+        accountId,
+        slotName: entry.slotName,
+        key: entry.key,
+        value: entry.value,
+      }))
+    );
+  }
+}
+
+async function archiveAndReplaceVaultAssets(
+  db: MidenDatabase,
+  accountId: string,
+  nonce: string,
+  newAssets: JsVaultAsset[]
+) {
+  const oldAssets = await db.latestAccountAssets
+    .where("accountId")
+    .equals(accountId)
+    .toArray();
+
+  for (const asset of oldAssets) {
+    await db.historicalAccountAssets.put({
+      accountId,
+      replacedAtNonce: nonce,
+      vaultKey: asset.vaultKey,
+      oldAsset: asset.asset,
+    });
+  }
+
+  const oldKeys = new Set(oldAssets.map((a) => a.vaultKey));
+  for (const asset of newAssets) {
+    if (!oldKeys.has(asset.vaultKey)) {
+      await db.historicalAccountAssets.put({
+        accountId,
+        replacedAtNonce: nonce,
+        vaultKey: asset.vaultKey,
+        oldAsset: null,
+      });
+    }
+  }
+
+  await db.latestAccountAssets.where("accountId").equals(accountId).delete();
+  if (newAssets.length > 0) {
+    await db.latestAccountAssets.bulkPut(
+      newAssets.map((asset) => ({
+        accountId,
+        vaultKey: asset.vaultKey,
+        asset: asset.asset,
+      }))
+    );
+  }
+}
+
+async function restoreSlotsFromHistorical(
+  db: MidenDatabase,
+  accountId: string,
+  nonce: string
+) {
+  const oldSlots = await db.historicalAccountStorages
+    .where("[accountId+replacedAtNonce]")
+    .equals([accountId, nonce])
+    .toArray();
+
+  for (const slot of oldSlots) {
+    if (slot.oldSlotValue !== null) {
+      await db.latestAccountStorages.put({
+        accountId: slot.accountId,
+        slotName: slot.slotName,
+        slotValue: slot.oldSlotValue,
+        slotType: slot.slotType,
+      });
+    } else {
+      await db.latestAccountStorages
+        .where("[accountId+slotName]")
+        .equals([accountId, slot.slotName])
+        .delete();
+    }
+  }
+}
+
+async function restoreMapEntriesFromHistorical(
+  db: MidenDatabase,
+  accountId: string,
+  nonce: string
+) {
+  const oldEntries = await db.historicalStorageMapEntries
+    .where("[accountId+replacedAtNonce]")
+    .equals([accountId, nonce])
+    .toArray();
+
+  for (const entry of oldEntries) {
+    if (entry.oldValue !== null) {
+      await db.latestStorageMapEntries.put({
+        accountId: entry.accountId,
+        slotName: entry.slotName,
+        key: entry.key,
+        value: entry.oldValue,
+      });
+    } else {
+      await db.latestStorageMapEntries
+        .where("[accountId+slotName+key]")
+        .equals([accountId, entry.slotName, entry.key])
+        .delete();
+    }
+  }
+}
+
+async function restoreAssetsFromHistorical(
+  db: MidenDatabase,
+  accountId: string,
+  nonce: string
+) {
+  const oldAssets = await db.historicalAccountAssets
+    .where("[accountId+replacedAtNonce]")
+    .equals([accountId, nonce])
+    .toArray();
+
+  for (const asset of oldAssets) {
+    if (asset.oldAsset !== null) {
+      await db.latestAccountAssets.put({
+        accountId: asset.accountId,
+        vaultKey: asset.vaultKey,
+        asset: asset.oldAsset,
+      });
+    } else {
+      await db.latestAccountAssets
+        .where("[accountId+vaultKey]")
+        .equals([accountId, asset.vaultKey])
+        .delete();
+    }
+  }
+}
+
+/**
+ * Replaces an account's full state (storage, map entries, vault assets, header)
+ * with a new snapshot. Before overwriting, all current latest values are archived
+ * to historical.
+ */
+export async function applyFullAccountState(
+  dbId: string,
+  accountState: {
+    accountId: string;
+    nonce: string;
+    storageSlots: JsStorageSlot[];
+    storageMapEntries: JsStorageMapEntry[];
+    assets: JsVaultAsset[];
+    codeRoot: string;
+    storageRoot: string;
+    vaultRoot: string;
+    committed: boolean;
+    accountCommitment: string;
+    accountSeed: Uint8Array | undefined;
+  }
+) {
+  try {
+    const db = getDatabase(dbId);
+    const {
+      accountId,
+      nonce,
+      storageSlots,
+      storageMapEntries,
+      assets,
+      codeRoot,
+      storageRoot,
+      vaultRoot,
+      committed,
+      accountCommitment,
+      accountSeed,
+    } = accountState;
+
+    await db.dexie.transaction(
+      "rw",
+      [
+        db.latestAccountStorages,
+        db.historicalAccountStorages,
+        db.latestStorageMapEntries,
+        db.historicalStorageMapEntries,
+        db.latestAccountAssets,
+        db.historicalAccountAssets,
+        db.latestAccountHeaders,
+        db.historicalAccountHeaders,
+      ],
+      async () => {
+        // Archive: save current latest values to historical (so they can be
+        // restored on undo), then replace latest with the new state.
+        await archiveAndReplaceStorageSlots(db, accountId, nonce, storageSlots);
+        await archiveAndReplaceMapEntries(
+          db,
+          accountId,
+          nonce,
+          storageMapEntries
+        );
+        await archiveAndReplaceVaultAssets(db, accountId, nonce, assets);
+
+        // Archive old header and write new header
+        const oldHeader = await db.latestAccountHeaders
+          .where("id")
+          .equals(accountId)
+          .first();
+
+        if (oldHeader) {
+          await db.historicalAccountHeaders.put({
+            id: accountId,
+            replacedAtNonce: nonce,
+            codeRoot: oldHeader.codeRoot,
+            storageRoot: oldHeader.storageRoot,
+            vaultRoot: oldHeader.vaultRoot,
+            nonce: oldHeader.nonce,
+            committed: oldHeader.committed,
+            accountSeed: oldHeader.accountSeed,
+            accountCommitment: oldHeader.accountCommitment,
+            locked: oldHeader.locked,
+          });
+        }
+
+        await db.latestAccountHeaders.put({
+          id: accountId,
+          codeRoot,
+          storageRoot,
+          vaultRoot,
+          nonce,
+          committed,
+          accountSeed,
+          accountCommitment,
+          locked: false,
+        } as IAccount);
+      }
+    );
+  } catch (error) {
+    logWebStoreError(error, `Error applying full account state`);
   }
 }
 
@@ -392,8 +817,7 @@ export async function upsertAccountRecord(
   nonce: string,
   committed: boolean,
   commitment: string,
-  accountSeed: Uint8Array | undefined,
-  tx?: Transaction
+  accountSeed: Uint8Array | undefined
 ) {
   try {
     const db = getDatabase(dbId);
@@ -409,31 +833,9 @@ export async function upsertAccountRecord(
       locked: false,
     };
 
-    await (tx || db).accounts.put(data as IAccount);
-    await (tx || db).trackedAccounts.put({ id: accountId } as ITrackedAccount);
+    await db.latestAccountHeaders.put(data as IAccount);
   } catch (error) {
     logWebStoreError(error, `Error inserting account: ${accountId}`);
-  }
-}
-
-export async function insertAccountAuth(
-  dbId: string,
-  pubKeyCommitmentHex: string,
-  secretKey: string
-) {
-  try {
-    const db = getDatabase(dbId);
-    const data = {
-      pubKeyCommitmentHex,
-      secretKeyHex: secretKey,
-    };
-
-    await db.accountAuths.add(data);
-  } catch (error) {
-    logWebStoreError(
-      error,
-      `Error inserting account auth for pubKey: ${pubKeyCommitmentHex}`
-    );
   }
 }
 
@@ -544,26 +946,254 @@ export async function getForeignAccountCode(
 export async function lockAccount(dbId: string, accountId: string) {
   try {
     const db = getDatabase(dbId);
-    await db.accounts.where("id").equals(accountId).modify({ locked: true });
+    await db.latestAccountHeaders
+      .where("id")
+      .equals(accountId)
+      .modify({ locked: true });
+    // Also lock historical rows so that undo/rebuild preserves the lock.
+    await db.historicalAccountHeaders
+      .where("id")
+      .equals(accountId)
+      .modify({ locked: true });
   } catch (error) {
     logWebStoreError(error, `Error locking account: ${accountId}`);
   }
 }
 
+/**
+ * Prunes historical account states for a single account up to the given nonce.
+ *
+ * Deletes all historical entries with `replacedAtNonce <= upToNonce` and any
+ * orphaned account code. Mirrors the SQLite implementation.
+ */
+export async function pruneAccountHistory(
+  dbId: string,
+  accountId: string,
+  upToNonce: string
+): Promise<number> {
+  try {
+    const db = getDatabase(dbId);
+    let totalDeleted = 0;
+    const boundaryNonce = BigInt(upToNonce);
+
+    await db.dexie.transaction(
+      "rw",
+      [
+        db.historicalAccountHeaders,
+        db.historicalAccountStorages,
+        db.historicalStorageMapEntries,
+        db.historicalAccountAssets,
+        db.accountCodes,
+        db.latestAccountHeaders,
+        db.foreignAccountCode,
+      ],
+      async () => {
+        // Nonces are stored as strings so we cannot use index range queries
+        // (lexicographic ordering would be wrong). Filter in JS instead.
+        const headers = await db.historicalAccountHeaders
+          .where("id")
+          .equals(accountId)
+          .toArray();
+
+        const toPrune = headers.filter(
+          (h) => BigInt(h.replacedAtNonce) <= boundaryNonce
+        );
+
+        // Collect code roots from headers we are about to delete.
+        const candidateCodeRoots = new Set(toPrune.map((h) => h.codeRoot));
+
+        for (const h of toPrune) {
+          await db.historicalAccountHeaders
+            .where("accountCommitment")
+            .equals(h.accountCommitment)
+            .delete();
+
+          const rat = h.replacedAtNonce;
+          totalDeleted += 1;
+          totalDeleted += await db.historicalAccountStorages
+            .where("[accountId+replacedAtNonce]")
+            .equals([accountId, rat])
+            .delete();
+          totalDeleted += await db.historicalStorageMapEntries
+            .where("[accountId+replacedAtNonce]")
+            .equals([accountId, rat])
+            .delete();
+          totalDeleted += await db.historicalAccountAssets
+            .where("[accountId+replacedAtNonce]")
+            .equals([accountId, rat])
+            .delete();
+        }
+
+        // Delete orphaned code: only check roots from the deleted headers,
+        // and only if they are not referenced by any remaining header or foreign code.
+        if (candidateCodeRoots.size > 0) {
+          const latestHeaders = await db.latestAccountHeaders.toArray();
+          const remainingHistorical =
+            await db.historicalAccountHeaders.toArray();
+          const foreignCodes = await db.foreignAccountCode.toArray();
+
+          const referencedCodeRoots = new Set<string>();
+          for (const h of latestHeaders) referencedCodeRoots.add(h.codeRoot);
+          for (const h of remainingHistorical)
+            referencedCodeRoots.add(h.codeRoot);
+          for (const f of foreignCodes) referencedCodeRoots.add(f.codeRoot);
+
+          for (const root of candidateCodeRoots) {
+            if (!referencedCodeRoots.has(root)) {
+              await db.accountCodes.where("root").equals(root).delete();
+              totalDeleted += 1;
+            }
+          }
+        }
+      }
+    );
+
+    return totalDeleted;
+  } catch (error) {
+    logWebStoreError(error, `Error pruning account history for ${accountId}`);
+    throw error;
+  }
+}
+
+/**
+ * Undoes discarded account states by restoring old values from historical
+ * back to latest. Non-null old values overwrite latest; null old values
+ * (entries that didn't exist before that nonce) cause deletion from latest.
+ */
 export async function undoAccountStates(
   dbId: string,
   accountCommitments: string[]
-) {
+): Promise<void> {
   try {
     const db = getDatabase(dbId);
-    await db.accounts
-      .where("accountCommitment")
-      .anyOf(accountCommitments)
-      .delete();
+
+    await db.dexie.transaction(
+      "rw",
+      [
+        db.latestAccountStorages,
+        db.historicalAccountStorages,
+        db.latestStorageMapEntries,
+        db.historicalStorageMapEntries,
+        db.latestAccountAssets,
+        db.historicalAccountAssets,
+        db.latestAccountHeaders,
+        db.historicalAccountHeaders,
+      ],
+      async () => {
+        // Step 1: Resolve nonces from both latest and historical headers
+        const accountNonces = new Map<string, Set<string>>();
+
+        for (const commitment of accountCommitments) {
+          const latestRecord = await db.latestAccountHeaders
+            .where("accountCommitment")
+            .equals(commitment)
+            .first();
+
+          if (latestRecord) {
+            if (!accountNonces.has(latestRecord.id)) {
+              accountNonces.set(latestRecord.id, new Set());
+            }
+            accountNonces.get(latestRecord.id)!.add(latestRecord.nonce);
+            continue;
+          }
+
+          const histRecord = await db.historicalAccountHeaders
+            .where("accountCommitment")
+            .equals(commitment)
+            .first();
+
+          if (histRecord) {
+            if (!accountNonces.has(histRecord.id)) {
+              accountNonces.set(histRecord.id, new Set());
+            }
+            accountNonces.get(histRecord.id)!.add(histRecord.nonce);
+          }
+        }
+
+        // Step 2: Group nonces by account, sort descending (undo most recent first).
+        // Descending order is needed because each nonce's old value is the state before
+        // that nonce — processing most recent first lets earlier nonces overwrite with
+        // the correct final value.
+        for (const [accountId, nonces] of accountNonces) {
+          const sortedNonces = [...nonces].sort((a, b) =>
+            Number(BigInt(b) - BigInt(a))
+          );
+
+          // Step 3: Restore old values from historical back to latest, undoing
+          // each nonce in descending order. Non-null old values overwrite latest;
+          // null old values (entries that didn't exist before) cause deletion.
+          for (const nonce of sortedNonces) {
+            await restoreSlotsFromHistorical(db, accountId, nonce);
+            await restoreMapEntriesFromHistorical(db, accountId, nonce);
+            await restoreAssetsFromHistorical(db, accountId, nonce);
+          }
+
+          // Step 4: Restore old header from the earliest discarded nonce
+          const minNonce = sortedNonces[sortedNonces.length - 1];
+          const oldHeader = await db.historicalAccountHeaders
+            .where("[id+replacedAtNonce]")
+            .equals([accountId, minNonce])
+            .first();
+
+          if (oldHeader) {
+            await db.latestAccountHeaders.put({
+              id: oldHeader.id,
+              codeRoot: oldHeader.codeRoot,
+              storageRoot: oldHeader.storageRoot,
+              vaultRoot: oldHeader.vaultRoot,
+              nonce: oldHeader.nonce,
+              committed: oldHeader.committed,
+              accountSeed: oldHeader.accountSeed,
+              accountCommitment: oldHeader.accountCommitment,
+              locked: oldHeader.locked,
+            } as IAccount);
+          } else {
+            // No previous state — delete the account entirely
+            await db.latestAccountHeaders
+              .where("id")
+              .equals(accountId)
+              .delete();
+            await db.latestAccountStorages
+              .where("accountId")
+              .equals(accountId)
+              .delete();
+            await db.latestStorageMapEntries
+              .where("accountId")
+              .equals(accountId)
+              .delete();
+            await db.latestAccountAssets
+              .where("accountId")
+              .equals(accountId)
+              .delete();
+          }
+
+          // Step 5: Delete consumed historical entries at discarded nonces
+          for (const nonce of sortedNonces) {
+            await db.historicalAccountStorages
+              .where("[accountId+replacedAtNonce]")
+              .equals([accountId, nonce])
+              .delete();
+            await db.historicalStorageMapEntries
+              .where("[accountId+replacedAtNonce]")
+              .equals([accountId, nonce])
+              .delete();
+            await db.historicalAccountAssets
+              .where("[accountId+replacedAtNonce]")
+              .equals([accountId, nonce])
+              .delete();
+            await db.historicalAccountHeaders
+              .where("[id+replacedAtNonce]")
+              .equals([accountId, nonce])
+              .delete();
+          }
+        }
+      }
+    );
   } catch (error) {
     logWebStoreError(
       error,
       `Error undoing account states: ${accountCommitments.join(",")}`
     );
+    throw error;
   }
 }

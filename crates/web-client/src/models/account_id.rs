@@ -91,10 +91,30 @@ pub enum AccountInterface {
 #[wasm_bindgen]
 impl AccountId {
     /// Builds an account ID from its hex string representation.
+    ///
+    /// Returns an error if the provided string is not a valid hex-encoded account ID.
     #[wasm_bindgen(js_name = "fromHex")]
-    pub fn from_hex(hex: &str) -> AccountId {
-        let native_account_id = NativeAccountId::from_hex(hex).unwrap();
-        AccountId(native_account_id)
+    pub fn from_hex(hex: &str) -> Result<AccountId, JsValue> {
+        let native_account_id = NativeAccountId::from_hex(hex)
+            .map_err(|err| js_error_with_context(err, "error instantiating AccountId from hex"))?;
+        Ok(AccountId(native_account_id))
+    }
+
+    /// Builds an account ID from its prefix and suffix field elements.
+    ///
+    /// This is useful when the account ID components are stored separately (e.g., in storage
+    /// maps) and need to be recombined into an `AccountId`.
+    ///
+    /// Returns an error if the provided felts do not form a valid account ID.
+    #[wasm_bindgen(js_name = "fromPrefixSuffix")]
+    pub fn from_prefix_suffix(prefix: &Felt, suffix: &Felt) -> Result<AccountId, JsValue> {
+        let prefix_felt: NativeFelt = (*prefix).into();
+        let suffix_felt: NativeFelt = (*suffix).into();
+        let native_account_id = NativeAccountId::try_from_elements(suffix_felt, prefix_felt)
+            .map_err(|err| {
+                js_error_with_context(err, "error instantiating AccountId from prefix and suffix")
+            })?;
+        Ok(AccountId(native_account_id))
     }
 
     /// Returns true if the ID refers to a faucet.
@@ -144,9 +164,7 @@ impl AccountId {
         let network_id: NativeNetworkId = network_id.into();
 
         let routing_params = RoutingParameters::new(account_interface.into());
-        let address = Address::new(self.0)
-            .with_routing_parameters(routing_params)
-            .map_err(|err| js_error_with_context(err, "failed to set routing parameters"))?;
+        let address = Address::new(self.0).with_routing_parameters(routing_params);
         Ok(address.encode(network_id))
     }
 

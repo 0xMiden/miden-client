@@ -1,4 +1,4 @@
-import test from "./playwright.global.setup";
+import test, { getProverUrl } from "./playwright.global.setup";
 import {
   badHexId,
   consumeTransaction,
@@ -14,6 +14,8 @@ import {
 } from "./webClientTestUtils";
 import { Page, expect } from "@playwright/test";
 import { ConsumableNoteRecord } from "../dist/crates/miden_client_web";
+
+const hasRemoteProver = !!getProverUrl();
 
 const getConsumableNotes = async (
   testingPage: Page,
@@ -55,6 +57,7 @@ test.describe("get_input_note", () => {
   });
 
   test("retrieve an input note that does exist", async ({ page }) => {
+    test.slow();
     const { consumedNoteId } = await setupConsumedNote(page);
 
     // Test both the existing client method and new RpcClient
@@ -85,6 +88,7 @@ test.describe("get_input_note", () => {
   });
 
   test("get note script by root", async ({ page }) => {
+    test.slow();
     await setupWalletAndFaucet(page);
 
     // First, we need to get a note script root from an existing note
@@ -133,6 +137,7 @@ test.describe("get_input_note", () => {
   test("sync notes by tag and check nullifier commit height", async ({
     page,
   }) => {
+    test.slow();
     const { consumedNoteId } = await setupConsumedNote(page, true);
 
     const result = await page.evaluate(async (_consumedNoteId: string) => {
@@ -183,6 +188,7 @@ test.describe("get_input_note", () => {
 
 test.describe("get_input_notes", () => {
   test("note exists, note filter all", async ({ page }) => {
+    test.slow();
     const { consumedNoteId } = await setupConsumedNote(page);
     const { noteIds } = await getInputNotes(page);
     expect(noteIds.length).toBeGreaterThanOrEqual(1);
@@ -205,55 +211,84 @@ test.describe("get_consumable_notes", () => {
     });
   });
 
-  test("no filter by account", async ({ page }) => {
-    const { createdNoteId: noteId1, accountId: accountId1 } =
-      await setupMintedNote(page);
-    const { createdNoteId: noteId2, accountId: accountId2 } =
-      await setupMintedNote(page);
+  const noFilterTestCases = [
+    { flag: false, description: "no filter by account" },
+    {
+      flag: true,
+      description: "no filter by account with remote prover",
+    },
+  ];
 
-    const noteIds = new Set([noteId1, noteId2]);
-    const accountIds = new Set([accountId1, accountId2]);
-    const result = await getConsumableNotes(page);
-    expect(noteIds).toEqual(new Set(result.map((r) => r.noteId)));
-    expect(accountIds).toEqual(
-      new Set(result.map((r) => r.consumability[0].accountId))
-    );
-    expect(result.length).toBeGreaterThanOrEqual(2);
-    const consumableRecord1 = result.find((r) => r.noteId === noteId1);
-    const consumableRecord2 = result.find((r) => r.noteId === noteId2);
+  noFilterTestCases.forEach(({ flag, description }) => {
+    test(description, async ({ page }) => {
+      test.skip(flag && !hasRemoteProver, "no remote prover configured");
+      test.slow();
+      const { createdNoteId: noteId1, accountId: accountId1 } =
+        await setupMintedNote(page, false, flag);
+      const { createdNoteId: noteId2, accountId: accountId2 } =
+        await setupMintedNote(page, false, flag);
 
-    consumableRecord1!!.consumability.forEach((c) => {
-      expect(c.accountId).toEqual(accountId1);
-    });
+      const noteIds = new Set([noteId1, noteId2]);
+      const accountIds = new Set([accountId1, accountId2]);
+      const result = await getConsumableNotes(page);
+      expect(noteIds).toEqual(new Set(result.map((r) => r.noteId)));
+      expect(accountIds).toEqual(
+        new Set(result.map((r) => r.consumability[0].accountId))
+      );
+      expect(result.length).toBeGreaterThanOrEqual(2);
+      const consumableRecord1 = result.find((r) => r.noteId === noteId1);
+      const consumableRecord2 = result.find((r) => r.noteId === noteId2);
 
-    consumableRecord2!!.consumability.forEach((c) => {
-      expect(c.accountId).toEqual(accountId2);
+      consumableRecord1!!.consumability.forEach((c) => {
+        expect(c.accountId).toEqual(accountId1);
+      });
+
+      consumableRecord2!!.consumability.forEach((c) => {
+        expect(c.accountId).toEqual(accountId2);
+      });
     });
   });
 
-  test("p2ide consume after block", async ({ page }) => {
-    const { accountId: senderAccountId, faucetId } =
-      await setupWalletAndFaucet(page);
-    const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
-    const recallHeight = (await getSyncHeight(page)) + 30;
-    await sendTransaction(
-      page,
-      senderAccountId,
-      targetAccountId,
-      faucetId,
-      recallHeight
-    );
+  const p2ideTestCases = [
+    { flag: false, description: "p2ide consume after block" },
+    {
+      flag: true,
+      description: "p2ide consume after block with remote prover",
+    },
+  ];
+  const RECALL_HEIGHT_DELTA = 500;
 
-    const consumableRecipient = await getConsumableNotes(page, targetAccountId);
-    const consumableSender = await getConsumableNotes(page, senderAccountId);
-    expect(consumableSender.length).toBe(1);
-    expect(consumableSender[0].consumability[0].consumableAfterBlock).toBe(
-      recallHeight
-    );
-    expect(consumableRecipient.length).toBe(1);
-    expect(
-      consumableRecipient[0].consumability[0].consumableAfterBlock
-    ).toBeUndefined();
+  p2ideTestCases.forEach(({ flag, description }) => {
+    test(description, async ({ page }) => {
+      test.skip(flag && !hasRemoteProver, "no remote prover configured");
+      test.slow();
+      const { accountId: senderAccountId, faucetId } =
+        await setupWalletAndFaucet(page);
+      const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
+      const recallHeight = (await getSyncHeight(page)) + RECALL_HEIGHT_DELTA;
+      await sendTransaction(
+        page,
+        senderAccountId,
+        targetAccountId,
+        faucetId,
+        recallHeight,
+        flag
+      );
+
+      const consumableRecipient = await getConsumableNotes(
+        page,
+        targetAccountId
+      );
+      const consumableSender = await getConsumableNotes(page, senderAccountId);
+      expect(consumableSender.length).toBe(1);
+      expect(consumableSender[0].consumability[0].consumableAfterBlock).toBe(
+        recallHeight
+      );
+      expect(consumableRecipient.length).toBe(1);
+      expect(
+        consumableRecipient[0].consumability[0].consumableAfterBlock
+      ).toBeUndefined();
+    });
   });
 });
 
@@ -261,6 +296,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
   test("should create a proper consumable p2id note from the createP2IDNote function", async ({
     page,
   }) => {
+    test.slow();
     const { accountId: senderId, faucetId } = await setupWalletAndFaucet(page);
     const { accountId: targetId } = await setupWalletAndFaucet(page);
 
@@ -295,12 +331,8 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           new window.NoteAttachment()
         );
 
-        let outputNote = window.OutputNote.full(p2IdNote);
-
         let transactionRequest = new window.TransactionRequestBuilder()
-          .withOwnOutputNotes(
-            new window.MidenArrays.OutputNoteArray([outputNote])
-          )
+          .withOwnOutputNotes(new window.NoteArray([p2IdNote]))
           .build();
 
         let transactionUpdate = await window.helpers.executeAndApplyTransaction(
@@ -404,12 +436,8 @@ test.describe("createP2IDNote and createP2IDENote", () => {
           new window.NoteAttachment()
         );
 
-        let outputNote = window.OutputNote.full(p2IdeNote);
-
         let transactionRequest = new window.TransactionRequestBuilder()
-          .withOwnOutputNotes(
-            new window.MidenArrays.OutputNoteArray([outputNote])
-          )
+          .withOwnOutputNotes(new window.NoteArray([p2IdeNote]))
           .build();
 
         let transactionUpdate = await window.helpers.executeAndApplyTransaction(

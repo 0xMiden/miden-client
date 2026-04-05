@@ -21,6 +21,7 @@ use crate::rpc::domain::account::{
     AccountProof,
     AccountStorageDetails,
     AccountStorageMapDetails,
+    AccountStorageRequirements,
     AccountUpdateSummary,
     AccountVaultDetails,
     FetchedAccount,
@@ -31,14 +32,10 @@ use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncInfo};
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
-use crate::rpc::domain::sync::StateSyncInfo;
+use crate::rpc::domain::sync::ChainMmrInfo;
 use crate::rpc::domain::transaction::{TransactionRecord, TransactionsInfo};
-use crate::rpc::generated::account::AccountSummary;
 use crate::rpc::generated::note::NoteSyncRecord;
-use crate::rpc::generated::rpc::{BlockRange, SyncStateResponse};
-use crate::rpc::generated::transaction::TransactionSummary;
-use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError};
-use crate::transaction::ForeignAccount;
+use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError, RpcStatusInfo};
 
 pub type MockClient<AUTH> = Client<AUTH>;
 
@@ -109,89 +106,26 @@ impl MockRpcApi {
         self.mock_chain.read().block_header(block_num.as_usize())
     }
 
-    /// Generates a sync state response based on the request block number.
-    fn get_sync_state_request(
+    /// Finds the next block containing a matching note after `block_from`, or the chain tip.
+    fn find_next_block_with_notes(
         &self,
-        request_block_range: BlockRange,
+        block_from: u32,
         note_tags: &BTreeSet<NoteTag>,
-        account_ids: &[AccountId],
-    ) -> Result<SyncStateResponse, RpcError> {
-        // Determine the next block number to sync
-        let next_block_num = self
-            .mock_chain
+    ) -> BlockNumber {
+        self.mock_chain
             .read()
             .committed_notes()
             .values()
             .filter_map(|note| {
                 let block_num = note.inclusion_proof().location().block_num();
-                if note_tags.contains(&note.metadata().tag())
-                    && block_num.as_u32() > request_block_range.block_from
-                {
+                if note_tags.contains(&note.metadata().tag()) && block_num.as_u32() > block_from {
                     Some(block_num)
                 } else {
                     None
                 }
             })
             .min()
-            .unwrap_or_else(|| self.get_chain_tip_block_num());
-
-        // Retrieve the next block
-        let next_block = self.get_block_by_num(next_block_num);
-
-        // Prepare the MMR delta
-        let from_block_num =
-            if request_block_range.block_from == self.get_chain_tip_block_num().as_u32() {
-                next_block_num.as_usize()
-            } else {
-                request_block_range.block_from as usize + 1
-            };
-
-        let mmr_delta = self
-            .get_mmr()
-            .get_delta(Forest::new(from_block_num), Forest::new(next_block_num.as_usize()))
-            .unwrap();
-
-        // Collect notes that are in the next block
-        let notes = self.get_notes_in_block(next_block_num, note_tags, account_ids);
-
-        let transactions = self
-            .mock_chain
-            .read()
-            .proven_blocks()
-            .iter()
-            .filter(|block| {
-                block.header().block_num().as_u32() > request_block_range.block_from
-                    && block.header().block_num() <= next_block_num
-            })
-            .flat_map(|block| {
-                block.body().transactions().as_slice().iter().map(|tx| TransactionSummary {
-                    transaction_id: Some(tx.id().into()),
-                    block_num: next_block_num.as_u32(),
-                    account_id: Some(tx.account_id().into()),
-                })
-            })
-            .collect();
-
-        let mut accounts = vec![];
-
-        for (block_num, updates) in self.account_commitment_updates.read().iter() {
-            if block_num.as_u32() > request_block_range.block_from && *block_num <= next_block_num {
-                accounts.extend(updates.iter().map(|(account_id, commitment)| AccountSummary {
-                    account_id: Some((*account_id).into()),
-                    account_commitment: Some(commitment.into()),
-                    block_num: block_num.as_u32(),
-                }));
-            }
-        }
-
-        Ok(SyncStateResponse {
-            chain_tip: self.get_chain_tip_block_num().as_u32(),
-            block_header: Some(next_block.into()),
-            mmr_delta: Some(mmr_delta.try_into()?),
-            accounts,
-            transactions,
-            notes,
-        })
+            .unwrap_or_else(|| self.get_chain_tip_block_num())
     }
 
     /// Retrieves account vault updates in a given block range.
@@ -327,7 +261,7 @@ impl MockRpcApi {
                         let storage_map_info = StorageMapUpdate {
                             block_num: block_number,
                             slot_name: slot_name.clone(),
-                            key: (*key).into(),
+                            key: *key,
                             value: *value,
                         };
                         updates.push(storage_map_info);
@@ -361,7 +295,7 @@ impl MockRpcApi {
                 {
                     Some(NoteSyncRecord {
                         note_index_in_block: u32::from(
-                            note.inclusion_proof().location().node_index_in_block(),
+                            note.inclusion_proof().location().block_note_tree_index(),
                         ),
                         note_id: Some(note.id().into()),
                         metadata: Some(note.metadata().clone().into()),
@@ -407,6 +341,10 @@ impl MockRpcApi {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl NodeRpcClient for MockRpcApi {
+    fn has_genesis_commitment(&self) -> Option<Word> {
+        None
+    }
+
     async fn set_genesis_commitment(&self, _commitment: Word) -> Result<(), RpcError> {
         // The mock client doesn't use accept headers, so we don't need to do anything here.
         Ok(())
@@ -417,51 +355,54 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
-        block_to: Option<BlockNumber>,
+        _block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<NoteSyncInfo, RpcError> {
-        let block_range = BlockRange {
-            block_from: block_num.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        };
+        let next_block_num = self.find_next_block_with_notes(block_num.as_u32(), note_tags);
+        let next_block = self.get_block_by_num(next_block_num);
 
-        let response = self.get_sync_state_request(block_range, note_tags, &[])?;
+        let note_records = self.get_notes_in_block(next_block_num, note_tags, &[]);
 
-        let response = NoteSyncInfo {
-            chain_tip: response.chain_tip.into(),
-            block_header: response.block_header.unwrap().try_into().unwrap(),
-            mmr_path: self.get_mmr().open(block_num.as_usize()).unwrap().merkle_path,
-            notes: response
-                .notes
-                .into_iter()
-                .map(|note| {
-                    let note_id: NoteId = note.note_id.unwrap().try_into().unwrap();
-                    let note_index = u16::try_from(note.note_index_in_block).unwrap();
-                    let merkle_path = note.inclusion_path.unwrap().try_into().unwrap();
-                    let metadata = note.metadata.unwrap().try_into().unwrap();
+        let notes = note_records
+            .into_iter()
+            .map(|note| {
+                let note_id: NoteId = note.note_id.unwrap().try_into().unwrap();
+                let note_index = u16::try_from(note.note_index_in_block).unwrap();
+                let merkle_path = note.inclusion_path.unwrap().try_into().unwrap();
+                let metadata = note.metadata.unwrap().try_into().unwrap();
 
-                    CommittedNote::new(note_id, note_index, merkle_path, metadata)
-                })
-                .collect(),
-        };
+                CommittedNote::new(note_id, note_index, merkle_path, metadata)
+            })
+            .collect();
 
-        Ok(response)
+        Ok(NoteSyncInfo {
+            chain_tip: self.get_chain_tip_block_num(),
+            block_header: next_block,
+            mmr_path: self.get_mmr().open(block_num.as_usize()).unwrap().merkle_path().clone(),
+            notes,
+        })
     }
 
-    /// Executes the specified sync state request and returns the response.
-    async fn sync_state(
+    async fn sync_chain_mmr(
         &self,
-        block_num: BlockNumber,
-        account_ids: &[AccountId],
-        note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<StateSyncInfo, RpcError> {
-        let block_range = BlockRange {
-            block_from: block_num.as_u32(),
-            block_to: None,
-        };
-        let response = self.get_sync_state_request(block_range, note_tags, account_ids)?;
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+    ) -> Result<ChainMmrInfo, RpcError> {
+        let chain_tip = self.get_chain_tip_block_num();
+        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
 
-        Ok(response.try_into().unwrap())
+        let from_forest = if block_from == chain_tip {
+            target_block.as_usize()
+        } else {
+            block_from.as_u32() as usize + 1
+        };
+
+        let mmr_delta = self
+            .get_mmr()
+            .get_delta(Forest::new(from_forest), Forest::new(target_block.as_usize()))
+            .unwrap();
+
+        Ok(ChainMmrInfo { mmr_delta })
     }
 
     /// Retrieves the block header for the specified block number. If the block number is not
@@ -529,31 +470,39 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Returns the node's tracked account details for the specified account ID.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        let summary = self
-            .account_commitment_updates
-            .read()
-            .iter()
-            .rev()
-            .find_map(|(block_num, updates)| {
-                updates.get(&account_id).map(|commitment| AccountUpdateSummary {
-                    commitment: *commitment,
-                    last_block_num: *block_num,
-                })
-            })
-            .unwrap();
+        let summary =
+            self.account_commitment_updates
+                .read()
+                .iter()
+                .rev()
+                .find_map(|(block_num, updates)| {
+                    updates.get(&account_id).map(|commitment| AccountUpdateSummary {
+                        commitment: *commitment,
+                        last_block_num: *block_num,
+                    })
+                });
 
         if let Ok(account) = self.mock_chain.read().committed_account(account_id) {
+            let summary = summary.unwrap_or_else(|| AccountUpdateSummary {
+                commitment: account.to_commitment(),
+                last_block_num: BlockNumber::GENESIS,
+            });
             Ok(FetchedAccount::new_public(account.clone(), summary))
-        } else {
+        } else if let Some(summary) = summary {
             Ok(FetchedAccount::new_private(account_id, summary))
+        } else {
+            Err(RpcError::ExpectedDataMissing(format!(
+                "account {account_id} not found in mock commitment updates or mock chain"
+            )))
         }
     }
 
     /// Returns the account proof for the specified account. The `known_account_code` parameter
     /// is ignored in the mock implementation and the latest account code is always returned.
-    async fn get_account(
+    async fn get_account_proof(
         &self,
-        foreign_account: ForeignAccount,
+        account_id: AccountId,
+        account_storage_requirements: AccountStorageRequirements,
         account_state: AccountStateAt,
         _known_account_code: Option<AccountCode>,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
@@ -564,58 +513,57 @@ impl NodeRpcClient for MockRpcApi {
             AccountStateAt::ChainTip => mock_chain.latest_block_header().block_num(),
         };
 
-        let headers = match &foreign_account {
-            ForeignAccount::Public(account_id, account_storage_requirements) => {
-                let account = mock_chain.committed_account(*account_id).unwrap();
+        let headers = if account_id.has_public_state() {
+            let account = mock_chain.committed_account(account_id).unwrap();
 
-                let mut map_details = vec![];
-                for slot_name in account_storage_requirements.inner().keys() {
-                    if let Some(StorageSlotContent::Map(storage_map)) =
-                        account.storage().get(slot_name).map(StorageSlot::content)
-                    {
-                        let entries: Vec<StorageMapEntry> = storage_map
-                            .entries()
-                            .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
-                            .collect();
+            let mut map_details = vec![];
+            for slot_name in account_storage_requirements.inner().keys() {
+                if let Some(StorageSlotContent::Map(storage_map)) =
+                    account.storage().get(slot_name).map(StorageSlot::content)
+                {
+                    let entries: Vec<StorageMapEntry> = storage_map
+                        .entries()
+                        .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
+                        .collect();
 
-                        let too_many_entries = entries.len() > 1000;
-                        let account_storage_map_detail = AccountStorageMapDetails {
-                            slot_name: slot_name.clone(),
-                            too_many_entries,
-                            entries: StorageMapEntries::AllEntries(entries),
-                        };
+                    let too_many_entries = entries.len() > 1000;
+                    let account_storage_map_detail = AccountStorageMapDetails {
+                        slot_name: slot_name.clone(),
+                        too_many_entries,
+                        entries: StorageMapEntries::AllEntries(entries),
+                    };
 
-                        map_details.push(account_storage_map_detail);
-                    } else {
-                        panic!("Storage slot {slot_name} is not a map");
-                    }
+                    map_details.push(account_storage_map_detail);
+                } else {
+                    panic!("Storage slot {slot_name} is not a map");
                 }
+            }
 
-                let storage_details = AccountStorageDetails {
-                    header: account.storage().to_header(),
-                    map_details,
-                };
+            let storage_details = AccountStorageDetails {
+                header: account.storage().to_header(),
+                map_details,
+            };
 
-                let mut assets = vec![];
-                for asset in account.vault().assets() {
-                    assets.push(asset);
-                }
-                let vault_details = AccountVaultDetails {
-                    too_many_assets: assets.len() > 1000,
-                    assets,
-                };
+            let mut assets = vec![];
+            for asset in account.vault().assets() {
+                assets.push(asset);
+            }
+            let vault_details = AccountVaultDetails {
+                too_many_assets: assets.len() > 1000,
+                assets,
+            };
 
-                Some(AccountDetails {
-                    header: account.into(),
-                    storage_details,
-                    code: account.code().clone(),
-                    vault_details,
-                })
-            },
-            ForeignAccount::Private(_) => None,
+            Some(AccountDetails {
+                header: account.into(),
+                storage_details,
+                code: account.code().clone(),
+                vault_details,
+            })
+        } else {
+            None
         };
 
-        let witness = mock_chain.account_tree().open(foreign_account.account_id());
+        let witness = mock_chain.account_tree().open(account_id);
 
         let proof = AccountProof::new(witness, headers).unwrap();
 
@@ -753,6 +701,27 @@ impl NodeRpcClient for MockRpcApi {
 
     async fn get_network_id(&self) -> Result<NetworkId, RpcError> {
         Ok(NetworkId::Testnet)
+    }
+
+    async fn get_rpc_limits(&self) -> Result<crate::rpc::RpcLimits, RpcError> {
+        Ok(crate::rpc::RpcLimits::default())
+    }
+
+    fn has_rpc_limits(&self) -> Option<crate::rpc::RpcLimits> {
+        None
+    }
+
+    async fn set_rpc_limits(&self, _limits: crate::rpc::RpcLimits) {
+        // No-op for mock client
+    }
+
+    async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {
+        Ok(RpcStatusInfo {
+            version: env!("CARGO_PKG_VERSION").into(),
+            genesis_commitment: None,
+            store: None,
+            block_producer: None,
+        })
     }
 }
 

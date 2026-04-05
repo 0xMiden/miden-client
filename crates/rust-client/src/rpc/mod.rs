@@ -49,7 +49,7 @@ use core::fmt;
 use domain::account::{AccountProof, FetchedAccount};
 use domain::note::{FetchedNote, NoteSyncInfo};
 use domain::nullifier::NullifierUpdate;
-use domain::sync::StateSyncInfo;
+use domain::sync::ChainMmrInfo;
 use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountCode, AccountHeader, AccountId};
 use miden_protocol::address::NetworkId;
@@ -67,6 +67,9 @@ mod errors;
 pub use errors::*;
 
 mod endpoint;
+pub(crate) use domain::limits::RPC_LIMITS_STORE_SETTING;
+pub use domain::limits::RpcLimits;
+pub use domain::status::RpcStatusInfo;
 pub use endpoint::Endpoint;
 
 #[cfg(not(feature = "testing"))]
@@ -79,12 +82,12 @@ mod tonic_client;
 #[cfg(feature = "tonic")]
 pub use tonic_client::GrpcClient;
 
+use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
-use crate::transaction::ForeignAccount;
 
 /// Represents the state that we want to retrieve from the network
 pub enum AccountStateAt {
@@ -93,15 +96,6 @@ pub enum AccountStateAt {
     /// Gets the state at a specific block number
     Block(BlockNumber),
 }
-
-// RPC ENDPOINT LIMITS
-// ================================================================================================
-
-// TODO: We need a better structured way of getting limits as defined by the node (#1139)
-pub const NOTE_IDS_LIMIT: usize = 100;
-pub const NULLIFIER_PREFIXES_LIMIT: usize = 1000;
-pub const ACCOUNT_ID_LIMIT: usize = 1000;
-pub const NOTE_TAG_LIMIT: usize = 1000;
 
 // NODE RPC CLIENT TRAIT
 // ================================================================================================
@@ -118,6 +112,9 @@ pub trait NodeRpcClient: Send + Sync {
     /// genesis commitment in the request headers. If the genesis commitment is already set,
     /// this method does nothing.
     async fn set_genesis_commitment(&self, commitment: Word) -> Result<(), RpcError>;
+
+    /// Returns the genesis commitment if it has been set, without fetching from the node.
+    fn has_genesis_commitment(&self) -> Option<Word>;
 
     /// Given a Proven Transaction, send it to the node for it to be included in a future block
     /// using the `/SubmitProvenTransaction` RPC endpoint.
@@ -156,24 +153,15 @@ pub trait NodeRpcClient: Send + Sync {
     /// verify that each note is part of the block's note tree.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
-    /// Fetches info from the node necessary to perform a state sync using the
-    /// `/SyncState` RPC endpoint.
+    /// Fetches the MMR delta for a given block range using the `/SyncChainMmr` RPC endpoint.
     ///
-    /// - `block_num` is the last block number known by the client. The returned [`StateSyncInfo`]
-    ///   should contain data starting from the next block, until the first block which contains a
-    ///   note of matching the requested tag, or the chain tip if there are no notes.
-    /// - `account_ids` is a list of account IDs and determines the accounts the client is
-    ///   interested in and should receive account updates of.
-    /// - `note_tags` is a list of tags used to filter the notes the client is interested in, which
-    ///   serves as a "note group" filter. Notice that you can't filter by a specific note ID.
-    /// - `nullifiers_tags` similar to `note_tags`, is a list of tags used to filter the nullifiers
-    ///   corresponding to some notes the client is interested in.
-    async fn sync_state(
+    /// - `block_from` is the last block number already present in the caller's MMR.
+    /// - `block_to` is the optional upper bound of the range. If `None`, syncs up to the chain tip.
+    async fn sync_chain_mmr(
         &self,
-        block_num: BlockNumber,
-        account_ids: &[AccountId],
-        note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<StateSyncInfo, RpcError>;
+        block_from: BlockNumber,
+        block_to: Option<BlockNumber>,
+    ) -> Result<ChainMmrInfo, RpcError>;
 
     /// Fetches the current state of an account from the node using the `/GetAccountDetails` RPC
     /// endpoint.
@@ -211,18 +199,22 @@ pub trait NodeRpcClient: Send + Sync {
     /// `/CheckNullifiers` RPC endpoint.
     async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError>;
 
-    /// Fetches the account data needed to perform a Foreign Procedure Invocation (FPI) on the
-    /// specified foreign account, using the `GetAccountProof` endpoint.
+    /// Fetches the account proof and optionally its details from the node, using the
+    /// `GetAccountProof` endpoint.
     ///
     /// The `account_state` parameter specifies the block number from which to retrieve
     /// the account proof from (the state of the account at that block).
     ///
+    /// The `storage_requirements` parameter specifies which storage slots and map keys
+    /// should be included in the response for public accounts.
+    ///
     /// The `known_account_code` parameter is the known code commitment
-    /// to prevent unnecessary data fetching. Returns the block number and the FPI account data. If
-    /// the tracked account is not found in the node, the method will return an error.
-    async fn get_account(
+    /// to prevent unnecessary data fetching. Returns the block number and the account proof. If
+    /// the account is not found in the node, the method will return an error.
+    async fn get_account_proof(
         &self,
-        foreign_account: ForeignAccount,
+        account_id: AccountId,
+        storage_requirements: AccountStorageRequirements,
         account_state: AccountStateAt,
         known_account_code: Option<AccountCode>,
     ) -> Result<(BlockNumber, AccountProof), RpcError>;
@@ -308,7 +300,7 @@ pub trait NodeRpcClient: Send + Sync {
             if let FetchedAccount::Public(account, _) = response {
                 let account = *account;
                 // We should only return an account if it's newer, otherwise we ignore it
-                if account.nonce().as_int() > local_account.nonce().as_int() {
+                if account.nonce().as_canonical_u64() > local_account.nonce().as_canonical_u64() {
                     public_accounts.push(account);
                 }
             }
@@ -390,51 +382,93 @@ pub trait NodeRpcClient: Send + Sync {
     /// Errors:
     /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
     async fn get_network_id(&self) -> Result<NetworkId, RpcError>;
+
+    /// Fetches the RPC limits configured on the node.
+    ///
+    /// Implementations may cache the result internally to avoid repeated network calls.
+    async fn get_rpc_limits(&self) -> Result<RpcLimits, RpcError>;
+
+    /// Returns the RPC limits if they have been set, without fetching from the node.
+    fn has_rpc_limits(&self) -> Option<RpcLimits>;
+
+    /// Sets the RPC limits internally to be used by the client.
+    async fn set_rpc_limits(&self, limits: RpcLimits);
+
+    /// Fetches the RPC status without requiring Accept header validation.
+    ///
+    /// This is useful for diagnostics when version negotiation fails, as it allows
+    /// retrieving node information even when there's a version mismatch.
+    async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError>;
 }
 
 // RPC API ENDPOINT
 // ================================================================================================
 //
 /// RPC methods for the Miden protocol.
-#[derive(Debug)]
-pub enum NodeRpcClientEndpoint {
+#[derive(Debug, Clone, Copy)]
+pub enum RpcEndpoint {
+    Status,
     CheckNullifiers,
     SyncNullifiers,
     GetAccount,
-    GetAccountStateDelta,
     GetBlockByNumber,
     GetBlockHeaderByNumber,
     GetNotesById,
-    SyncState,
+    SyncChainMmr,
     SubmitProvenTx,
     SyncNotes,
     GetNoteScriptByRoot,
     SyncStorageMaps,
     SyncAccountVault,
     SyncTransactions,
+    GetLimits,
 }
 
-impl fmt::Display for NodeRpcClientEndpoint {
+impl RpcEndpoint {
+    /// Returns the endpoint name as used in the RPC service definition.
+    pub fn proto_name(&self) -> &'static str {
+        match self {
+            RpcEndpoint::Status => "Status",
+            RpcEndpoint::CheckNullifiers => "CheckNullifiers",
+            RpcEndpoint::SyncNullifiers => "SyncNullifiers",
+            RpcEndpoint::GetAccount => "GetAccount",
+            RpcEndpoint::GetBlockByNumber => "GetBlockByNumber",
+            RpcEndpoint::GetBlockHeaderByNumber => "GetBlockHeaderByNumber",
+            RpcEndpoint::GetNotesById => "GetNotesById",
+            RpcEndpoint::SyncChainMmr => "SyncChainMmr",
+            RpcEndpoint::SubmitProvenTx => "SubmitProvenTransaction",
+            RpcEndpoint::SyncNotes => "SyncNotes",
+            RpcEndpoint::GetNoteScriptByRoot => "GetNoteScriptByRoot",
+            RpcEndpoint::SyncStorageMaps => "SyncStorageMaps",
+            RpcEndpoint::SyncAccountVault => "SyncAccountVault",
+            RpcEndpoint::SyncTransactions => "SyncTransactions",
+            RpcEndpoint::GetLimits => "GetLimits",
+        }
+    }
+}
+
+impl fmt::Display for RpcEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NodeRpcClientEndpoint::CheckNullifiers => write!(f, "check_nullifiers"),
-            NodeRpcClientEndpoint::SyncNullifiers => {
+            RpcEndpoint::Status => write!(f, "status"),
+            RpcEndpoint::CheckNullifiers => write!(f, "check_nullifiers"),
+            RpcEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
             },
-            NodeRpcClientEndpoint::GetAccount => write!(f, "get_account"),
-            NodeRpcClientEndpoint::GetAccountStateDelta => write!(f, "get_account_state_delta"),
-            NodeRpcClientEndpoint::GetBlockByNumber => write!(f, "get_block_by_number"),
-            NodeRpcClientEndpoint::GetBlockHeaderByNumber => {
+            RpcEndpoint::GetAccount => write!(f, "get_account_proof"),
+            RpcEndpoint::GetBlockByNumber => write!(f, "get_block_by_number"),
+            RpcEndpoint::GetBlockHeaderByNumber => {
                 write!(f, "get_block_header_by_number")
             },
-            NodeRpcClientEndpoint::GetNotesById => write!(f, "get_notes_by_id"),
-            NodeRpcClientEndpoint::SyncState => write!(f, "sync_state"),
-            NodeRpcClientEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
-            NodeRpcClientEndpoint::SyncNotes => write!(f, "sync_notes"),
-            NodeRpcClientEndpoint::GetNoteScriptByRoot => write!(f, "get_note_script_by_root"),
-            NodeRpcClientEndpoint::SyncStorageMaps => write!(f, "sync_storage_maps"),
-            NodeRpcClientEndpoint::SyncAccountVault => write!(f, "sync_account_vault"),
-            NodeRpcClientEndpoint::SyncTransactions => write!(f, "sync_transactions"),
+            RpcEndpoint::GetNotesById => write!(f, "get_notes_by_id"),
+            RpcEndpoint::SyncChainMmr => write!(f, "sync_chain_mmr"),
+            RpcEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
+            RpcEndpoint::SyncNotes => write!(f, "sync_notes"),
+            RpcEndpoint::GetNoteScriptByRoot => write!(f, "get_note_script_by_root"),
+            RpcEndpoint::SyncStorageMaps => write!(f, "sync_storage_maps"),
+            RpcEndpoint::SyncAccountVault => write!(f, "sync_account_vault"),
+            RpcEndpoint::SyncTransactions => write!(f, "sync_transactions"),
+            RpcEndpoint::GetLimits => write!(f, "get_limits"),
         }
     }
 }

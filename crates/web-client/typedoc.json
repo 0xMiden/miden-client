@@ -1,8 +1,9 @@
 {
-  "entryPoints": ["./dist/index.d.ts"],
+  "entryPoints": ["./dist/docs-entry.d.ts"],
   "tsconfig": "./tsconfig.docs.json",
   "readme": "none",
   "out": "../../docs/typedoc/web-client",
   "plugin": ["typedoc-plugin-markdown"],
-  "disableSources": true
+  "disableSources": true,
+  "excludeInternal": true
 }

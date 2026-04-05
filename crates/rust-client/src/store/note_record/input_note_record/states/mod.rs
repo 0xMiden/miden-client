@@ -6,7 +6,7 @@ use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::{NoteId, NoteInclusionProof, NoteMetadata};
 use miden_protocol::transaction::TransactionId;
-pub use miden_tx::utils::{
+pub use miden_tx::utils::serde::{
     ByteReader,
     ByteWriter,
     Deserializable,
@@ -116,6 +116,38 @@ impl InputNoteState {
 
     pub(crate) fn consumer_transaction_id(&self) -> Option<&TransactionId> {
         self.inner().consumer_transaction_id()
+    }
+
+    /// Returns the block height at which this note was consumed, if it is in a consumed state.
+    pub fn consumed_block_height(&self) -> Option<BlockNumber> {
+        match self {
+            InputNoteState::ConsumedAuthenticatedLocal(s) => Some(s.nullifier_block_height),
+            InputNoteState::ConsumedUnauthenticatedLocal(s) => Some(s.nullifier_block_height),
+            InputNoteState::ConsumedExternal(s) => Some(s.nullifier_block_height),
+            _ => None,
+        }
+    }
+
+    /// Returns the per-account position of the consuming transaction within the account's
+    /// execution chain for the block, if available.
+    pub fn consumed_tx_order(&self) -> Option<u32> {
+        match self {
+            InputNoteState::ConsumedAuthenticatedLocal(s) => s.consumed_tx_order,
+            InputNoteState::ConsumedUnauthenticatedLocal(s) => s.consumed_tx_order,
+            InputNoteState::ConsumedExternal(s) => s.consumed_tx_order,
+            _ => None,
+        }
+    }
+
+    /// Sets the consumed transaction order on the inner consumed state. No-op if the note is
+    /// not in a consumed state.
+    pub(crate) fn set_consumed_tx_order(&mut self, order: Option<u32>) {
+        match self {
+            InputNoteState::ConsumedAuthenticatedLocal(s) => s.consumed_tx_order = order,
+            InputNoteState::ConsumedUnauthenticatedLocal(s) => s.consumed_tx_order = order,
+            InputNoteState::ConsumedExternal(s) => s.consumed_tx_order = order,
+            _ => {},
+        }
     }
 
     /// Returns a new state to reflect that the note has received an inclusion proof. The proof is

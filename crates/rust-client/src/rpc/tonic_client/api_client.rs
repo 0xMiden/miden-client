@@ -34,6 +34,7 @@ pub(crate) mod api_client_wrapper {
         /// Connects to the Miden node API using the provided URL and genesis commitment.
         ///
         /// The client is configured with an interceptor that sets all requisite request metadata.
+        // Kept async for API parity with the native client; in WASM this is synchronous.
         #[allow(clippy::unused_async)]
         pub async fn new_client(
             endpoint: String,
@@ -42,6 +43,19 @@ pub(crate) mod api_client_wrapper {
         ) -> Result<ApiClient, RpcError> {
             let wasm_client = WasmClient::new(endpoint);
             let interceptor = accept_header_interceptor(genesis_commitment);
+            let client = ProtoClient::with_interceptor(wasm_client.clone(), interceptor);
+            Ok(ApiClient { client, wasm_client })
+        }
+
+        /// Connects to the Miden node API without injecting an Accept header.
+        // Kept async for API parity with the native client; in WASM this is synchronous.
+        #[allow(clippy::unused_async)]
+        pub async fn new_client_without_accept_header(
+            endpoint: String,
+            _timeout_ms: u64,
+        ) -> Result<ApiClient, RpcError> {
+            let wasm_client = WasmClient::new(endpoint);
+            let interceptor = MetadataInterceptor::default();
             let client = ProtoClient::with_interceptor(wasm_client.clone(), interceptor);
             Ok(ApiClient { client, wasm_client })
         }
@@ -104,6 +118,27 @@ pub(crate) mod api_client_wrapper {
             let interceptor = accept_header_interceptor(genesis_commitment);
 
             // Return the connected client.
+            let client = ProtoClient::with_interceptor(channel.clone(), interceptor);
+            Ok(ApiClient { client, channel })
+        }
+
+        /// Connects to the Miden node API without injecting an Accept header.
+        pub async fn new_client_without_accept_header(
+            endpoint: String,
+            timeout_ms: u64,
+        ) -> Result<ApiClient, RpcError> {
+            // Setup connection channel.
+            let endpoint = tonic::transport::Endpoint::try_from(endpoint)
+                .map_err(|err| RpcError::ConnectionError(Box::new(err)))?
+                .timeout(Duration::from_millis(timeout_ms));
+            let channel = endpoint
+                .tls_config(tonic::transport::ClientTlsConfig::new().with_native_roots())
+                .map_err(|err| RpcError::ConnectionError(Box::new(err)))?
+                .connect()
+                .await
+                .map_err(|err| RpcError::ConnectionError(Box::new(err)))?;
+
+            let interceptor = MetadataInterceptor::default();
             let client = ProtoClient::with_interceptor(channel.clone(), interceptor);
             Ok(ApiClient { client, channel })
         }

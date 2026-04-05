@@ -839,11 +839,11 @@ import { useConsume } from '@miden-sdk/react';
 function ConsumeNotes() {
   const { consume, result, isLoading, stage, error, reset } = useConsume();
 
-  const handleConsume = async (noteIds: string[]) => {
+  const handleConsume = async (notes: string[]) => {
     try {
       const { transactionId } = await consume({
         accountId: '0xmywallet...',  // Your wallet ID
-        noteIds: noteIds,             // Array of note IDs to consume
+        notes,                        // Note IDs, InputNoteRecords, or Note objects
       });
 
       console.log('Consumed! TX:', transactionId);
@@ -948,6 +948,47 @@ function CustomTransactionButton({ accountId }: { accountId: string }) {
     <button onClick={handleRun} disabled={isLoading}>
       {isLoading ? stage : 'Run Transaction'}
     </button>
+  );
+}
+```
+
+#### `useExecuteProgram()`
+
+Execute a program (view call) against an account and read the resulting stack
+output. This runs locally and does not submit anything to the network. Useful
+for reading on-chain state like storage maps or computed values.
+
+Built-in features:
+- **Auto pre-sync** before executing (disable with `skipSync: true`)
+- **Concurrency guard** prevents double-executions while a call is in-flight
+- **Ergonomic output** converts the raw `FeltArray` to a `bigint[]` array
+
+```tsx
+import { useExecuteProgram } from '@miden-sdk/react';
+
+function ReadCountButton({ accountId, script }: { accountId: string; script: TransactionScript }) {
+  const { execute, result, isLoading, error } = useExecuteProgram();
+
+  const handleRead = async () => {
+    const { stack } = await execute({
+      accountId,
+      script,
+      // Optional:
+      // adviceInputs: myAdviceInputs,
+      // foreignAccounts: [otherAccountId],
+      // skipSync: true,
+    });
+    console.log('Stack output:', stack); // bigint[]
+  };
+
+  return (
+    <div>
+      <button onClick={handleRead} disabled={isLoading}>
+        {isLoading ? 'Executing...' : 'Read Count'}
+      </button>
+      {result && <p>Count: {result.stack[0].toString()}</p>}
+      {error && <p>Error: {error.message}</p>}
+    </div>
   );
 }
 ```

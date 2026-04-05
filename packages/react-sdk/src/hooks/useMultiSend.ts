@@ -6,8 +6,7 @@ import {
   NoteAssets,
   NoteAttachment,
   NoteType,
-  OutputNote,
-  OutputNoteArray,
+  NoteArray,
   TransactionRequestBuilder,
 } from "@miden-sdk/miden-sdk";
 import type {
@@ -21,6 +20,9 @@ import { createNoteAttachment } from "../utils/noteAttachment";
 import { MidenError, assertSignerConnected } from "../utils/errors";
 import { getNoteType, waitForTransactionCommit } from "../utils/noteFilters";
 import type { ClientWithTransactions } from "../utils/noteFilters";
+import { proveWithFallback } from "../utils/prover";
+import { useMidenStore } from "../store/MidenStore";
+import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseMultiSendResult {
   /** Create multiple P2ID output notes in one transaction */
@@ -113,7 +115,7 @@ export function useMultiSend(): UseMultiSendResult {
             const iterAssetId = parseAccountId(options.assetId);
             const receiverId = parseAccountId(to);
             const assets = new NoteAssets([
-              new FungibleAsset(iterAssetId, amount),
+              new FungibleAsset(iterAssetId, BigInt(amount)),
             ]);
             const resolvedNoteType = recipientNoteType
               ? getNoteType(recipientNoteType)
@@ -131,7 +133,6 @@ export function useMultiSend(): UseMultiSendResult {
             );
             const recipientAddress = parseAddress(to, receiverId);
             return {
-              outputNote: OutputNote.full(note),
               note,
               recipientAddress,
               noteType: resolvedNoteType,
@@ -140,18 +141,20 @@ export function useMultiSend(): UseMultiSendResult {
         );
 
         const txRequest = new TransactionRequestBuilder()
-          .withOwnOutputNotes(
-            new OutputNoteArray(outputs.map((o) => o.outputNote))
-          )
+          .withOwnOutputNotes(new NoteArray(outputs.map((o) => o.note)))
           .build();
 
         const txSenderId = parseAccountId(options.from);
         const txResult = await client.executeTransaction(txSenderId, txRequest);
 
         setStage("proving");
-        const provenTransaction = await client.proveTransaction(
-          txResult,
-          prover ?? undefined
+        const proverConfig = useMidenStore.getState().config;
+        const provenTransaction = await proveWithFallback(
+          (resolvedProver) =>
+            runExclusiveDirect(() =>
+              client.proveTransaction(txResult, resolvedProver)
+            ),
+          proverConfig
         );
 
         setStage("submitting");
@@ -172,6 +175,7 @@ export function useMultiSend(): UseMultiSendResult {
         if (hasPrivate) {
           await waitForTransactionCommit(
             client as unknown as ClientWithTransactions,
+            runExclusiveDirect,
             txIdHex
           );
 

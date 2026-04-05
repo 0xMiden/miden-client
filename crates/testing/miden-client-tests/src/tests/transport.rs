@@ -14,11 +14,11 @@ use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransp
 use miden_client::utils::RwLock;
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_protocol::Felt;
-use miden_protocol::crypto::rand::RpoRandomCoin;
+use miden_protocol::crypto::rand::RandomCoin;
 use miden_protocol::note::NoteType as ProtocolNoteType;
-use miden_protocol::transaction::OutputNote;
-use miden_protocol::utils::Serializable;
-use miden_standards::note::create_p2id_note;
+use miden_protocol::transaction::RawOutputNote;
+use miden_protocol::utils::serde::Serializable;
+use miden_standards::note::P2idNote;
 use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChainBuilder, TxContextInput};
 use rand::Rng;
@@ -32,12 +32,11 @@ async fn transport_basic() {
     let (mut sender, sender_account) = create_test_user_transport(mock_node.clone()).await;
     let (mut recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
     let recipient_address = Address::new(recipient_account.id())
-        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
-        .unwrap();
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
     let (mut observer, _observer_account) = create_test_user_transport(mock_node.clone()).await;
 
     // Create note
-    let note = create_p2id_note(
+    let note = P2idNote::create(
         sender_account.id(),
         recipient_account.id(),
         vec![],
@@ -80,10 +79,9 @@ async fn transport_cursor_pagination() {
     let (mut sender, sender_account) = create_test_user_transport(mock_node.clone()).await;
     let (mut recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
     let recipient_address = Address::new(recipient_account.id())
-        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
-        .unwrap();
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
 
-    let note_a = create_p2id_note(
+    let note_a = P2idNote::create(
         sender_account.id(),
         recipient_account.id(),
         vec![],
@@ -93,7 +91,7 @@ async fn transport_cursor_pagination() {
     )
     .unwrap();
 
-    let note_b = create_p2id_note(
+    let note_b = P2idNote::create(
         sender_account.id(),
         recipient_account.id(),
         vec![],
@@ -124,10 +122,9 @@ async fn transport_duplicate_note_handling() {
     let (mut sender, sender_account) = create_test_user_transport(mock_node.clone()).await;
     let (mut recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
     let recipient_address = Address::new(recipient_account.id())
-        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
-        .unwrap();
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
 
-    let note = create_p2id_note(
+    let note = P2idNote::create(
         sender_account.id(),
         recipient_account.id(),
         vec![],
@@ -157,11 +154,10 @@ async fn transport_fetch_no_matching_tags() {
     let (mut sender, sender_account) = create_test_user_transport(mock_node.clone()).await;
     let (mut recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
     let recipient_address = Address::new(recipient_account.id())
-        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
-        .unwrap();
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
     let (mut observer, _observer_account) = create_test_user_transport(mock_node.clone()).await;
 
-    let note = create_p2id_note(
+    let note = P2idNote::create(
         sender_account.id(),
         recipient_account.id(),
         vec![],
@@ -197,7 +193,7 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
         .unwrap();
 
     let private_note =
-        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([1, 2, 3, 4].map(Felt::new).into()))
+        NoteBuilder::new(mock_account.id(), RandomCoin::new([1, 2, 3, 4].map(Felt::new).into()))
             .note_type(ProtocolNoteType::Private)
             .tag(NoteTag::new(0).into())
             .build()
@@ -212,7 +208,7 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
         mock_chain
             .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note])
             .unwrap()
-            .extend_expected_output_notes(vec![OutputNote::Full(private_note.clone())])
+            .extend_expected_output_notes(vec![RawOutputNote::Full(private_note.clone())])
             .build()
             .unwrap()
             .execute(),
@@ -223,8 +219,6 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     mock_chain.prove_next_block().unwrap();
 
     // Advance the chain several blocks past the note's commitment block.
-    // This is critical: if chain tip == note block, the mock's sync_notes fallback
-    // would accidentally return the note regardless of the scan start point.
     for _ in 0..5 {
         mock_chain.prove_next_block().unwrap();
     }
@@ -238,7 +232,7 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
 
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
-    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
+    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
 
     let keystore_path = temp_dir();
     let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
@@ -249,7 +243,7 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
         .sqlite_store(create_test_store_path())
         .authenticator(Arc::new(keystore))
         .in_debug_mode(DebugMode::Enabled)
-        .tx_graceful_blocks(None)
+        .tx_discard_delta(None)
         .note_transport(Arc::new(transport_client));
 
     let mut client = builder.build().await.unwrap();
@@ -258,9 +252,7 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     // 3. Register tag 0 so chain sync sees the note's block.
     client.add_note_tag(NoteTag::new(0)).await.unwrap();
 
-    // 4. Sync to chain tip. The NTL is empty so no transport notes are imported. The chain sync
-    //    sees the private note on-chain but discards it (no details). sync_height advances well
-    //    past block 1.
+    // 4. Sync to chain tip. The NTL is empty so no transport notes are imported.
     client.sync_state().await.unwrap();
     let sync_height = client.get_sync_height().await.unwrap();
     assert!(sync_height.as_u32() > 1, "client should have synced past block 1");
@@ -272,14 +264,12 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
         .write()
         .add_note(private_note.header().clone(), details_bytes);
 
-    // 6. Second sync_state: fetch_transport_notes runs first (importing the note from NTL), then
-    //    chain sync runs (nothing new). This matches the real flow where sync_state always calls
-    //    fetch_transport_notes before chain sync. Without the fix, after_block_num = sync_height
-    //    (e.g. 6), sync_notes scans blocks > 6, note at block 1 is missed → note stays Expected.
-    //    With the fix, after_block_num = max(0, sync_height - 20) = 0, scan finds it at block 1.
+    // 6. Second sync_state: fetch_transport_notes imports the note, then chain sync runs.
+    // Without the fix, after_block_num = sync_height, scan misses the note at block 1.
+    // With the fix, lookback window catches it.
     client.sync_state().await.unwrap();
 
-    // 7. The note should be Committed after the second sync (no third sync needed).
+    // 7. The note should be Committed after the second sync.
     let committed_notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();
     assert!(
         committed_notes.iter().any(|n| n.id() == private_note.id()),

@@ -127,11 +127,11 @@ Will turn the Account ID into its bech32 string representation.
 
 ##### network\_id
 
-[`NetworkId`](NetworkId.md)
+`NetworkId`
 
 ##### account\_interface
 
-[`BasicWallet`](../enumerations/AccountInterface.md#basicwallet)
+`AccountInterface`
 
 #### Returns
 
@@ -175,11 +175,40 @@ Given a bech32 encoded string, return the matching Account ID for it.
 
 Builds an account ID from its hex string representation.
 
+Returns an error if the provided string is not a valid hex-encoded account ID.
+
 #### Parameters
 
 ##### hex
 
 `string`
+
+#### Returns
+
+`AccountId`
+
+***
+
+### fromPrefixSuffix()
+
+> `static` **fromPrefixSuffix**(`prefix`, `suffix`): `AccountId`
+
+Builds an account ID from its prefix and suffix field elements.
+
+This is useful when the account ID components are stored separately (e.g., in storage
+maps) and need to be recombined into an `AccountId`.
+
+Returns an error if the provided felts do not form a valid account ID.
+
+#### Parameters
+
+##### prefix
+
+[`Felt`](Felt.md)
+
+##### suffix
+
+[`Felt`](Felt.md)
 
 #### Returns
 

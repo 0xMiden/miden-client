@@ -12,6 +12,9 @@ use crate::store::NoteRecordError;
 pub struct ConsumedExternalNoteState {
     /// Block height at which the note was nullified.
     pub nullifier_block_height: BlockNumber,
+    /// Per-account position of the consuming transaction within the account's execution chain
+    /// for the block. `None` if the order has not been determined yet.
+    pub consumed_tx_order: Option<u32>,
 }
 
 impl NoteStateHandler for ConsumedExternalNoteState {
@@ -70,18 +73,23 @@ impl NoteStateHandler for ConsumedExternalNoteState {
     }
 }
 
-impl miden_tx::utils::Serializable for ConsumedExternalNoteState {
-    fn write_into<W: miden_tx::utils::ByteWriter>(&self, target: &mut W) {
+impl miden_tx::utils::serde::Serializable for ConsumedExternalNoteState {
+    fn write_into<W: miden_tx::utils::serde::ByteWriter>(&self, target: &mut W) {
         self.nullifier_block_height.write_into(target);
+        self.consumed_tx_order.write_into(target);
     }
 }
 
-impl miden_tx::utils::Deserializable for ConsumedExternalNoteState {
-    fn read_from<R: miden_tx::utils::ByteReader>(
+impl miden_tx::utils::serde::Deserializable for ConsumedExternalNoteState {
+    fn read_from<R: miden_tx::utils::serde::ByteReader>(
         source: &mut R,
-    ) -> Result<Self, miden_tx::utils::DeserializationError> {
+    ) -> Result<Self, miden_tx::utils::serde::DeserializationError> {
         let nullifier_block_height = BlockNumber::read_from(source)?;
-        Ok(ConsumedExternalNoteState { nullifier_block_height })
+        let consumed_tx_order = Option::<u32>::read_from(source)?;
+        Ok(ConsumedExternalNoteState {
+            nullifier_block_height,
+            consumed_tx_order,
+        })
     }
 }
 

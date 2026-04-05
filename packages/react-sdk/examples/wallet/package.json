@@ -9,31 +9,23 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@getpara/evm-wallet-connectors": "^2.15.0",
-    "@getpara/react-sdk-lite": "^2.15.0",
-    "@getpara/web-sdk": "^2.15.0",
-    "@miden-sdk/miden-para": "^0.13.4",
-    "@miden-sdk/miden-sdk": "^0.13.0",
-    "@miden-sdk/miden-turnkey": "^1.0.4",
-    "@miden-sdk/miden-turnkey-react": "^1.0.4",
-    "@miden-sdk/miden-wallet-adapter-react": "^0.13.4",
-    "@miden-sdk/react": "^0.13.3",
-    "@miden-sdk/use-miden-para-react": "^0.13.4",
-    "@tanstack/react-query": "^5.90.21",
-    "@turnkey/react-wallet-kit": "^1.9.0",
-    "@wagmi/core": "^3.4.0",
+    "@miden-sdk/miden-sdk": "^0.14.0",
+    "@miden-sdk/react": "^0.14.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "viem": "^2.47.0",
-    "wagmi": "^3.5.0"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@miden-sdk/vite-plugin": "^0.13.4",
+    "@miden-sdk/vite-plugin": "^0.14.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.0",
     "typescript": "^5.0.0",
-    "vite": "^5.0.0",
-    "vite-plugin-node-polyfills": "^0.25.0"
+    "vite": "^5.0.0"
+  },
+  "resolutions": {
+    "@isaacs/brace-expansion": ">=5.0.1",
+    "esbuild": ">=0.25.0",
+    "rollup": ">=4.59.0",
+    "minimatch": ">=10.2.1"
   }
 }

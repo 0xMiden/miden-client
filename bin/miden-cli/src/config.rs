@@ -7,7 +7,10 @@ use std::time::Duration;
 use figment::providers::{Format, Toml};
 use figment::value::{Dict, Map};
 use figment::{Figment, Metadata, Profile, Provider};
-use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
+use miden_client::note_transport::{
+    NOTE_TRANSPORT_DEVNET_ENDPOINT,
+    NOTE_TRANSPORT_TESTNET_ENDPOINT,
+};
 use miden_client::rpc::Endpoint;
 use serde::{Deserialize, Serialize};
 
@@ -21,8 +24,14 @@ pub const STORE_FILENAME: &str = "store.sqlite3";
 pub const KEYSTORE_DIRECTORY: &str = "keystore";
 pub const DEFAULT_REMOTE_PROVER_TIMEOUT: Duration = Duration::from_secs(20);
 
-/// Returns the global miden directory path in the user's home directory
+/// Returns the global miden directory path.
+///
+/// If the `MIDEN_CLIENT_HOME` environment variable is set, returns that path directly.
+/// Otherwise, returns the `.miden` directory in the user's home directory.
 pub fn get_global_miden_dir() -> Result<PathBuf, std::io::Error> {
+    if let Ok(miden_home) = std::env::var("MIDEN_CLIENT_HOME") {
+        return Ok(PathBuf::from(miden_home));
+    }
     dirs::home_dir()
         .ok_or_else(|| {
             std::io::Error::new(std::io::ErrorKind::NotFound, "Could not determine home directory")
@@ -38,8 +47,31 @@ pub fn get_local_miden_dir() -> Result<PathBuf, std::io::Error> {
 // CLI CONFIG
 // ================================================================================================
 
+/// Whether the configuration was loaded from the local or global `.miden` directory.
+#[derive(Debug, Clone)]
+pub enum ConfigKind {
+    Local,
+    Global,
+}
+
+/// The `.miden` directory from which the configuration was loaded.
+#[derive(Debug, Clone)]
+pub struct ConfigDir {
+    pub path: PathBuf,
+    pub kind: ConfigKind,
+}
+
+impl std::fmt::Display for ConfigDir {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({:?})", self.path.display(), self.kind)
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CliConfig {
+    /// The directory this configuration was loaded from. Not part of the TOML file.
+    #[serde(skip)]
+    pub config_dir: Option<ConfigDir>,
     /// Describes settings related to the RPC endpoint.
     pub rpc: RpcConfig,
     /// Path to the `SQLite` store file.
@@ -83,12 +115,13 @@ impl Provider for CliConfig {
 /// (see [`CliConfig::data()`]) to provide default values during configuration merging.
 /// The paths returned are relative and intended to be resolved against a `.miden` directory.
 ///
-/// For loading configuration from the filesystem, use [`CliConfig::from_system()`] instead.
+/// For loading configuration from the filesystem, use [`CliConfig::load()`] instead.
 impl Default for CliConfig {
     fn default() -> Self {
         // Create paths relative to the config file location (which is in .miden directory)
         // These will be resolved relative to the .miden directory when the config is loaded
         Self {
+            config_dir: None,
             rpc: RpcConfig::default(),
             store_filepath: PathBuf::from(STORE_FILENAME),
             secret_keys_directory: PathBuf::from(KEYSTORE_DIRECTORY),
@@ -103,6 +136,22 @@ impl Default for CliConfig {
 }
 
 impl CliConfig {
+    /// Returns `true` when this config was loaded from the local `.miden` directory.
+    ///
+    /// This is typically set when loading via [`CliConfig::from_local_dir`] or
+    /// [`CliConfig::load`] (when local takes precedence).
+    pub fn is_local(&self) -> bool {
+        matches!(&self.config_dir, Some(ConfigDir { kind: ConfigKind::Local, .. }))
+    }
+
+    /// Returns `true` when this config was loaded from the global `.miden` directory.
+    ///
+    /// This is typically set when loading via [`CliConfig::from_global_dir`] or
+    /// [`CliConfig::load`] (when local config is not available).
+    pub fn is_global(&self) -> bool {
+        matches!(&self.config_dir, Some(ConfigDir { kind: ConfigKind::Global, .. }))
+    }
+
     /// Loads configuration from a specific `.miden` directory.
     ///
     /// # ⚠️ WARNING: Advanced Use Only
@@ -118,12 +167,12 @@ impl CliConfig {
     ///
     /// For standard CLI-like configuration loading, use:
     /// ```ignore
-    /// CliConfig::from_system()  // Respects local → global priority
+    /// CliConfig::load()  // Respects local → global priority
     /// ```
     ///
     /// Or for client initialization:
     /// ```ignore
-    /// CliClient::from_system_user_config(debug_mode).await?
+    /// CliClient::new(debug_mode).await?
     /// ```
     ///
     /// ## When to use this method
@@ -158,7 +207,7 @@ impl CliConfig {
     /// let config = CliConfig::from_dir(&PathBuf::from("/path/to/.miden"))?;
     ///
     /// // ✅ Prefer this for CLI-like behavior:
-    /// let config = CliConfig::from_system()?;
+    /// let config = CliConfig::load()?;
     /// # Ok(())
     /// # }
     /// ```
@@ -196,8 +245,8 @@ impl CliConfig {
     ///
     /// For standard CLI-like behavior:
     /// ```ignore
-    /// CliConfig::from_system()  // Respects local → global fallback
-    /// CliClient::from_system_user_config(debug_mode).await?
+    /// CliConfig::load()  // Respects local → global fallback
+    /// CliClient::new(debug_mode).await?
     /// ```
     ///
     /// ## When to use this method
@@ -217,7 +266,12 @@ impl CliConfig {
     /// - Configuration file parsing fails
     pub fn from_local_dir() -> Result<Self, CliError> {
         let local_miden_dir = get_local_miden_dir()?;
-        Self::from_dir(&local_miden_dir)
+        let mut config = Self::from_dir(&local_miden_dir)?;
+        config.config_dir = Some(ConfigDir {
+            path: local_miden_dir,
+            kind: ConfigKind::Local,
+        });
+        Ok(config)
     }
 
     /// Loads configuration from the global `.miden` directory (user's home directory).
@@ -233,8 +287,8 @@ impl CliConfig {
     ///
     /// For standard CLI-like behavior:
     /// ```ignore
-    /// CliConfig::from_system()  // Respects local → global priority
-    /// CliClient::from_system_user_config(debug_mode).await?
+    /// CliConfig::load()  // Respects local → global priority
+    /// CliClient::new(debug_mode).await?
     /// ```
     ///
     /// ## When to use this method
@@ -256,7 +310,12 @@ impl CliConfig {
         let global_miden_dir = get_global_miden_dir().map_err(|e| {
             CliError::Config(Box::new(e), "Failed to determine global config directory".to_string())
         })?;
-        Self::from_dir(&global_miden_dir)
+        let mut config = Self::from_dir(&global_miden_dir)?;
+        config.config_dir = Some(ConfigDir {
+            path: global_miden_dir,
+            kind: ConfigKind::Global,
+        });
+        Ok(config)
     }
 
     /// Loads configuration from system directories with priority: local first, then global
@@ -272,8 +331,8 @@ impl CliConfig {
     /// 2. Global `.miden/miden-client.toml` in the home directory (fallback)
     ///
     /// This matches the CLI's configuration priority logic. For most use cases, you should
-    /// use [`CliClient::from_system_user_config()`](crate::CliClient::from_system_user_config)
-    /// instead, which uses this method internally.
+    /// use [`CliClient::new()`](crate::CliClient::new) instead, which uses this method
+    /// internally.
     ///
     /// # Returns
     ///
@@ -296,14 +355,14 @@ impl CliConfig {
     ///
     /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// // ✅ Recommended: Loads from local .miden dir if it exists, otherwise from global
-    /// let config = CliConfig::from_system()?;
+    /// let config = CliConfig::load()?;
     ///
     /// // Or even better, use CliClient directly:
-    /// // let client = CliClient::from_system_user_config(DebugMode::Disabled).await?;
+    /// // let client = CliClient::new(DebugMode::Disabled).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn from_system() -> Result<Self, CliError> {
+    pub fn load() -> Result<Self, CliError> {
         // Try local first
         match Self::from_local_dir() {
             Ok(config) => Ok(config),
@@ -375,7 +434,17 @@ pub struct NoteTransportConfig {
 impl Default for NoteTransportConfig {
     fn default() -> Self {
         Self {
-            endpoint: NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(),
+            endpoint: NOTE_TRANSPORT_TESTNET_ENDPOINT.to_string(),
+            timeout_ms: 10000,
+        }
+    }
+}
+
+impl NoteTransportConfig {
+    /// Returns a `NoteTransportConfig` for the devnet network.
+    pub fn devnet() -> Self {
+        Self {
+            endpoint: NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string(),
             timeout_ms: 10000,
         }
     }

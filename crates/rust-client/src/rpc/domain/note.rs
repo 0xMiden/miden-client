@@ -15,7 +15,7 @@ use miden_protocol::note::{
     NoteType,
 };
 use miden_protocol::{MastForest, MastNodeId, Word};
-use miden_tx::utils::Deserializable;
+use miden_tx::utils::serde::Deserializable;
 
 use super::{MissingFieldHelper, RpcConversionError};
 use crate::rpc::{RpcError, generated as proto};
@@ -44,7 +44,8 @@ impl TryFrom<proto::note::NoteMetadata> for NoteMetadata {
             .sender
             .ok_or_else(|| proto::note::NoteMetadata::missing_field(stringify!(sender)))?
             .try_into()?;
-        let note_type = NoteType::try_from(u64::from(value.note_type))?;
+        let note_type =
+            NoteType::try_from(u64::try_from(value.note_type).expect("invalid note type"))?;
         let tag = NoteTag::new(value.tag);
 
         // Deserialize attachment if present
@@ -55,19 +56,35 @@ impl TryFrom<proto::note::NoteMetadata> for NoteMetadata {
                 .map_err(RpcConversionError::DeserializationError)?
         };
 
-        Ok(NoteMetadata::new(sender, note_type, tag).with_attachment(attachment))
+        Ok(NoteMetadata::new(sender, note_type).with_tag(tag).with_attachment(attachment))
     }
 }
 
 impl From<NoteMetadata> for proto::note::NoteMetadata {
     fn from(value: NoteMetadata) -> Self {
-        use miden_tx::utils::Serializable;
+        use miden_tx::utils::serde::Serializable;
         proto::note::NoteMetadata {
             sender: Some(value.sender().into()),
-            note_type: value.note_type() as u32,
+            note_type: value.note_type() as i32,
             tag: value.tag().as_u32(),
             attachment: value.attachment().to_bytes(),
         }
+    }
+}
+
+impl TryFrom<proto::note::NoteHeader> for NoteHeader {
+    type Error = RpcConversionError;
+
+    fn try_from(value: proto::note::NoteHeader) -> Result<Self, Self::Error> {
+        let note_id = value
+            .note_id
+            .ok_or(proto::note::NoteHeader::missing_field(stringify!(note_id)))?
+            .try_into()?;
+        let metadata = value
+            .metadata
+            .ok_or(proto::note::NoteHeader::missing_field(stringify!(metadata)))?
+            .try_into()?;
+        Ok(NoteHeader::new(note_id, metadata))
     }
 }
 
@@ -154,7 +171,11 @@ impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
 
             let committed_note = CommittedNote::new(
                 note_id,
-                u16::try_from(note.note_index_in_block).expect("note index out of range"),
+                u16::try_from(note.note_index_in_block).map_err(|_| {
+                    RpcConversionError::InvalidField(
+                        "note_index_in_block value out of u16 range".into(),
+                    )
+                })?,
                 inclusion_path,
                 metadata,
             );

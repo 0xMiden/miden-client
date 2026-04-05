@@ -1,13 +1,13 @@
 use miden_client::Word as NativeWord;
 use miden_client::note::{
-    NoteInputs as NativeNoteInputs,
     NoteRecipient as NativeNoteRecipient,
     NoteScript as NativeNoteScript,
+    NoteStorage as NativeNoteStorage,
 };
 use wasm_bindgen::prelude::*;
 
-use super::note_inputs::NoteInputs;
 use super::note_script::NoteScript;
+use super::note_storage::NoteStorage;
 use super::word::Word;
 use crate::models::miden_arrays::NoteRecipientArray as RecipientArray;
 
@@ -15,10 +15,10 @@ use crate::models::miden_arrays::NoteRecipientArray as RecipientArray;
 ///
 /// The recipient is not an account address, instead it is a value that describes when a note can be
 /// consumed. Because not all notes have predetermined consumer addresses, e.g. swap notes can be
-/// consumed by anyone, the recipient is defined as the code and its inputs, that when successfully
+/// consumed by anyone, the recipient is defined as the code and its storage, that when successfully
 /// executed results in the note's consumption.
 ///
-/// Recipient is computed as a nested hash of the serial number, the script root, and the inputs
+/// Recipient is computed as a nested hash of the serial number, the script root, and the storage
 /// commitment, ensuring the recipient digest binds all three pieces of data together.
 #[derive(Clone)]
 #[wasm_bindgen]
@@ -26,14 +26,18 @@ pub struct NoteRecipient(NativeNoteRecipient);
 
 #[wasm_bindgen]
 impl NoteRecipient {
-    /// Creates a note recipient from its serial number, script, and inputs.
+    /// Creates a note recipient from its serial number, script, and storage.
     #[wasm_bindgen(constructor)]
-    pub fn new(serial_num: &Word, note_script: &NoteScript, inputs: &NoteInputs) -> NoteRecipient {
+    pub fn new(
+        serial_num: &Word,
+        note_script: &NoteScript,
+        storage: &NoteStorage,
+    ) -> NoteRecipient {
         let native_serial_num: NativeWord = serial_num.into();
         let native_note_script: NativeNoteScript = note_script.into();
-        let native_note_inputs: NativeNoteInputs = inputs.into();
+        let native_note_storage: NativeNoteStorage = storage.into();
         let native_note_recipient =
-            NativeNoteRecipient::new(native_serial_num, native_note_script, native_note_inputs);
+            NativeNoteRecipient::new(native_serial_num, native_note_script, native_note_storage);
 
         NoteRecipient(native_note_recipient)
     }
@@ -54,9 +58,9 @@ impl NoteRecipient {
         self.0.script().into()
     }
 
-    /// Returns the inputs provided to the script.
-    pub fn inputs(&self) -> NoteInputs {
-        self.0.inputs().into()
+    /// Returns the storage provided to the script.
+    pub fn storage(&self) -> NoteStorage {
+        self.0.storage().into()
     }
 }
 

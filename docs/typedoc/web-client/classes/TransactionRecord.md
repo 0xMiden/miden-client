@@ -128,13 +128,13 @@ Returns the nullifiers of the consumed input notes.
 
 ### outputNotes()
 
-> **outputNotes**(): [`OutputNotes`](OutputNotes.md)
+> **outputNotes**(): `OutputNotes`
 
 Returns the output notes created by this transaction.
 
 #### Returns
 
-[`OutputNotes`](OutputNotes.md)
+`OutputNotes`
 
 ***
 
@@ -152,10 +152,10 @@ Returns the block height at which the transaction was submitted.
 
 ### transactionStatus()
 
-> **transactionStatus**(): [`TransactionStatus`](TransactionStatus.md)
+> **transactionStatus**(): `TransactionStatus`
 
 Returns the current status of the transaction.
 
 #### Returns
 
-[`TransactionStatus`](TransactionStatus.md)
+`TransactionStatus`

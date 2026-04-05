@@ -1,13 +1,14 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { NoteFilter, NoteFilterTypes, NoteId } from "@miden-sdk/miden-sdk";
+import type { Note, InputNoteRecord } from "@miden-sdk/miden-sdk";
 import type {
   ConsumeOptions,
   TransactionStage,
   TransactionResult,
 } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
-import { assertSignerConnected } from "../utils/errors";
+import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseConsumeResult {
   /** Consume one or more notes */
@@ -29,14 +30,14 @@ export interface UseConsumeResult {
  *
  * @example
  * ```tsx
- * function ConsumeNotesButton({ accountId, noteIds }: Props) {
+ * function ConsumeNotesButton({ accountId, notes }: Props) {
  *   const { consume, isLoading, stage, error } = useConsume();
  *
  *   const handleConsume = async () => {
  *     try {
  *       const result = await consume({
  *         accountId,
- *         noteIds,
+ *         notes,
  *       });
  *       console.log('Consumed! TX:', result.transactionId);
  *     } catch (err) {
@@ -53,7 +54,8 @@ export interface UseConsumeResult {
  * ```
  */
 export function useConsume(): UseConsumeResult {
-  const { client, isReady, sync, prover, signerConnected } = useMiden();
+  const { client, isReady, sync, runExclusive, prover } = useMiden();
+  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -66,10 +68,8 @@ export function useConsume(): UseConsumeResult {
         throw new Error("Miden client is not ready");
       }
 
-      assertSignerConnected(signerConnected);
-
-      if (options.noteIds.length === 0) {
-        throw new Error("No note IDs provided");
+      if (options.notes.length === 0) {
+        throw new Error("No notes provided");
       }
 
       setIsLoading(true);
@@ -81,28 +81,82 @@ export function useConsume(): UseConsumeResult {
         const accountIdObj = parseAccountId(options.accountId);
 
         setStage("proving");
-        const noteIds = options.noteIds.map((noteId) => NoteId.fromHex(noteId));
-        const filter = new NoteFilter(NoteFilterTypes.List, noteIds);
-        const noteRecords = await client.getInputNotes(filter);
-        const notes = noteRecords.map((record) => record.toNote());
+        const txResult = await runExclusiveSafe(async () => {
+          // Resolve each input to a Note object, preserving original order:
+          // - InputNoteRecord (has .toNote()) → unwrap via .toNote()
+          // - Note (has .id() but not .toNote()) → use directly
+          // - string → look up from store by hex ID
+          // - NoteId → look up from store
+          const resolved: Note[] = new Array(options.notes.length);
+          const lookupIndices: number[] = [];
+          const lookupIds: NoteId[] = [];
 
-        if (notes.length === 0) {
-          throw new Error("No notes found for provided IDs");
-        }
+          for (let i = 0; i < options.notes.length; i++) {
+            const item = options.notes[i];
+            if (typeof item === "string") {
+              lookupIndices.push(i);
+              lookupIds.push(NoteId.fromHex(item));
+            } else if (
+              item !== null &&
+              typeof item === "object" &&
+              typeof (item as InputNoteRecord).toNote === "function"
+            ) {
+              resolved[i] = (item as InputNoteRecord).toNote();
+            } else if (
+              item !== null &&
+              typeof item === "object" &&
+              typeof (item as Note).id === "function"
+            ) {
+              resolved[i] = item as Note;
+            } else {
+              lookupIndices.push(i);
+              lookupIds.push(item as NoteId);
+            }
+          }
 
-        if (notes.length !== options.noteIds.length) {
-          throw new Error("Some notes could not be found for provided IDs");
-        }
+          if (lookupIds.length > 0) {
+            const filter = new NoteFilter(NoteFilterTypes.List, lookupIds);
+            const noteRecords = await client.getInputNotes(filter);
 
-        const txRequest = client.newConsumeTransactionRequest(notes);
-        const txId = prover
-          ? await client.submitNewTransactionWithProver(
-              accountIdObj,
-              txRequest,
-              prover
-            )
-          : await client.submitNewTransaction(accountIdObj, txRequest);
-        const txResult = { transactionId: txId.toString() };
+            if (noteRecords.length !== lookupIds.length) {
+              throw new Error("Some notes could not be found for provided IDs");
+            }
+
+            // Match returned records back to their original positions by ID
+            const recordById = new Map(
+              noteRecords.map((r) => [r.id().toString(), r])
+            );
+            for (let j = 0; j < lookupIndices.length; j++) {
+              const record = recordById.get(lookupIds[j].toString());
+              if (!record) {
+                throw new Error(
+                  "Some notes could not be found for provided IDs"
+                );
+              }
+              resolved[lookupIndices[j]] = record.toNote();
+            }
+          }
+
+          const notes = resolved;
+
+          if (notes.length === 0) {
+            throw new Error("No notes found for provided IDs");
+          }
+
+          if (notes.length !== options.notes.length) {
+            throw new Error("Some notes could not be found for provided IDs");
+          }
+
+          const txRequest = client.newConsumeTransactionRequest(notes);
+          const txId = prover
+            ? await client.submitNewTransactionWithProver(
+                accountIdObj,
+                txRequest,
+                prover
+              )
+            : await client.submitNewTransaction(accountIdObj, txRequest);
+          return { transactionId: txId.toString() };
+        });
 
         setStage("complete");
         setResult(txResult);
@@ -119,7 +173,7 @@ export function useConsume(): UseConsumeResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, prover, signerConnected, sync]
+    [client, isReady, prover, runExclusive, sync]
   );
 
   const reset = useCallback(() => {

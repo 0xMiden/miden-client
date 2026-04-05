@@ -1,5 +1,6 @@
 use miden_client::PrettyPrint;
-use miden_client::note::{NoteScript as NativeNoteScript, WellKnownNote};
+use miden_client::note::NoteScript as NativeNoteScript;
+use miden_standards::note::StandardNote;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
@@ -36,17 +37,17 @@ impl NoteScript {
 
     /// Returns the well-known P2ID script.
     pub fn p2id() -> Self {
-        WellKnownNote::P2ID.script().into()
+        StandardNote::P2ID.script().into()
     }
 
     /// Returns the well-known P2IDE script (P2ID with execution hint).
     pub fn p2ide() -> Self {
-        WellKnownNote::P2IDE.script().into()
+        StandardNote::P2IDE.script().into()
     }
 
     /// Returns the well-known SWAP script.
     pub fn swap() -> Self {
-        WellKnownNote::SWAP.script().into()
+        StandardNote::SWAP.script().into()
     }
 
     /// Returns the MAST root of this script.

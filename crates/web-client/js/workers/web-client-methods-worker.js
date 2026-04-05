@@ -92,12 +92,21 @@ let processing = false; // Flag to ensure one message is processed at a time.
 // Track pending callback requests
 let pendingCallbacks = new Map();
 
+// Timeout for pending callbacks (30 seconds)
+const CALLBACK_TIMEOUT_MS = 30000;
+
 // Define proxy functions for callbacks that communicate with main thread
 const callbackProxies = {
   getKey: async (pubKey) => {
     return new Promise((resolve, reject) => {
       const requestId = `${CallbackType.GET_KEY}-${Date.now()}-${Math.random()}`;
-      pendingCallbacks.set(requestId, { resolve, reject });
+      const timeoutId = setTimeout(() => {
+        if (pendingCallbacks.has(requestId)) {
+          pendingCallbacks.delete(requestId);
+          reject(new Error(`Callback ${requestId} timed out`));
+        }
+      }, CALLBACK_TIMEOUT_MS);
+      pendingCallbacks.set(requestId, { resolve, reject, timeoutId });
 
       self.postMessage({
         action: WorkerAction.EXECUTE_CALLBACK,
@@ -110,7 +119,13 @@ const callbackProxies = {
   insertKey: async (pubKey, secretKey) => {
     return new Promise((resolve, reject) => {
       const requestId = `${CallbackType.INSERT_KEY}-${Date.now()}-${Math.random()}`;
-      pendingCallbacks.set(requestId, { resolve, reject });
+      const timeoutId = setTimeout(() => {
+        if (pendingCallbacks.has(requestId)) {
+          pendingCallbacks.delete(requestId);
+          reject(new Error(`Callback ${requestId} timed out`));
+        }
+      }, CALLBACK_TIMEOUT_MS);
+      pendingCallbacks.set(requestId, { resolve, reject, timeoutId });
 
       self.postMessage({
         action: WorkerAction.EXECUTE_CALLBACK,
@@ -123,7 +138,13 @@ const callbackProxies = {
   sign: async (pubKey, signingInputs) => {
     return new Promise((resolve, reject) => {
       const requestId = `${CallbackType.SIGN}-${Date.now()}-${Math.random()}`;
-      pendingCallbacks.set(requestId, { resolve, reject });
+      const timeoutId = setTimeout(() => {
+        if (pendingCallbacks.has(requestId)) {
+          pendingCallbacks.delete(requestId);
+          reject(new Error(`Callback ${requestId} timed out`));
+        }
+      }, CALLBACK_TIMEOUT_MS);
+      pendingCallbacks.set(requestId, { resolve, reject, timeoutId });
 
       self.postMessage({
         action: WorkerAction.EXECUTE_CALLBACK,
@@ -137,49 +158,25 @@ const callbackProxies = {
 
 // Define a mapping from method names to handler functions.
 const methodHandlers = {
-  [MethodName.NEW_WALLET]: async (args) => {
-    const wasm = await getWasmOrThrow();
-    const [walletStorageModeStr, mutable, authSchemeId, seed] = args;
-    const walletStorageMode =
-      wasm.AccountStorageMode.tryFromStr(walletStorageModeStr);
-    const wallet = await wasmWebClient.newWallet(
-      walletStorageMode,
-      mutable,
-      authSchemeId,
-      seed
-    );
-    const serializedWallet = wallet.serialize();
-    return serializedWallet.buffer;
-  },
-  [MethodName.NEW_FAUCET]: async (args) => {
-    const wasm = await getWasmOrThrow();
-    const [
-      faucetStorageModeStr,
-      nonFungible,
-      tokenSymbol,
-      decimals,
-      maxSupplyStr,
-      authSchemeId,
-    ] = args;
-    const faucetStorageMode =
-      wasm.AccountStorageMode.tryFromStr(faucetStorageModeStr);
-    const maxSupply = BigInt(maxSupplyStr);
-    const faucet = await wasmWebClient.newFaucet(
-      faucetStorageMode,
-      nonFungible,
-      tokenSymbol,
-      decimals,
-      maxSupply,
-      authSchemeId
-    );
-    const serializedFaucet = faucet.serialize();
-    return serializedFaucet.buffer;
-  },
   [MethodName.SYNC_STATE]: async () => {
     // Call the internal WASM method (sync lock is handled at the JS wrapper level)
     const syncSummary = await wasmWebClient.syncStateImpl();
     const serializedSyncSummary = syncSummary.serialize();
     return serializedSyncSummary.buffer;
+  },
+  [MethodName.APPLY_TRANSACTION]: async (args) => {
+    const wasm = await getWasmOrThrow();
+    const [serializedTransactionResult, submissionHeight] = args;
+    const transactionResultBytes = new Uint8Array(serializedTransactionResult);
+    const transactionResult = wasm.TransactionResult.deserialize(
+      transactionResultBytes
+    );
+    const transactionUpdate = await wasmWebClient.applyTransaction(
+      transactionResult,
+      submissionHeight
+    );
+    const serializedUpdate = transactionUpdate.serialize();
+    return serializedUpdate.buffer;
   },
   [MethodName.EXECUTE_TRANSACTION]: async (args) => {
     const wasm = await getWasmOrThrow();
@@ -432,7 +429,7 @@ async function processMessage(event) {
       }
 
       wasmWebClient = new wasm.WebClient();
-      await wasmWebClient.createMockClient(seed);
+      await wasmWebClient.createMockClient(seed, undefined, undefined);
 
       wasmSeed = seed;
       ready = true;
@@ -489,7 +486,9 @@ self.onmessage = (event) => {
     pendingCallbacks.has(event.data.callbackRequestId)
   ) {
     const { callbackRequestId, callbackResult, callbackError } = event.data;
-    const { resolve, reject } = pendingCallbacks.get(callbackRequestId);
+    const { resolve, reject, timeoutId } =
+      pendingCallbacks.get(callbackRequestId);
+    clearTimeout(timeoutId);
     pendingCallbacks.delete(callbackRequestId);
     if (!callbackError) {
       resolve(callbackResult);

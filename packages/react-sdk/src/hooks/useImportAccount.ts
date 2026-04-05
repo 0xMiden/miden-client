@@ -6,7 +6,7 @@ import type {
   Account,
   AccountId as AccountIdType,
   AccountFile as AccountFileType,
-  WebClient,
+  WasmWebClient as WebClient,
 } from "@miden-sdk/miden-sdk";
 import type { ImportAccountOptions } from "../types";
 import { DEFAULTS } from "../types";
@@ -146,7 +146,7 @@ export function useImportAccount(): UseImportAccountResult {
               throw new Error("Account not found after import");
             }
             case "id": {
-              const accountId = resolveAccountId(options.accountId);
+              const accountId = parseAccountId(options.accountId);
               await client.importAccountById(accountId);
               const fetchedAccount = await client.getAccount(accountId);
               if (!fetchedAccount) {
@@ -196,10 +196,6 @@ export function useImportAccount(): UseImportAccountResult {
     error,
     reset,
   };
-}
-
-function resolveAccountId(accountId: string | AccountIdType): AccountIdType {
-  return parseAccountId(accountId);
 }
 
 async function resolveAccountFile(

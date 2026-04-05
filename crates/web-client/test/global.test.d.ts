@@ -31,13 +31,14 @@ import {
   NoteAssets,
   NoteConsumability,
   NoteExecutionHint,
+  NoteExportFormat,
   NoteFilter,
   NoteFile,
   NoteFilterTypes,
   NoteId,
   NoteIdAndArgs,
   NoteIdAndArgsArray,
-  NoteInputs,
+  NoteStorage,
   NoteMetadata,
   NoteRecipient,
   NoteTag,
@@ -47,6 +48,7 @@ import {
   Package,
   ProcedureThreshold,
   PublicKey,
+  Poseidon2,
   Rpo256,
   RpcClient,
   Signature,
@@ -75,13 +77,18 @@ import {
   CodeBuilder,
   CodeBuilderMode,
   createAuthFalcon512RpoMultisig,
+  MidenClient,
+  WasmWebClient,
+  MockWasmWebClient,
+  createP2IDNote,
+  createP2IDENote,
+  buildSwapTag,
 } from "../dist/index";
-import { MockWebClient, WebClient } from "../js";
 
 declare global {
   interface Window {
-    client: WebClient & WasmWebClient;
-    MockWebClient: typeof MockWebClient;
+    client: WasmWebClient & WasmWebClient;
+    MockWasmWebClient: typeof MockWasmWebClient;
     remoteProverUrl?: string;
     remoteProverInstance: TransactionProver;
     Account: typeof Account;
@@ -89,8 +96,6 @@ declare global {
     AccountBuilder: typeof AccountBuilder;
     AccountComponent: typeof AccountComponent;
     AccountDelta: typeof AccountDelta;
-    AccountStorageDelta: typeof AccountStorageDelta;
-    AccountVaultDelta: typeof AccountVaultDelta;
     AccountHeader: typeof AccountHeader;
     AccountId: typeof AccountId;
     AccountInterface: typeof AccountInterface;
@@ -121,13 +126,14 @@ declare global {
     NoteAssets: typeof NoteAssets;
     NoteConsumability: typeof NoteConsumability;
     NoteExecutionHint: typeof NoteExecutionHint;
+    NoteExportFormat: typeof NoteExportFormat;
     NoteFilter: typeof NoteFilter;
     NoteFile: typeof NoteFile;
     NoteFilterTypes: typeof NoteFilterTypes;
     NoteId: typeof NoteId;
     NoteIdAndArgs: typeof NoteIdAndArgs;
     NoteIdAndArgsArray: typeof NoteIdAndArgsArray;
-    NoteInputs: typeof NoteInputs;
+    NoteStorage: typeof NoteStorage;
     NoteMetadata: typeof NoteMetadata;
     NoteRecipient: typeof NoteRecipient;
     NoteScript: typeof NoteScript;
@@ -138,6 +144,7 @@ declare global {
     Package: typeof Package;
     ProcedureThreshold: typeof ProcedureThreshold;
     PublicKey: typeof PublicKey;
+    Poseidon2: typeof Poseidon2;
     Rpo256: typeof Rpo256;
     Signature: typeof Signature;
     SigningInputs: typeof SigningInputs;
@@ -159,13 +166,16 @@ declare global {
     TransactionScriptInputPairArray: typeof TransactionScriptInputPairArray;
     TransactionSummary: typeof TransactionSummary;
     RpcClient: typeof RpcClient;
-    WebClient: typeof WebClient;
+    WasmWebClient: typeof WasmWebClient;
     Word: typeof Word;
-    Address: typeof Address;
     MidenArrays: typeof MidenArrays;
     CodeBuilder: typeof CodeBuilder;
     CodeBuilderMode: typeof CodeBuilderMode;
     createAuthFalcon512RpoMultisig: typeof createAuthFalcon512RpoMultisig;
+    MidenClient: typeof MidenClient;
+    createP2IDNote: typeof createP2IDNote;
+    createP2IDENote: typeof createP2IDENote;
+    buildSwapTag: typeof buildSwapTag;
     createClient: () => Promise<void>;
 
     rpcUrl: string;

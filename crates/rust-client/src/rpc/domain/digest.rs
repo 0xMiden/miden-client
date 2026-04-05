@@ -1,10 +1,10 @@
 use alloc::string::String;
-use alloc::vec::Vec;
 use core::fmt::{self, Debug, Display, Formatter};
 
 use hex::ToHex;
+use miden_protocol::account::StorageMapKey;
 use miden_protocol::note::NoteId;
-use miden_protocol::{Felt, StarkField, Word};
+use miden_protocol::{Felt, Word};
 
 use crate::rpc::errors::RpcConversionError;
 use crate::rpc::generated as proto;
@@ -36,21 +36,23 @@ impl ToHex for &proto::primitives::Digest {
 
 impl ToHex for proto::primitives::Digest {
     fn encode_hex<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(Word::SERIALIZED_SIZE);
-        data.extend(format!("{:016x}", self.d0).chars());
-        data.extend(format!("{:016x}", self.d1).chars());
-        data.extend(format!("{:016x}", self.d2).chars());
-        data.extend(format!("{:016x}", self.d3).chars());
-        data.into_iter().collect()
+        const HEX_LOWER: [char; 16] =
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
+        [self.d0, self.d1, self.d2, self.d3]
+            .into_iter()
+            .flat_map(u64::to_be_bytes)
+            .flat_map(|b| [HEX_LOWER[(b >> 4) as usize], HEX_LOWER[(b & 0xf) as usize]])
+            .collect()
     }
 
     fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
-        let mut data: Vec<char> = Vec::with_capacity(Word::SERIALIZED_SIZE);
-        data.extend(format!("{:016X}", self.d0).chars());
-        data.extend(format!("{:016X}", self.d1).chars());
-        data.extend(format!("{:016X}", self.d2).chars());
-        data.extend(format!("{:016X}", self.d3).chars());
-        data.into_iter().collect()
+        const HEX_UPPER: [char; 16] =
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+        [self.d0, self.d1, self.d2, self.d3]
+            .into_iter()
+            .flat_map(u64::to_be_bytes)
+            .flat_map(|b| [HEX_UPPER[(b >> 4) as usize], HEX_UPPER[(b & 0xf) as usize]])
+            .collect()
     }
 }
 
@@ -60,10 +62,10 @@ impl ToHex for proto::primitives::Digest {
 impl From<Word> for proto::primitives::Digest {
     fn from(value: Word) -> Self {
         Self {
-            d0: value[0].as_int(),
-            d1: value[1].as_int(),
-            d2: value[2].as_int(),
-            d3: value[3].as_int(),
+            d0: value[0].as_canonical_u64(),
+            d1: value[1].as_canonical_u64(),
+            d2: value[2].as_canonical_u64(),
+            d3: value[3].as_canonical_u64(),
         }
     }
 }
@@ -93,10 +95,7 @@ impl TryFrom<proto::primitives::Digest> for [Felt; 4] {
     type Error = RpcConversionError;
 
     fn try_from(value: proto::primitives::Digest) -> Result<Self, Self::Error> {
-        if [value.d0, value.d1, value.d2, value.d3]
-            .iter()
-            .all(|v| *v < <Felt as StarkField>::MODULUS)
-        {
+        if [value.d0, value.d1, value.d2, value.d3].iter().all(|v| *v < Felt::ORDER) {
             Ok([
                 Felt::new(value.d0),
                 Felt::new(value.d1),
@@ -130,5 +129,13 @@ impl TryFrom<&proto::primitives::Digest> for Word {
 
     fn try_from(value: &proto::primitives::Digest) -> Result<Self, Self::Error> {
         (*value).try_into()
+    }
+}
+
+impl TryFrom<proto::primitives::Digest> for StorageMapKey {
+    type Error = RpcConversionError;
+
+    fn try_from(value: proto::primitives::Digest) -> Result<Self, Self::Error> {
+        Ok(StorageMapKey::new(value.try_into()?))
     }
 }

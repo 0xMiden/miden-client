@@ -157,6 +157,19 @@ token_metadata.ticker = "TEST"
 
 View a summary of the current client state.
 
+#### Action Flags
+
+| Flag           | Description                                  | Short Flag |
+| -------------- | -------------------------------------------- | ---------- |
+| `--rpc-status` | Display detailed RPC node status information | `-r`       |
+
+When using the `--rpc-status` flag, the command displays additional information about the RPC node including:
+
+- Node version
+- Genesis commitment
+- Store connection status and chain tip
+- Block producer status and chain tip
+
 ### `notes`
 
 View and manage notes. Also, exchange private notes using the note transport network.
@@ -389,7 +402,7 @@ The file referenced by `--inputs-path` should contain a TOML array of inline tab
 The input file should contain a TOML table called `inputs`, as in the following example:
 
 ```toml
-inputs = [ { key = "0x0000001000000000000000000000000000000000000000000000000000000000", values = ["13", "9"]}, { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]}, ]
+inputs = [ { key = "0x0000000000000000000000000000000000000000000000000000001000000000", values = ["13", "9"]}, { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]}, ]
 ```
 
 ### `note-transport`

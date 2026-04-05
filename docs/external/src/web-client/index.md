@@ -38,3 +38,35 @@ yarn add @miden-sdk/miden-sdk
 ```
 
 See the [README](https://github.com/0xMiden/miden-client/blob/main/crates/web-client/README) for full installation instructions and some usage instructions, including code examples for wallet creation, transaction execution, and syncing state.
+
+## API Reference
+
+For complete API documentation, see the [TypeDoc API Reference](https://github.com/0xMiden/miden-client/blob/main/docs/typedoc/web-client/README.md).
+
+## Resource Management
+
+The MidenClient uses a dedicated [Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) to offload computationally intensive operations like wallet creation, transaction proving, and state synchronization. This keeps the main thread responsive.
+
+When building applications that create multiple MidenClient instances (e.g., multi-wallet apps or when switching between networks), it's important to properly clean up instances you no longer need:
+
+```typescript
+import { MidenClient } from "@miden-sdk/miden-sdk";
+
+// Create client
+const client = await MidenClient.create({ rpcUrl });
+
+// ... use the client ...
+
+// Clean up when done to free the worker thread
+client.terminate();
+
+// Or use explicit resource management (TC39 proposal):
+{
+  using client = await MidenClient.create();
+  // ... client.terminate() called automatically at end of scope
+}
+```
+
+Each active MidenClient holds a Web Worker thread. Calling `terminate()` releases this resource. Failure to terminate unused clients may lead to memory leaks in long-running applications.
+
+**Note:** After calling `terminate()`, all subsequent method calls will throw `Error("Client terminated")`.

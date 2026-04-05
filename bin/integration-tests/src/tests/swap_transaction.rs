@@ -1,10 +1,11 @@
 use anyhow::{Context, Result};
-use miden_client::account::{Account, AccountStorageMode};
+use miden_client::account::AccountStorageMode;
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
-use miden_client::note::{Note, NoteDetails, NoteFile, NoteType, build_swap_tag};
+use miden_client::note::{Note, NoteDetails, NoteFile, NoteType, SwapNote};
 use miden_client::testing::common::*;
 use miden_client::transaction::{SwapTransactionData, TransactionRequestBuilder};
+use tracing::info;
 
 use crate::tests::config::ClientConfig;
 
@@ -60,7 +61,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     .await?;
 
     // mint 1000 BTC for accountA
-    println!("minting 1000 btc for account A");
+    info!(account_id = %account_a.id(), faucet_id = %btc_faucet_account.id(), "Minting 1000 BTC for account A");
 
     let tx_id =
         mint_and_consume(&mut client1, account_a.id(), btc_faucet_account.id(), NoteType::Public)
@@ -68,7 +69,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     wait_for_tx(&mut client1, tx_id).await?;
 
     // mint 1000 ETH for accountB
-    println!("minting 1000 eth for account B");
+    info!(account_id = %account_b.id(), faucet_id = %eth_faucet_account.id(), "Minting 1000 ETH for account B");
 
     let tx_id =
         mint_and_consume(&mut client2, account_b.id(), eth_faucet_account.id(), NoteType::Public)
@@ -77,11 +78,11 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
 
     // Create ONCHAIN swap note (clientA offers 1 BTC in exchange of 25 ETH)
     // check that account now has 1 less BTC
-    println!("creating swap note with accountA");
     let offered_asset = FungibleAsset::new(btc_faucet_account.id(), OFFERED_ASSET_AMOUNT)?;
     let requested_asset = FungibleAsset::new(eth_faucet_account.id(), REQUESTED_ASSET_AMOUNT)?;
+    info!(account_id = %account_a.id(), offered_amount = OFFERED_ASSET_AMOUNT, requested_amount = REQUESTED_ASSET_AMOUNT, "Creating swap note");
 
-    println!("Running SWAP tx...");
+    info!("Executing SWAP transaction");
     let tx_request = TransactionRequestBuilder::new().build_swap(
         &SwapTransactionData::new(
             account_a.id(),
@@ -101,7 +102,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
 
     execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await?;
 
-    let swap_note_tag = build_swap_tag(
+    let swap_note_tag = SwapNote::build_tag(
         NoteType::Public,
         &Asset::Fungible(offered_asset),
         &Asset::Fungible(requested_asset),
@@ -110,13 +111,13 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     // add swap note's tag to client2
     // we could technically avoid this step, but for the first iteration of swap notes we'll
     // require to manually add tags
-    println!("Adding swap tag");
+    info!(tag = %swap_note_tag, "Adding swap note tag to client 2");
     client2.add_note_tag(swap_note_tag).await?;
 
     // sync on client 2, we should get the swap note
     // consume swap note with accountB, and check that the vault changed appropriately
     client2.sync_state().await?;
-    println!("Consuming swap note on second client...");
+    info!(note_id = %expected_output_notes[0].id(), account_id = %account_b.id(), "Consuming swap note on client 2");
 
     let note = client2
         .get_input_note(expected_output_notes[0].id())
@@ -129,7 +130,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     // sync on client 1, we should get the missing payback note details.
     // try consuming the received note with accountA, it should now have 25 ETH
     client1.sync_state().await?;
-    println!("Consuming swap payback note on first client...");
+    info!(note_id = %expected_payback_note_details[0].id(), account_id = %account_a.id(), "Consuming swap payback note on client 1");
 
     let note = client1
         .get_input_note(expected_payback_note_details[0].id())
@@ -144,76 +145,20 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     // - accountA: 999 BTC, 25 ETH
     // - accountB: 1 BTC, 975 ETH
 
-    // first reload the account
-    let account_a: Account = client1
-        .get_account(account_a.id())
-        .await?
-        .context("failed to find account A after swap transaction")?
-        .try_into()
-        .unwrap();
-    let account_a_assets = account_a.vault().assets();
-    assert_eq!(account_a_assets.count(), 2);
-    let mut account_a_assets = account_a.vault().assets();
+    let account_a_reader = client1.account_reader(account_a.id());
+    let account_a_btc = account_a_reader.get_balance(btc_faucet_account.id()).await?;
+    let account_a_eth = account_a_reader.get_balance(eth_faucet_account.id()).await?;
 
-    let asset_1 = account_a_assets
-        .next()
-        .context("expected first asset in account A;s vault after swap")?;
-    let asset_2 = account_a_assets
-        .next()
-        .context("expected second asset in account A's vault after swap")?;
+    assert_eq!(account_a_btc, 999);
+    assert_eq!(account_a_eth, 25);
 
-    match (asset_1, asset_2) {
-        (Asset::Fungible(btc_asset), Asset::Fungible(eth_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 999);
-            assert_eq!(eth_asset.amount(), 25);
-        },
-        (Asset::Fungible(eth_asset), Asset::Fungible(btc_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 999);
-            assert_eq!(eth_asset.amount(), 25);
-        },
-        _ => panic!("should only have fungible assets!"),
-    }
+    let account_b_reader = client2.account_reader(account_b.id());
+    let account_b_btc = account_b_reader.get_balance(btc_faucet_account.id()).await?;
+    let account_b_eth = account_b_reader.get_balance(eth_faucet_account.id()).await?;
 
-    let account_b: Account = client2
-        .get_account(account_b.id())
-        .await?
-        .context("failed to find account B after swap transaction")?
-        .try_into()
-        .unwrap();
-    let account_b_assets = account_b.vault().assets();
-    assert_eq!(account_b_assets.count(), 2);
-    let mut account_b_assets = account_b.vault().assets();
+    assert_eq!(account_b_btc, 1);
+    assert_eq!(account_b_eth, 975);
 
-    let asset_1 = account_b_assets
-        .next()
-        .context("expected first asset in account B's vault after swap")?;
-    let asset_2 = account_b_assets
-        .next()
-        .context("expected second asset in account B's vault after swap")?;
-
-    match (asset_1, asset_2) {
-        (Asset::Fungible(btc_asset), Asset::Fungible(eth_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 1);
-            assert_eq!(eth_asset.amount(), 975);
-        },
-        (Asset::Fungible(eth_asset), Asset::Fungible(btc_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 1);
-            assert_eq!(eth_asset.amount(), 975);
-        },
-        _ => panic!("should only have fungible assets!"),
-    }
     Ok(())
 }
 
@@ -265,14 +210,14 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     .await?;
 
     // mint 1000 BTC for accountA
-    println!("minting 1000 btc for account A");
+    info!(account_id = %account_a.id(), faucet_id = %btc_faucet_account.id(), "Minting 1000 BTC for account A");
     let tx_id =
         mint_and_consume(&mut client1, account_a.id(), btc_faucet_account.id(), NoteType::Public)
             .await;
     wait_for_tx(&mut client1, tx_id).await?;
 
     // mint 1000 ETH for accountB
-    println!("minting 1000 eth for account B");
+    info!(account_id = %account_b.id(), faucet_id = %eth_faucet_account.id(), "Minting 1000 ETH for account B");
     let tx_id =
         mint_and_consume(&mut client2, account_b.id(), eth_faucet_account.id(), NoteType::Public)
             .await;
@@ -280,11 +225,11 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
 
     // Create ONCHAIN swap note (clientA offers 1 BTC in exchange of 25 ETH)
     // check that account now has 1 less BTC
-    println!("creating swap note with accountA");
     let offered_asset = FungibleAsset::new(btc_faucet_account.id(), OFFERED_ASSET_AMOUNT)?;
     let requested_asset = FungibleAsset::new(eth_faucet_account.id(), REQUESTED_ASSET_AMOUNT)?;
+    info!(account_id = %account_a.id(), offered_amount = OFFERED_ASSET_AMOUNT, requested_amount = REQUESTED_ASSET_AMOUNT, "Creating swap note");
 
-    println!("Running SWAP tx...");
+    info!("Executing SWAP transaction");
     let tx_request = TransactionRequestBuilder::new().build_swap(
         &SwapTransactionData::new(
             account_a.id(),
@@ -310,7 +255,7 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
         .await?
         .with_context(|| format!("Output note {} not found", expected_output_notes[0].id()))?;
 
-    let tag = build_swap_tag(
+    let tag = SwapNote::build_tag(
         NoteType::Private,
         &Asset::Fungible(offered_asset),
         &Asset::Fungible(requested_asset),
@@ -328,7 +273,7 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     client2.sync_state().await?;
 
     // consume swap note with accountB, and check that the vault changed appropriately
-    println!("Consuming swap note on second client...");
+    info!(note_id = %expected_output_notes[0].id(), account_id = %account_b.id(), "Consuming swap note on client 2");
 
     let note = client2
         .get_input_note(expected_output_notes[0].id())
@@ -341,7 +286,7 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     // sync on client 1, we should get the missing payback note details.
     // try consuming the received note with accountA, it should now have 25 ETH
     client1.sync_state().await?;
-    println!("Consuming swap payback note on first client...");
+    info!(note_id = %expected_payback_note_details[0].id(), account_id = %account_a.id(), "Consuming swap payback note on client 1");
 
     let note = client1
         .get_input_note(expected_payback_note_details[0].id())
@@ -356,75 +301,19 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     // - accountA: 999 BTC, 25 ETH
     // - accountB: 1 BTC, 975 ETH
 
-    // first reload the account
-    let account_a: Account = client1
-        .get_account(account_a.id())
-        .await?
-        .context("failed to find account A after private swap transaction")?
-        .try_into()
-        .unwrap();
-    let account_a_assets = account_a.vault().assets();
-    assert_eq!(account_a_assets.count(), 2);
-    let mut account_a_assets = account_a.vault().assets();
+    let account_a_reader = client1.account_reader(account_a.id());
+    let account_a_btc = account_a_reader.get_balance(btc_faucet_account.id()).await?;
+    let account_a_eth = account_a_reader.get_balance(eth_faucet_account.id()).await?;
 
-    let asset_1 = account_a_assets
-        .next()
-        .context("expected first asset in account A's vault after private swap")?;
-    let asset_2 = account_a_assets
-        .next()
-        .context("expected second asset in account A's vault after private swap")?;
+    assert_eq!(account_a_btc, 999);
+    assert_eq!(account_a_eth, 25);
 
-    match (asset_1, asset_2) {
-        (Asset::Fungible(btc_asset), Asset::Fungible(eth_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 999);
-            assert_eq!(eth_asset.amount(), 25);
-        },
-        (Asset::Fungible(eth_asset), Asset::Fungible(btc_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 999);
-            assert_eq!(eth_asset.amount(), 25);
-        },
-        _ => panic!("should only have fungible assets!"),
-    }
+    let account_b_reader = client2.account_reader(account_b.id());
+    let account_b_btc = account_b_reader.get_balance(btc_faucet_account.id()).await?;
+    let account_b_eth = account_b_reader.get_balance(eth_faucet_account.id()).await?;
 
-    let account_b: Account = client2
-        .get_account(account_b.id())
-        .await?
-        .context("failed to find account B after swap transaction")?
-        .try_into()
-        .unwrap();
-    let account_b_assets = account_b.vault().assets();
-    assert_eq!(account_b_assets.count(), 2);
-    let mut account_b_assets = account_b.vault().assets();
+    assert_eq!(account_b_btc, 1);
+    assert_eq!(account_b_eth, 975);
 
-    let asset_1 = account_b_assets
-        .next()
-        .context("expected first asset in account B's vault after swap")?;
-    let asset_2 = account_b_assets
-        .next()
-        .context("expected second asset in account B's vault after swap")?;
-
-    match (asset_1, asset_2) {
-        (Asset::Fungible(btc_asset), Asset::Fungible(eth_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 1);
-            assert_eq!(eth_asset.amount(), 975);
-        },
-        (Asset::Fungible(eth_asset), Asset::Fungible(btc_asset))
-            if btc_asset.faucet_id() == btc_faucet_account.id()
-                && eth_asset.faucet_id() == eth_faucet_account.id() =>
-        {
-            assert_eq!(btc_asset.amount(), 1);
-            assert_eq!(eth_asset.amount(), 975);
-        },
-        _ => panic!("should only have fungible assets!"),
-    }
     Ok(())
 }

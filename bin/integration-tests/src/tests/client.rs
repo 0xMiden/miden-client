@@ -2,35 +2,29 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use miden_client::account::component::AccountComponent;
+use miden_client::account::component::{AccountComponent, AccountComponentMetadata};
 use miden_client::account::{
     Account,
     AccountBuilder,
     AccountId,
     AccountStorageMode,
+    AccountType,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotName,
 };
-use miden_client::assembly::{
-    CodeBuilder,
-    DefaultSourceManager,
-    MastForest,
-    Module,
-    ModuleKind,
-    Path,
-};
+use miden_client::assembly::{CodeBuilder, DefaultSourceManager, Module, ModuleKind, Path};
 use miden_client::asset::{Asset, FungibleAsset};
-use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, RPO_FALCON_SCHEME_ID};
+use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteFile, NoteScript, NoteType};
+use miden_client::note::{NoteFile, NoteType};
 use miden_client::rpc::AccountStateAt;
 use miden_client::rpc::domain::account::{
     AccountStorageRequirements,
     FetchedAccount,
     StorageMapEntries,
-    StorageMapKey,
 };
 use miden_client::store::{
     InputNoteRecord,
@@ -42,7 +36,6 @@ use miden_client::store::{
 use miden_client::testing::common::*;
 use miden_client::transaction::{
     DiscardCause,
-    ForeignAccount,
     PaymentNoteDescription,
     ProvenTransaction,
     TransactionInputs,
@@ -52,8 +45,9 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{ClientError, Deserializable, Felt, Serializable, Word};
+use miden_client::{ClientError, Felt, Word};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
+use tracing::info;
 
 use crate::tests::config::ClientConfig;
 
@@ -64,7 +58,7 @@ pub async fn test_client_builder_initializes_client_with_endpoint(
 
     let mut client = ClientBuilder::<FilesystemKeyStore>::new()
         .grpc_client(&endpoint, Some(10_000))
-        .filesystem_keystore(auth_path.to_str().context("failed to convert auth path to string")?)
+        .filesystem_keystore(auth_path)?
         .sqlite_store(store_config)
         .in_debug_mode(miden_client::DebugMode::Enabled)
         .build()
@@ -124,7 +118,7 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
         )
         .unwrap();
 
-    println!("Running P2ID tx...");
+    info!(from = %from_account_id, to = %to_account_id, "Running P2ID transaction");
 
     // Create transactions
     let transaction_result_1 =
@@ -161,8 +155,9 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     // wait for 1 block
     wait_for_blocks(&mut client, 1).await;
 
-    // wait for 1 block
+    // wait for both transactions to be committed
     wait_for_tx(&mut client, transaction_id_1).await?;
+    wait_for_tx(&mut client, transaction_id_2).await?;
 
     let transactions = client
         .get_transactions(TransactionFilter::All)
@@ -180,16 +175,12 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
     let note = client.get_output_note(note_id).await.unwrap().unwrap();
     assert!(matches!(note.state(), OutputNoteState::CommittedFull { .. }));
 
-    let sender_account: Account = client
-        .get_account(from_account_id)
-        .await?
-        .context("failed to find sender account after transactions")?
-        .try_into()
-        .unwrap();
-    assert_eq!(
-        sender_account.vault().get_balance(faucet_account_id).unwrap(),
-        MINT_AMOUNT - (TRANSFER_AMOUNT * 2)
-    );
+    let sender_balance = client
+        .account_reader(from_account_id)
+        .get_balance(faucet_account_id)
+        .await
+        .context("failed to find sender account after transactions")?;
+    assert_eq!(sender_balance, MINT_AMOUNT - (TRANSFER_AMOUNT * 2));
     Ok(())
 }
 
@@ -555,7 +546,7 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         // Create a Mint Tx for 1000 units of our fungible asset
         let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
 
-        println!("Minting Asset");
+        info!(faucet_id = %faucet_account_id, target = %from_account_id, "Minting first asset");
         let tx_request = TransactionRequestBuilder::new().build_mint_fungible_asset(
             fungible_asset,
             from_account_id,
@@ -563,7 +554,7 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
             client.rng(),
         )?;
 
-        println!("Executing transaction...");
+        info!("Executing first mint transaction");
         let transaction_id =
             client.submit_new_transaction(faucet_account_id, tx_request.clone()).await?;
         let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
@@ -576,7 +567,7 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         // Create a Mint Tx for 1000 units of our fungible asset
         let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
 
-        println!("Minting Asset");
+        info!(faucet_id = %faucet_account_id, target = %from_account_id, "Minting second asset");
         let tx_request = TransactionRequestBuilder::new().build_mint_fungible_asset(
             fungible_asset,
             from_account_id,
@@ -584,12 +575,12 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
             client.rng(),
         )?;
 
-        println!("Executing transaction...");
+        info!("Executing second mint transaction");
         let transaction_result =
             client.execute_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
         let transaction_id = transaction_result.id();
 
-        println!("Sending transaction to node");
+        info!(tx_id = %transaction_id, "Sending second transaction to node");
         // May need a few attempts until it gets included
         let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
         while client
@@ -616,7 +607,7 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
         // Create a Mint Tx for 1000 units of our fungible asset
         let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
 
-        println!("Minting Asset");
+        info!(faucet_id = %faucet_account_id, target = %from_account_id, "Minting third asset");
         let tx_request = TransactionRequestBuilder::new().build_mint_fungible_asset(
             fungible_asset,
             from_account_id,
@@ -624,12 +615,12 @@ pub async fn test_multiple_transactions_can_be_committed_in_different_blocks_wit
             client.rng(),
         )?;
 
-        println!("Executing transaction...");
+        info!("Executing third mint transaction");
         let transaction_result =
             client.execute_transaction(faucet_account_id, tx_request.clone()).await.unwrap();
         let transaction_id = transaction_result.id();
 
-        println!("Sending transaction to node");
+        info!(tx_id = %transaction_id, "Sending third transaction to node");
         // May need a few attempts until it gets included
         let note_id = tx_request.expected_output_own_notes().pop().unwrap().id();
         while client
@@ -720,20 +711,22 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
     let faucet_account_id = faucet_account_header.id();
     let to_account_ids = [target_basic_account_1.id(), target_basic_account_2.id()];
 
-    // Mint tokens to the accounts
     let fungible_asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
+
+    // Mint tokens to the accounts
     let mint_tx_request = mint_multiple_fungible_asset(
         fungible_asset,
         &[to_account_ids[0], to_account_ids[0], to_account_ids[1], to_account_ids[1]],
         NoteType::Private,
         client.rng(),
     );
+    let all_expected_notes = mint_tx_request.expected_output_own_notes();
+    execute_tx_and_sync(&mut client, faucet_account_id, mint_tx_request).await?;
 
-    execute_tx_and_sync(&mut client, faucet_account_id, mint_tx_request.clone()).await?;
     unauth_client.sync_state().await.unwrap();
 
     // Filter notes by ownership
-    let expected_notes = mint_tx_request.expected_output_own_notes().into_iter();
+    let expected_notes = all_expected_notes.into_iter();
     let client_notes: Vec<_> = client.get_input_notes(NoteFilter::All).await.unwrap();
     let client_notes_ids: Vec<_> = client_notes.iter().map(|note| note.id()).collect();
 
@@ -824,7 +817,7 @@ pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -
     let current_block_num = client_1.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
-    println!("Running P2IDE tx...");
+    info!(from = %from_account_id, to = %to_account_id, "Running P2IDE transaction");
     let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
         PaymentNoteDescription::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id)
             .with_reclaim_height(current_block_num),
@@ -842,7 +835,7 @@ pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -
 
     // Consume the note with the sender account
 
-    println!("Consuming Note...");
+    info!(note_id = %note.id(), account_id = %from_account_id, "Consuming note");
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![note.clone().try_into().unwrap()])
         .unwrap();
@@ -891,7 +884,7 @@ pub async fn test_import_consumed_note_with_id(client_config: ClientConfig) -> R
     let current_block_num = client_1.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
-    println!("Running P2IDE tx...");
+    info!(from = %from_account_id, to = %to_account_id, "Running P2IDE transaction (public)");
     let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
         PaymentNoteDescription::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id)
             .with_reclaim_height(current_block_num),
@@ -909,7 +902,7 @@ pub async fn test_import_consumed_note_with_id(client_config: ClientConfig) -> R
 
     // Consume the note with the sender account
 
-    println!("Consuming Note...");
+    info!(note_id = %note.id(), account_id = %from_account_id, "Consuming note");
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![note.clone().try_into().unwrap()])
         .unwrap();
@@ -954,7 +947,7 @@ pub async fn test_import_note_with_proof(client_config: ClientConfig) -> Result<
     let current_block_num = client_1.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
-    println!("Running P2IDE tx...");
+    info!(from = %from_account_id, to = %to_account_id, "Running P2IDE transaction (with proof)");
     let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
         PaymentNoteDescription::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id)
             .with_reclaim_height(current_block_num),
@@ -1024,7 +1017,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
     let current_block_num = client_1.get_sync_height().await.unwrap();
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
 
-    println!("Running P2IDE tx...");
+    info!(from = %from_account_id, to = %to_account_id, "Running P2IDE transaction (discarded)");
     let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
         PaymentNoteDescription::new(vec![Asset::Fungible(asset)], from_account_id, to_account_id)
             .with_reclaim_height(current_block_num),
@@ -1042,7 +1035,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
         .unwrap()
         .clone();
 
-    println!("Consuming Note...");
+    info!(note_id = %note.id(), account_id = %from_account_id, "Consuming note (without submitting)");
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![note.clone().try_into().unwrap()])
         .unwrap();
@@ -1053,8 +1046,8 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
     let tx_id = transaction_result.id();
 
     // Store the account state before applying the transaction
-    let account_before_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();
-    let account_hash_before_tx = account_before_tx.commitment();
+    let account_hash_before_tx =
+        client_1.account_reader(from_account_id).commitment().await.unwrap();
 
     // Apply the transaction
     let submission_height = client_1.get_sync_height().await.unwrap();
@@ -1064,8 +1057,8 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
         .unwrap();
 
     // Check that the account state has changed after applying the transaction
-    let account_after_tx = client_1.get_account(from_account_id).await.unwrap().unwrap();
-    let account_hash_after_tx = account_after_tx.commitment();
+    let account_hash_after_tx =
+        client_1.account_reader(from_account_id).commitment().await.unwrap();
 
     assert_ne!(
         account_hash_before_tx, account_hash_after_tx,
@@ -1100,8 +1093,8 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
     ));
 
     // Check that the account state has been rolled back after the transaction was discarded
-    let account_after_sync = client_1.get_account(from_account_id).await.unwrap().unwrap();
-    let account_hash_after_sync = account_after_sync.commitment();
+    let account_hash_after_sync =
+        client_1.account_reader(from_account_id).commitment().await.unwrap();
 
     assert_ne!(
         account_hash_after_sync, account_hash_after_tx,
@@ -1202,13 +1195,9 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
             .await;
     wait_for_tx(&mut client_1, tx_id).await?;
 
-    let private_account: Account = client_1
-        .get_account(from_account_id)
-        .await
-        .unwrap()
-        .unwrap()
-        .try_into()
-        .unwrap();
+    // Get full account from store for export to client_2
+    let private_account: Account =
+        client_1.get_account(from_account_id).await?.context("Account not found")?;
 
     let original_seed = private_account.seed();
 
@@ -1222,8 +1211,7 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     wait_for_node(&mut client_2).await;
 
     // When imported the account shouldn't be locked
-    let account_record = client_2.get_account(from_account_id).await.unwrap().unwrap();
-    assert!(!account_record.is_locked());
+    assert!(!client_2.account_reader(from_account_id).status().await.unwrap().is_locked());
 
     // Consume note with private account in client 1
     let tx_id =
@@ -1234,24 +1222,18 @@ pub async fn test_locked_account(client_config: ClientConfig) -> Result<()> {
     // After sync the private account should be locked in client 2
     let summary = client_2.sync_state().await.unwrap();
     assert!(summary.locked_accounts.contains(&from_account_id));
-    let account_record = client_2.get_account(from_account_id).await.unwrap().unwrap();
-    assert!(account_record.is_locked());
-    assert_eq!(account_record.status().seed().copied(), original_seed);
+    let status = client_2.account_reader(from_account_id).status().await.unwrap();
+    assert!(status.is_locked());
+    assert_eq!(status.seed(), original_seed.as_ref());
 
     // Get updated account from client 1 and import it in client 2 with `overwrite` flag
-    let updated_private_account = client_1
-        .get_account(from_account_id)
-        .await
-        .unwrap()
-        .unwrap()
-        .try_into()
-        .unwrap();
+    let updated_private_account: Account =
+        client_1.get_account(from_account_id).await?.context("Account not found")?;
     client_2.add_account(&updated_private_account, true).await.unwrap();
 
     // After sync the private account shouldn't be locked in client 2
     client_2.sync_state().await.unwrap();
-    let account_record = client_2.get_account(from_account_id).await.unwrap().unwrap();
-    assert!(!account_record.is_locked());
+    assert!(!client_2.account_reader(from_account_id).status().await.unwrap().is_locked());
     Ok(())
 }
 
@@ -1282,7 +1264,7 @@ pub async fn test_expired_transaction_fails(client_config: ClientConfig) -> Resu
 
     // Create a Mint Tx for 1000 units of our fungible asset
     let fungible_asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
-    println!("Minting Asset");
+    info!(faucet_id = %faucet_account_id, target = %from_account_id, expiration_delta, "Minting asset with expiration");
     let tx_request = TransactionRequestBuilder::new()
         .expiration_delta(expiration_delta)
         .build_mint_fungible_asset(
@@ -1292,14 +1274,14 @@ pub async fn test_expired_transaction_fails(client_config: ClientConfig) -> Resu
             client.rng(),
         )?;
 
-    println!("Executing transaction...");
+    info!("Executing transaction");
     let transaction_result =
         client.execute_transaction(faucet_account_id, tx_request).await.unwrap();
 
-    println!("Transaction executed successfully");
+    info!(tx_id = %transaction_result.id(), "Transaction executed, waiting for expiration");
     wait_for_blocks(&mut client, (expiration_delta + 1).into()).await;
 
-    println!("Sending transaction to node");
+    info!("Sending expired transaction to node (expecting failure)");
     let proven_transaction = client.prove_transaction(&transaction_result).await.unwrap();
     let submitted_tx_result =
         match client.submit_proven_transaction(proven_transaction, &transaction_result).await {
@@ -1368,8 +1350,8 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     let mut storage_map = StorageMap::new();
     storage_map.insert(
-        [Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into(),
-        [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
+        StorageMapKey::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into()),
+        [Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)].into(),
     )?;
 
     let map_slot_name =
@@ -1468,19 +1450,9 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .await
         .unwrap();
 
-    // Remove debug decorators from original note script, as they are not persisted on submission
-    // (https://github.com/0xMiden/miden-base/issues/1812)
-    let mut mast = (*note.script().mast()).clone();
-    mast.strip_decorators();
-
-    // normalize CSR storage to match deserialized form
-    let mast_bytes = mast.to_bytes();
-    let mast = MastForest::read_from_bytes(&mast_bytes)?;
-    let note_script = NoteScript::from_parts(Arc::new(mast), note.script().entrypoint());
-
     assert_eq!(node_nullifier.nullifier, nullifier);
     assert_eq!(node_nullifier_proof.leaf().entries().first().unwrap().0, nullifier.as_word());
-    assert_eq!(note_script, retrieved_note_script);
+    assert_eq!(note.script().root(), retrieved_note_script.root());
     assert!(!sync_storage_maps.updates.is_empty());
     assert!(!account_vault_info.updates.is_empty());
     assert!(!transactions_info.transaction_records.is_empty());
@@ -1572,12 +1544,12 @@ pub async fn test_output_only_note(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-/// Tests that `get_account` with `AccountStorageRequirements` correctly filters storage map
-/// entries by key.
+/// Tests that `get_account_proof` with `AccountStorageRequirements` correctly filters storage
+/// map entries by key.
 ///
 /// Creates a public account with a map slot containing 2 entries, then verifies:
 /// - Requesting with empty keys returns `AllEntries` with both entries.
-/// - Requesting with one specific key returns `EntriesWithProofs` with just that entry.
+/// - Requesting with one specific key returns `EntriesWithProofs` with just that entry's proof.
 pub async fn test_get_account_storage_map_key_filtering(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
@@ -1585,10 +1557,10 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     let map_slot_name =
         StorageSlotName::new("miden::testing::client::map").expect("valid slot name");
     let map_key_1 =
-        StorageMapKey::from([Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)]);
+        StorageMapKey::new([Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)].into());
     let map_value_1 = Word::from([Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)]);
     let map_key_2 =
-        StorageMapKey::from([Felt::new(20), Felt::new(20), Felt::new(20), Felt::new(20)]);
+        StorageMapKey::new([Felt::new(20), Felt::new(20), Felt::new(20), Felt::new(20)].into());
     let map_value_2 = Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
 
     let mut storage_map = StorageMap::new();
@@ -1602,13 +1574,17 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
             "pub proc dummy\n push.1\n end".to_string(),
         )
         .context("failed to compile component code")?;
-    let component = AccountComponent::new(component_code, vec![map_slot])
-        .map_err(|err| anyhow::anyhow!(err))?
-        .with_supports_all_types();
+    let component = AccountComponent::new(
+        component_code,
+        vec![map_slot],
+        AccountComponentMetadata::new("miden::testing::map_key_filtering", AccountType::all()),
+    )
+    .map_err(|err| anyhow::anyhow!(err))?;
 
-    let key_pair = AuthSecretKey::new_falcon512_rpo();
+    let key_pair = AuthSecretKey::new_falcon512_poseidon2();
     let auth_component: AccountComponent =
-        AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
+        AuthSingleSig::new(key_pair.public_key().to_commitment(), AuthSchemeId::Falcon512Poseidon2)
+            .into();
 
     let account = AccountBuilder::new(Default::default())
         .with_component(component)
@@ -1618,7 +1594,7 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
         .context("failed to build account")?;
     let account_id = account.id();
 
-    keystore.add_key(&key_pair).context("failed to add key")?;
+    keystore.add_key(&key_pair, account_id).await.context("failed to add key")?;
     client.add_account(&account, false).await?;
 
     // Deploy the account (first tx updates nonce)
@@ -1631,12 +1607,11 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
 
     // Request all entries (empty keys)
     let requirements_all = AccountStorageRequirements::new([(map_slot_name.clone(), [].iter())]);
-    let foreign_all = ForeignAccount::public(account_id, requirements_all)?;
-    let (_, proof_all) = rpc.get_account(foreign_all, AccountStateAt::ChainTip, None).await?;
-    let (_, details_all) = proof_all.into_parts();
-    let map_all = details_all
-        .as_ref()
-        .and_then(|d| d.storage_details.find_map_details(&map_slot_name))
+    let (_, proof_all) = rpc
+        .get_account_proof(account_id, requirements_all, AccountStateAt::ChainTip, None)
+        .await?;
+    let map_all = proof_all
+        .find_map_details(&map_slot_name)
         .context("expected storage map details")?;
 
     assert!(
@@ -1647,25 +1622,73 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
 
     // Request one specific key
     let requirements_one = AccountStorageRequirements::new([(map_slot_name.clone(), [&map_key_1])]);
-    let foreign_one = ForeignAccount::public(account_id, requirements_one)?;
-    let (_, proof_one) = rpc.get_account(foreign_one, AccountStateAt::ChainTip, None).await?;
-    let (_, details_one) = proof_one.into_parts();
-    let map_one = details_one
-        .as_ref()
-        .and_then(|d| d.storage_details.find_map_details(&map_slot_name))
+    let (_, proof_one) = rpc
+        .get_account_proof(account_id, requirements_one, AccountStateAt::ChainTip, None)
+        .await?;
+    let map_one = proof_one
+        .find_map_details(&map_slot_name)
         .context("expected storage map details")?;
 
     match &map_one.entries {
-        StorageMapEntries::EntriesWithProofs(witnesses) => {
-            assert_eq!(witnesses.len(), 1, "expected 1 witness");
-            let (_, value) = witnesses[0]
-                .entries()
-                .next()
-                .context("expected at least one entry in witness")?;
-            assert_eq!(*value, map_value_1, "value should match the requested key's value");
+        StorageMapEntries::EntriesWithProofs(proofs) => {
+            assert_eq!(proofs.len(), 1, "expected 1 proof");
+            let hashed_key = map_key_1.hash().as_word();
+            let value = proofs[0].get(&hashed_key);
+            assert!(value.is_some(), "proof should contain the requested key");
+            assert_eq!(value.unwrap(), map_value_1, "value should match the requested key's value");
         },
         other => anyhow::bail!("expected EntriesWithProofs, got {:?}", other),
     }
+
+    Ok(())
+}
+
+/// Tests that pruning account history removes old committed states without affecting
+/// the current account state. Sets up a faucet, mints twice to build up history,
+/// then verifies that `prune_account_history` deletes intermediate states while
+/// keeping the account readable and unchanged.
+pub async fn test_prune_account_history(client_config: ClientConfig) -> Result<()> {
+    let (mut client, authenticator) = client_config.into_client().await?;
+    wait_for_node(&mut client).await;
+
+    let (basic_account, faucet_account) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    let faucet_id = faucet_account.id();
+    let wallet_id = basic_account.id();
+
+    // Mint twice: each mint advances the faucet nonce, creating historical entries.
+    let (tx_id_1, _) = mint_note(&mut client, wallet_id, faucet_id, NoteType::Public).await;
+    wait_for_tx(&mut client, tx_id_1).await?;
+
+    let (tx_id_2, _) = mint_note(&mut client, wallet_id, faucet_id, NoteType::Public).await;
+    wait_for_tx(&mut client, tx_id_2).await?;
+
+    // Record faucet state before pruning.
+    let faucet_before = client.get_account(faucet_id).await?.unwrap();
+
+    // Prune faucet history up to nonce 1: should remove old committed states.
+    let deleted = client.prune_account_history(faucet_id, Felt::new(1)).await?;
+    assert!(deleted > 0, "Should have pruned old committed states");
+
+    // Account should still be fully readable and unchanged.
+    let faucet_after = client.get_account(faucet_id).await?.unwrap();
+    assert_eq!(
+        faucet_before.to_commitment(),
+        faucet_after.to_commitment(),
+        "Account state should be identical after pruning"
+    );
+
+    // Both accounts should still be readable.
+    assert!(client.get_account(wallet_id).await?.is_some());
+    assert!(client.get_account(faucet_id).await?.is_some());
+
+    info!(deleted_single = deleted, "Prune account history test completed");
 
     Ok(())
 }

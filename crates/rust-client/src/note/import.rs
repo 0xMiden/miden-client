@@ -55,8 +55,7 @@ where
     /// # Errors
     ///
     /// - If an attempt is made to overwrite a note that is currently processing.
-    /// - If the client has reached the note tags limit
-    ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
+    /// - If the client has reached the note tags limit.
     ///
     /// Note: This operation is atomic. If any note file is invalid or any existing note is in the
     /// processing state, the entire operation fails and no notes are imported.
@@ -266,8 +265,9 @@ where
                 let block_height = inclusion_proof.location().block_num();
                 let current_block_num = self.get_sync_height().await?;
 
+                let tag = metadata.tag();
                 let mut note_changed =
-                    note_record.inclusion_proof_received(inclusion_proof, metadata.clone())?;
+                    note_record.inclusion_proof_received(inclusion_proof, metadata)?;
 
                 if block_height <= current_block_num {
                     // FIXME: We should be able to build the mmr only once (outside the for loop).
@@ -285,11 +285,8 @@ where
                 } else {
                     // If the note is in the future we import it as unverified. We add the note tag
                     // so that the note is verified naturally in the next sync.
-                    self.insert_note_tag(NoteTagRecord::with_note_source(
-                        metadata.tag(),
-                        note_record.id(),
-                    ))
-                    .await?;
+                    self.insert_note_tag(NoteTagRecord::with_note_source(tag, note_record.id()))
+                        .await?;
                 }
 
                 if note_changed {
@@ -345,15 +342,13 @@ where
                         )
                         .await?;
 
+                    let tag = metadata.tag();
                     let note_changed =
-                        note_record.inclusion_proof_received(inclusion_proof, metadata.clone())?;
+                        note_record.inclusion_proof_received(inclusion_proof, metadata)?;
 
                     if note_record.block_header_received(&block_header)? | note_changed {
                         self.store
-                            .remove_note_tag(NoteTagRecord::with_note_source(
-                                metadata.tag(),
-                                note_record.id(),
-                            ))
+                            .remove_note_tag(NoteTagRecord::with_note_source(tag, note_record.id()))
                             .await?;
 
                         note_records.push(Some(note_record));

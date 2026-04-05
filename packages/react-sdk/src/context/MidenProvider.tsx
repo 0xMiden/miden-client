@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { WebClient } from "@miden-sdk/miden-sdk";
+import { WasmWebClient as WebClient } from "@miden-sdk/miden-sdk";
 import { useMidenStore } from "../store/MidenStore";
 import type { MidenConfig } from "../types";
 import { DEFAULTS } from "../types";
@@ -249,8 +249,8 @@ export function MidenProvider({
               resolvedConfig.noteTransportUrl,
               resolvedConfig.seed,
               storeName,
-              undefined, // getKeyCb - not needed for public accounts
-              undefined, // insertKeyCb - not needed for public accounts
+              signerContext.getKeyCb,
+              signerContext.insertKeyCb,
               wrappedSignCb
             );
 
@@ -366,7 +366,9 @@ export function MidenProvider({
     if (interval <= 0) return;
 
     syncIntervalRef.current = setInterval(() => {
-      sync();
+      if (!useMidenStore.getState().syncPaused) {
+        sync();
+      }
     }, interval);
 
     return () => {

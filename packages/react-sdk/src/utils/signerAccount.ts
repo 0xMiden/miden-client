@@ -1,30 +1,33 @@
-import type { WebClient } from "@miden-sdk/miden-sdk";
+import type { WasmWebClient as WebClient } from "@miden-sdk/miden-sdk";
 import type {
   SignerAccountConfig,
   SignerAccountType,
 } from "../context/SignerContext";
+import { parseAccountId } from "./accountParsing";
 
 // SIGNER ACCOUNT INITIALIZATION
 // ================================================================================================
 
 /**
- * Maps SignerAccountType string to SDK AccountType enum value.
+ * WASM AccountType enum values (from wasm-bindgen).
+ * We define these directly because the simplified API's AccountType const
+ * shadows the WASM enum with string aliases for some variants.
  */
-async function getAccountType(accountType: SignerAccountType) {
-  const { AccountType } = await import("@miden-sdk/miden-sdk");
+const WASM_ACCOUNT_TYPE: Record<SignerAccountType, number> = {
+  FungibleFaucet: 0,
+  NonFungibleFaucet: 1,
+  RegularAccountImmutableCode: 2,
+  RegularAccountUpdatableCode: 3,
+};
 
-  switch (accountType) {
-    case "RegularAccountImmutableCode":
-      return AccountType.RegularAccountImmutableCode;
-    case "RegularAccountUpdatableCode":
-      return AccountType.RegularAccountUpdatableCode;
-    case "FungibleFaucet":
-      return AccountType.FungibleFaucet;
-    case "NonFungibleFaucet":
-      return AccountType.NonFungibleFaucet;
-    default:
-      return AccountType.RegularAccountImmutableCode;
-  }
+/**
+ * Maps SignerAccountType string to the WASM AccountType enum numeric value.
+ */
+function getAccountType(accountType: SignerAccountType): number {
+  return (
+    WASM_ACCOUNT_TYPE[accountType] ??
+    WASM_ACCOUNT_TYPE.RegularAccountImmutableCode
+  );
 }
 
 /**
@@ -46,6 +49,11 @@ function isPrivateStorageMode(
  * 3. Attempts to import from chain if public/network storage mode
  * 4. Creates the account locally if it doesn't exist
  *
+ * When `importAccountId` is set on the config, steps 2-4 are skipped entirely
+ * and the account is imported from the chain by ID. This is the fast path for
+ * wallets that create accounts externally (e.g., via a vault with HD key
+ * derivation) and already know the on-chain account ID.
+ *
  * @param client - The WebClient instance
  * @param config - The signer account configuration
  * @returns The account ID as a string
@@ -54,24 +62,39 @@ export async function initializeSignerAccount(
   client: WebClient,
   config: SignerAccountConfig
 ): Promise<string> {
-  const { AccountBuilder, AccountComponent, Word } =
+  const { AccountBuilder, AccountComponent, AuthScheme, Word } =
     await import("@miden-sdk/miden-sdk");
 
   // Sync first to get latest state
   await client.syncState();
+
+  // Fast path: import existing account by ID instead of rebuilding from scratch.
+  if (config.importAccountId) {
+    const accountId = parseAccountId(config.importAccountId);
+    try {
+      await client.importAccountById(accountId);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes("already being tracked")) {
+        throw e;
+      }
+    }
+    await client.syncState();
+    return config.importAccountId;
+  }
 
   // Convert Uint8Array commitment to Word (required by SDK)
   const commitmentWord = Word.deserialize(config.publicKeyCommitment);
 
   // Build account with auth component from public key commitment
   const seed = config.accountSeed ?? crypto.getRandomValues(new Uint8Array(32));
-  const accountType = await getAccountType(config.accountType);
+  const accountType = getAccountType(config.accountType);
 
   let builder = new AccountBuilder(seed)
     .withAuthComponent(
       AccountComponent.createAuthComponentFromCommitment(
         commitmentWord,
-        1 // ECDSA auth scheme (K256/Keccak)
+        AuthScheme.AuthEcdsaK256Keccak
       )
     )
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK type mismatch between JS wrapper AccountType and WASM enum AccountType

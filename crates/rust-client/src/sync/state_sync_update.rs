@@ -212,6 +212,17 @@ impl TransactionUpdateTracker {
         if let Some(transaction) = self.transactions.get_mut(&transaction_inclusion.transaction_id)
         {
             transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
+            return;
+        }
+
+        // Fallback for transactions with unauthenticated input notes: the node
+        // authenticates these notes during processing, which changes the transaction
+        // ID. Match by account ID and pre-transaction state instead.
+        if let Some(transaction) = self.transactions.values_mut().find(|tx| {
+            tx.details.account_id == transaction_inclusion.account_id
+                && tx.details.init_account_state == transaction_inclusion.initial_state_commitment
+        }) {
+            transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
         }
     }
 
@@ -220,13 +231,13 @@ impl TransactionUpdateTracker {
     pub fn apply_sync_height_update(
         &mut self,
         new_sync_height: BlockNumber,
-        tx_graceful_blocks: Option<u32>,
+        tx_discard_delta: Option<u32>,
     ) {
-        if let Some(tx_graceful_blocks) = tx_graceful_blocks {
+        if let Some(tx_discard_delta) = tx_discard_delta {
             self.discard_transaction_with_predicate(
                 |transaction| {
                     transaction.details.submission_height
-                        < new_sync_height.checked_sub(tx_graceful_blocks).unwrap_or_default()
+                        < new_sync_height.checked_sub(tx_discard_delta).unwrap_or_default()
                 },
                 DiscardCause::Stale,
             );

@@ -5,30 +5,24 @@ use core::fmt::{self, Debug, Display, Formatter};
 
 use miden_protocol::Word;
 use miden_protocol::account::{
-    Account,
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    AccountStorageHeader,
-    StorageMap,
-    StorageMapWitness,
-    StorageSlotHeader,
-    StorageSlotName,
-    StorageSlotType,
+    Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader, StorageMap,
+    StorageMapKey, StorageSlotHeader, StorageSlotName, StorageSlotType,
 };
 use miden_protocol::asset::Asset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::block::account_tree::AccountWitness;
 use miden_protocol::crypto::merkle::SparseMerklePath;
 use miden_protocol::crypto::merkle::smt::SmtProof;
-use miden_tx::utils::{Deserializable, Serializable, ToHex};
+use miden_tx::utils::ToHex;
+use miden_tx::utils::serde::{Deserializable, Serializable};
 use thiserror::Error;
 
 use crate::alloc::string::ToString;
 use crate::rpc::RpcError;
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::errors::RpcConversionError;
-use crate::rpc::generated::rpc::account_request::account_detail_request;
+use crate::rpc::generated::rpc::account_request::account_detail_request::storage_map_detail_request::{MapKeys, SlotData};
+use crate::rpc::generated::rpc::account_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::generated::{self as proto};
 
 // FETCHED ACCOUNT
@@ -270,10 +264,18 @@ impl proto::rpc::account_response::AccountDetails {
                 .map(Vec::as_slice)
                 .unwrap_or_default();
 
-            if let StorageMapEntries::EntriesWithProofs(witnesses) = &map_detail.entries {
-                for (witness, raw_key) in witnesses.iter().zip(requested_keys.iter()) {
-                    let hashed_key = StorageMap::hash_key(*raw_key);
-                    if witness.proof().get(&hashed_key).is_none() {
+            if let StorageMapEntries::EntriesWithProofs(proofs) = &map_detail.entries {
+                if proofs.len() != requested_keys.len() {
+                    return Err(RpcError::InvalidResponse(format!(
+                        "expected {} proofs for storage map slot '{}', got {}",
+                        requested_keys.len(),
+                        map_detail.slot_name,
+                        proofs.len(),
+                    )));
+                }
+                for (proof, raw_key) in proofs.iter().zip(requested_keys.iter()) {
+                    let hashed_key = raw_key.hash().as_word();
+                    if proof.get(&hashed_key).is_none() {
                         return Err(RpcError::InvalidResponse(format!(
                             "proof for storage map key {} does not match the requested key",
                             raw_key.to_hex(),
@@ -410,25 +412,18 @@ impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
                 StorageMapEntries::AllEntries(entries)
             },
             Some(Entries::EntriesWithProofs(entries_with_proofs)) => {
-                let witnesses = entries_with_proofs
+                let proofs = entries_with_proofs
                     .entries
                     .into_iter()
                     .map(|entry| {
-                        // The node returns the hashed key, not the raw map key.
-                        let hashed_key: Word = entry
-                            .key
-                            .ok_or(RpcError::ExpectedDataMissing("key".into()))?
-                            .try_into()?;
                         let proof: SmtProof = entry
                             .proof
                             .ok_or(RpcError::ExpectedDataMissing("proof".into()))?
                             .try_into()?;
-
-                        let value = proof.get(&hashed_key).unwrap_or_default();
-                        Ok(StorageMapWitness::new_unchecked(proof, [(hashed_key, value)]))
+                        Ok(proof)
                     })
-                    .collect::<Result<Vec<StorageMapWitness>, RpcError>>()?;
-                StorageMapEntries::EntriesWithProofs(witnesses)
+                    .collect::<Result<Vec<SmtProof>, RpcError>>()?;
+                StorageMapEntries::EntriesWithProofs(proofs)
             },
             None => StorageMapEntries::AllEntries(Vec::new()),
         };
@@ -443,7 +438,7 @@ impl TryFrom<proto::rpc::account_storage_details::AccountStorageMapDetails>
 /// A storage map entry containing a key-value pair.
 #[derive(Clone, Debug)]
 pub struct StorageMapEntry {
-    pub key: Word,
+    pub key: StorageMapKey,
     pub value: Word,
 }
 
@@ -453,7 +448,8 @@ impl TryFrom<proto::rpc::account_storage_details::account_storage_map_details::a
     type Error = RpcError;
 
     fn try_from(value: proto::rpc::account_storage_details::account_storage_map_details::all_map_entries::StorageMapEntry) -> Result<Self, Self::Error> {
-        let key = value.key.ok_or(RpcError::ExpectedDataMissing("key".into()))?.try_into()?;
+        let key: StorageMapKey =
+            value.key.ok_or(RpcError::ExpectedDataMissing("key".into()))?.try_into()?;
         let value = value.value.ok_or(RpcError::ExpectedDataMissing("value".into()))?.try_into()?;
         Ok(Self { key, value })
     }
@@ -462,28 +458,29 @@ impl TryFrom<proto::rpc::account_storage_details::account_storage_map_details::a
 // STORAGE MAP ENTRIES
 // ================================================================================================
 
-/// Storage map entries, either all entries (for small/full maps) or entries with proofs
-/// (for partial maps).
+/// Storage map entries, either all entries (for small/full maps) or raw SMT proofs
+/// (for specific key queries).
 #[derive(Clone, Debug)]
 pub enum StorageMapEntries {
     /// All entries in the storage map (no proofs needed as the full map is available).
     AllEntries(Vec<StorageMapEntry>),
     /// Specific entries with their SMT proofs (for partial maps).
-    EntriesWithProofs(Vec<StorageMapWitness>),
+    EntriesWithProofs(Vec<SmtProof>),
 }
 
 impl StorageMapEntries {
     /// Converts the entries into a [`StorageMap`].
-    pub fn into_storage_map(self) -> Result<StorageMap, miden_protocol::errors::StorageMapError> {
+    ///
+    /// Returns `None` for the [`EntriesWithProofs`](Self::EntriesWithProofs) variant because it
+    /// contains partial data (SMT proofs) that cannot produce a complete [`StorageMap`].
+    pub fn into_storage_map(
+        self,
+    ) -> Option<Result<StorageMap, miden_protocol::errors::StorageMapError>> {
         match self {
             StorageMapEntries::AllEntries(entries) => {
-                StorageMap::with_entries(entries.into_iter().map(|e| (e.key, e.value)))
+                Some(StorageMap::with_entries(entries.into_iter().map(|e| (e.key, e.value))))
             },
-            StorageMapEntries::EntriesWithProofs(witnesses) => {
-                let entries: Vec<_> =
-                    witnesses.iter().flat_map(|w| w.entries().map(|(k, v)| (*k, *v))).collect();
-                StorageMap::with_entries(entries)
-            },
+            StorageMapEntries::EntriesWithProofs(_) => None,
         }
     }
 }
@@ -510,16 +507,8 @@ impl TryFrom<proto::rpc::AccountVaultDetails> for AccountVaultDetails {
         let assets = value
             .assets
             .into_iter()
-            .map(|asset| {
-                let native_digest: Word = asset
-                    .asset
-                    .ok_or(proto::rpc::AccountVaultDetails::missing_field(stringify!(assets)))?
-                    .try_into()?;
-                native_digest
-                    .try_into()
-                    .map_err(|_| RpcError::DeserializationError("asset".to_string()))
-            })
-            .collect::<Result<Vec<Asset>, RpcError>>()?;
+            .map(Asset::try_from)
+            .collect::<Result<Vec<Asset>, _>>()?;
 
         Ok(Self { too_many_assets, assets })
     }
@@ -550,7 +539,7 @@ impl AccountProof {
             ..
         }) = &account_details
         {
-            if account_header.commitment() != account_witness.state_commitment() {
+            if account_header.to_commitment() != account_witness.state_commitment() {
                 return Err(AccountProofError::InconsistentAccountCommitment);
             }
             if account_header.id() != account_witness.id() {
@@ -673,15 +662,14 @@ impl TryFrom<proto::account::AccountWitness> for AccountWitness {
             .ok_or(proto::account::AccountWitness::missing_field(stringify!(witness_id)))?
             .try_into()?;
 
-        let witness = AccountWitness::new(account_id, state_commitment, merkle_path).unwrap();
+        let witness = AccountWitness::new(account_id, state_commitment, merkle_path)
+            .map_err(|err| RpcError::InvalidResponse(format!("{err}")))?;
         Ok(witness)
     }
 }
 
 // ACCOUNT STORAGE REQUEST
 // ================================================================================================
-
-pub type StorageMapKey = Word;
 
 /// Describes storage slots indices to be requested, as well as a list of keys for each of those
 /// slots.
@@ -711,24 +699,25 @@ impl AccountStorageRequirements {
     pub fn inner(&self) -> &BTreeMap<StorageSlotName, Vec<StorageMapKey>> {
         &self.0
     }
+
+    /// Returns the keys requested for a given slot, or an empty slice if none were specified.
+    pub fn keys_for_slot(&self, slot_name: &StorageSlotName) -> &[StorageMapKey] {
+        self.0.get(slot_name).map_or(&[], Vec::as_slice)
+    }
 }
 
-impl From<AccountStorageRequirements> for Vec<account_detail_request::StorageMapDetailRequest> {
-    fn from(
-        value: AccountStorageRequirements,
-    ) -> Vec<account_detail_request::StorageMapDetailRequest> {
-        use account_detail_request::storage_map_detail_request::{MapKeys, SlotData};
+impl From<AccountStorageRequirements> for Vec<StorageMapDetailRequest> {
+    fn from(value: AccountStorageRequirements) -> Vec<StorageMapDetailRequest> {
         let request_map = value.0;
         let mut requests = Vec::with_capacity(request_map.len());
         for (slot_name, map_keys) in request_map {
             let slot_data = if map_keys.is_empty() {
                 Some(SlotData::AllEntries(true))
             } else {
-                Some(SlotData::MapKeys(MapKeys {
-                    map_keys: map_keys.into_iter().map(Into::into).collect(),
-                }))
+                let keys = map_keys.into_iter().map(|key| Word::from(key).into()).collect();
+                Some(SlotData::MapKeys(MapKeys { map_keys: keys }))
             };
-            requests.push(account_detail_request::StorageMapDetailRequest {
+            requests.push(StorageMapDetailRequest {
                 slot_name: slot_name.to_string(),
                 slot_data,
             });
@@ -738,15 +727,15 @@ impl From<AccountStorageRequirements> for Vec<account_detail_request::StorageMap
 }
 
 impl Serializable for AccountStorageRequirements {
-    fn write_into<W: miden_tx::utils::ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: miden_tx::utils::serde::ByteWriter>(&self, target: &mut W) {
         target.write(&self.0);
     }
 }
 
 impl Deserializable for AccountStorageRequirements {
-    fn read_from<R: miden_tx::utils::ByteReader>(
+    fn read_from<R: miden_tx::utils::serde::ByteReader>(
         source: &mut R,
-    ) -> Result<Self, miden_tx::utils::DeserializationError> {
+    ) -> Result<Self, miden_tx::utils::serde::DeserializationError> {
         Ok(AccountStorageRequirements(source.read()?))
     }
 }

@@ -1,22 +1,27 @@
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use async_trait::async_trait;
-use miden_protocol::account::{Account, AccountId};
-use miden_protocol::errors::{AccountError, AssetError};
+use miden_protocol::account::{AccountCode, AccountId};
 use miden_protocol::note::{Note, NoteId};
-use miden_standards::account::interface::{AccountInterface, AccountInterfaceExt};
 use miden_standards::note::NoteConsumptionStatus;
-use miden_tx::{NoteCheckerError, NoteConsumptionChecker, TransactionExecutor};
+use miden_tx::{
+    NoteCheckerError,
+    NoteConsumptionChecker,
+    NoteConsumptionInfo,
+    TransactionExecutor,
+};
 use thiserror::Error;
 
 use crate::ClientError;
+use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::note::CommittedNote;
 use crate::store::data_store::ClientDataStore;
 use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
 use crate::sync::{NoteUpdateAction, OnNoteReceived};
-use crate::transaction::{InputNote, TransactionRequestBuilder, TransactionRequestError};
+use crate::transaction::{AdviceMap, InputNote, TransactionArgs, TransactionRequestError};
 
 /// Represents the consumability of a note by a specific account.
 ///
@@ -24,72 +29,85 @@ use crate::transaction::{InputNote, TransactionRequestBuilder, TransactionReques
 /// relevant.
 pub type NoteConsumability = (AccountId, NoteConsumptionStatus);
 
+/// Returns `true` if the consumption status indicates that the note may be consumable by the
+/// account. A note is considered relevant unless it is permanently unconsumable (either due to
+/// a fundamental incompatibility or unconsumable conditions).
+fn is_relevant(consumption_status: &NoteConsumptionStatus) -> bool {
+    !matches!(
+        consumption_status,
+        NoteConsumptionStatus::NeverConsumable(_) | NoteConsumptionStatus::UnconsumableConditions
+    )
+}
+
 /// Provides functionality for testing whether a note is relevant to the client or not.
 ///
-/// Relevance is based on whether the note is able to be consumed by an account tracked in
-/// the provided `store`. The screener trial-executes a consume transaction **without** an
-/// authenticator so that external signers (e.g. wallet extensions) are never invoked during
-/// screening. For accounts that require authentication the checker returns
-/// [`NoteConsumptionStatus::ConsumableWithAuthorization`].
+/// Here, relevance is based on whether the note is able to be consumed by an account that is
+/// tracked in the provided `store`. This can be derived in a number of ways, such as looking
+/// at the combination of script root and note inputs. For example, a P2ID note is relevant
+/// for a specific account ID if this ID is its first note input.
 #[derive(Clone)]
 pub struct NoteScreener {
     /// A reference to the client's store, used to fetch necessary data to check consumability.
     store: Arc<dyn Store>,
+    /// Optional transaction arguments to use when checking consumability.
+    tx_args: Option<TransactionArgs>,
+    /// RPC client used for lazy-loading foreign account data during note screening.
+    rpc_api: Arc<dyn NodeRpcClient>,
 }
 
 impl NoteScreener {
-    pub fn new(store: Arc<dyn Store>) -> Self {
-        Self { store }
+    pub fn new(store: Arc<dyn Store>, rpc_api: Arc<dyn NodeRpcClient>) -> Self {
+        Self { store, tx_args: None, rpc_api }
     }
 
-    /// Returns a vector of tuples describing the relevance of the provided note to the
-    /// accounts monitored by this screener.
+    /// Sets the transaction arguments to use when checking note consumability.
+    /// If not set, a default `TransactionArgs` with an empty advice map is used.
+    #[must_use]
+    pub fn with_transaction_args(mut self, tx_args: TransactionArgs) -> Self {
+        self.tx_args = Some(tx_args);
+        self
+    }
+
+    fn tx_args(&self) -> TransactionArgs {
+        self.tx_args
+            .clone()
+            .unwrap_or_else(|| TransactionArgs::new(AdviceMap::default()))
+    }
+
+    /// Checks whether the provided note could be consumed by any of the accounts tracked by
+    /// this screener. Convenience wrapper around [`Self::can_consume_batch`] for a single note.
     ///
-    /// The relevance is determined by [`NoteConsumptionChecker::can_consume`] and is based on
-    /// current conditions (for example, it takes the latest block in the client as reference).
-    pub async fn check_relevance(
+    /// Returns the [`NoteConsumptionStatus`] for each account that could consume the note.
+    pub async fn can_consume(
         &self,
         note: &Note,
     ) -> Result<Vec<NoteConsumability>, NoteScreenerError> {
-        let mut note_relevances = vec![];
-        for id in self.store.get_account_ids().await? {
-            let account_record = self
-                .store
-                .get_account(id)
-                .await?
-                .ok_or(NoteScreenerError::AccountDataNotFound(id))?;
-            let account: Account = account_record
-                .try_into()
-                .map_err(|_| NoteScreenerError::AccountDataNotFound(id))?;
-
-            match self.check_standard_consumability(&account, note).await? {
-                NoteConsumptionStatus::NeverConsumable(_)
-                | NoteConsumptionStatus::UnconsumableConditions => {},
-                relevance => {
-                    note_relevances.push((id, relevance));
-                },
-            }
-        }
-
-        Ok(note_relevances)
+        Ok(self
+            .can_consume_batch(core::slice::from_ref(note))
+            .await?
+            .remove(&note.id())
+            .unwrap_or_default())
     }
 
-    /// Tries to execute a standard consume transaction to check if the note is consumable by the
-    /// account.
-    pub async fn check_standard_consumability(
+    /// Checks whether the provided notes could be consumed by any of the accounts tracked by
+    /// this screener, by executing a transaction for each note-account pair.
+    ///
+    /// Returns a map from [`NoteId`] to a list of `(AccountId, NoteConsumptionStatus)` pairs.
+    /// Notes that are permanently unconsumable by all accounts are not included in the result.
+    pub async fn can_consume_batch(
         &self,
-        account: &Account,
-        note: &Note,
-    ) -> Result<NoteConsumptionStatus, NoteScreenerError> {
-        let transaction_request =
-            TransactionRequestBuilder::new().build_consume_notes(vec![note.clone()])?;
+        notes: &[Note],
+    ) -> Result<BTreeMap<NoteId, Vec<NoteConsumability>>, NoteScreenerError> {
+        let account_ids = self.store.get_account_ids().await?;
+        if notes.is_empty() || account_ids.is_empty() {
+            return Ok(BTreeMap::new());
+        }
 
-        let tx_script = transaction_request
-            .build_transaction_script(&AccountInterface::from_account(account))?;
+        let block_ref = self.store.get_sync_height().await?;
+        let mut relevant_notes: BTreeMap<NoteId, Vec<NoteConsumability>> = BTreeMap::new();
+        let tx_args = self.tx_args();
 
-        let tx_args = transaction_request.clone().into_transaction_args(tx_script);
-
-        let data_store = ClientDataStore::new(self.store.clone());
+        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
         // Don't attach the real authenticator for consumability checks. The
         // NoteConsumptionChecker gracefully handles a missing authenticator by
         // returning `ConsumableWithAuthorization` instead of calling
@@ -98,20 +116,71 @@ impl NoteScreener {
         // sync_state, producing unwanted confirmation popups on every sync.
         let transaction_executor: TransactionExecutor<'_, '_, _, ()> =
             TransactionExecutor::new(&data_store);
+        let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
+
+        for account_id in account_ids {
+            let account_code = self.get_account_code(account_id).await?;
+            data_store.mast_store().load_account_code(&account_code);
+
+            for note in notes {
+                let consumption_status = consumption_checker
+                    .can_consume(
+                        account_id,
+                        block_ref,
+                        InputNote::unauthenticated(note.clone()),
+                        tx_args.clone(),
+                    )
+                    .await?;
+
+                if is_relevant(&consumption_status) {
+                    relevant_notes
+                        .entry(note.id())
+                        .or_default()
+                        .push((account_id, consumption_status));
+                }
+            }
+        }
+
+        Ok(relevant_notes)
+    }
+
+    /// Checks whether the provided notes could be consumed by a specific account by attempting
+    /// to execute them together in a transaction. Notes that fail are progressively removed
+    /// until a maximal set of successfully consumable notes is found.
+    ///
+    /// Returns a [`NoteConsumptionInfo`] splitting notes into those that succeeded and those
+    /// that failed.
+    pub async fn check_notes_consumability(
+        &self,
+        account_id: AccountId,
+        notes: Vec<Note>,
+    ) -> Result<NoteConsumptionInfo, NoteScreenerError> {
+        let block_ref = self.store.get_sync_height().await?;
+        let tx_args = self.tx_args();
+        let account_code = self.get_account_code(account_id).await?;
+
+        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
+        let transaction_executor: TransactionExecutor<'_, '_, _, ()> =
+            TransactionExecutor::new(&data_store);
 
         let consumption_checker = NoteConsumptionChecker::new(&transaction_executor);
 
-        data_store.mast_store().load_account_code(account.code());
-        let note_consumption_check = consumption_checker
-            .can_consume(
-                account.id(),
-                self.store.get_sync_height().await?,
-                InputNote::unauthenticated(note.clone()),
-                tx_args,
-            )
+        data_store.mast_store().load_account_code(&account_code);
+        let note_consumption_info = consumption_checker
+            .check_notes_consumability(account_id, block_ref, notes, tx_args)
             .await?;
 
-        Ok(note_consumption_check)
+        Ok(note_consumption_info)
+    }
+
+    async fn get_account_code(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountCode, NoteScreenerError> {
+        self.store
+            .get_account_code(account_id)
+            .await?
+            .ok_or(NoteScreenerError::AccountDataNotFound(account_id))
     }
 }
 
@@ -152,7 +221,7 @@ impl OnNoteReceived for NoteScreener {
 
                 // The note is not being tracked by the client and is public so we can screen it
                 let new_note_relevance = self
-                    .check_relevance(
+                    .can_consume(
                         &public_note
                             .clone()
                             .try_into()
@@ -181,8 +250,6 @@ impl OnNoteReceived for NoteScreener {
 /// Error when screening notes to check relevance to a client.
 #[derive(Debug, Error)]
 pub enum NoteScreenerError {
-    #[error("failed to process note inputs")]
-    InvalidNoteInputsError(#[from] InvalidNoteInputsError),
     #[error("account {0} data not found in the store")]
     AccountDataNotFound(AccountId),
     #[error("failed to fetch data from the store")]
@@ -191,16 +258,4 @@ pub enum NoteScreenerError {
     NoteCheckerError(#[from] NoteCheckerError),
     #[error("failed to build transaction request")]
     TransactionRequestError(#[from] TransactionRequestError),
-}
-
-#[derive(Debug, Error)]
-pub enum InvalidNoteInputsError {
-    #[error("account error for note with id {0}: {1}")]
-    AccountError(NoteId, AccountError),
-    #[error("asset error for note with id {0}: {1}")]
-    AssetError(NoteId, AssetError),
-    #[error("expected {1} note inputs for note with id {0}")]
-    WrongNumInputs(NoteId, usize),
-    #[error("note input representing block with value {1} for note with id {0}")]
-    BlockNumberError(NoteId, u64),
 }

@@ -1,22 +1,10 @@
-use serde::{Deserialize, Serialize};
-use serde_wasm_bindgen::from_value;
-use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen_futures::{JsFuture, js_sys};
+use wasm_bindgen_futures::js_sys;
 
-// WEB KEYSTORE HELPER
+// WEB KEYSTORE FFI BINDINGS
 // ================================================================================================
 
-// TODO: This functionality is not directly related to the webstore. As such, it should be moved
-// into the webclient crate specifically.
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AccountAuthIdxdbObject {
-    pub secret_key: String,
-}
-
-#[wasm_bindgen(module = "/src/js/accounts.js")]
+#[wasm_bindgen(module = "/src/js/auth.js")]
 extern "C" {
     #[wasm_bindgen(js_name = insertAccountAuth)]
     pub fn idxdb_insert_account_auth(
@@ -30,36 +18,35 @@ extern "C" {
         db_id: &str,
         pub_key_commitment_hex: String,
     ) -> js_sys::Promise;
-}
 
-pub async fn insert_account_auth(
-    db_id: &str,
-    pub_key_commitment_hex: String,
-    secret_key: String,
-) -> Result<(), JsValue> {
-    let promise = idxdb_insert_account_auth(db_id, pub_key_commitment_hex, secret_key);
-    JsFuture::from(promise).await?;
+    #[wasm_bindgen(js_name = removeAccountAuth)]
+    pub fn idxdb_remove_account_auth(
+        db_id: &str,
+        pub_key_commitment_hex: String,
+    ) -> js_sys::Promise;
 
-    Ok(())
-}
+    #[wasm_bindgen(js_name = insertAccountKeyMapping)]
+    pub fn idxdb_insert_account_key_mapping(
+        db_id: &str,
+        account_id_hex: String,
+        pub_key_commitment_hex: String,
+    ) -> js_sys::Promise;
 
-pub async fn get_account_auth_by_pub_key_commitment(
-    db_id: &str,
-    pub_key_commitment_hex: String,
-) -> Result<String, JsValue> {
-    let promise =
-        idxdb_get_account_auth_by_pub_key_commitment(db_id, pub_key_commitment_hex.clone());
-    let js_secret_key = JsFuture::from(promise).await?;
+    #[wasm_bindgen(js_name = getKeyCommitmentsByAccountId)]
+    pub fn idxdb_get_key_commitments_by_account_id(
+        db_id: &str,
+        account_id_hex: String,
+    ) -> js_sys::Promise;
 
-    let account_auth_idxdb: Option<AccountAuthIdxdbObject> =
-        from_value(js_secret_key).map_err(|err| {
-            JsValue::from_str(&format!("Error: failed to deserialize secret key: {err}"))
-        })?;
+    #[wasm_bindgen(js_name = getAccountIdByKeyCommitment)]
+    pub fn idxdb_get_account_id_by_key_commitment(
+        db_id: &str,
+        pub_key_commitment_hex: String,
+    ) -> js_sys::Promise;
 
-    match account_auth_idxdb {
-        Some(account_auth) => Ok(account_auth.secret_key),
-        None => Err(JsValue::from_str(&format!(
-            "Pub key commitment {pub_key_commitment_hex} not found in the store"
-        ))),
-    }
+    #[wasm_bindgen(js_name = removeAllMappingsForKey)]
+    pub fn idxdb_remove_all_mappings_for_key(
+        db_id: &str,
+        pub_key_commitment_hex: String,
+    ) -> js_sys::Promise;
 }

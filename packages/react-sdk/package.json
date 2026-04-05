@@ -1,6 +1,6 @@
 {
   "name": "@miden-sdk/react",
-  "version": "0.13.4",
+  "version": "0.14.0",
   "description": "React hooks library for Miden Web Client",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -28,7 +28,7 @@
     "test:all": "VITE_CJS_IGNORE_WARNING=1 vitest run && playwright test"
   },
   "peerDependencies": {
-    "@miden-sdk/miden-sdk": "^0.13.0",
+    "@miden-sdk/miden-sdk": "^0.14.0",
     "react": ">=18.0.0"
   },
   "dependencies": {
@@ -66,5 +66,12 @@
   },
   "bugs": {
     "url": "https://github.com/0xMiden/miden-client/issues"
+  },
+  "resolutions": {
+    "@isaacs/brace-expansion": ">=5.0.1",
+    "esbuild": ">=0.25.0",
+    "minimatch": ">=10.2.1",
+    "rollup": ">=4.59.0",
+    "qs": ">=6.15.0"
   }
 }

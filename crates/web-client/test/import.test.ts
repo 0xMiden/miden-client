@@ -1,7 +1,6 @@
 import test from "./playwright.global.setup";
 import { Page, expect } from "@playwright/test";
 import {
-  clearStore,
   createNewFaucet,
   createNewWallet,
   fundAccountFromFaucet,
@@ -27,7 +26,7 @@ const importWalletFromSeed = async (
       );
       return {
         accountId: account.id().toString(),
-        accountCommitment: account.commitment().toHex(),
+        accountCommitment: account.to_commitment().toHex(),
       };
     },
     {
@@ -38,6 +37,21 @@ const importWalletFromSeed = async (
   );
 };
 
+// Creates a new WebClient with a fresh IndexedDB store, simulating a clean
+// start. This ensures both the store and the RPC client cache are empty.
+const createFreshClient = async (page: Page) => {
+  await page.evaluate(async () => {
+    const freshStoreName = `test_fresh_${crypto.randomUUID().slice(0, 8)}`;
+    const client = await window.WasmWebClient.createClient(
+      window.rpcUrl,
+      undefined,
+      undefined,
+      freshStoreName
+    );
+    window.client = client;
+  });
+};
+
 const importAccountById = async (page: Page, accountId: string) => {
   return await page.evaluate(async (id) => {
     const client = window.client;
@@ -46,19 +60,20 @@ const importAccountById = async (page: Page, accountId: string) => {
     const account = await client.getAccount(_accountId);
     return {
       accountId: account?.id().toString(),
-      accountCommitment: account?.commitment().toHex(),
+      accountCommitment: account?.to_commitment().toHex(),
     };
   }, accountId);
 };
 
 test.describe("import from seed", () => {
   test("should import same public account from seed", async ({ page }) => {
+    test.slow();
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
     const mutable = false;
     const storageMode = StorageMode.PUBLIC;
-    const authSchemeId = 0;
+    const authSchemeId = 2;
 
     const initialWallet = await createNewWallet(page, {
       storageMode,
@@ -82,7 +97,7 @@ test.describe("import from seed", () => {
     );
 
     // Deleting the account
-    await clearStore(page);
+    await createFreshClient(page);
 
     const { accountId: restoredAccountId } = await importWalletFromSeed(
       page,
@@ -111,12 +126,13 @@ test.describe("import from seed", () => {
 
 test.describe("import public account by id", () => {
   test("should import public account from id", async ({ page }) => {
+    test.slow();
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
     const mutable = false;
     const storageMode = StorageMode.PUBLIC;
-    const authSchemeId = 0;
+    const authSchemeId = 2;
 
     const initialWallet = await createNewWallet(page, {
       storageMode,
@@ -134,7 +150,7 @@ test.describe("import public account by id", () => {
       initialWallet.id
     );
 
-    await clearStore(page);
+    await createFreshClient(page);
 
     const { accountId: restoredAccountId } = await importAccountById(
       page,

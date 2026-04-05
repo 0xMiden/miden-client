@@ -14,7 +14,6 @@ use alloc::vec::Vec;
 
 use base64::Engine;
 use base64::engine::general_purpose;
-use miden_client::Word;
 use miden_client::account::{
     Account,
     AccountCode,
@@ -22,13 +21,16 @@ use miden_client::account::{
     AccountId,
     AccountStorage,
     Address,
+    StorageMapKey,
+    StorageSlotName,
 };
-use miden_client::asset::AssetVault;
+use miden_client::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness, StorageMapWitness};
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, Nullifier};
 use miden_client::store::{
     AccountRecord,
+    AccountSmtForest,
     AccountStatus,
     AccountStorageFilter,
     BlockRelevance,
@@ -42,6 +44,8 @@ use miden_client::store::{
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
+use miden_client::utils::RwLock;
+use miden_client::{Felt, Word};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use wasm_bindgen::prelude::*;
@@ -75,20 +79,67 @@ extern "C" {
     fn open_database(network: &str, client_version: &str) -> js_sys::Promise;
 }
 
-/// `WebStore` provides an `IndexedDB`-backed implementation of the Store trait.
+/// `IdxdbStore` provides an `IndexedDB`-backed implementation of the Store trait.
 ///
 /// The database reference is stored in a JavaScript registry and looked up by
 /// `database_id` when needed. This avoids storing `JsValue` references in Rust
 /// which would prevent the struct from being Send + Sync.
-pub struct WebStore {
+pub struct IdxdbStore {
     database_id: String,
+    smt_forest: RwLock<AccountSmtForest>,
 }
 
-impl WebStore {
-    pub async fn new(database_name: String) -> Result<WebStore, JsValue> {
+impl IdxdbStore {
+    pub async fn new(database_name: String) -> Result<IdxdbStore, JsValue> {
         let promise = open_database(database_name.as_str(), CLIENT_VERSION);
         let _db_id = JsFuture::from(promise).await?;
-        Ok(WebStore { database_id: database_name })
+
+        let store = IdxdbStore {
+            database_id: database_name,
+            smt_forest: RwLock::new(AccountSmtForest::new()),
+        };
+
+        // Initialize SMT forest
+        store.build_smt_forest().await?;
+
+        Ok(store)
+    }
+
+    /// Builds the SMT forest by loading all existing account vault and storage data.
+    ///
+    /// This ensures that the forest contains all necessary Merkle nodes for generating
+    /// witnesses when creating partial accounts or executing transactions.
+    async fn build_smt_forest(&self) -> Result<(), JsValue> {
+        let account_ids = self
+            .get_account_ids()
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to get account IDs: {e:?}")))?;
+
+        for account_id in account_ids {
+            let vault = self.get_account_vault(account_id).await.map_err(|e| {
+                JsValue::from_str(&format!("Failed to get vault for account {account_id}: {e:?}"))
+            })?;
+
+            let storage = self
+                .get_account_storage(account_id, AccountStorageFilter::All)
+                .await
+                .map_err(|e| {
+                    JsValue::from_str(&format!(
+                        "Failed to get storage for account {account_id}: {e:?}"
+                    ))
+                })?;
+
+            self.smt_forest
+                .write()
+                .insert_and_register_account_state(account_id, &vault, &storage)
+                .map_err(|e| {
+                    JsValue::from_str(&format!(
+                        "Failed to insert account state for {account_id}: {e:?}"
+                    ))
+                })?;
+        }
+
+        Ok(())
     }
 
     /// Returns the database ID as a string slice for passing to JS functions.
@@ -97,9 +148,12 @@ impl WebStore {
     }
 }
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-impl Store for WebStore {
+#[async_trait::async_trait(?Send)]
+impl Store for IdxdbStore {
+    fn identifier(&self) -> &str {
+        &self.database_id
+    }
+
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn get_current_timestamp(&self) -> Option<u64> {
         Some(current_timestamp_u64())
@@ -157,6 +211,18 @@ impl Store for WebStore {
         self.get_output_notes(note_filter).await
     }
 
+    async fn get_input_note_by_offset(
+        &self,
+        filter: NoteFilter,
+        consumer: AccountId,
+        block_start: Option<BlockNumber>,
+        block_end: Option<BlockNumber>,
+        offset: u32,
+    ) -> Result<Option<InputNoteRecord>, StoreError> {
+        self.get_input_note_by_offset(filter, consumer, block_start, block_end, offset)
+            .await
+    }
+
     async fn upsert_input_notes(&self, notes: &[InputNoteRecord]) -> Result<(), StoreError> {
         self.upsert_input_notes(notes).await
     }
@@ -193,6 +259,10 @@ impl Store for WebStore {
         self.get_tracked_block_headers().await
     }
 
+    async fn get_tracked_block_header_numbers(&self) -> Result<BTreeSet<usize>, StoreError> {
+        self.get_tracked_block_header_numbers().await
+    }
+
     async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
@@ -216,6 +286,14 @@ impl Store for WebStore {
 
     async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError> {
         self.prune_irrelevant_blocks().await
+    }
+
+    async fn prune_account_history(
+        &self,
+        account_id: AccountId,
+        up_to_nonce: Felt,
+    ) -> Result<usize, StoreError> {
+        self.prune_account_history(account_id, up_to_nonce).await
     }
 
     // ACCOUNTS
@@ -262,6 +340,16 @@ impl Store for WebStore {
         self.get_account(account_id).await
     }
 
+    async fn get_account_code(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<AccountCode>, StoreError> {
+        let Some((header, _)) = self.get_account_header(account_id).await? else {
+            return Ok(None);
+        };
+        Ok(Some(self.get_account_code(header.code_commitment()).await?))
+    }
+
     async fn get_minimal_partial_account(
         &self,
         account_id: AccountId,
@@ -298,6 +386,23 @@ impl Store for WebStore {
         filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError> {
         self.get_account_storage(account_id, filter).await
+    }
+
+    async fn get_account_asset(
+        &self,
+        account_id: AccountId,
+        vault_key: AssetVaultKey,
+    ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
+        self.get_account_asset(account_id, vault_key).await
+    }
+
+    async fn get_account_map_item(
+        &self,
+        account_id: AccountId,
+        slot_name: StorageSlotName,
+        key: StorageMapKey,
+    ) -> Result<(Word, StorageMapWitness), StoreError> {
+        self.get_account_map_item(account_id, slot_name, key).await
     }
 
     async fn get_addresses_by_account_id(

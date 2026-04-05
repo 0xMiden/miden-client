@@ -99,6 +99,21 @@ impl SqliteStore {
             .collect()
     }
 
+    pub(crate) fn get_tracked_block_header_numbers(
+        conn: &mut Connection,
+    ) -> Result<BTreeSet<usize>, StoreError> {
+        const QUERY: &str = "SELECT block_num FROM block_headers WHERE has_client_notes=true";
+        conn.prepare(QUERY)
+            .into_store_error()?
+            .query_map(params![], |row| row.get::<_, u32>(0))
+            .into_store_error()?
+            .map(|result| {
+                let block_num: u32 = result.into_store_error()?;
+                Ok(block_num as usize)
+            })
+            .collect()
+    }
+
     pub(crate) fn get_partial_blockchain_nodes(
         conn: &mut Connection,
         filter: &PartialBlockchainFilter,
@@ -345,12 +360,11 @@ fn parse_partial_blockchain_nodes_columns(
 fn parse_partial_blockchain_nodes(
     serialized_partial_blockchain_node_parts: &SerializedPartialBlockchainNodeParts,
 ) -> Result<(InOrderIndex, Word), StoreError> {
+    let id_usize = usize::try_from(serialized_partial_blockchain_node_parts.id)
+        .map_err(|e| StoreError::ParsingError(format!("partial blockchain node id is too large: {e}")))?;
     let id = InOrderIndex::new(
-        NonZeroUsize::new(
-            usize::try_from(serialized_partial_blockchain_node_parts.id)
-                .expect("id is u64, should not fail"),
-        )
-        .unwrap(),
+        NonZeroUsize::new(id_usize)
+            .ok_or_else(|| StoreError::ParsingError("partial blockchain node id cannot be zero".to_string()))?,
     );
     let node: Word = Word::try_from(&serialized_partial_blockchain_node_parts.node)?;
     Ok((id, node))
@@ -481,7 +495,7 @@ mod test {
 
             let proof = mmr.open(block_num).expect("valid proof");
             let mut idx = InOrderIndex::from_leaf_pos(block_num);
-            for node in proof.merkle_path.nodes() {
+            for node in proof.merkle_path().nodes() {
                 tracked_nodes.insert(idx.sibling(), *node);
                 idx = idx.parent();
             }
@@ -566,7 +580,10 @@ mod test {
         for block_num in tracked_blocks {
             let partial_proof = partial_mmr.open(block_num).expect("partial mmr query succeeds");
             assert!(partial_proof.is_some());
-            assert_eq!(partial_proof.unwrap(), mmr.open(block_num).unwrap());
+            assert_eq!(
+                partial_proof.unwrap().merkle_path(),
+                mmr.open(block_num).unwrap().merkle_path()
+            );
         }
     }
 }
