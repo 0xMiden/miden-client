@@ -2,20 +2,15 @@
  * StorageView wraps the raw WASM AccountStorage to provide a developer-friendly
  * (and AI-agent-friendly) API.
  *
- * Key behavior: `getItem()` on a StorageMap slot returns the first entry's value
- * instead of the map commitment hash. This makes the most common usage pattern
- * work correctly without requiring knowledge of `getMapItem`.
- *
- * Note on StorageMap ordering: Miden storage maps are Merkle-based, so iteration
- * order is determined by key hashes, not insertion order. "First entry" means the
- * first entry returned by the underlying iterator — this is deterministic for a
- * given map state but not meaningful as an ordering concept.
+ * Key behavior: `getItem()` returns a `StorageResult` that works intuitively for
+ * both Value and StorageMap slots. The result has `.toNumber()`, `.toHex()`, and
+ * `.toString()` methods that do the right thing automatically. For StorageMap slots,
+ * `.entries` provides access to all map entries.
  *
  * The raw WASM AccountStorage is still accessible via `.raw` for advanced use cases
  * that need the original behavior (e.g., comparing map commitment roots).
  */
 export class StorageView {
-  /** @type {import("../Cargo.toml").AccountStorage} */
   #storage;
   #WordClass;
 
@@ -52,30 +47,41 @@ export class StorageView {
   }
 
   /**
-   * Smart read: returns the actual stored value for both Value and StorageMap slots.
+   * Returns a StorageResult for the given slot.
    *
-   * - For Value slots: returns the stored Word directly.
-   * - For StorageMap slots: returns the first entry's value (NOT the commitment hash).
+   * The result has convenience methods that work for both Value and StorageMap slots:
+   * - `.toNumber()` — first felt as a JS number
+   * - `.toBigInt()` — first felt as BigInt (full u64 precision)
+   * - `.toHex()` — first felt's Word as hex string
+   * - `.toString()` — renders as the number (works in JSX: {result})
+   * - `.isMap` — true if this is a StorageMap slot
+   * - `.entries` — all map entries (undefined for Value slots)
+   * - `.word` — the underlying Word value
    *
-   * To read a specific key from a StorageMap, use `getMapItem(slotName, key)`.
-   * To get the raw commitment hash of a StorageMap, use `raw.getItem(slotName)`.
+   * For explicit key-based map reads, use `getMapItem(slotName, key)`.
+   * For the raw commitment hash, use `raw.getItem(slotName)`.
    *
    * @param {string} slotName
-   * @returns {import("../Cargo.toml").Word | undefined}
+   * @returns {StorageResult | undefined}
    */
   getItem(slotName) {
-    // Try to get map entries — if it returns an array, this is a StorageMap
+    // Check if this is a StorageMap by trying getMapEntries
     const entries = this.#storage.getMapEntries(slotName);
     if (entries !== undefined && entries !== null) {
-      // It's a StorageMap — return the first entry's value as a Word
-      if (entries.length > 0) {
-        return this.#parseEntryValue(entries[0]);
-      }
-      return undefined; // Empty map
+      // StorageMap — build result from entries
+      const parsedEntries = entries.map((e) => ({
+        key: e.key,
+        value: e.value,
+        word: this.#hexToWord(e.value),
+      }));
+      const firstWord = parsedEntries.length > 0 ? parsedEntries[0].word : undefined;
+      return new StorageResult(firstWord, true, parsedEntries);
     }
 
-    // Not a map — use the raw getItem for Value slots
-    return this.#storage.getItem(slotName);
+    // Value slot — use raw getItem
+    const word = this.#storage.getItem(slotName);
+    if (!word) return undefined;
+    return new StorageResult(word, false, undefined);
   }
 
   /**
@@ -103,30 +109,131 @@ export class StorageView {
    * Works for both Value and StorageMap slots.
    *
    * Note: Felts are u64-backed. Values above Number.MAX_SAFE_INTEGER (2^53 - 1)
-   * will lose precision. Use `wordToBigInt(storage.getItem(slotName))` for exact
-   * large values.
+   * will lose precision. Use `.toBigInt()` on the StorageResult for exact values.
    *
    * @param {string} slotName
    * @returns {number | undefined}
    */
   getNumber(slotName) {
-    const word = this.getItem(slotName);
-    if (!word) return undefined;
-    return wordToNumber(word);
+    return this.getItem(slotName)?.toNumber();
   }
 
   /**
-   * Parse a JsStorageMapEntry's value hex string into a Word.
-   * @param {{ key: string, value: string }} entry
+   * @param {string} hex
    * @returns {import("../Cargo.toml").Word | undefined}
    */
-  #parseEntryValue(entry) {
-    if (!entry?.value || !this.#WordClass) return undefined;
+  #hexToWord(hex) {
+    if (!hex || !this.#WordClass) return undefined;
     try {
-      return this.#WordClass.fromHex(entry.value);
+      return this.#WordClass.fromHex(hex);
     } catch {
       return undefined;
     }
+  }
+}
+
+/**
+ * Result of reading a storage slot. Works for both Value and StorageMap slots.
+ *
+ * Provides a unified interface so code like `storage.getItem(name).toNumber()`
+ * works regardless of the underlying slot type.
+ *
+ * For StorageMap slots, the convenience methods (toNumber, toHex, toBigInt)
+ * operate on the first entry's value. The full map data is available via `.entries`.
+ * Note: Miden storage maps are Merkle-based, so "first" is determined by key hash
+ * order — deterministic for a given map state, but not meaningful as an ordering.
+ */
+export class StorageResult {
+  #word;
+  #isMap;
+  #entries;
+
+  /**
+   * @param {import("../Cargo.toml").Word | undefined} word — the primary Word value
+   * @param {boolean} isMap — whether this came from a StorageMap slot
+   * @param {Array<{key: string, value: string, word: import("../Cargo.toml").Word | undefined}> | undefined} entries
+   */
+  constructor(word, isMap, entries) {
+    this.#word = word;
+    this.#isMap = isMap;
+    this.#entries = entries;
+  }
+
+  /** True if this slot is a StorageMap. */
+  get isMap() {
+    return this.#isMap;
+  }
+
+  /**
+   * All entries from a StorageMap slot.
+   * Each entry has { key: string (hex), value: string (hex), word: Word | undefined }.
+   * Returns undefined for Value slots.
+   */
+  get entries() {
+    return this.#entries;
+  }
+
+  /**
+   * The underlying Word value.
+   * For Value slots: the stored Word.
+   * For StorageMap slots: the first entry's value as a Word (or undefined if empty).
+   */
+  get word() {
+    return this.#word;
+  }
+
+  /**
+   * First felt as a JavaScript number.
+   * WARNING: May lose precision for values > Number.MAX_SAFE_INTEGER (2^53 - 1).
+   * Use .toBigInt() for exact large values.
+   * @returns {number}
+   */
+  toNumber() {
+    if (!this.#word) return 0;
+    return wordToNumber(this.#word);
+  }
+
+  /**
+   * First felt as a BigInt. Preserves full u64 precision.
+   * @returns {bigint}
+   */
+  toBigInt() {
+    if (!this.#word) return 0n;
+    return wordToBigInt(this.#word);
+  }
+
+  /**
+   * The Word's hex representation.
+   * For Value slots: the stored Word hex.
+   * For StorageMap slots: the first entry's value Word hex.
+   * @returns {string}
+   */
+  toHex() {
+    if (!this.#word) return "0x" + "0".repeat(64);
+    return this.#word.toHex();
+  }
+
+  /**
+   * Renders as the numeric value. Makes `{storageResult}` work in JSX.
+   * @returns {string}
+   */
+  toString() {
+    return String(this.toNumber());
+  }
+
+  /**
+   * JSON serialization — returns the numeric value.
+   */
+  toJSON() {
+    return this.toNumber();
+  }
+
+  /**
+   * Allows `+result`, `result * 2`, etc. to work as expected.
+   * @returns {number}
+   */
+  valueOf() {
+    return this.toNumber();
   }
 }
 
@@ -141,7 +248,6 @@ export class StorageView {
 export function wordToBigInt(word) {
   try {
     const hex = word.toHex();
-    // First felt = first 16 hex chars after "0x", little-endian byte order
     const feltHex = hex.slice(2, 18);
     const bytes = feltHex.match(/../g);
     if (!bytes) return 0n;
