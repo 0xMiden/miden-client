@@ -51,6 +51,7 @@
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@types/node": "^24.9.2",
     "@wasm-tool/rollup-plugin-rust": "^3.0.3",
+    "binaryen": "^121.0.0",
     "chai": "^5.1.1",
     "cpr": "^3.0.1",
     "cross-env": "^7.0.3",

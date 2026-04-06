@@ -772,6 +772,11 @@ binary-extensions@^2.0.0:
   resolved "https://registry.npmjs.org/binary-extensions/-/binary-extensions-2.3.0.tgz"
   integrity sha512-Ceh+7ox5qe7LJuLHoY0feh3pHuUDHAcRUeyL2VYghZwfpkNIy/+8Ocg0a3UuSoYzavmylwuLWQOf3hl0jjMMIw==
 
+binaryen@^121.0.0:
+  version "121.0.0"
+  resolved "https://registry.yarnpkg.com/binaryen/-/binaryen-121.0.0.tgz#6f6c40c196b3bb9d4b516f296664fc4196717175"
+  integrity sha512-St5LX+CmVdDQMf+DDHWdne7eDK+8tH9TE4Kc+Xk3s5+CzVYIKeJbWuXgsKVbkdLJXGUc2eflFqjThQy555mBag==
+
 brace-expansion@^5.0.5:
   version "5.0.5"
   resolved "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.5.tgz"
