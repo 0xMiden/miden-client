@@ -171,7 +171,7 @@ impl WebClient {
         if let Some(client) = self.get_mut_inner() {
             let foreign_accounts_map: BTreeMap<NativeAccountId, NativeForeignAccount> =
                 foreign_accounts
-                    .__inner
+                    
                     .iter()
                     .map(|a| {
                         let fa: NativeForeignAccount = a.clone().into();
