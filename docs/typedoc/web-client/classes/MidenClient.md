@@ -210,6 +210,24 @@ Creates and initializes a new MidenClient.
 
 ***
 
+### createDevnet()
+
+> `static` **createDevnet**(`options?`): `Promise`\<`MidenClient`\>
+
+Creates a client preconfigured for devnet (rpc, prover, note transport, autoSync).
+
+#### Parameters
+
+##### options?
+
+[`ClientOptions`](../interfaces/ClientOptions.md)
+
+#### Returns
+
+`Promise`\<`MidenClient`\>
+
+***
+
 ### createMock()
 
 > `static` **createMock**(`options?`): `Promise`\<`MidenClient`\>
@@ -232,7 +250,7 @@ Creates a mock client for testing.
 
 > `static` **createTestnet**(`options?`): `Promise`\<`MidenClient`\>
 
-Creates a client preconfigured for testnet use. Defaults to autoSync: true.
+Creates a client preconfigured for testnet (rpc, prover, note transport, autoSync).
 
 #### Parameters
 

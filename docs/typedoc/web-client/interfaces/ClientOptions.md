@@ -38,9 +38,12 @@ External keystore callbacks.
 
 ### noteTransportUrl?
 
-> `optional` **noteTransportUrl**: `string`
+> `optional` **noteTransportUrl**: `"testnet"` \| `"devnet"` \| `string` & `object`
 
-Note transport URL (optional).
+Note transport endpoint. Accepts shorthands or a raw URL:
+- `"testnet"` — Miden testnet transport (`https://transport.miden.io`)
+- `"devnet"` — Miden devnet transport (`https://transport.devnet.miden.io`)
+- any other string — treated as a raw note transport endpoint URL
 
 ***
 
