@@ -42,10 +42,17 @@ export class MidenClient {
   /**
    * Creates and initializes a new MidenClient.
    *
+   * If no `rpcUrl` is provided, defaults to testnet with full configuration
+   * (RPC, prover, note transport, autoSync).
+   *
    * @param {ClientOptions} [options] - Client configuration options.
    * @returns {Promise<MidenClient>} A fully initialized client.
    */
   static async create(options) {
+    if (!options?.rpcUrl) {
+      return MidenClient.createTestnet(options);
+    }
+
     const getWasm = MidenClient._getWasmOrThrow;
     const WebClientClass = MidenClient._WasmWebClient;
 
