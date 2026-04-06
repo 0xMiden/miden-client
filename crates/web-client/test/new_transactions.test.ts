@@ -439,9 +439,15 @@ test.describe("custom transaction tests", () => {
       );
       const customNote = new sdk.Note(noteAssets, noteMetadata, noteRecipient);
 
-      const outputNote = sdk.OutputNote.full(customNote);
+      let ownNotes;
+      if (sdk.NoteArray) {
+        ownNotes = new sdk.NoteArray();
+        ownNotes.push(customNote);
+      } else {
+        ownNotes = [customNote];
+      }
       const transactionRequest = new sdk.TransactionRequestBuilder()
-        .withOwnOutputNotes(new sdk.OutputNoteArray([outputNote]))
+        .withOwnOutputNotes(ownNotes)
         .build();
 
       await client.submitNewTransaction(faucet.id(), transactionRequest);
@@ -541,13 +547,16 @@ test.describe("custom transaction with multiple output notes", () => {
       const note1 = new sdk.Note(noteAssets1, noteMetadata, noteRecipient1);
       const note2 = new sdk.Note(noteAssets2, noteMetadata, noteRecipient2);
 
-      const outputNotes = [
-        sdk.OutputNote.full(note1),
-        sdk.OutputNote.full(note2),
-      ];
+      let ownNotes;
+      if (sdk.NoteArray) {
+        ownNotes = new sdk.NoteArray();
+        [note1, note2].forEach((n) => ownNotes.push(n));
+      } else {
+        ownNotes = [note1, note2];
+      }
 
       const transactionRequest = new sdk.TransactionRequestBuilder()
-        .withOwnOutputNotes(new sdk.OutputNoteArray(outputNotes))
+        .withOwnOutputNotes(ownNotes)
         .build();
 
       await client.submitNewTransaction(sender.id(), transactionRequest);
@@ -608,13 +617,16 @@ test.describe("custom transaction with multiple output notes", () => {
       const note1 = new sdk.Note(noteAssets1, noteMetadata, noteRecipient1);
       const note2 = new sdk.Note(noteAssets2, noteMetadata, noteRecipient2);
 
-      const outputNotes = [
-        sdk.OutputNote.full(note1),
-        sdk.OutputNote.full(note2),
-      ];
+      let ownNotes;
+      if (sdk.NoteArray) {
+        ownNotes = new sdk.NoteArray();
+        [note1, note2].forEach((n) => ownNotes.push(n));
+      } else {
+        ownNotes = [note1, note2];
+      }
 
       const transactionRequest = new sdk.TransactionRequestBuilder()
-        .withOwnOutputNotes(new sdk.OutputNoteArray(outputNotes))
+        .withOwnOutputNotes(ownNotes)
         .build();
 
       let threw = false;

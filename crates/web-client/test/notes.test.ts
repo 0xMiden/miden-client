@@ -1143,9 +1143,15 @@ test.describe("createP2IDNote and createP2IDENote", () => {
         new sdk.NoteAttachment()
       );
 
-      let outputNote = sdk.OutputNote.full(p2IdNote);
+      let ownNotes;
+      if (sdk.NoteArray) {
+        ownNotes = new sdk.NoteArray();
+        ownNotes.push(p2IdNote);
+      } else {
+        ownNotes = [p2IdNote];
+      }
       let transactionRequest = new sdk.TransactionRequestBuilder()
-        .withOwnOutputNotes(new sdk.OutputNoteArray([outputNote]))
+        .withOwnOutputNotes(ownNotes)
         .build();
 
       execResult = await intClient.executeTransaction(
@@ -1330,9 +1336,15 @@ test.describe("createP2IDNote and createP2IDENote", () => {
         new sdk.NoteAttachment()
       );
 
-      let outputNote = sdk.OutputNote.full(p2IdeNote);
+      let ownNotes;
+      if (sdk.NoteArray) {
+        ownNotes = new sdk.NoteArray();
+        ownNotes.push(p2IdeNote);
+      } else {
+        ownNotes = [p2IdeNote];
+      }
       let transactionRequest = new sdk.TransactionRequestBuilder()
-        .withOwnOutputNotes(new sdk.OutputNoteArray([outputNote]))
+        .withOwnOutputNotes(ownNotes)
         .build();
 
       execResult = await intClient.executeTransaction(
