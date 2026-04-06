@@ -301,9 +301,10 @@ async fn benchmark_tx_full(
 
             let tx_request = build_chunk_tx_request(&client, chunk, slot_infos)?;
 
-            // Measure full transaction time (execute + prove + submit)
-            let (_, duration) = Box::pin(measure_time_async(|| async {
-                client.submit_new_transaction(account_id, tx_request).await
+            // Measure full transaction time (execute + prove + submit).
+            // Inner Box::pin moves the future to the heap to stay under clippy's size limit.
+            let (_, duration) = Box::pin(measure_time_async(|| {
+                Box::pin(client.submit_new_transaction(account_id, tx_request))
             }))
             .await;
 

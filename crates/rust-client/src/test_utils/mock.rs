@@ -505,6 +505,7 @@ impl NodeRpcClient for MockRpcApi {
         account_storage_requirements: AccountStorageRequirements,
         account_state: AccountStateAt,
         _known_account_code: Option<AccountCode>,
+        _known_vault_commitment: Option<Word>,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
         let mock_chain = self.mock_chain.read();
 

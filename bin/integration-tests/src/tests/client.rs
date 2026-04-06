@@ -4,15 +4,8 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use miden_client::account::component::{AccountComponent, AccountComponentMetadata};
 use miden_client::account::{
-    Account,
-    AccountBuilder,
-    AccountId,
-    AccountStorageMode,
-    AccountType,
-    StorageMap,
-    StorageMapKey,
-    StorageSlot,
-    StorageSlotName,
+    Account, AccountBuilder, AccountId, AccountStorageMode, AccountType, StorageMap, StorageMapKey,
+    StorageSlot, StorageSlotName,
 };
 use miden_client::assembly::{CodeBuilder, DefaultSourceManager, Module, ModuleKind, Path};
 use miden_client::asset::{Asset, FungibleAsset};
@@ -22,30 +15,17 @@ use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{NoteFile, NoteType};
 use miden_client::rpc::AccountStateAt;
 use miden_client::rpc::domain::account::{
-    AccountStorageRequirements,
-    FetchedAccount,
-    StorageMapEntries,
+    AccountStorageRequirements, FetchedAccount, StorageMapEntries,
 };
 use miden_client::store::{
-    InputNoteRecord,
-    InputNoteState,
-    NoteFilter,
-    OutputNoteState,
-    TransactionFilter,
+    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter,
 };
 use miden_client::testing::common::*;
 use miden_client::transaction::{
-    DiscardCause,
-    PaymentNoteDescription,
-    ProvenTransaction,
-    TransactionInputs,
-    TransactionKernel,
-    TransactionProver,
-    TransactionProverError,
-    TransactionRequestBuilder,
-    TransactionStatus,
+    DiscardCause, PaymentNoteDescription, ProvenTransaction, TransactionInputs, TransactionKernel,
+    TransactionProver, TransactionProverError, TransactionRequestBuilder, TransactionStatus,
 };
-use miden_client::{ClientError, Felt, Word};
+use miden_client::{ClientError, EMPTY_WORD, Felt, Word};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use tracing::info;
 
@@ -1608,7 +1588,7 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     // Request all entries (empty keys)
     let requirements_all = AccountStorageRequirements::new([(map_slot_name.clone(), [].iter())]);
     let (_, proof_all) = rpc
-        .get_account_proof(account_id, requirements_all, AccountStateAt::ChainTip, None)
+        .get_account_proof(account_id, requirements_all, AccountStateAt::ChainTip, None, None)
         .await?;
     let map_all = proof_all
         .find_map_details(&map_slot_name)
@@ -1623,7 +1603,7 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     // Request one specific key
     let requirements_one = AccountStorageRequirements::new([(map_slot_name.clone(), [&map_key_1])]);
     let (_, proof_one) = rpc
-        .get_account_proof(account_id, requirements_one, AccountStateAt::ChainTip, None)
+        .get_account_proof(account_id, requirements_one, AccountStateAt::ChainTip, None, None)
         .await?;
     let map_one = proof_one
         .find_map_details(&map_slot_name)
@@ -1639,6 +1619,52 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
         },
         other => anyhow::bail!("expected EntriesWithProofs, got {:?}", other),
     }
+
+    Ok(())
+}
+
+/// Tests that `get_account_proof` returns vault details for public accounts.
+///
+/// Creates a public faucet and wallet, mints tokens so the wallet holds assets,
+/// then calls `get_account_proof` and verifies the response includes the correct
+pub async fn test_get_account_proof_returns_vault_details(
+    client_config: ClientConfig,
+) -> Result<()> {
+    let (mut client, keystore) = client_config.into_client().await?;
+    wait_for_node(&mut client).await;
+
+    let (wallet, faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Public,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    // Mint tokens so the wallet has assets in its vault
+    let tx_id = mint_and_consume(&mut client, wallet.id(), faucet.id(), NoteType::Public).await;
+    wait_for_tx(&mut client, tx_id).await?;
+
+    // Query the wallet's account proof from the node
+    let rpc = client.test_rpc_api();
+    let (_, proof) = rpc
+        .get_account_proof(
+            wallet.id(),
+            AccountStorageRequirements::default(),
+            AccountStateAt::ChainTip,
+            None,
+            Some(EMPTY_WORD),
+        )
+        .await?;
+
+    let vault_details =
+        proof.vault_details().context("expected vault details for public account")?;
+
+    assert_eq!(
+        vault_details.assets.len(),
+        1,
+        "expected exactly 1 asset (the minted fungible token)"
+    );
 
     Ok(())
 }

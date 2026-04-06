@@ -209,14 +209,22 @@ pub trait NodeRpcClient: Send + Sync {
     /// should be included in the response for public accounts.
     ///
     /// The `known_account_code` parameter is the known code commitment
-    /// to prevent unnecessary data fetching. Returns the block number and the account proof. If
-    /// the account is not found in the node, the method will return an error.
+    /// to prevent unnecessary data fetching.
+    ///
+    /// The `known_vault_commitment` parameter controls vault data retrieval:
+    /// - `None`: vault data is not requested.
+    /// - `Some(commitment)`: vault data is returned only if the account's current vault root
+    ///   differs from the provided commitment. Use `EMPTY_WORD` to always fetch.
+    ///
+    /// Returns the block number and the account proof. If the account is not found in
+    /// the node, the method will return an error.
     async fn get_account_proof(
         &self,
         account_id: AccountId,
         storage_requirements: AccountStorageRequirements,
         account_state: AccountStateAt,
         known_account_code: Option<AccountCode>,
+        known_vault_commitment: Option<Word>,
     ) -> Result<(BlockNumber, AccountProof), RpcError>;
 
     /// Fetches the commit height where the nullifier was consumed. If the nullifier isn't found,

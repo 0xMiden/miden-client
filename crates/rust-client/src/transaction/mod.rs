@@ -68,12 +68,12 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::account::{Account, AccountCode, AccountId};
-use miden_protocol::asset::NonFungibleAsset;
+use miden_protocol::asset::{Asset, NonFungibleAsset};
 use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
 use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
 use miden_protocol::transaction::AccountInputs;
-use miden_protocol::{Felt, Word};
+use miden_protocol::{EMPTY_WORD, Felt, Word};
 use miden_standards::account::interface::AccountInterfaceExt;
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
@@ -775,6 +775,7 @@ where
                             AccountStorageRequirements::default(),
                             AccountStateAt::Block(block_num),
                             None,
+                            None,
                         )
                         .await?;
                     let (witness, _) = account_proof.into_parts();
@@ -904,14 +905,34 @@ pub(crate) async fn fetch_public_account_inputs(
     let known_account_code: Option<AccountCode> =
         store.get_foreign_account_code(vec![account_id]).await?.into_values().next();
 
-    let (_, account_proof) = rpc_api
+    let (proof_block_num, mut account_proof) = rpc_api
         .get_account_proof(
             account_id,
             storage_requirements.clone(),
             account_state_at,
             known_account_code,
+            Some(EMPTY_WORD),
         )
         .await?;
+
+    // If the account has too many assets for a single response, fetch them via
+    // the sync_account_vault endpoint. Bound the sync to the same block as the proof
+    // to avoid attaching newer vault state to an older proof.
+    if account_proof.vault_details().is_some_and(|v| v.too_many_assets) {
+        let vault_info = rpc_api
+            .sync_account_vault(BlockNumber::from(0), Some(proof_block_num), account_id)
+            .await?;
+        let mut updates = vault_info.updates;
+        updates.sort_by_key(|u| u.block_num);
+        let assets: Vec<Asset> = updates
+            .into_iter()
+            .map(|u| (u.vault_key, u.asset))
+            .collect::<BTreeMap<_, _>>()
+            .into_values()
+            .flatten()
+            .collect();
+        account_proof.set_vault_assets(assets);
+    }
 
     let account_inputs = request::account_proof_into_inputs(account_proof, &storage_requirements)?;
 

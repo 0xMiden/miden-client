@@ -612,6 +612,21 @@ impl AccountProof {
         self.account_witness.path()
     }
 
+    /// Returns the vault details, if present.
+    pub fn vault_details(&self) -> Option<&AccountVaultDetails> {
+        self.state_headers.as_ref().map(|d| &d.vault_details)
+    }
+
+    /// Replaces the vault assets in the account details.
+    ///
+    /// Used when the original response had `too_many_assets` set and the full asset list
+    /// was fetched separately via `sync_account_vault`.
+    pub fn set_vault_assets(&mut self, assets: Vec<Asset>) {
+        if let Some(details) = &mut self.state_headers {
+            details.vault_details.assets = assets;
+        }
+    }
+
     /// Deconstructs `AccountProof` into its individual parts.
     pub fn into_parts(self) -> (AccountWitness, Option<AccountDetails>) {
         (self.account_witness, self.state_headers)
