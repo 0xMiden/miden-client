@@ -42,12 +42,12 @@ impl From<&NoteIdAndArgs> for (NativeNoteId, Option<NativeNoteArgs>) {
 
 impl From<NoteIdAndArgsArray> for Vec<(NativeNoteId, Option<NativeNoteArgs>)> {
     fn from(note_id_and_args_array: NoteIdAndArgsArray) -> Self {
-        note_id_and_args_array.__inner.into_iter().map(Into::into).collect()
+        note_id_and_args_array.into_iter().map(Into::into).collect()
     }
 }
 
 impl From<&NoteIdAndArgsArray> for Vec<(NativeNoteId, Option<NativeNoteArgs>)> {
     fn from(note_id_and_args_array: &NoteIdAndArgsArray) -> Self {
-        note_id_and_args_array.__inner.iter().map(Into::into).collect()
+        note_id_and_args_array.iter().map(Into::into).collect()
     }
 }
