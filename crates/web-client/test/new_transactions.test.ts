@@ -761,7 +761,7 @@ test.describe("custom account component tests", () => {
         ?.storage()
         .getMapItem(MAP_SLOT_NAME, keyZero);
 
-      const expected = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const expected = new sdk.Word(sdk.u64Array([4, 3, 2, 1]));
 
       return {
         retrieveMapKeyHex: retrieveMapKey?.toHex(),
@@ -907,7 +907,7 @@ test.describe("custom account component tests", () => {
         ?.storage()
         .getMapItem(MAP_SLOT_NAME, keyZero);
 
-      const expected = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const expected = new sdk.Word(sdk.u64Array([4, 3, 2, 1]));
 
       return {
         retrieveMapKeyHex: retrieveMapKey?.toHex(),
