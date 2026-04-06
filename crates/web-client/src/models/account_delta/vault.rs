@@ -50,8 +50,8 @@ impl AccountVaultDelta {
             .fungible()
             .iter()
             .filter(|&(_, &value)| value > 0)
-            .filter_map(|(faucet_id, &diff)| {
-                FungibleAsset::new_inner(&faucet_id.into(), diff.unsigned_abs()).ok()
+            .filter_map(|(vault_key, &diff)| {
+                FungibleAsset::new_inner(&vault_key.faucet_id().into(), diff.unsigned_abs()).ok()
             })
             .collect()
     }
@@ -63,8 +63,8 @@ impl AccountVaultDelta {
             .fungible()
             .iter()
             .filter(|&(_, &value)| value < 0)
-            .filter_map(|(faucet_id, &diff)| {
-                FungibleAsset::new_inner(&faucet_id.into(), diff.unsigned_abs()).ok()
+            .filter_map(|(vault_key, &diff)| {
+                FungibleAsset::new_inner(&vault_key.faucet_id().into(), diff.unsigned_abs()).ok()
             })
             .collect()
     }
@@ -93,10 +93,10 @@ impl FungibleAssetDeltaItem {
     }
 }
 
-impl From<(&NativeAccountId, &i64)> for FungibleAssetDeltaItem {
-    fn from(native_fungible_asset_delta_item: (&NativeAccountId, &i64)) -> Self {
+impl From<(&miden_client::asset::AssetVaultKey, &i64)> for FungibleAssetDeltaItem {
+    fn from(native_fungible_asset_delta_item: (&miden_client::asset::AssetVaultKey, &i64)) -> Self {
         Self {
-            faucet_id: (*native_fungible_asset_delta_item.0).into(),
+            faucet_id: native_fungible_asset_delta_item.0.faucet_id().into(),
             amount: *native_fungible_asset_delta_item.1,
         }
     }
@@ -128,7 +128,9 @@ impl FungibleAssetDelta {
     /// Returns the delta amount for a given faucet, if present.
     pub fn amount(&self, faucet_id: &AccountId) -> Option<i64> {
         let native_faucet_id: NativeAccountId = faucet_id.into();
-        self.0.amount(&native_faucet_id)
+        let vault_key = miden_protocol::asset::AssetVaultKey::new_fungible(native_faucet_id)
+            .expect("faucet_id should be a fungible faucet");
+        self.0.amount(&vault_key)
     }
 
     /// Returns the number of distinct fungible assets in the delta.

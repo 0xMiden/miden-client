@@ -21,7 +21,7 @@ use js_export_macro::js_export;
 #[cfg(feature = "browser")]
 use js_sys::{Function, Reflect};
 use miden_client::builder::ClientBuilder;
-use miden_client::crypto::RpoRandomCoin;
+use miden_client::crypto::RandomCoin;
 #[cfg(feature = "nodejs")]
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note_transport::NoteTransportClient;
@@ -244,7 +244,7 @@ impl WebClient {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
         })?;
 
-        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 0));
+        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 10_000));
 
         let note_transport_client = node_note_transport_url
             .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
@@ -297,7 +297,7 @@ impl WebClient {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
         })?;
 
-        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 0));
+        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 10_000));
 
         let note_transport_client = node_note_transport_url
             .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
@@ -324,8 +324,8 @@ impl WebClient {
         &self,
         rpc_client: Arc<dyn NodeRpcClient>,
         store: Arc<dyn Store>,
-        keystore: WebKeyStore<RpoRandomCoin>,
-        rng: RpoRandomCoin,
+        keystore: WebKeyStore<RandomCoin>,
+        rng: RandomCoin,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
         debug_mode: Option<bool>,
     ) -> Result<(), JsValue> {
@@ -421,7 +421,7 @@ impl WebClient {
         rpc_client: Arc<dyn NodeRpcClient>,
         store: Arc<dyn Store>,
         keystore: FilesystemKeyStore,
-        rng: RpoRandomCoin,
+        rng: RandomCoin,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
         debug_mode: Option<bool>,
     ) -> Result<(), JsErr> {
@@ -461,7 +461,7 @@ impl WebClient {
     }
 }
 
-pub(crate) fn create_rng(seed: Option<Vec<u8>>) -> Result<RpoRandomCoin, JsErr> {
+pub(crate) fn create_rng(seed: Option<Vec<u8>>) -> Result<RandomCoin, JsErr> {
     let mut rng = match seed {
         Some(seed_bytes) => {
             if seed_bytes.len() == 32 {
@@ -475,7 +475,7 @@ pub(crate) fn create_rng(seed: Option<Vec<u8>>) -> Result<RpoRandomCoin, JsErr> 
         None => StdRng::from_os_rng(),
     };
     let coin_seed: [u64; 4] = rng.random();
-    Ok(RpoRandomCoin::new(coin_seed.map(Felt::new).into()))
+    Ok(RandomCoin::new(coin_seed.map(Felt::new).into()))
 }
 
 // ERROR HANDLING HELPERS

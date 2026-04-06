@@ -12,7 +12,6 @@ use miden_client::account::{
     AccountDelta,
     AccountHeader,
     AccountId,
-    AccountIdPrefix,
     AccountStorage,
     Address,
     PartialAccount,
@@ -34,7 +33,7 @@ use miden_client::store::{
 };
 use miden_client::sync::NoteTagRecord;
 use miden_client::utils::Serializable;
-use miden_client::{AccountError, Word};
+use miden_client::{AccountError, Felt, Word};
 use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
 use miden_protocol::asset::{AssetVaultKey, PartialVault};
 use miden_protocol::crypto::merkle::MerkleError;
@@ -440,7 +439,7 @@ impl SqliteStore {
         smt_forest: &mut AccountSmtForest,
         init_account_state: &AccountHeader,
         final_account_state: &AccountHeader,
-        updated_fungible_assets: BTreeMap<AccountIdPrefix, FungibleAsset>,
+        updated_fungible_assets: BTreeMap<AssetVaultKey, FungibleAsset>,
         old_map_roots: &BTreeMap<StorageSlotName, Word>,
         delta: &AccountDelta,
     ) -> Result<(), StoreError> {
@@ -493,7 +492,7 @@ impl SqliteStore {
         Self::write_storage_delta(
             tx,
             account_id,
-            final_account_state.nonce().as_int(),
+            final_account_state.nonce().as_canonical_u64(),
             &updated_storage_slots,
             delta,
         )?;
@@ -700,8 +699,8 @@ impl SqliteStore {
         // Restore assets with non-NULL old values
         tx.execute(
             "INSERT OR REPLACE INTO latest_account_assets \
-             (account_id, vault_key, faucet_id_prefix, asset) \
-             SELECT account_id, vault_key, faucet_id_prefix, old_asset \
+             (account_id, vault_key, asset) \
+             SELECT account_id, vault_key, old_asset \
              FROM historical_account_assets \
              WHERE account_id = ? AND replaced_at_nonce = ? AND old_asset IS NOT NULL",
             params![account_id_hex, nonce_val],
@@ -733,7 +732,7 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         let account_id = new_account_state.id();
         let account_id_hex = account_id.to_hex();
-        let nonce_val = u64_to_value(new_account_state.nonce().as_int());
+        let nonce_val = u64_to_value(new_account_state.nonce().as_canonical_u64());
 
         // Insert and register account state in the SMT forest (handles old root cleanup)
         smt_forest.insert_and_register_account_state(
@@ -767,8 +766,8 @@ impl SqliteStore {
         .into_store_error()?;
         tx.execute(
             "INSERT OR REPLACE INTO historical_account_assets \
-             (account_id, replaced_at_nonce, vault_key, faucet_id_prefix, old_asset) \
-             SELECT account_id, ?, vault_key, faucet_id_prefix, asset \
+             (account_id, replaced_at_nonce, vault_key, old_asset) \
+             SELECT account_id, ?, vault_key, asset \
              FROM latest_account_assets WHERE account_id = ?",
             params![&nonce_val, &account_id_hex],
         )
@@ -815,8 +814,8 @@ impl SqliteStore {
         .into_store_error()?;
         tx.execute(
             "INSERT OR IGNORE INTO historical_account_assets \
-             (account_id, replaced_at_nonce, vault_key, faucet_id_prefix, old_asset) \
-             SELECT account_id, ?, vault_key, faucet_id_prefix, NULL \
+             (account_id, replaced_at_nonce, vault_key, old_asset) \
+             SELECT account_id, ?, vault_key, NULL \
              FROM latest_account_assets WHERE account_id = ?",
             params![&nonce_val, &account_id_hex],
         )
@@ -875,9 +874,9 @@ impl SqliteStore {
             let old_code_commitment = old.code_commitment().to_string();
             let old_storage_commitment = old.storage_commitment().to_string();
             let old_vault_root = old.vault_root().to_string();
-            let old_nonce = u64_to_value(old.nonce().as_int());
+            let old_nonce = u64_to_value(old.nonce().as_canonical_u64());
             let old_commitment = old.to_commitment().to_string();
-            let replaced_at_nonce = u64_to_value(new_header.nonce().as_int());
+            let replaced_at_nonce = u64_to_value(new_header.nonce().as_canonical_u64());
 
             // Read the old seed and locked status from latest (if any)
             let (old_seed, old_locked): (Option<Vec<u8>>, bool) = tx
@@ -926,7 +925,7 @@ impl SqliteStore {
         let code_commitment = new_header.code_commitment().to_string();
         let storage_commitment = new_header.storage_commitment().to_string();
         let vault_root = new_header.vault_root().to_string();
-        let nonce = u64_to_value(new_header.nonce().as_int());
+        let nonce = u64_to_value(new_header.nonce().as_canonical_u64());
         let commitment = new_header.to_commitment().to_string();
         let account_seed = account_seed.map(|seed| seed.to_bytes());
 
@@ -972,6 +971,96 @@ impl SqliteStore {
             .into_store_error()?;
 
         Ok(())
+    }
+
+    /// Prunes historical account states for a single account up to the given nonce.
+    ///
+    /// Deletes all historical entries with `replaced_at_nonce <= up_to_nonce`
+    /// (see DESIGN.md for why this threshold is safe), then removes any account
+    /// code that was only referenced by the deleted headers.
+    pub fn prune_account_history(
+        conn: &mut Connection,
+        account_id: AccountId,
+        up_to_nonce: Felt,
+    ) -> Result<usize, StoreError> {
+        let tx = conn.transaction().into_store_error()?;
+        let account_id_hex = account_id.to_hex();
+        let boundary_val = u64_to_value(up_to_nonce.as_canonical_u64());
+        let mut total_deleted: usize = 0;
+
+        // Collect code commitments from headers we are about to delete.
+        let candidate_code_commitments: Vec<String> = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT DISTINCT code_commitment FROM historical_account_headers \
+                     WHERE id = ? AND replaced_at_nonce <= ?",
+                )
+                .into_store_error()?;
+            let rows = stmt
+                .query_map(params![&account_id_hex, &boundary_val], |row| row.get(0))
+                .into_store_error()?;
+            rows.collect::<Result<Vec<String>, _>>().into_store_error()?
+        };
+
+        // Delete historical entries.
+        total_deleted += tx
+            .execute(
+                "DELETE FROM historical_account_headers \
+                 WHERE id = ? AND replaced_at_nonce <= ?",
+                params![&account_id_hex, &boundary_val],
+            )
+            .into_store_error()?;
+
+        total_deleted += tx
+            .execute(
+                "DELETE FROM historical_account_storage \
+                 WHERE account_id = ? AND replaced_at_nonce <= ?",
+                params![&account_id_hex, &boundary_val],
+            )
+            .into_store_error()?;
+
+        total_deleted += tx
+            .execute(
+                "DELETE FROM historical_storage_map_entries \
+                 WHERE account_id = ? AND replaced_at_nonce <= ?",
+                params![&account_id_hex, &boundary_val],
+            )
+            .into_store_error()?;
+
+        total_deleted += tx
+            .execute(
+                "DELETE FROM historical_account_assets \
+                 WHERE account_id = ? AND replaced_at_nonce <= ?",
+                params![&account_id_hex, &boundary_val],
+            )
+            .into_store_error()?;
+
+        // Delete orphaned code: only check commitments from the deleted headers,
+        // and only if they are not referenced by any remaining header or foreign code.
+        for commitment in &candidate_code_commitments {
+            let still_referenced: bool = tx
+                .query_row(
+                    "SELECT EXISTS(
+                        SELECT 1 FROM latest_account_headers WHERE code_commitment = ?1
+                        UNION ALL
+                        SELECT 1 FROM historical_account_headers WHERE code_commitment = ?1
+                        UNION ALL
+                        SELECT 1 FROM foreign_account_code WHERE code_commitment = ?1
+                    )",
+                    params![commitment],
+                    |row| row.get(0),
+                )
+                .into_store_error()?;
+
+            if !still_referenced {
+                total_deleted += tx
+                    .execute("DELETE FROM account_code WHERE commitment = ?", params![commitment])
+                    .into_store_error()?;
+            }
+        }
+
+        tx.commit().into_store_error()?;
+        Ok(total_deleted)
     }
 
     fn remove_address_internal(tx: &Transaction<'_>, address: &Address) -> Result<(), StoreError> {

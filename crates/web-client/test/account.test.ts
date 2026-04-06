@@ -100,7 +100,10 @@ test.describe("get public account with details", () => {
   test("assets and storage with too many assets/entries are retrieved", async ({
     run,
   }) => {
-    test.skip(true, "requires running node with specific genesis account");
+    test.skip(
+      true,
+      "Temporarily skipped: node returns Internal error for large genesis account"
+    );
   });
 });
 

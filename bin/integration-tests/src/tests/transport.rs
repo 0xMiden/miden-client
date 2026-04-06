@@ -1,16 +1,11 @@
-use std::sync::Arc;
-
 use anyhow::{Context, Result};
 use miden_client::account::AccountStorageMode;
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::FungibleAsset;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::NoteType;
-use miden_client::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT;
-use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::{InputNoteState, NoteFilter};
 use miden_client::testing::common::{
-    FilesystemKeyStore,
     assert_account_has_single_asset,
     consume_notes,
     execute_tx_and_sync,
@@ -23,32 +18,6 @@ use miden_client::transaction::TransactionRequestBuilder;
 
 use crate::tests::config::ClientConfig;
 
-async fn builder_with_transport(
-    client_config: ClientConfig,
-) -> Result<(miden_client::builder::ClientBuilder<FilesystemKeyStore>, FilesystemKeyStore)> {
-    let (mut builder, keystore) = client_config
-        .into_client_builder()
-        .await
-        .context("failed to get client builder")?;
-
-    // Determine endpoint from env, fallback to default constant
-    let endpoint = std::env::var("TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT")
-        .unwrap_or_else(|_| NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string());
-    let timeout = std::env::var("TEST_TIMEOUT")
-        .ok()
-        .and_then(|s| s.parse::<u64>().ok())
-        .unwrap_or(1_000);
-
-    let nt_client = Arc::new(
-        GrpcNoteTransportClient::connect(endpoint, timeout)
-            .await
-            .context("failed connecting note transport client")?,
-    );
-
-    builder = builder.note_transport(nt_client);
-    Ok((builder, keystore))
-}
-
 // TRANSPORT NOTE INCLUSION PROOF AND CONSUMPTION TESTS
 // ================================================================================================
 
@@ -56,20 +25,27 @@ async fn builder_with_transport(
 pub async fn test_transport_note_inclusion_proof_and_consumption(
     client_config: ClientConfig,
 ) -> Result<()> {
-    if std::env::var("TEST_WITH_NOTE_TRANSPORT").unwrap_or_default() != "1" {
-        eprintln!("Skipping note transport test (set TEST_WITH_NOTE_TRANSPORT=1 to enable)");
+    if client_config.note_transport_endpoint.is_none() {
+        eprintln!(
+            "Skipping note transport test (set TEST_MIDEN_NOTE_TRANSPORT_URL or use \
+             --note-transport-url to enable)"
+        );
         return Ok(());
     }
 
     let (rpc_endpoint, rpc_timeout, ..) = client_config.as_parts();
-    let sender_config = ClientConfig::new(rpc_endpoint.clone(), rpc_timeout);
-    let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout);
+    let sender_config = ClientConfig::new(rpc_endpoint.clone(), rpc_timeout)
+        .with_note_transport_endpoint(client_config.note_transport_endpoint.clone());
+    let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout)
+        .with_note_transport_endpoint(client_config.note_transport_endpoint);
 
-    let (sender_builder, sender_keystore) = builder_with_transport(sender_config)
+    let (sender_builder, sender_keystore) = sender_config
+        .into_client_builder()
         .await
         .context("failed to get sender builder")?;
     let mut sender = sender_builder.build().await.context("failed to build sender")?;
-    let (recipient_builder, recipient_keystore) = builder_with_transport(recipient_config)
+    let (recipient_builder, recipient_keystore) = recipient_config
+        .into_client_builder()
         .await
         .context("failed to get recipient builder")?;
     let mut recipient = recipient_builder.build().await.context("failed to build recipient")?;
@@ -158,20 +134,27 @@ pub async fn test_transport_note_inclusion_proof_and_consumption(
 pub async fn test_transport_multiple_notes_different_blocks(
     client_config: ClientConfig,
 ) -> Result<()> {
-    if std::env::var("TEST_WITH_NOTE_TRANSPORT").unwrap_or_default() != "1" {
-        eprintln!("Skipping note transport test (set TEST_WITH_NOTE_TRANSPORT=1 to enable)");
+    if client_config.note_transport_endpoint.is_none() {
+        eprintln!(
+            "Skipping note transport test (set TEST_MIDEN_NOTE_TRANSPORT_URL or use \
+             --note-transport-url to enable)"
+        );
         return Ok(());
     }
 
     let (rpc_endpoint, rpc_timeout, ..) = client_config.as_parts();
-    let sender_config = ClientConfig::new(rpc_endpoint.clone(), rpc_timeout);
-    let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout);
+    let sender_config = ClientConfig::new(rpc_endpoint.clone(), rpc_timeout)
+        .with_note_transport_endpoint(client_config.note_transport_endpoint.clone());
+    let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout)
+        .with_note_transport_endpoint(client_config.note_transport_endpoint);
 
-    let (sender_builder, sender_keystore) = builder_with_transport(sender_config)
+    let (sender_builder, sender_keystore) = sender_config
+        .into_client_builder()
         .await
         .context("failed to get sender builder")?;
     let mut sender = sender_builder.build().await.context("failed to build sender")?;
-    let (recipient_builder, recipient_keystore) = builder_with_transport(recipient_config)
+    let (recipient_builder, recipient_keystore) = recipient_config
+        .into_client_builder()
         .await
         .context("failed to get recipient builder")?;
     let mut recipient = recipient_builder.build().await.context("failed to build recipient")?;
@@ -282,20 +265,27 @@ pub async fn test_transport_multiple_notes_different_blocks(
 /// Tests that a note sent via transport before being committed on-chain starts as Expected,
 /// then transitions to Committed once the mint tx is executed and synced.
 pub async fn test_transport_note_not_yet_committed(client_config: ClientConfig) -> Result<()> {
-    if std::env::var("TEST_WITH_NOTE_TRANSPORT").unwrap_or_default() != "1" {
-        eprintln!("Skipping note transport test (set TEST_WITH_NOTE_TRANSPORT=1 to enable)");
+    if client_config.note_transport_endpoint.is_none() {
+        eprintln!(
+            "Skipping note transport test (set TEST_MIDEN_NOTE_TRANSPORT_URL or use \
+             --note-transport-url to enable)"
+        );
         return Ok(());
     }
 
     let (rpc_endpoint, rpc_timeout, ..) = client_config.as_parts();
-    let sender_config = ClientConfig::new(rpc_endpoint.clone(), rpc_timeout);
-    let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout);
+    let sender_config = ClientConfig::new(rpc_endpoint.clone(), rpc_timeout)
+        .with_note_transport_endpoint(client_config.note_transport_endpoint.clone());
+    let recipient_config = ClientConfig::new(rpc_endpoint, rpc_timeout)
+        .with_note_transport_endpoint(client_config.note_transport_endpoint);
 
-    let (sender_builder, sender_keystore) = builder_with_transport(sender_config)
+    let (sender_builder, sender_keystore) = sender_config
+        .into_client_builder()
         .await
         .context("failed to get sender builder")?;
     let mut sender = sender_builder.build().await.context("failed to build sender")?;
-    let (recipient_builder, recipient_keystore) = builder_with_transport(recipient_config)
+    let (recipient_builder, recipient_keystore) = recipient_config
+        .into_client_builder()
         .await
         .context("failed to get recipient builder")?;
     let mut recipient = recipient_builder.build().await.context("failed to build recipient")?;

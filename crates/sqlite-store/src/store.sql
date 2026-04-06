@@ -106,7 +106,6 @@ CREATE TABLE historical_storage_map_entries (
 CREATE TABLE latest_account_assets (
     account_id TEXT NOT NULL,        -- account ID
     vault_key TEXT NOT NULL,         -- asset's vault key
-    faucet_id_prefix TEXT NOT NULL,  -- prefix of the faucet ID, used to filter by faucet
     asset TEXT NOT NULL,             -- serialized asset value
     PRIMARY KEY (account_id, vault_key)
 ) WITHOUT ROWID;
@@ -117,7 +116,6 @@ CREATE TABLE historical_account_assets (
     account_id TEXT NOT NULL,           -- account ID
     replaced_at_nonce BIGINT NOT NULL,  -- nonce at which this old asset was replaced
     vault_key TEXT NOT NULL,            -- asset's vault key
-    faucet_id_prefix TEXT NOT NULL,     -- prefix of the faucet ID, used to filter by faucet
     old_asset TEXT NULL,                -- old serialized asset value (NULL = asset was new)
     PRIMARY KEY (account_id, replaced_at_nonce, vault_key)
 ) WITHOUT ROWID;

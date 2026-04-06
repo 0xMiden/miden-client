@@ -6,6 +6,7 @@ use miden_client::account::component::{
 };
 use miden_client::account::{
     AccountComponentCode as NativeAccountComponentCode,
+    AccountType,
     StorageSlot as NativeStorageSlot,
 };
 use miden_client::assembly::{Library as NativeLibrary, MastNodeExt};
@@ -51,10 +52,13 @@ impl GetProceduresResultItem {
     }
 }
 
-impl From<&(NativeWord, bool)> for GetProceduresResultItem {
-    fn from(native_get_procedures_result_item: &(NativeWord, bool)) -> Self {
+impl From<(miden_protocol::account::AccountProcedureRoot, bool)> for GetProceduresResultItem {
+    fn from(
+        native_get_procedures_result_item: (miden_protocol::account::AccountProcedureRoot, bool),
+    ) -> Self {
+        let digest_word: NativeWord = native_get_procedures_result_item.0.into();
         Self {
-            digest: native_get_procedures_result_item.0.into(),
+            digest: digest_word.into(),
             is_auth: native_get_procedures_result_item.1,
         }
     }
@@ -79,7 +83,7 @@ impl AccountComponent {
         NativeAccountComponent::new(
             native_account_code,
             native_slots,
-            AccountComponentMetadata::new("custom"),
+            AccountComponentMetadata::new("custom", AccountType::all()),
         )
         .map(AccountComponent)
         .map_err(|e| js_error_with_context(e, "Failed to compile account component"))
@@ -88,9 +92,10 @@ impl AccountComponent {
     /// Marks the component as supporting all account types.
     #[js_export(js_name = "withSupportsAllTypes")]
     pub fn with_supports_all_types(&self) -> Self {
-        let metadata = self.0.metadata().clone().with_supports_all_types();
         let code = self.0.component_code().clone();
         let slots = self.0.storage_slots().to_vec();
+        let name = self.0.metadata().name();
+        let metadata = AccountComponentMetadata::new(name, AccountType::all());
         AccountComponent(
             NativeAccountComponent::new(code, slots, metadata)
                 .expect("reconstructing component with updated metadata should not fail"),
@@ -143,7 +148,7 @@ impl AccountComponent {
     /// Returns all procedures exported by this component.
     #[js_export(js_name = "getProcedures")]
     pub fn get_procedures(&self) -> Vec<GetProceduresResultItem> {
-        self.0.get_procedures().iter().map(Into::into).collect()
+        self.0.procedures().map(Into::into).collect()
     }
 
     /// Builds an auth component from a secret key, inferring the auth scheme from the key type.
@@ -156,7 +161,7 @@ impl AccountComponent {
 
         let auth_scheme = match native_secret_key {
             NativeSecretKey::EcdsaK256Keccak(_) => AuthScheme::AuthEcdsaK256Keccak,
-            NativeSecretKey::Falcon512Rpo(_) => AuthScheme::AuthRpoFalcon512,
+            NativeSecretKey::Falcon512Poseidon2(_) => AuthScheme::AuthRpoFalcon512,
             // This is because the definition of NativeSecretKey has the
             // '#[non_exhaustive]' attribute, without this catch-all clause,
             // this is a compiler error.
@@ -196,7 +201,7 @@ impl AccountComponent {
         NativeAccountComponent::new(
             native_library,
             native_slots,
-            AccountComponentMetadata::new("custom"),
+            AccountComponentMetadata::new("custom", AccountType::all()),
         )
         .map(AccountComponent)
         .map_err(|e| js_error_with_context(e, "Failed to create account component from package"))
@@ -215,7 +220,7 @@ impl AccountComponent {
         NativeAccountComponent::new(
             native_library,
             native_slots,
-            AccountComponentMetadata::new("custom"),
+            AccountComponentMetadata::new("custom", AccountType::all()),
         )
         .map(AccountComponent)
         .map_err(|e| js_error_with_context(e, "Failed to create account component from library"))
@@ -229,7 +234,7 @@ impl AccountComponent {
     ) -> AccountComponent {
         match auth_scheme {
             AuthScheme::AuthRpoFalcon512 => {
-                let auth = NativeSingleSig::new(commitment, NativeAuthSchemeId::Falcon512Rpo);
+                let auth = NativeSingleSig::new(commitment, NativeAuthSchemeId::Falcon512Poseidon2);
                 AccountComponent(auth.into())
             },
             AuthScheme::AuthEcdsaK256Keccak => {

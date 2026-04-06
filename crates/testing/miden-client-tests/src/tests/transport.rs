@@ -14,10 +14,10 @@ use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransp
 use miden_client::utils::RwLock;
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_protocol::Felt;
-use miden_protocol::crypto::rand::RpoRandomCoin;
+use miden_protocol::crypto::rand::RandomCoin;
 use miden_protocol::note::NoteType as ProtocolNoteType;
-use miden_protocol::transaction::OutputNote;
-use miden_protocol::utils::Serializable;
+use miden_protocol::transaction::RawOutputNote;
+use miden_protocol::utils::serde::Serializable;
 use miden_standards::note::P2idNote;
 use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChainBuilder, TxContextInput};
@@ -193,7 +193,7 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
         .unwrap();
 
     let private_note =
-        NoteBuilder::new(mock_account.id(), RpoRandomCoin::new([1, 2, 3, 4].map(Felt::new).into()))
+        NoteBuilder::new(mock_account.id(), RandomCoin::new([1, 2, 3, 4].map(Felt::new).into()))
             .note_type(ProtocolNoteType::Private)
             .tag(NoteTag::new(0).into())
             .build()
@@ -208,7 +208,7 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
         mock_chain
             .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note])
             .unwrap()
-            .extend_expected_output_notes(vec![OutputNote::Full(private_note.clone())])
+            .extend_expected_output_notes(vec![RawOutputNote::Full(private_note.clone())])
             .build()
             .unwrap()
             .execute(),
@@ -232,7 +232,7 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
 
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
-    let rng = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
+    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
 
     let keystore_path = temp_dir();
     let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();

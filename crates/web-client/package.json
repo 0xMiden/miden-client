@@ -1,6 +1,6 @@
 {
   "name": "@miden-sdk/miden-sdk",
-  "version": "0.13.1",
+  "version": "0.14.0",
   "description": "Miden Wasm SDK",
   "collaborators": [
     "Miden"
@@ -33,13 +33,16 @@
     "check:wasm-types": "node ./scripts/check-bindgen-types.js",
     "check:method-classification": "node ./scripts/check-method-classification.js",
     "test": "yarn playwright install --with-deps && yarn playwright test",
+    "test:ci": "yarn playwright install --with-deps chromium && yarn playwright test",
+    "test:ci:remote_prover": "yarn playwright install --with-deps && cross-env TEST_MIDEN_PROVER_URL=localhost yarn playwright test -g 'with remote prover'",
     "test:devnet": "cross-env TEST_MIDEN_NETWORK=devnet yarn test",
     "test:testnet": "cross-env TEST_MIDEN_NETWORK=testnet yarn test",
-    "test:remote_prover": "yarn install && yarn playwright install --with-deps && cross-env MIDEN_WEB_DEV=true yarn run build && cross-env REMOTE_PROVER=true yarn playwright test -g 'with remote prover' ",
-    "test:remote_prover:devnet": "cross-env TEST_MIDEN_NETWORK=devnet yarn run test:remote_prover",
-    "test:remote_prover:testnet": "cross-env TEST_MIDEN_NETWORK=testnet yarn run test:remote_prover",
+    "test:remote_prover": "yarn install && yarn playwright install --with-deps && cross-env MIDEN_WEB_DEV=true yarn run build && cross-env TEST_MIDEN_PROVER_URL=localhost yarn playwright test -g 'with remote prover' ",
+    "test:remote_prover:devnet": "cross-env TEST_MIDEN_NETWORK=devnet TEST_MIDEN_PROVER_URL=devnet yarn run test:remote_prover",
+    "test:remote_prover:testnet": "cross-env TEST_MIDEN_NETWORK=testnet TEST_MIDEN_PROVER_URL=testnet yarn run test:remote_prover",
     "test:clean": "yarn install && yarn playwright install --with-deps && MIDEN_WEB_DEV=true yarn run build && yarn playwright test ",
     "test:node": "vitest run",
+    "test:clean:opt": "yarn install && yarn playwright install --with-deps && yarn run build && yarn playwright test ",
     "typedoc": "typedoc"
   },
   "devDependencies": {

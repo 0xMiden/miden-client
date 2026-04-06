@@ -33,6 +33,7 @@ pub struct StorageMapEntryIdxdbObject {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountAssetIdxdbObject {
+    pub vault_key: String,
     pub asset: String,
 }
 

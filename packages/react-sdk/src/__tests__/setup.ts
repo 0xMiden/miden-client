@@ -198,14 +198,11 @@ vi.mock("@miden-sdk/miden-sdk", () => {
         (_scheme: unknown, _words: unknown[]) => new (class NoteAttachment {})()
       ),
     }),
-    OutputNoteArray: class OutputNoteArray {
+    NoteArray: class NoteArray {
       notes: unknown[];
       constructor(notes: unknown[]) {
         this.notes = notes;
       }
-    },
-    OutputNote: {
-      full: vi.fn((note: unknown) => ({ note })),
     },
     NoteAndArgs: class NoteAndArgs {
       note: unknown;

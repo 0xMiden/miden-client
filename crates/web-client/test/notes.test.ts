@@ -35,6 +35,7 @@ test.describe("get_input_note", () => {
   });
 
   test("retrieve an input note that does exist", async ({ run }) => {
+    test.slow();
     const result = await run(async ({ sdk, helpers }) => {
       const integration = await helpers.createIntegrationClient();
       if (!integration) return { skip: true };
@@ -177,6 +178,7 @@ test.describe("get_input_note", () => {
   });
 
   test("get note script by root", async ({ run }) => {
+    test.slow();
     const result = await run(async ({ sdk, helpers }) => {
       const integration = await helpers.createIntegrationClient();
       if (!integration) return { skip: true };
@@ -315,6 +317,7 @@ test.describe("get_input_note", () => {
   test("sync notes by tag and check nullifier commit height", async ({
     run,
   }) => {
+    test.slow();
     const result = await run(async ({ sdk, helpers }) => {
       const integration = await helpers.createIntegrationClient();
       if (!integration) return { skip: true };
@@ -474,6 +477,7 @@ test.describe("get_input_note", () => {
 
 test.describe("get_input_notes", () => {
   test("note exists, note filter all", async ({ run }) => {
+    test.slow();
     const result = await run(async ({ sdk, helpers }) => {
       const integration = await helpers.createIntegrationClient();
       if (!integration) return { skip: true };
@@ -597,6 +601,7 @@ test.describe("get_input_notes", () => {
 
 test.describe("get_consumable_notes", () => {
   test("filter by account", async ({ run }) => {
+    test.slow();
     const result = await run(async ({ sdk, helpers }) => {
       const integration = await helpers.createIntegrationClient();
       if (!integration) return { skip: true };
@@ -702,6 +707,7 @@ test.describe("get_consumable_notes", () => {
   });
 
   test("no filter by account", async ({ run }) => {
+    test.slow();
     const result = await run(async ({ sdk, helpers }) => {
       const integration = await helpers.createIntegrationClient();
       if (!integration) return { skip: true };
@@ -823,6 +829,7 @@ test.describe("get_consumable_notes", () => {
   });
 
   test("p2ide consume after block", async ({ run }) => {
+    test.slow();
     const result = await run(async ({ sdk, helpers }) => {
       const integration = await helpers.createIntegrationClient();
       if (!integration) return { skip: true };
@@ -1000,6 +1007,7 @@ test.describe("createP2IDNote and createP2IDENote", () => {
   test("should create a proper consumable p2id note from the createP2IDNote function", async ({
     run,
   }) => {
+    test.slow();
     const result = await run(async ({ sdk, helpers }) => {
       const integration = await helpers.createIntegrationClient();
       if (!integration) return { skip: true };

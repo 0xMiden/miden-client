@@ -22,7 +22,7 @@ impl AuthSecretKey {
     #[js_export(js_name = "rpoFalconWithRNG")]
     pub fn rpo_falcon_with_rng(seed: Option<Vec<u8>>) -> Result<AuthSecretKey, JsErr> {
         let mut rng = Self::try_rng_from_seed(seed)?;
-        Ok(NativeAuthSecretKey::new_falcon512_rpo_with_rng(&mut rng).into())
+        Ok(NativeAuthSecretKey::new_falcon512_poseidon2_with_rng(&mut rng).into())
     }
 
     #[js_export(js_name = "ecdsaWithRNG")]
@@ -63,7 +63,7 @@ impl AuthSecretKey {
     #[js_export(js_name = "getRpoFalcon512SecretKeyAsFelts")]
     pub fn get_rpo_falcon_512_secret_key_as_felts(&self) -> Result<Vec<Felt>, JsErr> {
         let secret_key_as_bytes = match &self.0 {
-            NativeAuthSecretKey::Falcon512Rpo(key) => key.to_bytes(),
+            NativeAuthSecretKey::Falcon512Poseidon2(key) => key.to_bytes(),
             _ => return Err(from_str_err("Key is not an RPO Falcon 512 key")),
         };
 

@@ -38,7 +38,10 @@ export async function openDatabase(
   clientVersion: string
 ): Promise<string> {
   const db = new MidenDatabase(network);
-  await db.open(clientVersion);
+  const success = await db.open(clientVersion);
+  if (!success) {
+    throw new Error(`Failed to open IndexedDB database: ${network}`);
+  }
   databaseRegistry.set(network, db);
   return network;
 }
@@ -107,7 +110,6 @@ export interface IHistoricalStorageMapEntry {
 export interface ILatestAccountAsset {
   accountId: string;
   vaultKey: string;
-  faucetIdPrefix: string;
   asset: string;
 }
 
@@ -115,7 +117,6 @@ export interface IHistoricalAccountAsset {
   accountId: string;
   replacedAtNonce: string;
   vaultKey: string;
-  faucetIdPrefix: string;
   oldAsset: string | null;
 }
 
@@ -240,7 +241,6 @@ export interface ISetting {
 
 export interface JsVaultAsset {
   vaultKey: string;
-  faucetIdPrefix: string;
   asset: string;
 }
 
@@ -280,11 +280,7 @@ const V1_STORES: Record<string, string> = {
     "accountId",
     "[accountId+replacedAtNonce]"
   ),
-  [Table.LatestAccountAssets]: indexes(
-    "[accountId+vaultKey]",
-    "accountId",
-    "faucetIdPrefix"
-  ),
+  [Table.LatestAccountAssets]: indexes("[accountId+vaultKey]", "accountId"),
   [Table.HistoricalAccountAssets]: indexes(
     "[accountId+replacedAtNonce+vaultKey]",
     "accountId",

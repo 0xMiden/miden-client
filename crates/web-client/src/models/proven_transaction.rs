@@ -3,7 +3,6 @@ use miden_client::account::AccountId as NativeAccountId;
 use miden_client::transaction::ProvenTransaction as NativeProvenTransaction;
 
 use crate::models::account_id::AccountId;
-use crate::models::output_notes::OutputNotes;
 use crate::models::transaction_id::TransactionId;
 use crate::models::word::Word;
 use crate::platform::{JsBytes, JsErr};
@@ -51,11 +50,8 @@ impl ProvenTransaction {
         self.0.expiration_block_num().as_u32()
     }
 
-    /// Returns notes created by this transaction.
-    #[js_export(js_name = "outputNotes")]
-    pub fn output_notes(&self) -> OutputNotes {
-        self.0.output_notes().into()
-    }
+    // Note: proven output notes are not exposed in the web client yet.
+    // The web client only exposes executed output notes via OutputNote/OutputNotes.
 
     /// Returns the commitment of the reference block.
     #[js_export(js_name = "refBlockCommitment")]

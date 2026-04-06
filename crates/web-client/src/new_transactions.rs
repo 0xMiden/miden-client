@@ -1,9 +1,12 @@
-use alloc::collections::BTreeSet;
+use alloc::collections::BTreeMap;
 
 use js_export_macro::js_export;
 use miden_client::ClientError;
+use miden_client::account::AccountId as NativeAccountId;
 use miden_client::asset::FungibleAsset;
 use miden_client::note::{BlockNumber, Note as NativeNote};
+#[cfg(feature = "testing")]
+use miden_client::transaction::LocalTransactionProver;
 use miden_client::transaction::{
     ForeignAccount as NativeForeignAccount,
     PaymentNoteDescription,
@@ -302,15 +305,21 @@ impl WebClient {
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
         let foreign_accounts_vec: Vec<crate::models::foreign_account::ForeignAccount> =
             foreign_accounts.into();
-        let foreign_accounts_set: BTreeSet<NativeForeignAccount> =
-            foreign_accounts_vec.into_iter().map(Into::into).collect();
+        let foreign_accounts_map: BTreeMap<NativeAccountId, NativeForeignAccount> =
+            foreign_accounts_vec
+                .into_iter()
+                .map(|a| {
+                    let fa: NativeForeignAccount = a.into();
+                    (fa.account_id(), fa)
+                })
+                .collect();
 
         let result = client
             .execute_program(
                 account_id.into(),
                 tx_script.into(),
                 advice_inputs.into(),
-                foreign_accounts_set,
+                foreign_accounts_map,
             )
             .await
             .map_err(|err| js_error_with_context(err, "failed to execute program"))?;
@@ -327,6 +336,14 @@ impl WebClient {
         transaction_result: &TransactionResult,
         prover: Option<TransactionProver>,
     ) -> Result<ProvenTransaction, JsErr> {
+        #[cfg(feature = "testing")]
+        if prover.is_none() && self.mock_rpc_api.lock().await.is_some() {
+            return LocalTransactionProver::default()
+                .prove_dummy(transaction_result.native().executed_transaction().clone())
+                .map(Into::into)
+                .map_err(|err| js_error_with_context(err, "failed to prove transaction"));
+        }
+
         let mut guard = self.get_mut_inner().await;
         let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
         let prover_arc =

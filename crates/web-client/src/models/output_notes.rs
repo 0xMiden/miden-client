@@ -1,5 +1,5 @@
 use js_export_macro::js_export;
-use miden_client::transaction::OutputNotes as NativeOutputNotes;
+use miden_client::transaction::RawOutputNotes as NativeRawOutputNotes;
 
 use super::output_note::OutputNote;
 use super::word::Word;
@@ -8,7 +8,7 @@ use super::word::Word;
 /// not produce any notes.
 #[derive(Clone)]
 #[js_export]
-pub struct OutputNotes(pub(crate) NativeOutputNotes);
+pub struct OutputNotes(pub(crate) NativeRawOutputNotes);
 
 #[js_export]
 impl OutputNotes {
@@ -45,14 +45,14 @@ impl OutputNotes {
 // CONVERSIONS
 // ================================================================================================
 
-impl From<NativeOutputNotes> for OutputNotes {
-    fn from(native_notes: NativeOutputNotes) -> Self {
+impl From<NativeRawOutputNotes> for OutputNotes {
+    fn from(native_notes: NativeRawOutputNotes) -> Self {
         OutputNotes(native_notes)
     }
 }
 
-impl From<&NativeOutputNotes> for OutputNotes {
-    fn from(native_notes: &NativeOutputNotes) -> Self {
+impl From<&NativeRawOutputNotes> for OutputNotes {
+    fn from(native_notes: &NativeRawOutputNotes) -> Self {
         OutputNotes(native_notes.clone())
     }
 }

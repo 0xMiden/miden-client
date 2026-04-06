@@ -37,7 +37,7 @@ impl FungibleAsset {
     /// Encodes this asset into the word layout used in the vault.
     #[js_export(js_name = "intoWord")]
     pub fn into_word(&self) -> Word {
-        let native_word: NativeWord = self.0.into();
+        let native_word: NativeWord = self.0.to_value_word();
         native_word.into()
     }
 }

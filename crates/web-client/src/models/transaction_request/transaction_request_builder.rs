@@ -9,7 +9,6 @@ use miden_client::note::{
 use miden_client::transaction::{
     ForeignAccount as NativeForeignAccount,
     NoteArgs as NativeNoteArgs,
-    OutputNote as NativeOutputNote,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
     TransactionScript as NativeTransactionScript,
 };
@@ -21,12 +20,11 @@ use crate::models::foreign_account::ForeignAccount;
 use crate::models::miden_arrays::{
     ForeignAccountArray,
     NoteAndArgsArray,
+    NoteArray,
     NoteDetailsAndTagArray,
     NoteRecipientArray,
-    OutputNoteArray,
 };
 use crate::models::note_recipient::NoteRecipient;
-use crate::models::output_note::OutputNote;
 use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_request::note_and_args::NoteAndArgs;
 use crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag;
@@ -69,13 +67,11 @@ impl TransactionRequestBuilder {
         self.clone()
     }
 
-    /// Adds notes created by the sender that should be emitted by the transaction.
+    /// Adds output notes created by the sender that should be emitted by the transaction.
     #[js_export(js_name = "withOwnOutputNotes")]
-    pub fn with_own_output_notes(&mut self, notes: OutputNoteArray) -> Self {
-        let items: Vec<OutputNote> = notes.into();
-        let native_output_notes: Vec<NativeOutputNote> =
-            items.into_iter().map(Into::into).collect();
-        self.0 = self.0.clone().own_output_notes(native_output_notes);
+    pub fn with_own_output_notes(&mut self, notes: NoteArray) -> Self {
+        let native_notes: Vec<NativeNote> = notes.into();
+        self.0 = self.0.clone().own_output_notes(native_notes);
         self.clone()
     }
 

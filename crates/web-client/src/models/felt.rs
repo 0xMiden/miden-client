@@ -20,7 +20,7 @@ impl Felt {
     /// Returns the integer representation of the field element.
     #[js_export(js_name = "asInt")]
     pub fn as_int(&self) -> JsU64 {
-        self.0.as_int() as JsU64
+        self.0.as_canonical_u64() as JsU64
     }
 
     /// Returns the string representation of the field element.

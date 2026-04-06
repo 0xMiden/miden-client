@@ -135,8 +135,8 @@ impl AccountId {
     pub fn from_prefix_suffix(prefix: &Felt, suffix: &Felt) -> Result<AccountId, JsErr> {
         let prefix_felt: NativeFelt = (*prefix).into();
         let suffix_felt: NativeFelt = (*suffix).into();
-        let native_account_id =
-            NativeAccountId::try_from([prefix_felt, suffix_felt]).map_err(|err| {
+        let native_account_id = NativeAccountId::try_from_elements(suffix_felt, prefix_felt)
+            .map_err(|err| {
                 js_error_with_context(err, "error instantiating AccountId from prefix and suffix")
             })?;
         Ok(AccountId(native_account_id))

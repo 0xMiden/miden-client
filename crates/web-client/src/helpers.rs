@@ -36,30 +36,20 @@ pub(crate) async fn generate_wallet(
     };
 
     let native_scheme: NativeAuthScheme = auth_scheme.try_into()?;
-    let (key_pair, auth_component) = match native_scheme {
-        NativeAuthScheme::Falcon512Rpo => {
-            let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(&mut rng);
-            let auth_component: AccountComponent = AuthSingleSig::new(
-                key_pair.public_key().to_commitment(),
-                NativeAuthScheme::Falcon512Rpo,
-            )
-            .into();
-            (key_pair, auth_component)
+    let key_pair = match native_scheme {
+        NativeAuthScheme::Falcon512Poseidon2 => {
+            AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut rng)
         },
         NativeAuthScheme::EcdsaK256Keccak => {
-            let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng);
-            let auth_component: AccountComponent = AuthSingleSig::new(
-                key_pair.public_key().to_commitment(),
-                NativeAuthScheme::EcdsaK256Keccak,
-            )
-            .into();
-            (key_pair, auth_component)
+            AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng)
         },
         _ => {
             let message = format!("unsupported auth scheme: {native_scheme:?}");
             return Err(from_str_err(&message));
         },
     };
+    let auth_component: AccountComponent =
+        AuthSingleSig::new(key_pair.public_key().to_commitment(), native_scheme).into();
 
     let account_type = if mutable {
         AccountType::RegularAccountUpdatableCode

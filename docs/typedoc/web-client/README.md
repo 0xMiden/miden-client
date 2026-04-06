@@ -24,7 +24,6 @@
 - [NoteFile](classes/NoteFile.md)
 - [NoteId](classes/NoteId.md)
 - [NoteTag](classes/NoteTag.md)
-- [OutputNote](classes/OutputNote.md)
 - [OutputNoteRecord](classes/OutputNoteRecord.md)
 - [SyncSummary](classes/SyncSummary.md)
 - [TransactionId](classes/TransactionId.md)
@@ -106,6 +105,7 @@
 - [AuthScheme](variables/AuthScheme.md)
 - [MidenArrays](variables/MidenArrays.md)
 - [NoteVisibility](variables/NoteVisibility.md)
+- [RawOutputNote](variables/RawOutputNote.md)
 - [StorageMode](variables/StorageMode.md)
 
 ## Functions

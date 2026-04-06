@@ -16,6 +16,9 @@ extern "C" {
     #[wasm_bindgen(js_name = getTrackedBlockHeaders)]
     pub fn idxdb_get_tracked_block_headers(db_id: &str) -> js_sys::Promise;
 
+    #[wasm_bindgen(js_name = getTrackedBlockHeaderNumbers)]
+    pub fn idxdb_get_tracked_block_header_numbers(db_id: &str) -> js_sys::Promise;
+
     #[wasm_bindgen(js_name = getPartialBlockchainNodesAll)]
     pub fn idxdb_get_partial_blockchain_nodes_all(db_id: &str) -> js_sys::Promise;
 

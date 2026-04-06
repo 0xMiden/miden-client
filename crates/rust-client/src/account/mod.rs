@@ -36,6 +36,7 @@
 
 use alloc::vec::Vec;
 
+use miden_protocol::Felt;
 use miden_protocol::account::auth::PublicKey;
 pub use miden_protocol::account::{
     Account,
@@ -77,7 +78,6 @@ pub use miden_standards::account::interface::AccountInterfaceExt;
 use miden_standards::account::wallets::BasicWallet;
 
 use super::Client;
-use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::rpc::node::{EndpointError, GetAccountError};
@@ -106,9 +106,14 @@ pub mod component {
         no_auth_library,
         singlesig_acl_library,
         singlesig_library,
-        storage_schema_library,
     };
     pub use miden_standards::account::faucets::{BasicFungibleFaucet, NetworkFungibleFaucet};
+    pub use miden_standards::account::mint_policies::{
+        AuthControlled,
+        AuthControlledInitConfig,
+        OwnerControlled,
+        OwnerControlledInitConfig,
+    };
     pub use miden_standards::account::wallets::BasicWallet;
 }
 
@@ -192,7 +197,7 @@ impl<AUTH> Client<AUTH> {
                     return Err(ClientError::AccountAlreadyTracked(account.id()));
                 }
 
-                if tracked_account.nonce().as_int() > account.nonce().as_int() {
+                if tracked_account.nonce().as_canonical_u64() > account.nonce().as_canonical_u64() {
                     // If the new account is older than the one being tracked, return an error
                     return Err(ClientError::AccountNonceTooLow);
                 }
@@ -390,6 +395,21 @@ impl<AUTH> Client<AUTH> {
     pub fn account_reader(&self, account_id: AccountId) -> AccountReader {
         AccountReader::new(self.store.clone(), account_id)
     }
+
+    /// Prunes historical account states for the specified account up to the given nonce.
+    ///
+    /// Deletes all historical entries with `replaced_at_nonce <= up_to_nonce` and any
+    /// orphaned account code.
+    ///
+    /// Returns the total number of rows deleted, including historical entries and orphaned
+    /// account code.
+    pub async fn prune_account_history(
+        &self,
+        account_id: AccountId,
+        up_to_nonce: Felt,
+    ) -> Result<usize, ClientError> {
+        Ok(self.store.prune_account_history(account_id, up_to_nonce).await?)
+    }
 }
 
 // UTILITY FUNCTIONS
@@ -424,22 +444,8 @@ pub fn build_wallet_id(
     };
 
     let auth_scheme = public_key.auth_scheme();
-    let auth_component = match auth_scheme {
-        AuthSchemeId::Falcon512Rpo => {
-            let auth_component: AccountComponent =
-                AuthSingleSig::new(public_key.to_commitment(), AuthSchemeId::Falcon512Rpo).into();
-            auth_component
-        },
-        AuthSchemeId::EcdsaK256Keccak => {
-            let auth_component: AccountComponent =
-                AuthSingleSig::new(public_key.to_commitment(), AuthSchemeId::EcdsaK256Keccak)
-                    .into();
-            auth_component
-        },
-        auth_scheme => {
-            return Err(ClientError::UnsupportedAuthSchemeId(auth_scheme.as_u8()));
-        },
-    };
+    let auth_component: AccountComponent =
+        AuthSingleSig::new(public_key.to_commitment(), auth_scheme).into();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(account_type)

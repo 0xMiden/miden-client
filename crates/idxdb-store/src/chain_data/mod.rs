@@ -19,6 +19,7 @@ use js_bindings::{
     idxdb_get_partial_blockchain_nodes_all,
     idxdb_get_partial_blockchain_nodes_up_to_inorder_index,
     idxdb_get_partial_blockchain_peaks_by_block_num,
+    idxdb_get_tracked_block_header_numbers,
     idxdb_get_tracked_block_headers,
     idxdb_insert_block_header,
     idxdb_insert_partial_blockchain_nodes,
@@ -110,6 +111,16 @@ impl IdxdbStore {
             .collect();
 
         results
+    }
+
+    pub(crate) async fn get_tracked_block_header_numbers(
+        &self,
+    ) -> Result<BTreeSet<usize>, StoreError> {
+        let promise = idxdb_get_tracked_block_header_numbers(self.db_id());
+        let block_nums: Vec<u32> =
+            await_js(promise, "failed to get tracked block header numbers").await?;
+
+        Ok(block_nums.into_iter().map(|n| n as usize).collect())
     }
 
     pub(crate) async fn get_partial_blockchain_nodes(

@@ -2,6 +2,8 @@
 import { test, expect } from "./test-setup";
 
 test.describe("mock chain tests", () => {
+  test.describe.configure({ timeout: 720000 });
+
   test("send transaction with mock chain completes successfully", async ({
     run,
   }) => {

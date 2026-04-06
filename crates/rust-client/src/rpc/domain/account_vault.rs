@@ -4,10 +4,29 @@ use alloc::vec::Vec;
 use miden_protocol::Word;
 use miden_protocol::asset::{Asset, AssetVaultKey};
 use miden_protocol::block::BlockNumber;
-use miden_protocol::errors::AssetError;
 
 use crate::rpc::domain::MissingFieldHelper;
-use crate::rpc::{RpcError, generated as proto};
+use crate::rpc::{RpcConversionError, RpcError, generated as proto};
+
+// ASSET CONVERSION
+// ================================================================================================
+
+impl TryFrom<proto::primitives::Asset> for Asset {
+    type Error = RpcConversionError;
+
+    fn try_from(value: proto::primitives::Asset) -> Result<Self, Self::Error> {
+        let key_word: Word = value
+            .key
+            .ok_or(proto::primitives::Asset::missing_field(stringify!(key)))?
+            .try_into()?;
+        let value_word: Word = value
+            .value
+            .ok_or(proto::primitives::Asset::missing_field(stringify!(value)))?
+            .try_into()?;
+        Asset::from_key_value_words(key_word, value_word)
+            .map_err(|e| RpcConversionError::InvalidField(e.to_string()))
+    }
+}
 
 // ACCOUNT VAULT INFO
 // ================================================================================================
@@ -70,32 +89,28 @@ pub struct AccountVaultUpdate {
 // ACCOUNT VAULT UPDATE CONVERSION
 // ================================================================================================
 
-impl TryFrom<proto::primitives::Asset> for Asset {
-    type Error = RpcError;
-
-    fn try_from(value: proto::primitives::Asset) -> Result<Self, Self::Error> {
-        let word: Word = value
-            .asset
-            .ok_or(proto::rpc::SyncAccountVaultResponse::missing_field(stringify!(asset)))?
-            .try_into()?;
-        word.try_into()
-            .map_err(|e: AssetError| RpcError::InvalidResponse(e.to_string()))
-    }
-}
-
 impl TryFrom<proto::rpc::AccountVaultUpdate> for AccountVaultUpdate {
     type Error = RpcError;
 
     fn try_from(value: proto::rpc::AccountVaultUpdate) -> Result<Self, Self::Error> {
         let block_num = value.block_num;
 
-        let asset: Option<Asset> = value.asset.map(TryInto::try_into).transpose()?;
-
         let vault_key_inner: Word = value
             .vault_key
             .ok_or(proto::rpc::SyncAccountVaultResponse::missing_field(stringify!(vault_key)))?
             .try_into()?;
-        let vault_key = AssetVaultKey::new_unchecked(vault_key_inner);
+        let vault_key = AssetVaultKey::try_from(vault_key_inner)
+            .map_err(|e| RpcError::InvalidResponse(e.to_string()))?;
+
+        let asset = value.asset.map(Asset::try_from).transpose()?;
+
+        if let Some(ref asset) = asset
+            && asset.vault_key() != vault_key
+        {
+            return Err(RpcError::InvalidResponse(
+                "account vault update returned mismatched asset key".to_string(),
+            ));
+        }
 
         Ok(Self {
             block_num: block_num.into(),

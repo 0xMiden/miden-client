@@ -14,23 +14,22 @@ WEB_CLIENT_DIR=crates/web-client
 RUST_CLIENT_DIR=crates/rust-client
 
 EXCLUDE_WASM_PACKAGES=--exclude miden-client-web --exclude miden-idxdb-store
-NOTE_TRANSPORT_ENDPOINT=http://127.0.0.1:57292
+TEST_MIDEN_NOTE_TRANSPORT_URL?=http://127.0.0.1:57292
 
 # --- Linting -------------------------------------------------------------------------------------
 
 .PHONY: clippy
 clippy: ## Run Clippy with configs
-	cargo clippy --workspace $(EXCLUDE_WASM_PACKAGES) --all-targets -- -D warnings
+	cargo +nightly clippy --workspace $(EXCLUDE_WASM_PACKAGES) --features "testing std" --all-targets -- -D warnings
 
 .PHONY: clippy-wasm
 clippy-wasm: rust-client-ts-build ## Run Clippy for the wasm packages (web client and idxdb store)
-	cargo clippy --package miden-client-web --target wasm32-unknown-unknown --all-targets -- -D warnings
-	cargo clippy --package miden-idxdb-store --target wasm32-unknown-unknown --all-targets -- -D warnings
+	cargo +nightly clippy --package miden-client-web --target wasm32-unknown-unknown --all-targets -- -D warnings
+	cargo +nightly clippy --package miden-idxdb-store --target wasm32-unknown-unknown --all-targets -- -D warnings
 
 .PHONY: fix
-fix: ## Run Fix with configs, building tests with proper features to avoid type split.
-	cargo +nightly fix --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --features "testing std" --all-targets --allow-staged --allow-dirty
-	cargo +nightly fix --package testing-remote-prover --all-targets --allow-staged --allow-dirty
+fix: ## Run Fix with configs
+	cargo +nightly fix --workspace $(EXCLUDE_WASM_PACKAGES) --features "testing std" --all-targets --allow-staged --allow-dirty
 
 .PHONY: fix-wasm
 fix-wasm: ## Run Fix for the wasm packages (web client and idxdb store)
@@ -39,14 +38,18 @@ fix-wasm: ## Run Fix for the wasm packages (web client and idxdb store)
 
 .PHONY: format
 format: ## Run format using nightly toolchain
-	cargo +nightly fmt --all && yarn prettier . --write && yarn eslint . --fix
+	cargo +nightly fmt --all
+	yarn --silent prettier . --write --log-level silent
+	yarn --silent eslint . --fix
 
 .PHONY: format-check
 format-check: ## Run format using nightly toolchain but only in check mode
-	cargo +nightly fmt --all --check && yarn prettier . --check && yarn eslint .
+	cargo +nightly fmt --all --check
+	yarn --silent prettier . --check
+	yarn --silent eslint .
 
 .PHONY: lint
-lint: format fix toml clippy fix-wasm clippy-wasm typos-check rust-client-ts-lint web-client-check-methods ## Run all linting tasks at once (clippy, fixing, formatting, typos)
+lint: fix fix-wasm format toml clippy clippy-wasm typos-check rust-client-ts-lint web-client-check-methods ## Run all linting tasks at once (clippy, fixing, formatting, typos)
 
 .PHONY: toml
 toml: ## Runs Format for all TOML files
@@ -138,14 +141,16 @@ start-note-transport:
 integration-test: ## Run integration tests
 	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
 
+
 .PHONY: integration-test-web-client
 SHARD_PARAMETER ?= ""
 integration-test-web-client: ## Run integration tests for the web client (with a chromium browser)
 	cd ./crates/web-client && yarn run test:clean -- --project=chromium $(SHARD_PARAMETER)
 
+
 .PHONY: integration-test-web-client-webkit
-integration-test-web-client-webkit: ## Run integration tests for the web client (with webkit)
-	cd ./crates/web-client && yarn run test:clean -- --project=webkit
+integration-test-web-client-webkit: ## Run web client tests (webkit)
+	cd ./crates/web-client && yarn run test -- --project=webkit
 
 .PHONY: test-web-client-nodejs
 test-web-client-nodejs: ## Run web client tests on Node.js (mock chain, no browser needed)
@@ -158,7 +163,7 @@ integration-test-remote-prover-web-client: ## Run integration tests for the web 
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included (requires note transport service)
-	TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT=$(NOTE_TRANSPORT_ENDPOINT) TEST_WITH_NOTE_TRANSPORT=1 cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
+	TEST_MIDEN_NOTE_TRANSPORT_URL=$(TEST_MIDEN_NOTE_TRANSPORT_URL) cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration
 	cargo nextest run --workspace $(EXCLUDE_WASM_PACKAGES) --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
 
 .PHONY: test-dev
@@ -171,7 +176,7 @@ integration-test-dev: ## Run integration tests with debug assertions enabled via
 
 .PHONY: integration-test-binary
 integration-test-binary: ## Run the integration tests using the standalone binary (requires note transport service)
-	TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT=$(NOTE_TRANSPORT_ENDPOINT) TEST_WITH_NOTE_TRANSPORT=1 cargo run --package miden-client-integration-tests --release --locked
+	TEST_MIDEN_NOTE_TRANSPORT_URL=$(TEST_MIDEN_NOTE_TRANSPORT_URL) cargo run --package miden-client-integration-tests --release --locked
 
 .PHONY: start-prover
 start-prover: ## Start the remote prover
@@ -203,8 +208,7 @@ build: ## Build the CLI binary, client library and tests binary in release mode
 	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --release --locked
 
 build-wasm: rust-client-ts-build ## Build the wasm packages (web client and idxdb store)
-	CODEGEN=1 cargo build --package miden-client-web --target wasm32-unknown-unknown --locked
-	cargo build --package miden-idxdb-store --target wasm32-unknown-unknown --locked
+	cargo build --package miden-client-web --package miden-idxdb-store --target wasm32-unknown-unknown --locked
 
 .PHONY: rust-client-ts-build
 rust-client-ts-build:

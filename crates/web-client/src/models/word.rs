@@ -33,7 +33,7 @@ impl Word {
     /// Returns the word as an array of numeric values.
     #[js_export(js_name = "toU64s")]
     pub fn to_u64s(&self) -> Vec<JsU64> {
-        self.0.iter().map(|f| NativeFelt::as_int(f) as JsU64).collect()
+        self.0.iter().map(|f| NativeFelt::as_canonical_u64(f) as JsU64).collect()
     }
 
     /// Creates a Word from a hex string.

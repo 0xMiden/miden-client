@@ -57,7 +57,7 @@ impl AuthFalcon512RpoMultisigConfig {
             .into_iter()
             .map(|word| {
                 let native_word: NativeWord = word.into();
-                (PublicKeyCommitment::from(native_word), NativeAuthSchemeId::Falcon512Rpo)
+                (PublicKeyCommitment::from(native_word), NativeAuthSchemeId::Falcon512Poseidon2)
             })
             .collect();
 
