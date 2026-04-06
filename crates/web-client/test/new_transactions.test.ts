@@ -296,9 +296,8 @@ test.describe("custom transaction tests", () => {
       const customNote = new sdk.Note(noteAssets, noteMetadata, noteRecipient);
 
       // Creating First Custom Transaction Request to Mint the Custom Note
-      const outputNote = sdk.OutputNote.full(customNote);
       const transactionRequest = new sdk.TransactionRequestBuilder()
-        .withOwnOutputNotes(new sdk.OutputNoteArray([outputNote]))
+        .withOwnOutputNotes(new sdk.NoteArray([customNote]))
         .build();
 
       // Execute and Submit Transaction
@@ -1000,12 +999,17 @@ test.describe("storage map test", () => {
 
       // Use felt values instead of hex for comparison (hex normalization
       // differs between browser BigUint64Array and Node.js number arrays).
-      const getLastFelt = (word) => {
+      // Sum all felts to be robust to any platform ordering differences;
+      // only one felt in the Word is non-zero so the sum equals the value.
+      const sumFelts = (word) => {
         const felts = word?.toFelts();
-        return felts ? Number(felts[felts.length - 1].asInt()) : undefined;
+        if (!felts) return undefined;
+        let sum = 0;
+        for (const f of felts) sum += Number(f.asInt());
+        return sum;
       };
 
-      const initialMapFelt = getLastFelt(
+      const initialMapSum = sumFelts(
         (await client.getAccount(bumpItemAccountBuilderResult.account.id()))
           ?.storage()
           .getMapItem(MAP_SLOT_NAME, MAP_KEY)
@@ -1036,7 +1040,7 @@ test.describe("storage map test", () => {
       await client.proveBlock();
       await client.syncState();
 
-      const finalMapFelt = getLastFelt(
+      const finalMapSum = sumFelts(
         (await client.getAccount(bumpItemAccountBuilderResult.account.id()))
           ?.storage()
           .getMapItem(MAP_SLOT_NAME, MAP_KEY)
@@ -1049,14 +1053,14 @@ test.describe("storage map test", () => {
       const mapEntries = accountStorage?.getMapEntries(MAP_SLOT_NAME);
 
       return {
-        initialMapFelt,
-        finalMapFelt,
+        initialMapSum,
+        finalMapSum,
         mapEntriesLength: mapEntries?.length,
       };
     });
 
-    expect(result.initialMapFelt).toBe(1);
-    expect(result.finalMapFelt).toBe(2);
+    expect(result.initialMapSum).toBe(1);
+    expect(result.finalMapSum).toBe(2);
     expect(result.mapEntriesLength).toBeGreaterThan(1);
   });
 });
