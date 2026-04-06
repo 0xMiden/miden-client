@@ -42,89 +42,10 @@ export class MidenClient {
   /**
    * Creates and initializes a new MidenClient.
    *
-   * If no `rpcUrl` is provided, defaults to testnet with full configuration
-   * (RPC, prover, note transport, autoSync).
-   *
    * @param {ClientOptions} [options] - Client configuration options.
    * @returns {Promise<MidenClient>} A fully initialized client.
    */
   static async create(options) {
-    if (!options?.rpcUrl) {
-      return MidenClient.createTestnet(options);
-    }
-
-    return MidenClient.#createInternal(options);
-  }
-
-  /**
-   * Creates a client preconfigured for testnet use.
-   *
-   * Defaults: rpcUrl "testnet", proverUrl "testnet", noteTransportUrl "testnet", autoSync true.
-   * All defaults can be overridden via options.
-   *
-   * @param {ClientOptions} [options] - Options to override defaults.
-   * @returns {Promise<MidenClient>} A fully initialized testnet client.
-   */
-  static async createTestnet(options) {
-    return MidenClient.#createInternal({
-      rpcUrl: "testnet",
-      proverUrl: "testnet",
-      noteTransportUrl: "testnet",
-      autoSync: true,
-      ...options,
-    });
-  }
-
-  /**
-   * Creates a client preconfigured for devnet use.
-   *
-   * Defaults: rpcUrl "devnet", proverUrl "devnet", noteTransportUrl "devnet", autoSync true.
-   * All defaults can be overridden via options.
-   *
-   * @param {ClientOptions} [options] - Options to override defaults.
-   * @returns {Promise<MidenClient>} A fully initialized devnet client.
-   */
-  static async createDevnet(options) {
-    return MidenClient.#createInternal({
-      rpcUrl: "devnet",
-      proverUrl: "devnet",
-      noteTransportUrl: "devnet",
-      autoSync: true,
-      ...options,
-    });
-  }
-
-  /**
-   * Creates a mock client for testing.
-   *
-   * @param {MockOptions} [options] - Mock client options.
-   * @returns {Promise<MidenClient>} A mock client.
-   */
-  static async createMock(options) {
-    const getWasm = MidenClient._getWasmOrThrow;
-    const MockWebClientClass = MidenClient._MockWasmWebClient;
-
-    if (!MockWebClientClass || !getWasm) {
-      throw new Error(
-        "MidenClient not initialized. Import from the SDK package entry point."
-      );
-    }
-
-    const seed = options?.seed ? await hashSeed(options.seed) : undefined;
-
-    const inner = await MockWebClientClass.createClient(
-      options?.serializedMockChain,
-      options?.serializedNoteTransport,
-      seed
-    );
-
-    const client = new MidenClient(inner, getWasm, null);
-    client.#isMock = true;
-    return client;
-  }
-
-  /** @internal Shared implementation for all create* methods. */
-  static async #createInternal(options) {
     const getWasm = MidenClient._getWasmOrThrow;
     const WebClientClass = MidenClient._WasmWebClient;
 
@@ -171,6 +92,73 @@ export class MidenClient {
       await client.sync();
     }
 
+    return client;
+  }
+
+  /**
+   * Creates a client preconfigured for testnet use.
+   *
+   * Defaults: rpcUrl "testnet", proverUrl "testnet", noteTransportUrl "testnet", autoSync true.
+   * All defaults can be overridden via options.
+   *
+   * @param {ClientOptions} [options] - Options to override defaults.
+   * @returns {Promise<MidenClient>} A fully initialized testnet client.
+   */
+  static async createTestnet(options) {
+    return MidenClient.create({
+      rpcUrl: "testnet",
+      proverUrl: "testnet",
+      noteTransportUrl: "testnet",
+      autoSync: true,
+      ...options,
+    });
+  }
+
+  /**
+   * Creates a client preconfigured for devnet use.
+   *
+   * Defaults: rpcUrl "devnet", proverUrl "devnet", noteTransportUrl "devnet", autoSync true.
+   * All defaults can be overridden via options.
+   *
+   * @param {ClientOptions} [options] - Options to override defaults.
+   * @returns {Promise<MidenClient>} A fully initialized devnet client.
+   */
+  static async createDevnet(options) {
+    return MidenClient.create({
+      rpcUrl: "devnet",
+      proverUrl: "devnet",
+      noteTransportUrl: "devnet",
+      autoSync: true,
+      ...options,
+    });
+  }
+
+  /**
+   * Creates a mock client for testing.
+   *
+   * @param {MockOptions} [options] - Mock client options.
+   * @returns {Promise<MidenClient>} A mock client.
+   */
+  static async createMock(options) {
+    const getWasm = MidenClient._getWasmOrThrow;
+    const MockWebClientClass = MidenClient._MockWasmWebClient;
+
+    if (!MockWebClientClass || !getWasm) {
+      throw new Error(
+        "MidenClient not initialized. Import from the SDK package entry point."
+      );
+    }
+
+    const seed = options?.seed ? await hashSeed(options.seed) : undefined;
+
+    const inner = await MockWebClientClass.createClient(
+      options?.serializedMockChain,
+      options?.serializedNoteTransport,
+      seed
+    );
+
+    const client = new MidenClient(inner, getWasm, null);
+    client.#isMock = true;
     return client;
   }
 
