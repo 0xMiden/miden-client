@@ -21,7 +21,6 @@ impl NoteAndArgs {
     #[js_export(constructor)]
     pub fn new(note: &Note, args: Option<NoteArgs>) -> NoteAndArgs {
         NoteAndArgs { note: note.clone(), args }
-
     }
 }
 

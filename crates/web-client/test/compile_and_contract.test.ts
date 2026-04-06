@@ -479,9 +479,7 @@ test.describe("transactions.execute()", () => {
     const countWord = updated?.storage().getItem(COUNTER_SLOT_NAME);
 
     // The counter is stored in the first felt of the word
-    const countValue = countWord
-      ? Number(countWord.toFelts()[0].asInt())
-      : 0;
+    const countValue = countWord ? Number(countWord.toFelts()[0].asInt()) : 0;
 
     expect(countValue).toBe(1);
   });
