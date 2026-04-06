@@ -4,8 +4,15 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use miden_client::account::component::{AccountComponent, AccountComponentMetadata};
 use miden_client::account::{
-    Account, AccountBuilder, AccountId, AccountStorageMode, AccountType, StorageMap, StorageMapKey,
-    StorageSlot, StorageSlotName,
+    Account,
+    AccountBuilder,
+    AccountId,
+    AccountStorageMode,
+    AccountType,
+    StorageMap,
+    StorageMapKey,
+    StorageSlot,
+    StorageSlotName,
 };
 use miden_client::assembly::{CodeBuilder, DefaultSourceManager, Module, ModuleKind, Path};
 use miden_client::asset::{Asset, FungibleAsset};
@@ -15,15 +22,28 @@ use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{NoteFile, NoteType};
 use miden_client::rpc::AccountStateAt;
 use miden_client::rpc::domain::account::{
-    AccountStorageRequirements, FetchedAccount, StorageMapEntries,
+    AccountStorageRequirements,
+    FetchedAccount,
+    StorageMapEntries,
 };
 use miden_client::store::{
-    InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState, TransactionFilter,
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    OutputNoteState,
+    TransactionFilter,
 };
 use miden_client::testing::common::*;
 use miden_client::transaction::{
-    DiscardCause, PaymentNoteDescription, ProvenTransaction, TransactionInputs, TransactionKernel,
-    TransactionProver, TransactionProverError, TransactionRequestBuilder, TransactionStatus,
+    DiscardCause,
+    PaymentNoteDescription,
+    ProvenTransaction,
+    TransactionInputs,
+    TransactionKernel,
+    TransactionProver,
+    TransactionProverError,
+    TransactionRequestBuilder,
+    TransactionStatus,
 };
 use miden_client::{ClientError, EMPTY_WORD, Felt, Word};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
@@ -1658,9 +1678,8 @@ pub async fn test_get_account_proof_returns_vault_details(
         .await?;
 
     let (_, details) = proof.into_parts();
-    let vault_details = details
-        .context("expected account details for public account")?
-        .vault_details;
+    let vault_details =
+        details.context("expected account details for public account")?.vault_details;
 
     assert_eq!(
         vault_details.assets.len(),
