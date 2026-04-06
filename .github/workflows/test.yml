@@ -310,8 +310,8 @@ jobs:
     needs: [build-web-client-dist-folder, build-node-builder]
     strategy:
       matrix:
-        shard_index: [1, 2, 3, 4, 5]
-        shard_total: [5]
+        shard_index: [1, 2, 3, 4, 5, 6, 7]
+        shard_total: [7]
     steps:
       - uses: actions/checkout@v6
       - name: Fetch dist folder
