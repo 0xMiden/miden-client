@@ -93,6 +93,6 @@ impl From<&NoteRecipient> for NativeNoteRecipient {
 
 impl From<&RecipientArray> for Vec<NativeNoteRecipient> {
     fn from(recipient_array: &RecipientArray) -> Self {
-        recipient_array.__inner.iter().map(NativeNoteRecipient::from).collect()
+        recipient_array.iter().map(NativeNoteRecipient::from).collect()
     }
 }
