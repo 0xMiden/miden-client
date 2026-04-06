@@ -141,8 +141,34 @@ export async function createNodeIntegrationClient(
  * - null → undefined for Option<T> returns
  */
 export function wrapNodeClient(rawClient: any, rawSdk: any): any {
+  // Keystore shim: the browser exposes client.keystore via #[wasm_bindgen(getter)],
+  // but the napi WebClient does not. Provide the same interface using the underlying
+  // client methods that exist on both platforms.
+  const keystoreShim = {
+    async insert(accountId: any, secretKey: any) {
+      return rawClient.addAccountSecretKeyToWebStore(accountId, secretKey);
+    },
+    async get(pubKeyCommitment: any) {
+      return rawClient.getAccountAuthByPubKeyCommitment(pubKeyCommitment);
+    },
+    async getCommitments(accountId: any) {
+      return rawClient.getPublicKeyCommitmentsOfAccount(accountId);
+    },
+    async getAccountId(pubKeyCommitment: any) {
+      const account =
+        await rawClient.getAccountByKeyCommitment(pubKeyCommitment);
+      return account ? account.id() : undefined;
+    },
+    async remove() {
+      throw new Error("remove() is not supported on Node.js");
+    },
+  };
+
   return new Proxy(rawClient, {
     get(target, prop) {
+      if (prop === "keystore") {
+        return keystoreShim;
+      }
       if (prop === "syncState") {
         return (...args: any[]) => target.syncStateImpl(...args);
       }
