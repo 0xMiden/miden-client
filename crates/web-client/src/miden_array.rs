@@ -73,6 +73,31 @@ macro_rules! declare_js_miden_arrays {
                 }
             }
 
+            impl $miden_type_array_name {
+                /// Returns an iterator over references to the elements.
+                pub fn iter(&self) -> core::slice::Iter<'_, $miden_type_name> {
+                    self.__inner.iter()
+                }
+            }
+
+            impl IntoIterator for $miden_type_array_name {
+                type Item = $miden_type_name;
+                type IntoIter = alloc::vec::IntoIter<$miden_type_name>;
+
+                fn into_iter(self) -> Self::IntoIter {
+                    self.__inner.into_iter()
+                }
+            }
+
+            impl<'a> IntoIterator for &'a $miden_type_array_name {
+                type Item = &'a $miden_type_name;
+                type IntoIter = core::slice::Iter<'a, $miden_type_name>;
+
+                fn into_iter(self) -> Self::IntoIter {
+                    self.__inner.iter()
+                }
+            }
+
             impl From<$miden_type_array_name> for Vec<$miden_type_name> {
                 fn from(array: $miden_type_array_name) -> Self {
                     return array.__inner;
