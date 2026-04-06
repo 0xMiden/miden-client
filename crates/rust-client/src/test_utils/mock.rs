@@ -307,17 +307,21 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
-        _block_to: Option<BlockNumber>,
+        block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<NoteSyncInfo, RpcError> {
         let chain_tip = self.get_chain_tip_block_num();
+        let upper_bound = block_to.unwrap_or(chain_tip);
 
-        // Collect all blocks with matching notes after block_num
+        // Collect all blocks with matching notes in the range (block_num, upper_bound]
         let mut blocks_with_notes: BTreeMap<BlockNumber, BTreeMap<NoteId, CommittedNote>> =
             BTreeMap::new();
         for note in self.mock_chain.read().committed_notes().values() {
             let note_block = note.inclusion_proof().location().block_num();
-            if note_tags.contains(&note.metadata().tag()) && note_block > block_num {
+            if note_tags.contains(&note.metadata().tag())
+                && note_block > block_num
+                && note_block <= upper_bound
+            {
                 let committed = CommittedNote::new(
                     note.id(),
                     CommittedNoteMetadata::Full(note.metadata().clone()),
@@ -336,7 +340,7 @@ impl NodeRpcClient for MockRpcApi {
             })
             .collect();
 
-        Ok(NoteSyncInfo { chain_tip, block_to: chain_tip, blocks })
+        Ok(NoteSyncInfo { chain_tip, block_to: upper_bound, blocks })
     }
 
     async fn sync_chain_mmr(

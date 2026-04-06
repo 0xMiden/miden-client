@@ -389,6 +389,10 @@ where
             .map_err(ClientError::RpcError)?;
 
         for block in &sync_result.blocks {
+            if block.block_header.block_num() > current_block_num {
+                break;
+            }
+
             for sync_note in block.notes.values() {
                 if !expected_notes.iter().any(|(id, _)| id == sync_note.note_id()) {
                     continue;
