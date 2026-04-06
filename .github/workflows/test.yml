@@ -372,7 +372,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: target/release/testing-node-builder
-          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
       - name: Start test node
         run: |
           RUST_LOG=none target/release/testing-node-builder &
@@ -411,7 +411,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: target/release/testing-node-builder
-          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
       - name: Restore remote-prover binary
         uses: actions/cache/restore@v4
         with:
