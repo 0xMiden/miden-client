@@ -37,7 +37,7 @@ impl From<TransactionScriptInputPair> for (NativeWord, Vec<NativeFelt>) {
         let native_word: NativeWord = transaction_script_input_pair.word.into();
         let native_felts: Vec<NativeFelt> = transaction_script_input_pair
             .felts
-            .__inner
+            
             .into_iter()
             .map(Into::into)
             .collect();
@@ -50,7 +50,7 @@ impl From<&TransactionScriptInputPair> for (NativeWord, Vec<NativeFelt>) {
         let native_word: NativeWord = transaction_script_input_pair.word.clone().into();
         let native_felts: Vec<NativeFelt> = transaction_script_input_pair
             .felts
-            .__inner
+            
             .iter()
             .map(|felt| (*felt).into())
             .collect();
@@ -61,7 +61,7 @@ impl From<&TransactionScriptInputPair> for (NativeWord, Vec<NativeFelt>) {
 impl From<TransactionScriptInputPairArray> for Vec<(NativeWord, Vec<NativeFelt>)> {
     fn from(transaction_script_input_pair_array: TransactionScriptInputPairArray) -> Self {
         transaction_script_input_pair_array
-            .__inner
+            
             .into_iter()
             .map(Into::into)
             .collect()
@@ -70,6 +70,6 @@ impl From<TransactionScriptInputPairArray> for Vec<(NativeWord, Vec<NativeFelt>)
 
 impl From<&TransactionScriptInputPairArray> for Vec<(NativeWord, Vec<NativeFelt>)> {
     fn from(transaction_script_input_pair_array: &TransactionScriptInputPairArray) -> Self {
-        transaction_script_input_pair_array.__inner.iter().map(Into::into).collect()
+        transaction_script_input_pair_array.iter().map(Into::into).collect()
     }
 }
