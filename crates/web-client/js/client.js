@@ -58,12 +58,13 @@ export class MidenClient {
     const seed = options?.seed ? await hashSeed(options.seed) : undefined;
 
     const rpcUrl = resolveRpcUrl(options?.rpcUrl);
+    const noteTransportUrl = resolveNoteTransportUrl(options?.noteTransportUrl);
 
     let inner;
     if (options?.keystore) {
       inner = await WebClientClass.createClientWithExternalKeystore(
         rpcUrl,
-        options?.noteTransportUrl,
+        noteTransportUrl,
         seed,
         options?.storeName,
         options.keystore.getKey,
@@ -73,7 +74,7 @@ export class MidenClient {
     } else {
       inner = await WebClientClass.createClient(
         rpcUrl,
-        options?.noteTransportUrl,
+        noteTransportUrl,
         seed,
         options?.storeName
       );
@@ -96,15 +97,39 @@ export class MidenClient {
 
   /**
    * Creates a client preconfigured for testnet use.
-   * Defaults to autoSync: true.
    *
-   * @param {object} [options] - Options (autoSync can be overridden).
+   * Defaults: rpcUrl "testnet", proverUrl "testnet", noteTransportUrl "testnet", autoSync true.
+   * All defaults can be overridden via options.
+   *
+   * @param {ClientOptions} [options] - Options to override defaults.
    * @returns {Promise<MidenClient>} A fully initialized testnet client.
    */
   static async createTestnet(options) {
     return MidenClient.create({
+      rpcUrl: "testnet",
+      proverUrl: "testnet",
+      noteTransportUrl: "testnet",
+      autoSync: true,
       ...options,
-      autoSync: options?.autoSync ?? true,
+    });
+  }
+
+  /**
+   * Creates a client preconfigured for devnet use.
+   *
+   * Defaults: rpcUrl "devnet", proverUrl "devnet", noteTransportUrl "devnet", autoSync true.
+   * All defaults can be overridden via options.
+   *
+   * @param {ClientOptions} [options] - Options to override defaults.
+   * @returns {Promise<MidenClient>} A fully initialized devnet client.
+   */
+  static async createDevnet(options) {
+    return MidenClient.create({
+      rpcUrl: "devnet",
+      proverUrl: "devnet",
+      noteTransportUrl: "devnet",
+      autoSync: true,
+      ...options,
     });
   }
 
@@ -256,6 +281,25 @@ const PROVER_URLS = {
   devnet: "https://tx-prover.devnet.miden.io",
   testnet: "https://tx-prover.testnet.miden.io",
 };
+
+const NOTE_TRANSPORT_URLS = {
+  testnet: "https://transport.miden.io",
+  devnet: "https://transport.devnet.miden.io",
+};
+
+/**
+ * Resolves a noteTransportUrl shorthand or raw URL into a concrete endpoint string.
+ *
+ * @param {string | undefined} noteTransportUrl - "testnet", "devnet", or a raw URL.
+ * @returns {string | undefined} A fully qualified URL, or undefined if omitted.
+ */
+function resolveNoteTransportUrl(noteTransportUrl) {
+  if (!noteTransportUrl) return undefined;
+  return (
+    NOTE_TRANSPORT_URLS[noteTransportUrl.trim().toLowerCase()] ??
+    noteTransportUrl
+  );
+}
 
 /**
  * Resolves a proverUrl shorthand or raw URL into a TransactionProver.
