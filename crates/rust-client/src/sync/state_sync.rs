@@ -233,10 +233,8 @@ impl StateSync {
 
         // Build input note records for public notes from the fetched note bodies and the
         // inclusion proofs already present in the note blocks.
-        let public_notes = core::mem::take(&mut sync_data.public_notes);
         let mut public_note_records: BTreeMap<NoteId, InputNoteRecord> = BTreeMap::new();
-        for (note_id, note) in public_notes {
-            // Find the inclusion proof for this note from the sync blocks.
+        for (note_id, note) in core::mem::take(&mut sync_data.public_notes) {
             let inclusion_proof = sync_data
                 .note_blocks
                 .iter()
@@ -393,17 +391,26 @@ impl StateSync {
         state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<(), ClientError> {
+        let RawStateSyncData {
+            mmr_delta,
+            chain_tip_header,
+            note_blocks,
+            nullifiers,
+            transactions,
+            ..
+        } = sync_data;
+
         // Advance the partial MMR: apply delta (up to chain_tip - 1), capture peaks for
         // storage, then add the chain tip leaf (which the delta excludes due to the
         // one-block lag in block header MMR commitments).
         let mut new_authentication_nodes =
-            current_partial_mmr.apply(sync_data.mmr_delta).map_err(StoreError::MmrError)?;
+            current_partial_mmr.apply(mmr_delta).map_err(StoreError::MmrError)?;
         let new_peaks = current_partial_mmr.peaks();
         new_authentication_nodes
-            .append(&mut current_partial_mmr.add(sync_data.chain_tip_header.commitment(), false));
+            .append(&mut current_partial_mmr.add(chain_tip_header.commitment(), false));
 
         state_sync_update.block_updates.insert(
-            sync_data.chain_tip_header.clone(),
+            chain_tip_header.clone(),
             false,
             new_peaks,
             new_authentication_nodes,
@@ -411,7 +418,7 @@ impl StateSync {
 
         // Screen each note block and track relevant ones in the partial MMR using the
         // authentication path from the sync_notes response.
-        for block in sync_data.note_blocks {
+        for block in note_blocks {
             let found_relevant_note = self
                 .note_state_sync(
                     &mut state_sync_update.note_updates,
@@ -424,8 +431,6 @@ impl StateSync {
             if found_relevant_note {
                 let block_pos = block.block_header.block_num().as_usize();
 
-                // Collect authentication nodes added by track() so the store can persist
-                // them. Skip if already tracked (from a previous sync).
                 let track_auth_nodes = if current_partial_mmr.is_tracked(block_pos) {
                     vec![]
                 } else {
@@ -451,11 +456,11 @@ impl StateSync {
         }
 
         // Apply transaction and nullifier data.
-        state_sync_update.note_updates.extend_nullifiers(sync_data.nullifiers);
+        state_sync_update.note_updates.extend_nullifiers(nullifiers);
         self.transaction_state_sync(
             &mut state_sync_update.transaction_updates,
-            &sync_data.chain_tip_header,
-            &sync_data.transactions,
+            &chain_tip_header,
+            &transactions,
         );
 
         Ok(())
