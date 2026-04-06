@@ -279,10 +279,11 @@ impl StateSync {
     }
 
     /// Fetches the sync data from the node by calling the following endpoints:
-    /// 1. `get_block_header_by_number` — gets the chain tip block header.
-    /// 2. `sync_chain_mmr` — gets the MMR delta to the chain tip.
-    /// 3. `sync_notes` — loops until the full range to the chain tip is covered (handles paginated
-    ///    responses).
+    /// 1. `sync_notes` — loops until the full range to the chain tip is covered. The node includes
+    ///    the range-end block in its final response.
+    /// 2. `get_notes_by_id` — fetches full metadata for notes with attachments and full note bodies
+    ///    for public notes.
+    /// 3. `sync_chain_mmr` — gets the MMR delta to the chain tip.
     /// 4. `sync_transactions` — gets transaction data for the full range.
     ///
     /// Returns a [`RawStateSyncData`] where `chain_tip == current_block_num` signals no progress.
@@ -294,10 +295,22 @@ impl StateSync {
     ) -> Result<RawStateSyncData, ClientError> {
         info!("Fetching sync data from node.");
 
-        // Step 1: Discover the chain tip.
-        let (chain_tip_header, _) = self.rpc_api.get_block_header_by_number(None, false).await?;
-        let chain_tip = chain_tip_header.block_num();
+        // Step 1: Paginate sync_notes over the full range. The last block is the chain tip,
+        // providing its header and MMR proof.
+        let sync_notes_result = self
+            .rpc_api
+            .sync_notes_with_details(current_block_num, None, note_tags.as_ref())
+            .await?;
 
+        let chain_tip_header = sync_notes_result
+            .blocks
+            .last()
+            .expect("sync_notes should always return the range-end block")
+            .block_header
+            .clone();
+        let chain_tip = sync_notes_result.chain_tip;
+
+        // No progress — already at the tip.
         if chain_tip == current_block_num {
             return Ok(RawStateSyncData {
                 chain_tip,
@@ -314,15 +327,9 @@ impl StateSync {
             });
         }
 
-        // Fetch the MMR delta to the chain tip.
+        // Step 2: Fetch the MMR delta to the chain tip.
         let chain_mmr_info =
             self.rpc_api.sync_chain_mmr(current_block_num, Some(chain_tip)).await?;
-
-        // Step 2: Paginate sync_notes over the full range, then fetch note details in one call.
-        let sync_notes_result = self
-            .rpc_api
-            .sync_notes_with_details(current_block_num, Some(chain_tip), note_tags.as_ref())
-            .await?;
 
         // Step 3: Gather transactions for tracked accounts over the full range.
         let (account_commitment_updates, transactions, nullifiers) =

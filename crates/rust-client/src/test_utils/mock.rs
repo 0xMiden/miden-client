@@ -331,6 +331,10 @@ impl NodeRpcClient for MockRpcApi {
             }
         }
 
+        // Always include the upper_bound block (with empty notes if needed), matching the
+        // node behavior where the range-end block is always present when the scan completes.
+        blocks_with_notes.entry(upper_bound).or_default();
+
         let blocks: Vec<NoteSyncBlock> = blocks_with_notes
             .into_iter()
             .map(|(bn, notes)| {
