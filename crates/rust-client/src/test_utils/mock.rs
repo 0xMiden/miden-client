@@ -193,6 +193,7 @@ impl MockRpcApi {
                 transaction_records.push(TransactionRecord {
                     block_num: block_number,
                     transaction_header: transaction_header.clone(),
+                    output_notes: vec![],
                 });
             }
         }

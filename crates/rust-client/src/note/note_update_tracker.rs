@@ -1,7 +1,7 @@
 use alloc::collections::BTreeMap;
 
 use miden_protocol::block::BlockHeader;
-use miden_protocol::note::{NoteId, Nullifier};
+use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
 
 use crate::ClientError;
 use crate::rpc::RpcError;
@@ -319,12 +319,40 @@ impl NoteUpdateTracker {
                 false
             };
 
-        if let Some(output_note_record) = self.get_output_note_by_id(*committed_note.note_id()) {
-            // The note belongs to our locally tracked set of output notes
-            output_note_record.inclusion_proof_received(inclusion_proof)?;
-        }
+        self.try_commit_output_note(*committed_note.note_id(), inclusion_proof)?;
 
         Ok(is_tracked_as_input_note)
+    }
+
+    /// Applies inclusion proofs from the transaction sync response to tracked output notes.
+    ///
+    /// This transitions output notes from `Expected` to `Committed` state using the
+    /// inclusion proofs returned by `SyncTransactions`. Unlike the note sync path, this
+    /// works regardless of whether the note's tag was tracked.
+    pub(crate) fn apply_output_note_inclusion_proofs(
+        &mut self,
+        committed_notes: &[CommittedNote],
+    ) -> Result<(), ClientError> {
+        for committed_note in committed_notes {
+            self.try_commit_output_note(
+                *committed_note.note_id(),
+                committed_note.inclusion_proof().clone(),
+            )?;
+        }
+        Ok(())
+    }
+
+    /// If the note is tracked as an output note, transitions it to `Committed` with the
+    /// given inclusion proof. No-op if the note is not tracked.
+    fn try_commit_output_note(
+        &mut self,
+        note_id: NoteId,
+        inclusion_proof: NoteInclusionProof,
+    ) -> Result<(), ClientError> {
+        if let Some(output_note) = self.get_output_note_by_id(note_id) {
+            output_note.inclusion_proof_received(inclusion_proof)?;
+        }
+        Ok(())
     }
 
     /// Applies the necessary state transitions to the [`NoteUpdateTracker`] when a note is
