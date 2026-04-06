@@ -16,7 +16,7 @@ use super::{AccountUpdates, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::NodeRpcClient;
-use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
+use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncBlock};
 use crate::rpc::domain::transaction::{
     TransactionInclusion,
     TransactionRecord as RpcTransactionRecord,
@@ -229,33 +229,52 @@ impl StateSync {
 
         state_sync_update.block_num = sync_data.chain_tip;
 
-        // Fetch public note details. This calls get_notes_by_id which returns full metadata.
-        let public_note_ids: Vec<NoteId> = sync_data
+        // Fetch full note details via get_notes_by_id for:
+        // - Notes missing metadata (have attachments whose data wasn't in the sync response)
+        // - Public notes (need full note body: scripts, assets, etc.)
+        // All qualifying notes are fetched (not just the ones we track) to avoid revealing
+        // which specific notes the client is interested in.
+        let notes_to_fetch: Vec<NoteId> = sync_data
             .note_blocks
             .iter()
             .flat_map(|b| b.notes.values())
-            .filter(|n| n.note_type() != NoteType::Private)
+            .filter(|n| n.metadata().is_none() || n.note_type() != NoteType::Private)
             .map(|n| *n.note_id())
             .collect();
 
-        let public_note_records = self.fetch_public_note_details(&public_note_ids).await?;
+        let mut public_note_records: BTreeMap<NoteId, InputNoteRecord> = BTreeMap::new();
 
-        // Fill metadata from the already-fetched public notes (avoids a redundant
-        // get_notes_by_id call for public notes with attachments).
-        for record in public_note_records.values() {
-            if let Some(metadata) = record.metadata() {
+        if !notes_to_fetch.is_empty() {
+            let fetched_notes = self
+                .rpc_api
+                .get_notes_by_id(&notes_to_fetch)
+                .await
+                .map_err(ClientError::RpcError)?;
+
+            for fetched_note in fetched_notes {
+                let note_id = fetched_note.id();
+
+                // Fill metadata on committed notes that were missing it.
                 for block in &mut sync_data.note_blocks {
-                    if let Some(note) = block.notes.get_mut(&record.id())
+                    if let Some(note) = block.notes.get_mut(&note_id)
                         && note.metadata().is_none()
                     {
-                        note.set_metadata(metadata.clone());
+                        note.set_metadata(fetched_note.metadata().clone());
                     }
+                }
+
+                // Build input note records for public notes.
+                if let FetchedNote::Public(note, inclusion_proof) = fetched_note {
+                    let state = crate::store::input_note_states::UnverifiedNoteState {
+                        metadata: note.metadata().clone(),
+                        inclusion_proof,
+                    }
+                    .into();
+                    let record = InputNoteRecord::new(note.into(), None, state);
+                    public_note_records.insert(record.id(), record);
                 }
             }
         }
-
-        // Fetch attachment metadata for remaining notes (private notes with attachments).
-        self.fill_attachment_metadata(&mut sync_data.note_blocks).await?;
 
         self.account_state_sync(
             &mut state_sync_update.account_updates,
@@ -587,33 +606,6 @@ impl StateSync {
         }
 
         Ok(found_relevant_note)
-    }
-
-    /// Queries the node for all received notes that aren't being locally tracked in the client.
-    ///
-    /// The client can receive metadata for private notes that it's not tracking. In this case,
-    /// notes are ignored for now as they become useless until details are imported.
-    async fn fetch_public_note_details(
-        &self,
-        query_notes: &[NoteId],
-    ) -> Result<BTreeMap<NoteId, InputNoteRecord>, ClientError> {
-        if query_notes.is_empty() {
-            return Ok(BTreeMap::new());
-        }
-
-        info!("Getting note details for notes that are not being tracked.");
-
-        let return_notes = self.rpc_api.get_public_note_records(query_notes, None).await?;
-
-        Ok(return_notes.into_iter().map(|note| (note.id(), note)).collect())
-    }
-
-    /// Fetches full [`NoteMetadata`] for committed notes that have attachments.
-    async fn fill_attachment_metadata(
-        &self,
-        note_blocks: &mut [NoteSyncBlock],
-    ) -> Result<(), ClientError> {
-        crate::note::fill_attachment_metadata(self.rpc_api.as_ref(), note_blocks).await
     }
 
     /// Collects the nullifier tags for the notes that were updated in the sync response and uses
