@@ -42,6 +42,8 @@ struct RawStateSyncData {
     chain_tip_header: BlockHeader,
     /// Blocks with matching notes that the client is interested in.
     note_blocks: Vec<NoteSyncBlock>,
+    /// Fetched note details (public note bodies + private note headers with metadata).
+    fetched_notes: Vec<FetchedNote>,
     /// Account commitment updates for the synced range.
     account_commitment_updates: Vec<(AccountId, Word)>,
     /// Transaction inclusions for the synced range.
@@ -229,50 +231,18 @@ impl StateSync {
 
         state_sync_update.block_num = sync_data.chain_tip;
 
-        // Fetch full note details via get_notes_by_id for:
-        // - Notes missing metadata (have attachments whose data wasn't in the sync response)
-        // - Public notes (need full note body: scripts, assets, etc.)
-        // All qualifying notes are fetched (not just the ones we track) to avoid revealing
-        // which specific notes the client is interested in.
-        let notes_to_fetch: Vec<NoteId> = sync_data
-            .note_blocks
-            .iter()
-            .flat_map(|b| b.notes.values())
-            .filter(|n| n.metadata().is_none() || n.note_type() != NoteType::Private)
-            .map(|n| *n.note_id())
-            .collect();
-
+        // Build input note records for public notes from the already-fetched note details.
+        let fetched_notes = core::mem::take(&mut sync_data.fetched_notes);
         let mut public_note_records: BTreeMap<NoteId, InputNoteRecord> = BTreeMap::new();
-
-        if !notes_to_fetch.is_empty() {
-            let fetched_notes = self
-                .rpc_api
-                .get_notes_by_id(&notes_to_fetch)
-                .await
-                .map_err(ClientError::RpcError)?;
-
-            for fetched_note in fetched_notes {
-                let note_id = fetched_note.id();
-
-                // Fill metadata on committed notes that were missing it.
-                for block in &mut sync_data.note_blocks {
-                    if let Some(note) = block.notes.get_mut(&note_id)
-                        && note.metadata().is_none()
-                    {
-                        note.set_metadata(fetched_note.metadata().clone());
-                    }
+        for fetched_note in fetched_notes {
+            if let FetchedNote::Public(note, inclusion_proof) = fetched_note {
+                let state = crate::store::input_note_states::UnverifiedNoteState {
+                    metadata: note.metadata().clone(),
+                    inclusion_proof,
                 }
-
-                // Build input note records for public notes.
-                if let FetchedNote::Public(note, inclusion_proof) = fetched_note {
-                    let state = crate::store::input_note_states::UnverifiedNoteState {
-                        metadata: note.metadata().clone(),
-                        inclusion_proof,
-                    }
-                    .into();
-                    let record = InputNoteRecord::new(note.into(), None, state);
-                    public_note_records.insert(record.id(), record);
-                }
+                .into();
+                let record = InputNoteRecord::new(note.into(), None, state);
+                public_note_records.insert(record.id(), record);
             }
         }
 
@@ -331,6 +301,7 @@ impl StateSync {
                 },
                 chain_tip_header,
                 note_blocks: vec![],
+                fetched_notes: vec![],
                 account_commitment_updates: vec![],
                 transactions: vec![],
                 nullifiers: vec![],
@@ -341,24 +312,11 @@ impl StateSync {
         let chain_mmr_info =
             self.rpc_api.sync_chain_mmr(current_block_num, Some(chain_tip)).await?;
 
-        // Step 2: Loop sync_notes until we've covered the full range to the chain tip.
-        // Each response's `block_to` tells us how far the node scanned; if it's less
-        // than the chain tip, the response was truncated and we continue from there.
-        let mut note_blocks = Vec::new();
-        let mut cursor = current_block_num;
-
-        loop {
-            let note_sync =
-                self.rpc_api.sync_notes(cursor, Some(chain_tip), note_tags.as_ref()).await?;
-
-            let empty_response = note_sync.blocks.is_empty();
-            note_blocks.extend(note_sync.blocks);
-            cursor = note_sync.block_to + 1;
-
-            if cursor >= chain_tip || empty_response {
-                break;
-            }
-        }
+        // Step 2: Paginate sync_notes over the full range, then fetch note details in one call.
+        let (_note_chain_tip, note_blocks, fetched_notes) = self
+            .rpc_api
+            .sync_notes_with_details(current_block_num, Some(chain_tip), note_tags.as_ref())
+            .await?;
 
         // Step 3: Gather transactions for tracked accounts over the full range.
         let (account_commitment_updates, transactions, nullifiers) =
@@ -369,6 +327,7 @@ impl StateSync {
             mmr_delta: chain_mmr_info.mmr_delta,
             chain_tip_header,
             note_blocks,
+            fetched_notes,
             account_commitment_updates,
             transactions,
             nullifiers,

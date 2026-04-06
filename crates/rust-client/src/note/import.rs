@@ -370,52 +370,39 @@ where
     /// proof.
     async fn check_expected_notes(
         &mut self,
-        mut request_block_num: BlockNumber,
+        request_block_num: BlockNumber,
         // Expected notes with their tags
         expected_notes: Vec<(NoteId, &NoteTag)>,
     ) -> Result<BTreeMap<NoteId, Option<(NoteMetadata, NoteInclusionProof)>>, ClientError> {
         let tracked_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
         let mut retrieved_proofs = BTreeMap::new();
         let current_block_num = self.get_sync_height().await?;
-        loop {
-            if request_block_num > current_block_num {
-                break;
-            }
 
-            let mut sync_notes =
-                self.rpc_api.sync_notes(request_block_num, None, &tracked_tags).await?;
+        if request_block_num > current_block_num {
+            return Ok(retrieved_proofs);
+        }
 
-            // Fetch full metadata for all notes with attachments in the sync response.
-            // This fetches all notes with missing metadata (not just the ones we're interested
-            // in) to avoid revealing which specific notes the client cares about.
-            super::fill_attachment_metadata(self.rpc_api.as_ref(), &mut sync_notes.blocks).await?;
+        let (_chain_tip, note_blocks, _fetched_notes) = self
+            .rpc_api
+            .sync_notes_with_details(request_block_num, Some(current_block_num), &tracked_tags)
+            .await
+            .map_err(ClientError::RpcError)?;
 
-            for block in &sync_notes.blocks {
-                let note_block_num = block.block_header.block_num();
-
-                if note_block_num > current_block_num {
-                    break;
+        for block in &note_blocks {
+            for sync_note in block.notes.values() {
+                if !expected_notes.iter().any(|(id, _)| id == sync_note.note_id()) {
+                    continue;
                 }
 
-                for sync_note in block.notes.values() {
-                    if !expected_notes.iter().any(|(id, _)| id == sync_note.note_id()) {
-                        continue;
-                    }
-
-                    let metadata = sync_note
-                        .metadata()
-                        .cloned()
-                        .expect("metadata should be available after fill_attachment_metadata");
-                    retrieved_proofs.insert(
-                        *sync_note.note_id(),
-                        Some((metadata, sync_note.inclusion_proof().clone())),
-                    );
-                }
+                let metadata = sync_note
+                    .metadata()
+                    .cloned()
+                    .expect("metadata should be available after sync_notes_with_details");
+                retrieved_proofs.insert(
+                    *sync_note.note_id(),
+                    Some((metadata, sync_note.inclusion_proof().clone())),
+                );
             }
-
-            // Advance past the last block the node checked. Adding 1 avoids
-            // re-requesting the same range on the next iteration.
-            request_block_num = sync_notes.block_to + 1;
         }
 
         retrieved_proofs
