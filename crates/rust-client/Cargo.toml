@@ -24,6 +24,7 @@ ignored = ["getrandom", "prost-types", "tonic-prost"]
 crate-type = ["lib"]
 
 [features]
+dap = ["dep:miden-debug"]
 default = ["std"]
 std = [
   "dep:tokio",
@@ -40,6 +41,7 @@ tonic = []
 
 [dependencies]
 # Miden dependencies
+miden-debug                = { optional = true, workspace = true }
 miden-protocol             = { workspace = true }
 miden-remote-prover-client = { default-features = false, features = ["tx-prover"], workspace = true }
 miden-standards            = { workspace = true }
