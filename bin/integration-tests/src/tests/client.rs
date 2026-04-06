@@ -1657,8 +1657,10 @@ pub async fn test_get_account_proof_returns_vault_details(
         )
         .await?;
 
-    let vault_details =
-        proof.vault_details().context("expected vault details for public account")?;
+    let (_, details) = proof.into_parts();
+    let vault_details = details
+        .context("expected account details for public account")?
+        .vault_details;
 
     assert_eq!(
         vault_details.assets.len(),
