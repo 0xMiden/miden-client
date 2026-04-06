@@ -124,3 +124,4 @@ export default defineConfig({
         },
       }),
 });
+// CI trigger

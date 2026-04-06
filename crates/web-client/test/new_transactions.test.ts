@@ -1,4 +1,5 @@
 // @ts-nocheck
+// Platform-agnostic transaction tests (browser + Node.js)
 import { test, expect } from "./test-setup";
 
 // NEW_MINT_TRANSACTION TESTS
@@ -296,8 +297,17 @@ test.describe("custom transaction tests", () => {
       const customNote = new sdk.Note(noteAssets, noteMetadata, noteRecipient);
 
       // Creating First Custom Transaction Request to Mint the Custom Note
+      // NoteArray is a browser-only WASM wrapper; on Node.js napi accepts
+      // plain JS arrays for Vec<Note> parameters.
+      let ownNotes;
+      if (sdk.NoteArray) {
+        ownNotes = new sdk.NoteArray();
+        ownNotes.push(customNote);
+      } else {
+        ownNotes = [customNote];
+      }
       const transactionRequest = new sdk.TransactionRequestBuilder()
-        .withOwnOutputNotes(new sdk.NoteArray([customNote]))
+        .withOwnOutputNotes(ownNotes)
         .build();
 
       // Execute and Submit Transaction
@@ -1300,3 +1310,4 @@ test.describe("submitNewTransactionWithProver tests", () => {
     });
   });
 });
+
