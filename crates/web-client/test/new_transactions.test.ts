@@ -1310,4 +1310,3 @@ test.describe("submitNewTransactionWithProver tests", () => {
     });
   });
 });
-

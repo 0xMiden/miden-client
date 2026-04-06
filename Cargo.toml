@@ -44,19 +44,17 @@ miden-standards = { default-features = false, version = "0.14" }
 miden-testing   = { default-features = false, version = "0.14" }
 miden-tx        = { default-features = false, version = "0.14" }
 
-# Miden node dependencies (from git branch until compatible crates.io release)
-miden-node-block-producer = { git = "https://github.com/0xMiden/miden-node", rev = "c2d61c0eee9f81dd6335ed51c3424a9bd5e34dd8" }
-miden-node-ntx-builder = { git = "https://github.com/0xMiden/miden-node", rev = "c2d61c0eee9f81dd6335ed51c3424a9bd5e34dd8" }
-miden-node-proto = { git = "https://github.com/0xMiden/miden-node", rev = "c2d61c0eee9f81dd6335ed51c3424a9bd5e34dd8" }
-miden-node-proto-build = { default-features = false, git = "https://github.com/0xMiden/miden-node", rev = "c2d61c0eee9f81dd6335ed51c3424a9bd5e34dd8" }
-miden-node-rpc = { git = "https://github.com/0xMiden/miden-node", rev = "c2d61c0eee9f81dd6335ed51c3424a9bd5e34dd8" }
-miden-node-store = { git = "https://github.com/0xMiden/miden-node", rev = "c2d61c0eee9f81dd6335ed51c3424a9bd5e34dd8" }
-miden-node-utils = { git = "https://github.com/0xMiden/miden-node", rev = "c2d61c0eee9f81dd6335ed51c3424a9bd5e34dd8" }
-miden-node-validator = { git = "https://github.com/0xMiden/miden-node", rev = "c2d61c0eee9f81dd6335ed51c3424a9bd5e34dd8" }
+# Miden node dependencies
+miden-node-block-producer        = { version = "0.14" }
+miden-node-ntx-builder           = { version = "0.14" }
+miden-node-proto                 = { version = "0.14" }
+miden-node-proto-build           = { default-features = false, version = "0.14" }
+miden-node-rpc                   = { version = "0.14" }
+miden-node-store                 = { version = "0.14" }
+miden-node-utils                 = { version = "0.14" }
+miden-node-validator             = { version = "0.14" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-remote-prover-client = { default-features = false, features = [
-  "tx-prover",
-], git = "https://github.com/0xMiden/miden-node", rev = "c2d61c0eee9f81dd6335ed51c3424a9bd5e34dd8" }
+miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.14" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }

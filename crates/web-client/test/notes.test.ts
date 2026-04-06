@@ -434,9 +434,17 @@ test.describe("get_input_note", () => {
       const tag = fetchedNotes[0].metadata.tag();
 
       const syncInfo = await rpcClient.syncNotes(0, undefined, [tag]);
-      const syncedNoteIds = syncInfo
-        .notes()
-        .map((synced) => synced.noteId().toString());
+      const blocks = syncInfo.blocks();
+      const syncedNotes = syncInfo.notes();
+      const syncedNoteIds = syncedNotes.map((synced) =>
+        synced.noteId().toString()
+      );
+      const syncedBlockNoteIds = blocks.flatMap((block) =>
+        block.notes().map((synced) => synced.noteId().toString())
+      );
+      const firstSyncedNote = syncedNotes[0];
+      const compatBlockHeader = syncInfo.blockHeader();
+      const compatMmrPath = syncInfo.mmrPath();
 
       const retrievedInputNote = await intClient.getInputNote(createdNoteId);
       const nullifierWord = fetchedNote
@@ -456,8 +464,28 @@ test.describe("get_input_note", () => {
         skip: false,
         fetchedNotesEmpty: false,
         syncedNoteIds,
+        syncedBlockNoteIds,
         consumedNoteId: createdNoteId,
+        chainTip: syncInfo.chainTip(),
+        blockTo: syncInfo.blockTo(),
+        compatBlockNum: compatBlockHeader?.blockNum(),
+        firstBlockNum: blocks[0]?.blockHeader().blockNum(),
+        compatMmrDepth: compatMmrPath?.depth(),
+        firstBlockMmrDepth: blocks[0]?.mmrPath().depth(),
+        firstSyncedNoteSender: firstSyncedNote?.sender().toString(),
+        firstSyncedNoteMetadataSender: firstSyncedNote
+          ?.metadata()
+          .sender()
+          .toString(),
+        firstSyncedNoteIndex: firstSyncedNote?.noteIndex(),
+        firstSyncedNoteProofIndex: firstSyncedNote
+          ?.inclusionProof()
+          .location()
+          .blockNoteTreeIndex(),
         nullifierHex,
+        nullifierWord: fetchedNote
+          ? fetchedNote.nullifier().toHex()
+          : undefined,
         commitHeightDefined: commitHeight !== undefined,
       };
     });
@@ -470,7 +498,18 @@ test.describe("get_input_note", () => {
       return;
     }
     expect(result.syncedNoteIds).toContain(result.consumedNoteId);
+    expect(result.syncedNoteIds).toEqual(result.syncedBlockNoteIds);
+    expect(result.chainTip).toBeGreaterThanOrEqual(result.blockTo);
+    expect(result.compatBlockNum).toEqual(result.firstBlockNum);
+    expect(result.compatMmrDepth).toEqual(result.firstBlockMmrDepth);
+    expect(result.firstSyncedNoteSender).toEqual(
+      result.firstSyncedNoteMetadataSender
+    );
+    expect(result.firstSyncedNoteIndex).toEqual(
+      result.firstSyncedNoteProofIndex
+    );
     expect(result.nullifierHex).toMatch(/^0x[0-9a-fA-F]+$/);
+    expect(result.nullifierWord).toEqual(result.nullifierHex);
     expect(result.commitHeightDefined).toBe(true);
   });
 });
