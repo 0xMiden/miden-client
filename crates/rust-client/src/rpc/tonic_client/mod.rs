@@ -570,7 +570,10 @@ impl NodeRpcClient for GrpcClient {
             block_to: block_to.map(|b| b.as_u32()),
         });
 
-        let request = proto::rpc::SyncChainMmrRequest { block_range };
+        let request = proto::rpc::SyncChainMmrRequest {
+            block_range,
+            finality: proto::rpc::Finality::Committed as i32,
+        };
 
         let response = self
             .call_with_retry(RpcEndpoint::SyncChainMmr, |mut rpc_api| {

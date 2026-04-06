@@ -370,57 +370,48 @@ where
     /// proof.
     async fn check_expected_notes(
         &mut self,
-        mut request_block_num: BlockNumber,
+        request_block_num: BlockNumber,
         // Expected notes with their tags
         expected_notes: Vec<(NoteId, &NoteTag)>,
     ) -> Result<BTreeMap<NoteId, Option<(NoteMetadata, NoteInclusionProof)>>, ClientError> {
         let tracked_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
         let mut retrieved_proofs = BTreeMap::new();
         let current_block_num = self.get_sync_height().await?;
-        loop {
-            if request_block_num > current_block_num {
+
+        if request_block_num > current_block_num {
+            return Ok(retrieved_proofs);
+        }
+
+        let sync_result = self
+            .rpc_api
+            .sync_notes_with_details(request_block_num, Some(current_block_num), &tracked_tags)
+            .await
+            .map_err(ClientError::RpcError)?;
+
+        for block in &sync_result.blocks {
+            if block.block_header.block_num() > current_block_num {
                 break;
             }
 
-            let sync_notes =
-                self.rpc_api.sync_notes(request_block_num, None, &tracked_tags).await?;
-
-            for sync_note in sync_notes.notes {
+            for sync_note in block.notes.values() {
                 if !expected_notes.iter().any(|(id, _)| id == sync_note.note_id()) {
                     continue;
                 }
 
-                // This means that a note with the same id was found.
-                // Therefore, we should mark the note as committed.
-                let note_block_num = sync_notes.block_header.block_num();
-
-                if note_block_num > current_block_num {
-                    break;
-                }
-
-                let note_inclusion_proof = NoteInclusionProof::new(
-                    note_block_num,
-                    sync_note.note_index(),
-                    sync_note.inclusion_path().clone(),
-                )?;
-
+                let metadata = sync_note
+                    .metadata()
+                    .cloned()
+                    .expect("metadata should be available after sync_notes_with_details");
                 retrieved_proofs.insert(
                     *sync_note.note_id(),
-                    Some((sync_note.metadata(), note_inclusion_proof)),
+                    Some((metadata, sync_note.inclusion_proof().clone())),
                 );
             }
-
-            // We might have reached the chain tip without having found some notes, bail if so
-            if sync_notes.block_header.block_num() == sync_notes.chain_tip {
-                break;
-            }
-
-            // This means that a note with the same id was not found.
-            // Therefore, we should request again for sync_notes with the same note_tag
-            // and with the block_num of the last block header
-            // (sync_notes.block_header.unwrap()).
-            request_block_num = sync_notes.block_header.block_num();
         }
-        Ok(retrieved_proofs)
+
+        retrieved_proofs
+            .into_iter()
+            .map(|(note_id, data)| Ok((note_id, data)))
+            .collect()
     }
 }
