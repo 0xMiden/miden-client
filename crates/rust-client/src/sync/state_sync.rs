@@ -276,9 +276,9 @@ impl StateSync {
 
     /// Fetches the sync data from the node by calling the following endpoints:
     /// 1. `sync_chain_mmr` — discovers the chain tip and gets the MMR delta.
-    /// 2. `sync_notes` — loops until the full range to the chain tip is covered.
-    /// 3. `get_notes_by_id` — fetches full metadata for notes with attachments and full note bodies
-    ///    for public notes.
+    /// 2. `sync_notes` — loops until the full range to the chain tip is covered (handles paginated
+    ///    responses).
+    /// 3. `get_notes_by_id` — fetches full metadata for notes with attachments.
     /// 4. `sync_transactions` — gets transaction data for the full range.
     ///
     /// Returns `None` when the client is already at the chain tip (no progress).
