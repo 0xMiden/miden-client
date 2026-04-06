@@ -50,6 +50,7 @@ use miden_client::store::{
 };
 use miden_client::sync::{NoteTagRecord, StateSyncUpdate};
 use miden_client::transaction::{TransactionRecord, TransactionStoreUpdate};
+use miden_protocol::Felt;
 use miden_protocol::account::StorageMapWitness;
 use miden_protocol::asset::AssetVaultKey;
 use rusqlite::Connection;
@@ -283,6 +284,17 @@ impl Store for SqliteStore {
         self.interact_with_connection(SqliteStore::prune_irrelevant_blocks).await
     }
 
+    async fn prune_account_history(
+        &self,
+        account_id: AccountId,
+        up_to_nonce: Felt,
+    ) -> Result<usize, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::prune_account_history(conn, account_id, up_to_nonce)
+        })
+        .await
+    }
+
     async fn get_block_headers(
         &self,
         block_numbers: &BTreeSet<BlockNumber>,
@@ -297,6 +309,11 @@ impl Store for SqliteStore {
 
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError> {
         self.interact_with_connection(SqliteStore::get_tracked_block_headers).await
+    }
+
+    async fn get_tracked_block_header_numbers(&self) -> Result<BTreeSet<usize>, StoreError> {
+        self.interact_with_connection(SqliteStore::get_tracked_block_header_numbers)
+            .await
     }
 
     async fn get_partial_blockchain_nodes(

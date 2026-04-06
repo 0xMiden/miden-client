@@ -68,9 +68,9 @@ const SYNC_METHODS = new Set([
 ]);
 
 const WRITE_METHODS = new Set([
-  "addAccountSecretKeyToWebStore",
   "addTag",
   "executeForSummary",
+  "executeProgram",
   "fetchAllPrivateNotes",
   "fetchPrivateNotes",
   "forceImportStore",
@@ -80,6 +80,7 @@ const WRITE_METHODS = new Set([
   "importPublicAccountFromSeed",
   "insertAccountAddress",
   "newAccount",
+  "pruneAccountHistory",
   "removeAccountAddress",
   "removeTag",
   "removeSetting",
@@ -94,8 +95,6 @@ const READ_METHODS = new Set([
   "exportNoteFile",
   "exportStore",
   "getAccount",
-  "getAccountAuthByPubKeyCommitment",
-  "getAccountByKeyCommitment",
   "getAccountCode",
   "getAccountStorage",
   "getAccountVault",
@@ -105,7 +104,6 @@ const READ_METHODS = new Set([
   "getInputNotes",
   "getOutputNote",
   "getOutputNotes",
-  "getPublicKeyCommitmentsOfAccount",
   "getSetting",
   "getSyncHeight",
   "getTransactions",
@@ -113,6 +111,8 @@ const READ_METHODS = new Set([
   "listTags",
   "executeProgram",
 ]);
+
+const MOCK_STORE_NAME = "mock_client_db";
 
 // Suppress unused-variable warnings — these sets exist solely for the CI lint check.
 void SYNC_METHODS;
@@ -606,16 +606,6 @@ class WebClient {
     });
   }
 
-  async addAccountSecretKeyToWebStore(accountId, secretKey) {
-    return this._serializeWasmCall(async () => {
-      const wasmWebClient = await this.getWasmWebClient();
-      return await wasmWebClient.addAccountSecretKeyToWebStore(
-        accountId,
-        secretKey
-      );
-    });
-  }
-
   async submitNewTransaction(accountId, transactionRequest) {
     try {
       if (!this.worker) {
@@ -844,7 +834,16 @@ class WebClient {
 
 class MockWebClient extends WebClient {
   constructor(seed, logLevel) {
-    super(null, null, seed, "mock", undefined, undefined, undefined, logLevel);
+    super(
+      null,
+      null,
+      seed,
+      MOCK_STORE_NAME,
+      undefined,
+      undefined,
+      undefined,
+      logLevel
+    );
   }
 
   initializeWorker() {

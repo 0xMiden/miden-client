@@ -143,21 +143,22 @@ export async function getAccountStorageMaps(dbId, accountId) {
         logWebStoreError(error, `Error fetching account storage maps for account ${accountId}`);
     }
 }
-export async function getAccountVaultAssets(dbId, accountId, faucetIdPrefixes) {
+export async function getAccountVaultAssets(dbId, accountId, vaultKeys) {
     try {
         const db = getDatabase(dbId);
         let query = db.latestAccountAssets.where("accountId").equals(accountId);
         let records;
-        if (faucetIdPrefixes.length) {
-            const prefixSet = new Set(faucetIdPrefixes);
+        if (vaultKeys.length) {
+            const keySet = new Set(vaultKeys);
             records = await query
-                .and((record) => prefixSet.has(record.faucetIdPrefix))
+                .and((record) => keySet.has(record.vaultKey))
                 .toArray();
         }
         else {
             records = await query.toArray();
         }
         return records.map((record) => ({
+            vaultKey: record.vaultKey,
             asset: record.asset,
         }));
     }
@@ -246,7 +247,6 @@ export async function upsertVaultAssets(dbId, accountId, assets) {
         const latestEntries = assets.map((asset) => ({
             accountId,
             vaultKey: asset.vaultKey,
-            faucetIdPrefix: asset.faucetIdPrefix,
             asset: asset.asset,
         }));
         await db.latestAccountAssets.bulkPut(latestEntries);
@@ -327,7 +327,6 @@ export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots
                     accountId,
                     replacedAtNonce: nonce,
                     vaultKey: entry.vaultKey,
-                    faucetIdPrefix: entry.faucetIdPrefix,
                     oldAsset: oldAsset?.asset ?? null,
                 });
                 // "" means removal
@@ -341,7 +340,6 @@ export async function applyTransactionDelta(dbId, accountId, nonce, updatedSlots
                     await db.latestAccountAssets.put({
                         accountId,
                         vaultKey: entry.vaultKey,
-                        faucetIdPrefix: entry.faucetIdPrefix,
                         asset: entry.asset,
                     });
                 }
@@ -470,7 +468,6 @@ async function archiveAndReplaceVaultAssets(db, accountId, nonce, newAssets) {
             accountId,
             replacedAtNonce: nonce,
             vaultKey: asset.vaultKey,
-            faucetIdPrefix: asset.faucetIdPrefix,
             oldAsset: asset.asset,
         });
     }
@@ -481,7 +478,6 @@ async function archiveAndReplaceVaultAssets(db, accountId, nonce, newAssets) {
                 accountId,
                 replacedAtNonce: nonce,
                 vaultKey: asset.vaultKey,
-                faucetIdPrefix: asset.faucetIdPrefix,
                 oldAsset: null,
             });
         }
@@ -491,7 +487,6 @@ async function archiveAndReplaceVaultAssets(db, accountId, nonce, newAssets) {
         await db.latestAccountAssets.bulkPut(newAssets.map((asset) => ({
             accountId,
             vaultKey: asset.vaultKey,
-            faucetIdPrefix: asset.faucetIdPrefix,
             asset: asset.asset,
         })));
     }
@@ -550,7 +545,6 @@ async function restoreAssetsFromHistorical(db, accountId, nonce) {
             await db.latestAccountAssets.put({
                 accountId: asset.accountId,
                 vaultKey: asset.vaultKey,
-                faucetIdPrefix: asset.faucetIdPrefix,
                 asset: asset.oldAsset,
             });
         }
@@ -728,6 +722,83 @@ export async function lockAccount(dbId, accountId) {
     }
     catch (error) {
         logWebStoreError(error, `Error locking account: ${accountId}`);
+    }
+}
+/**
+ * Prunes historical account states for a single account up to the given nonce.
+ *
+ * Deletes all historical entries with `replacedAtNonce <= upToNonce` and any
+ * orphaned account code. Mirrors the SQLite implementation.
+ */
+export async function pruneAccountHistory(dbId, accountId, upToNonce) {
+    try {
+        const db = getDatabase(dbId);
+        let totalDeleted = 0;
+        const boundaryNonce = BigInt(upToNonce);
+        await db.dexie.transaction("rw", [
+            db.historicalAccountHeaders,
+            db.historicalAccountStorages,
+            db.historicalStorageMapEntries,
+            db.historicalAccountAssets,
+            db.accountCodes,
+            db.latestAccountHeaders,
+            db.foreignAccountCode,
+        ], async () => {
+            // Nonces are stored as strings so we cannot use index range queries
+            // (lexicographic ordering would be wrong). Filter in JS instead.
+            const headers = await db.historicalAccountHeaders
+                .where("id")
+                .equals(accountId)
+                .toArray();
+            const toPrune = headers.filter((h) => BigInt(h.replacedAtNonce) <= boundaryNonce);
+            // Collect code roots from headers we are about to delete.
+            const candidateCodeRoots = new Set(toPrune.map((h) => h.codeRoot));
+            for (const h of toPrune) {
+                await db.historicalAccountHeaders
+                    .where("accountCommitment")
+                    .equals(h.accountCommitment)
+                    .delete();
+                const rat = h.replacedAtNonce;
+                totalDeleted += 1;
+                totalDeleted += await db.historicalAccountStorages
+                    .where("[accountId+replacedAtNonce]")
+                    .equals([accountId, rat])
+                    .delete();
+                totalDeleted += await db.historicalStorageMapEntries
+                    .where("[accountId+replacedAtNonce]")
+                    .equals([accountId, rat])
+                    .delete();
+                totalDeleted += await db.historicalAccountAssets
+                    .where("[accountId+replacedAtNonce]")
+                    .equals([accountId, rat])
+                    .delete();
+            }
+            // Delete orphaned code: only check roots from the deleted headers,
+            // and only if they are not referenced by any remaining header or foreign code.
+            if (candidateCodeRoots.size > 0) {
+                const latestHeaders = await db.latestAccountHeaders.toArray();
+                const remainingHistorical = await db.historicalAccountHeaders.toArray();
+                const foreignCodes = await db.foreignAccountCode.toArray();
+                const referencedCodeRoots = new Set();
+                for (const h of latestHeaders)
+                    referencedCodeRoots.add(h.codeRoot);
+                for (const h of remainingHistorical)
+                    referencedCodeRoots.add(h.codeRoot);
+                for (const f of foreignCodes)
+                    referencedCodeRoots.add(f.codeRoot);
+                for (const root of candidateCodeRoots) {
+                    if (!referencedCodeRoots.has(root)) {
+                        await db.accountCodes.where("root").equals(root).delete();
+                        totalDeleted += 1;
+                    }
+                }
+            }
+        });
+        return totalDeleted;
+    }
+    catch (error) {
+        logWebStoreError(error, `Error pruning account history for ${accountId}`);
+        throw error;
     }
 }
 /**

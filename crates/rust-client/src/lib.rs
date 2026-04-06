@@ -135,7 +135,7 @@ mod test_utils;
 
 pub mod errors;
 
-pub use miden_protocol::utils::{Deserializable, Serializable, SliceReader};
+pub use miden_protocol::utils::serde::{Deserializable, Serializable, SliceReader};
 
 // RE-EXPORTS
 // ================================================================================================
@@ -212,7 +212,7 @@ pub mod auth {
 
     pub use crate::account::component::AuthScheme;
 
-    pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::Falcon512Rpo;
+    pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::Falcon512Poseidon2;
     pub const ECDSA_K256_KECCAK_SCHEME_ID: AuthSchemeId = AuthSchemeId::EcdsaK256Keccak;
 }
 
@@ -226,9 +226,14 @@ pub mod block {
 /// the `miden_standards` crate.
 pub mod crypto {
     pub mod rpo_falcon512 {
-        pub use miden_protocol::crypto::dsa::falcon512_rpo::{PublicKey, SecretKey, Signature};
+        pub use miden_protocol::crypto::dsa::falcon512_poseidon2::{
+            PublicKey,
+            SecretKey,
+            Signature,
+        };
     }
-    pub use miden_protocol::crypto::hash::blake::{Blake3_160, Blake3Digest};
+    pub use miden_protocol::crypto::hash::blake::Blake3Digest;
+    pub use miden_protocol::crypto::hash::poseidon2::Poseidon2;
     pub use miden_protocol::crypto::hash::rpo::Rpo256;
     pub use miden_protocol::crypto::merkle::mmr::{
         Forest,
@@ -255,7 +260,7 @@ pub mod crypto {
         NodeIndex,
         SparseMerklePath,
     };
-    pub use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
+    pub use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
 }
 
 /// Provides types for working with addresses within the Miden network.
@@ -272,8 +277,6 @@ pub mod address {
 
 /// Provides types for working with the virtual machine within the Miden network.
 pub mod vm {
-    // TODO: Remove this re-export once miden-protocol exposes PackageKind/ProcedureExport.
-    pub use miden_mast_package::{PackageKind, ProcedureExport};
     pub use miden_protocol::vm::{
         AdviceInputs,
         AdviceMap,
@@ -281,7 +284,9 @@ pub mod vm {
         MastArtifact,
         Package,
         PackageExport,
+        PackageKind,
         PackageManifest,
+        ProcedureExport,
         Program,
         QualifiedProcedureName,
         Section,
@@ -299,7 +304,6 @@ pub use miden_protocol::{
     MIN_TX_EXECUTION_CYCLES,
     ONE,
     PrettyPrint,
-    StarkField,
     Word,
     ZERO,
 };

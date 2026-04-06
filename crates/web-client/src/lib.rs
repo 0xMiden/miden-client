@@ -6,7 +6,7 @@ use core::fmt::Write;
 use idxdb_store::IdxdbStore;
 use js_sys::{Function, Reflect};
 use miden_client::builder::ClientBuilder;
-use miden_client::crypto::RpoRandomCoin;
+use miden_client::crypto::RandomCoin;
 use miden_client::note_transport::NoteTransportClient;
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::rpc::{Endpoint, GrpcClient, NodeRpcClient};
@@ -38,6 +38,7 @@ pub mod tags;
 pub mod transactions;
 pub mod utils;
 
+pub mod keystore_api;
 mod web_keystore;
 mod web_keystore_callbacks;
 mod web_keystore_db;
@@ -47,7 +48,7 @@ pub use web_keystore::WebKeyStore;
 
 /// Client authenticator type. Gate with `#[cfg]` to support other keystores, e.g.
 /// `FilesystemKeyStore` for Node.js.
-pub(crate) type ClientAuth = WebKeyStore<RpoRandomCoin>;
+pub(crate) type ClientAuth = WebKeyStore<RandomCoin>;
 
 const BASE_STORE_NAME: &str = "MidenClientDB";
 
@@ -121,11 +122,20 @@ impl WebClient {
         self.inner.as_mut()
     }
 
-    pub(crate) fn keystore(&self) -> Result<&Arc<ClientAuth>, JsValue> {
+    pub(crate) fn inner_keystore(&self) -> Result<&Arc<ClientAuth>, JsValue> {
         self.inner
             .as_ref()
             .and_then(|c| c.authenticator())
             .ok_or_else(|| JsValue::from_str("Client not initialized"))
+    }
+
+    /// Returns a `WebKeystoreApi` handle for managing secret keys.
+    ///
+    /// The returned object can be used from JavaScript as `client.keystore`.
+    #[wasm_bindgen(getter)]
+    pub fn keystore(&self) -> Result<keystore_api::WebKeystoreApi, JsValue> {
+        let ks = self.inner_keystore()?.clone();
+        Ok(keystore_api::WebKeystoreApi::new(ks))
     }
 
     /// Creates a new `WebClient` instance with the specified configuration.
@@ -150,7 +160,7 @@ impl WebClient {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
         })?;
 
-        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 0));
+        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 10_000));
 
         let note_transport_client = node_note_transport_url
             .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
@@ -210,7 +220,7 @@ impl WebClient {
             Endpoint::try_from(url.as_str()).map_err(|_| JsValue::from_str("Invalid node URL"))
         })?;
 
-        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 0));
+        let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 10_000));
 
         let note_transport_client = node_note_transport_url
             .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
@@ -253,7 +263,7 @@ impl WebClient {
         rpc_client: Arc<dyn NodeRpcClient>,
         store: Arc<dyn Store>,
         keystore: Arc<ClientAuth>,
-        rng: RpoRandomCoin,
+        rng: RandomCoin,
         note_transport_client: Option<Arc<dyn NoteTransportClient>>,
         debug_mode: bool,
     ) -> Result<(), JsValue> {
@@ -303,7 +313,7 @@ impl WebClient {
 // HELPERS
 // ================================================================================================
 
-pub(crate) fn create_rng(seed: Option<Vec<u8>>) -> Result<RpoRandomCoin, JsValue> {
+pub(crate) fn create_rng(seed: Option<Vec<u8>>) -> Result<RandomCoin, JsValue> {
     let mut rng = match seed {
         Some(seed_bytes) => {
             if seed_bytes.len() == 32 {
@@ -317,7 +327,7 @@ pub(crate) fn create_rng(seed: Option<Vec<u8>>) -> Result<RpoRandomCoin, JsValue
         None => StdRng::from_os_rng(),
     };
     let coin_seed: [u64; 4] = rng.random();
-    Ok(RpoRandomCoin::new(coin_seed.map(Felt::new).into()))
+    Ok(RandomCoin::new(coin_seed.map(Felt::new).into()))
 }
 
 // ERROR HANDLING HELPERS

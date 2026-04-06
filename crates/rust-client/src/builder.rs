@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 
 use miden_protocol::assembly::{DefaultSourceManager, SourceManagerSync};
 use miden_protocol::block::BlockNumber;
-use miden_protocol::crypto::rand::RpoRandomCoin;
+use miden_protocol::crypto::rand::RandomCoin;
 use miden_protocol::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use miden_tx::{ExecutionOptions, LocalTransactionProver};
 use rand::Rng;
@@ -158,9 +158,10 @@ where
     /// Creates a `ClientBuilder` pre-configured for Miden testnet.
     ///
     /// This automatically configures:
-    /// - **RPC**: `https://rpc.testnet.miden.io`
-    /// - **Prover**: Remote prover at `https://tx-prover.testnet.miden.io`
-    /// - **Note transport**: `https://transport.miden.io`
+    /// - **RPC**: [`Endpoint::testnet()`]
+    /// - **Prover**: Remote prover at [`TESTNET_PROVER_ENDPOINT`]
+    /// - **Note transport**:
+    ///   [`NOTE_TRANSPORT_TESTNET_ENDPOINT`](crate::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT)
     ///
     /// You still need to provide:
     /// - A store (via `.store()`)
@@ -187,7 +188,7 @@ where
                 TESTNET_PROVER_ENDPOINT.to_string(),
             ))),
             note_transport_config: Some(NoteTransportConfig {
-                endpoint: crate::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(),
+                endpoint: crate::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT.to_string(),
                 timeout_ms: NOTE_TRANSPORT_DEFAULT_TIMEOUT_MS,
             }),
             endpoint: Some(endpoint),
@@ -198,10 +199,10 @@ where
     /// Creates a `ClientBuilder` pre-configured for Miden devnet.
     ///
     /// This automatically configures:
-    /// - **RPC**: `https://rpc.devnet.miden.io`
-    /// - **Prover**: Remote prover at `https://tx-prover.devnet.miden.io`
-    ///
-    /// Note transport is not configured by default for devnet.
+    /// - **RPC**: [`Endpoint::devnet()`]
+    /// - **Prover**: Remote prover at [`DEVNET_PROVER_ENDPOINT`]
+    /// - **Note transport**:
+    ///   [`NOTE_TRANSPORT_DEVNET_ENDPOINT`](crate::note_transport::NOTE_TRANSPORT_DEVNET_ENDPOINT)
     ///
     /// You still need to provide:
     /// - A store (via `.store()`)
@@ -227,6 +228,10 @@ where
             tx_prover: Some(Arc::new(RemoteTransactionProver::new(
                 DEVNET_PROVER_ENDPOINT.to_string(),
             ))),
+            note_transport_config: Some(NoteTransportConfig {
+                endpoint: crate::note_transport::NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string(),
+                timeout_ms: NOTE_TRANSPORT_DEFAULT_TIMEOUT_MS,
+            }),
             endpoint: Some(endpoint),
             ..Self::default()
         }
@@ -412,7 +417,7 @@ where
         } else {
             let mut seed_rng = rand::rng();
             let coin_seed: [u64; 4] = seed_rng.random();
-            Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()))
+            Box::new(RandomCoin::new(coin_seed.map(Felt::new).into()))
         };
 
         // Set default prover if not provided
@@ -468,6 +473,7 @@ where
             exec_options: ExecutionOptions::new(
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,
+                ExecutionOptions::DEFAULT_CORE_TRACE_FRAGMENT_SIZE,
                 false,
                 self.in_debug_mode.into(),
             )

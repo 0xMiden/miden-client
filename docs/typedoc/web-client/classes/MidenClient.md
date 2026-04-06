@@ -38,6 +38,12 @@ Returns the client-level default prover.
 
 ***
 
+### keystore
+
+> `readonly` **keystore**: [`KeystoreResource`](../interfaces/KeystoreResource.md)
+
+***
+
 ### notes
 
 > `readonly` **notes**: [`NotesResource`](../interfaces/NotesResource.md)

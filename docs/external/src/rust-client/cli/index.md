@@ -402,7 +402,7 @@ The file referenced by `--inputs-path` should contain a TOML array of inline tab
 The input file should contain a TOML table called `inputs`, as in the following example:
 
 ```toml
-inputs = [ { key = "0x0000001000000000000000000000000000000000000000000000000000000000", values = ["13", "9"]}, { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]}, ]
+inputs = [ { key = "0x0000000000000000000000000000000000000000000000000000001000000000", values = ["13", "9"]}, { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]}, ]
 ```
 
 ### `note-transport`

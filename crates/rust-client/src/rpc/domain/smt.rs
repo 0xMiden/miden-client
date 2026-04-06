@@ -50,7 +50,7 @@ impl From<&SmtLeaf> for proto::primitives::SmtLeaf {
     fn from(value: &SmtLeaf) -> Self {
         match value {
             SmtLeaf::Empty(index) => proto::primitives::SmtLeaf {
-                leaf: Some(proto::primitives::smt_leaf::Leaf::EmptyLeafIndex(index.value())),
+                leaf: Some(proto::primitives::smt_leaf::Leaf::EmptyLeafIndex(index.position())),
             },
             SmtLeaf::Single(entry) => proto::primitives::SmtLeaf {
                 leaf: Some(proto::primitives::smt_leaf::Leaf::Single(entry.into())),

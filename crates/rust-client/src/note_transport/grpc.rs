@@ -6,7 +6,7 @@ use core::task::{Context, Poll};
 
 use futures::Stream;
 use miden_protocol::note::{NoteHeader, NoteTag};
-use miden_protocol::utils::{Deserializable, Serializable};
+use miden_protocol::utils::serde::{Deserializable, Serializable};
 use miden_tx::utils::sync::RwLock;
 use tonic::{Request, Streaming};
 use tonic_health::pb::HealthCheckRequest;

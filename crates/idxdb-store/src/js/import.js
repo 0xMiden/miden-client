@@ -8,6 +8,8 @@ async function recursivelyTransformForImport(obj) {
     switch (obj.type) {
         case "Blob":
             return new Blob([base64ToUint8Array(obj.value.data)]);
+        case "Uint8Array":
+            return base64ToUint8Array(obj.value.data);
         case "Array":
             return await Promise.all(obj.value.map((v) => recursivelyTransformForImport({ type: getImportType(v), value: v })));
         case "Object":
@@ -25,6 +27,9 @@ async function recursivelyTransformForImport(obj) {
 function getImportType(value) {
     if (value && typeof value === "object" && value.__type === "Blob") {
         return "Blob";
+    }
+    if (value && typeof value === "object" && value.__type === "Uint8Array") {
+        return "Uint8Array";
     }
     if (Array.isArray(value))
         return "Array";

@@ -168,10 +168,12 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
         )?;
 
         let note_commitments = value
-            .nullifiers
+            .input_notes
             .into_iter()
             .map(|d| {
                 let word: Word = d
+                    .nullifier
+                    .ok_or(RpcError::ExpectedDataMissing("nullifier".into()))?
                     .try_into()
                     .map_err(|e: RpcConversionError| RpcError::InvalidResponse(e.to_string()))?;
                 Ok(InputNoteCommitment::from(Nullifier::from_raw(word)))
@@ -182,8 +184,8 @@ impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
         let output_notes = value
             .output_notes
             .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<NoteHeader>, RpcError>>()?;
+            .map(NoteHeader::try_from)
+            .collect::<Result<Vec<NoteHeader>, _>>()?;
 
         let transaction_header = TransactionHeader::new(
             account_id.try_into()?,

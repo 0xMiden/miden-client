@@ -5,8 +5,14 @@ use core::fmt;
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockNumber;
-use miden_protocol::transaction::{OutputNotes, TransactionId, TransactionScript};
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use miden_protocol::transaction::{RawOutputNotes, TransactionId, TransactionScript};
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+};
 
 // TRANSACTION RECORD
 // ================================================================================================
@@ -83,7 +89,7 @@ pub struct TransactionDetails {
     /// Nullifiers of the input notes consumed in the transaction.
     pub input_note_nullifiers: Vec<Word>,
     /// Output notes generated as a result of the transaction.
-    pub output_notes: OutputNotes,
+    pub output_notes: RawOutputNotes,
     /// Block number for the block against which the transaction was executed.
     pub block_num: BlockNumber,
     /// Block number at which the transaction was submitted.
@@ -114,7 +120,7 @@ impl Deserializable for TransactionDetails {
         let init_account_state = Word::read_from(source)?;
         let final_account_state = Word::read_from(source)?;
         let input_note_nullifiers = Vec::<Word>::read_from(source)?;
-        let output_notes = OutputNotes::read_from(source)?;
+        let output_notes = RawOutputNotes::read_from(source)?;
         let block_num = BlockNumber::read_from(source)?;
         let submission_height = BlockNumber::read_from(source)?;
         let expiration_block_num = BlockNumber::read_from(source)?;
@@ -228,7 +234,7 @@ impl fmt::Display for TransactionStatus {
             TransactionStatus::Committed { block_number, .. } => {
                 write!(f, "Committed (Block: {block_number})")
             },
-            TransactionStatus::Discarded(cause) => write!(f, "Discarded ({cause})",),
+            TransactionStatus::Discarded(cause) => write!(f, "Discarded ({cause})"),
         }
     }
 }

@@ -20,7 +20,7 @@ export {
   NoteFile,
   NoteId,
   NoteTag,
-  OutputNote,
+  RawOutputNote,
   OutputNoteRecord,
   SyncSummary,
   TransactionId,

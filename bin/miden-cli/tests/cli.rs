@@ -11,7 +11,7 @@ use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::address::AddressInterface;
 use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
 use miden_client::builder::ClientBuilder;
-use miden_client::crypto::{FeltRng, RpoRandomCoin};
+use miden_client::crypto::{FeltRng, RandomCoin};
 use miden_client::keystore::Keystore;
 use miden_client::note::{
     Note,
@@ -33,10 +33,11 @@ use miden_client::testing::common::{
     execute_tx_and_sync,
     insert_new_wallet,
 };
-use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
+use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Serializable;
 use miden_client::{self, Client, DebugMode, Felt};
 use miden_client_cli::MIDEN_DIR;
+use miden_client_cli::config::Network;
 use miden_client_sqlite_store::SqliteStore;
 use predicates::str::contains;
 use rand::Rng;
@@ -313,7 +314,7 @@ async fn token_symbol_mapping() -> Result<()> {
     // Create a token symbol mapping file in the MIDEN_DIR directory
     let token_symbol_map_path = temp_dir.join(MIDEN_DIR).join("token_symbol_map.toml");
     let token_symbol_map_content =
-        format!(r#"BTC = {{ id = "{fungible_faucet_account_id}", decimals = 10 }}"#,);
+        format!(r#"BTC = {{ id = "{fungible_faucet_account_id}", decimals = 10 }}"#);
     fs::write(&token_symbol_map_path, token_symbol_map_content).unwrap();
 
     sync_cli(&temp_dir);
@@ -379,7 +380,7 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
 
         let cargo_workspace_dir =
             env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let source_path = format!("{cargo_workspace_dir}/../../data/{genesis_account_filename}",);
+        let source_path = format!("{cargo_workspace_dir}/../../data/{genesis_account_filename}");
 
         std::fs::copy(source_path, new_file_path).unwrap();
     }
@@ -626,6 +627,9 @@ async fn consume_unauthenticated_note() -> Result<()> {
     // Mint
     let note_id = mint_cli(&temp_dir, &wallet_account_id, &fungible_faucet_account_id);
 
+    // Wait for the mint transaction to be committed on the node
+    sync_until_committed_transaction(&temp_dir);
+
     // Consume the note, internally this checks that the note was consumed correctly
     consume_note_cli(&temp_dir, &wallet_account_id, &[&note_id]);
     Ok(())
@@ -713,9 +717,8 @@ async fn debug_mode_outputs_logs() -> Result<()> {
 
     // Send transaction and wait for it to be committed
     client.sync_state().await?;
-    let transaction_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Full(note.clone())])
-        .build()?;
+    let transaction_request =
+        TransactionRequestBuilder::new().own_output_notes(vec![note.clone()]).build()?;
     execute_tx_and_sync(&mut client, account.id(), transaction_request).await?;
 
     // Export the note
@@ -851,7 +854,8 @@ async fn list_addresses_remove() -> Result<()> {
 
     // Remove the Unspecified wallet from the account
     let mut remove_address_cmd = cargo_bin_cmd!("miden-client");
-    let unspecified_wallet_address = regex::Regex::new(r"mlcl1[0-9a-z]+")
+    // Match any bech32 Miden address (HRP varies by network: mlcl, mdev, mtst, mm, etc.)
+    let unspecified_wallet_address = regex::Regex::new(r"m[a-z]{1,4}1[0-9a-z]+")
         .unwrap()
         .find(&formatted_output)
         .unwrap()
@@ -906,7 +910,7 @@ async fn new_wallet_with_deploy_flag() -> Result<()> {
     // Verify that the nonce is non-zero (account was deployed)
     // By convention, a nonce of 0 indicates an undeployed account
     assert!(
-        nonce.as_int() > 0,
+        nonce.as_canonical_u64() > 0,
         "Account nonce should be non-zero after deployment, but got: {nonce}"
     );
 
@@ -919,11 +923,13 @@ async fn new_wallet_with_deploy_flag() -> Result<()> {
 /// Initializes a CLI with the network in the config file and returns the store path and the temp
 /// directory where the CLI is running.
 fn init_cli() -> (PathBuf, PathBuf, Endpoint) {
-    // Try to read from env first or default to localhost
-    let endpoint = match std::env::var("TEST_MIDEN_RPC_ENDPOINT") {
-        Ok(endpoint) => Endpoint::try_from(endpoint.as_str()).unwrap(),
-        Err(_) => Endpoint::localhost(),
-    };
+    // Try to read from env first or default to localhost.
+    // Accepts "devnet", "testnet", "localhost", or a custom RPC endpoint string.
+    let network: Network = std::env::var("TEST_MIDEN_NETWORK")
+        .unwrap_or_else(|_| "localhost".to_string())
+        .parse()
+        .unwrap();
+    let endpoint = Endpoint::try_from(network.to_rpc_endpoint().as_str()).unwrap();
 
     let store_path = create_test_store_path();
     let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
@@ -1143,8 +1149,9 @@ fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         output.status.success(),
         "Failed to create wallet {}",
         String::from_utf8(output.stderr)
-            .map(|err_msg| format!("with error: {err_msg}"))
-            .unwrap_or(". Also failed to access the Command's stderr".to_string())
+            .map_or(". Also failed to access the Command's stderr".to_string(), |err_msg| format!(
+                "with error: {err_msg}"
+            ))
     );
 
     std::str::from_utf8(&output.stdout)
@@ -1171,7 +1178,7 @@ async fn create_rust_client_with_store_path(
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
 
-    let rng = Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()));
+    let rng = Box::new(RandomCoin::new(coin_seed.map(Felt::new).into()));
 
     let keystore = FilesystemKeyStore::new(temp_dir())?;
 
@@ -1277,14 +1284,14 @@ fn create_account_with_multisig_auth() {
 
         "miden::standards::auth::multisig::approver_public_keys" = [
             { key = ["0", "0", "0", "0"], value = "0x0000000000000000000000000000000000000000000000000000000000000001" },
-            { key = ["0", "0", "0", "1"], value = "0x0000000000000000000000000000000000000000000000000000000000000002" },
-            { key = ["0", "0", "0", "2"], value = "0x0000000000000000000000000000000000000000000000000000000000000003" }
+            { key = ["1", "0", "0", "0"], value = "0x0000000000000000000000000000000000000000000000000000000000000002" },
+            { key = ["2", "0", "0", "0"], value = "0x0000000000000000000000000000000000000000000000000000000000000003" }
         ]
 
         "miden::standards::auth::multisig::approver_schemes" = [
             { key = ["0", "0", "0", "0"], value = ["2", "0", "0", "0"] },
-            { key = ["0", "0", "0", "1"], value = ["2", "0", "0", "0"] },
-            { key = ["0", "0", "0", "2"], value = ["2", "0", "0", "0"] }
+            { key = ["1", "0", "0", "0"], value = ["2", "0", "0", "0"] },
+            { key = ["2", "0", "0", "0"], value = ["2", "0", "0", "0"] }
         ]
 
         "miden::standards::auth::multisig::procedure_thresholds" = [
@@ -1320,7 +1327,7 @@ fn create_account_with_acl_auth() {
     // Create init storage data file for acl-auth with a test public key
     let init_storage_data_toml = r#"
         "miden::standards::auth::singlesig_acl::pub_key" = "0x0000000000000000000000000000000000000000000000000000000000000001"
-        "miden::standards::auth::singlesig_acl::scheme" = "Falcon512Rpo"
+        "miden::standards::auth::singlesig_acl::scheme" = "Falcon512Poseidon2"
         "miden::standards::auth::singlesig_acl::config.num_trigger_procs" = "1"
         "miden::standards::auth::singlesig_acl::config.allow_unauthorized_output_notes" = "0"
         "miden::standards::auth::singlesig_acl::config.allow_unauthorized_input_notes" = "0"

@@ -210,7 +210,7 @@ pub async fn apply_transaction_delta(
 
             changed_map_entries.push(JsStorageMapEntry {
                 slot_name: slot_name.to_string(),
-                key: key.inner().to_hex(),
+                key: Word::from(*key).to_hex(),
                 value: value_str,
             });
         }
@@ -222,8 +222,7 @@ pub async fn apply_transaction_delta(
 
     for vault_key in removed_vault_keys {
         changed_assets.push(JsVaultAsset {
-            vault_key: Word::from(*vault_key).to_hex(),
-            faucet_id_prefix: vault_key.faucet_id_prefix().to_hex(),
+            vault_key: vault_key.to_string(),
             asset: String::new(),
         });
     }

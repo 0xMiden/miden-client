@@ -40,25 +40,30 @@ export function getRpcUrl(): string {
 }
 
 // Determine remote prover URL from environment or default based on network.
-// Returns undefined if remote proving is not requested (REMOTE_PROVER not set).
+// TEST_MIDEN_PROVER_URL overrides the network preset. If neither is set, returns undefined
+// (local prover). The "local" value explicitly forces local proving.
 export function getProverUrl(): string | undefined {
   if (process.env.TEST_MIDEN_PROVER_URL) {
-    return process.env.TEST_MIDEN_PROVER_URL;
+    const url = process.env.TEST_MIDEN_PROVER_URL;
+    if (url.toLowerCase() === "local") return undefined;
+    if (url.toLowerCase() === "devnet")
+      return "https://tx-prover.devnet.miden.io";
+    if (url.toLowerCase() === "testnet")
+      return "https://tx-prover.testnet.miden.io";
+    if (url.toLowerCase() === "localhost")
+      return `http://localhost:${REMOTE_TX_PROVER_PORT}`;
+    return url;
   }
 
-  if (!process.env.REMOTE_PROVER) {
-    return undefined;
-  }
-
+  // Network preset defaults
   const network = process.env.TEST_MIDEN_NETWORK?.toLowerCase();
   switch (network) {
     case "devnet":
       return "https://tx-prover.devnet.miden.io";
     case "testnet":
       return "https://tx-prover.testnet.miden.io";
-    case "localhost":
     default:
-      return `http://localhost:${REMOTE_TX_PROVER_PORT}`;
+      return undefined;
   }
 }
 
@@ -114,7 +119,7 @@ export const test = base.extend<{ forEachTest: void }>({
             window.remoteProverInstance =
               window.TransactionProver.newRemoteProver(
                 window.remoteProverUrl,
-                BigInt(20_000)
+                BigInt(120_000)
               );
           }
 
@@ -160,7 +165,7 @@ export const test = base.extend<{ forEachTest: void }>({
             const proverToUse = useRemoteProver
               ? window.TransactionProver.newRemoteProver(
                   window.remoteProverUrl,
-                  null
+                  BigInt(120_000)
                 )
               : window.TransactionProver.newLocalProver();
 
@@ -234,3 +239,39 @@ export const test = base.extend<{ forEachTest: void }>({
 });
 
 export default test;
+
+// Lightweight fixture for mock-only tests that don't need an RPC connection.
+// Only loads the SDK exports and WASM module onto the page.
+export const mockTest = base.extend<{ forEachTest: void }>({
+  forEachTest: [
+    async ({ page }, use, testInfo) => {
+      page.on("console", (msg) => {
+        if (msg.type() === "debug") {
+          console.log(`PAGE DEBUG: ${msg.text()}`);
+        }
+      });
+
+      page.on("pageerror", (err) => {
+        console.error("PAGE ERROR:", err);
+      });
+
+      page.on("error", (err) => {
+        console.error("PUPPETEER ERROR:", err);
+      });
+
+      await page.goto("http://localhost:8080");
+
+      await page.evaluate(async () => {
+        const sdkExports = await import("./index.js");
+        for (const [key, value] of Object.entries(sdkExports)) {
+          window[key] = value;
+        }
+        const wasm = await window.getWasmOrThrow();
+        window.AuthScheme = wasm.AuthScheme;
+      });
+
+      await use();
+    },
+    { auto: true },
+  ],
+});

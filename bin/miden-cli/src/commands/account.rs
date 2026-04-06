@@ -115,7 +115,7 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
             acc.id().to_hex(),
             account_type_display_name(&acc.id())?,
             acc.id().storage_mode().to_string(),
-            acc.nonce().as_int().to_string(),
+            acc.nonce().as_canonical_u64().to_string(),
             status,
         ]);
     }
@@ -136,7 +136,7 @@ pub async fn show_account<AUTH>(
     let account = if let Some(account) = client.get_account(account_id).await? {
         account
     } else {
-        println!("Account {account_id} is not tracked by the client. Fetching from the network...",);
+        println!("Account {account_id} is not tracked by the client. Fetching from the network...");
 
         let rpc_client =
             GrpcClient::new(&cli_config.rpc.endpoint.clone().into(), cli_config.rpc.timeout_ms);
@@ -174,7 +174,7 @@ pub async fn show_account<AUTH>(
                     // TODO: Display non-fungible assets more clearly.
                     (
                         "Non Fungible Asset",
-                        non_fungible_asset.faucet_id_prefix().to_hex(),
+                        non_fungible_asset.faucet_id().prefix().to_hex(),
                         1.0.to_string(),
                     )
                 },
@@ -263,7 +263,10 @@ async fn print_summary_table<AUTH>(
         Cell::new("Storage Root"),
         Cell::new(account.storage().to_commitment().to_string()),
     ]);
-    table.add_row(vec![Cell::new("Nonce"), Cell::new(account.nonce().as_int().to_string())]);
+    table.add_row(vec![
+        Cell::new("Nonce"),
+        Cell::new(account.nonce().as_canonical_u64().to_string()),
+    ]);
 
     println!("{table}\n");
     Ok(())

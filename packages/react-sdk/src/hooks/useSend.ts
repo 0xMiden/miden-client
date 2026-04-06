@@ -6,8 +6,7 @@ import {
   NoteAssets,
   NoteAttachment,
   NoteType,
-  OutputNote,
-  OutputNoteArray,
+  NoteArray,
   TransactionRequestBuilder,
 } from "@miden-sdk/miden-sdk";
 import type { SendOptions, SendResult, TransactionStage } from "../types";
@@ -168,9 +167,7 @@ export function useSend(): UseSendResult {
             );
 
             const txRequest = new TransactionRequestBuilder()
-              .withOwnOutputNotes(
-                new OutputNoteArray([OutputNote.full(p2idNote)])
-              )
+              .withOwnOutputNotes(new NoteArray([p2idNote]))
               .build();
 
             const execFromId = parseAccountId(options.from);
@@ -217,7 +214,7 @@ export function useSend(): UseSendResult {
               attachment
             );
             txRequest = new TransactionRequestBuilder()
-              .withOwnOutputNotes(new OutputNoteArray([OutputNote.full(note)]))
+              .withOwnOutputNotes(new NoteArray([note]))
               .build();
           } else {
             txRequest = client.newSendTransactionRequest(

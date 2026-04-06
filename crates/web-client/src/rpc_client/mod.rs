@@ -43,7 +43,7 @@ impl RpcClient {
     /// @param endpoint - Endpoint to connect to.
     #[wasm_bindgen(constructor)]
     pub fn new(endpoint: Endpoint) -> Result<RpcClient, JsValue> {
-        let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), 0));
+        let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), 10_000));
 
         Ok(RpcClient { inner: rpc_client })
     }

@@ -4,12 +4,7 @@ use alloc::vec::Vec;
 use miden_protocol::Word;
 use miden_protocol::account::delta::NonFungibleDeltaAction;
 use miden_protocol::account::{
-    AccountDelta,
-    AccountId,
-    AccountIdPrefix,
-    StorageMap,
-    StorageSlotName,
-    StorageSlotType,
+    AccountDelta, AccountId, StorageMap, StorageSlotName, StorageSlotType,
 };
 use miden_protocol::asset::{Asset, AssetVaultKey, FungibleAsset};
 use miden_protocol::crypto::merkle::MerkleError;
@@ -38,7 +33,7 @@ pub fn compute_storage_delta(
         let old_root = old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
         let new_root = smt_forest.update_storage_map_nodes(
             old_root,
-            map_delta.entries().iter().map(|(key, value)| (*key.inner(), *value)),
+            map_delta.entries().iter().map(|(key, value)| (*key, *value)),
         )?;
         updated_slots.insert(slot_name.clone(), (new_root, StorageSlotType::Map));
     }
@@ -58,20 +53,20 @@ pub fn compute_vault_delta(
     let mut updated_assets = Vec::new();
     let mut removed_vault_keys = Vec::new();
 
-    // Build lookup map from faucet ID prefix to FungibleAsset
-    let mut fungible_map: BTreeMap<AccountIdPrefix, FungibleAsset> = old_vault_assets
+    // Build lookup map from vault key to FungibleAsset
+    let mut fungible_map: BTreeMap<AssetVaultKey, FungibleAsset> = old_vault_assets
         .iter()
         .filter_map(|asset| match asset {
-            Asset::Fungible(fa) => Some((fa.faucet_id_prefix(), *fa)),
+            Asset::Fungible(fa) => Some((fa.vault_key(), *fa)),
             Asset::NonFungible(_) => None,
         })
         .collect();
 
     // Process fungible deltas
-    for (faucet_id, delta_amount) in delta.vault().fungible().iter() {
-        let delta_asset = FungibleAsset::new(*faucet_id, delta_amount.unsigned_abs())?;
+    for (vault_key, delta_amount) in delta.vault().fungible().iter() {
+        let delta_asset = FungibleAsset::new(vault_key.faucet_id(), delta_amount.unsigned_abs())?;
 
-        let asset = match fungible_map.remove(&faucet_id.prefix()) {
+        let asset = match fungible_map.remove(vault_key) {
             Some(existing) => {
                 if *delta_amount >= 0 {
                     existing.add(delta_asset)?

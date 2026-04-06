@@ -24,7 +24,6 @@
 - [NoteFile](classes/NoteFile.md)
 - [NoteId](classes/NoteId.md)
 - [NoteTag](classes/NoteTag.md)
-- [OutputNote](classes/OutputNote.md)
 - [OutputNoteRecord](classes/OutputNoteRecord.md)
 - [SyncSummary](classes/SyncSummary.md)
 - [TransactionId](classes/TransactionId.md)
@@ -56,6 +55,7 @@
 - [FaucetCreateOptions](interfaces/FaucetCreateOptions.md)
 - [FetchPrivateNotesOptions](interfaces/FetchPrivateNotesOptions.md)
 - [InsertAccountOptions](interfaces/InsertAccountOptions.md)
+- [KeystoreResource](interfaces/KeystoreResource.md)
 - [MintOptions](interfaces/MintOptions.md)
 - [MockOptions](interfaces/MockOptions.md)
 - [NoteOptions](interfaces/NoteOptions.md)
@@ -106,6 +106,7 @@
 - [AuthScheme](variables/AuthScheme.md)
 - [MidenArrays](variables/MidenArrays.md)
 - [NoteVisibility](variables/NoteVisibility.md)
+- [RawOutputNote](variables/RawOutputNote.md)
 - [StorageMode](variables/StorageMode.md)
 
 ## Functions

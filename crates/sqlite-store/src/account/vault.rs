@@ -29,22 +29,24 @@ impl SqliteStore {
             .vault()
             .fungible()
             .iter()
-            .map(|(faucet_id, _)| Value::Text(faucet_id.prefix().to_hex()))
+            .map(|(vault_key, _)| Value::Text(vault_key.to_string()))
             .collect::<Vec<Value>>();
 
-        const QUERY: &str = "SELECT asset FROM latest_account_assets WHERE account_id = ? AND faucet_id_prefix IN rarray(?)";
+        const QUERY: &str = "SELECT vault_key, asset FROM latest_account_assets WHERE account_id = ? AND vault_key IN rarray(?)";
 
         conn.prepare(QUERY)
             .into_store_error()?
             .query_map(params![account_id.to_hex(), Rc::new(fungible_faucet_prefixes)], |row| {
-                let asset: String = row.get(0)?;
-                Ok(asset)
+                let vault_key: String = row.get(0)?;
+                let asset: String = row.get(1)?;
+                Ok((vault_key, asset))
             })
             .into_store_error()?
             .map(|result| {
-                let asset_str: String = result.into_store_error()?;
-                let word = Word::try_from(asset_str)?;
-                Ok(Asset::try_from(word)?)
+                let (vault_key_str, asset_str): (String, String) = result.into_store_error()?;
+                let key_word = Word::try_from(vault_key_str)?;
+                let value_word = Word::try_from(asset_str)?;
+                Ok(Asset::from_key_value_words(key_word, value_word)?)
             })
             .collect()
     }
@@ -60,26 +62,18 @@ impl SqliteStore {
         account_id: AccountId,
         assets: impl Iterator<Item = Asset>,
     ) -> Result<(), StoreError> {
-        const LATEST_QUERY: &str = insert_sql!(
-            latest_account_assets {
-                account_id,
-                vault_key,
-                faucet_id_prefix,
-                asset
-            } | REPLACE
-        );
+        const LATEST_QUERY: &str =
+            insert_sql!(latest_account_assets { account_id, vault_key, asset } | REPLACE);
 
         let mut latest_stmt = tx.prepare_cached(LATEST_QUERY).into_store_error()?;
         let account_id_hex = account_id.to_hex();
 
         for asset in assets {
-            let vault_key_word: Word = asset.vault_key().into();
-            let vault_key_hex = vault_key_word.to_hex();
-            let faucet_prefix_hex = asset.faucet_id_prefix().to_hex();
-            let asset_hex = Word::from(asset).to_hex();
+            let vault_key_hex = asset.vault_key().to_string();
+            let asset_hex = asset.to_value_word().to_hex();
 
             latest_stmt
-                .execute(params![&account_id_hex, &vault_key_hex, &faucet_prefix_hex, &asset_hex])
+                .execute(params![&account_id_hex, &vault_key_hex, &asset_hex])
                 .into_store_error()?;
         }
 
@@ -102,27 +96,18 @@ impl SqliteStore {
                 account_id,
                 replaced_at_nonce,
                 vault_key,
-                faucet_id_prefix,
                 old_asset
             } | REPLACE
         );
-        const LATEST_INSERT: &str = insert_sql!(
-            latest_account_assets {
-                account_id,
-                vault_key,
-                faucet_id_prefix,
-                asset
-            } | REPLACE
-        );
+        const LATEST_INSERT: &str =
+            insert_sql!(latest_account_assets { account_id, vault_key, asset } | REPLACE);
 
         let mut hist_stmt = tx.prepare_cached(HISTORICAL_INSERT).into_store_error()?;
         let mut latest_stmt = tx.prepare_cached(LATEST_INSERT).into_store_error()?;
 
         // Archive and delete removed assets
         for vault_key in removed_vault_keys {
-            let vault_key_word: Word = (*vault_key).into();
-            let vault_key_hex = vault_key_word.to_hex();
-            let faucet_prefix_hex = vault_key.faucet_id_prefix().to_hex();
+            let vault_key_hex = vault_key.to_string();
 
             // Read old asset value from latest (should exist since we're removing it)
             let old_asset: Option<String> = tx
@@ -135,13 +120,7 @@ impl SqliteStore {
 
             // Archive old value to historical
             hist_stmt
-                .execute(params![
-                    account_id_hex,
-                    nonce_val,
-                    &vault_key_hex,
-                    &faucet_prefix_hex,
-                    old_asset,
-                ])
+                .execute(params![account_id_hex, nonce_val, &vault_key_hex, old_asset,])
                 .into_store_error()?;
         }
 
@@ -156,7 +135,7 @@ impl SqliteStore {
                     Rc::new(
                         removed_vault_keys
                             .iter()
-                            .map(|k| Value::from(Word::from(*k).to_hex()))
+                            .map(|k| Value::from(k.to_string()))
                             .collect::<Vec<Value>>(),
                     ),
                 ],
@@ -166,10 +145,8 @@ impl SqliteStore {
 
         // Archive old values and insert updated assets
         for asset in updated_assets {
-            let vault_key_word: Word = asset.vault_key().into();
-            let vault_key_hex = vault_key_word.to_hex();
-            let faucet_prefix_hex = asset.faucet_id_prefix().to_hex();
-            let asset_hex = Word::from(*asset).to_hex();
+            let vault_key_hex = asset.vault_key().to_string();
+            let asset_hex = asset.to_value_word().to_hex();
 
             // Read old asset value from latest (NULL if asset is new)
             let old_asset: Option<String> = tx
@@ -182,18 +159,12 @@ impl SqliteStore {
 
             // Archive old value to historical (NULL old_asset = asset was new)
             hist_stmt
-                .execute(params![
-                    account_id_hex,
-                    nonce_val,
-                    &vault_key_hex,
-                    &faucet_prefix_hex,
-                    old_asset,
-                ])
+                .execute(params![account_id_hex, nonce_val, &vault_key_hex, old_asset,])
                 .into_store_error()?;
 
             // Insert/update in latest
             latest_stmt
-                .execute(params![account_id_hex, &vault_key_hex, &faucet_prefix_hex, &asset_hex])
+                .execute(params![account_id_hex, &vault_key_hex, &asset_hex])
                 .into_store_error()?;
         }
 

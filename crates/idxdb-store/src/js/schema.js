@@ -27,7 +27,10 @@ export function getDatabase(dbId) {
  */
 export async function openDatabase(network, clientVersion) {
     const db = new MidenDatabase(network);
-    await db.open(clientVersion);
+    const success = await db.open(clientVersion);
+    if (!success) {
+        throw new Error(`Failed to open IndexedDB database: ${network}`);
+    }
     databaseRegistry.set(network, db);
     return network;
 }
@@ -68,7 +71,7 @@ const V1_STORES = {
     [Table.HistoricalAccountStorage]: indexes("[accountId+replacedAtNonce+slotName]", "accountId", "[accountId+replacedAtNonce]"),
     [Table.LatestStorageMapEntries]: indexes("[accountId+slotName+key]", "accountId", "[accountId+slotName]"),
     [Table.HistoricalStorageMapEntries]: indexes("[accountId+replacedAtNonce+slotName+key]", "accountId", "[accountId+replacedAtNonce]"),
-    [Table.LatestAccountAssets]: indexes("[accountId+vaultKey]", "accountId", "faucetIdPrefix"),
+    [Table.LatestAccountAssets]: indexes("[accountId+vaultKey]", "accountId"),
     [Table.HistoricalAccountAssets]: indexes("[accountId+replacedAtNonce+vaultKey]", "accountId", "[accountId+replacedAtNonce]"),
     [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
     [Table.AccountKeyMapping]: indexes("[accountIdHex+pubKeyCommitmentHex]", "accountIdHex", "pubKeyCommitmentHex"),
