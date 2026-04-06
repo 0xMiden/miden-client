@@ -62,6 +62,6 @@ impl From<&Felt> for NativeFelt {
 
 impl From<&FeltArray> for Vec<NativeFelt> {
     fn from(felt_array: &FeltArray) -> Self {
-        felt_array.__inner.iter().map(Into::into).collect()
+        felt_array.iter().map(Into::into).collect()
     }
 }
