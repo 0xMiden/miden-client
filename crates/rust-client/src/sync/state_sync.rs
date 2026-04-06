@@ -308,7 +308,7 @@ impl StateSync {
             .expect("sync_notes should always return the range-end block")
             .block_header
             .clone();
-        let chain_tip = sync_notes_result.chain_tip;
+        let chain_tip = chain_tip_header.block_num();
 
         // No progress — already at the tip.
         if chain_tip == current_block_num {

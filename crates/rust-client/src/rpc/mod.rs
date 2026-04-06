@@ -243,11 +243,7 @@ pub trait NodeRpcClient: Send + Sync {
             }
         }
 
-        Ok(SyncNotesResult {
-            chain_tip,
-            blocks: all_blocks,
-            public_notes,
-        })
+        Ok(SyncNotesResult { blocks: all_blocks, public_notes })
     }
 
     /// Fetches the nullifiers corresponding to a list of prefixes using the
