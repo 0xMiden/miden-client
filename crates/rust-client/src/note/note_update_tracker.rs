@@ -327,8 +327,7 @@ impl NoteUpdateTracker {
     /// Applies inclusion proofs from the transaction sync response to tracked output notes.
     ///
     /// This transitions output notes from `Expected` to `Committed` state using the
-    /// inclusion proofs returned by `SyncTransactions`. Unlike the note sync path, this
-    /// works regardless of whether the note's tag was tracked.
+    /// inclusion proofs returned by `SyncTransactions`.
     pub(crate) fn apply_output_note_inclusion_proofs(
         &mut self,
         committed_notes: &[CommittedNote],

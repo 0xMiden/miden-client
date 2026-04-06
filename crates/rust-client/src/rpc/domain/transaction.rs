@@ -73,7 +73,7 @@ pub struct TransactionInclusion {
 // ================================================================================================
 
 /// Represent a list of transaction records that were included in a range of blocks.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct TransactionsInfo {
     /// Current chain tip
     pub chain_tip: BlockNumber,
@@ -116,15 +116,14 @@ impl TryFrom<proto::rpc::SyncTransactionsResponse> for TransactionsInfo {
 
 /// Contains information about a transaction that got included in the chain at a specific block
 /// number.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct TransactionRecord {
     /// Block number in which the transaction was included.
     pub block_num: BlockNumber,
     /// A transaction header.
     pub transaction_header: TransactionHeader,
     /// Output notes with inclusion proofs, as returned by the node's `SyncTransactions`
-    /// response. These allow the client to transition its tracked output notes to
-    /// `Committed` state without relying on the note sync path.
+    /// response.
     pub output_notes: Vec<CommittedNote>,
 }
 

@@ -211,7 +211,7 @@ impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
 /// actual attachment data. For notes without attachments, full [`NoteMetadata`] can be
 /// constructed directly. For notes with attachments, only the header fields are available
 /// until the full metadata is fetched via `GetNotesById`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum CommittedNoteMetadata {
     /// Full metadata is available (no attachment, or attachment was already fetched).
     Full(NoteMetadata),
@@ -242,7 +242,7 @@ impl CommittedNoteMetadata {
 /// actual attachment data. For notes without attachments, full [`NoteMetadata`] is available
 /// immediately. For notes with attachments, the metadata starts as
 /// [`CommittedNoteMetadata::Header`] until the full data is fetched via `GetNotesById`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct CommittedNote {
     /// Note ID of the committed note.
     note_id: NoteId,
