@@ -47,7 +47,7 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use domain::account::{AccountProof, FetchedAccount};
-use domain::note::{FetchedNote, NoteSyncBlock, NoteSyncInfo};
+use domain::note::{FetchedNote, NoteSyncInfo, SyncNotesResult};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::ChainMmrInfo;
 use miden_protocol::Word;
@@ -194,7 +194,7 @@ pub trait NodeRpcClient: Send + Sync {
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<(BlockNumber, Vec<NoteSyncBlock>, Vec<FetchedNote>), RpcError> {
+    ) -> Result<SyncNotesResult, RpcError> {
         let mut all_blocks = Vec::new();
         let mut cursor = block_from;
         let mut chain_tip;
@@ -203,11 +203,11 @@ pub trait NodeRpcClient: Send + Sync {
             let note_sync = self.sync_notes(cursor, block_to, note_tags).await?;
 
             chain_tip = note_sync.chain_tip;
-            let empty_response = note_sync.blocks.is_empty();
-            all_blocks.extend(note_sync.blocks);
             cursor = note_sync.block_to + 1;
+            let done = note_sync.blocks.is_empty() || cursor >= chain_tip;
+            all_blocks.extend(note_sync.blocks);
 
-            if cursor >= chain_tip || empty_response {
+            if done {
                 break;
             }
         }
@@ -220,13 +220,13 @@ pub trait NodeRpcClient: Send + Sync {
             .map(|n| *n.note_id())
             .collect();
 
-        let fetched_notes = if note_ids.is_empty() {
-            vec![]
-        } else {
+        let mut public_notes = BTreeMap::new();
+
+        if !note_ids.is_empty() {
             let fetched = self.get_notes_by_id(&note_ids).await?;
 
-            // Fill metadata on committed notes that were missing it.
-            for fetched_note in &fetched {
+            for fetched_note in fetched {
+                // Fill metadata on committed notes that were missing it.
                 let note_id = fetched_note.id();
                 for block in &mut all_blocks {
                     if let Some(note) = block.notes.get_mut(&note_id)
@@ -235,12 +235,15 @@ pub trait NodeRpcClient: Send + Sync {
                         note.set_metadata(fetched_note.metadata().clone());
                     }
                 }
+
+                // Collect full note bodies for public notes.
+                if let FetchedNote::Public(note, _) = fetched_note {
+                    public_notes.insert(note.id(), note);
+                }
             }
+        }
 
-            fetched
-        };
-
-        Ok((chain_tip, all_blocks, fetched_notes))
+        Ok(SyncNotesResult { blocks: all_blocks, public_notes })
     }
 
     /// Fetches the nullifiers corresponding to a list of prefixes using the

@@ -8,7 +8,7 @@ use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{Forest, MmrDelta, PartialMmr};
-use miden_protocol::note::{NoteId, NoteTag, NoteType, Nullifier};
+use miden_protocol::note::{Note, NoteId, NoteTag, NoteType, Nullifier};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -16,7 +16,7 @@ use super::{AccountUpdates, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::NodeRpcClient;
-use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncBlock};
+use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
 use crate::rpc::domain::transaction::{
     TransactionInclusion,
     TransactionRecord as RpcTransactionRecord,
@@ -42,8 +42,8 @@ struct RawStateSyncData {
     chain_tip_header: BlockHeader,
     /// Blocks with matching notes that the client is interested in.
     note_blocks: Vec<NoteSyncBlock>,
-    /// Fetched note details (public note bodies + private note headers with metadata).
-    fetched_notes: Vec<FetchedNote>,
+    /// Full note bodies for public notes, keyed by note ID.
+    public_notes: BTreeMap<NoteId, Note>,
     /// Account commitment updates for the synced range.
     account_commitment_updates: Vec<(AccountId, Word)>,
     /// Transaction inclusions for the synced range.
@@ -231,11 +231,19 @@ impl StateSync {
 
         state_sync_update.block_num = sync_data.chain_tip;
 
-        // Build input note records for public notes from the already-fetched note details.
-        let fetched_notes = core::mem::take(&mut sync_data.fetched_notes);
+        // Build input note records for public notes from the fetched note bodies and the
+        // inclusion proofs already present in the note blocks.
+        let public_notes = core::mem::take(&mut sync_data.public_notes);
         let mut public_note_records: BTreeMap<NoteId, InputNoteRecord> = BTreeMap::new();
-        for fetched_note in fetched_notes {
-            if let FetchedNote::Public(note, inclusion_proof) = fetched_note {
+        for (note_id, note) in public_notes {
+            // Find the inclusion proof for this note from the sync blocks.
+            let inclusion_proof = sync_data
+                .note_blocks
+                .iter()
+                .find_map(|b| b.notes.get(&note_id))
+                .map(|committed| committed.inclusion_proof().clone());
+
+            if let Some(inclusion_proof) = inclusion_proof {
                 let state = crate::store::input_note_states::UnverifiedNoteState {
                     metadata: note.metadata().clone(),
                     inclusion_proof,
@@ -301,7 +309,7 @@ impl StateSync {
                 },
                 chain_tip_header,
                 note_blocks: vec![],
-                fetched_notes: vec![],
+                public_notes: BTreeMap::new(),
                 account_commitment_updates: vec![],
                 transactions: vec![],
                 nullifiers: vec![],
@@ -313,7 +321,7 @@ impl StateSync {
             self.rpc_api.sync_chain_mmr(current_block_num, Some(chain_tip)).await?;
 
         // Step 2: Paginate sync_notes over the full range, then fetch note details in one call.
-        let (_note_chain_tip, note_blocks, fetched_notes) = self
+        let sync_notes_result = self
             .rpc_api
             .sync_notes_with_details(current_block_num, Some(chain_tip), note_tags.as_ref())
             .await?;
@@ -326,8 +334,8 @@ impl StateSync {
             chain_tip,
             mmr_delta: chain_mmr_info.mmr_delta,
             chain_tip_header,
-            note_blocks,
-            fetched_notes,
+            note_blocks: sync_notes_result.blocks,
+            public_notes: sync_notes_result.public_notes,
             account_commitment_updates,
             transactions,
             nullifiers,

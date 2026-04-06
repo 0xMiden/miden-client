@@ -141,6 +141,19 @@ pub struct NoteSyncInfo {
     pub blocks: Vec<NoteSyncBlock>,
 }
 
+/// Result of [`NodeRpcClient::sync_notes_with_details`](crate::rpc::NodeRpcClient::sync_notes_with_details).
+///
+/// Contains fully-resolved note blocks (all metadata filled) and full note bodies for
+/// public notes. The block data and public note bodies are separated to avoid duplication:
+/// blocks carry metadata + inclusion proofs, while `public_notes` carries the note content
+/// (scripts, assets, recipient) keyed by note ID.
+pub struct SyncNotesResult {
+    /// Blocks containing matching notes with fully-resolved metadata.
+    pub blocks: Vec<NoteSyncBlock>,
+    /// Full note bodies for public notes, keyed by note ID.
+    pub public_notes: BTreeMap<NoteId, Note>,
+}
+
 impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
     type Error = RpcError;
 

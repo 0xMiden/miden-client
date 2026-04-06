@@ -382,13 +382,13 @@ where
             return Ok(retrieved_proofs);
         }
 
-        let (_chain_tip, note_blocks, _fetched_notes) = self
+        let sync_result = self
             .rpc_api
             .sync_notes_with_details(request_block_num, Some(current_block_num), &tracked_tags)
             .await
             .map_err(ClientError::RpcError)?;
 
-        for block in &note_blocks {
+        for block in &sync_result.blocks {
             for sync_note in block.notes.values() {
                 if !expected_notes.iter().any(|(id, _)| id == sync_note.note_id()) {
                     continue;
