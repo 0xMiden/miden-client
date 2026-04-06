@@ -4,7 +4,11 @@ use alloc::vec::Vec;
 use miden_protocol::Word;
 use miden_protocol::account::delta::NonFungibleDeltaAction;
 use miden_protocol::account::{
-    AccountDelta, AccountId, StorageMap, StorageSlotName, StorageSlotType,
+    AccountDelta,
+    AccountId,
+    StorageMap,
+    StorageSlotName,
+    StorageSlotType,
 };
 use miden_protocol::asset::{Asset, AssetVaultKey, FungibleAsset};
 use miden_protocol::crypto::merkle::MerkleError;
