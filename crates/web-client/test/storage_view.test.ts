@@ -263,7 +263,12 @@ test.describe("StorageView", () => {
       // under test here.
       const big = BigInt(Number.MAX_SAFE_INTEGER) + 1n; // 2^53
       const word = new window.Word(new BigUint64Array([big, 0n, 0n, 0n]));
-      const result = new window.StorageResult(word, false, undefined, window.Word);
+      const result = new window.StorageResult(
+        word,
+        false,
+        undefined,
+        window.Word
+      );
 
       // toBigInt() and toString() must remain lossless and never throw
       const bigStr = result.toBigInt().toString();
@@ -298,7 +303,12 @@ test.describe("StorageView", () => {
   test("valueOf() returns a JS number for small values", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const word = new window.Word(new BigUint64Array([42n, 0n, 0n, 0n]));
-      const result = new window.StorageResult(word, false, undefined, window.Word);
+      const result = new window.StorageResult(
+        word,
+        false,
+        undefined,
+        window.Word
+      );
       return {
         valueOf: +result,
         arithmetic: result * 2,
