@@ -33,9 +33,6 @@ type Service = Channel;
 type Service = tonic_web_wasm_client::Client;
 
 /// Establishes a connection to the note transport service, returning the gRPC clients.
-///
-/// Platform-specific: on native this performs TLS + TCP connect; on WASM it wraps a
-/// `tonic_web_wasm_client::Client`.
 #[cfg(not(target_arch = "wasm32"))]
 async fn connect_channel(
     endpoint: &str,
