@@ -2,7 +2,11 @@ use miden_client::Serializable;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::assembly::Assembler as NativeAssembler;
 use miden_client::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
-use miden_client::vm::{Package as NativePackage, TargetType as NativeTargetType};
+use miden_client::vm::{
+    Package as NativePackage,
+    QualifiedProcedureName,
+    TargetType as NativeTargetType,
+};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
@@ -59,13 +63,17 @@ impl TestUtils {
 
         let library = NativeAssembler::default().assemble_library([CODE]).unwrap();
 
-        let package = NativePackage::from_library(
+        let lib_package = NativePackage::from_library(
             "test_program_package_no_metadata".into(),
             "0.0.0".parse().unwrap(),
-            NativeTargetType::Executable,
+            NativeTargetType::Library,
             library,
             core::iter::empty(),
         );
+
+        let entrypoint: QualifiedProcedureName =
+            "test_program_package_no_metadata::main".parse().unwrap();
+        let package = lib_package.make_executable(&entrypoint).unwrap();
 
         let bytes: Vec<u8> = package.to_bytes();
         Uint8Array::from(bytes.as_slice())

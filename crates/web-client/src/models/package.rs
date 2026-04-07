@@ -43,7 +43,8 @@ impl Package {
             return Err(JsValue::from_str("Package does not contain a program"));
         }
 
-        let native_program = self.0.unwrap_program();
+        let native_program =
+            self.0.try_into_program().map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(native_program.into())
     }
 }
