@@ -73,7 +73,7 @@ use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
 use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
 use miden_protocol::transaction::AccountInputs;
-use miden_protocol::{Felt, Word};
+use miden_protocol::{EMPTY_WORD, Felt, Word};
 use miden_standards::account::interface::AccountInterfaceExt;
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
@@ -403,7 +403,7 @@ where
     ) -> Result<TransactionStoreUpdate, ClientError> {
         let note_updates = self.get_note_updates(submission_height, tx_result).await?;
 
-        let new_tags = note_updates
+        let mut new_tags: Vec<NoteTagRecord> = note_updates
             .updated_input_notes()
             .filter_map(|note| {
                 let note = note.inner();
@@ -417,6 +417,12 @@ where
                 }
             })
             .collect();
+
+        // Track output note tags so that `sync_notes` discovers their inclusion proofs.
+        new_tags.extend(note_updates.updated_output_notes().map(|note| {
+            let note = note.inner();
+            NoteTagRecord::with_note_source(note.metadata().tag(), note.id())
+        }));
 
         Ok(TransactionStoreUpdate::new(
             tx_result.executed_transaction().clone(),
@@ -775,6 +781,7 @@ where
                             AccountStorageRequirements::default(),
                             AccountStateAt::Block(block_num),
                             None,
+                            None,
                         )
                         .await?;
                     let (witness, _) = account_proof.into_parts();
@@ -910,6 +917,7 @@ pub(crate) async fn fetch_public_account_inputs(
             storage_requirements.clone(),
             account_state_at,
             known_account_code,
+            Some(EMPTY_WORD),
         )
         .await?;
 

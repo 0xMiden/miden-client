@@ -324,7 +324,7 @@ impl GrpcClient {
                     .map(|map| map.name().to_string());
                 let account_request = AccountRequest {
                     account_id: Some(account_id.into()),
-                    block_num: None,
+                    block_num: Some(block_number),
                     details: Some(AccountDetailRequest {
                         code_commitment: Some(EMPTY_WORD.into()),
                         asset_vault_commitment: Some(EMPTY_WORD.into()),
@@ -357,6 +357,7 @@ impl GrpcClient {
         &self,
         account_id: AccountId,
         storage_details: &AccountStorageDetails,
+        block_to: Option<BlockNumber>,
     ) -> Result<Vec<StorageSlot>, RpcError> {
         let mut slots = vec![];
         // `SyncStorageMaps` will return information for *every* map for a given account, so this
@@ -389,7 +390,7 @@ impl GrpcClient {
                             info
                         } else {
                             let fetched_data =
-                                self.sync_storage_maps(0_u32.into(), None, account_id).await?;
+                                self.sync_storage_maps(0_u32.into(), block_to, account_id).await?;
                             map_cache.insert(fetched_data)
                         };
                         // The sync endpoint may return multiple updates for the same key
@@ -430,6 +431,28 @@ impl GrpcClient {
             }
         }
         Ok(slots)
+    }
+
+    /// Fetches the full vault assets via `SyncAccountVault`.
+    ///
+    /// Used when `too_many_assets` is set in the response. Deduplicates updates by
+    /// vault key, keeping only the latest value per key.
+    async fn fetch_full_vault(
+        &self,
+        account_id: AccountId,
+        block_to: Option<BlockNumber>,
+    ) -> Result<Vec<Asset>, RpcError> {
+        let vault_info =
+            self.sync_account_vault(BlockNumber::from(0), block_to, account_id).await?;
+        let mut updates = vault_info.updates;
+        updates.sort_by_key(|u| u.block_num);
+        Ok(updates
+            .into_iter()
+            .map(|u| (u.vault_key, u.asset))
+            .collect::<BTreeMap<_, _>>()
+            .into_values()
+            .flatten()
+            .collect())
     }
 }
 
@@ -570,7 +593,10 @@ impl NodeRpcClient for GrpcClient {
             block_to: block_to.map(|b| b.as_u32()),
         });
 
-        let request = proto::rpc::SyncChainMmrRequest { block_range };
+        let request = proto::rpc::SyncChainMmrRequest {
+            block_range,
+            finality: proto::rpc::Finality::Committed as i32,
+        };
 
         let response = self
             .call_with_retry(RpcEndpoint::SyncChainMmr, |mut rpc_api| {
@@ -611,28 +637,15 @@ impl NodeRpcClient for GrpcClient {
                 ))?;
             let account_id = details.header.id();
             let nonce = details.header.nonce();
-            let assets: Vec<Asset> = {
-                if details.vault_details.too_many_assets {
-                    let vault_info =
-                        self.sync_account_vault(BlockNumber::from(0), None, account_id).await?;
-                    // The sync endpoint may return multiple updates for the same vault key
-                    // across different blocks. We sort by block number so that
-                    // inserting into the map keeps only the latest value per key.
-                    let mut updates = vault_info.updates;
-                    updates.sort_by_key(|u| u.block_num);
-                    updates
-                        .into_iter()
-                        .map(|u| (u.vault_key, u.asset))
-                        .collect::<BTreeMap<_, _>>()
-                        .into_values()
-                        .flatten()
-                        .collect()
-                } else {
-                    details.vault_details.assets
-                }
+            let assets = if details.vault_details.too_many_assets {
+                self.fetch_full_vault(account_id, Some(block_number)).await?
+            } else {
+                details.vault_details.assets
             };
 
-            let slots = self.build_storage_slots(account_id, &details.storage_details).await?;
+            let slots = self
+                .build_storage_slots(account_id, &details.storage_details, Some(block_number))
+                .await?;
             let seed = None;
             let asset_vault = AssetVault::new(&assets).map_err(|err| {
                 RpcError::InvalidResponse(format!("api rpc returned non-valid assets: {err}"))
@@ -670,6 +683,7 @@ impl NodeRpcClient for GrpcClient {
         storage_requirements: AccountStorageRequirements,
         account_state: AccountStateAt,
         known_account_code: Option<AccountCode>,
+        known_vault_commitment: Option<Word>,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
         let mut known_codes_by_commitment: BTreeMap<Word, AccountCode> = BTreeMap::new();
         if let Some(account_code) = known_account_code {
@@ -683,9 +697,7 @@ impl NodeRpcClient for GrpcClient {
         let account_details = if account_id.has_public_state() {
             Some(AccountDetailRequest {
                 code_commitment: Some(EMPTY_WORD.into()),
-                // TODO: implement a way to request asset vaults
-                // https://github.com/0xMiden/miden-client/issues/1412
-                asset_vault_commitment: None,
+                asset_vault_commitment: known_vault_commitment.map(Into::into),
                 storage_maps,
             })
         } else {
@@ -716,26 +728,31 @@ impl NodeRpcClient for GrpcClient {
             .ok_or(RpcError::ExpectedDataMissing("AccountWitness".to_string()))?
             .try_into()?;
 
+        let block_num: BlockNumber = response
+            .block_num
+            .ok_or(RpcError::ExpectedDataMissing("response block num".to_string()))?
+            .block_num
+            .into();
+
         // For accounts with public state, details should be present when requested
         let headers = if account_witness.id().has_public_state() {
-            Some(
-                response
-                    .details
-                    .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                    .into_domain(&known_codes_by_commitment, &storage_requirements)?,
-            )
+            let mut details = response
+                .details
+                .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
+                .into_domain(&known_codes_by_commitment, &storage_requirements)?;
+
+            if details.vault_details.too_many_assets {
+                details.vault_details.assets =
+                    self.fetch_full_vault(account_id, Some(block_num)).await?;
+            }
+
+            Some(details)
         } else {
             None
         };
 
         let proof = AccountProof::new(account_witness, headers)
             .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
-
-        let block_num = response
-            .block_num
-            .ok_or(RpcError::ExpectedDataMissing("response block num".to_string()))?
-            .block_num
-            .into();
 
         Ok((block_num, proof))
     }

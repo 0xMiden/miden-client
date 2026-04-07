@@ -4,6 +4,7 @@ use miden_protocol::block::BlockHeader;
 use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
 
 use crate::ClientError;
+use crate::rpc::RpcError;
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::store::{InputNoteRecord, OutputNoteRecord};
@@ -300,16 +301,17 @@ impl NoteUpdateTracker {
         committed_note: &CommittedNote,
         block_header: &BlockHeader,
     ) -> Result<bool, ClientError> {
-        let inclusion_proof = NoteInclusionProof::new(
-            block_header.block_num(),
-            committed_note.note_index(),
-            committed_note.inclusion_path().clone(),
-        )?;
+        let inclusion_proof = committed_note.inclusion_proof().clone();
+
         let is_tracked_as_input_note =
             if let Some(input_note_record) = self.get_input_note_by_id(*committed_note.note_id()) {
-                // The note belongs to our locally tracked set of input notes
-                input_note_record
-                    .inclusion_proof_received(inclusion_proof.clone(), committed_note.metadata())?;
+                let metadata = committed_note.metadata().cloned().ok_or_else(|| {
+                    ClientError::RpcError(RpcError::ExpectedDataMissing(format!(
+                        "full metadata for committed note {}",
+                        committed_note.note_id()
+                    )))
+                })?;
+                input_note_record.inclusion_proof_received(inclusion_proof.clone(), metadata)?;
                 input_note_record.block_header_received(block_header)?;
 
                 true
@@ -317,12 +319,39 @@ impl NoteUpdateTracker {
                 false
             };
 
-        if let Some(output_note_record) = self.get_output_note_by_id(*committed_note.note_id()) {
-            // The note belongs to our locally tracked set of output notes
-            output_note_record.inclusion_proof_received(inclusion_proof)?;
-        }
+        self.try_commit_output_note(*committed_note.note_id(), inclusion_proof)?;
 
         Ok(is_tracked_as_input_note)
+    }
+
+    /// Applies inclusion proofs from the transaction sync response to tracked output notes.
+    ///
+    /// This transitions output notes from `Expected` to `Committed` state using the
+    /// inclusion proofs returned by `SyncTransactions`.
+    pub(crate) fn apply_output_note_inclusion_proofs(
+        &mut self,
+        committed_notes: &[CommittedNote],
+    ) -> Result<(), ClientError> {
+        for committed_note in committed_notes {
+            self.try_commit_output_note(
+                *committed_note.note_id(),
+                committed_note.inclusion_proof().clone(),
+            )?;
+        }
+        Ok(())
+    }
+
+    /// If the note is tracked as an output note, transitions it to `Committed` with the
+    /// given inclusion proof. No-op if the note is not tracked.
+    fn try_commit_output_note(
+        &mut self,
+        note_id: NoteId,
+        inclusion_proof: NoteInclusionProof,
+    ) -> Result<(), ClientError> {
+        if let Some(output_note) = self.get_output_note_by_id(note_id) {
+            output_note.inclusion_proof_received(inclusion_proof)?;
+        }
+        Ok(())
     }
 
     /// Applies the necessary state transitions to the [`NoteUpdateTracker`] when a note is
