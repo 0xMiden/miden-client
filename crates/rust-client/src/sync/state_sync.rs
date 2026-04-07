@@ -255,9 +255,7 @@ impl StateSync {
         )
         .await?;
 
-        // Apply local changes. These involve updating the MMR and applying state transitions
-        // to notes based on the received information.
-        info!("Applying state transitions locally.");
+        // Apply local changes: update the MMR, screen notes, and apply state transitions.
         self.apply_sync_result(
             sync_data,
             &public_note_records,
@@ -267,7 +265,6 @@ impl StateSync {
         .await?;
 
         if self.sync_nullifiers {
-            info!("Syncing nullifiers.");
             self.nullifiers_state_sync(&mut state_sync_update, block_num).await?;
         }
 
@@ -288,16 +285,21 @@ impl StateSync {
         account_ids: &[AccountId],
         note_tags: &Arc<BTreeSet<NoteTag>>,
     ) -> Result<Option<RawStateSyncData>, ClientError> {
-        info!("Fetching sync data from node.");
-
-        // Step 1: Fetch the MMR delta to the chain tip.
+        // Step 1: Fetch the MMR delta and chain tip header.
         let chain_mmr_info = self.rpc_api.sync_chain_mmr(current_block_num, None).await?;
         let chain_tip = chain_mmr_info.block_to;
 
         // No progress — already at the tip.
         if chain_tip == current_block_num {
+            info!(block_num = %current_block_num, "Already at chain tip, nothing to sync.");
             return Ok(None);
         }
+
+        info!(
+            block_from = %current_block_num,
+            block_to = %chain_tip,
+            "Syncing state.",
+        );
 
         // Step 2: Paginate sync_notes using the same chain tip so MMR paths are opened at
         // a consistent forest.
@@ -305,6 +307,14 @@ impl StateSync {
             .rpc_api
             .sync_notes_with_details(current_block_num, Some(chain_tip), note_tags.as_ref())
             .await?;
+
+        let note_count: usize = sync_notes_result.blocks.iter().map(|b| b.notes.len()).sum();
+        info!(
+            blocks_with_notes = sync_notes_result.blocks.len(),
+            notes = note_count,
+            public_notes = sync_notes_result.public_notes.len(),
+            "Fetched note sync data.",
+        );
 
         // Step 3: Gather transactions for tracked accounts over the full range.
         let (account_commitment_updates, transactions, nullifiers) =
