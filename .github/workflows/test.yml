@@ -139,6 +139,9 @@ jobs:
       - name: Build node-builder
         if: steps.cache-node-builder.outputs.cache-hit != 'true'
         run: cargo build --release --package node-builder --locked
+      - name: Check binary existance
+        run: |
+          file -E target/release/testing-node-builder
 
   build-note-transport:
     name: Build note-transport
@@ -184,6 +187,9 @@ jobs:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: false
+      - name: Check binary existance
+        run: |
+          file -E target/release/testing-remote-prover
       - name: Build remote-prover
         if: steps.cache-remote-prover.outputs.cache-hit != 'true'
         run: cargo build --release --package testing-remote-prover --locked
@@ -377,7 +383,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: target/release/testing-node-builder
-          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
       - name: Restore remote-prover binary
         uses: actions/cache/restore@v4
         with:
@@ -403,4 +409,3 @@ jobs:
       - name: Stop miden-prover
         if: always()
         run: make stop-prover
-
