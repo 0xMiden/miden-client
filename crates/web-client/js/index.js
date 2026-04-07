@@ -887,9 +887,9 @@ class MockWebClient extends WebClient {
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
     await wasmWebClient.createMockClient(
-      seed,
-      serializedMockChain,
-      serializedMockNoteTransportNode
+      seed ?? null,
+      serializedMockChain ?? null,
+      serializedMockNoteTransportNode ?? null
     );
 
     // Wait for the worker to be ready
