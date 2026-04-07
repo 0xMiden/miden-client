@@ -139,6 +139,9 @@ jobs:
       - name: Build node-builder
         if: steps.cache-node-builder.outputs.cache-hit != 'true'
         run: cargo build --release --package node-builder --locked
+      - name: Check binary existance
+        run: |
+          file -E target/release/testing-node-builder
 
   build-note-transport:
     name: Build note-transport
@@ -187,6 +190,9 @@ jobs:
       - name: Build remote-prover
         if: steps.cache-remote-prover.outputs.cache-hit != 'true'
         run: cargo build --release --package testing-remote-prover --locked
+      - name: Check binary existance
+        run: |
+          file -E target/release/testing-remote-prover
 
   integration-tests:
     name: Integration tests
