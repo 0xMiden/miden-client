@@ -1,8 +1,7 @@
 //! gRPC-based note transport client.
 //!
 //! On native targets, the connection is established lazily on the first request using a
-//! TLS-enabled `tonic` channel. On WASM, a `tonic_web_wasm_client` is created on demand
-//! without TLS or timeout configuration.
+//! TLS-enabled `tonic` channel. On WASM, a `tonic_web_wasm_client` is created on demand.
 
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -58,6 +57,10 @@ async fn connect_channel(
 }
 
 /// Establishes a connection to the note transport service, returning the gRPC clients.
+///
+/// Note: `timeout_ms` is currently ignored on WASM as `tonic_web_wasm_client::Client` does not
+/// support timeout configuration.
+// TODO: refactor `connect_channel` so that WASM doesn't accept a timeout parameter.
 #[cfg(target_arch = "wasm32")]
 #[allow(clippy::unused_async)]
 async fn connect_channel(
@@ -72,6 +75,7 @@ async fn connect_channel(
 }
 
 /// Inner state holding the connected gRPC clients.
+#[derive(Clone)]
 struct ConnectedClient {
     client: MidenNoteTransportClient<Service>,
     health_client: HealthClient<Service>,
@@ -97,33 +101,26 @@ impl GrpcNoteTransportClient {
         }
     }
 
-    /// Ensures the client is connected, establishing the connection if needed.
-    async fn ensure_connected(&self) -> Result<(), NoteTransportError> {
-        if self.inner.read().is_some() {
-            return Ok(());
+    /// Ensures the client is connected and returns the connected state.
+    async fn ensure_connected(&self) -> Result<ConnectedClient, NoteTransportError> {
+        if let Some(connected) = self.inner.read().as_ref() {
+            return Ok(connected.clone());
         }
 
         let (client, health_client) = connect_channel(&self.endpoint, self.timeout_ms).await?;
-        *self.inner.write() = Some(ConnectedClient { client, health_client });
-        Ok(())
+        let connected = ConnectedClient { client, health_client };
+        *self.inner.write() = Some(connected.clone());
+        Ok(connected)
     }
 
     /// Get a clone of the main client, connecting if needed.
     async fn api(&self) -> Result<MidenNoteTransportClient<Service>, NoteTransportError> {
-        self.ensure_connected().await?;
-        Ok(self.inner.read().as_ref().expect("client should be connected").client.clone())
+        Ok(self.ensure_connected().await?.client)
     }
 
     /// Get a clone of the health client, connecting if needed.
     async fn health_api(&self) -> Result<HealthClient<Service>, NoteTransportError> {
-        self.ensure_connected().await?;
-        Ok(self
-            .inner
-            .read()
-            .as_ref()
-            .expect("client should be connected")
-            .health_client
-            .clone())
+        Ok(self.ensure_connected().await?.health_client)
     }
 
     /// Pushes a note to the note transport network.
