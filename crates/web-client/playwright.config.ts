@@ -46,8 +46,6 @@ export default defineConfig({
         // Node.js-only tests (use napi-specific JS wrapper)
         "test/compile_and_contract*",
         "test/miden_client_api*",
-        // Remote prover tests run in a dedicated CI job with the prover service
-        "test/remote_prover_transactions*",
       ],
     },
 
@@ -65,8 +63,6 @@ export default defineConfig({
         // Node.js-only tests (use napi-specific JS wrapper)
         "test/compile_and_contract*",
         "test/miden_client_api*",
-        // Remote prover tests run in a dedicated CI job with the prover service
-        "test/remote_prover_transactions*",
       ],
     },
 

@@ -14,6 +14,11 @@ import {
 // The CI grep filter matches test names containing "with remote prover".
 
 test.describe("remote prover transaction tests", () => {
+  test.skip(
+    !process.env.TEST_MIDEN_PROVER_URL,
+    "requires a running remote prover service (TEST_MIDEN_PROVER_URL)"
+  );
+
   test("mint transaction with remote prover completes successfully", async ({
     page,
   }) => {
