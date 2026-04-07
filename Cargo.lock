@@ -3209,9 +3209,8 @@ dependencies = [
 
 [[package]]
 name = "miden-large-smt-backend-rocksdb"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "458b491aa032924cddd1a7e7e31f85b31546223c14dd513fe4e208d0be617342"
+version = "0.14.3"
+source = "git+https://github.com/0xMiden/node.git?branch=igamigo-avoid-missing-notes#dcd1be783804af2e102d165bd9f018e7c073c430"
 dependencies = [
  "miden-crypto",
  "miden-node-rocksdb-cxx-linkage-fix",
@@ -3271,9 +3270,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-block-producer"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94d4cce7632c4f6a01f826111451e00eebbaf22b5d0852411835047b5bb3a534"
+version = "0.14.3"
+source = "git+https://github.com/0xMiden/node.git?branch=igamigo-avoid-missing-notes#dcd1be783804af2e102d165bd9f018e7c073c430"
 dependencies = [
  "anyhow",
  "futures",
@@ -3298,9 +3296,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-db"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d64e879dfe91043a0b6bb494e3307f0d1008b312c4c4543c311b11ff0d46621"
+version = "0.14.3"
+source = "git+https://github.com/0xMiden/node.git?branch=igamigo-avoid-missing-notes#dcd1be783804af2e102d165bd9f018e7c073c430"
 dependencies = [
  "deadpool",
  "deadpool-diesel",
@@ -3313,9 +3310,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-grpc-error-macro"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1dbaff4590be922da19e030a9f09c6726b249e848feff9de39437d478093ce8c"
+version = "0.14.3"
+source = "git+https://github.com/0xMiden/node.git?branch=igamigo-avoid-missing-notes#dcd1be783804af2e102d165bd9f018e7c073c430"
 dependencies = [
  "quote",
  "syn 2.0.117",
@@ -3323,9 +3319,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-ntx-builder"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e59fb9487bc65619ca97a26f677e94617baeec3d725b5a1f7a59cec9fedf6ee2"
+version = "0.14.3"
+source = "git+https://github.com/0xMiden/node.git?branch=igamigo-avoid-missing-notes#dcd1be783804af2e102d165bd9f018e7c073c430"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3354,9 +3349,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-proto"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a733c7258607588847e93e4c1ce59bda5ed755cda9da4d28c576e0be11410f5"
+version = "0.14.3"
+source = "git+https://github.com/0xMiden/node.git?branch=igamigo-avoid-missing-notes#dcd1be783804af2e102d165bd9f018e7c073c430"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3379,9 +3373,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-proto-build"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd280101c340742e7babd0487ed59d23d5f3a8d25d68c69cf38ca3874e354f12"
+version = "0.14.3"
+source = "git+https://github.com/0xMiden/node.git?branch=igamigo-avoid-missing-notes#dcd1be783804af2e102d165bd9f018e7c073c430"
 dependencies = [
  "build-rs",
  "fs-err",
@@ -3392,15 +3385,13 @@ dependencies = [
 
 [[package]]
 name = "miden-node-rocksdb-cxx-linkage-fix"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2945a5d1e6439296df7b5bfd4aac2467bf76db5c97ebccb34f4e92e75bed75da"
+version = "0.14.3"
+source = "git+https://github.com/0xMiden/node.git?branch=igamigo-avoid-missing-notes#dcd1be783804af2e102d165bd9f018e7c073c430"
 
 [[package]]
 name = "miden-node-rpc"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03a92331cd1ddae4cb9d494280b7f1764d9eb4069778b02e079e2efb0c146e35"
+version = "0.14.3"
+source = "git+https://github.com/0xMiden/node.git?branch=igamigo-avoid-missing-notes#dcd1be783804af2e102d165bd9f018e7c073c430"
 dependencies = [
  "anyhow",
  "futures",
@@ -3427,9 +3418,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-store"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f3b6996d3e74d20cf13f088547e14781ca4e40ffdfe43ebc9cb2b3dd0abcc3d"
+version = "0.14.3"
+source = "git+https://github.com/0xMiden/node.git?branch=igamigo-avoid-missing-notes#dcd1be783804af2e102d165bd9f018e7c073c430"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3469,9 +3459,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-utils"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69345db56b14977ba4573d64aee6bec94516e8f6cc78459697dfbbf968582fb4"
+version = "0.14.3"
+source = "git+https://github.com/0xMiden/node.git?branch=igamigo-avoid-missing-notes#dcd1be783804af2e102d165bd9f018e7c073c430"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3504,9 +3493,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-validator"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "282904b4f2ea50b593b81c8c6685ebc114fd4fe943f6554951aa0e45445512ec"
+version = "0.14.3"
+source = "git+https://github.com/0xMiden/node.git?branch=igamigo-avoid-missing-notes#dcd1be783804af2e102d165bd9f018e7c073c430"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -3621,9 +3609,8 @@ dependencies = [
 
 [[package]]
 name = "miden-remote-prover-client"
-version = "0.14.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce891ff590864966164013c01edcd96a691433928881644cc8ab5e5debf71315"
+version = "0.14.3"
+source = "git+https://github.com/0xMiden/node.git?branch=igamigo-avoid-missing-notes#dcd1be783804af2e102d165bd9f018e7c073c430"
 dependencies = [
  "build-rs",
  "fs-err",
