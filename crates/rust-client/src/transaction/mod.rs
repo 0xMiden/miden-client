@@ -403,7 +403,7 @@ where
     ) -> Result<TransactionStoreUpdate, ClientError> {
         let note_updates = self.get_note_updates(submission_height, tx_result).await?;
 
-        let new_tags = note_updates
+        let mut new_tags: Vec<NoteTagRecord> = note_updates
             .updated_input_notes()
             .filter_map(|note| {
                 let note = note.inner();
@@ -417,6 +417,12 @@ where
                 }
             })
             .collect();
+
+        // Track output note tags so that `sync_notes` discovers their inclusion proofs.
+        new_tags.extend(note_updates.updated_output_notes().map(|note| {
+            let note = note.inner();
+            NoteTagRecord::with_note_source(note.metadata().tag(), note.id())
+        }));
 
         Ok(TransactionStoreUpdate::new(
             tx_result.executed_transaction().clone(),

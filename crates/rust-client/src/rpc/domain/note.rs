@@ -1,10 +1,13 @@
+use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
+use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::crypto::merkle::{MerklePath, SparseMerklePath};
+use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::note::{
     Note,
     NoteAttachment,
+    NoteAttachmentKind,
     NoteDetails,
     NoteHeader,
     NoteId,
@@ -111,132 +114,242 @@ impl TryFrom<proto::note::NoteInclusionInBlockProof> for NoteInclusionProof {
 // SYNC NOTE
 // ================================================================================================
 
-/// Represents a `roto::rpc_store::SyncNotesResponse` with fields converted into domain types.
+/// Represents a single block's worth of note sync data from the `SyncNotesResponse`.
+#[derive(Debug, Clone)]
+pub struct NoteSyncBlock {
+    /// Block header containing the matching notes.
+    pub block_header: BlockHeader,
+    /// MMR path for verifying the block's inclusion in the MMR at `block_to`.
+    pub mmr_path: MerklePath,
+    /// Notes matching the requested tags in this block, keyed by note ID.
+    pub notes: BTreeMap<NoteId, CommittedNote>,
+}
+
+/// Represents a `SyncNotesResponse` with fields converted into domain types.
+///
+/// The response may contain multiple blocks with matching notes. When `blocks` is empty,
+/// no notes matched in the scanned range.
 #[derive(Debug)]
 pub struct NoteSyncInfo {
-    /// Number of the latest block in the chain.
+    /// Number of the latest block in the chain when the response was generated.
     pub chain_tip: BlockNumber,
-    /// Block header of the block with the first note matching the specified criteria.
-    pub block_header: BlockHeader,
-    /// Proof for block header's MMR with respect to the chain tip.
-    ///
-    /// More specifically, the full proof consists of `forest`, `position` and `path` components.
-    /// This value constitutes the `path`. The other two components can be obtained as follows:
-    ///    - `position` is simply `response.block_header.block_num`.
-    ///    - `forest` is the same as `response.chain_tip + 1`.
-    pub mmr_path: MerklePath,
-    /// List of all notes together with the Merkle paths from `response.block_header.note_root`.
-    pub notes: Vec<CommittedNote>,
+    /// The last block the node checked. Used as a cursor for pagination: if less than the
+    /// requested range end (or chain tip), the client should continue from this block.
+    pub block_to: BlockNumber,
+    /// Blocks containing matching notes, ordered by block number ascending.
+    /// May be empty if no notes matched in the range.
+    pub blocks: Vec<NoteSyncBlock>,
+}
+
+/// Result of [`NodeRpcClient::sync_notes_with_details`](crate::rpc::NodeRpcClient::sync_notes_with_details).
+///
+/// Contains fully-resolved note blocks (all metadata filled) and full note bodies for
+/// public notes. The block data and public note bodies are separated to avoid duplication:
+/// blocks carry metadata + inclusion proofs, while `public_notes` carries the note content
+/// (scripts, assets, recipient) keyed by note ID.
+pub struct SyncNotesResult {
+    /// Blocks containing matching notes with fully-resolved metadata.
+    pub blocks: Vec<NoteSyncBlock>,
+    /// Full note bodies for public notes, keyed by note ID.
+    pub public_notes: BTreeMap<NoteId, Note>,
 }
 
 impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
     type Error = RpcError;
 
     fn try_from(value: proto::rpc::SyncNotesResponse) -> Result<Self, Self::Error> {
-        let chain_tip = value
+        let pagination_info = value
             .pagination_info
-            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(pagination_info)))?
-            .chain_tip;
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(pagination_info)))?;
 
-        // Validate and convert block header
-        let block_header = value
-            .block_header
-            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(block_header)))?
-            .try_into()?;
+        let chain_tip = BlockNumber::from(pagination_info.chain_tip);
+        let block_to = BlockNumber::from(pagination_info.block_num);
 
-        let mmr_path = value
-            .mmr_path
-            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(mmr_path)))?
-            .try_into()?;
+        let blocks = value
+            .blocks
+            .into_iter()
+            .map(|block| {
+                let block_header = block
+                    .block_header
+                    .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
+                        blocks.block_header
+                    )))?
+                    .try_into()?;
 
-        // Validate and convert account note inclusions into an (AccountId, Word) tuple
-        let mut notes = vec![];
-        for note in value.notes {
-            let note_id: NoteId = note
-                .note_id
-                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.note_id)))?
-                .try_into()?;
+                let mmr_path = block
+                    .mmr_path
+                    .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
+                        blocks.mmr_path
+                    )))?
+                    .try_into()?;
 
-            let inclusion_path = note
-                .inclusion_path
-                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
-                    notes.inclusion_path
-                )))?
-                .try_into()?;
+                let notes: BTreeMap<NoteId, CommittedNote> = block
+                    .notes
+                    .into_iter()
+                    .map(|n| {
+                        let note = CommittedNote::try_from(n)?;
+                        Ok((*note.note_id(), note))
+                    })
+                    .collect::<Result<_, RpcConversionError>>()?;
 
-            let metadata = note
-                .metadata
-                .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.metadata)))?
-                .try_into()?;
+                Ok(NoteSyncBlock { block_header, mmr_path, notes })
+            })
+            .collect::<Result<Vec<_>, RpcError>>()?;
 
-            let committed_note = CommittedNote::new(
-                note_id,
-                u16::try_from(note.note_index_in_block).map_err(|_| {
-                    RpcConversionError::InvalidField(
-                        "note_index_in_block value out of u16 range".into(),
-                    )
-                })?,
-                inclusion_path,
-                metadata,
-            );
-
-            notes.push(committed_note);
-        }
-
-        Ok(NoteSyncInfo {
-            chain_tip: chain_tip.into(),
-            block_header,
-            mmr_path,
-            notes,
-        })
+        Ok(NoteSyncInfo { chain_tip, block_to, blocks })
     }
 }
 
 // COMMITTED NOTE
 // ================================================================================================
 
-/// Represents a committed note, returned as part of a `SyncStateResponse`.
+/// The metadata state of a committed note.
+///
+/// The sync response provides header fields (sender, type, tag, attachment kind) but not the
+/// actual attachment data. For notes without attachments, full [`NoteMetadata`] can be
+/// constructed directly. For notes with attachments, only the header fields are available
+/// until the full metadata is fetched via `GetNotesById`.
+#[derive(Debug, Clone)]
+pub enum CommittedNoteMetadata {
+    /// Full metadata is available (no attachment, or attachment was already fetched).
+    Full(NoteMetadata),
+    /// Only the header fields are available; the attachment data has not been fetched yet.
+    // Ideally this would wrap `NoteMetadataHeader` directly, but it lacks a public
+    // constructor in the protocol crate.
+    Header {
+        sender: AccountId,
+        note_type: NoteType,
+        tag: NoteTag,
+        attachment_kind: NoteAttachmentKind,
+    },
+}
+
+impl CommittedNoteMetadata {
+    /// Returns the full metadata if available.
+    pub fn metadata(&self) -> Option<&NoteMetadata> {
+        match self {
+            Self::Full(m) => Some(m),
+            Self::Header { .. } => None,
+        }
+    }
+}
+
+/// Represents a committed note, returned as part of a `SyncNotesResponse`.
+///
+/// The sync response provides a [`NoteMetadataHeader`](crate::note::NoteMetadataHeader) but not the
+/// actual attachment data. For notes without attachments, full [`NoteMetadata`] is available
+/// immediately. For notes with attachments, the metadata starts as
+/// [`CommittedNoteMetadata::Header`] until the full data is fetched via `GetNotesById`.
 #[derive(Debug, Clone)]
 pub struct CommittedNote {
     /// Note ID of the committed note.
     note_id: NoteId,
-    /// Note index for the note merkle tree.
-    note_index: u16,
-    /// Merkle path for the note merkle tree up to the block's note root.
-    inclusion_path: SparseMerklePath,
-    /// Note metadata.
-    metadata: NoteMetadata,
+    /// Note metadata — either full or header-only depending on whether the note has an
+    /// attachment that hasn't been fetched yet.
+    metadata: CommittedNoteMetadata,
+    /// Inclusion proof for the note in the block.
+    inclusion_proof: NoteInclusionProof,
 }
 
 impl CommittedNote {
     pub fn new(
         note_id: NoteId,
-        note_index: u16,
-        inclusion_path: SparseMerklePath,
-        metadata: NoteMetadata,
+        metadata: CommittedNoteMetadata,
+        inclusion_proof: NoteInclusionProof,
     ) -> Self {
-        Self {
-            note_id,
-            note_index,
-            inclusion_path,
-            metadata,
-        }
+        Self { note_id, metadata, inclusion_proof }
     }
 
     pub fn note_id(&self) -> &NoteId {
         &self.note_id
     }
 
-    pub fn note_index(&self) -> u16 {
-        self.note_index
+    pub fn note_type(&self) -> NoteType {
+        match &self.metadata {
+            CommittedNoteMetadata::Full(m) => m.note_type(),
+            CommittedNoteMetadata::Header { note_type, .. } => *note_type,
+        }
     }
 
-    pub fn inclusion_path(&self) -> &SparseMerklePath {
-        &self.inclusion_path
+    pub fn tag(&self) -> NoteTag {
+        match &self.metadata {
+            CommittedNoteMetadata::Full(m) => m.tag(),
+            CommittedNoteMetadata::Header { tag, .. } => *tag,
+        }
     }
 
-    pub fn metadata(&self) -> NoteMetadata {
-        self.metadata.clone()
+    pub fn sender(&self) -> AccountId {
+        match &self.metadata {
+            CommittedNoteMetadata::Full(m) => m.sender(),
+            CommittedNoteMetadata::Header { sender, .. } => *sender,
+        }
+    }
+
+    /// Returns the full note metadata, or `None` if only the header is available.
+    pub fn metadata(&self) -> Option<&NoteMetadata> {
+        self.metadata.metadata()
+    }
+
+    /// Returns the committed note metadata enum.
+    pub fn committed_metadata(&self) -> &CommittedNoteMetadata {
+        &self.metadata
+    }
+
+    /// Sets the full metadata, promoting from `Header` to `Full`.
+    ///
+    /// Used after fetching attachment data via `GetNotesById` for notes whose sync
+    /// response only included header fields.
+    pub fn set_metadata(&mut self, metadata: NoteMetadata) {
+        self.metadata = CommittedNoteMetadata::Full(metadata);
+    }
+
+    pub fn inclusion_proof(&self) -> &NoteInclusionProof {
+        &self.inclusion_proof
+    }
+}
+
+impl TryFrom<proto::note::NoteSyncRecord> for CommittedNote {
+    type Error = RpcConversionError;
+
+    fn try_from(note: proto::note::NoteSyncRecord) -> Result<Self, Self::Error> {
+        let proto_header = note.metadata_header.ok_or(
+            proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.metadata_header)),
+        )?;
+
+        let sender = proto_header
+            .sender
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
+                notes.metadata_header.sender
+            )))?
+            .try_into()?;
+        let note_type =
+            NoteType::try_from(u64::try_from(proto_header.note_type).expect("invalid note type"))?;
+        let tag = NoteTag::new(proto_header.tag);
+        let attachment_kind = u8::try_from(proto_header.attachment_kind)
+            .ok()
+            .and_then(|kind| NoteAttachmentKind::try_from(kind).ok())
+            .unwrap_or_default();
+
+        let metadata = if attachment_kind == NoteAttachmentKind::None {
+            CommittedNoteMetadata::Full(NoteMetadata::new(sender, note_type).with_tag(tag))
+        } else {
+            CommittedNoteMetadata::Header { sender, note_type, tag, attachment_kind }
+        };
+
+        let proto_inclusion_proof = note.inclusion_proof.ok_or(
+            proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.inclusion_proof)),
+        )?;
+
+        let note_id: NoteId = proto_inclusion_proof
+            .note_id
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
+                notes.inclusion_proof.note_id
+            )))?
+            .try_into()?;
+
+        let inclusion_proof: NoteInclusionProof = proto_inclusion_proof.try_into()?;
+
+        Ok(CommittedNote::new(note_id, metadata, inclusion_proof))
     }
 }
 
