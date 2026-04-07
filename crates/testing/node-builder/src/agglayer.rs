@@ -113,8 +113,8 @@ pub fn create_agglayer_genesis_accounts() -> Result<AgglayerGenesisAccounts> {
 /// nonce to ONE.
 ///
 /// This mirrors the MASM `register_faucet` procedure which writes to both:
-/// 1. faucet_registry: `[0, 0, suffix, prefix] -> [1, 0, 0, 0]`
-/// 2. token_registry: `hash(origin_token_addr) -> [0, 0, suffix, prefix]`
+/// 1. `faucet_registry`: `[0, 0, suffix, prefix] -> [1, 0, 0, 0]`
+/// 2. `token_registry`: `hash(origin_token_addr) -> [0, 0, suffix, prefix]`
 fn register_faucet_and_finalize(
     bridge: Account,
     faucet_id: miden_protocol::account::AccountId,
@@ -133,7 +133,7 @@ fn register_faucet_and_finalize(
     // 2. Register in token_registry: hash(origin_token_addr[5]) -> [0, 0, suffix, prefix]
     let addr_elements = origin_token_address.to_elements();
     let token_addr_hash = Poseidon2::hash_elements(&addr_elements);
-    let token_key = StorageMapKey::new(token_addr_hash.into());
+    let token_key = StorageMapKey::new(token_addr_hash);
     let faucet_value = faucet_account_id_word;
     storage
         .set_map_item(AggLayerBridge::token_registry_map_slot_name(), token_key, faucet_value)
