@@ -8,8 +8,6 @@ use miden_client::testing::MockChain;
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
 use miden_client::utils::{Deserializable, RwLock, Serializable};
-#[cfg(feature = "browser")]
-use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "browser")]
 use crate::WebKeyStore;
@@ -17,17 +15,17 @@ use crate::platform::{JsErr, from_str_err};
 use crate::{WebClient, create_rng, js_error_with_context};
 
 #[cfg(feature = "browser")]
-#[wasm_bindgen]
+#[js_export]
 impl WebClient {
     /// Creates a new client with a mock RPC API. Useful for testing purposes and proof-of-concept
     /// applications as it uses a mock chain that simulates the behavior of a real node.
-    #[wasm_bindgen(js_name = "createMockClient")]
+    #[js_export(js_name = "createMockClient")]
     pub async fn create_mock_client(
-        &mut self,
+        &self,
         seed: Option<Vec<u8>>,
         serialized_mock_chain: Option<Vec<u8>>,
         serialized_mock_note_transport_node: Option<Vec<u8>>,
-    ) -> Result<JsValue, JsValue> {
+    ) -> Result<String, JsErr> {
         let mock_rpc_api = match serialized_mock_chain {
             Some(chain) => {
                 Arc::new(MockRpcApi::new(MockChain::read_from_bytes(&chain).map_err(|err| {
@@ -52,7 +50,7 @@ impl WebClient {
         let store: Arc<dyn Store> = Arc::new(
             IdxdbStore::new(store_name.clone())
                 .await
-                .map_err(|_| JsValue::from_str("Failed to initialize IdxdbStore"))?,
+                .map_err(|_| from_str_err("Failed to initialize IdxdbStore"))?,
         );
         let keystore = WebKeyStore::new_with_callbacks(rng, store_name, None, None, None);
 
@@ -69,7 +67,7 @@ impl WebClient {
         *self.mock_rpc_api.lock().await = Some(mock_rpc_api);
         *self.mock_note_transport_api.lock().await = Some(mock_note_transport_api);
 
-        Ok(JsValue::from_str("Client created successfully"))
+        Ok("Client created successfully".to_string())
     }
 }
 
