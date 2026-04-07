@@ -137,8 +137,8 @@ The following are just a few simple examples to get started. For more details, s
 ```typescript
 import { MidenClient, AccountType } from "@miden-sdk/miden-sdk";
 
-// 1. Create client (defaults to testnet)
-const client = await MidenClient.create();
+// 1. Create client (defaults to testnet, or use createTestnet()/createDevnet())
+const client = await MidenClient.createDevnet();
 
 // 2. Create a wallet and a token (faucet account)
 const wallet = await client.accounts.create();
