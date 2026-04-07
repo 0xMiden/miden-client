@@ -1,3 +1,9 @@
+//! gRPC-based note transport client.
+//!
+//! On native targets, the connection is established lazily on the first request using a
+//! TLS-enabled `tonic` channel. On WASM, a `tonic_web_wasm_client` is created on demand
+//! without TLS or timeout configuration.
+
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -76,8 +82,7 @@ struct ConnectedClient {
 
 /// gRPC client for the note transport network.
 ///
-/// The connection is established lazily on first use, following the same pattern as
-/// [`GrpcClient`](crate::rpc::tonic_client::GrpcClient).
+/// The connection is established lazily on first use.
 pub struct GrpcNoteTransportClient {
     inner: RwLock<Option<ConnectedClient>>,
     endpoint: String,
