@@ -120,4 +120,3 @@
 - [getWasmOrThrow](functions/getWasmOrThrow.md)
 - [importStore](functions/importStore.md)
 - [wordToBigInt](functions/wordToBigInt.md)
-- [wordToNumber](functions/wordToNumber.md)

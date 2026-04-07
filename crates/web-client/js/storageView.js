@@ -3,9 +3,14 @@
  * (and AI-agent-friendly) API.
  *
  * Key behavior: `getItem()` returns a `StorageResult` that works intuitively for
- * both Value and StorageMap slots. The result has `.toNumber()`, `.toHex()`, and
+ * both Value and StorageMap slots. The result has `.toBigInt()`, `.toHex()`, and
  * `.toString()` methods that do the right thing automatically. For StorageMap slots,
  * `.entries` provides access to all map entries.
+ *
+ * Numeric ergonomics: `StorageResult` is usable directly in template strings,
+ * JSX, and arithmetic via `toString()` (lossless, BigInt-backed) and `valueOf()`
+ * (returns a JS number for values that fit, throws on overflow — never silently
+ * corrupts). For exact u64 access use `.toBigInt()`.
  *
  * The raw WASM AccountStorage is still accessible via `.raw` for advanced use cases
  * that need the original behavior (e.g., comparing map commitment roots).
@@ -60,13 +65,17 @@ export class StorageView {
    * Returns a StorageResult for the given slot.
    *
    * The result has convenience methods that work for both Value and StorageMap slots:
-   * - `.toNumber()` — first felt as a JS number
    * - `.toBigInt()` — first felt as BigInt (full u64 precision)
    * - `.toHex()` — first felt's Word as hex string
-   * - `.toString()` — renders as the number (works in JSX: {result})
+   * - `.toString()` — renders as the BigInt value (works in JSX: {result})
    * - `.isMap` — true if this is a StorageMap slot
    * - `.entries` — all map entries (undefined for Value slots)
    * - `.word` — the underlying Word value
+   *
+   * The result is also usable directly in arithmetic (`+result`, `result * 2`)
+   * via `valueOf()`, which returns a JS number for values that fit and throws
+   * `RangeError` for values exceeding `Number.MAX_SAFE_INTEGER` — use `.toBigInt()`
+   * for exact access to large u64 values.
    *
    * For explicit key-based map reads, use `getMapItem(slotName, key)`.
    * For the raw commitment hash, use `raw.getItem(slotName)`.
@@ -78,7 +87,7 @@ export class StorageView {
     // Type detection + value retrieval in one pass.
     // We call getMapEntries to detect maps, but defer parsing the entries
     // until .entries is actually accessed (lazy). Only the first entry's
-    // Word is parsed eagerly for the convenience methods (toNumber, etc.).
+    // Word is parsed eagerly for the convenience methods (toBigInt, etc.).
     const rawEntries = this.#storage.getMapEntries(slotName);
     if (rawEntries !== undefined && rawEntries !== null) {
       // StorageMap — parse only the first entry eagerly
@@ -132,30 +141,16 @@ export class StorageView {
   getCommitment(slotName) {
     return this.#storage.getItem(slotName);
   }
-
-  /**
-   * Convenience: read the first felt of a storage slot as a JavaScript number.
-   * Works for both Value and StorageMap slots.
-   *
-   * Note: Felts are u64-backed. Values above Number.MAX_SAFE_INTEGER (2^53 - 1)
-   * will lose precision. Use `.toBigInt()` on the StorageResult for exact values.
-   *
-   * @param {string} slotName
-   * @returns {number | undefined}
-   */
-  getNumber(slotName) {
-    return this.getItem(slotName)?.toNumber();
-  }
 }
 
 /**
  * Result of reading a storage slot. Works for both Value and StorageMap slots.
  *
- * Provides a unified interface so code like `storage.getItem(name).toNumber()`
+ * Provides a unified interface so code like `storage.getItem(name).toBigInt()`
  * works regardless of the underlying slot type.
  *
- * For StorageMap slots, the convenience methods (toNumber, toHex, toBigInt)
- * operate on the first entry's value. The full map data is available via `.entries`.
+ * For StorageMap slots, the convenience methods (toHex, toBigInt) operate on
+ * the first entry's value. The full map data is available via `.entries`.
  * Note: Miden storage maps are Merkle-based, so "first" is determined by key hash
  * order — deterministic for a given map state, but not meaningful as an ordering.
  */
@@ -236,17 +231,6 @@ export class StorageResult {
   }
 
   /**
-   * First felt as a JavaScript number.
-   * WARNING: May lose precision for values > Number.MAX_SAFE_INTEGER (2^53 - 1).
-   * Use .toBigInt() for exact large values.
-   * @returns {number}
-   */
-  toNumber() {
-    if (!this.#word) return 0;
-    return wordToNumber(this.#word);
-  }
-
-  /**
    * First felt as a BigInt. Preserves full u64 precision.
    * @returns {bigint}
    */
@@ -267,11 +251,12 @@ export class StorageResult {
   }
 
   /**
-   * Renders as the numeric value. Makes `{storageResult}` work in JSX.
+   * Renders as the BigInt value (lossless). Makes `{storageResult}` work in JSX
+   * and template literals: `` `value: ${result}` ``.
    * @returns {string}
    */
   toString() {
-    return String(this.toNumber());
+    return this.toBigInt().toString();
   }
 
   /**
@@ -284,10 +269,23 @@ export class StorageResult {
 
   /**
    * Allows `+result`, `result * 2`, etc. to work as expected.
+   *
+   * Returns a JS number for values that fit in `Number.MAX_SAFE_INTEGER`
+   * (2^53 - 1). For larger u64 values, throws `RangeError` rather than
+   * silently losing precision — use `.toBigInt()` to access the exact value.
+   *
    * @returns {number}
+   * @throws {RangeError} if the underlying felt exceeds Number.MAX_SAFE_INTEGER
    */
   valueOf() {
-    return this.toNumber();
+    const big = this.toBigInt();
+    if (big > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new RangeError(
+        `StorageResult value ${big} exceeds Number.MAX_SAFE_INTEGER ` +
+          `(${Number.MAX_SAFE_INTEGER}) — use .toBigInt() to read the exact value.`
+      );
+    }
+    return Number(big);
   }
 }
 
@@ -312,18 +310,6 @@ export function wordToBigInt(word) {
   } catch {
     return 0n;
   }
-}
-
-/**
- * Convert a Word's first felt to a JavaScript number.
- * WARNING: May lose precision for values > Number.MAX_SAFE_INTEGER (2^53 - 1).
- * Use wordToBigInt() when exact large values matter.
- *
- * @param {Word} word
- * @returns {number}
- */
-export function wordToNumber(word) {
-  return Number(wordToBigInt(word));
 }
 
 /**

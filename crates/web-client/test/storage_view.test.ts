@@ -38,7 +38,7 @@ const MAP_SLOT_CODE = (slotName: string) => `
 // =======================================================================================================
 
 test.describe("StorageView", () => {
-  test("getItem() on a Value slot returns a StorageResult with correct toNumber()", async ({
+  test("getItem() on a Value slot returns a StorageResult", async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
@@ -91,7 +91,6 @@ test.describe("StorageView", () => {
         hasRaw: storage.raw !== undefined,
         slotNames,
         isMap: item?.isMap,
-        number: item?.toNumber(),
         bigint: item?.toBigInt()?.toString(),
         hex: item?.toHex(),
         str: item?.toString(),
@@ -106,7 +105,6 @@ test.describe("StorageView", () => {
     expect(result.hasRaw).toBe(true);
     expect(result.slotNames).toContain("test::counter");
     expect(result.isMap).toBe(false);
-    expect(result.number).toBe(0);
     expect(result.bigint).toBe("0");
     expect(result.hex).toBeDefined();
     expect(result.str).toBe("0");
@@ -161,14 +159,14 @@ test.describe("StorageView", () => {
         isMap: item?.isMap,
         entriesType: item?.entries !== undefined ? "array" : "undefined",
         entriesLength: item?.entries?.length,
-        number: item?.toNumber(),
+        bigint: item?.toBigInt()?.toString(),
       };
     });
 
     expect(result.isMap).toBe(true);
     expect(result.entriesType).toBe("array");
     expect(result.entriesLength).toBe(0);
-    expect(result.number).toBe(0);
+    expect(result.bigint).toBe("0");
   });
 
   test("getCommitment() returns the raw commitment hash", async ({ page }) => {
@@ -222,48 +220,94 @@ test.describe("StorageView", () => {
     expect(result.match).toBe(true);
   });
 
-  test("getNumber() returns number directly", async ({ page }) => {
+  test("wordToBigInt() round-trips known felt values losslessly", async ({
+    page,
+  }) => {
     const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
+      // Construct Words with known first-felt values via the
+      // BigUint64Array constructor and assert wordToBigInt round-trips them.
+      const cases: bigint[] = [
+        0n,
+        1n,
+        42n,
+        BigInt(Number.MAX_SAFE_INTEGER), // 2^53 - 1, last value that fits in JS number
+        BigInt(Number.MAX_SAFE_INTEGER) + 1n, // 2^53, first value that loses precision in number
+        (1n << 62n) - 1n, // large but safely below the felt modulus
+      ];
 
-      const SLOT_NAME = "test::num";
-      const code = `
-        use miden::protocol::active_account
-        use miden::core::word
-        use miden::core::sys
+      const out: { input: string; got: string; ok: boolean }[] = [];
+      for (const v of cases) {
+        const word = new window.Word(new BigUint64Array([v, 0n, 0n, 0n]));
+        const got = window.wordToBigInt(word);
+        out.push({
+          input: v.toString(),
+          got: got.toString(),
+          ok: got === v,
+        });
+      }
+      return out;
+    });
 
-        const SLOT = word("${SLOT_NAME}")
+    for (const c of result) {
+      expect(c.ok, `wordToBigInt(${c.input}) returned ${c.got}`).toBe(true);
+    }
+  });
 
-        pub proc read
-          push.SLOT[0..2] exec.active_account::get_item
-          exec.sys::truncate_stack
-        end
-      `;
+  test("valueOf() throws RangeError for values exceeding MAX_SAFE_INTEGER", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      // Build a StorageResult around a Word whose first felt is > MAX_SAFE_INTEGER.
+      // We bypass StorageView since constructing a real account with a giant
+      // value would be considerably more code; the wrapper class is the unit
+      // under test here.
+      const big = BigInt(Number.MAX_SAFE_INTEGER) + 1n; // 2^53
+      const word = new window.Word(new BigUint64Array([big, 0n, 0n, 0n]));
+      const result = new window.StorageResult(word, false, undefined, window.Word);
 
-      const component = await client.compile.component({
-        code,
-        slots: [window.StorageSlot.emptyValue(SLOT_NAME)],
-      });
+      // toBigInt() and toString() must remain lossless and never throw
+      const bigStr = result.toBigInt().toString();
+      const stringified = result.toString();
+      const json = result.toJSON();
 
-      const seed = new Uint8Array(32);
-      seed.fill(0x33);
-      const auth = window.AuthSecretKey.rpoFalconWithRNG(seed);
+      // valueOf() (and `+result`) must throw a RangeError
+      let threw = false;
+      let message = "";
+      let isRangeError = false;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const _ = +result;
+      } catch (err) {
+        threw = true;
+        isRangeError = err instanceof RangeError;
+        message = err instanceof Error ? err.message : String(err);
+      }
 
-      const account = await client.accounts.create({
-        type: "ImmutableContract",
-        storage: "public",
-        seed,
-        auth,
-        components: [component],
-      });
+      return { bigStr, stringified, json, threw, isRangeError, message };
+    });
 
+    const expected = (BigInt(Number.MAX_SAFE_INTEGER) + 1n).toString();
+    expect(result.bigStr).toBe(expected);
+    expect(result.stringified).toBe(expected);
+    expect(result.json).toBe(expected);
+    expect(result.threw).toBe(true);
+    expect(result.isRangeError).toBe(true);
+    expect(result.message).toContain("toBigInt");
+  });
+
+  test("valueOf() returns a JS number for small values", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const word = new window.Word(new BigUint64Array([42n, 0n, 0n, 0n]));
+      const result = new window.StorageResult(word, false, undefined, window.Word);
       return {
-        number: account.storage().getNumber(SLOT_NAME),
-        nonExistent: account.storage().getNumber("does::not::exist"),
+        valueOf: +result,
+        arithmetic: result * 2,
+        templated: `value: ${result}`,
       };
     });
 
-    expect(result.number).toBe(0);
-    expect(result.nonExistent).toBeUndefined();
+    expect(result.valueOf).toBe(42);
+    expect(result.arithmetic).toBe(84);
+    expect(result.templated).toBe("value: 42");
   });
 });

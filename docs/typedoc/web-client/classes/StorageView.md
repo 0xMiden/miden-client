@@ -132,25 +132,6 @@ Returns the value for a key in a StorageMap slot.
 
 ***
 
-### getNumber()
-
-> **getNumber**(`slotName`): `number`
-
-Convenience: first felt as a JavaScript number.
-Works for both slot types.
-
-#### Parameters
-
-##### slotName
-
-`string`
-
-#### Returns
-
-`number`
-
-***
-
 ### getSlotNames()
 
 > **getSlotNames**(): `string`[]

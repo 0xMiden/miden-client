@@ -35,9 +35,4 @@ export {
 export * from "./api-types";
 
 // Storage utilities
-export {
-  StorageView,
-  StorageResult,
-  wordToBigInt,
-  wordToNumber,
-} from "./index";
+export { StorageView, StorageResult, wordToBigInt } from "./index";

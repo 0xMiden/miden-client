@@ -65,25 +65,23 @@ export declare class StorageResult {
   /** The first Felt of the stored Word. */
   felt(): Felt | undefined;
 
-  /**
-   * First felt as a JavaScript number.
-   * WARNING: May lose precision for values > Number.MAX_SAFE_INTEGER.
-   */
-  toNumber(): number;
-
   /** First felt as a BigInt. Preserves full u64 precision. */
   toBigInt(): bigint;
 
   /** The Word's hex representation. */
   toHex(): string;
 
-  /** Renders as the numeric value. Makes `{result}` work in JSX. */
+  /** Renders as the BigInt value (lossless). Makes `{result}` work in JSX. */
   toString(): string;
 
   /** Returns the value as a string for JSON precision safety. */
   toJSON(): string;
 
-  /** Allows arithmetic: `+result`, `result * 2`. */
+  /**
+   * Allows arithmetic: `+result`, `result * 2`.
+   * Returns a JS number for values fitting in Number.MAX_SAFE_INTEGER.
+   * Throws RangeError for larger values — use `.toBigInt()` for exact access.
+   */
   valueOf(): number;
 }
 
@@ -127,19 +125,10 @@ export declare class StorageView {
    * Useful for proofs, state comparison, and syncing.
    */
   getCommitment(slotName: string): Word | undefined;
-
-  /**
-   * Convenience: first felt as a JavaScript number.
-   * Works for both slot types.
-   */
-  getNumber(slotName: string): number | undefined;
 }
 
 /** Convert a Word's first felt to a BigInt (full u64 precision). */
 export declare function wordToBigInt(word: Word): bigint;
-
-/** Convert a Word's first felt to a number (may lose precision > 2^53). */
-export declare function wordToNumber(word: Word): number;
 
 // ════════════════════════════════════════════════════════════════
 // Internal exports (not public API — for tests and advanced usage)

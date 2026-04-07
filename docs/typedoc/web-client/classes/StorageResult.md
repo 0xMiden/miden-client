@@ -125,24 +125,11 @@ Returns the value as a string for JSON precision safety.
 
 ***
 
-### toNumber()
-
-> **toNumber**(): `number`
-
-First felt as a JavaScript number.
-WARNING: May lose precision for values > Number.MAX_SAFE_INTEGER.
-
-#### Returns
-
-`number`
-
-***
-
 ### toString()
 
 > **toString**(): `string`
 
-Renders as the numeric value. Makes `{result}` work in JSX.
+Renders as the BigInt value (lossless). Makes `{result}` work in JSX.
 
 #### Returns
 
@@ -155,6 +142,8 @@ Renders as the numeric value. Makes `{result}` work in JSX.
 > **valueOf**(): `number`
 
 Allows arithmetic: `+result`, `result * 2`.
+Returns a JS number for values fitting in Number.MAX_SAFE_INTEGER.
+Throws RangeError for larger values — use `.toBigInt()` for exact access.
 
 #### Returns
 
