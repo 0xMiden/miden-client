@@ -41,10 +41,12 @@ impl NoteStateHandler for ExpectedNoteState {
     fn consumed_externally(
         &self,
         nullifier_block_height: BlockNumber,
+        consumer_account: Option<AccountId>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Ok(Some(
             ConsumedExternalNoteState {
                 nullifier_block_height,
+                consumer_account,
                 consumed_tx_order: None,
             }
             .into(),

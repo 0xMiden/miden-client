@@ -66,6 +66,8 @@ pub struct TransactionInclusion {
     pub account_id: AccountId,
     /// The initial account state commitment before the transaction was executed.
     pub initial_state_commitment: Word,
+    /// The nullifiers of the input notes consumed by this transaction.
+    pub nullifiers: Vec<Nullifier>,
     /// Output notes from this transaction, with inclusion proofs.
     pub output_notes: Vec<CommittedNote>,
 }
