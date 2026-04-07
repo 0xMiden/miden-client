@@ -367,10 +367,13 @@ impl NodeRpcClient for MockRpcApi {
             .get_delta(Forest::new(from_forest), Forest::new(target_block.as_usize()))
             .unwrap();
 
+        let block_header = self.get_block_by_num(target_block);
+
         Ok(ChainMmrInfo {
             block_from,
             block_to: target_block,
             mmr_delta,
+            block_header,
         })
     }
 

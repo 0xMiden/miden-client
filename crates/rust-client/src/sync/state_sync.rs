@@ -278,7 +278,7 @@ impl StateSync {
     }
 
     /// Fetches the sync data from the node by calling the following endpoints:
-    /// 1. `sync_chain_mmr` — discovers the chain tip and gets the MMR delta.
+    /// 1. `sync_chain_mmr` — discovers the chain tip, gets the MMR delta and chain tip header.
     /// 2. `sync_notes` — loops until the full range to the chain tip is covered (handles paginated
     ///    responses).
     /// 3. `get_notes_by_id` — fetches full metadata for notes with attachments.
@@ -302,19 +302,12 @@ impl StateSync {
             return Ok(None);
         }
 
-        // Step 2: Paginate sync_notes over the full range.
+        // Step 2: Paginate sync_notes using the same chain tip so MMR paths are opened at
+        // a consistent forest.
         let sync_notes_result = self
             .rpc_api
             .sync_notes_with_details(current_block_num, Some(chain_tip), note_tags.as_ref())
             .await?;
-
-        // The last block is the chain tip even if it contains no matching notes.
-        let chain_tip_header = sync_notes_result
-            .blocks
-            .last()
-            .expect("sync_notes should always return the range-end block")
-            .block_header
-            .clone();
 
         // Step 3: Gather transactions for tracked accounts over the full range.
         let (account_commitment_updates, transactions, transaction_output_notes, nullifiers) =
@@ -322,7 +315,7 @@ impl StateSync {
 
         Ok(Some(RawStateSyncData {
             mmr_delta: chain_mmr_info.mmr_delta,
-            chain_tip_header,
+            chain_tip_header: chain_mmr_info.block_header,
             note_blocks: sync_notes_result.blocks,
             public_notes: sync_notes_result.public_notes,
             account_commitment_updates,
