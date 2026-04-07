@@ -4,6 +4,7 @@
 
 ### Enhancements
 
+* Made `GrpcNoteTransportClient` connection lazy, deferring it to the first RPC call instead of connecting eagerly at client initialization ([#1970](https://github.com/0xMiden/miden-client/pull/1970)).
 * Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)) ([#1737](https://github.com/0xMiden/miden-client/pull/1737), [#1809](https://github.com/0xMiden/miden-client/pull/1809)).
 * Added typed error parsing for node RPC endpoints, enabling programmatic error handling instead of string parsing ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).
 * Added `--rpc-status` flag to `miden-client info` command to display RPC node status information including node version, genesis commitment, store status, and block producer status; also added `get_status_unversioned` to `NodeRpcClient` trait ([#1742](https://github.com/0xMiden/miden-client/pull/1742)).

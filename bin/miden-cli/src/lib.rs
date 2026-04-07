@@ -151,9 +151,7 @@ impl CliClient {
         // Add optional note transport client
         if let Some(tl_config) = config.note_transport {
             let note_transport_client =
-                GrpcNoteTransportClient::connect(tl_config.endpoint.clone(), tl_config.timeout_ms)
-                    .await
-                    .map_err(|e| CliError::from(miden_client::ClientError::from(e)))?;
+                GrpcNoteTransportClient::new(tl_config.endpoint.clone(), tl_config.timeout_ms);
             builder = builder.note_transport(Arc::new(note_transport_client));
         }
 
