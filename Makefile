@@ -6,8 +6,13 @@ help: ## Show description of all commands
 
 # --- Variables -----------------------------------------------------------------------------------
 
-# The build target defaults to rust's host.
-BUILD_TARGET ?= $(shell rustc -vV | grep host | awk '{print $$2}')
+# The build target can be set via BUILD_TARGET to cross-compile.
+# Used when targeting a specific environment (used to produce artifact binaries)
+# in the CI.
+ifneq ($(BUILD_TARGET),)
+TARGET_FLAG = --target $(BUILD_TARGET)
+endif
+
 FEATURES_CLIENT=--features "std"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
@@ -205,7 +210,7 @@ install-tests: ## Install the tests binary
 ## artifact generation for releases.
 
 build: ## Build the CLI binary, client library and tests binary in release mode
-	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) --target $(BUILD_TARGET) --release --locked
+	cargo build --workspace $(EXCLUDE_WASM_PACKAGES) $(TARGET_FLAG) --release --locked
 
 build-wasm: rust-client-ts-build ## Build the wasm packages (web client and idxdb store)
 	cargo build --package miden-client-web --package miden-idxdb-store --target wasm32-unknown-unknown --locked
