@@ -187,12 +187,12 @@ jobs:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: false
-      - name: Check binary existance
-        run: |
-          file -E target/release/testing-remote-prover
       - name: Build remote-prover
         if: steps.cache-remote-prover.outputs.cache-hit != 'true'
         run: cargo build --release --package testing-remote-prover --locked
+      - name: Check binary existance
+        run: |
+          file -E target/release/testing-remote-prover
 
   integration-tests:
     name: Integration tests
