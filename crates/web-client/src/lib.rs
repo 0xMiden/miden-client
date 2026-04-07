@@ -162,8 +162,9 @@ impl WebClient {
 
         let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 10_000));
 
-        let note_transport_client = node_note_transport_url
-            .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
+        let note_transport_client = node_note_transport_url.map(|url| {
+            Arc::new(GrpcNoteTransportClient::new(url, 10_000)) as Arc<dyn NoteTransportClient>
+        });
 
         let store_name =
             store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));
@@ -222,8 +223,9 @@ impl WebClient {
 
         let web_rpc_client = Arc::new(GrpcClient::new(&endpoint, 10_000));
 
-        let note_transport_client = node_note_transport_url
-            .map(|url| Arc::new(GrpcNoteTransportClient::new(url)) as Arc<dyn NoteTransportClient>);
+        let note_transport_client = node_note_transport_url.map(|url| {
+            Arc::new(GrpcNoteTransportClient::new(url, 10_000)) as Arc<dyn NoteTransportClient>
+        });
 
         let store_name =
             store_name.unwrap_or(format!("{}_{}", BASE_STORE_NAME, endpoint.to_network_id()));

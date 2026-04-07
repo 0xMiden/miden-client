@@ -447,8 +447,10 @@ where
             );
 
             #[cfg(target_arch = "wasm32")]
-            let transport =
-                crate::note_transport::grpc::GrpcNoteTransportClient::new(config.endpoint);
+            let transport = crate::note_transport::grpc::GrpcNoteTransportClient::new(
+                config.endpoint,
+                config.timeout_ms,
+            );
 
             self.note_transport_api = Some(Arc::new(transport) as Arc<dyn NoteTransportClient>);
         }

@@ -32,6 +32,42 @@ type Service = Channel;
 #[cfg(target_arch = "wasm32")]
 type Service = tonic_web_wasm_client::Client;
 
+/// Establishes a connection to the note transport service, returning the gRPC clients.
+///
+/// Platform-specific: on native this performs TLS + TCP connect; on WASM it wraps a
+/// `tonic_web_wasm_client::Client`.
+#[cfg(not(target_arch = "wasm32"))]
+async fn connect_channel(
+    endpoint: &str,
+    timeout_ms: u64,
+) -> Result<(MidenNoteTransportClient<Service>, HealthClient<Service>), NoteTransportError> {
+    let endpoint = tonic::transport::Endpoint::try_from(String::from(endpoint))
+        .map_err(|e| NoteTransportError::Connection(Box::new(e)))?
+        .timeout(Duration::from_millis(timeout_ms));
+    let tls = ClientTlsConfig::new().with_native_roots();
+    let channel = endpoint
+        .tls_config(tls)
+        .map_err(|e| NoteTransportError::Connection(Box::new(e)))?
+        .connect()
+        .await
+        .map_err(|e| NoteTransportError::Connection(Box::new(e)))?;
+    Ok((MidenNoteTransportClient::new(channel.clone()), HealthClient::new(channel)))
+}
+
+/// Establishes a connection to the note transport service, returning the gRPC clients.
+#[cfg(target_arch = "wasm32")]
+#[allow(clippy::unused_async)]
+async fn connect_channel(
+    endpoint: &str,
+    _timeout_ms: u64,
+) -> Result<(MidenNoteTransportClient<Service>, HealthClient<Service>), NoteTransportError> {
+    let wasm_client = tonic_web_wasm_client::Client::new(String::from(endpoint));
+    Ok((
+        MidenNoteTransportClient::new(wasm_client.clone()),
+        HealthClient::new(wasm_client),
+    ))
+}
+
 /// Inner state holding the connected gRPC clients.
 struct ConnectedClient {
     client: MidenNoteTransportClient<Service>,
@@ -51,7 +87,6 @@ pub struct GrpcNoteTransportClient {
 impl GrpcNoteTransportClient {
     /// Creates a new [`GrpcNoteTransportClient`] without establishing a connection.
     /// The connection will be established lazily on the first request.
-    #[cfg(not(target_arch = "wasm32"))]
     pub fn new(endpoint: String, timeout_ms: u64) -> Self {
         Self {
             inner: RwLock::new(None),
@@ -60,40 +95,13 @@ impl GrpcNoteTransportClient {
         }
     }
 
-    /// gRPC client (WASM) constructor — connects eagerly since WASM channels are cheap.
-    #[cfg(target_arch = "wasm32")]
-    pub fn new(endpoint: String) -> Self {
-        let wasm_client = tonic_web_wasm_client::Client::new(endpoint.clone());
-        let health_client = HealthClient::new(wasm_client.clone());
-        let client = MidenNoteTransportClient::new(wasm_client);
-
-        Self {
-            inner: RwLock::new(Some(ConnectedClient { client, health_client })),
-            endpoint,
-            timeout_ms: 0,
-        }
-    }
-
     /// Ensures the client is connected, establishing the connection if needed.
-    #[cfg(not(target_arch = "wasm32"))]
     async fn ensure_connected(&self) -> Result<(), NoteTransportError> {
         if self.inner.read().is_some() {
             return Ok(());
         }
 
-        let endpoint = tonic::transport::Endpoint::try_from(self.endpoint.clone())
-            .map_err(|e| NoteTransportError::Connection(Box::new(e)))?
-            .timeout(Duration::from_millis(self.timeout_ms));
-        let tls = ClientTlsConfig::new().with_native_roots();
-        let channel = endpoint
-            .tls_config(tls)
-            .map_err(|e| NoteTransportError::Connection(Box::new(e)))?
-            .connect()
-            .await
-            .map_err(|e| NoteTransportError::Connection(Box::new(e)))?;
-        let health_client = HealthClient::new(channel.clone());
-        let client = MidenNoteTransportClient::new(channel);
-
+        let (client, health_client) = connect_channel(&self.endpoint, self.timeout_ms).await?;
         *self.inner.write() = Some(ConnectedClient { client, health_client });
         Ok(())
     }
@@ -107,7 +115,13 @@ impl GrpcNoteTransportClient {
     /// Get a clone of the health client, connecting if needed.
     async fn health_api(&self) -> Result<HealthClient<Service>, NoteTransportError> {
         self.ensure_connected().await?;
-        Ok(self.inner.read().as_ref().expect("client should be connected").health_client.clone())
+        Ok(self
+            .inner
+            .read()
+            .as_ref()
+            .expect("client should be connected")
+            .health_client
+            .clone())
     }
 
     /// Pushes a note to the note transport network.
