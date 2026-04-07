@@ -158,7 +158,7 @@ pub fn apply_account_delta_to_forest(
     for (slot_name, (new_root, slot_type)) in &updated_storage_slots {
         if *slot_type == StorageSlotType::Map {
             let old_root = old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
-            if let Some(root) = final_roots.iter_mut().find(|r| **r == old_root) {
+            if let Some(root) = final_roots[1..].iter_mut().find(|r| **r == old_root) {
                 *root = *new_root;
             } else {
                 // New map slot not in the old roots — append it
