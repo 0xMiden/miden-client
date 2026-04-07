@@ -1,15 +1,8 @@
-use alloc::sync::Arc;
-
 use miden_client::Serializable;
 use miden_client::account::AccountId as NativeAccountId;
 use miden_client::assembly::Assembler as NativeAssembler;
 use miden_client::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
-use miden_client::vm::{
-    MastArtifact as NativeMastArtifact,
-    Package as NativePackage,
-    PackageKind as NativePackageKind,
-    PackageManifest as NativePackageManifest,
-};
+use miden_client::vm::{Package as NativePackage, TargetType as NativeTargetType};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
@@ -41,25 +34,22 @@ impl TestUtils {
 
         let library = NativeAssembler::default().assemble_library([CODE]).unwrap();
 
-        let package_without_metadata = NativePackage {
-            name: "test_package_no_metadata".to_string(),
-            mast: NativeMastArtifact::Library(Arc::new(library)),
-            manifest: NativePackageManifest::new(None),
-            sections: vec![], // No metadata section
-            version: Default::default(),
-            description: None,
-            kind: NativePackageKind::Library,
-        };
+        let package = NativePackage::from_library(
+            "test_package_no_metadata".into(),
+            "0.0.0".parse().unwrap(),
+            NativeTargetType::Library,
+            library,
+            core::iter::empty(),
+        );
 
-        let bytes: Vec<u8> = package_without_metadata.to_bytes();
-
+        let bytes: Vec<u8> = package.to_bytes();
         Uint8Array::from(bytes.as_slice())
     }
 
     #[wasm_bindgen(js_name = "createMockSerializedProgramPackage")]
     pub fn create_mock_serialized_program_package() -> Uint8Array {
         pub const CODE: &str = "
-            begin
+            pub proc main
                 # This code computes 1001st Fibonacci number
                 repeat.1000
                     swap dup.1 add
@@ -67,20 +57,17 @@ impl TestUtils {
             end
         ";
 
-        let program = NativeAssembler::default().assemble_program(CODE).unwrap();
+        let library = NativeAssembler::default().assemble_library([CODE]).unwrap();
 
-        let package_without_metadata = NativePackage {
-            name: "test_program_package_no_metadata".to_string(),
-            mast: NativeMastArtifact::Executable(Arc::new(program)),
-            manifest: NativePackageManifest::new(None),
-            sections: vec![], // No metadata section
-            version: Default::default(),
-            description: None,
-            kind: NativePackageKind::Executable,
-        };
+        let package = NativePackage::from_library(
+            "test_program_package_no_metadata".into(),
+            "0.0.0".parse().unwrap(),
+            NativeTargetType::Executable,
+            library,
+            core::iter::empty(),
+        );
 
-        let bytes: Vec<u8> = package_without_metadata.to_bytes();
-
+        let bytes: Vec<u8> = package.to_bytes();
         Uint8Array::from(bytes.as_slice())
     }
 }

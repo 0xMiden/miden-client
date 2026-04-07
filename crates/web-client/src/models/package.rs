@@ -31,7 +31,7 @@ impl Package {
             return Err(JsValue::from_str("Package does not contain a library"));
         }
 
-        let native_library = self.0.unwrap_library();
+        let native_library = self.0.mast.clone();
         Ok((*native_library).clone().into())
     }
 
@@ -44,7 +44,7 @@ impl Package {
         }
 
         let native_program = self.0.unwrap_program();
-        Ok((*native_program).clone().into())
+        Ok(native_program.into())
     }
 }
 
