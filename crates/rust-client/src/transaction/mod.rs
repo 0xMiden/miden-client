@@ -73,7 +73,7 @@ use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
 use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
 use miden_protocol::transaction::AccountInputs;
-use miden_protocol::{Felt, Word};
+use miden_protocol::{EMPTY_WORD, Felt, Word};
 use miden_standards::account::interface::AccountInterfaceExt;
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
@@ -781,6 +781,7 @@ where
                             AccountStorageRequirements::default(),
                             AccountStateAt::Block(block_num),
                             None,
+                            None,
                         )
                         .await?;
                     let (witness, _) = account_proof.into_parts();
@@ -916,6 +917,7 @@ pub(crate) async fn fetch_public_account_inputs(
             storage_requirements.clone(),
             account_state_at,
             known_account_code,
+            Some(EMPTY_WORD),
         )
         .await?;
 
