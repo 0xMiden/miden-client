@@ -19,6 +19,7 @@
 * Added automatic registration of note scripts required by network transactions (NTX). The client now checks the node's script registry before submitting a transaction and registers any missing scripts via a separate registration transaction ([#1840](https://github.com/0xMiden/miden-client/pull/1840)).
 * Added automatic retry for rate-limited (`ResourceExhausted`) and transiently unavailable RPC calls in `GrpcClient`, with up to 5 attempts and `retry-after` header support ([#1928](https://github.com/0xMiden/miden-client/pull/1928)).
 * Added client methods to prune account history (commitments of previous nonces, alongside its orphaned account code) ([#1886](https://github.com/0xMiden/miden-client/pull/1886)).
+* Changed the sync state to track the consumer account on externally-consumed notes, so the `InputNoteReader` can return notes even if the transaction was not locally executed ([#1973](https://github.com/0xMiden/miden-client/pull/1973)).
 
 ### Changes
 
