@@ -193,6 +193,7 @@ impl MockRpcApi {
                 transaction_records.push(TransactionRecord {
                     block_num: block_number,
                     transaction_header: transaction_header.clone(),
+                    output_notes: vec![],
                 });
             }
         }
@@ -331,6 +332,10 @@ impl NodeRpcClient for MockRpcApi {
             }
         }
 
+        // Always include the upper_bound block (with empty notes if needed), matching the
+        // node behavior where the range-end block is always present when the scan completes.
+        blocks_with_notes.entry(upper_bound).or_default();
+
         let blocks: Vec<NoteSyncBlock> = blocks_with_notes
             .into_iter()
             .map(|(bn, notes)| {
@@ -362,10 +367,13 @@ impl NodeRpcClient for MockRpcApi {
             .get_delta(Forest::new(from_forest), Forest::new(target_block.as_usize()))
             .unwrap();
 
+        let block_header = self.get_block_by_num(target_block);
+
         Ok(ChainMmrInfo {
             block_from,
             block_to: target_block,
             mmr_delta,
+            block_header,
         })
     }
 
