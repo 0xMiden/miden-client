@@ -31,8 +31,8 @@ test.describe("swap transaction tests", () => {
       const assetAAmount = BigInt(1);
       const assetBAmount = BigInt(25);
 
-      await mintAndConsumeTransaction(page, accountA, faucetA, false);
-      await mintAndConsumeTransaction(page, accountB, faucetB, false);
+      await mintAndConsumeTransaction(page, accountA, faucetA, flag);
+      await mintAndConsumeTransaction(page, accountB, faucetB, flag);
 
       const { accountAAssets, accountBAssets } = await swapTransaction(
         page,

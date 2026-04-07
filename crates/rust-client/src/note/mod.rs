@@ -88,6 +88,7 @@ pub use miden_protocol::note::{
     NoteInclusionProof,
     NoteLocation,
     NoteMetadata,
+    NoteMetadataHeader,
     NoteRecipient,
     NoteScript,
     NoteStorage,
@@ -115,6 +116,7 @@ pub use note_update_tracker::{
     NoteUpdateType,
     OutputNoteUpdate,
 };
+
 /// Note retrieval methods.
 impl<AUTH> Client<AUTH>
 where

@@ -1,9 +1,10 @@
 use alloc::collections::BTreeMap;
 
 use miden_protocol::block::BlockHeader;
-use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
+use miden_protocol::note::{NoteId, Nullifier};
 
 use crate::ClientError;
+use crate::rpc::RpcError;
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::store::{InputNoteRecord, OutputNoteRecord};
@@ -300,16 +301,17 @@ impl NoteUpdateTracker {
         committed_note: &CommittedNote,
         block_header: &BlockHeader,
     ) -> Result<bool, ClientError> {
-        let inclusion_proof = NoteInclusionProof::new(
-            block_header.block_num(),
-            committed_note.note_index(),
-            committed_note.inclusion_path().clone(),
-        )?;
+        let inclusion_proof = committed_note.inclusion_proof().clone();
+
         let is_tracked_as_input_note =
             if let Some(input_note_record) = self.get_input_note_by_id(*committed_note.note_id()) {
-                // The note belongs to our locally tracked set of input notes
-                input_note_record
-                    .inclusion_proof_received(inclusion_proof.clone(), committed_note.metadata())?;
+                let metadata = committed_note.metadata().cloned().ok_or_else(|| {
+                    ClientError::RpcError(RpcError::ExpectedDataMissing(format!(
+                        "full metadata for committed note {}",
+                        committed_note.note_id()
+                    )))
+                })?;
+                input_note_record.inclusion_proof_received(inclusion_proof.clone(), metadata)?;
                 input_note_record.block_header_received(block_header)?;
 
                 true
