@@ -218,7 +218,8 @@ jobs:
           path: ~/.cargo/bin/miden-note-transport-node-bin
           key: ${{ runner.os }}-note-transport-${{ needs.build-note-transport.outputs.note_transport_rev }}
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1      - name: Start test node
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Start test node
         run: |
           RUST_LOG=none target/release/testing-node-builder &
           sleep 4
