@@ -280,8 +280,7 @@ test.describe("StorageView", () => {
       let message = "";
       let isRangeError = false;
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const _ = +result;
+        void +result;
       } catch (err) {
         threw = true;
         isRangeError = err instanceof RangeError;
