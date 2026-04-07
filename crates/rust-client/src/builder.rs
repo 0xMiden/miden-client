@@ -183,7 +183,10 @@ where
     pub fn for_testnet() -> Self {
         let endpoint = Endpoint::testnet();
         Self {
-            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(&endpoint, DEFAULT_GRPC_TIMEOUT_MS))),
+            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(
+                &endpoint,
+                DEFAULT_GRPC_TIMEOUT_MS,
+            ))),
             tx_prover: Some(Arc::new(RemoteTransactionProver::new(
                 TESTNET_PROVER_ENDPOINT.to_string(),
             ))),
@@ -224,7 +227,10 @@ where
     pub fn for_devnet() -> Self {
         let endpoint = Endpoint::devnet();
         Self {
-            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(&endpoint, DEFAULT_GRPC_TIMEOUT_MS))),
+            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(
+                &endpoint,
+                DEFAULT_GRPC_TIMEOUT_MS,
+            ))),
             tx_prover: Some(Arc::new(RemoteTransactionProver::new(
                 DEVNET_PROVER_ENDPOINT.to_string(),
             ))),
@@ -265,7 +271,10 @@ where
     pub fn for_localhost() -> Self {
         let endpoint = Endpoint::localhost();
         Self {
-            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(&endpoint, DEFAULT_GRPC_TIMEOUT_MS))),
+            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(
+                &endpoint,
+                DEFAULT_GRPC_TIMEOUT_MS,
+            ))),
             endpoint: Some(endpoint),
             ..Self::default()
         }
@@ -300,8 +309,10 @@ where
     #[must_use]
     #[cfg(feature = "tonic")]
     pub fn grpc_client(mut self, endpoint: &crate::rpc::Endpoint, timeout_ms: Option<u64>) -> Self {
-        self.rpc_api =
-            Some(Arc::new(crate::rpc::GrpcClient::new(endpoint, timeout_ms.unwrap_or(DEFAULT_GRPC_TIMEOUT_MS))));
+        self.rpc_api = Some(Arc::new(crate::rpc::GrpcClient::new(
+            endpoint,
+            timeout_ms.unwrap_or(DEFAULT_GRPC_TIMEOUT_MS),
+        )));
         self
     }
 
