@@ -2289,7 +2289,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "tokio",
  "tower-service",
  "tracing",
@@ -2913,10 +2913,10 @@ dependencies = [
  "getrandom 0.3.4",
  "gloo-timers",
  "hex",
- "miden-node-proto-build 0.14.1 (git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs)",
+ "miden-node-proto-build",
  "miden-note-transport-proto-build",
  "miden-protocol",
- "miden-remote-prover-client 0.14.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miden-remote-prover-client",
  "miden-standards",
  "miden-testing",
  "miden-tx",
@@ -3209,8 +3209,9 @@ dependencies = [
 
 [[package]]
 name = "miden-large-smt-backend-rocksdb"
-version = "0.14.1"
-source = "git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs#5d1cf3787c5b22f0fd471e3dd4c5bf735c80b9a6"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "458b491aa032924cddd1a7e7e31f85b31546223c14dd513fe4e208d0be617342"
 dependencies = [
  "miden-crypto",
  "miden-node-rocksdb-cxx-linkage-fix",
@@ -3270,17 +3271,18 @@ dependencies = [
 
 [[package]]
 name = "miden-node-block-producer"
-version = "0.14.1"
-source = "git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs#5d1cf3787c5b22f0fd471e3dd4c5bf735c80b9a6"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94d4cce7632c4f6a01f826111451e00eebbaf22b5d0852411835047b5bb3a534"
 dependencies = [
  "anyhow",
  "futures",
  "itertools 0.14.0",
  "miden-node-proto",
- "miden-node-proto-build 0.14.1 (git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs)",
+ "miden-node-proto-build",
  "miden-node-utils",
  "miden-protocol",
- "miden-remote-prover-client 0.14.1 (git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs)",
+ "miden-remote-prover-client",
  "miden-standards",
  "miden-tx-batch-prover",
  "rand 0.9.2",
@@ -3296,8 +3298,9 @@ dependencies = [
 
 [[package]]
 name = "miden-node-db"
-version = "0.14.1"
-source = "git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs#5d1cf3787c5b22f0fd471e3dd4c5bf735c80b9a6"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d64e879dfe91043a0b6bb494e3307f0d1008b312c4c4543c311b11ff0d46621"
 dependencies = [
  "deadpool",
  "deadpool-diesel",
@@ -3310,8 +3313,9 @@ dependencies = [
 
 [[package]]
 name = "miden-node-grpc-error-macro"
-version = "0.14.1"
-source = "git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs#5d1cf3787c5b22f0fd471e3dd4c5bf735c80b9a6"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1dbaff4590be922da19e030a9f09c6726b249e848feff9de39437d478093ce8c"
 dependencies = [
  "quote",
  "syn 2.0.117",
@@ -3319,8 +3323,9 @@ dependencies = [
 
 [[package]]
 name = "miden-node-ntx-builder"
-version = "0.14.1"
-source = "git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs#5d1cf3787c5b22f0fd471e3dd4c5bf735c80b9a6"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e59fb9487bc65619ca97a26f677e94617baeec3d725b5a1f7a59cec9fedf6ee2"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3330,10 +3335,10 @@ dependencies = [
  "libsqlite3-sys",
  "miden-node-db",
  "miden-node-proto",
- "miden-node-proto-build 0.14.1 (git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs)",
+ "miden-node-proto-build",
  "miden-node-utils",
  "miden-protocol",
- "miden-remote-prover-client 0.14.1 (git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs)",
+ "miden-remote-prover-client",
  "miden-standards",
  "miden-tx",
  "thiserror 2.0.18",
@@ -3349,8 +3354,9 @@ dependencies = [
 
 [[package]]
 name = "miden-node-proto"
-version = "0.14.1"
-source = "git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs#5d1cf3787c5b22f0fd471e3dd4c5bf735c80b9a6"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a733c7258607588847e93e4c1ce59bda5ed755cda9da4d28c576e0be11410f5"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3358,7 +3364,7 @@ dependencies = [
  "hex",
  "http 1.4.0",
  "miden-node-grpc-error-macro",
- "miden-node-proto-build 0.14.1 (git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs)",
+ "miden-node-proto-build",
  "miden-node-utils",
  "miden-protocol",
  "miden-standards",
@@ -3373,21 +3379,9 @@ dependencies = [
 
 [[package]]
 name = "miden-node-proto-build"
-version = "0.14.1"
+version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa2495aca83f266e9a051b829ad4595bbe0c533196f992f54bb0b521abe19574"
-dependencies = [
- "build-rs",
- "fs-err",
- "miette",
- "protox",
- "tonic-prost-build",
-]
-
-[[package]]
-name = "miden-node-proto-build"
-version = "0.14.1"
-source = "git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs#5d1cf3787c5b22f0fd471e3dd4c5bf735c80b9a6"
+checksum = "fd280101c340742e7babd0487ed59d23d5f3a8d25d68c69cf38ca3874e354f12"
 dependencies = [
  "build-rs",
  "fs-err",
@@ -3398,20 +3392,22 @@ dependencies = [
 
 [[package]]
 name = "miden-node-rocksdb-cxx-linkage-fix"
-version = "0.14.1"
-source = "git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs#5d1cf3787c5b22f0fd471e3dd4c5bf735c80b9a6"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2945a5d1e6439296df7b5bfd4aac2467bf76db5c97ebccb34f4e92e75bed75da"
 
 [[package]]
 name = "miden-node-rpc"
-version = "0.14.1"
-source = "git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs#5d1cf3787c5b22f0fd471e3dd4c5bf735c80b9a6"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03a92331cd1ddae4cb9d494280b7f1764d9eb4069778b02e079e2efb0c146e35"
 dependencies = [
  "anyhow",
  "futures",
  "http 1.4.0",
  "mediatype",
  "miden-node-proto",
- "miden-node-proto-build 0.14.1 (git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs)",
+ "miden-node-proto-build",
  "miden-node-utils",
  "miden-protocol",
  "miden-tx",
@@ -3431,8 +3427,9 @@ dependencies = [
 
 [[package]]
 name = "miden-node-store"
-version = "0.14.1"
-source = "git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs#5d1cf3787c5b22f0fd471e3dd4c5bf735c80b9a6"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f3b6996d3e74d20cf13f088547e14781ca4e40ffdfe43ebc9cb2b3dd0abcc3d"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3450,10 +3447,10 @@ dependencies = [
  "miden-large-smt-backend-rocksdb",
  "miden-node-db",
  "miden-node-proto",
- "miden-node-proto-build 0.14.1 (git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs)",
+ "miden-node-proto-build",
  "miden-node-utils",
  "miden-protocol",
- "miden-remote-prover-client 0.14.1 (git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs)",
+ "miden-remote-prover-client",
  "miden-standards",
  "pretty_assertions",
  "rand 0.9.2",
@@ -3472,8 +3469,9 @@ dependencies = [
 
 [[package]]
 name = "miden-node-utils"
-version = "0.14.1"
-source = "git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs#5d1cf3787c5b22f0fd471e3dd4c5bf735c80b9a6"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69345db56b14977ba4573d64aee6bec94516e8f6cc78459697dfbbf968582fb4"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3506,8 +3504,9 @@ dependencies = [
 
 [[package]]
 name = "miden-node-validator"
-version = "0.14.1"
-source = "git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs#5d1cf3787c5b22f0fd471e3dd4c5bf735c80b9a6"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "282904b4f2ea50b593b81c8c6685ebc114fd4fe943f6554951aa0e45445512ec"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -3517,7 +3516,7 @@ dependencies = [
  "diesel_migrations",
  "miden-node-db",
  "miden-node-proto",
- "miden-node-proto-build 0.14.1 (git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs)",
+ "miden-node-proto-build",
  "miden-node-utils",
  "miden-protocol",
  "miden-tx",
@@ -3629,28 +3628,7 @@ dependencies = [
  "build-rs",
  "fs-err",
  "getrandom 0.4.2",
- "miden-node-proto-build 0.14.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "miden-protocol",
- "miden-tx",
- "miette",
- "prost",
- "thiserror 2.0.18",
- "tokio",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
- "tonic-web-wasm-client",
-]
-
-[[package]]
-name = "miden-remote-prover-client"
-version = "0.14.1"
-source = "git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs#5d1cf3787c5b22f0fd471e3dd4c5bf735c80b9a6"
-dependencies = [
- "build-rs",
- "fs-err",
- "getrandom 0.4.2",
- "miden-node-proto-build 0.14.1 (git+https://github.com/0xMiden/node.git?branch=igamigo-tx-notes-proofs)",
+ "miden-node-proto-build",
  "miden-protocol",
  "miden-tx",
  "miette",

@@ -44,14 +44,14 @@ miden-testing   = { default-features = false, version = "0.14" }
 miden-tx        = { default-features = false, version = "0.14" }
 
 # Miden node dependencies
-miden-node-block-producer        = { branch = "igamigo-tx-notes-proofs", git = "https://github.com/0xMiden/node.git" }
-miden-node-ntx-builder           = { branch = "igamigo-tx-notes-proofs", git = "https://github.com/0xMiden/node.git" }
-miden-node-proto                 = { branch = "igamigo-tx-notes-proofs", git = "https://github.com/0xMiden/node.git" }
-miden-node-proto-build           = { branch = "igamigo-tx-notes-proofs", default-features = false, git = "https://github.com/0xMiden/node.git" }
-miden-node-rpc                   = { branch = "igamigo-tx-notes-proofs", git = "https://github.com/0xMiden/node.git" }
-miden-node-store                 = { branch = "igamigo-tx-notes-proofs", git = "https://github.com/0xMiden/node.git" }
-miden-node-utils                 = { branch = "igamigo-tx-notes-proofs", git = "https://github.com/0xMiden/node.git" }
-miden-node-validator             = { branch = "igamigo-tx-notes-proofs", git = "https://github.com/0xMiden/node.git" }
+miden-node-block-producer        = { version = "0.14" }
+miden-node-ntx-builder           = { version = "0.14" }
+miden-node-proto                 = { version = "0.14" }
+miden-node-proto-build           = { default-features = false, version = "0.14" }
+miden-node-rpc                   = { version = "0.14" }
+miden-node-store                 = { version = "0.14" }
+miden-node-utils                 = { version = "0.14" }
+miden-node-validator             = { version = "0.14" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
 miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.14" }
 
