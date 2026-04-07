@@ -8,6 +8,7 @@ use alloc::vec::Vec;
 
 use js_export_macro::js_export;
 use miden_client::block::BlockNumber;
+use miden_client::builder::DEFAULT_GRPC_TIMEOUT_MS;
 use miden_client::note::{NoteId as NativeNoteId, Nullifier};
 use miden_client::rpc::domain::account::AccountStorageRequirements as NativeAccountStorageRequirements;
 use miden_client::rpc::domain::note::FetchedNote as NativeFetchedNote;
@@ -44,7 +45,7 @@ impl RpcClient {
     /// @param endpoint - Endpoint to connect to.
     #[js_export(constructor)]
     pub fn new(endpoint: Endpoint) -> Result<RpcClient, JsErr> {
-        let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), 10_000));
+        let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), DEFAULT_GRPC_TIMEOUT_MS));
 
         Ok(RpcClient { inner: rpc_client })
     }

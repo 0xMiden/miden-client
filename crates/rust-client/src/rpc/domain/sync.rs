@@ -1,4 +1,4 @@
-use miden_protocol::block::BlockNumber;
+use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::MmrDelta;
 
 use crate::rpc::domain::MissingFieldHelper;
@@ -15,6 +15,8 @@ pub struct ChainMmrInfo {
     pub block_to: BlockNumber,
     /// The MMR delta for the requested block range.
     pub mmr_delta: MmrDelta,
+    /// The block header at `block_to`.
+    pub block_header: BlockHeader,
 }
 
 impl TryFrom<proto::rpc::SyncChainMmrResponse> for ChainMmrInfo {
@@ -30,6 +32,11 @@ impl TryFrom<proto::rpc::SyncChainMmrResponse> for ChainMmrInfo {
             .ok_or(proto::rpc::SyncChainMmrResponse::missing_field(stringify!(mmr_delta)))?
             .try_into()?;
 
+        let block_header = value
+            .block_header
+            .ok_or(proto::rpc::SyncChainMmrResponse::missing_field(stringify!(block_header)))?
+            .try_into()?;
+
         Ok(Self {
             block_from: block_range.block_from.into(),
             block_to: block_range
@@ -39,6 +46,7 @@ impl TryFrom<proto::rpc::SyncChainMmrResponse> for ChainMmrInfo {
                 )))?
                 .into(),
             mmr_delta,
+            block_header,
         })
     }
 }

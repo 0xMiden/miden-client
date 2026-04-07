@@ -163,13 +163,8 @@ impl ClientConfig {
                 .ok()
                 .and_then(|s| s.parse::<u64>().ok())
                 .unwrap_or(10_000);
-            let nt_client = Arc::new(
-                GrpcNoteTransportClient::connect(transport_url.clone(), transport_timeout)
-                    .await
-                    .with_context(|| {
-                        format!("failed to connect note transport at {transport_url}")
-                    })?,
-            );
+            let nt_client =
+                Arc::new(GrpcNoteTransportClient::new(transport_url.clone(), transport_timeout));
             builder = builder.note_transport(nt_client);
         }
 

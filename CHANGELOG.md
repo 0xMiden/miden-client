@@ -4,6 +4,7 @@
 
 ### Enhancements
 
+* Made `GrpcNoteTransportClient` connection lazy, deferring it to the first RPC call instead of connecting eagerly at client initialization ([#1970](https://github.com/0xMiden/miden-client/pull/1970)).
 * Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)) ([#1737](https://github.com/0xMiden/miden-client/pull/1737), [#1809](https://github.com/0xMiden/miden-client/pull/1809)).
 * Added typed error parsing for node RPC endpoints, enabling programmatic error handling instead of string parsing ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).
 * Added `--rpc-status` flag to `miden-client info` command to display RPC node status information including node version, genesis commitment, store status, and block producer status; also added `get_status_unversioned` to `NodeRpcClient` trait ([#1742](https://github.com/0xMiden/miden-client/pull/1742)).
@@ -43,7 +44,7 @@
 * [BREAKING][rename][all] Adapted to upstream protocol 0.14.0 renames: `NoteHeader::commitment()` renamed to `to_commitment()`, `NoteLocation::node_index_in_block()` renamed to `block_note_tree_index()`, `StorageMapKey::inner()` removed (use `Word::from(key)`), `TransactionOutputs::expiration_block_num` field now private (use getter). ([#1926](https://github.com/0xMiden/miden-client/pull/1926))
 * Added an `InputNoteReader` accessible through `client.input_note_reader()` that allows for lazy iterator over all the consumed input notes ([#1843](https://github.com/0xMiden/miden-client/pull/1843), ([#1925](https://github.com/0xMiden/miden-client/pull/1925))).
 * Removed miden-cli template TOMLs in favor of direct serialization into packages ([#1879](https://github.com/0xMiden/miden-client/pull/1879)).
-* [BREAKING] Updated `SyncState` to fetch multiple note updates (([#1941](https://github.com/0xMiden/node/pull/1941))).
+* [BREAKING] Updated `SyncState` to fetch multiple note updates ([#1941](https://github.com/0xMiden/node/pull/1941), [#1963](https://github.com/0xMiden/miden-client/pull/1963)).
 * Unified test environment variables across Rust and web client test suites. `TEST_MIDEN_NETWORK` now acts as a preset that configures all components (RPC, prover, note transport) for `devnet`/`testnet`/`localhost`. Individual env vars (`TEST_MIDEN_RPC_URL`, `TEST_MIDEN_PROVER_URL`, `TEST_MIDEN_NOTE_TRANSPORT_URL`) override specific components. Removed `TEST_MIDEN_RPC_ENDPOINT`, `TEST_WITH_NOTE_TRANSPORT`, `TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT`, and `REMOTE_PROVER` ([#1939](https://github.com/0xMiden/miden-client/pull/1939)).
 
 ### Features

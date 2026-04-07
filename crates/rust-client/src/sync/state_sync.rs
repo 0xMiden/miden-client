@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::crypto::merkle::mmr::{Forest, MmrDelta, PartialMmr};
+use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
 use miden_protocol::note::{Note, NoteId, NoteTag, NoteType, Nullifier};
 use tracing::info;
 
@@ -29,13 +29,10 @@ use crate::transaction::TransactionRecord;
 
 /// Raw data fetched from the node needed to sync the client to the chain tip.
 ///
-/// Aggregates the responses of `get_block_header_by_number`, `sync_chain_mmr`, `sync_notes`,
-/// and `sync_transactions`. This may contain more data than a particular
-/// client needs to store — it is filtered and transformed into a [`StateSyncUpdate`] before being
-/// applied.
+/// Aggregates the responses of `sync_chain_mmr`, `sync_notes`, `get_notes_by_id`, and
+/// `sync_transactions`. This may contain more data than a particular client needs to store — it is
+/// filtered and transformed into a [`StateSyncUpdate`] before being applied.
 struct RawStateSyncData {
-    /// The chain tip at the time of the response.
-    chain_tip: BlockNumber,
     /// MMR delta covering the full range from `current_block` to `chain_tip`.
     mmr_delta: MmrDelta,
     /// Chain tip block header.
@@ -220,16 +217,15 @@ impl StateSync {
 
         let note_tags = Arc::new(note_tags);
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
-        let mut sync_data = self
+        let Some(mut sync_data) = self
             .fetch_sync_data(state_sync_update.block_num, &account_ids, &note_tags)
-            .await?;
-
-        // No progress — already at the tip.
-        if sync_data.chain_tip == state_sync_update.block_num {
+            .await?
+        else {
+            // No progress — already at the tip.
             return Ok(state_sync_update);
-        }
+        };
 
-        state_sync_update.block_num = sync_data.chain_tip;
+        state_sync_update.block_num = sync_data.chain_tip_header.block_num();
 
         // Build input note records for public notes from the fetched note bodies and the
         // inclusion proofs already present in the note blocks.
@@ -259,9 +255,7 @@ impl StateSync {
         )
         .await?;
 
-        // Apply local changes. These involve updating the MMR and applying state transitions
-        // to notes based on the received information.
-        info!("Applying state transitions locally.");
+        // Apply local changes: update the MMR, screen notes, and apply state transitions.
         self.apply_sync_result(
             sync_data,
             &public_note_records,
@@ -271,7 +265,6 @@ impl StateSync {
         .await?;
 
         if self.sync_nullifiers {
-            info!("Syncing nullifiers.");
             self.nullifiers_state_sync(&mut state_sync_update, block_num).await?;
         }
 
@@ -279,65 +272,63 @@ impl StateSync {
     }
 
     /// Fetches the sync data from the node by calling the following endpoints:
-    /// 1. `get_block_header_by_number` — gets the chain tip block header.
-    /// 2. `sync_chain_mmr` — gets the MMR delta to the chain tip.
-    /// 3. `sync_notes` — loops until the full range to the chain tip is covered (handles paginated
+    /// 1. `sync_chain_mmr` — discovers the chain tip, gets the MMR delta and chain tip header.
+    /// 2. `sync_notes` — loops until the full range to the chain tip is covered (handles paginated
     ///    responses).
+    /// 3. `get_notes_by_id` — fetches full metadata for notes with attachments.
     /// 4. `sync_transactions` — gets transaction data for the full range.
     ///
-    /// Returns a [`RawStateSyncData`] where `chain_tip == current_block_num` signals no progress.
+    /// Returns `None` when the client is already at the chain tip (no progress).
     async fn fetch_sync_data(
         &self,
         current_block_num: BlockNumber,
         account_ids: &[AccountId],
         note_tags: &Arc<BTreeSet<NoteTag>>,
-    ) -> Result<RawStateSyncData, ClientError> {
-        info!("Fetching sync data from node.");
+    ) -> Result<Option<RawStateSyncData>, ClientError> {
+        // Step 1: Fetch the MMR delta and chain tip header.
+        let chain_mmr_info = self.rpc_api.sync_chain_mmr(current_block_num, None).await?;
+        let chain_tip = chain_mmr_info.block_to;
 
-        // Step 1: Discover the chain tip.
-        let (chain_tip_header, _) = self.rpc_api.get_block_header_by_number(None, false).await?;
-        let chain_tip = chain_tip_header.block_num();
-
+        // No progress — already at the tip.
         if chain_tip == current_block_num {
-            return Ok(RawStateSyncData {
-                chain_tip,
-                mmr_delta: MmrDelta {
-                    forest: Forest::new(current_block_num.as_usize()),
-                    data: vec![],
-                },
-                chain_tip_header,
-                note_blocks: vec![],
-                public_notes: BTreeMap::new(),
-                account_commitment_updates: vec![],
-                transactions: vec![],
-                nullifiers: vec![],
-            });
+            info!(block_num = %current_block_num, "Already at chain tip, nothing to sync.");
+            return Ok(None);
         }
 
-        // Fetch the MMR delta to the chain tip.
-        let chain_mmr_info =
-            self.rpc_api.sync_chain_mmr(current_block_num, Some(chain_tip)).await?;
+        info!(
+            block_from = %current_block_num,
+            block_to = %chain_tip,
+            "Syncing state.",
+        );
 
-        // Step 2: Paginate sync_notes over the full range, then fetch note details in one call.
+        // Step 2: Paginate sync_notes using the same chain tip so MMR paths are opened at
+        // a consistent forest.
         let sync_notes_result = self
             .rpc_api
             .sync_notes_with_details(current_block_num, Some(chain_tip), note_tags.as_ref())
             .await?;
 
+        let note_count: usize = sync_notes_result.blocks.iter().map(|b| b.notes.len()).sum();
+        info!(
+            blocks_with_notes = sync_notes_result.blocks.len(),
+            notes = note_count,
+            public_notes = sync_notes_result.public_notes.len(),
+            "Fetched note sync data.",
+        );
+
         // Step 3: Gather transactions for tracked accounts over the full range.
         let (account_commitment_updates, transactions, nullifiers) =
             self.fetch_transaction_data(current_block_num, chain_tip, account_ids).await?;
 
-        Ok(RawStateSyncData {
-            chain_tip,
+        Ok(Some(RawStateSyncData {
             mmr_delta: chain_mmr_info.mmr_delta,
-            chain_tip_header,
+            chain_tip_header: chain_mmr_info.block_header,
             note_blocks: sync_notes_result.blocks,
             public_notes: sync_notes_result.public_notes,
             account_commitment_updates,
             transactions,
             nullifiers,
-        })
+        }))
     }
 
     /// Fetches transaction data for the given range and account IDs.
@@ -357,20 +348,21 @@ impl StateSync {
             .sync_transactions(block_from, Some(block_to), account_ids.to_vec())
             .await?;
 
-        let account_updates = derive_account_commitment_updates(&tx_info.transaction_records);
+        let transaction_records = tx_info.transaction_records;
 
-        let tx_inclusions = tx_info
-            .transaction_records
-            .iter()
+        let account_updates = derive_account_commitment_updates(&transaction_records);
+        let nullifiers = compute_ordered_nullifiers(&transaction_records);
+
+        let tx_inclusions = transaction_records
+            .into_iter()
             .map(|r| TransactionInclusion {
                 transaction_id: r.transaction_header.id(),
                 block_num: r.block_num,
                 account_id: r.transaction_header.account_id(),
                 initial_state_commitment: r.transaction_header.initial_state_commitment(),
+                output_notes: r.output_notes,
             })
             .collect();
-
-        let nullifiers = compute_ordered_nullifiers(&tx_info.transaction_records);
 
         Ok((account_updates, tx_inclusions, nullifiers))
     }
@@ -462,6 +454,15 @@ impl StateSync {
             &chain_tip_header,
             &transactions,
         );
+
+        // Transition tracked output notes to Committed using inclusion proofs from the
+        // transaction sync response. This covers output notes regardless of whether their
+        // tags were tracked in the note sync.
+        for transaction in &transactions {
+            state_sync_update
+                .note_updates
+                .apply_output_note_inclusion_proofs(&transaction.output_notes)?;
+        }
 
         Ok(())
     }
@@ -832,6 +833,7 @@ mod tests {
                     vec![],
                     fee,
                 ),
+                output_notes: vec![],
             }
         }
 
@@ -881,6 +883,7 @@ mod tests {
                     vec![],
                     fee,
                 ),
+                output_notes: vec![],
             };
 
             let result = super::super::compute_ordered_nullifiers(&[tx_a2, tx_b1, tx_a3, tx_a1]);
@@ -1202,10 +1205,11 @@ mod tests {
         let sync_data = state_sync
             .fetch_sync_data(BlockNumber::GENESIS, &[], &Arc::new(note_tags.clone()))
             .await
-            .unwrap();
+            .unwrap()
+            .expect("should have progressed past genesis");
 
         // Should have advanced to the chain tip.
-        assert_eq!(sync_data.chain_tip, chain_tip);
+        assert_eq!(sync_data.chain_tip_header.block_num(), chain_tip);
         assert!(!sync_data.note_blocks.is_empty(), "should have note blocks");
 
         // Apply the MMR delta and add the chain tip block.
