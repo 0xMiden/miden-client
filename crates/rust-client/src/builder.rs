@@ -441,16 +441,10 @@ where
             && let Some(config) = self.note_transport_config
         {
             #[cfg(not(target_arch = "wasm32"))]
-            let transport = crate::note_transport::grpc::GrpcNoteTransportClient::connect(
+            let transport = crate::note_transport::grpc::GrpcNoteTransportClient::new(
                 config.endpoint,
                 config.timeout_ms,
-            )
-            .await
-            .map_err(|e| {
-                ClientError::ClientInitializationError(format!(
-                    "Failed to connect to note transport: {e}"
-                ))
-            })?;
+            );
 
             #[cfg(target_arch = "wasm32")]
             let transport =
