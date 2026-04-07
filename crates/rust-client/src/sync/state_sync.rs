@@ -45,9 +45,6 @@ struct RawStateSyncData {
     account_commitment_updates: Vec<(AccountId, Word)>,
     /// Transaction inclusions for the synced range.
     transactions: Vec<TransactionInclusion>,
-    /// Output notes from committed transactions, with inclusion proofs.
-    /// Used to transition tracked output notes to `Committed` state.
-    transaction_output_notes: Vec<CommittedNote>,
     /// Nullifiers for the synced range.
     nullifiers: Vec<Nullifier>,
 }
@@ -310,7 +307,7 @@ impl StateSync {
             .await?;
 
         // Step 3: Gather transactions for tracked accounts over the full range.
-        let (account_commitment_updates, transactions, transaction_output_notes, nullifiers) =
+        let (account_commitment_updates, transactions, nullifiers) =
             self.fetch_transaction_data(current_block_num, chain_tip, account_ids).await?;
 
         Ok(Some(RawStateSyncData {
@@ -320,7 +317,6 @@ impl StateSync {
             public_notes: sync_notes_result.public_notes,
             account_commitment_updates,
             transactions,
-            transaction_output_notes,
             nullifiers,
         }))
     }
@@ -331,17 +327,10 @@ impl StateSync {
         block_from: BlockNumber,
         block_to: BlockNumber,
         account_ids: &[AccountId],
-    ) -> Result<
-        (
-            Vec<(AccountId, Word)>,
-            Vec<TransactionInclusion>,
-            Vec<CommittedNote>,
-            Vec<Nullifier>,
-        ),
-        ClientError,
-    > {
+    ) -> Result<(Vec<(AccountId, Word)>, Vec<TransactionInclusion>, Vec<Nullifier>), ClientError>
+    {
         if account_ids.is_empty() {
-            return Ok((vec![], vec![], vec![], vec![]));
+            return Ok((vec![], vec![], vec![]));
         }
 
         let tx_info = self
@@ -349,28 +338,23 @@ impl StateSync {
             .sync_transactions(block_from, Some(block_to), account_ids.to_vec())
             .await?;
 
-        let account_updates = derive_account_commitment_updates(&tx_info.transaction_records);
+        let transaction_records = tx_info.transaction_records;
 
-        let tx_inclusions = tx_info
-            .transaction_records
-            .iter()
+        let account_updates = derive_account_commitment_updates(&transaction_records);
+        let nullifiers = compute_ordered_nullifiers(&transaction_records);
+
+        let tx_inclusions = transaction_records
+            .into_iter()
             .map(|r| TransactionInclusion {
                 transaction_id: r.transaction_header.id(),
                 block_num: r.block_num,
                 account_id: r.transaction_header.account_id(),
                 initial_state_commitment: r.transaction_header.initial_state_commitment(),
+                output_notes: r.output_notes,
             })
             .collect();
 
-        let output_notes: Vec<CommittedNote> = tx_info
-            .transaction_records
-            .iter()
-            .flat_map(|r| r.output_notes.iter().cloned())
-            .collect();
-
-        let nullifiers = compute_ordered_nullifiers(&tx_info.transaction_records);
-
-        Ok((account_updates, tx_inclusions, output_notes, nullifiers))
+        Ok((account_updates, tx_inclusions, nullifiers))
     }
 
     // HELPERS
@@ -395,7 +379,6 @@ impl StateSync {
             note_blocks,
             nullifiers,
             transactions,
-            transaction_output_notes,
             ..
         } = sync_data;
 
@@ -465,9 +448,11 @@ impl StateSync {
         // Transition tracked output notes to Committed using inclusion proofs from the
         // transaction sync response. This covers output notes regardless of whether their
         // tags were tracked in the note sync.
-        state_sync_update
-            .note_updates
-            .apply_output_note_inclusion_proofs(&transaction_output_notes)?;
+        for transaction in &transactions {
+            state_sync_update
+                .note_updates
+                .apply_output_note_inclusion_proofs(&transaction.output_notes)?;
+        }
 
         Ok(())
     }

@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
-use miden_protocol::asset::FungibleAsset;
+use miden_protocol::asset::Asset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{NoteHeader, Nullifier};
 use miden_protocol::transaction::{
@@ -16,9 +16,8 @@ use miden_protocol::transaction::{
 use super::note::CommittedNote;
 use crate::rpc::{RpcConversionError, RpcError, generated as proto};
 
-// TODO: Remove this when we turn on fees and the node informs the correct asset account ID
-
 /// A native asset faucet ID for use in testing scenarios.
+#[cfg(test)]
 pub const ACCOUNT_ID_NATIVE_ASSET_FAUCET: u128 = 0xab00_0000_0000_cd20_0000_ac00_0000_de00_u128;
 
 // INTO TRANSACTION ID
@@ -57,7 +56,7 @@ impl From<TransactionId> for proto::transaction::TransactionId {
 // ================================================================================================
 
 /// Represents a transaction that was included in the node at a certain block.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct TransactionInclusion {
     /// The transaction identifier.
     pub transaction_id: TransactionId,
@@ -67,6 +66,8 @@ pub struct TransactionInclusion {
     pub account_id: AccountId,
     /// The initial account state commitment before the transaction was executed.
     pub initial_state_commitment: Word,
+    /// Output notes from this transaction, with inclusion proofs.
+    pub output_notes: Vec<CommittedNote>,
 }
 
 // TRANSACTIONS INFO
@@ -209,15 +210,30 @@ fn convert_transaction_header(
         committed_output_notes.push(note);
     }
 
+    let fee_asset: Asset = value
+        .fee
+        .ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
+            entity: "TransactionHeader",
+            field_name: "fee",
+        })?
+        .try_into()?;
+
+    let fee = match fee_asset {
+        Asset::Fungible(fungible) => fungible,
+        Asset::NonFungible(_) => {
+            return Err(RpcError::InvalidResponse(
+                "expected fungible asset for transaction fee".into(),
+            ));
+        },
+    };
+
     let transaction_header = TransactionHeader::new(
         account_id.try_into()?,
         initial_state_commitment.try_into()?,
         final_state_commitment.try_into()?,
         input_notes,
         output_note_headers,
-        // TODO: handle this; should we open an issue in miden-node?
-        FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("is valid"), 0u64)
-            .unwrap(),
+        fee,
     );
     Ok((transaction_header, committed_output_notes))
 }
