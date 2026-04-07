@@ -288,6 +288,55 @@ async fn input_note_reader_filters_by_consumer_and_block_range() {
     }
 }
 
+/// Reproducer for the `InputNoteReader` external-consumption bug.
+///
+/// When a client tracks a note targeted at some other account, and that other account
+/// consumes the note in a transaction NOT executed by this client (e.g. via the network
+/// transaction builder, or simply by another client against the same node), sync transitions
+/// the note to `ConsumedExternalNoteState`. That state carries no consumer account, so the
+/// `consumer_account_id` column in the DB is NULL.
+///
+/// `Client::input_note_reader(consumer)` filters by `consumer_account_id IN (?)`, so it can
+/// never return such notes — even though the API signature strongly suggests it should
+/// surface every note consumed by `consumer`.
+///
+/// This test fails today: the reader returns 0 notes instead of 1.
+#[tokio::test]
+async fn input_note_reader_finds_externally_consumed_notes() {
+    let store = create_test_store().await;
+    let consumer = AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
+
+    // Note was consumed externally (e.g. by `consumer` via a network tx). The local client
+    // observed only the nullifier on chain, so it landed in ConsumedExternalNoteState.
+    let mut note = create_consumed_external_input_note(0, 1);
+    // The block sync sets a tx order on the nullifier, so populate it to mirror reality.
+    note.set_consumed_tx_order(Some(0));
+
+    store.upsert_input_notes(&[note.clone()]).await.unwrap();
+
+    // Sanity: the note IS in the store as Consumed.
+    let in_store = store.get_input_notes(NoteFilter::Consumed).await.unwrap();
+    assert_eq!(in_store.len(), 1);
+    assert_eq!(in_store[0].id(), note.id());
+
+    // But the reader keyed by the (presumed) consumer cannot find it.
+    let store: Arc<dyn Store> = Arc::new(store);
+    let mut reader = InputNoteReader::new(store, consumer);
+
+    let mut collected = Vec::new();
+    while let Some(n) = reader.next().await.unwrap() {
+        collected.push(n);
+    }
+
+    assert_eq!(
+        collected.len(),
+        1,
+        "InputNoteReader should return externally-consumed notes when queried by their consumer, \
+         but got {} notes. See the issue tracker for context.",
+        collected.len()
+    );
+}
+
 // ORDERING TESTS (INPUT NOTES)
 // ================================================================================================
 
