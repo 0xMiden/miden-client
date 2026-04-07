@@ -324,7 +324,7 @@ impl GrpcClient {
                     .map(|map| map.name().to_string());
                 let account_request = AccountRequest {
                     account_id: Some(account_id.into()),
-                    block_num: None,
+                    block_num: Some(block_number),
                     details: Some(AccountDetailRequest {
                         code_commitment: Some(EMPTY_WORD.into()),
                         asset_vault_commitment: Some(EMPTY_WORD.into()),
@@ -357,6 +357,7 @@ impl GrpcClient {
         &self,
         account_id: AccountId,
         storage_details: &AccountStorageDetails,
+        block_to: Option<BlockNumber>,
     ) -> Result<Vec<StorageSlot>, RpcError> {
         let mut slots = vec![];
         // `SyncStorageMaps` will return information for *every* map for a given account, so this
@@ -389,7 +390,7 @@ impl GrpcClient {
                             info
                         } else {
                             let fetched_data =
-                                self.sync_storage_maps(0_u32.into(), None, account_id).await?;
+                                self.sync_storage_maps(0_u32.into(), block_to, account_id).await?;
                             map_cache.insert(fetched_data)
                         };
                         // The sync endpoint may return multiple updates for the same key
@@ -637,12 +638,14 @@ impl NodeRpcClient for GrpcClient {
             let account_id = details.header.id();
             let nonce = details.header.nonce();
             let assets = if details.vault_details.too_many_assets {
-                self.fetch_full_vault(account_id, None).await?
+                self.fetch_full_vault(account_id, Some(block_number)).await?
             } else {
                 details.vault_details.assets
             };
 
-            let slots = self.build_storage_slots(account_id, &details.storage_details).await?;
+            let slots = self
+                .build_storage_slots(account_id, &details.storage_details, Some(block_number))
+                .await?;
             let seed = None;
             let asset_vault = AssetVault::new(&assets).map_err(|err| {
                 RpcError::InvalidResponse(format!("api rpc returned non-valid assets: {err}"))
