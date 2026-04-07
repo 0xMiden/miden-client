@@ -392,12 +392,10 @@ impl WebClient {
             Endpoint::try_from(url.as_str()).map_err(|_| from_str_err("Invalid node URL"))
         })?;
 
-        let rpc_client = Arc::new(GrpcClient::new(&endpoint, 10_000));
+        let rpc_client = Arc::new(GrpcClient::new(&endpoint, DEFAULT_GRPC_TIMEOUT_MS));
 
         let note_transport_client = if let Some(url) = node_note_transport_url {
-            let client = GrpcNoteTransportClient::connect(url, 10_000)
-                .await
-                .map_err(|e| from_str_err(&format!("Failed to connect note transport: {e}")))?;
+            let client = GrpcNoteTransportClient::new(url, DEFAULT_GRPC_TIMEOUT_MS);
             Some(Arc::new(client) as Arc<dyn NoteTransportClient>)
         } else {
             None

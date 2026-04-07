@@ -78,3 +78,6 @@ export declare class MockWasmWebClient extends WasmWebClient {
   serializeMockChain(): Uint8Array;
   serializeMockNoteTransportNode(): Uint8Array;
 }
+
+/** Alias for MockWasmWebClient — used by test apps that import MockWebClient directly. */
+export { MockWasmWebClient as MockWebClient };
