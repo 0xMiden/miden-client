@@ -38,16 +38,11 @@ use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::crypto::FeltRng;
 use miden_client::note::NoteAssets;
-use miden_client::testing::common::{
-    insert_new_wallet,
-    wait_for_blocks,
-    wait_for_consumable_notes,
-    wait_for_tx,
-};
+use miden_client::testing::common::{insert_new_wallet, wait_for_consumable_notes, wait_for_tx};
 use miden_client::transaction::TransactionRequestBuilder;
 
 use super::agglayer_test_utils::generate_claim_data_for_account;
-use super::{AgglayerConfig, create_agglayer_clients, setup_core_accounts};
+use super::{AgglayerConfig, create_agglayer_clients, setup_core_accounts, wait_for_note_consumed};
 use crate::tests::config::ClientConfig;
 
 // BRIDGE-IN-OUT TEST
@@ -181,6 +176,7 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
                 bridge_id,
                 bridge_admin.client.rng(),
             )?;
+            let config_note_id = config_note.id();
             let config_output_tx = TransactionRequestBuilder::new()
                 .own_output_notes(vec![config_note.clone()])
                 .build()?;
@@ -194,8 +190,8 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
             // Wait for bridge to consume the config note as network transaction.
             // In CI, the node's network transaction queue may be congested from parallel tests,
             // so we allow more blocks than the minimum needed locally.
-            wait_for_blocks(&mut bridge_admin.client, 5).await;
-            println!("[bridge_in_out] Waited for bridge to consume CONFIG_AGG_BRIDGE note");
+            wait_for_note_consumed(&mut bridge_admin.client, bridge_id, config_note_id, 30).await?;
+            println!("[bridge_in_out] Bridge consumed CONFIG_AGG_BRIDGE note (via NoteReader)");
 
             (agglayer_faucet.id(), origin_token_address, scale)
         },
@@ -226,6 +222,7 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
 
     let update_ger_note =
         UpdateGerNote::create(ger, ger_manager_id, bridge_id, ger_manager.client.rng())?;
+    let update_ger_note_id = update_ger_note.id();
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![update_ger_note])
         .build()?;
@@ -235,8 +232,8 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
 
     // Wait for bridge to consume the UPDATE_GER note.
     // Allow extra blocks for CI where the node processes many concurrent network transactions.
-    wait_for_blocks(&mut ger_manager.client, 5).await;
-    println!("[bridge_in_out] Waited for bridge to consume UPDATE_GER note");
+    wait_for_note_consumed(&mut ger_manager.client, bridge_id, update_ger_note_id, 30).await?;
+    println!("[bridge_in_out] Bridge consumed UPDATE_GER note (via NoteReader)");
 
     let miden_claim_amount = leaf_data
         .amount
@@ -251,15 +248,19 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
     };
     let claim_note =
         create_claim_note(claim_inputs, bridge_id, ger_manager_id, ger_manager.client.rng())?;
+    let claim_note_id = claim_note.id();
     let tx_request = TransactionRequestBuilder::new().own_output_notes(vec![claim_note]).build()?;
     let tx_id = ger_manager.client.submit_new_transaction(ger_manager_id, tx_request).await?;
     wait_for_tx(&mut ger_manager.client, tx_id).await?;
     println!("[bridge_in_out] CLAIM note submitted");
 
-    // Wait for agglayer faucet to consume the CLAIM note and create P2ID note.
+    // Wait for agglayer faucet to consume the CLAIM note (detected via NoteReader).
     // The faucet processes the CLAIM as a network transaction and outputs a P2ID note
-    // targeting the destination account. This involves a multi-step chain of network
-    // transactions, so we poll with retries rather than waiting a fixed number of blocks.
+    // targeting the destination account.
+    wait_for_note_consumed(&mut ger_manager.client, agglayer_faucet_id, claim_note_id, 30).await?;
+    println!("[bridge_in_out] Faucet consumed CLAIM note (via NoteReader)");
+
+    // Now wait for the resulting P2ID note to become consumable by destination
     let consumable_notes =
         wait_for_consumable_notes(&mut user.client, destination_account.id(), 30).await;
     println!(
@@ -306,6 +307,7 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
         destination_account.id(),
         user.client.rng(),
     )?;
+    let b2agg_note_id = b2agg_note.id();
     println!("[bridge_in_out] B2AGG note created with amount: {}", bridge_out_amount);
 
     let b2agg_output_tx =
@@ -319,8 +321,53 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
 
     // Wait for bridge to consume the B2AGG note as network transaction.
     // Allow extra blocks for CI where the node processes many concurrent network transactions.
-    wait_for_blocks(&mut user.client, 5).await;
-    println!("[bridge_in_out] Waited for bridge to consume B2AGG note");
+    wait_for_note_consumed(&mut user.client, bridge_id, b2agg_note_id, 30).await?;
+    println!("[bridge_in_out] Bridge consumed B2AGG note (via NoteReader)");
+
+    // ============================================================================================
+    // SUMMARY: NoteReader indexer verification
+    // ============================================================================================
+    user.client.sync_state().await?;
+
+    println!("[NoteReader] Notes consumed by bridge:");
+    let update_ger_script = UpdateGerNote::script();
+    let mut bridge_reader = user.client.input_note_reader(bridge_id);
+    let mut bridge_count = 0u32;
+    while let Some(note) = bridge_reader.next().await? {
+        bridge_count += 1;
+        if note.details().script() == &update_ger_script {
+            println!(
+                "[NoteReader]   #{}: note_id={} (UPDATE_GER), state={}, storage={:?}",
+                bridge_count,
+                note.id().to_hex(),
+                note.state(),
+                note.details().storage().items(),
+            );
+        } else {
+            println!(
+                "[NoteReader]   #{}: note_id={}, state={}",
+                bridge_count,
+                note.id().to_hex(),
+                note.state(),
+            );
+        }
+    }
+    println!("[NoteReader] Bridge consumed {} notes total", bridge_count);
+
+    println!("[NoteReader] Notes consumed by faucet:");
+    let mut faucet_reader = user.client.input_note_reader(agglayer_faucet_id);
+    let mut faucet_count = 0u32;
+    while let Some(note) = faucet_reader.next().await? {
+        faucet_count += 1;
+        println!(
+            "[NoteReader]   #{}: note_id={}, state={}, assets={:?}",
+            faucet_count,
+            note.id().to_hex(),
+            note.state(),
+            note.assets(),
+        );
+    }
+    println!("[NoteReader] Faucet consumed {} notes total", faucet_count);
 
     println!("[bridge_in_out] Test completed successfully");
     Ok(())
