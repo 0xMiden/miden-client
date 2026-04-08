@@ -59,7 +59,7 @@ miden-remote-prover-client       = { default-features = false, features = ["tx-p
 miden-debug = { default-features = false, features = [
   "dap",
   "std",
-], path = "../miden-debug" }
+], version = "0.6" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
@@ -86,13 +86,3 @@ must_use_candidate          = "allow" # This marks many fn's which isn't helpful
 should_panic_without_expect = "allow" # We don't care about the specific panic message.
 # End of pedantic lints.
 
-# Patch VM crates to miden-vm main for unreleased `into_parts()` needed by miden-debug DAP
-# TODO: This will go.
-[patch.crates-io]
-miden-air               = { git = "https://github.com/0xMiden/miden-vm.git", rev = "2327f4a5c04c7a6ec3aa612612a3fc993d383dc3" }
-miden-core              = { git = "https://github.com/0xMiden/miden-vm.git", rev = "2327f4a5c04c7a6ec3aa612612a3fc993d383dc3" }
-miden-debug-types       = { git = "https://github.com/0xMiden/miden-vm.git", rev = "2327f4a5c04c7a6ec3aa612612a3fc993d383dc3" }
-miden-processor         = { git = "https://github.com/0xMiden/miden-vm.git", rev = "2327f4a5c04c7a6ec3aa612612a3fc993d383dc3" }
-miden-utils-core-derive = { git = "https://github.com/0xMiden/miden-vm.git", rev = "2327f4a5c04c7a6ec3aa612612a3fc993d383dc3" }
-miden-utils-diagnostics = { git = "https://github.com/0xMiden/miden-vm.git", rev = "2327f4a5c04c7a6ec3aa612612a3fc993d383dc3" }
-miden-utils-indexing    = { git = "https://github.com/0xMiden/miden-vm.git", rev = "2327f4a5c04c7a6ec3aa612612a3fc993d383dc3" }
