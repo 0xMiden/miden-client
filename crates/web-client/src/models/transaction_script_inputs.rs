@@ -61,6 +61,6 @@ impl From<TransactionScriptInputPairArray> for Vec<(NativeWord, Vec<NativeFelt>)
 
 impl From<&TransactionScriptInputPairArray> for Vec<(NativeWord, Vec<NativeFelt>)> {
     fn from(transaction_script_input_pair_array: &TransactionScriptInputPairArray) -> Self {
-        transaction_script_input_pair_array.into_iter().map(Into::into).collect()
+        transaction_script_input_pair_array.iter().map(Into::into).collect()
     }
 }
