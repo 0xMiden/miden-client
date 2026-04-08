@@ -89,6 +89,7 @@ export { createP2IDNote, createP2IDENote, buildSwapTag };
 export {
   _WasmWebClient as WasmWebClient,
   _MockWasmWebClient as MockWasmWebClient,
+  _MockWasmWebClient as MockWebClient,
 };
 
 // Re-export all napi SDK types (equivalent to browser's `export * from "../Cargo.toml"`).
@@ -176,6 +177,14 @@ export const TransactionRequestBuilder = /* @__PURE__ */ _reexport(
 export const NetworkId = /* @__PURE__ */ _reexport("NetworkId");
 export const RpcClient = /* @__PURE__ */ _reexport("RpcClient");
 export const Endpoint = /* @__PURE__ */ _reexport("Endpoint");
+
+// Transaction result / sync types
+export const SyncSummary = /* @__PURE__ */ _reexport("SyncSummary");
+export const TransactionResult = /* @__PURE__ */ _reexport("TransactionResult");
+
+// Store import/export
+export const exportStore = /* @__PURE__ */ _reexport("exportStore");
+export const importStore = /* @__PURE__ */ _reexport("importStore");
 
 // Misc
 export const AdviceMap = /* @__PURE__ */ _reexport("AdviceMap");
