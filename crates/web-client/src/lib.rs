@@ -132,15 +132,17 @@ unsafe impl Sync for WebClient {}
 // Prevent deadpool's Drop from panicking on Node.js process exit.
 // When napi's Tokio runtime shuts down, the SQLite connection pool tries to
 // spawn_blocking during Drop, but the runtime is already gone. This causes a
-// panic-in-panic (SIGABRT). Since the OS reclaims all resources on exit anyway,
-// we intentionally leak the client to avoid the crash.
+// panic-in-panic (SIGABRT).
+//
+// We only leak when the runtime is already gone (process shutdown). During
+// normal operation, the regular Drop chain runs so resources are released.
 #[cfg(feature = "nodejs")]
 impl Drop for WebClient {
     fn drop(&mut self) {
-        // Take ownership of the inner Mutex contents and forget them,
-        // preventing the deadpool Drop chain from running.
-        let inner = std::mem::replace(&mut self.inner, AsyncCell::new(None));
-        std::mem::forget(inner);
+        if tokio::runtime::Handle::try_current().is_err() {
+            let inner = std::mem::replace(&mut self.inner, AsyncCell::new(None));
+            std::mem::forget(inner);
+        }
     }
 }
 
