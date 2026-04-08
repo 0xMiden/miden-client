@@ -37,6 +37,7 @@ use crate::rpc::domain::note::{
     NoteSyncInfo,
 };
 use crate::rpc::domain::nullifier::NullifierUpdate;
+use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::sync::ChainMmrInfo;
 use crate::rpc::domain::transaction::{TransactionRecord, TransactionsInfo};
@@ -695,6 +696,13 @@ impl NodeRpcClient for MockRpcApi {
             store: None,
             block_producer: None,
         })
+    }
+
+    async fn get_network_note_status(
+        &self,
+        _note_id: NoteId,
+    ) -> Result<NetworkNoteStatusInfo, RpcError> {
+        todo!("We need to check if we want to implement this for the mockchain");
     }
 }
 

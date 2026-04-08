@@ -39,6 +39,7 @@ use super::{
     Endpoint, FetchedAccount, NodeRpcClient, RpcEndpoint, NoteSyncInfo, RpcError,
     RpcStatusInfo,
 };
+use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::sync::ChainMmrInfo;
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
@@ -1081,6 +1082,21 @@ impl NodeRpcClient for GrpcClient {
 
     async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {
         GrpcClient::get_status_unversioned(self).await
+    }
+
+    async fn get_network_note_status(
+        &self,
+        note_id: NoteId,
+    ) -> Result<NetworkNoteStatusInfo, RpcError> {
+        let request = proto::note::NoteId { id: Some(note_id.into()) };
+
+        let response = self
+            .call_with_retry(RpcEndpoint::GetNetworkNoteStatus, |mut rpc_api| {
+                Box::pin(async move { rpc_api.get_network_note_status(request).await })
+            })
+            .await?;
+
+        response.into_inner().try_into()
     }
 }
 
