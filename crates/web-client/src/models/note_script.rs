@@ -4,6 +4,7 @@ use miden_client::note::NoteScript as NativeNoteScript;
 use miden_standards::note::StandardNote;
 
 use super::word::Word;
+use crate::js_error_with_context;
 use crate::models::package::Package;
 use crate::platform::{JsBytes, JsErr};
 use crate::utils::{deserialize_from_bytes, serialize_to_bytes};
@@ -56,11 +57,13 @@ impl NoteScript {
     }
 
     /// Creates a `NoteScript` from the given `Package`.
-    /// Throws if the package is invalid.
+    /// The package must contain a library with exactly one procedure annotated with
+    /// `@note_script`.
     #[js_export(js_name = "fromPackage")]
     pub fn from_package(package: &Package) -> Result<NoteScript, JsErr> {
-        let program = package.as_program()?;
-        let native_note_script = NativeNoteScript::new(program.into());
+        let native_package: miden_client::vm::Package = package.into();
+        let native_note_script = NativeNoteScript::from_package(&native_package)
+            .map_err(|e| js_error_with_context(e, "failed to create note script from package"))?;
         Ok(native_note_script.into())
     }
 }

@@ -31,7 +31,7 @@ impl Package {
             return Err(from_str_err("Package does not contain a library"));
         }
 
-        let native_library = self.0.unwrap_library();
+        let native_library = self.0.mast.clone();
         Ok((*native_library).clone().into())
     }
 
@@ -43,8 +43,8 @@ impl Package {
             return Err(from_str_err("Package does not contain a program"));
         }
 
-        let native_program = self.0.unwrap_program();
-        Ok((*native_program).clone().into())
+        let native_program = self.0.try_into_program().map_err(|e| from_str_err(&e.to_string()))?;
+        Ok(native_program.into())
     }
 }
 

@@ -193,7 +193,7 @@ impl AccountComponent {
         storage_slots: StorageSlotArray,
     ) -> Result<AccountComponent, JsErr> {
         let native_package: NativePackage = package.into();
-        let native_library = native_package.unwrap_library().as_ref().clone();
+        let native_library = (*native_package.mast).clone();
         let items: Vec<StorageSlot> = storage_slots.into();
         let native_slots: Vec<NativeStorageSlot> =
             items.into_iter().map(std::convert::Into::into).collect();

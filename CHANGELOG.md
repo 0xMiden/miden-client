@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.14.0 (TBD)
+## 0.14.0 (2026-04-07)
 
 ### Enhancements
 
@@ -20,6 +20,7 @@
 * Added automatic registration of note scripts required by network transactions (NTX). The client now checks the node's script registry before submitting a transaction and registers any missing scripts via a separate registration transaction ([#1840](https://github.com/0xMiden/miden-client/pull/1840)).
 * Added automatic retry for rate-limited (`ResourceExhausted`) and transiently unavailable RPC calls in `GrpcClient`, with up to 5 attempts and `retry-after` header support ([#1928](https://github.com/0xMiden/miden-client/pull/1928)).
 * Added client methods to prune account history (commitments of previous nonces, alongside its orphaned account code) ([#1886](https://github.com/0xMiden/miden-client/pull/1886)).
+* Changed the sync state to track the consumer account on externally-consumed notes, so the `InputNoteReader` can return notes even if the transaction was not locally executed ([#1973](https://github.com/0xMiden/miden-client/pull/1973)).
 
 ### Changes
 
@@ -46,6 +47,7 @@
 * Removed miden-cli template TOMLs in favor of direct serialization into packages ([#1879](https://github.com/0xMiden/miden-client/pull/1879)).
 * [BREAKING] Updated `SyncState` to fetch multiple note updates ([#1941](https://github.com/0xMiden/node/pull/1941), [#1963](https://github.com/0xMiden/miden-client/pull/1963)).
 * Unified test environment variables across Rust and web client test suites. `TEST_MIDEN_NETWORK` now acts as a preset that configures all components (RPC, prover, note transport) for `devnet`/`testnet`/`localhost`. Individual env vars (`TEST_MIDEN_RPC_URL`, `TEST_MIDEN_PROVER_URL`, `TEST_MIDEN_NOTE_TRANSPORT_URL`) override specific components. Removed `TEST_MIDEN_RPC_ENDPOINT`, `TEST_WITH_NOTE_TRANSPORT`, `TEST_MIDEN_NOTE_TRANSPORT_ENDPOINT`, and `REMOTE_PROVER` ([#1939](https://github.com/0xMiden/miden-client/pull/1939)).
+* [BREAKING] Updated miden-node crates to v0.14.3 and adapted to upstream package-related changes: `MastArtifact` and `PackageKind` removed, `Package::mast` is now `Arc<Library>`, `PackageManifest::new()` returns `Result`, `assemble_library()` returns `Arc<Library>`([#1972](https://github.com/0xMiden/miden-client/pull/1972)).
 
 ### Features
 

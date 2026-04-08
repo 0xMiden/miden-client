@@ -155,7 +155,10 @@ impl BlockUpdates {
 /// Contains transaction changes to apply to the store.
 #[derive(Default)]
 pub struct TransactionUpdateTracker {
+    /// Transactions that were committed in the block.
     transactions: BTreeMap<TransactionId, TransactionRecord>,
+    /// Nullifier-to-account mappings from external transactions by tracked accounts.
+    external_nullifier_accounts: BTreeMap<Nullifier, AccountId>,
 }
 
 impl TransactionUpdateTracker {
@@ -164,7 +167,10 @@ impl TransactionUpdateTracker {
         let transactions =
             transactions.into_iter().map(|tx| (tx.id, tx)).collect::<BTreeMap<_, _>>();
 
-        Self { transactions }
+        Self {
+            transactions,
+            external_nullifier_accounts: BTreeMap::new(),
+        }
     }
 
     /// Returns a reference to committed transactions.
@@ -195,6 +201,12 @@ impl TransactionUpdateTracker {
             .map(|tx| tx.id)
     }
 
+    /// Returns the account ID that consumed the given nullifier in an external transaction, if
+    /// available.
+    pub fn external_nullifier_account(&self, nullifier: &Nullifier) -> Option<AccountId> {
+        self.external_nullifier_accounts.get(nullifier).copied()
+    }
+
     /// Applies the necessary state transitions to the [`TransactionUpdateTracker`] when a
     /// transaction is included in a block.
     pub fn apply_transaction_inclusion(
@@ -216,6 +228,15 @@ impl TransactionUpdateTracker {
                 && tx.details.init_account_state == transaction_inclusion.initial_state_commitment
         }) {
             transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
+            return;
+        }
+
+        // No local transaction matched. This is an external transaction by a tracked account.
+        // Record the nullifier→account mappings so we can attribute note consumption to tracked
+        // accounts during nullifier processing.
+        for nullifier in &transaction_inclusion.nullifiers {
+            self.external_nullifier_accounts
+                .insert(*nullifier, transaction_inclusion.account_id);
         }
     }
 
