@@ -256,7 +256,7 @@ where
 
             if let Some(Some(block_height)) = nullifier_commit_heights.get(&note_record.nullifier())
             {
-                if note_record.consumed_externally(note_record.nullifier(), *block_height)? {
+                if note_record.consumed_externally(note_record.nullifier(), *block_height, None)? {
                     note_records.push(Some(note_record));
                 }
 

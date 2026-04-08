@@ -56,8 +56,7 @@ pub enum InputNoteState {
     ConsumedAuthenticatedLocal(ConsumedAuthenticatedLocalNoteState),
     /// Unauthenticated note consumed locally by the client and confirmed by the network.
     ConsumedUnauthenticatedLocal(ConsumedUnauthenticatedLocalNoteState),
-    /// Note consumed by an external account (e.g. an account not tracked by the client) and
-    /// confirmed by the network.
+    /// Note consumed by a transaction not submitted by this client and confirmed by the network.
     ConsumedExternal(ConsumedExternalNoteState),
 }
 
@@ -161,13 +160,14 @@ impl InputNoteState {
         self.inner().inclusion_proof_received(inclusion_proof, metadata)
     }
 
-    /// Returns a new state to reflect that the note has been consumed by an external transaction.
-    /// If the note state doesn't change, `None` is returned.
+    /// Returns a new state to reflect that the note has been consumed by a transaction not
+    /// submitted by this client. If the note state doesn't change, `None` is returned.
     pub(crate) fn consumed_externally(
         &self,
         nullifier_block_height: BlockNumber,
+        consumer_account: Option<AccountId>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
-        self.inner().consumed_externally(nullifier_block_height)
+        self.inner().consumed_externally(nullifier_block_height, consumer_account)
     }
 
     /// Returns a new state to reflect that the note has received a block header.
@@ -322,7 +322,15 @@ impl Display for InputNoteState {
                 )
             },
             InputNoteState::ConsumedExternal(state) => {
-                write!(f, "Consumed (at block {})", state.nullifier_block_height)
+                if let Some(account) = state.consumer_account {
+                    write!(
+                        f,
+                        "Consumed (at block {} by tracked account {})",
+                        state.nullifier_block_height, account
+                    )
+                } else {
+                    write!(f, "Consumed (at block {})", state.nullifier_block_height)
+                }
             },
         }
     }
@@ -344,6 +352,7 @@ pub trait NoteStateHandler {
     fn consumed_externally(
         &self,
         nullifier_block_height: BlockNumber,
+        consumer_account: Option<AccountId>,
     ) -> Result<Option<InputNoteState>, NoteRecordError>;
 
     fn block_header_received(

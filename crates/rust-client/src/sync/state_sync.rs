@@ -9,6 +9,7 @@ use miden_protocol::account::{Account, AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
 use miden_protocol::note::{Note, NoteId, NoteTag, NoteType, Nullifier};
+use miden_protocol::transaction::InputNoteCommitment;
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -355,12 +356,21 @@ impl StateSync {
 
         let tx_inclusions = transaction_records
             .into_iter()
-            .map(|r| TransactionInclusion {
-                transaction_id: r.transaction_header.id(),
-                block_num: r.block_num,
-                account_id: r.transaction_header.account_id(),
-                initial_state_commitment: r.transaction_header.initial_state_commitment(),
-                output_notes: r.output_notes,
+            .map(|r| {
+                let nullifiers = r
+                    .transaction_header
+                    .input_notes()
+                    .iter()
+                    .map(InputNoteCommitment::nullifier)
+                    .collect();
+                TransactionInclusion {
+                    transaction_id: r.transaction_header.id(),
+                    block_num: r.block_num,
+                    account_id: r.transaction_header.account_id(),
+                    initial_state_commitment: r.transaction_header.initial_state_commitment(),
+                    nullifiers,
+                    output_notes: r.output_notes,
+                }
             })
             .collect();
 
@@ -613,9 +623,14 @@ impl StateSync {
         new_nullifiers.retain(|update| update.block_num <= state_sync_update.block_num);
 
         for nullifier_update in new_nullifiers {
+            let external_consumer_account = state_sync_update
+                .transaction_updates
+                .external_nullifier_account(&nullifier_update.nullifier);
+
             state_sync_update.note_updates.apply_nullifiers_state_transitions(
                 &nullifier_update,
                 state_sync_update.transaction_updates.committed_transactions(),
+                external_consumer_account,
             )?;
 
             // Process nullifiers and track the updates of local tracked transactions that were
@@ -1024,6 +1039,7 @@ mod tests {
         let note_tags: BTreeSet<NoteTag> =
             input_notes.iter().filter_map(|n| n.metadata().map(NoteMetadata::tag)).collect();
 
+        let account_id = account.id();
         let sync_input = StateSyncInput {
             accounts: vec![account.into()],
             note_tags,
@@ -1046,6 +1062,18 @@ mod tests {
         assert_eq!(find_order(note1.id()), Some(0), "note1 should have tx_order 0");
         assert_eq!(find_order(note2.id()), Some(1), "note2 should have tx_order 1");
         assert_eq!(find_order(note3.id()), Some(2), "note3 should have tx_order 2");
+
+        // Since there are no uncommitted_transactions, these notes were consumed by a tracked
+        // account via external transactions. Verify that consumer_account is populated.
+        for note in &updated_notes {
+            let record = note.inner();
+            assert!(record.is_consumed(), "note should be in a consumed state");
+            assert_eq!(
+                record.consumer_account(),
+                Some(account_id),
+                "externally-consumed notes by a tracked account should have consumer_account set",
+            );
+        }
     }
 
     #[tokio::test]

@@ -1,5 +1,6 @@
 use alloc::collections::BTreeMap;
 
+use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockHeader;
 use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
 
@@ -359,12 +360,15 @@ impl NoteUpdateTracker {
     ///
     /// For input note records two possible scenarios are considered:
     /// 1. The note was being processed by a local transaction that just got committed.
-    /// 2. The note was consumed by an external transaction. If a local transaction was processing
-    ///    the note and it didn't get committed, the transaction should be discarded.
+    /// 2. The note was consumed by a transaction not submitted by this client. This includes
+    ///    consumption by untracked accounts as well as consumption by tracked accounts whose
+    ///    transactions were submitted by other client instances. If a local transaction was
+    ///    processing the note and it didn't get committed, the transaction should be discarded.
     pub(crate) fn apply_nullifiers_state_transitions<'a>(
         &mut self,
         nullifier_update: &NullifierUpdate,
         mut committed_transactions: impl Iterator<Item = &'a TransactionRecord>,
+        external_consumer_account: Option<AccountId>,
     ) -> Result<(), ClientError> {
         let order = self.get_nullifier_order(nullifier_update.nullifier);
 
@@ -383,10 +387,13 @@ impl NoteUpdateTracker {
                         .transaction_committed(consumer_transaction.id, block_number)?;
                 }
             } else {
-                // The note was consumed by an external transaction
-                input_note_update
-                    .inner_mut()
-                    .consumed_externally(nullifier_update.nullifier, nullifier_update.block_num)?;
+                // The note was consumed by a transaction not submitted by this client.
+                // If the consuming account is tracked, external_consumer_account will be Some.
+                input_note_update.inner_mut().consumed_externally(
+                    nullifier_update.nullifier,
+                    nullifier_update.block_num,
+                    external_consumer_account,
+                )?;
             }
             input_note_update.inner_mut().set_consumed_tx_order(order);
         }
