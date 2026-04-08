@@ -11,6 +11,7 @@ use wasm_bindgen::prelude::*;
 use super::account_code::AccountCode;
 use super::account_header::AccountHeader;
 use super::account_id::AccountId;
+use super::fungible_asset::FungibleAsset;
 use super::word::Word;
 use crate::js_error_with_context;
 
@@ -134,6 +135,28 @@ impl AccountProof {
             .map_err(|err| js_error_with_context(err, "invalid slot name"))?;
 
         Ok(self.inner.find_map_details(&slot_name).map(|d| d.too_many_entries))
+    }
+
+    /// Returns the fungible assets in the account's vault, if vault details were included
+    /// in the proof response.
+    ///
+    /// Returns `undefined` if the account is private or vault data was not requested.
+    #[wasm_bindgen(js_name = "vaultFungibleAssets")]
+    pub fn vault_fungible_assets(&self) -> Option<Vec<FungibleAsset>> {
+        let (_, details) = self.inner.clone().into_parts();
+        details.map(|d| {
+            d.vault_details
+                .assets
+                .into_iter()
+                .filter_map(|asset| {
+                    if asset.is_fungible() {
+                        Some(asset.unwrap_fungible().into())
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        })
     }
 
     /// Returns the names of all storage slots that have map details available.

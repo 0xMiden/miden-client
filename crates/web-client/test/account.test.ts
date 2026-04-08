@@ -1,5 +1,11 @@
 import { Page, expect } from "@playwright/test";
 import test, { isLocalhost } from "./playwright.global.setup";
+import {
+  StorageMode,
+  createNewWallet,
+  createNewFaucet,
+  fundAccountFromFaucet,
+} from "./webClientTestUtils";
 
 // GET_ACCOUNT TESTS
 // =======================================================================================================
@@ -484,5 +490,89 @@ test.describe("getAccountByKeyCommitment tests", () => {
 
     expect(result.foundAccountId).toEqual(result.faucetId);
     expect(result.foundIsFaucet).toBe(true);
+  });
+});
+
+// GET_ACCOUNT_PROOF VAULT COMMITMENT TESTS
+// =======================================================================================================
+
+test.describe("getAccountProof vault commitment", () => {
+  test("returns vault details based on known_vault_commitment parameter", async ({
+    page,
+  }) => {
+    // Create public wallet and faucet, then fund the wallet so it has assets on-chain
+    const walletResult = await createNewWallet(page, {
+      storageMode: StorageMode.PUBLIC,
+      mutable: false,
+      authSchemeId: 2,
+    });
+    const faucetResult = await createNewFaucet(page, StorageMode.PUBLIC);
+    await fundAccountFromFaucet(page, walletResult.id, faucetResult.id);
+
+    const proofResults = await page.evaluate(
+      async ({ walletId }) => {
+        const endpoint = new window.Endpoint(window.rpcUrl);
+        const rpcClient = new window.RpcClient(endpoint);
+        const accountId = window.AccountId.fromHex(walletId);
+
+        const emptyWord = new window.Word(new BigUint64Array([0n, 0n, 0n, 0n]));
+
+        // Query 1: EMPTY_WORD — always fetches vault data (commitment never matches)
+        const proof1 = await rpcClient.getAccountProof(
+          accountId,
+          undefined,
+          undefined,
+          emptyWord
+        );
+        const vaultCommitment = proof1.accountHeader()!.vaultCommitment();
+
+        // Query 2: actual vault commitment — matches node state, should skip vault data
+        const proof2 = await rpcClient.getAccountProof(
+          accountId,
+          undefined,
+          undefined,
+          vaultCommitment
+        );
+
+        // Query 3: undefined — vault data not requested
+        const proof3 = await rpcClient.getAccountProof(accountId);
+
+        return {
+          query1: {
+            blockNum: proof1.blockNum(),
+            hasAccountHeader: !!proof1.accountHeader(),
+            vaultCommitment: vaultCommitment.toHex(),
+            numVaultAssets: proof1.vaultFungibleAssets()?.length ?? null,
+          },
+          query2: {
+            blockNum: proof2.blockNum(),
+            hasAccountHeader: !!proof2.accountHeader(),
+            numVaultAssets: proof2.vaultFungibleAssets()?.length ?? null,
+          },
+          query3: {
+            blockNum: proof3.blockNum(),
+            hasAccountHeader: !!proof3.accountHeader(),
+            numVaultAssets: proof3.vaultFungibleAssets()?.length ?? null,
+          },
+        };
+      },
+      { walletId: walletResult.id }
+    );
+
+    // Query 1: EMPTY_WORD — always fetches vault data
+    expect(proofResults.query1.blockNum).toBeGreaterThan(0);
+    expect(proofResults.query1.hasAccountHeader).toBe(true);
+    expect(proofResults.query1.vaultCommitment).toMatch(/^0x[0-9a-fA-F]+$/);
+    expect(proofResults.query1.numVaultAssets).toBe(1);
+
+    // Query 2: actual vault commitment — matches, node skips vault data
+    expect(proofResults.query2.blockNum).toBeGreaterThan(0);
+    expect(proofResults.query2.hasAccountHeader).toBe(true);
+    expect(proofResults.query2.numVaultAssets).toBe(0);
+
+    // Query 3: undefined — vault data not requested
+    expect(proofResults.query3.blockNum).toBeGreaterThan(0);
+    expect(proofResults.query3.hasAccountHeader).toBe(true);
+    expect(proofResults.query3.numVaultAssets).toBe(0);
   });
 });
