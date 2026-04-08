@@ -44,11 +44,8 @@ impl From<TransactionScriptInputPair> for (NativeWord, Vec<NativeFelt>) {
 impl From<&TransactionScriptInputPair> for (NativeWord, Vec<NativeFelt>) {
     fn from(transaction_script_input_pair: &TransactionScriptInputPair) -> Self {
         let native_word: NativeWord = transaction_script_input_pair.word.clone().into();
-        let native_felts: Vec<NativeFelt> = transaction_script_input_pair
-            .felts
-            .iter()
-            .map(|felt| felt.into())
-            .collect();
+        let native_felts: Vec<NativeFelt> =
+            transaction_script_input_pair.felts.iter().map(Into::into).collect();
         (native_word, native_felts)
     }
 }
