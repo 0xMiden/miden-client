@@ -41,7 +41,7 @@ jobs:
         run: ./scripts/check-react-sdk-version-pr.sh "${{ github.event.pull_request.base.sha }}"
 
   # Build native Node.js binaries for each platform
-  build-native:
+  build-native-nodejs:
     needs: check-version
     if: needs.check-version.outputs.should_publish_web == 'true'
     strategy:
@@ -93,7 +93,7 @@ jobs:
 
   # Publish all packages to npm
   publish:
-    needs: [check-version, build-native]
+    needs: [check-version, build-native-nodejs]
     if: >
       !cancelled() &&
       needs.check-version.result == 'success'
@@ -125,13 +125,13 @@ jobs:
 
       # ── Publish Node.js platform packages ──
       - name: Download native binary artifacts
-        if: needs.check-version.outputs.should_publish_web == 'true' && needs.build-native.result == 'success'
+        if: needs.check-version.outputs.should_publish_web == 'true' && needs.build-native-nodejs.result == 'success'
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
       - name: Sync platform package versions and publish
-        if: needs.check-version.outputs.should_publish_web == 'true' && needs.build-native.result == 'success'
+        if: needs.check-version.outputs.should_publish_web == 'true' && needs.build-native-nodejs.result == 'success'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
         run: |
@@ -156,7 +156,7 @@ jobs:
           yarn build
 
       - name: Inject Node.js optionalDependencies before publish
-        if: needs.check-version.outputs.should_publish_web == 'true' && needs.build-native.result == 'success'
+        if: needs.check-version.outputs.should_publish_web == 'true' && needs.build-native-nodejs.result == 'success'
         run: |
           cd crates/web-client
           node -e "
