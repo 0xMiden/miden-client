@@ -47,6 +47,17 @@ pub enum NetworkNoteStatus {
     Committed,
 }
 
+impl core::fmt::Display for NetworkNoteStatus {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            NetworkNoteStatus::Pending => write!(f, "Pending"),
+            NetworkNoteStatus::Processed => write!(f, "Processed"),
+            NetworkNoteStatus::Discarded => write!(f, "Discarded"),
+            NetworkNoteStatus::Committed => write!(f, "Committed"),
+        }
+    }
+}
+
 pub struct NetworkNoteStatusInfo {
     pub status: NetworkNoteStatus,
     pub last_error: Option<String>,

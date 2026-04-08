@@ -69,7 +69,7 @@ pub use errors::*;
 mod endpoint;
 pub(crate) use domain::limits::RPC_LIMITS_STORE_SETTING;
 pub use domain::limits::RpcLimits;
-pub use domain::status::RpcStatusInfo;
+pub use domain::status::{NetworkNoteStatus, NetworkNoteStatusInfo, RpcStatusInfo};
 pub use endpoint::Endpoint;
 
 #[cfg(not(feature = "testing"))]
@@ -84,7 +84,6 @@ pub use tonic_client::GrpcClient;
 
 use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::rpc::domain::account_vault::AccountVaultInfo;
-use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::store::InputNoteRecord;
