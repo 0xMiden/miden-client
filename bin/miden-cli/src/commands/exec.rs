@@ -52,10 +52,9 @@ pub struct ExecCmd {
 
     /// Start a DAP debug adapter server on the given address (e.g. "127.0.0.1:4711")
     /// and wait for a DAP client to connect before executing.
-    ///
-    /// If this binary was built without DAP support, using this flag returns an error.
+    #[cfg(feature = "dap")]
     #[arg(long = "start-debug-adapter")]
-    start_debug_adapter: Option<String>,
+    start_debug_adapter: Option<std::net::SocketAddr>,
 }
 
 impl ExecCmd {
@@ -145,7 +144,7 @@ impl ExecCmd {
 
         #[cfg(feature = "dap")]
         if let Some(addr) = self.start_debug_adapter.as_ref() {
-            let config = miden_debug::DapConfig::new(addr.clone());
+            let config = miden_debug::DapConfig::new(addr.to_string());
             let config_handle = config.clone();
             miden_debug::DapConfig::set_global(config);
 
@@ -173,14 +172,6 @@ impl ExecCmd {
                     CliError::Exec(err.into(), "error executing the program".to_string())
                 });
             }
-        }
-
-        #[cfg(not(feature = "dap"))]
-        if self.start_debug_adapter.is_some() {
-            return Err(CliError::InvalidArgument(
-                "--start-debug-adapter requires a CLI build with the `dap` feature enabled"
-                    .to_string(),
-            ));
         }
 
         client
