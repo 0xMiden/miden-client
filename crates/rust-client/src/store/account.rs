@@ -7,6 +7,7 @@ use miden_protocol::account::{Account, AccountId, PartialAccount};
 use miden_protocol::{Felt, Word};
 
 use crate::ClientError;
+use crate::sync::PublicAccountUpdate;
 
 // ACCOUNT RECORD DATA
 // ================================================================================================
@@ -142,8 +143,8 @@ impl Display for AccountStatus {
 
 /// Contains account changes to apply to the store.
 pub struct AccountUpdates {
-    /// Updated public accounts.
-    updated_public_accounts: Vec<Account>,
+    /// Updated public accounts, either as full state replacements or incremental deltas.
+    updated_public_accounts: Vec<PublicAccountUpdate>,
     /// Network account commitments that don't match the current tracked state for private
     /// accounts.
     mismatched_private_accounts: Vec<(AccountId, Word)>,
@@ -152,7 +153,7 @@ pub struct AccountUpdates {
 impl AccountUpdates {
     /// Creates a new instance of `AccountUpdates`.
     pub fn new(
-        updated_public_accounts: Vec<Account>,
+        updated_public_accounts: Vec<PublicAccountUpdate>,
         mismatched_private_accounts: Vec<(AccountId, Word)>,
     ) -> Self {
         Self {
@@ -162,7 +163,7 @@ impl AccountUpdates {
     }
 
     /// Returns the updated public accounts.
-    pub fn updated_public_accounts(&self) -> &[Account] {
+    pub fn updated_public_accounts(&self) -> &[PublicAccountUpdate] {
         &self.updated_public_accounts
     }
 

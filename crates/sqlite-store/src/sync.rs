@@ -8,7 +8,7 @@ use miden_client::Word;
 use miden_client::account::AccountId;
 use miden_client::note::{BlockNumber, NoteTag};
 use miden_client::store::{AccountSmtForest, StoreError};
-use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
+use miden_client::sync::{NoteTagRecord, NoteTagSource, PublicAccountUpdate, StateSyncUpdate};
 use miden_client::utils::{Deserializable, Serializable};
 use rusqlite::{Connection, Transaction, params};
 
@@ -178,8 +178,15 @@ impl SqliteStore {
         }
 
         // Update public accounts on the db that have been updated onchain
-        for account in account_updates.updated_public_accounts() {
-            Self::update_account_state(&tx, &mut smt_forest, account)?;
+        for update in account_updates.updated_public_accounts() {
+            match update {
+                PublicAccountUpdate::Full(account) => {
+                    Self::update_account_state(&tx, &mut smt_forest, account)?;
+                },
+                PublicAccountUpdate::Delta { new_header, delta } => {
+                    Self::apply_sync_account_delta(&tx, &mut smt_forest, new_header, delta)?;
+                },
+            }
         }
         drop(smt_forest);
 

@@ -2,7 +2,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
-use miden_protocol::account::AccountId;
+use miden_protocol::account::{AccountDelta, AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks};
 use miden_protocol::note::{NoteId, Nullifier};
@@ -83,7 +83,7 @@ impl From<&StateSyncUpdate> for SyncSummary {
                 .account_updates
                 .updated_public_accounts()
                 .iter()
-                .map(Account::id)
+                .map(PublicAccountUpdate::id)
                 .collect(),
             value
                 .account_updates
@@ -315,14 +315,46 @@ impl TransactionUpdateTracker {
     }
 }
 
+// PUBLIC ACCOUNT UPDATE
+// ================================================================================================
+
+/// Represents an update to a single public account's state.
+///
+/// Small accounts that fit within the node's response threshold are sent as `Full` replacements.
+/// Oversized accounts (too many storage map entries or vault assets) are sent as incremental
+/// `Delta` updates to avoid reconstructing the full account in memory.
+#[derive(Debug, Clone)]
+pub enum PublicAccountUpdate {
+    /// Full account state replacement.
+    Full(Account),
+    /// Incremental delta applied to the locally stored state.
+    Delta {
+        /// The new account header after the delta is applied.
+        new_header: AccountHeader,
+        /// The changes relative to the current locally-stored state.
+        delta: AccountDelta,
+    },
+}
+
+impl PublicAccountUpdate {
+    /// Returns the account ID for this update.
+    pub fn id(&self) -> AccountId {
+        match self {
+            Self::Full(account) => account.id(),
+            Self::Delta { new_header, .. } => new_header.id(),
+        }
+    }
+}
+
 // ACCOUNT UPDATES
 // ================================================================================================
 
 /// Contains account changes to apply to the store after a sync request.
 #[derive(Debug, Clone, Default)]
+#[allow(clippy::struct_field_names)]
 pub struct AccountUpdates {
-    /// Updated public accounts.
-    updated_public_accounts: Vec<Account>,
+    /// Updated public accounts, either as full state replacements or incremental deltas.
+    updated_public_accounts: Vec<PublicAccountUpdate>,
     /// Account commitments received from the network that don't match the currently
     /// locally-tracked state of the private accounts.
     ///
@@ -335,7 +367,7 @@ pub struct AccountUpdates {
 impl AccountUpdates {
     /// Creates a new instance of `AccountUpdates`.
     pub fn new(
-        updated_public_accounts: Vec<Account>,
+        updated_public_accounts: Vec<PublicAccountUpdate>,
         mismatched_private_accounts: Vec<(AccountId, Word)>,
     ) -> Self {
         Self {
@@ -345,7 +377,7 @@ impl AccountUpdates {
     }
 
     /// Returns the updated public accounts.
-    pub fn updated_public_accounts(&self) -> &[Account] {
+    pub fn updated_public_accounts(&self) -> &[PublicAccountUpdate] {
         &self.updated_public_accounts
     }
 
