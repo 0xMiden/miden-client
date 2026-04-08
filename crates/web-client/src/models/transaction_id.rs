@@ -1,8 +1,10 @@
+use miden_client::Word as NativeWord;
 use miden_client::transaction::TransactionId as NativeTransactionId;
 use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;
 use super::word::Word;
+use crate::js_error_with_context;
 
 /// A unique identifier of a transaction.
 ///
@@ -18,6 +20,18 @@ pub struct TransactionId(NativeTransactionId);
 
 #[wasm_bindgen]
 impl TransactionId {
+    /// Creates a `TransactionId` from a hex string.
+    ///
+    /// Fails if the provided string is not a valid hex representation of a `TransactionId`.
+    #[wasm_bindgen(js_name = "fromHex")]
+    pub fn from_hex(hex: &str) -> Result<TransactionId, JsValue> {
+        let native_word = NativeWord::try_from(hex).map_err(|err| {
+            js_error_with_context(err, "error instantiating TransactionId from hex")
+        })?;
+        let native_tx_id = NativeTransactionId::from_raw(native_word);
+        Ok(TransactionId(native_tx_id))
+    }
+
     /// Returns the transaction ID as field elements.
     #[wasm_bindgen(js_name = "asElements")]
     pub fn as_elements(&self) -> Vec<Felt> {

@@ -1,7 +1,7 @@
 import { Page, expect } from "@playwright/test";
 import test from "./playwright.global.setup";
 
-export const testStandardFpi = async (page: Page): Promise<void> => {
+export const testStandardFpi = async (page: Page): Promise<string> => {
   return await page.evaluate(async () => {
     const client = window.client;
     await client.syncState();
@@ -65,7 +65,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
 
     let foreignAccountId = getItemAccountBuilderResult.account.id();
 
-    await client.addAccountSecretKeyToWebStore(foreignAccountId, secretKey);
+    await client.keystore.insert(foreignAccountId, secretKey);
     await client.newAccount(getItemAccountBuilderResult.account, false);
     await client.syncState();
 
@@ -86,7 +86,7 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
     let newAccount = await client.newWallet(
       window.AccountStorageMode.public(),
       false,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
 
     let txScript = `
@@ -96,11 +96,11 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
                 procref.::miden::testing::fpi_component::get_fpi_map_item
 
                 # push the foreign account id
-                push.{account_id_suffix} push.{account_id_prefix}
-                # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, storage_item_index]
+                push.{account_id_prefix} push.{account_id_suffix}
+                # => [foreign_id_suffix, foreign_id_prefix, FOREIGN_PROC_ROOT, storage_item_index]
 
                 exec.tx::execute_foreign_procedure
-                push.9.12.18.30 assert_eqw
+                push.30.18.12.9 assert_eqw
             end
         `;
 
@@ -137,11 +137,45 @@ export const testStandardFpi = async (page: Page): Promise<void> => {
       newAccount.id(),
       txRequest2
     );
+
+    return foreignAccountId.toString();
   });
 };
 
 test.describe("fpi test", () => {
-  test("runs the standard fpi test successfully", async ({ page }) => {
-    await expect(testStandardFpi(page)).resolves.toBeUndefined();
+  test("runs the standard fpi test successfully and verifies account proof", async ({
+    page,
+  }) => {
+    const foreignAccountId = await testStandardFpi(page);
+
+    // Test RpcClient.getAccountProof on the deployed public account
+    const proofResult = await page.evaluate(
+      async (_foreignAccountId: string) => {
+        const endpoint = new window.Endpoint(window.rpcUrl);
+        const rpcClient = new window.RpcClient(endpoint);
+
+        const accountId = window.AccountId.fromHex(_foreignAccountId);
+        const accountProof = await rpcClient.getAccountProof(accountId);
+
+        return {
+          accountId: accountProof.accountId().toString(),
+          blockNum: accountProof.blockNum(),
+          accountCommitment: accountProof.accountCommitment().toHex(),
+          hasAccountHeader: !!accountProof.accountHeader(),
+          hasAccountCode: !!accountProof.accountCode(),
+          numStorageSlots: accountProof.numStorageSlots(),
+          nonce: accountProof.accountHeader()?.nonce().toString(),
+        };
+      },
+      foreignAccountId
+    );
+
+    expect(proofResult.accountId).toEqual(foreignAccountId);
+    expect(proofResult.blockNum).toBeGreaterThan(0);
+    expect(proofResult.accountCommitment).toMatch(/^0x[0-9a-fA-F]+$/);
+    expect(proofResult.hasAccountHeader).toBe(true);
+    expect(proofResult.hasAccountCode).toBe(true);
+    expect(proofResult.numStorageSlots).toBeGreaterThan(0);
+    expect(proofResult.nonce).toBeDefined();
   });
 });

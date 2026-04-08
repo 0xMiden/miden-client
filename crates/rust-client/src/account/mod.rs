@@ -34,10 +34,10 @@
 //!
 //! For more details on accounts, refer to the [Account] documentation.
 
-use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
 
-use miden_protocol::account::auth::{PublicKey, PublicKeyCommitment};
+use miden_protocol::Felt;
+use miden_protocol::account::auth::PublicKey;
 pub use miden_protocol::account::{
     Account,
     AccountBuilder,
@@ -56,6 +56,8 @@ pub use miden_protocol::account::{
     PartialStorage,
     PartialStorageMap,
     StorageMap,
+    StorageMapKey,
+    StorageMapWitness,
     StorageSlot,
     StorageSlotContent,
     StorageSlotId,
@@ -63,31 +65,34 @@ pub use miden_protocol::account::{
     StorageSlotType,
 };
 pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
+use miden_protocol::asset::AssetVault;
 pub use miden_protocol::errors::{AccountIdError, AddressError, NetworkIdError};
 use miden_protocol::note::NoteTag;
-use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo};
+
+mod account_reader;
+pub use account_reader::AccountReader;
+use miden_standards::account::auth::AuthSingleSig;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_standards::account::interface::AccountInterfaceExt;
 use miden_standards::account::wallets::BasicWallet;
-use miden_tx::utils::{Deserializable, Serializable};
 
 use super::Client;
-use crate::Word;
-use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
-use crate::store::{AccountRecord, AccountStatus};
+use crate::rpc::node::{EndpointError, GetAccountError};
+use crate::store::{AccountStatus, AccountStorageFilter};
 use crate::sync::NoteTagRecord;
-
-const PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX: &str = "_public_key_commitments";
 
 pub mod component {
     pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
 
     pub use miden_protocol::account::auth::*;
     pub use miden_protocol::account::component::{
+        FeltSchema,
         InitStorageData,
+        SchemaType,
+        StorageSchema,
         StorageSlotSchema,
         StorageValueName,
     };
@@ -96,17 +101,18 @@ pub mod component {
     pub use miden_standards::account::components::{
         basic_fungible_faucet_library,
         basic_wallet_library,
-        ecdsa_k256_keccak_library,
-        falcon_512_rpo_acl_library,
-        falcon_512_rpo_library,
-        falcon_512_rpo_multisig_library,
+        multisig_library,
         network_fungible_faucet_library,
         no_auth_library,
+        singlesig_acl_library,
+        singlesig_library,
     };
-    pub use miden_standards::account::faucets::{
-        BasicFungibleFaucet,
-        FungibleFaucetExt,
-        NetworkFungibleFaucet,
+    pub use miden_standards::account::faucets::{BasicFungibleFaucet, NetworkFungibleFaucet};
+    pub use miden_standards::account::mint_policies::{
+        AuthControlled,
+        AuthControlledInitConfig,
+        OwnerControlled,
+        OwnerControlledInitConfig,
     };
     pub use miden_standards::account::wallets::BasicWallet;
 }
@@ -143,10 +149,8 @@ impl<AUTH> Client<AUTH> {
     ///   being tracked.
     /// - If `overwrite` is set to `true` and the `account_data` commitment doesn't match the
     ///   network's account commitment.
-    /// - If the client has reached the accounts limit
-    ///   ([`ACCOUNT_ID_LIMIT`](crate::rpc::ACCOUNT_ID_LIMIT)).
-    /// - If the client has reached the note tags limit
-    ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
+    /// - If the client has reached the accounts limit.
+    /// - If the client has reached the note tags limit.
     pub async fn add_account(
         &mut self,
         account: &Account,
@@ -193,7 +197,7 @@ impl<AUTH> Client<AUTH> {
                     return Err(ClientError::AccountAlreadyTracked(account.id()));
                 }
 
-                if tracked_account.nonce().as_int() > account.nonce().as_int() {
+                if tracked_account.nonce().as_canonical_u64() > account.nonce().as_canonical_u64() {
                     // If the new account is older than the one being tracked, return an error
                     return Err(ClientError::AccountNonceTooLow);
                 }
@@ -203,7 +207,7 @@ impl<AUTH> Client<AUTH> {
                     // the one in the network
                     let network_account_commitment =
                         self.rpc_api.get_account_details(account.id()).await?.commitment();
-                    if network_account_commitment != account.commitment() {
+                    if network_account_commitment != account.to_commitment() {
                         return Err(ClientError::AccountCommitmentMismatch(
                             network_account_commitment,
                         ));
@@ -224,7 +228,15 @@ impl<AUTH> Client<AUTH> {
     /// - If the account is private.
     /// - There was an error sending the request to the network.
     pub async fn import_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
-        let fetched_account = self.rpc_api.get_account_details(account_id).await?;
+        let fetched_account =
+            self.rpc_api.get_account_details(account_id).await.map_err(|err| {
+                match err.endpoint_error() {
+                    Some(EndpointError::GetAccount(GetAccountError::AccountNotFound)) => {
+                        ClientError::AccountNotFoundOnChain(account_id)
+                    },
+                    _ => ClientError::RpcError(err),
+                }
+            })?;
 
         let account = match fetched_account {
             FetchedAccount::Private(..) => {
@@ -241,8 +253,7 @@ impl<AUTH> Client<AUTH> {
     /// # Errors
     /// - If the account is not found on the network.
     /// - If the address is already being tracked.
-    /// - If the client has reached the note tags limit
-    ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
+    /// - If the client has reached the note tags limit.
     pub async fn add_address(
         &mut self,
         address: Address,
@@ -293,6 +304,39 @@ impl<AUTH> Client<AUTH> {
     // ACCOUNT DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
 
+    /// Retrieves the asset vault for a specific account.
+    ///
+    /// To check the balance for a single asset, use [`Client::account_reader`] instead.
+    pub async fn get_account_vault(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AssetVault, ClientError> {
+        self.store.get_account_vault(account_id).await.map_err(ClientError::StoreError)
+    }
+
+    /// Retrieves the whole account storage for a specific account.
+    ///
+    /// To only load a specific slot, use [`Client::account_reader`] instead.
+    pub async fn get_account_storage(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountStorage, ClientError> {
+        self.store
+            .get_account_storage(account_id, AccountStorageFilter::All)
+            .await
+            .map_err(ClientError::StoreError)
+    }
+
+    /// Retrieves the account code for a specific account.
+    ///
+    /// Returns `None` if the account is not found.
+    pub async fn get_account_code(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Option<AccountCode>, ClientError> {
+        self.store.get_account_code(account_id).await.map_err(ClientError::StoreError)
+    }
+
     /// Returns a list of [`AccountHeader`] of all accounts stored in the database along with their
     /// statuses.
     ///
@@ -303,178 +347,68 @@ impl<AUTH> Client<AUTH> {
         self.store.get_account_headers().await.map_err(Into::into)
     }
 
-    /// Retrieves a full [`AccountRecord`] object for the specified `account_id`. This result
-    /// represents data for the latest state known to the client, alongside its status. Returns
-    /// `None` if the account ID is not found.
-    pub async fn get_account(
-        &self,
-        account_id: AccountId,
-    ) -> Result<Option<AccountRecord>, ClientError> {
-        self.store.get_account(account_id).await.map_err(Into::into)
+    /// Retrieves the full [`Account`] object from the store, returning `None` if not found.
+    ///
+    /// This method loads the complete account state including vault, storage, and code.
+    ///
+    /// For lazy access that fetches only the data you need, use
+    /// [`Client::account_reader`] instead.
+    ///
+    /// Use [`Client::try_get_account`] if you want to error when the account is not found.
+    pub async fn get_account(&self, account_id: AccountId) -> Result<Option<Account>, ClientError> {
+        match self.store.get_account(account_id).await? {
+            Some(record) => Ok(Some(record.try_into()?)),
+            None => Ok(None),
+        }
     }
 
-    /// Retrieves an [`AccountHeader`] object for the specified [`AccountId`] along with its status.
-    /// Returns `None` if the account ID is not found.
+    /// Retrieves the full [`Account`] object from the store, erroring if not found.
     ///
-    /// Said account's state is the state according to the last sync performed.
-    pub async fn get_account_header_by_id(
-        &self,
-        account_id: AccountId,
-    ) -> Result<Option<(AccountHeader, AccountStatus)>, ClientError> {
-        self.store.get_account_header(account_id).await.map_err(Into::into)
-    }
-
-    /// Attempts to retrieve an [`AccountRecord`] by its [`AccountId`].
+    /// This method loads the complete account state including vault, storage, and code.
     ///
-    /// # Errors
-    ///
-    /// - If the account record is not found.
-    /// - If the underlying store operation fails.
-    pub async fn try_get_account(
-        &self,
-        account_id: AccountId,
-    ) -> Result<AccountRecord, ClientError> {
+    /// Use [`Client::get_account`] if you want to handle missing accounts gracefully.
+    pub async fn try_get_account(&self, account_id: AccountId) -> Result<Account, ClientError> {
         self.get_account(account_id)
             .await?
             .ok_or(ClientError::AccountDataNotFound(account_id))
     }
 
-    /// Attempts to retrieve an [`AccountHeader`] by its [`AccountId`].
+    /// Creates an [`AccountReader`] for lazy access to account data.
     ///
-    /// # Errors
+    /// The `AccountReader` provides lazy access to account state - each method call
+    /// fetches fresh data from storage, ensuring you always see the current state.
     ///
-    /// - If the account header is not found.
-    /// - If the underlying store operation fails.
-    pub async fn try_get_account_header(
+    /// For loading the full [`Account`] object, use [`Client::get_account`] instead.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let reader = client.account_reader(account_id);
+    ///
+    /// // Each call fetches fresh data
+    /// let nonce = reader.nonce().await?;
+    /// let balance = reader.get_balance(faucet_id).await?;
+    ///
+    /// // Storage access is integrated
+    /// let value = reader.get_storage_item("my_slot").await?;
+    /// let (map_value, witness) = reader.get_storage_map_witness("balances", key).await?;
+    /// ```
+    pub fn account_reader(&self, account_id: AccountId) -> AccountReader {
+        AccountReader::new(self.store.clone(), account_id)
+    }
+
+    /// Prunes historical account states for the specified account up to the given nonce.
+    ///
+    /// Deletes all historical entries with `replaced_at_nonce <= up_to_nonce` and any
+    /// orphaned account code.
+    ///
+    /// Returns the total number of rows deleted, including historical entries and orphaned
+    /// account code.
+    pub async fn prune_account_history(
         &self,
         account_id: AccountId,
-    ) -> Result<(AccountHeader, AccountStatus), ClientError> {
-        self.get_account_header_by_id(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))
-    }
-
-    /// Adds a list of public key commitments associated with the given account ID.
-    ///
-    /// Commitments are stored as a `BTreeSet`, so duplicates are ignored. If the account already
-    /// has known commitments, the new ones are merged into the existing set.
-    ///
-    /// This is useful because with a public key commitment, we can retrieve its corresponding
-    /// secret key using, for example,
-    /// [`FilesystemKeyStore::get_key`](crate::keystore::FilesystemKeyStore::get_key). This yields
-    /// an indirect mapping from account ID to its secret keys: account ID -> public key commitments
-    /// -> secret keys (via keystore).
-    ///
-    /// To identify these keys and avoid collisions, the account ID is turned into its hex
-    /// representation and a suffix is added. If the resulting set is empty, any existing settings
-    /// entry is removed.
-    pub async fn register_account_public_key_commitments(
-        &self,
-        account_id: &AccountId,
-        pub_keys: &[PublicKey],
-    ) -> Result<(), ClientError> {
-        let setting_key =
-            format!("{}{}", account_id.to_hex(), PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX);
-        // Store commitments as Words because PublicKeyCommitment doesn't implement
-        // (De)Serializable.
-        let (had_setting, mut commitments): (bool, BTreeSet<Word>) =
-            match self.store.get_setting(setting_key.clone()).await? {
-                Some(known) => {
-                    let known: BTreeSet<Word> = Deserializable::read_from_bytes(&known)
-                        .map_err(ClientError::DataDeserializationError)?;
-                    (true, known)
-                },
-                None => (false, BTreeSet::new()),
-            };
-
-        commitments.extend(pub_keys.iter().map(|pk| Word::from(pk.to_commitment())));
-
-        if commitments.is_empty() {
-            if had_setting {
-                self.store.remove_setting(setting_key).await.map_err(ClientError::StoreError)?;
-            }
-            return Ok(());
-        }
-
-        self.store
-            .set_setting(setting_key, Serializable::to_bytes(&commitments))
-            .await
-            .map_err(ClientError::StoreError)
-    }
-
-    /// Removes a list of public key commitments associated with the given account ID.
-    ///
-    /// Commitments are stored as a `BTreeSet`, so duplicates in `pub_key_commitments` are ignored
-    /// and missing commitments are skipped. If the account is not registered or has no stored
-    /// commitments, this is a no-op.
-    ///
-    /// If the resulting set is empty, the settings entry is removed. Returns `true` if at least
-    /// one commitment was removed, or `false` otherwise.
-    pub async fn deregister_account_public_key_commitment(
-        &self,
-        account_id: &AccountId,
-        pub_key_commitments: &[PublicKeyCommitment],
-    ) -> Result<bool, ClientError> {
-        let setting_key =
-            format!("{}{}", account_id.to_hex(), PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX);
-        let Some(known) = self.store.get_setting(setting_key.clone()).await? else {
-            return Ok(false);
-        };
-        let mut commitments: BTreeSet<Word> = Deserializable::read_from_bytes(&known)
-            .map_err(ClientError::DataDeserializationError)?;
-
-        if commitments.is_empty() {
-            self.store.remove_setting(setting_key).await.map_err(ClientError::StoreError)?;
-            return Ok(false);
-        }
-
-        let mut removed_any = false;
-        for commitment in pub_key_commitments {
-            let word = Word::from(*commitment);
-            if commitments.remove(&word) {
-                removed_any = true;
-            }
-        }
-
-        if !removed_any {
-            return Ok(false);
-        }
-
-        if commitments.is_empty() {
-            self.store.remove_setting(setting_key).await.map_err(ClientError::StoreError)?;
-            return Ok(true);
-        }
-
-        self.store
-            .set_setting(setting_key, Serializable::to_bytes(&commitments))
-            .await
-            .map_err(ClientError::StoreError)?;
-        Ok(true)
-    }
-
-    /// Returns the previously stored public key commitments associated with the given
-    /// [`AccountId`], if any.
-    ///
-    /// Once retrieved, this list of public key commitments can be used in conjunction with
-    /// [`FilesystemKeyStore::get_key`](crate::keystore::FilesystemKeyStore::get_key) to retrieve
-    /// secret keys.
-    ///
-    /// Commitments are stored as a `BTreeSet`, so the returned list is deduplicated. Returns an
-    /// empty vector if the account is not registered or no commitments are stored.
-    pub async fn get_account_public_key_commitments(
-        &self,
-        account_id: &AccountId,
-    ) -> Result<Vec<PublicKeyCommitment>, ClientError> {
-        let setting_key =
-            format!("{}{}", account_id.to_hex(), PUBLIC_KEY_COMMITMENT_SETTING_SUFFIX);
-        match self.store.get_setting(setting_key).await? {
-            Some(known) => {
-                let commitments: BTreeSet<Word> = Deserializable::read_from_bytes(&known)
-                    .map_err(ClientError::DataDeserializationError)?;
-                Ok(commitments.into_iter().map(PublicKeyCommitment::from).collect())
-            },
-            None => Ok(vec![]),
-        }
+        up_to_nonce: Felt,
+    ) -> Result<usize, ClientError> {
+        Ok(self.store.prune_account_history(account_id, up_to_nonce).await?)
     }
 }
 
@@ -486,7 +420,7 @@ impl<AUTH> Client<AUTH> {
 /// used seed is known).
 ///
 /// This function currently supports accounts composed of the [`BasicWallet`] component and one of
-/// the supported authentication schemes ([`AuthFalcon512Rpo`] or [`AuthEcdsaK256Keccak`]).
+/// the supported authentication schemes ([`AuthSingleSig`]).
 ///
 /// # Arguments
 /// - `init_seed`: Initial seed used to create the account. This is the seed passed to
@@ -510,21 +444,8 @@ pub fn build_wallet_id(
     };
 
     let auth_scheme = public_key.auth_scheme();
-    let auth_component = match auth_scheme {
-        AuthSchemeId::Falcon512Rpo => {
-            let auth_component: AccountComponent =
-                AuthFalcon512Rpo::new(public_key.to_commitment()).into();
-            auth_component
-        },
-        AuthSchemeId::EcdsaK256Keccak => {
-            let auth_component: AccountComponent =
-                AuthEcdsaK256Keccak::new(public_key.to_commitment()).into();
-            auth_component
-        },
-        auth_scheme => {
-            return Err(ClientError::UnsupportedAuthSchemeId(auth_scheme.as_u8()));
-        },
-    };
+    let auth_component: AccountComponent =
+        AuthSingleSig::new(public_key.to_commitment(), auth_scheme).into();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(account_type)

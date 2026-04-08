@@ -13,11 +13,11 @@ use js_bindings::{
     idxdb_remove_setting,
 };
 
-use crate::WebStore;
+use crate::IdxdbStore;
 use crate::promise::{await_js, await_js_value};
 use crate::settings::models::SettingValueIdxdbObject;
 
-impl WebStore {
+impl IdxdbStore {
     pub(crate) async fn set_setting(&self, key: String, value: Vec<u8>) -> Result<(), StoreError> {
         let promise = idxdb_insert_setting(self.db_id(), key, value);
         await_js_value(promise, "failed to set setting value").await?;

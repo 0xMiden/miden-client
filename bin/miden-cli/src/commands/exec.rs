@@ -1,8 +1,8 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use clap::Parser;
-use miden_client::auth::TransactionAuthenticator;
+use miden_client::keystore::Keystore;
 use miden_client::vm::AdviceInputs;
 use miden_client::{Client, Felt, Word};
 use serde::{Deserialize, Deserializer, Serialize, de};
@@ -37,7 +37,7 @@ pub struct ExecCmd {
     ///
     /// The input file should contain a TOML table called `inputs`, as in the following example:
     ///    inputs = [
-    ///        { key = "0x0000001000000000000000000000000000000000000000000000000000000000", values = ["13", "9"]},
+    ///        { key = "0x0000000000000000000000000000000000000000000000000000001000000000", values = ["13", "9"]},
     ///        { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]},
     ///    ]
     #[arg(long, short)]
@@ -50,7 +50,7 @@ pub struct ExecCmd {
 }
 
 impl ExecCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
@@ -88,7 +88,7 @@ impl ExecCmd {
         let tx_script = client.code_builder().compile_tx_script(&program)?;
 
         let result = client
-            .execute_program(account_id, tx_script, advice_inputs, BTreeSet::new())
+            .execute_program(account_id, tx_script, advice_inputs, BTreeMap::new())
             .await;
 
         match result {

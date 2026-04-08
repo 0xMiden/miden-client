@@ -1,10 +1,10 @@
 use alloc::string::String;
 
-use miden_client::account::StorageSlotName as NativeStorageSlotName;
-use miden_client::rpc::domain::account::{
-    AccountStorageRequirements as NativeAccountStorageRequirements,
+use miden_client::account::{
     StorageMapKey as NativeStorageMapKey,
+    StorageSlotName as NativeStorageSlotName,
 };
+use miden_client::rpc::domain::account::AccountStorageRequirements as NativeAccountStorageRequirements;
 use wasm_bindgen::prelude::*;
 
 use crate::models::word::Word;
@@ -60,8 +60,11 @@ impl AccountStorageRequirements {
             let slot_name = NativeStorageSlotName::new(sk.storage_slot_name)
                 .map_err(|err| JsValue::from_str(&format!("invalid storage slot name: {err}")))?;
 
-            let native_keys: Vec<NativeStorageMapKey> =
-                sk.storage_map_keys.into_iter().map(Into::into).collect();
+            let native_keys: Vec<NativeStorageMapKey> = sk
+                .storage_map_keys
+                .into_iter()
+                .map(|w| NativeStorageMapKey::new(w.into()))
+                .collect();
 
             intermediate.push((slot_name, native_keys));
         }

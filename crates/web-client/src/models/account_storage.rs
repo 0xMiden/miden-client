@@ -60,15 +60,7 @@ impl AccountStorage {
             return None;
         };
 
-        Some(
-            map.entries()
-                .map(|(key, value)| JsStorageMapEntry {
-                    root: map.root().to_hex(),
-                    key: key.to_hex(),
-                    value: value.to_hex(),
-                })
-                .collect(),
-        )
+        Some(JsStorageMapEntry::from_map(map, slot_name))
     }
 }
 

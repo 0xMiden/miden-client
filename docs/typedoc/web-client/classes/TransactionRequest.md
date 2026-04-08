@@ -38,13 +38,13 @@ Returns the authentication argument if present.
 
 ### expectedFutureNotes()
 
-> **expectedFutureNotes**(): [`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
+> **expectedFutureNotes**(): `NoteDetailsAndTag`[]
 
 Returns notes expected to be created in subsequent executions.
 
 #### Returns
 
-[`NoteDetailsAndTag`](NoteDetailsAndTag.md)[]
+`NoteDetailsAndTag`[]
 
 ***
 

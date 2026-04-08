@@ -1,6 +1,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use miden_client::Word as NativeWord;
 use miden_client::account::StorageSlotName;
 use miden_client::block::BlockNumber;
 use miden_client::rpc::domain::account::{AccountProof as NativeAccountProof, StorageMapEntries};
@@ -13,11 +14,11 @@ use super::account_id::AccountId;
 use super::word::Word;
 use crate::js_error_with_context;
 
-/// Proof of existence of a public account's state at a specific block number, as returned by
-/// the node.
+/// Proof of existence of an account's state at a specific block number, as returned by the node.
 ///
-/// Includes the account header, storage slot values, account code, and optionally storage
-/// map entries for the requested storage maps.
+/// For public accounts, this includes the account header, storage slot values, account code,
+/// and optionally storage map entries for the requested storage maps.
+/// For private accounts, only the account commitment and merkle proof are available.
 #[derive(Clone)]
 #[wasm_bindgen]
 pub struct AccountProof {
@@ -105,19 +106,14 @@ impl AccountProof {
             StorageMapEntries::AllEntries(entries) => entries
                 .iter()
                 .map(|e| StorageMapEntryJs {
-                    key: Word::from(e.key),
+                    key: Word::from(NativeWord::from(e.key)),
                     value: Word::from(e.value),
                 })
                 .collect(),
-            StorageMapEntries::EntriesWithProofs(witnesses) => witnesses
-                .iter()
-                .flat_map(|w| {
-                    w.entries().map(|(k, v)| StorageMapEntryJs {
-                        key: Word::from(*k),
-                        value: Word::from(*v),
-                    })
-                })
-                .collect(),
+            // EntriesWithProofs contains raw SMT proofs without enumerable key-value
+            // pairs. The proofs are used for verification only; entries cannot be
+            // reconstructed from them.
+            StorageMapEntries::EntriesWithProofs(_) => Vec::new(),
         };
 
         Ok(Some(entries))

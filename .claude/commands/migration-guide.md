@@ -1,0 +1,74 @@
+Generate a migration guide for the Miden Client SDK from the structured changelog entries.
+
+## Steps
+
+1. Determine the target version from `$ARGUMENTS` (e.g., "0.14.0", "0.13.0", or "latest"). If empty, default to "latest".
+2. Read `CHANGELOG.md` and extract the changelog section for the target version.
+   - If version is "latest", find the first version section that has a date (not "TBD").
+   - Identify the previous version from the preceding section header.
+3. Parse all `[BREAKING]` entries from the target version section.
+4. Read `Changelog.Format.md` for the category and scope definitions.
+5. For each breaking change, apply the migration strategy based on the category tag:
+   - `rename`: Show find-replace instructions, update imports
+   - `removal`: Show replacement API with equivalent functionality
+   - `param`: Show old vs new function signatures, explain new parameters
+   - `type`: Show type conversions and import changes
+   - `behavior`: Explain the behavioral difference and when code needs adaptation
+   - `arch`: Show Cargo.toml/package.json changes, new import paths
+6. For each breaking change, use the PR number to fetch the diff via `gh pr view #NUMBER` for additional context.
+7. Explore the codebase to find real usage patterns for before/after code examples.
+8. Group related breaking changes that affect the same workflow into a single section.
+9. Generate the migration guide document following the output structure below.
+
+## Output Structure
+
+For each `[BREAKING]` entry (or group of related entries), generate:
+
+### [Breaking Change Title]
+**PR:** #NUMBER
+
+#### Summary
+1-2 sentence explanation of what changed and why.
+
+#### Affected Code
+
+**Rust:**
+```rust
+// Before (previous version)
+old_code_example();
+
+// After (target version)
+new_code_example();
+```
+
+**TypeScript:** (only if scope includes `web`)
+```typescript
+// Before (previous version)
+oldCodeExample();
+
+// After (target version)
+newCodeExample();
+```
+
+#### Migration Steps
+1. Step-by-step instructions
+2. ...
+
+#### Common Errors
+| Error Message | Cause | Solution |
+|---------------|-------|----------|
+| `error[E0...]` | ... | ... |
+
+## Rules
+
+- Start the document with a brief version summary (1-2 sentences about the release theme).
+- Use a table of contents for guides with 5+ breaking changes.
+- Order sections by impact: most disruptive changes first.
+- End with a "Need Help?" section linking to Discord/GitHub issues.
+- Include both Rust and TypeScript examples when scope includes both `rust` and `web`.
+- Use real, runnable code examples (not pseudocode). Keep examples minimal but complete.
+- Always specify language for syntax highlighting (```rust, ```typescript).
+- Use diff syntax (```diff) when showing inline changes.
+- Do NOT include non-breaking features or fixes.
+- Tone: direct and actionable ("Update your imports" not "You may want to consider updating").
+- Focus on the "what to do" not the "why we broke it".

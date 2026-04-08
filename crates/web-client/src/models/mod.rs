@@ -37,6 +37,8 @@ pub mod account_file;
 pub mod account_header;
 pub mod account_id;
 pub mod account_proof;
+pub mod account_reader;
+pub mod account_status;
 pub mod account_storage;
 pub mod account_storage_mode;
 pub mod account_storage_requirements;
@@ -72,16 +74,17 @@ pub mod note_attachment;
 pub mod note_attachment_kind;
 pub mod note_details;
 pub mod note_execution_hint;
+pub mod note_export_format;
 pub mod note_file;
 pub mod note_filter;
 pub mod note_header;
 pub mod note_id;
 pub mod note_inclusion_proof;
-pub mod note_inputs;
 pub mod note_location;
 pub mod note_metadata;
 pub mod note_recipient;
 pub mod note_script;
+pub mod note_storage;
 pub mod note_sync_info;
 pub mod note_tag;
 pub mod note_type;
@@ -91,6 +94,7 @@ pub mod output_note_state;
 pub mod output_notes;
 pub mod package;
 pub mod partial_note;
+pub mod poseidon2;
 pub mod program;
 pub mod proven_transaction;
 pub mod provers;
@@ -125,11 +129,11 @@ declare_js_miden_arrays! {
     (crate::models::account_id::AccountId) -> AccountIdArray,
     (crate::models::foreign_account::ForeignAccount) -> ForeignAccountArray,
     (crate::models::note_recipient::NoteRecipient) -> NoteRecipientArray,
+    (crate::models::note::Note) -> NoteArray,
     (crate::models::output_note::OutputNote) -> OutputNoteArray,
     (crate::models::storage_slot::StorageSlot) -> StorageSlotArray,
     (crate::models::transaction_script_inputs::TransactionScriptInputPair) -> TransactionScriptInputPairArray,
     (crate::models::felt::Felt) -> FeltArray,
-    (crate::models::output_notes::OutputNotes) -> OutputNotesArray,
     (crate::models::transaction_request::note_and_args::NoteAndArgs) -> NoteAndArgsArray,
     (crate::models::transaction_request::note_details_and_tag::NoteDetailsAndTag) -> NoteDetailsAndTagArray,
     (crate::models::transaction_request::note_id_and_args::NoteIdAndArgs) -> NoteIdAndArgsArray

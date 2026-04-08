@@ -1,142 +1,52 @@
-use alloc::vec::Vec;
-
-use miden_protocol::Word;
-use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::MmrDelta;
-use miden_protocol::note::NoteId;
-use miden_protocol::transaction::TransactionId;
 
-use super::note::CommittedNote;
-use super::transaction::TransactionInclusion;
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::{RpcError, generated as proto};
 
-// STATE SYNC INFO
+// CHAIN MMR INFO
 // ================================================================================================
 
-/// Represents a `proto::rpc::SyncStateResponse` with fields converted into domain types.
-pub struct StateSyncInfo {
-    /// The block number of the chain tip at the moment of the response.
-    pub chain_tip: BlockNumber,
-    /// The returned block header.
-    pub block_header: BlockHeader,
-    /// MMR delta that contains data for (`current_block.num`, `incoming_block_header.num-1`).
+/// Represents the result of a `SyncChainMmr` RPC call, with fields converted into domain types.
+pub struct ChainMmrInfo {
+    /// The block number from which the delta starts (inclusive).
+    pub block_from: BlockNumber,
+    /// The block number up to which the delta covers (inclusive).
+    pub block_to: BlockNumber,
+    /// The MMR delta for the requested block range.
     pub mmr_delta: MmrDelta,
-    /// Tuples of `AccountId` alongside their new account commitments.
-    pub account_commitment_updates: Vec<(AccountId, Word)>,
-    /// List of tuples of Note ID, Note Index and Merkle Path for all new notes.
-    pub note_inclusions: Vec<CommittedNote>,
-    /// List of transaction IDs of transaction that were included in (`request.block_num`,
-    /// `response.block_num-1`) along with the account the tx was executed against and the block
-    /// number the transaction was included in.
-    pub transactions: Vec<TransactionInclusion>,
+    /// The block header at `block_to`.
+    pub block_header: BlockHeader,
 }
 
-// STATE SYNC INFO CONVERSION
-// ================================================================================================
-
-impl TryFrom<proto::rpc::SyncStateResponse> for StateSyncInfo {
+impl TryFrom<proto::rpc::SyncChainMmrResponse> for ChainMmrInfo {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc::SyncStateResponse) -> Result<Self, Self::Error> {
-        let chain_tip = value.chain_tip;
+    fn try_from(value: proto::rpc::SyncChainMmrResponse) -> Result<Self, Self::Error> {
+        let block_range = value
+            .block_range
+            .ok_or(proto::rpc::SyncChainMmrResponse::missing_field(stringify!(block_range)))?;
 
-        // Validate and convert block header
-        let block_header: BlockHeader = value
-            .block_header
-            .ok_or(proto::rpc::SyncStateResponse::missing_field(stringify!(block_header)))?
-            .try_into()?;
-
-        // Validate and convert MMR Delta
         let mmr_delta = value
             .mmr_delta
-            .ok_or(proto::rpc::SyncStateResponse::missing_field(stringify!(mmr_delta)))?
+            .ok_or(proto::rpc::SyncChainMmrResponse::missing_field(stringify!(mmr_delta)))?
             .try_into()?;
 
-        // Validate and convert account commitment updates into an (AccountId, Word) tuple
-        let mut account_commitment_updates = vec![];
-        for update in value.accounts {
-            let account_id = update
-                .account_id
-                .ok_or(proto::rpc::SyncStateResponse::missing_field(stringify!(
-                    accounts.account_id
-                )))?
-                .try_into()?;
-            let account_commitment = update
-                .account_commitment
-                .ok_or(proto::rpc::SyncStateResponse::missing_field(stringify!(
-                    accounts.account_commitment
-                )))?
-                .try_into()?;
-            account_commitment_updates.push((account_id, account_commitment));
-        }
-
-        // Validate and convert account note inclusions into an (AccountId, Word) tuple
-        let mut note_inclusions = vec![];
-        for note in value.notes {
-            let note_id: NoteId = note
-                .note_id
-                .ok_or(proto::rpc::SyncStateResponse::missing_field(stringify!(notes.note_id)))?
-                .try_into()?;
-
-            let inclusion_path = note
-                .inclusion_path
-                .ok_or(proto::rpc::SyncStateResponse::missing_field(stringify!(
-                    notes.inclusion_path
-                )))?
-                .try_into()?;
-
-            let metadata = note
-                .metadata
-                .ok_or(proto::rpc::SyncStateResponse::missing_field(stringify!(notes.metadata)))?
-                .try_into()?;
-
-            let committed_note = super::note::CommittedNote::new(
-                note_id,
-                u16::try_from(note.note_index_in_block).expect("note index out of range"),
-                inclusion_path,
-                metadata,
-            );
-
-            note_inclusions.push(committed_note);
-        }
-
-        let transactions = value
-            .transactions
-            .iter()
-            .map(|transaction_summary| {
-                let transaction_id = transaction_summary.transaction_id.ok_or(
-                    proto::rpc::SyncStateResponse::missing_field(stringify!(
-                        transactions.transaction_id
-                    )),
-                )?;
-                let transaction_id = TransactionId::try_from(transaction_id)?;
-
-                let transaction_block_num = transaction_summary.block_num;
-
-                let transaction_account_id = transaction_summary.account_id.clone().ok_or(
-                    proto::rpc::SyncStateResponse::missing_field(stringify!(
-                        transactions.account_id
-                    )),
-                )?;
-                let transaction_account_id = AccountId::try_from(transaction_account_id)?;
-
-                Ok(TransactionInclusion {
-                    transaction_id,
-                    block_num: transaction_block_num.into(),
-                    account_id: transaction_account_id,
-                })
-            })
-            .collect::<Result<Vec<TransactionInclusion>, RpcError>>()?;
+        let block_header = value
+            .block_header
+            .ok_or(proto::rpc::SyncChainMmrResponse::missing_field(stringify!(block_header)))?
+            .try_into()?;
 
         Ok(Self {
-            chain_tip: chain_tip.into(),
-            block_header,
+            block_from: block_range.block_from.into(),
+            block_to: block_range
+                .block_to
+                .ok_or(proto::rpc::SyncChainMmrResponse::missing_field(stringify!(
+                    block_range.block_to
+                )))?
+                .into(),
             mmr_delta,
-            account_commitment_updates,
-            note_inclusions,
-            transactions,
+            block_header,
         })
     }
 }

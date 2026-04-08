@@ -42,13 +42,13 @@ An asset vault can be reduced to a single hash which is the root of the Sparse M
 
 ### fungibleAssets()
 
-> **fungibleAssets**(): [`FungibleAsset`](FungibleAsset.md)[]
+> **fungibleAssets**(): `FungibleAsset`[]
 
 Returns the fungible assets contained in this vault.
 
 #### Returns
 
-[`FungibleAsset`](FungibleAsset.md)[]
+`FungibleAsset`[]
 
 ***
 

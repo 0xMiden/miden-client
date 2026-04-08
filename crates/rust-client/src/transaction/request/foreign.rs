@@ -9,10 +9,13 @@ use miden_protocol::account::{
     PartialStorage,
     PartialStorageMap,
     StorageMap,
+    StorageMapKey,
+    StorageMapWitness,
 };
 use miden_protocol::asset::{AssetVault, PartialVault};
+use miden_protocol::crypto::merkle::smt::SmtProof;
 use miden_protocol::transaction::AccountInputs;
-use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
+use miden_tx::utils::serde::{Deserializable, DeserializationError, Serializable};
 
 use super::TransactionRequestError;
 use crate::rpc::domain::account::{
@@ -29,13 +32,16 @@ use crate::rpc::domain::account::{
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)]
 pub enum ForeignAccount {
-    /// Public account data will be retrieved from the network at execution time, based on the
-    /// account ID. The second element of the tuple indicates which storage slot indices
-    /// and map keys are desired to be retrieved.
+    /// Account with public on-chain state (`Public` or `Network` storage mode) whose state and
+    /// code will be retrieved from the network at execution time. Declaring it upfront lets you
+    /// specify [`AccountStorageRequirements`] so the correct storage map entries are fetched in a
+    /// single RPC call. If not declared, the account is lazily loaded with empty storage
+    /// requirements, and any storage map accesses will trigger additional RPC calls during
+    /// execution.
     Public(AccountId, AccountStorageRequirements),
-    /// Private account data requires [`PartialAccount`] to be passed. An account witness
-    /// will be retrieved from the network at execution time so that it can be used as inputs to
-    /// the transaction kernel.
+    /// Private account that requires a [`PartialAccount`] to be provided by the caller. An
+    /// account witness will be retrieved from the network at execution time so that it can be
+    /// used as inputs to the transaction kernel.
     Private(PartialAccount),
 }
 
@@ -47,7 +53,7 @@ impl ForeignAccount {
         account_id: AccountId,
         storage_requirements: AccountStorageRequirements,
     ) -> Result<Self, TransactionRequestError> {
-        if !account_id.is_public() {
+        if !account_id.has_public_state() {
             return Err(TransactionRequestError::InvalidForeignAccountId(account_id));
         }
 
@@ -58,7 +64,7 @@ impl ForeignAccount {
     /// retrieved at execution time.
     pub fn private(account: impl Into<PartialAccount>) -> Result<Self, TransactionRequestError> {
         let partial_account: PartialAccount = account.into();
-        if partial_account.id().is_public() {
+        if partial_account.id().has_public_state() {
             return Err(TransactionRequestError::InvalidForeignAccountId(partial_account.id()));
         }
 
@@ -96,7 +102,7 @@ impl PartialOrd for ForeignAccount {
 }
 
 impl Serializable for ForeignAccount {
-    fn write_into<W: miden_tx::utils::ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: miden_tx::utils::serde::ByteWriter>(&self, target: &mut W) {
         match self {
             ForeignAccount::Public(account_id, storage_requirements) => {
                 target.write(0u8);
@@ -112,9 +118,9 @@ impl Serializable for ForeignAccount {
 }
 
 impl Deserializable for ForeignAccount {
-    fn read_from<R: miden_tx::utils::ByteReader>(
+    fn read_from<R: miden_tx::utils::serde::ByteReader>(
         source: &mut R,
-    ) -> Result<Self, miden_tx::utils::DeserializationError> {
+    ) -> Result<Self, miden_tx::utils::serde::DeserializationError> {
         let account_type: u8 = source.read_u8()?;
         match account_type {
             0 => {
@@ -132,8 +138,12 @@ impl Deserializable for ForeignAccount {
 }
 
 /// Converts an [`AccountProof`] to [`AccountInputs`].
-pub fn account_proof_into_inputs(
+///
+/// The `storage_requirements` are needed to reassociate raw keys with the SMT proofs returned
+/// by the node (the node only sends hashed leaf keys, not the original raw keys).
+pub(crate) fn account_proof_into_inputs(
     account_proof: AccountProof,
+    storage_requirements: &AccountStorageRequirements,
 ) -> Result<AccountInputs, TransactionRequestError> {
     let (witness, account_details) = account_proof.into_parts();
 
@@ -157,8 +167,11 @@ pub fn account_proof_into_inputs(
                             .map_err(TransactionRequestError::StorageMapError)?,
                     )
                 },
-                StorageMapEntries::EntriesWithProofs(witnesses) => {
-                    // Partial map - create from witnesses
+                StorageMapEntries::EntriesWithProofs(proofs) => {
+                    // Reassociate the proofs with the keys from storage requirements.
+                    let keys =
+                        storage_requirements.keys_for_slot(&account_storage_detail.slot_name);
+                    let witnesses = proofs_to_witnesses(proofs, keys)?;
                     PartialStorageMap::with_witnesses(witnesses)?
                 },
             };
@@ -171,7 +184,7 @@ pub fn account_proof_into_inputs(
                 account_header.id(),
                 account_header.nonce(),
                 code,
-                PartialStorage::new(storage_details.header, storage_map_proofs.into_iter())?,
+                PartialStorage::new(storage_details.header, storage_map_proofs)?,
                 PartialVault::new_full(vault),
                 None,
             )?,
@@ -179,4 +192,23 @@ pub fn account_proof_into_inputs(
         ));
     }
     Err(TransactionRequestError::ForeignAccountDataMissing)
+}
+
+/// Pairs each [`SmtProof`] with its corresponding key to produce [`StorageMapWitness`]es.
+///
+/// Proofs and keys are matched by position (the node returns proofs in the same order as
+/// the requested keys). [`StorageMapWitness::new`] validates each pair by hashing the key
+/// and checking that the proof's leaf covers it, so a mismatch will surface as a
+/// `StorageMapError::MissingKey` error.
+fn proofs_to_witnesses(
+    proofs: Vec<SmtProof>,
+    keys: &[StorageMapKey],
+) -> Result<Vec<StorageMapWitness>, TransactionRequestError> {
+    proofs
+        .into_iter()
+        .zip(keys)
+        .map(|(proof, key)| {
+            StorageMapWitness::new(proof, [*key]).map_err(TransactionRequestError::StorageMapError)
+        })
+        .collect()
 }

@@ -18,7 +18,8 @@ use miden_standards::account::interface::AccountInterfaceError;
 // ================================================================================================
 pub use miden_standards::errors::CodeBuilderError;
 pub use miden_tx::AuthenticationError;
-use miden_tx::utils::{DeserializationError, HexParseError};
+use miden_tx::utils::HexParseError;
+use miden_tx::utils::serde::DeserializationError;
 use miden_tx::{NoteCheckerError, TransactionExecutorError, TransactionProverError};
 use thiserror::Error;
 
@@ -80,6 +81,8 @@ pub enum ClientError {
     AccountCommitmentMismatch(Word),
     #[error("account {0} is private and its details cannot be retrieved from the network")]
     AccountIsPrivate(AccountId),
+    #[error("account with id {0} not found on the network")]
+    AccountNotFoundOnChain(AccountId),
     #[error(
         "cannot import account: the local account nonce is higher than the imported one, meaning the local state is newer"
     )]
@@ -149,17 +152,19 @@ pub enum ClientError {
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
     #[error("cannot track more note tags: the maximum of {0} tracked tags has been reached")]
-    NoteTagsLimitExceeded(usize),
+    NoteTagsLimitExceeded(u32),
     #[error("cannot track more accounts: the maximum of {0} tracked accounts has been reached")]
-    AccountsLimitExceeded(usize),
-    #[error(
-        "unsupported authentication scheme ID {0}; supported schemes are: RpoFalcon512 (0) and EcdsaK256Keccak (1)"
-    )]
-    UnsupportedAuthSchemeId(u8),
+    AccountsLimitExceeded(u32),
     #[error("expected full account data for account {0}, but only partial data is available")]
     AccountRecordNotFull(AccountId),
     #[error("expected partial account data for account {0}, but full data was found")]
     AccountRecordNotPartial(AccountId),
+    #[error("failed to register NTX note script with root {script_root:?}")]
+    NtxScriptRegistrationFailed {
+        script_root: Word,
+        #[source]
+        source: RpcError,
+    },
 }
 
 // CONVERSIONS

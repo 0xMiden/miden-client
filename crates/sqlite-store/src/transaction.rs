@@ -7,7 +7,7 @@ use std::vec::Vec;
 
 use miden_client::Word;
 use miden_client::note::ToInputNoteCommitments;
-use miden_client::store::{StoreError, TransactionFilter};
+use miden_client::store::{AccountSmtForest, StoreError, TransactionFilter};
 use miden_client::transaction::{
     TransactionDetails,
     TransactionId,
@@ -23,7 +23,6 @@ use rusqlite::{Connection, Transaction, params};
 use super::SqliteStore;
 use super::note::apply_note_updates_tx;
 use super::sync::add_note_tag_tx;
-use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::{insert_sql, subst};
 
@@ -114,13 +113,13 @@ impl SqliteStore {
 
         let updated_fungible_assets = Self::get_account_fungible_assets_for_delta(
             conn,
-            &executed_transaction.initial_account().into(),
+            executed_transaction.account_id(),
             executed_transaction.account_delta(),
         )?;
 
-        let updated_storage_maps = Self::get_account_storage_maps_for_delta(
+        let old_map_roots = Self::get_storage_map_roots_for_delta(
             conn,
-            &executed_transaction.initial_account().into(),
+            executed_transaction.account_id(),
             executed_transaction.account_delta(),
         )?;
 
@@ -137,8 +136,8 @@ impl SqliteStore {
 
         let details = TransactionDetails {
             account_id: executed_transaction.account_id(),
-            init_account_state: executed_transaction.initial_account().commitment(),
-            final_account_state: executed_transaction.final_account().commitment(),
+            init_account_state: executed_transaction.initial_account().initial_commitment(),
+            final_account_state: executed_transaction.final_account().to_commitment(),
             input_note_nullifiers: nullifiers,
             output_notes: output_notes.clone(),
             block_num: executed_transaction.block_header().block_num(),
@@ -165,7 +164,7 @@ impl SqliteStore {
             &executed_transaction.initial_account().into(),
             executed_transaction.final_account(),
             updated_fungible_assets,
-            updated_storage_maps,
+            &old_map_roots,
             executed_transaction.account_delta(),
         )?;
         drop(smt_forest);

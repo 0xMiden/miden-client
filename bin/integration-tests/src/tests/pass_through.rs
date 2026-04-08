@@ -1,13 +1,14 @@
 use anyhow::Result;
-use miden_client::account::component::{
-    AuthFalcon512RpoAcl,
-    AuthFalcon512RpoAclConfig,
-    BasicWallet,
-};
+use miden_client::account::component::BasicWallet;
 use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType};
 use miden_client::assembly::CodeBuilder;
 use miden_client::asset::{Asset, FungibleAsset};
-use miden_client::auth::{AuthSchemeId, TransactionAuthenticator};
+use miden_client::auth::{
+    AuthSchemeId,
+    AuthSingleSigAcl,
+    AuthSingleSigAclConfig,
+    TransactionAuthenticator,
+};
 use miden_client::crypto::FeltRng;
 use miden_client::crypto::rpo_falcon512::SecretKey;
 use miden_client::note::{
@@ -15,19 +16,20 @@ use miden_client::note::{
     NoteAssets,
     NoteDetails,
     NoteFile,
-    NoteInputs,
     NoteMetadata,
     NoteRecipient,
     NoteScript,
+    NoteStorage,
     NoteTag,
     NoteType,
-    build_p2id_recipient,
+    P2idNoteStorage,
 };
 use miden_client::store::{InputNoteState, TransactionFilter};
 use miden_client::testing::common::*;
-use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
+use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::{Client, ClientRng, Word};
 use rand::RngCore;
+use tracing::info;
 
 use crate::tests::config::ClientConfig;
 
@@ -46,6 +48,8 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         rpc_timeout_ms: client_config_2.1,
         store_config: client_config_2.2,
         auth_path: client_config_2.3,
+        prover_endpoint: client_config.prover_endpoint.clone(),
+        note_transport_endpoint: client_config.note_transport_endpoint.clone(),
     };
     let (mut client_2, authenticator_2) = client_config_2.into_client().await?;
 
@@ -58,14 +62,14 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         &mut client,
         AccountStorageMode::Private,
         &authenticator_1,
-        AuthSchemeId::Falcon512Rpo,
+        AuthSchemeId::Falcon512Poseidon2,
     )
     .await?;
     let (target, ..) = insert_new_wallet(
         &mut client_2,
         AccountStorageMode::Private,
         &authenticator_2,
-        AuthSchemeId::Falcon512Rpo,
+        AuthSchemeId::Falcon512Poseidon2,
     )
     .await?;
 
@@ -76,19 +80,19 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         &mut client,
         AccountStorageMode::Private,
         &authenticator_1,
-        AuthSchemeId::Falcon512Rpo,
+        AuthSchemeId::Falcon512Poseidon2,
     )
     .await?;
 
     // mint 1000 BTC for accountA
-    println!("minting 1000 btc for account A");
+    info!(account_id = %sender.id(), faucet_id = %btc_faucet_account.id(), "Minting 1000 BTC for sender");
 
     let tx_id =
         mint_and_consume(&mut client, sender.id(), btc_faucet_account.id(), NoteType::Public).await;
     wait_for_tx(&mut client, tx_id).await?;
 
     // Create a note that we will send to a pass-through account
-    println!("creating note with accountA");
+    info!(sender_id = %sender.id(), target_id = %target.id(), "Creating pass-through note");
     let asset = FungibleAsset::new(btc_faucet_account.id(), ASSET_AMOUNT)?;
 
     let (pass_through_note_1, pass_through_note_details_1) =
@@ -98,15 +102,12 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         create_pass_through_note(sender.id(), target.id(), asset.into(), client.rng())?;
 
     let tx_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![
-            OutputNote::Full(pass_through_note_1.clone()),
-            OutputNote::Full(pass_through_note_2.clone()),
-        ])
+        .own_output_notes(vec![pass_through_note_1.clone(), pass_through_note_2.clone()])
         .build()?;
 
     execute_tx_and_sync(&mut client, sender.id(), tx_request).await?;
 
-    println!("consuming pass-through note");
+    info!(note_id = %pass_through_note_1.id(), pass_through_account = %pass_through_account.id(), "Consuming pass-through note");
 
     client
         .import_notes(&[
@@ -142,13 +143,12 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         pass_through_account.id()
     );
 
-    let pass_through_before_second_tx = client
-        .get_account(pass_through_account.id())
-        .await?
-        .expect("pass-through account should exist");
-
     // Storing commitment to check later that (final_acc.commitment == initial_acc.commitment)
-    let commitment_before_second_tx = pass_through_before_second_tx.account_data().commitment();
+    let commitment_before_second_tx = client
+        .account_reader(pass_through_account.id())
+        .commitment()
+        .await
+        .expect("pass-through account should exist");
 
     // now try another transaction against the pass-through account
     let tx_request = TransactionRequestBuilder::new()
@@ -173,14 +173,14 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
         pass_through_account.id()
     );
 
-    let pass_through_after_second_tx = client
-        .get_account(pass_through_account.id())
-        .await?
+    let commitment_after_second_tx = client
+        .account_reader(pass_through_account.id())
+        .commitment()
+        .await
         .expect("pass-through account should exist");
 
     assert_eq!(
-        pass_through_after_second_tx.account_data().commitment(),
-        commitment_before_second_tx,
+        commitment_after_second_tx, commitment_before_second_tx,
         "pass-through transaction should not change account commitment"
     );
 
@@ -199,11 +199,13 @@ async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
     let key_pair = SecretKey::with_rng(client.rng());
     let pub_key = key_pair.public_key().to_commitment();
 
-    let acl_config = AuthFalcon512RpoAclConfig::new()
+    let acl_config = AuthSingleSigAclConfig::new()
         .with_allow_unauthorized_input_notes(true)
         .with_allow_unauthorized_output_notes(true);
 
-    let auth_component = AuthFalcon512RpoAcl::new(pub_key.into(), acl_config).unwrap();
+    let auth_component =
+        AuthSingleSigAcl::new(pub_key.into(), AuthSchemeId::Falcon512Poseidon2, acl_config)
+            .unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
@@ -234,15 +236,20 @@ fn create_pass_through_note(
 ) -> Result<(Note, NoteDetails)> {
     let note_script = get_pass_through_note_script();
 
-    let asset_word: Word = asset.into();
+    let asset_key: Word = asset.to_key_word();
+    let asset_value: Word = asset.to_value_word();
 
-    let target_recipient = build_p2id_recipient(target, rng.draw_word())?;
+    let target_recipient = P2idNoteStorage::new(target).into_recipient(rng.draw_word());
 
-    let inputs = NoteInputs::new(vec![
-        asset_word[0],
-        asset_word[1],
-        asset_word[2],
-        asset_word[3],
+    let inputs = NoteStorage::new(vec![
+        asset_key[0],
+        asset_key[1],
+        asset_key[2],
+        asset_key[3],
+        asset_value[0],
+        asset_value[1],
+        asset_value[2],
+        asset_value[3],
         target_recipient.digest()[0],
         target_recipient.digest()[1],
         target_recipient.digest()[2],
@@ -255,7 +262,7 @@ fn create_pass_through_note(
     let pass_through_recipient = NoteRecipient::new(serial_num, note_script, inputs);
 
     let metadata =
-        NoteMetadata::new(sender, NoteType::Public, NoteTag::with_account_target(target));
+        NoteMetadata::new(sender, NoteType::Public).with_tag(NoteTag::with_account_target(target));
     let note = Note::new(NoteAssets::new(vec![asset])?, metadata, pass_through_recipient);
 
     let pass_through_note_details =

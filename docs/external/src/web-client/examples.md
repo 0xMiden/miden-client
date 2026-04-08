@@ -44,11 +44,26 @@ Each example is self-contained and includes:
 
 ## Client Initialization
 
-Most if not all examples require you to initialize the Miden Web Client. You can do this via:
+Most if not all examples require you to initialize the Miden Client. You can do this via:
 
 ```typescript
-import { WebClient } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
-// Initialize the web client
-const webClient = await WebClient.createClient();
+// Initialize the client (defaults to testnet)
+const client = await MidenClient.create();
+
+// Or with options
+const client = await MidenClient.create({
+  rpcUrl: "http://localhost:57291",
+  autoSync: true
+});
+
+// Network-specific factories (RPC, prover, and note transport preconfigured)
+const testnetClient = await MidenClient.createTestnet();
+const devnetClient = await MidenClient.createDevnet();
+
+// For testing with a mock chain
+const client = await MidenClient.createMock();
 ```
+
+> **Note:** The `WebClient` class is deprecated. Use `MidenClient.create()` instead.

@@ -5,158 +5,119 @@ import {
   releaseSyncLock,
   releaseSyncLockWithError,
 } from "./syncLock.js";
-import { AsyncLock } from "./asyncLock.js";
-import { withWriteLock } from "./webLock.js";
+import { MidenClient } from "./client.js";
+import {
+  createP2IDNote,
+  createP2IDENote,
+  buildSwapTag,
+  _setWasm as _setStandaloneWasm,
+  _setWebClient as _setStandaloneWebClient,
+} from "./standalone.js";
 export * from "../Cargo.toml";
 
-// WASM PROXY METHODS
-// ================================================================================================
+export const AccountType = Object.freeze({
+  // WASM-compatible numeric values — usable with AccountBuilder directly
+  FungibleFaucet: 0,
+  NonFungibleFaucet: 1,
+  RegularAccountImmutableCode: 2,
+  RegularAccountUpdatableCode: 3,
+  // SDK-friendly aliases (same numeric values as their WASM equivalents)
+  MutableWallet: 3,
+  ImmutableWallet: 2,
+  ImmutableContract: 2,
+  MutableContract: 3,
+});
 
-/**
- * Set of method names that are synchronous (non-async) on the WASM object
- * and should NOT be wrapped with the async WASM lock. Wrapping them would
- * turn their return type from T into Promise<T>, breaking callers that
- * expect a synchronous return value.
- *
- * These methods may still mutate internal client state (e.g. RNG), but they
- * complete in a single synchronous call without yielding to the event loop.
- * JavaScript's single-threaded execution guarantees they cannot interleave
- * with an in-progress async WASM call.
- *
- * When updating this set, check the Rust source for any `pub fn` (non-async)
- * method on `impl WebClient` with #[wasm_bindgen] that is NOT already handled
- * by an explicit wrapper method on the JS WebClient class.
- */
+export const AuthScheme = Object.freeze({
+  Falcon: "falcon",
+  ECDSA: "ecdsa",
+});
+
+export const NoteVisibility = Object.freeze({
+  Public: "public",
+  Private: "private",
+});
+
+export const StorageMode = Object.freeze({
+  Public: "public",
+  Private: "private",
+  Network: "network",
+});
+
+export { MidenClient };
+export { createP2IDNote, createP2IDENote, buildSwapTag };
+
+// Internal exports — used by integration tests that need direct access to the low-level WebClient proxy.
+export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
+
+// Method classification sets — used by scripts/check-method-classification.js to ensure
+// every WASM export is explicitly categorised. Update when adding new WASM methods.
 const SYNC_METHODS = new Set([
+  "buildSwapTag",
+  "createCodeBuilder",
+  "newConsumeTransactionRequest",
   "newMintTransactionRequest",
   "newSendTransactionRequest",
-  "newConsumeTransactionRequest",
   "newSwapTransactionRequest",
-  "createCodeBuilder",
-  "buildSwapTag",
-  "setDebugMode",
-  "usesMockChain",
+  "proveBlock",
   "serializeMockChain",
   "serializeMockNoteTransportNode",
-  "proveBlock",
+  "setDebugMode",
+  "storeIdentifier",
+  "usesMockChain",
 ]);
 
-/**
- * Set of method names that mutate state. These are wrapped with the cross-tab
- * write lock (Layer 2) when accessed through the Proxy fallback.
- */
 const WRITE_METHODS = new Set([
-  "newAccount",
-  "importAccountFile",
-  "importAccountById",
-  "importPublicAccountFromSeed",
-  "importNoteFile",
-  "forceImportStore",
   "addTag",
-  "removeTag",
-  "setSetting",
-  "removeSetting",
-  "insertAccountAddress",
-  "removeAccountAddress",
-  "sendPrivateNote",
-  // fetch*PrivateNotes fetches from the note transport AND writes to IndexedDB
-  "fetchPrivateNotes",
-  "fetchAllPrivateNotes",
-  "addAccountSecretKeyToWebStore",
   "executeForSummary",
+  "executeProgram",
+  "fetchAllPrivateNotes",
+  "fetchPrivateNotes",
+  "forceImportStore",
+  "importAccountById",
+  "importAccountFile",
+  "importNoteFile",
+  "importPublicAccountFromSeed",
+  "insertAccountAddress",
+  "newAccount",
+  "pruneAccountHistory",
+  "removeAccountAddress",
+  "removeTag",
+  "removeSetting",
+  "sendPrivateNote",
+  "setSetting",
+  "submitProvenTransaction",
 ]);
 
-/**
- * Set of method names that are read-only (no state mutation). These are
- * wrapped with the in-process WASM lock only (Layer 1).
- *
- * This set exists purely for the CI lint check (`check-method-classification`)
- * which ensures every WASM export is explicitly classified — preventing new
- * write methods from silently defaulting to read-only.
- *
- * The Proxy behaviour is unchanged: methods not in SYNC_METHODS or
- * WRITE_METHODS already get WASM-lock-only wrapping.
- */
 const READ_METHODS = new Set([
-  "getAccounts",
-  "getAccount",
-  "getAccountAuthByPubKeyCommitment",
-  "getPublicKeyCommitmentsOfAccount",
-  "getInputNotes",
-  "getInputNote",
-  "getOutputNotes",
-  "getOutputNote",
-  "getConsumableNotes",
-  "getTransactions",
-  "getSyncHeight",
+  "accountReader",
+  "exportAccountFile",
   "exportNoteFile",
   "exportStore",
-  "exportAccountFile",
-  "listTags",
+  "getAccount",
+  "getAccountCode",
+  "getAccountStorage",
+  "getAccountVault",
+  "getAccounts",
+  "getConsumableNotes",
+  "getInputNote",
+  "getInputNotes",
+  "getOutputNote",
+  "getOutputNotes",
   "getSetting",
+  "getSyncHeight",
+  "getTransactions",
   "listSettingKeys",
+  "listTags",
+  "executeProgram",
 ]);
 
-/**
- * Module-level map tracking whether the current tab already holds the
- * cross-tab Web Lock for a given store name. Keyed by storeName so that
- * two WebClient instances targeting the same store correctly detect
- * re-entrancy and skip re-acquiring the lock (which would deadlock).
- */
-const _writeLockHeldByStore = new Map();
+const MOCK_STORE_NAME = "mock_client_db";
 
-/**
- * Create the Proxy that wraps a WebClient instance. The proxy:
- * - Returns properties from the wrapper (instance) first.
- * - Falls back to the underlying WASM WebClient, wrapping function calls
- *   through the in-process WASM lock (Layer 1) and, for write methods,
- *   the cross-tab write lock (Layer 2).
- */
-function createClientProxy(instance) {
-  return new Proxy(instance, {
-    get(target, prop, receiver) {
-      // If the property exists on the wrapper, return it.
-      if (prop in target) {
-        return Reflect.get(target, prop, receiver);
-      }
-      // Otherwise, if the wasmWebClient has it, return that.
-      if (target.wasmWebClient && prop in target.wasmWebClient) {
-        const value = target.wasmWebClient[prop];
-        if (typeof value === "function") {
-          // Synchronous methods: call directly without async wrapping.
-          // These are pure-computation methods whose callers expect a
-          // synchronous return value.
-          if (SYNC_METHODS.has(prop)) {
-            return (...args) => value.apply(target.wasmWebClient, args);
-          } else if (WRITE_METHODS.has(prop)) {
-            // Write methods: cross-tab lock (outer) → WASM lock (inner)
-            return (...args) =>
-              target._withWrite(prop, () =>
-                target._wasmLock.runExclusive(() =>
-                  value.apply(target.wasmWebClient, args)
-                )
-              );
-          } else if (READ_METHODS.has(prop)) {
-            // Read methods: WASM lock only
-            return (...args) =>
-              target._wasmLock.runExclusive(() =>
-                value.apply(target.wasmWebClient, args)
-              );
-          } else {
-            throw new Error(
-              `Unclassified WASM method: "${prop}". Add it to SYNC_METHODS, WRITE_METHODS, or READ_METHODS.`
-            );
-          }
-        }
-        return value;
-      }
-      return undefined;
-    },
-  });
-}
-
-// WASM MODULE LOADING
-// ================================================================================================
+// Suppress unused-variable warnings — these sets exist solely for the CI lint check.
+void SYNC_METHODS;
+void WRITE_METHODS;
+void READ_METHODS;
 
 const buildTypedArraysExport = (exportObject) => {
   return Object.entries(exportObject).reduce(
@@ -210,6 +171,8 @@ const ensureWasm = async () => {
           copyWebClientStatics(module.WebClient);
           webClientStaticsCopied = true;
         }
+        // Set WASM module for standalone utilities
+        _setStandaloneWasm(module);
       }
       return module;
     });
@@ -217,7 +180,7 @@ const ensureWasm = async () => {
   return wasmLoadPromise;
 };
 
-const getWasmOrThrow = async () => {
+export const getWasmOrThrow = async () => {
   const module = await ensureWasm();
   if (!module) {
     throw new Error(
@@ -226,10 +189,6 @@ const getWasmOrThrow = async () => {
   }
   return module;
 };
-
-// WEB CLIENT
-// ================================================================================================
-
 /**
  * WebClient is a wrapper around the underlying WASM WebClient object.
  *
@@ -246,18 +205,6 @@ const getWasmOrThrow = async () => {
  * 3. It employs a Proxy to forward any calls not designated for web worker computation
  *    directly to the underlying WASM WebClient instance.
  *
- * Concurrency safety is provided by three layers:
- *
- * - **Layer 1 (In-Process AsyncLock):** All main-thread WASM calls are serialized
- *   through `_wasmLock` to prevent "recursive use of an object detected" panics.
- *
- * - **Layer 2 (Cross-Tab Write Lock):** Mutating operations acquire an exclusive
- *   Web Lock (`miden-db-{storeName}`) so that writes from different tabs are
- *   serialized against the same IndexedDB database.
- *
- * - **Layer 3 (BroadcastChannel):** After every write, a notification is sent
- *   to all other tabs so they can refresh stale in-memory state.
- *
  * Additionally, the wrapper provides a static createClient function. This static method
  * instantiates the WebClient object and ensures that the necessary createClient calls are
  * performed both in the main thread and within the worker thread. This dual initialization
@@ -267,7 +214,29 @@ const getWasmOrThrow = async () => {
  * Because of this implementation, the only breaking change for end users is in the way the
  * web client is instantiated. Users should now use the WebClient.createClient static call.
  */
-export class WebClient {
+/**
+ * Create a Proxy that forwards missing properties to the underlying WASM
+ * WebClient.
+ */
+function createClientProxy(instance) {
+  return new Proxy(instance, {
+    get(target, prop, receiver) {
+      if (prop in target) {
+        return Reflect.get(target, prop, receiver);
+      }
+      if (target.wasmWebClient && prop in target.wasmWebClient) {
+        const value = target.wasmWebClient[prop];
+        if (typeof value === "function") {
+          return value.bind(target.wasmWebClient);
+        }
+        return value;
+      }
+      return undefined;
+    },
+  });
+}
+
+class WebClient {
   /**
    * Create a WebClient wrapper.
    *
@@ -310,55 +279,6 @@ export class WebClient {
     this.insertKeyCb = insertKeyCb;
     this.signCb = signCb;
     this.logLevel = logLevel;
-
-    // Layer 1: In-process WASM lock — serializes all main-thread WASM calls.
-    this._wasmLock = new AsyncLock();
-
-    // Layer 2 timeout: how long to wait to acquire the cross-tab write lock
-    // before aborting. Set to 0 to wait indefinitely. Can be overridden on
-    // the instance, e.g. client._writeLockTimeoutMs = 0.
-    this._writeLockTimeoutMs = 60_000;
-
-    // Layer 3: BroadcastChannel for cross-tab state-change notifications.
-    // If construction fails (e.g. unsupported WebView), Layer 3 is disabled
-    // but correctness is preserved: the cross-tab write lock (Layer 2) still
-    // prevents concurrent writes, and the next explicit user action will
-    // trigger a sync. Tabs just won't receive proactive refresh signals.
-    const channelName = `miden-state-${storeName || "default"}`;
-    try {
-      this._stateChannel =
-        typeof BroadcastChannel !== "undefined"
-          ? new BroadcastChannel(channelName)
-          : null;
-    } catch {
-      this._stateChannel = null;
-    }
-    this._stateListeners = [];
-    if (this._stateChannel) {
-      this._stateChannel.onmessage = async (event) => {
-        // Ignore cross-tab messages until the client is fully initialized.
-        if (!this.wasmWebClient) return;
-
-        // Auto-sync: refresh in-memory Rust Client state from IndexedDB.
-        // Sync coalescing (in syncLock.js) ensures concurrent syncs share the
-        // same result, so rapid messages are handled without debouncing.
-        try {
-          await this.syncState();
-        } catch {
-          // Sync failure is non-fatal — the next explicit sync will retry.
-        }
-
-        // Invoke listeners AFTER syncState resolves so in-memory state
-        // is guaranteed fresh when callbacks run.
-        for (const listener of this._stateListeners) {
-          try {
-            listener(event.data);
-          } catch {
-            // Swallow listener errors.
-          }
-        }
-      };
-    }
 
     // Check if Web Workers are available.
     if (typeof Worker !== "undefined") {
@@ -461,95 +381,26 @@ export class WebClient {
     // Lazy initialize the underlying WASM WebClient when first requested.
     this.wasmWebClient = null;
     this.wasmWebClientPromise = null;
+
+    // Promise chain to serialize direct WASM calls that require exclusive
+    // (&mut self) access. Without this, concurrent calls on the same client
+    // would panic with "recursive use of an object detected" due to
+    // wasm-bindgen's internal RefCell.
+    this._wasmCallChain = Promise.resolve();
   }
 
-  // CONCURRENCY HELPERS
-  // ================================================================================================
-
   /**
-   * Execute `fn` under the cross-tab write lock and broadcast a state-change
-   * notification when it completes. Safe to call re-entrantly within the same
-   * tab (the inner call skips the cross-tab lock since the outer call holds it).
+   * Serialize a WASM call that requires exclusive (&mut self) access.
+   * Concurrent calls are queued and executed one at a time.
    *
-   * @param {string} operation - Name of the operation (for the broadcast payload).
-   * @param {() => Promise<T>} fn - The async work.
-   * @returns {Promise<T>}
-   * @template T
+   * @param {() => Promise<any>} fn - The async function to execute.
+   * @returns {Promise<any>} The result of fn.
    */
-  async _withWrite(operation, fn) {
-    const storeName = this.storeName || "default";
-
-    if (_writeLockHeldByStore.get(storeName)) {
-      // This tab already holds the cross-tab Web Lock for this store —
-      // skip re-acquiring it to avoid deadlock. The outer call's lock
-      // still blocks other tabs. Works correctly even when two WebClient
-      // instances target the same store within the same tab.
-      return fn();
-    }
-
-    const result = await withWriteLock(
-      storeName,
-      async () => {
-        _writeLockHeldByStore.set(storeName, true);
-        try {
-          return await fn();
-        } finally {
-          _writeLockHeldByStore.set(storeName, false);
-        }
-      },
-      this._writeLockTimeoutMs
-    );
-
-    // Layer 3: notify other tabs. Skip for syncState — sync is not a
-    // user-facing mutation, and broadcasting it would cause a ping-pong
-    // loop (Tab A syncs → broadcasts → Tab B auto-syncs → broadcasts → …).
-    if (operation !== "syncState") {
-      this._broadcastStateChange(operation);
-    }
-
+  _serializeWasmCall(fn) {
+    const result = this._wasmCallChain.catch(() => {}).then(fn);
+    this._wasmCallChain = result.catch(() => {});
     return result;
   }
-
-  /**
-   * Send a state-change notification over the BroadcastChannel (Layer 3).
-   *
-   * @param {string} [operation] - Human-readable name of the operation.
-   */
-  _broadcastStateChange(operation) {
-    if (this._stateChannel) {
-      try {
-        this._stateChannel.postMessage({
-          type: "stateChanged",
-          operation,
-          storeName: this.storeName || "default",
-        });
-      } catch {
-        // BroadcastChannel may be closed — ignore.
-      }
-    }
-  }
-
-  /**
-   * Register a listener that is called when **another tab** mutates the same
-   * IndexedDB database (Layer 3). The WebClient automatically calls
-   * `syncState()` before invoking listeners, so the in-memory state is
-   * already refreshed when your callback runs. Use this for additional
-   * work like re-fetching accounts or updating UI.
-   *
-   * Returns an unsubscribe function.
-   *
-   * @param {(event: {type: string, operation?: string, storeName: string}) => void} callback
-   * @returns {() => void} Unsubscribe function.
-   */
-  onStateChanged(callback) {
-    this._stateListeners.push(callback);
-    return () => {
-      this._stateListeners = this._stateListeners.filter((l) => l !== callback);
-    };
-  }
-
-  // WORKER / WASM INITIALIZATION
-  // ================================================================================================
 
   // TODO: This will soon conflict with some changes in main.
   // More context here:
@@ -584,9 +435,6 @@ export class WebClient {
     }
     return this.wasmWebClientPromise;
   }
-
-  // FACTORY METHODS
-  // ================================================================================================
 
   /**
    * Factory method to create and initialize a WebClient instance.
@@ -683,7 +531,6 @@ export class WebClient {
     );
 
     await instance.ready;
-
     return createClientProxy(instance);
   }
 
@@ -710,37 +557,17 @@ export class WebClient {
     });
   }
 
-  // EXPLICITLY WRAPPED METHODS (Worker-Forwarded + Concurrency-Safe)
-  // ================================================================================================
+  // ----- Explicitly Wrapped Methods (Worker-Forwarded) -----
 
   async newWallet(storageMode, mutable, authSchemeId, seed) {
-    return this._withWrite("newWallet", async () => {
-      try {
-        if (!this.worker) {
-          return await this._wasmLock.runExclusive(async () => {
-            const wasmWebClient = await this.getWasmWebClient();
-            return await wasmWebClient.newWallet(
-              storageMode,
-              mutable,
-              authSchemeId,
-              seed
-            );
-          });
-        }
-        const wasm = await getWasmOrThrow();
-        const serializedStorageMode = storageMode.asStr();
-        const serializedAccountBytes = await this.callMethodWithWorker(
-          MethodName.NEW_WALLET,
-          serializedStorageMode,
-          mutable,
-          authSchemeId,
-          seed
-        );
-        return wasm.Account.deserialize(new Uint8Array(serializedAccountBytes));
-      } catch (error) {
-        console.error("INDEX.JS: Error in newWallet:", error);
-        throw error;
-      }
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newWallet(
+        storageMode,
+        mutable,
+        authSchemeId,
+        seed
+      );
     });
   }
 
@@ -752,157 +579,129 @@ export class WebClient {
     maxSupply,
     authSchemeId
   ) {
-    return this._withWrite("newFaucet", async () => {
-      try {
-        if (!this.worker) {
-          return await this._wasmLock.runExclusive(async () => {
-            const wasmWebClient = await this.getWasmWebClient();
-            return await wasmWebClient.newFaucet(
-              storageMode,
-              nonFungible,
-              tokenSymbol,
-              decimals,
-              maxSupply,
-              authSchemeId
-            );
-          });
-        }
-        const wasm = await getWasmOrThrow();
-        const serializedStorageMode = storageMode.asStr();
-        const serializedMaxSupply = maxSupply.toString();
-        const serializedAccountBytes = await this.callMethodWithWorker(
-          MethodName.NEW_FAUCET,
-          serializedStorageMode,
-          nonFungible,
-          tokenSymbol,
-          decimals,
-          serializedMaxSupply,
-          authSchemeId
-        );
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newFaucet(
+        storageMode,
+        nonFungible,
+        tokenSymbol,
+        decimals,
+        maxSupply,
+        authSchemeId
+      );
+    });
+  }
 
-        return wasm.Account.deserialize(new Uint8Array(serializedAccountBytes));
-      } catch (error) {
-        console.error("INDEX.JS: Error in newFaucet:", error);
-        throw error;
-      }
+  async newAccount(account, overwrite) {
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newAccount(account, overwrite);
+    });
+  }
+
+  async newAccountWithSecretKey(account, secretKey) {
+    return this._serializeWasmCall(async () => {
+      const wasmWebClient = await this.getWasmWebClient();
+      return await wasmWebClient.newAccountWithSecretKey(account, secretKey);
     });
   }
 
   async submitNewTransaction(accountId, transactionRequest) {
-    return this._withWrite("submitNewTransaction", async () => {
-      try {
-        if (!this.worker) {
-          return await this._wasmLock.runExclusive(async () => {
-            const wasmWebClient = await this.getWasmWebClient();
-            return await wasmWebClient.submitNewTransaction(
-              accountId,
-              transactionRequest
-            );
-          });
-        }
-
-        const wasm = await getWasmOrThrow();
-        const serializedTransactionRequest = transactionRequest.serialize();
-        const result = await this.callMethodWithWorker(
-          MethodName.SUBMIT_NEW_TRANSACTION,
-          accountId.toString(),
-          serializedTransactionRequest
+    try {
+      if (!this.worker) {
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.submitNewTransaction(
+          accountId,
+          transactionRequest
         );
-
-        const transactionResult = wasm.TransactionResult.deserialize(
-          new Uint8Array(result.serializedTransactionResult)
-        );
-
-        return transactionResult.id();
-      } catch (error) {
-        console.error("INDEX.JS: Error in submitNewTransaction:", error);
-        throw error;
       }
-    });
+
+      const wasm = await getWasmOrThrow();
+      const serializedTransactionRequest = transactionRequest.serialize();
+      const result = await this.callMethodWithWorker(
+        MethodName.SUBMIT_NEW_TRANSACTION,
+        accountId.toString(),
+        serializedTransactionRequest
+      );
+
+      const transactionResult = wasm.TransactionResult.deserialize(
+        new Uint8Array(result.serializedTransactionResult)
+      );
+
+      return transactionResult.id();
+    } catch (error) {
+      console.error("INDEX.JS: Error in submitNewTransaction:", error);
+      throw error;
+    }
   }
 
   async submitNewTransactionWithProver(accountId, transactionRequest, prover) {
-    return this._withWrite("submitNewTransactionWithProver", async () => {
-      try {
-        if (!this.worker) {
-          return await this._wasmLock.runExclusive(async () => {
-            const wasmWebClient = await this.getWasmWebClient();
-            return await wasmWebClient.submitNewTransactionWithProver(
-              accountId,
-              transactionRequest,
-              prover
-            );
-          });
-        }
-
-        const wasm = await getWasmOrThrow();
-        const serializedTransactionRequest = transactionRequest.serialize();
-        const proverPayload = prover.serialize();
-        const result = await this.callMethodWithWorker(
-          MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER,
-          accountId.toString(),
-          serializedTransactionRequest,
-          proverPayload
+    try {
+      if (!this.worker) {
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.submitNewTransactionWithProver(
+          accountId,
+          transactionRequest,
+          prover
         );
-
-        const transactionResult = wasm.TransactionResult.deserialize(
-          new Uint8Array(result.serializedTransactionResult)
-        );
-
-        return transactionResult.id();
-      } catch (error) {
-        console.error(
-          "INDEX.JS: Error in submitNewTransactionWithProver:",
-          error
-        );
-        throw error;
       }
-    });
+
+      const wasm = await getWasmOrThrow();
+      const serializedTransactionRequest = transactionRequest.serialize();
+      const proverPayload = prover.serialize();
+      const result = await this.callMethodWithWorker(
+        MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER,
+        accountId.toString(),
+        serializedTransactionRequest,
+        proverPayload
+      );
+
+      const transactionResult = wasm.TransactionResult.deserialize(
+        new Uint8Array(result.serializedTransactionResult)
+      );
+
+      return transactionResult.id();
+    } catch (error) {
+      console.error(
+        "INDEX.JS: Error in submitNewTransactionWithProver:",
+        error
+      );
+      throw error;
+    }
   }
 
   async executeTransaction(accountId, transactionRequest) {
-    return this._withWrite("executeTransaction", async () => {
-      try {
-        if (!this.worker) {
-          return await this._wasmLock.runExclusive(async () => {
-            const wasmWebClient = await this.getWasmWebClient();
-            return await wasmWebClient.executeTransaction(
-              accountId,
-              transactionRequest
-            );
-          });
-        }
-
-        const wasm = await getWasmOrThrow();
-        const serializedTransactionRequest = transactionRequest.serialize();
-        const serializedResultBytes = await this.callMethodWithWorker(
-          MethodName.EXECUTE_TRANSACTION,
-          accountId.toString(),
-          serializedTransactionRequest
+    try {
+      if (!this.worker) {
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.executeTransaction(
+          accountId,
+          transactionRequest
         );
-
-        return wasm.TransactionResult.deserialize(
-          new Uint8Array(serializedResultBytes)
-        );
-      } catch (error) {
-        console.error("INDEX.JS: Error in executeTransaction:", error);
-        throw error;
       }
-    });
+
+      const wasm = await getWasmOrThrow();
+      const serializedTransactionRequest = transactionRequest.serialize();
+      const serializedResultBytes = await this.callMethodWithWorker(
+        MethodName.EXECUTE_TRANSACTION,
+        accountId.toString(),
+        serializedTransactionRequest
+      );
+
+      return wasm.TransactionResult.deserialize(
+        new Uint8Array(serializedResultBytes)
+      );
+    } catch (error) {
+      console.error("INDEX.JS: Error in executeTransaction:", error);
+      throw error;
+    }
   }
 
-  // proveTransaction is CPU-heavy but does NOT write to IndexedDB, so it only
-  // needs the in-process WASM lock (Layer 1), not the cross-tab write lock.
   async proveTransaction(transactionResult, prover) {
     try {
       if (!this.worker) {
-        return await this._wasmLock.runExclusive(async () => {
-          const wasmWebClient = await this.getWasmWebClient();
-          return await wasmWebClient.proveTransaction(
-            transactionResult,
-            prover
-          );
-        });
+        const wasmWebClient = await this.getWasmWebClient();
+        return await wasmWebClient.proveTransaction(transactionResult, prover);
       }
 
       const wasm = await getWasmOrThrow();
@@ -924,51 +723,32 @@ export class WebClient {
     }
   }
 
-  // submitProvenTransaction and applyTransaction sync state before the write
-  // to catch cross-tab writes that occurred between execute and submit.
-  // This ensures the local IndexedDB view is fresh before submission.
-
-  async submitProvenTransaction(provenTransaction, transactionResult) {
-    return this._withWrite("submitProvenTransaction", async () => {
-      // Sync state to catch cross-tab writes that occurred since execute.
-      // We call syncStateImpl directly (bypassing the sync lock) because we
-      // already hold the write lock — calling syncState() would attempt to
-      // acquire sync lock → write lock, which is the reverse of the normal
-      // sync lock → write lock order and could deadlock across tabs.
-      try {
-        await this._wasmLock.runExclusive(async () => {
-          const wasmWebClient = await this.getWasmWebClient();
-          await wasmWebClient.syncStateImpl();
-        });
-      } catch {
-        // Sync failure is non-fatal — proceed with submission.
-        // The node will reject truly invalid transactions.
-      }
-
-      return await this._wasmLock.runExclusive(async () => {
-        const wasmWebClient = await this.getWasmWebClient();
-        return await wasmWebClient.submitProvenTransaction(
-          provenTransaction,
-          transactionResult
-        );
-      });
-    });
-  }
-
-  async applyTransaction(provenTransaction, transactionResult) {
-    return this._withWrite("applyTransaction", async () => {
-      return await this._wasmLock.runExclusive(async () => {
+  async applyTransaction(transactionResult, submissionHeight) {
+    try {
+      if (!this.worker) {
         const wasmWebClient = await this.getWasmWebClient();
         return await wasmWebClient.applyTransaction(
-          provenTransaction,
-          transactionResult
+          transactionResult,
+          submissionHeight
         );
-      });
-    });
-  }
+      }
 
-  // SYNC
-  // ================================================================================================
+      const wasm = await getWasmOrThrow();
+      const serializedTransactionResult = transactionResult.serialize();
+      const serializedUpdateBytes = await this.callMethodWithWorker(
+        MethodName.APPLY_TRANSACTION,
+        serializedTransactionResult,
+        submissionHeight
+      );
+
+      return wasm.TransactionStoreUpdate.deserialize(
+        new Uint8Array(serializedUpdateBytes)
+      );
+    } catch (error) {
+      console.error("INDEX.JS: Error in applyTransaction:", error);
+      throw error;
+    }
+  }
 
   /**
    * Syncs the client state with the node.
@@ -976,9 +756,6 @@ export class WebClient {
    * This method coordinates concurrent sync calls using the Web Locks API when available,
    * with an in-process mutex fallback for older browsers. If a sync is already in progress,
    * subsequent callers will wait and receive the same result (coalescing behavior).
-   *
-   * Sync also acquires the cross-tab write lock (Layer 2) so that it does not
-   * interleave with writes from other tabs.
    *
    * @returns {Promise<SyncSummary>} The sync summary
    */
@@ -993,8 +770,6 @@ export class WebClient {
    * with an in-process mutex fallback for older browsers. If a sync is already in progress,
    * subsequent callers will wait and receive the same result (coalescing behavior).
    *
-   * Lock nesting order: Sync Lock (coalescing, outer) → Write Lock → WASM Lock (inner).
-   *
    * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
    * @returns {Promise<SyncSummary>} The sync summary
    */
@@ -1003,7 +778,7 @@ export class WebClient {
     const dbId = this.storeName || "default";
 
     try {
-      // Acquire the sync lock (coordinates concurrent calls via coalescing)
+      // Acquire the sync lock (coordinates concurrent calls)
       const lockHandle = await acquireSyncLock(dbId, timeoutMs);
 
       if (!lockHandle.acquired) {
@@ -1011,31 +786,27 @@ export class WebClient {
         return lockHandle.coalescedResult;
       }
 
-      // We acquired the sync lock. Now acquire the write lock so that
-      // sync doesn't interleave with writes from other tabs.
+      // We acquired the lock - perform the sync
       try {
-        const result = await this._withWrite("syncState", async () => {
-          if (!this.worker) {
-            return await this._wasmLock.runExclusive(async () => {
-              const wasmWebClient = await this.getWasmWebClient();
-              return await wasmWebClient.syncStateImpl();
-            });
-          } else {
-            const wasm = await getWasmOrThrow();
-            const serializedSyncSummaryBytes = await this.callMethodWithWorker(
-              MethodName.SYNC_STATE
-            );
-            return wasm.SyncSummary.deserialize(
-              new Uint8Array(serializedSyncSummaryBytes)
-            );
-          }
-        });
+        let result;
+        if (!this.worker) {
+          const wasmWebClient = await this.getWasmWebClient();
+          result = await wasmWebClient.syncStateImpl();
+        } else {
+          const wasm = await getWasmOrThrow();
+          const serializedSyncSummaryBytes = await this.callMethodWithWorker(
+            MethodName.SYNC_STATE
+          );
+          result = wasm.SyncSummary.deserialize(
+            new Uint8Array(serializedSyncSummaryBytes)
+          );
+        }
 
-        // Release the sync lock with the result
+        // Release the lock with the result
         releaseSyncLock(dbId, result);
         return result;
       } catch (error) {
-        // Release the sync lock with the error
+        // Release the lock with the error
         releaseSyncLockWithError(dbId, error);
         throw error;
       }
@@ -1046,41 +817,33 @@ export class WebClient {
   }
 
   /**
-   * Replace the sign callback on a live client instance.
-   * This allows hot-swapping the signer without recreating the client.
+   * Terminates the underlying Web Worker used by this WebClient instance.
    *
-   * @param {(pubKey: Uint8Array, signingInputs: Uint8Array) => Promise<Uint8Array> | Uint8Array} signCb
-   *   - The new sign callback, or null/undefined to clear it.
+   * Call this method when you're done using a WebClient to free up browser
+   * resources. Each WebClient instance uses a dedicated Web Worker for
+   * computationally intensive operations. Terminating releases that thread.
+   *
+   * After calling terminate(), the WebClient should not be used.
    */
-  setSignCb(signCb) {
-    this.signCb = signCb ?? null;
-  }
-
-  // LIFECYCLE
-  // ================================================================================================
-
   terminate() {
     if (this.worker) {
       this.worker.terminate();
     }
-    if (this._stateChannel) {
-      try {
-        this._stateChannel.close();
-      } catch {
-        // Already closed — ignore.
-      }
-      this._stateChannel = null;
-    }
-    this._stateListeners = [];
   }
 }
 
-// MOCK WEB CLIENT
-// ================================================================================================
-
-export class MockWebClient extends WebClient {
+class MockWebClient extends WebClient {
   constructor(seed, logLevel) {
-    super(null, null, seed, "mock", undefined, undefined, undefined, logLevel);
+    super(
+      null,
+      null,
+      seed,
+      MOCK_STORE_NAME,
+      undefined,
+      undefined,
+      undefined,
+      logLevel
+    );
   }
 
   initializeWorker() {
@@ -1157,23 +920,15 @@ export class MockWebClient extends WebClient {
       }
 
       try {
-        const result = await this._withWrite("syncState", async () => {
-          if (!this.worker) {
-            return await this._wasmLock.runExclusive(async () => {
-              const wasmWebClient = await this.getWasmWebClient();
-              return wasmWebClient.syncStateImpl();
-            });
-          }
+        let result;
+        const wasmWebClient = await this.getWasmWebClient();
 
-          const { serializedMockChain, serializedMockNoteTransportNode } =
-            await this._wasmLock.runExclusive(async () => {
-              const wasmWebClient = await this.getWasmWebClient();
-              return {
-                serializedMockChain: wasmWebClient.serializeMockChain().buffer,
-                serializedMockNoteTransportNode:
-                  wasmWebClient.serializeMockNoteTransportNode().buffer,
-              };
-            });
+        if (!this.worker) {
+          result = await wasmWebClient.syncStateImpl();
+        } else {
+          let serializedMockChain = wasmWebClient.serializeMockChain().buffer;
+          let serializedMockNoteTransportNode =
+            wasmWebClient.serializeMockNoteTransportNode().buffer;
 
           const wasm = await getWasmOrThrow();
 
@@ -1183,10 +938,10 @@ export class MockWebClient extends WebClient {
             serializedMockNoteTransportNode
           );
 
-          return wasm.SyncSummary.deserialize(
+          result = wasm.SyncSummary.deserialize(
             new Uint8Array(serializedSyncSummaryBytes)
           );
-        });
+        }
 
         releaseSyncLock(dbId, result);
         return result;
@@ -1201,138 +956,112 @@ export class MockWebClient extends WebClient {
   }
 
   async submitNewTransaction(accountId, transactionRequest) {
-    return this._withWrite("submitNewTransaction", async () => {
-      try {
-        if (!this.worker) {
-          return await this._wasmLock.runExclusive(async () => {
-            const wasmWebClient = await this.getWasmWebClient();
-            return await wasmWebClient.submitNewTransaction(
-              accountId,
-              transactionRequest
-            );
-          });
-        }
-
-        const wasm = await getWasmOrThrow();
-        const serializedTransactionRequest = transactionRequest.serialize();
-        const { serializedMockChain, serializedMockNoteTransportNode } =
-          await this._wasmLock.runExclusive(async () => {
-            const wasmWebClient = await this.getWasmWebClient();
-            return {
-              serializedMockChain: wasmWebClient.serializeMockChain().buffer,
-              serializedMockNoteTransportNode:
-                wasmWebClient.serializeMockNoteTransportNode().buffer,
-            };
-          });
-
-        const result = await this.callMethodWithWorker(
-          MethodName.SUBMIT_NEW_TRANSACTION_MOCK,
-          accountId.toString(),
-          serializedTransactionRequest,
-          serializedMockChain,
-          serializedMockNoteTransportNode
-        );
-
-        const newMockChain = new Uint8Array(result.serializedMockChain);
-        const newMockNoteTransportNode = result.serializedMockNoteTransportNode
-          ? new Uint8Array(result.serializedMockNoteTransportNode)
-          : undefined;
-
-        const transactionResult = wasm.TransactionResult.deserialize(
-          new Uint8Array(result.serializedTransactionResult)
-        );
-
-        if (!(this instanceof MockWebClient)) {
-          return transactionResult.id();
-        }
-
-        this.wasmWebClient = new wasm.WebClient();
-        this.wasmWebClientPromise = Promise.resolve(this.wasmWebClient);
-        await this.wasmWebClient.createMockClient(
-          this.seed,
-          newMockChain,
-          newMockNoteTransportNode
-        );
-
-        return transactionResult.id();
-      } catch (error) {
-        console.error("INDEX.JS: Error in submitNewTransaction:", error);
-        throw error;
+    try {
+      if (!this.worker) {
+        return await super.submitNewTransaction(accountId, transactionRequest);
       }
-    });
+
+      const wasmWebClient = await this.getWasmWebClient();
+      const wasm = await getWasmOrThrow();
+      const serializedTransactionRequest = transactionRequest.serialize();
+      const serializedMockChain = wasmWebClient.serializeMockChain().buffer;
+      const serializedMockNoteTransportNode =
+        wasmWebClient.serializeMockNoteTransportNode().buffer;
+
+      const result = await this.callMethodWithWorker(
+        MethodName.SUBMIT_NEW_TRANSACTION_MOCK,
+        accountId.toString(),
+        serializedTransactionRequest,
+        serializedMockChain,
+        serializedMockNoteTransportNode
+      );
+
+      const newMockChain = new Uint8Array(result.serializedMockChain);
+      const newMockNoteTransportNode = result.serializedMockNoteTransportNode
+        ? new Uint8Array(result.serializedMockNoteTransportNode)
+        : undefined;
+
+      const transactionResult = wasm.TransactionResult.deserialize(
+        new Uint8Array(result.serializedTransactionResult)
+      );
+
+      if (!(this instanceof MockWebClient)) {
+        return transactionResult.id();
+      }
+
+      this.wasmWebClient = new wasm.WebClient();
+      this.wasmWebClientPromise = Promise.resolve(this.wasmWebClient);
+      await this.wasmWebClient.createMockClient(
+        this.seed,
+        newMockChain,
+        newMockNoteTransportNode
+      );
+
+      return transactionResult.id();
+    } catch (error) {
+      console.error("INDEX.JS: Error in submitNewTransaction:", error);
+      throw error;
+    }
   }
 
   async submitNewTransactionWithProver(accountId, transactionRequest, prover) {
-    return this._withWrite("submitNewTransactionWithProver", async () => {
-      try {
-        if (!this.worker) {
-          return await this._wasmLock.runExclusive(async () => {
-            const wasmWebClient = await this.getWasmWebClient();
-            return await wasmWebClient.submitNewTransactionWithProver(
-              accountId,
-              transactionRequest,
-              prover
-            );
-          });
-        }
-
-        const wasm = await getWasmOrThrow();
-        const serializedTransactionRequest = transactionRequest.serialize();
-        const proverPayload = prover.serialize();
-        const { serializedMockChain, serializedMockNoteTransportNode } =
-          await this._wasmLock.runExclusive(async () => {
-            const wasmWebClient = await this.getWasmWebClient();
-            return {
-              serializedMockChain: wasmWebClient.serializeMockChain().buffer,
-              serializedMockNoteTransportNode:
-                wasmWebClient.serializeMockNoteTransportNode().buffer,
-            };
-          });
-
-        const result = await this.callMethodWithWorker(
-          MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER_MOCK,
-          accountId.toString(),
-          serializedTransactionRequest,
-          proverPayload,
-          serializedMockChain,
-          serializedMockNoteTransportNode
+    try {
+      if (!this.worker) {
+        return await super.submitNewTransactionWithProver(
+          accountId,
+          transactionRequest,
+          prover
         );
-
-        const newMockChain = new Uint8Array(result.serializedMockChain);
-        const newMockNoteTransportNode = result.serializedMockNoteTransportNode
-          ? new Uint8Array(result.serializedMockNoteTransportNode)
-          : undefined;
-
-        const transactionResult = wasm.TransactionResult.deserialize(
-          new Uint8Array(result.serializedTransactionResult)
-        );
-
-        if (!(this instanceof MockWebClient)) {
-          return transactionResult.id();
-        }
-
-        this.wasmWebClient = new wasm.WebClient();
-        this.wasmWebClientPromise = Promise.resolve(this.wasmWebClient);
-        await this.wasmWebClient.createMockClient(
-          this.seed,
-          newMockChain,
-          newMockNoteTransportNode
-        );
-
-        return transactionResult.id();
-      } catch (error) {
-        console.error(
-          "INDEX.JS: Error in submitNewTransactionWithProver:",
-          error
-        );
-        throw error;
       }
-    });
+
+      const wasmWebClient = await this.getWasmWebClient();
+      const wasm = await getWasmOrThrow();
+      const serializedTransactionRequest = transactionRequest.serialize();
+      const proverPayload = prover.serialize();
+      const serializedMockChain = wasmWebClient.serializeMockChain().buffer;
+      const serializedMockNoteTransportNode =
+        wasmWebClient.serializeMockNoteTransportNode().buffer;
+
+      const result = await this.callMethodWithWorker(
+        MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER_MOCK,
+        accountId.toString(),
+        serializedTransactionRequest,
+        proverPayload,
+        serializedMockChain,
+        serializedMockNoteTransportNode
+      );
+
+      const newMockChain = new Uint8Array(result.serializedMockChain);
+      const newMockNoteTransportNode = result.serializedMockNoteTransportNode
+        ? new Uint8Array(result.serializedMockNoteTransportNode)
+        : undefined;
+
+      const transactionResult = wasm.TransactionResult.deserialize(
+        new Uint8Array(result.serializedTransactionResult)
+      );
+
+      if (!(this instanceof MockWebClient)) {
+        return transactionResult.id();
+      }
+
+      this.wasmWebClient = new wasm.WebClient();
+      this.wasmWebClientPromise = Promise.resolve(this.wasmWebClient);
+      await this.wasmWebClient.createMockClient(
+        this.seed,
+        newMockChain,
+        newMockNoteTransportNode
+      );
+
+      return transactionResult.id();
+    } catch (error) {
+      console.error(
+        "INDEX.JS: Error in submitNewTransactionWithProver:",
+        error
+      );
+      throw error;
+    }
   }
 }
-
-// STATICS
-// ================================================================================================
 
 function copyWebClientStatics(WasmWebClient) {
   if (!WasmWebClient) {
@@ -1348,3 +1077,9 @@ function copyWebClientStatics(WasmWebClient) {
     }
   });
 }
+
+// Wire MidenClient dependencies (resolves circular import)
+MidenClient._WasmWebClient = WebClient;
+MidenClient._MockWasmWebClient = MockWebClient;
+MidenClient._getWasmOrThrow = getWasmOrThrow;
+_setStandaloneWebClient(WebClient);

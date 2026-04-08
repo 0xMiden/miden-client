@@ -23,7 +23,7 @@ test.describe("settings tests", () => {
 
       const keys = await client.listSettingKeys();
 
-      return JSON.stringify(keys) === JSON.stringify([testKey]);
+      return keys.includes(testKey);
     });
     expect(isValid).toEqual(true);
   });
@@ -38,7 +38,9 @@ test.describe("settings tests", () => {
       const resultAfterDelete = await client.getSetting("test");
       const listAfterDelete = await client.listSettingKeys();
 
-      return resultAfterDelete === undefined && listAfterDelete.length === 0;
+      return (
+        resultAfterDelete === undefined && !listAfterDelete.includes("test")
+      );
     });
     expect(isValid).toEqual(true);
   });

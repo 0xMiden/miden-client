@@ -38,6 +38,10 @@ vi.mock("@miden-sdk/miden-sdk", async () => {
     AccountComponent: {
       createAuthComponentFromCommitment: vi.fn(() => "mockAuthComponent"),
     },
+    AuthScheme: {
+      AuthRpoFalcon512: 2,
+      AuthEcdsaK256Keccak: 1,
+    },
     Word: {
       deserialize: vi.fn(() => mockCommitmentWord),
     },

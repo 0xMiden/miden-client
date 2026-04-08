@@ -4,6 +4,7 @@ pub mod clear_config;
 pub mod exec;
 pub mod export;
 pub mod import;
+pub mod info;
 pub mod init;
 pub mod new_account;
 pub mod new_transactions;

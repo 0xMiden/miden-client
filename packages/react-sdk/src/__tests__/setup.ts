@@ -43,6 +43,14 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     submitProvenTransaction: vi.fn().mockResolvedValue(0),
     applyTransaction: vi.fn().mockResolvedValue({}),
     sendPrivateNote: vi.fn().mockResolvedValue(undefined),
+    exportStore: vi.fn().mockResolvedValue({ tables: {} }),
+    forceImportStore: vi.fn().mockResolvedValue(undefined),
+    exportNoteFile: vi
+      .fn()
+      .mockResolvedValue({ serialize: () => new Uint8Array([1, 2, 3]) }),
+    importNoteFile: vi
+      .fn()
+      .mockResolvedValue({ toString: () => "0xnote_imported" }),
     importAccountFile: vi.fn().mockResolvedValue("Imported account"),
     importAccountById: vi.fn().mockResolvedValue(undefined),
     importPublicAccountFromSeed: vi.fn().mockResolvedValue({}),
@@ -77,6 +85,10 @@ vi.mock("@miden-sdk/miden-sdk", () => {
   }
 
   return {
+    AuthScheme: {
+      AuthRpoFalcon512: 2,
+      AuthEcdsaK256Keccak: 1,
+    },
     WebClient,
     WasmWebClient: WebClient,
     AccountId: {
@@ -114,6 +126,7 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     NoteType: {
       Private: 2,
       Public: 1,
+      Encrypted: 3,
     },
     Note: {
       createP2IDNote: vi.fn(
@@ -185,14 +198,11 @@ vi.mock("@miden-sdk/miden-sdk", () => {
         (_scheme: unknown, _words: unknown[]) => new (class NoteAttachment {})()
       ),
     }),
-    OutputNoteArray: class OutputNoteArray {
+    NoteArray: class NoteArray {
       notes: unknown[];
       constructor(notes: unknown[]) {
         this.notes = notes;
       }
-    },
-    OutputNote: {
-      full: vi.fn((note: unknown) => ({ note })),
     },
     NoteAndArgs: class NoteAndArgs {
       note: unknown;
@@ -213,6 +223,31 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       withInputNotes = vi.fn(() => this);
       build = vi.fn(() => ({}));
     },
+    NoteFile: {
+      deserialize: vi.fn(() => ({ noteId: "0xnote_deserialized" })),
+    },
+    NoteExportFormat: {
+      Full: "Full",
+      Partial: "Partial",
+    },
+    TransactionProver: {
+      newLocalProver: vi.fn(() => ({ type: "local" })),
+      newRemoteProver: vi.fn((url: string, timeout: unknown) => ({
+        type: "remote",
+        url,
+        timeout,
+      })),
+    },
+    AdviceInputs: class AdviceInputs {},
+    ForeignAccount: Object.assign(class ForeignAccount {}, {
+      public: vi.fn(
+        (_id: unknown, _storage: unknown) => new (class ForeignAccount {})()
+      ),
+    }),
+    ForeignAccountArray: class ForeignAccountArray {
+      constructor(_accounts?: unknown[]) {}
+    },
+    AccountStorageRequirements: class AccountStorageRequirements {},
     NoteFilter: vi.fn().mockImplementation(() => ({
       free: vi.fn(),
     })),
@@ -226,6 +261,13 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       Unique: 6,
       Nullifiers: 7,
       Unverified: 8,
+    },
+    TransactionId: {
+      fromHex: vi.fn((hex: string) => ({
+        toString: vi.fn(() => hex),
+        toHex: vi.fn(() => hex),
+        free: vi.fn(),
+      })),
     },
     TransactionFilter: {
       all: vi.fn(() => ({})),

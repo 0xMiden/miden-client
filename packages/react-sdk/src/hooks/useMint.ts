@@ -7,8 +7,8 @@ import type {
 } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
+import { runExclusiveDirect } from "../utils/runExclusive";
 import { getNoteType } from "../utils/noteFilters";
-import { assertSignerConnected } from "../utils/errors";
 
 export interface UseMintResult {
   /** Mint tokens from a faucet to a target account */
@@ -55,7 +55,8 @@ export interface UseMintResult {
  * ```
  */
 export function useMint(): UseMintResult {
-  const { client, isReady, sync, prover, signerConnected } = useMiden();
+  const { client, isReady, sync, runExclusive, prover } = useMiden();
+  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
 
   const [result, setResult] = useState<TransactionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -67,8 +68,6 @@ export function useMint(): UseMintResult {
       if (!client || !isReady) {
         throw new Error("Miden client is not ready");
       }
-
-      assertSignerConnected(signerConnected);
 
       setIsLoading(true);
       setStage("executing");
@@ -82,22 +81,24 @@ export function useMint(): UseMintResult {
         const faucetIdObj = parseAccountId(options.faucetId);
 
         setStage("proving");
-        const txRequest = client.newMintTransactionRequest(
-          targetAccountIdObj,
-          faucetIdObj,
-          noteType,
-          options.amount
-        );
+        const txResult = await runExclusiveSafe(async () => {
+          const txRequest = client.newMintTransactionRequest(
+            targetAccountIdObj,
+            faucetIdObj,
+            noteType,
+            BigInt(options.amount)
+          );
 
-        const txId = prover
-          ? await client.submitNewTransactionWithProver(
-              faucetIdObj,
-              txRequest,
-              prover
-            )
-          : await client.submitNewTransaction(faucetIdObj, txRequest);
+          const txId = prover
+            ? await client.submitNewTransactionWithProver(
+                faucetIdObj,
+                txRequest,
+                prover
+              )
+            : await client.submitNewTransaction(faucetIdObj, txRequest);
 
-        const txResult = { transactionId: txId.toString() };
+          return { transactionId: txId.toString() };
+        });
 
         setStage("complete");
         setResult(txResult);
@@ -114,7 +115,7 @@ export function useMint(): UseMintResult {
         setIsLoading(false);
       }
     },
-    [client, isReady, prover, signerConnected, sync]
+    [client, isReady, prover, runExclusive, sync]
   );
 
   const reset = useCallback(() => {

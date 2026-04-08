@@ -119,7 +119,7 @@ test.describe("MockWebClient Integration", () => {
       const wallet = await client.newWallet(
         (window as any).AccountStorageMode.private(),
         true,
-        0
+        (window as any).AuthScheme.AuthRpoFalcon512
       );
 
       return {
@@ -149,7 +149,7 @@ test.describe("MockWebClient Integration", () => {
         "TEST",
         8,
         BigInt(1000000),
-        0
+        (window as any).AuthScheme.AuthRpoFalcon512
       );
 
       return {
@@ -177,7 +177,7 @@ test.describe("MockWebClient Integration", () => {
       await client.newWallet(
         (window as any).AccountStorageMode.private(),
         true,
-        0
+        (window as any).AuthScheme.AuthRpoFalcon512
       );
 
       // List accounts
@@ -209,7 +209,7 @@ test.describe("MockWebClient Integration", () => {
       const wallet = await client.newWallet(
         (window as any).AccountStorageMode.private(),
         true,
-        0
+        (window as any).AuthScheme.AuthRpoFalcon512
       );
       const faucet = await client.newFaucet(
         (window as any).AccountStorageMode.private(),
@@ -217,7 +217,7 @@ test.describe("MockWebClient Integration", () => {
         "TOKEN",
         8,
         BigInt(10000000),
-        0
+        (window as any).AuthScheme.AuthRpoFalcon512
       );
 
       // Mint tokens
@@ -287,12 +287,12 @@ test.describe("MockWebClient Integration", () => {
       const sender = await client.newWallet(
         (window as any).AccountStorageMode.private(),
         true,
-        0
+        (window as any).AuthScheme.AuthRpoFalcon512
       );
       const receiver = await client.newWallet(
         (window as any).AccountStorageMode.private(),
         true,
-        0
+        (window as any).AuthScheme.AuthRpoFalcon512
       );
       const faucet = await client.newFaucet(
         (window as any).AccountStorageMode.private(),
@@ -300,7 +300,7 @@ test.describe("MockWebClient Integration", () => {
         "SEND",
         8,
         BigInt(10000000),
-        0
+        (window as any).AuthScheme.AuthRpoFalcon512
       );
 
       // Mint tokens to sender
@@ -403,7 +403,7 @@ test.describe("MockWebClient Integration", () => {
       await client.newWallet(
         (window as any).AccountStorageMode.private(),
         true,
-        0
+        (window as any).AuthScheme.AuthRpoFalcon512
       );
 
       // Second sync

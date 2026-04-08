@@ -3,13 +3,14 @@ use alloc::vec::Vec;
 
 use chrono::Utc;
 use miden_client::Word;
+use miden_client::account::AccountId;
 use miden_client::note::{
     NoteAssets,
     NoteDetails,
-    NoteInputs,
     NoteMetadata,
     NoteRecipient,
     NoteScript,
+    NoteStorage,
     NoteUpdateTracker,
 };
 use miden_client::store::{
@@ -54,6 +55,12 @@ pub struct SerializedInputNoteData {
     pub state: Vec<u8>,
     #[wasm_bindgen(js_name = "createdAt")]
     pub created_at: String,
+    #[wasm_bindgen(js_name = "consumedBlockHeight")]
+    pub consumed_block_height: Option<u32>,
+    #[wasm_bindgen(js_name = "consumedTxOrder")]
+    pub consumed_tx_order: Option<u32>,
+    #[wasm_bindgen(js_name = "consumerAccountId")]
+    pub consumer_account_id: Option<String>,
 }
 
 #[wasm_bindgen(getter_with_clone)]
@@ -82,7 +89,7 @@ pub(crate) fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNot
 
     let details = note.details();
     let serial_number = details.serial_num().to_bytes();
-    let inputs = details.inputs().to_bytes();
+    let inputs = details.storage().to_bytes();
     let nullifier = details.nullifier().to_hex();
 
     let recipient = details.recipient();
@@ -92,6 +99,10 @@ pub(crate) fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNot
     let state_discriminant = note.state().discriminant();
     let state = note.state().to_bytes();
     let created_at = Utc::now().timestamp().to_string();
+
+    let consumed_block_height = note.state().consumed_block_height().map(|h| h.as_u32());
+    let consumed_tx_order = note.state().consumed_tx_order();
+    let consumer_account_id = note.consumer_account().map(AccountId::to_hex);
 
     SerializedInputNoteData {
         note_id,
@@ -104,6 +115,9 @@ pub(crate) fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNot
         state_discriminant,
         state,
         created_at,
+        consumed_block_height,
+        consumed_tx_order,
+        consumer_account_id,
     }
 }
 
@@ -122,6 +136,9 @@ pub async fn upsert_input_note_tx(db_id: &str, note: &InputNoteRecord) -> Result
         serialized_data.created_at,
         serialized_data.state_discriminant,
         serialized_data.state,
+        serialized_data.consumed_block_height,
+        serialized_data.consumed_tx_order,
+        serialized_data.consumer_account_id,
     );
     await_js_value(promise, "failed to upsert input note").await?;
 
@@ -199,7 +216,7 @@ pub fn parse_input_note_idxdb_object(
 
     let serial_number = Word::read_from_bytes(&serial_number)?;
     let script = NoteScript::read_from_bytes(&serialized_note_script)?;
-    let inputs = NoteInputs::read_from_bytes(&inputs)?;
+    let inputs = NoteStorage::read_from_bytes(&inputs)?;
     let recipient = NoteRecipient::new(serial_number, script, inputs);
 
     let details = NoteDetails::new(assets, recipient);

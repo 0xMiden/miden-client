@@ -8,7 +8,6 @@ use miden_client::note::{
 use miden_client::transaction::{
     ForeignAccount as NativeForeignAccount,
     NoteArgs as NativeNoteArgs,
-    OutputNote as NativeOutputNote,
     TransactionRequestBuilder as NativeTransactionRequestBuilder,
     TransactionScript as NativeTransactionScript,
 };
@@ -19,9 +18,9 @@ use crate::models::advice_map::AdviceMap;
 use crate::models::miden_arrays::{
     ForeignAccountArray,
     NoteAndArgsArray,
+    NoteArray,
     NoteDetailsAndTagArray,
     NoteRecipientArray,
-    OutputNoteArray,
 };
 use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_script::TransactionScript;
@@ -52,11 +51,11 @@ impl TransactionRequestBuilder {
         self
     }
 
-    /// Adds notes created by the sender that should be emitted by the transaction.
+    /// Adds output notes created by the sender that should be emitted by the transaction.
     #[wasm_bindgen(js_name = "withOwnOutputNotes")]
-    pub fn with_own_output_notes(mut self, notes: &OutputNoteArray) -> Self {
-        let native_output_notes: Vec<NativeOutputNote> = notes.into();
-        self.0 = self.0.own_output_notes(native_output_notes);
+    pub fn with_own_output_notes(mut self, notes: &NoteArray) -> Self {
+        let native_notes: Vec<NativeNote> = notes.into();
+        self.0 = self.0.own_output_notes(native_notes);
         self
     }
 
@@ -65,6 +64,13 @@ impl TransactionRequestBuilder {
     pub fn with_custom_script(mut self, script: &TransactionScript) -> Self {
         let native_script: NativeTransactionScript = script.into();
         self.0 = self.0.custom_script(native_script);
+        self
+    }
+
+    /// Sets the maximum number of blocks until the transaction request expires.
+    #[wasm_bindgen(js_name = "withExpirationDelta")]
+    pub fn with_expiration_delta(mut self, expiration_delta: u16) -> Self {
+        self.0 = self.0.expiration_delta(expiration_delta);
         self
     }
 

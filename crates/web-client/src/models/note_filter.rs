@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 
 use super::note_id::NoteId;
 
-// TODO: Add nullfiier support
+// TODO: Add nullifier support
 
 /// Filter options for querying notes from the store.
 #[derive(Clone)]

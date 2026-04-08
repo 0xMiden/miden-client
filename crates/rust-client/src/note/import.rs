@@ -55,8 +55,7 @@ where
     /// # Errors
     ///
     /// - If an attempt is made to overwrite a note that is currently processing.
-    /// - If the client has reached the note tags limit
-    ///   ([`NOTE_TAG_LIMIT`](crate::rpc::NOTE_TAG_LIMIT)).
+    /// - If the client has reached the note tags limit.
     ///
     /// Note: This operation is atomic. If any note file is invalid or any existing note is in the
     /// processing state, the entire operation fails and no notes are imported.
@@ -257,7 +256,7 @@ where
 
             if let Some(Some(block_height)) = nullifier_commit_heights.get(&note_record.nullifier())
             {
-                if note_record.consumed_externally(note_record.nullifier(), *block_height)? {
+                if note_record.consumed_externally(note_record.nullifier(), *block_height, None)? {
                     note_records.push(Some(note_record));
                 }
 
@@ -266,8 +265,9 @@ where
                 let block_height = inclusion_proof.location().block_num();
                 let current_block_num = self.get_sync_height().await?;
 
+                let tag = metadata.tag();
                 let mut note_changed =
-                    note_record.inclusion_proof_received(inclusion_proof, metadata.clone())?;
+                    note_record.inclusion_proof_received(inclusion_proof, metadata)?;
 
                 if block_height <= current_block_num {
                     // FIXME: We should be able to build the mmr only once (outside the for loop).
@@ -285,11 +285,8 @@ where
                 } else {
                     // If the note is in the future we import it as unverified. We add the note tag
                     // so that the note is verified naturally in the next sync.
-                    self.insert_note_tag(NoteTagRecord::with_note_source(
-                        metadata.tag(),
-                        note_record.id(),
-                    ))
-                    .await?;
+                    self.insert_note_tag(NoteTagRecord::with_note_source(tag, note_record.id()))
+                        .await?;
                 }
 
                 if note_changed {
@@ -345,15 +342,13 @@ where
                         )
                         .await?;
 
+                    let tag = metadata.tag();
                     let note_changed =
-                        note_record.inclusion_proof_received(inclusion_proof, metadata.clone())?;
+                        note_record.inclusion_proof_received(inclusion_proof, metadata)?;
 
                     if note_record.block_header_received(&block_header)? | note_changed {
                         self.store
-                            .remove_note_tag(NoteTagRecord::with_note_source(
-                                metadata.tag(),
-                                note_record.id(),
-                            ))
+                            .remove_note_tag(NoteTagRecord::with_note_source(tag, note_record.id()))
                             .await?;
 
                         note_records.push(Some(note_record));
@@ -375,57 +370,48 @@ where
     /// proof.
     async fn check_expected_notes(
         &mut self,
-        mut request_block_num: BlockNumber,
+        request_block_num: BlockNumber,
         // Expected notes with their tags
         expected_notes: Vec<(NoteId, &NoteTag)>,
     ) -> Result<BTreeMap<NoteId, Option<(NoteMetadata, NoteInclusionProof)>>, ClientError> {
         let tracked_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
         let mut retrieved_proofs = BTreeMap::new();
         let current_block_num = self.get_sync_height().await?;
-        loop {
-            if request_block_num > current_block_num {
+
+        if request_block_num > current_block_num {
+            return Ok(retrieved_proofs);
+        }
+
+        let sync_result = self
+            .rpc_api
+            .sync_notes_with_details(request_block_num, Some(current_block_num), &tracked_tags)
+            .await
+            .map_err(ClientError::RpcError)?;
+
+        for block in &sync_result.blocks {
+            if block.block_header.block_num() > current_block_num {
                 break;
             }
 
-            let sync_notes =
-                self.rpc_api.sync_notes(request_block_num, None, &tracked_tags).await?;
-
-            for sync_note in sync_notes.notes {
+            for sync_note in block.notes.values() {
                 if !expected_notes.iter().any(|(id, _)| id == sync_note.note_id()) {
                     continue;
                 }
 
-                // This means that a note with the same id was found.
-                // Therefore, we should mark the note as committed.
-                let note_block_num = sync_notes.block_header.block_num();
-
-                if note_block_num > current_block_num {
-                    break;
-                }
-
-                let note_inclusion_proof = NoteInclusionProof::new(
-                    note_block_num,
-                    sync_note.note_index(),
-                    sync_note.inclusion_path().clone(),
-                )?;
-
+                let metadata = sync_note
+                    .metadata()
+                    .cloned()
+                    .expect("metadata should be available after sync_notes_with_details");
                 retrieved_proofs.insert(
                     *sync_note.note_id(),
-                    Some((sync_note.metadata(), note_inclusion_proof)),
+                    Some((metadata, sync_note.inclusion_proof().clone())),
                 );
             }
-
-            // We might have reached the chain tip without having found some notes, bail if so
-            if sync_notes.block_header.block_num() == sync_notes.chain_tip {
-                break;
-            }
-
-            // This means that a note with the same id was not found.
-            // Therefore, we should request again for sync_notes with the same note_tag
-            // and with the block_num of the last block header
-            // (sync_notes.block_header.unwrap()).
-            request_block_num = sync_notes.block_header.block_num();
         }
-        Ok(retrieved_proofs)
+
+        retrieved_proofs
+            .into_iter()
+            .map(|(note_id, data)| Ok((note_id, data)))
+            .collect()
     }
 }

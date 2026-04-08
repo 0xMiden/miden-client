@@ -7,43 +7,19 @@ sidebar_position: 10
 
 This guide demonstrates how to use the note transport features in the Miden SDK. Note transport allows you to send and receive private notes using the Miden Note Transport network.
 
-## Initializing the Client with Note Transport
-
-To use note transport features, you need to initialize the client with a note transport endpoint URL:
-
-```typescript
-import { WebClient } from "@miden-sdk/miden-sdk";
-
-try {
-    // Initialize the web client with note transport endpoint
-    const webClient = await WebClient.createClient(
-        null,                           // Miden node endpoint (optional, defaults to testnet)
-        "https://transport.miden.io",   // Miden Note Transport node (optional, defaults to none)
-        null                            // seed (optional)
-    );
-
-    console.log("Client initialized with note transport");
-} catch (error) {
-    console.error("Failed to initialize client:", error.message);
-}
-```
-
 ## Sending Private Notes
 
-To send a private note, use `sendPrivateNote()`:
-
 ```typescript
-import { WebClient, Note, Address } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
-    // Initialize the web client with note transport endpoint
-    const webClient = await WebClient.createClient(null, "https://transport.miden.io", null);
+    const client = await MidenClient.create();
 
-    const note = /* note to be sent here */;
-    const address = /* recipient's address here */;
-
-    // Send the private note
-    await webClient.sendPrivateNote(note, address);
+    // Send a private note to a recipient address
+    await client.notes.sendPrivate({
+        noteId: "0xnote...",           // ID of the note to send
+        to: "mtst1recipient..."        // Recipient bech32 address
+    });
 
     console.log("Private note sent successfully");
 } catch (error) {
@@ -53,40 +29,23 @@ try {
 
 ## Fetching Private Notes
 
-To fetch private notes from the note transport layer, use `fetchPrivateNotes()`.
-
 ```typescript
-import { WebClient, NoteFilter, NoteFilterTypes } from "@miden-sdk/miden-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
-    // Initialize the web client with note transport endpoint
-    const webClient = await WebClient.createClient(null, "https://transport.miden.io", null);
+    const client = await MidenClient.create();
 
-    // Fetch private notes using pagination
-    await webClient.fetchPrivateNotes();
+    // Fetch private notes using pagination (default)
+    await client.notes.fetchPrivate();
 
-    // Alternatively, fetch all private notes without pagination.
-    // Reserve this for special cases like initial setup or troubleshooting.
-    // await webClient.fetchAllPrivateNotes();
+    // Or fetch all private notes at once
+    // (reserve for special cases like initial setup)
+    await client.notes.fetchPrivate({ mode: "all" });
 
-    // Retrieve the fetched notes
-    const filter = new NoteFilter(NoteFilterTypes.All);
-    const notes = await webClient.getInputNotes(filter);
-
-    console.log(`Fetched ${notes.length} private notes`);
+    // List the fetched notes
+    const notes = await client.notes.list();
+    console.log(`Fetched ${notes.length} notes`);
 } catch (error) {
     console.error("Failed to fetch private notes:", error.message);
 }
 ```
-
-## Relevant Documentation
-
-For more detailed information about note transport functionality, refer to the following API documentation:
-
-- [WebClient](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/WebClient.md) - Main client class for note transport operations
-- [Note](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/Note.md) - Class for working with notes
-- [Address](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/Address.md) - Class for working with addresses
-- [NoteFilter](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/classes/NoteFilter.md) - Class for filtering notes
-- [NoteFilterTypes](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/enumerations/NoteFilterTypes.md) - Enumeration for note filter types
-
-For a complete list of available classes and utilities, see the [SDK API Reference](https://github.com/0xMiden/miden-client/docs/typedoc/web-client/README.md).

@@ -47,7 +47,7 @@ pub struct AccountCmd {
 
 impl AccountCmd {
     pub async fn execute<AUTH>(&self, mut client: Client<AUTH>) -> Result<(), CliError> {
-        let cli_config = CliConfig::from_system()?;
+        let cli_config = CliConfig::load()?;
         match self {
             AccountCmd {
                 list: false,
@@ -83,7 +83,7 @@ impl AccountCmd {
                         let account_id: AccountId = parse_account_id(&client, id).await?;
 
                         // Check whether we're tracking that account
-                        let (account, _) = client.try_get_account_header(account_id).await?;
+                        let (account, _) = client.account_reader(account_id).header().await?;
 
                         client
                             .set_setting(DEFAULT_ACCOUNT_ID_KEY.to_string(), account.id())
@@ -109,18 +109,13 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     let mut table =
         create_dynamic_table(&["Account ID", "Type", "Storage Mode", "Nonce", "Status"]);
     for (acc, _acc_seed) in &accounts {
-        let status = client
-            .get_account(acc.id())
-            .await?
-            .expect("Account should be in store")
-            .status()
-            .to_string();
+        let status = client.account_reader(acc.id()).status().await?.to_string();
 
         table.add_row(vec![
             acc.id().to_hex(),
             account_type_display_name(&acc.id())?,
             acc.id().storage_mode().to_string(),
-            acc.nonce().as_int().to_string(),
+            acc.nonce().as_canonical_u64().to_string(),
             status,
         ]);
     }
@@ -139,10 +134,9 @@ pub async fn show_account<AUTH>(
     with_code: bool,
 ) -> Result<(), CliError> {
     let account = if let Some(account) = client.get_account(account_id).await? {
-        // TODO: Show partial accounts through CLI
-        account.try_into().map_err(|_| CliError::InvalidAccount(account_id))?
+        account
     } else {
-        println!("Account {account_id} is not tracked by the client. Fetching from the network...",);
+        println!("Account {account_id} is not tracked by the client. Fetching from the network...");
 
         let rpc_client =
             GrpcClient::new(&cli_config.rpc.endpoint.clone().into(), cli_config.rpc.timeout_ms);
@@ -180,7 +174,7 @@ pub async fn show_account<AUTH>(
                     // TODO: Display non-fungible assets more clearly.
                     (
                         "Non Fungible Asset",
-                        non_fungible_asset.faucet_id_prefix().to_hex(),
+                        non_fungible_asset.faucet_id().prefix().to_hex(),
                         1.0.to_string(),
                     )
                 },
@@ -253,7 +247,7 @@ async fn print_summary_table<AUTH>(
     table.add_row(vec![Cell::new("Account ID (hex)"), Cell::new(account.id().to_string())]);
     table.add_row(vec![
         Cell::new("Account Commitment"),
-        Cell::new(account.commitment().to_string()),
+        Cell::new(account.to_commitment().to_string()),
     ]);
     table.add_row(vec![Cell::new("Type"), Cell::new(account_type_display_name(&account.id())?)]);
     table.add_row(vec![
@@ -269,7 +263,10 @@ async fn print_summary_table<AUTH>(
         Cell::new("Storage Root"),
         Cell::new(account.storage().to_commitment().to_string()),
     ]);
-    table.add_row(vec![Cell::new("Nonce"), Cell::new(account.nonce().as_int().to_string())]);
+    table.add_row(vec![
+        Cell::new("Nonce"),
+        Cell::new(account.nonce().as_canonical_u64().to_string()),
+    ]);
 
     println!("{table}\n");
     Ok(())
@@ -319,9 +316,7 @@ async fn account_bech_32<AUTH>(
     client: &Client<AUTH>,
     cli_config: &CliConfig,
 ) -> Result<String, CliError> {
-    let account_record = client.try_get_account(account_id).await?;
-    let account: Account =
-        account_record.try_into().map_err(|_| CliError::InvalidAccount(account_id))?;
+    let account = client.try_get_account(account_id).await?;
     let account_interface = AccountInterface::from_account(&account);
 
     let mut address = Address::new(account_id);
@@ -330,11 +325,8 @@ async fn account_bech_32<AUTH>(
         .iter()
         .any(|c| matches!(c, AccountComponentInterface::BasicWallet))
     {
-        address = address
-            .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet))
-            .map_err(|err| {
-                CliError::Address(err, "Failed to set routing parameters".to_string())
-            })?;
+        address =
+            address.with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
     }
 
     let encoded = address.encode(cli_config.rpc.endpoint.0.to_network_id());

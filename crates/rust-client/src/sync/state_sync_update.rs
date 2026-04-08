@@ -99,31 +99,20 @@ impl From<&StateSyncUpdate> for SyncSummary {
 /// Contains all the block information that needs to be added in the client's store after a sync.
 #[derive(Debug, Clone, Default)]
 pub struct BlockUpdates {
-    /// New block headers to be stored, along with a flag indicating whether the block contains
-    /// notes that are relevant to the client and the MMR peaks for the block.
-    block_headers: Vec<(BlockHeader, bool, MmrPeaks)>,
+    /// New block headers to be stored, keyed by block number. The value contains the block
+    /// header, a flag indicating whether the block contains notes relevant to the client, and
+    /// the MMR peaks for the block.
+    block_headers: BTreeMap<BlockNumber, (BlockHeader, bool, MmrPeaks)>,
     /// New authentication nodes that are meant to be stored in order to authenticate block
     /// headers.
     new_authentication_nodes: Vec<(InOrderIndex, Word)>,
 }
 
 impl BlockUpdates {
-    /// Creates a new instance of [`BlockUpdates`].
-    pub fn new(
-        block_headers: Vec<(BlockHeader, bool, MmrPeaks)>,
-        new_authentication_nodes: Vec<(InOrderIndex, Word)>,
-    ) -> Self {
-        Self { block_headers, new_authentication_nodes }
-    }
-
-    /// Adds a new block header and its corresponding data to this [`BlockUpdates`].
+    /// Adds or updates a block header and its corresponding data in this [`BlockUpdates`].
     ///
-    /// # Parameters
-    /// - `block_header`: The block header to add.
-    /// - `has_client_notes`: Whether this block contains input notes that the client could use.
-    /// - `peaks`: The MMR peaks after including `block_header`.
-    /// - `new_authentication_nodes`: Authentication (MMR) nodes produced while adding
-    ///   `block_header` to the client's MMR.
+    /// If the block header already exists (same block number), the `has_client_notes` flag is
+    /// OR-ed and the peaks are kept from the first insertion. Otherwise a new entry is added.
     pub fn insert(
         &mut self,
         block_header: BlockHeader,
@@ -131,16 +120,20 @@ impl BlockUpdates {
         peaks: MmrPeaks,
         new_authentication_nodes: Vec<(InOrderIndex, Word)>,
     ) {
-        self.block_headers.push((block_header, has_client_notes, peaks));
+        self.block_headers
+            .entry(block_header.block_num())
+            .and_modify(|(_, existing_has_notes, _)| {
+                *existing_has_notes |= has_client_notes;
+            })
+            .or_insert((block_header, has_client_notes, peaks));
 
-        self.new_authentication_nodes.reserve(new_authentication_nodes.len());
         self.new_authentication_nodes.extend(new_authentication_nodes);
     }
 
     /// Returns the new block headers to be stored, along with a flag indicating whether the block
     /// contains notes that are relevant to the client and the MMR peaks for the block.
-    pub fn block_headers(&self) -> &[(BlockHeader, bool, MmrPeaks)] {
-        &self.block_headers
+    pub fn block_headers(&self) -> impl Iterator<Item = &(BlockHeader, bool, MmrPeaks)> {
+        self.block_headers.values()
     }
 
     /// Adds authentication nodes without an associated block header.
@@ -162,7 +155,10 @@ impl BlockUpdates {
 /// Contains transaction changes to apply to the store.
 #[derive(Default)]
 pub struct TransactionUpdateTracker {
+    /// Transactions that were committed in the block.
     transactions: BTreeMap<TransactionId, TransactionRecord>,
+    /// Nullifier-to-account mappings from external transactions by tracked accounts.
+    external_nullifier_accounts: BTreeMap<Nullifier, AccountId>,
 }
 
 impl TransactionUpdateTracker {
@@ -171,7 +167,10 @@ impl TransactionUpdateTracker {
         let transactions =
             transactions.into_iter().map(|tx| (tx.id, tx)).collect::<BTreeMap<_, _>>();
 
-        Self { transactions }
+        Self {
+            transactions,
+            external_nullifier_accounts: BTreeMap::new(),
+        }
     }
 
     /// Returns a reference to committed transactions.
@@ -202,6 +201,12 @@ impl TransactionUpdateTracker {
             .map(|tx| tx.id)
     }
 
+    /// Returns the account ID that consumed the given nullifier in an external transaction, if
+    /// available.
+    pub fn external_nullifier_account(&self, nullifier: &Nullifier) -> Option<AccountId> {
+        self.external_nullifier_accounts.get(nullifier).copied()
+    }
+
     /// Applies the necessary state transitions to the [`TransactionUpdateTracker`] when a
     /// transaction is included in a block.
     pub fn apply_transaction_inclusion(
@@ -212,6 +217,26 @@ impl TransactionUpdateTracker {
         if let Some(transaction) = self.transactions.get_mut(&transaction_inclusion.transaction_id)
         {
             transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
+            return;
+        }
+
+        // Fallback for transactions with unauthenticated input notes: the node
+        // authenticates these notes during processing, which changes the transaction
+        // ID. Match by account ID and pre-transaction state instead.
+        if let Some(transaction) = self.transactions.values_mut().find(|tx| {
+            tx.details.account_id == transaction_inclusion.account_id
+                && tx.details.init_account_state == transaction_inclusion.initial_state_commitment
+        }) {
+            transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
+            return;
+        }
+
+        // No local transaction matched. This is an external transaction by a tracked account.
+        // Record the nullifier→account mappings so we can attribute note consumption to tracked
+        // accounts during nullifier processing.
+        for nullifier in &transaction_inclusion.nullifiers {
+            self.external_nullifier_accounts
+                .insert(*nullifier, transaction_inclusion.account_id);
         }
     }
 
@@ -220,13 +245,13 @@ impl TransactionUpdateTracker {
     pub fn apply_sync_height_update(
         &mut self,
         new_sync_height: BlockNumber,
-        tx_graceful_blocks: Option<u32>,
+        tx_discard_delta: Option<u32>,
     ) {
-        if let Some(tx_graceful_blocks) = tx_graceful_blocks {
+        if let Some(tx_discard_delta) = tx_discard_delta {
             self.discard_transaction_with_predicate(
                 |transaction| {
                     transaction.details.submission_height
-                        < new_sync_height.checked_sub(tx_graceful_blocks).unwrap_or_default()
+                        < new_sync_height.checked_sub(tx_discard_delta).unwrap_or_default()
                 },
                 DiscardCause::Stale,
             );

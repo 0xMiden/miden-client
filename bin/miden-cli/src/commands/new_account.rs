@@ -9,17 +9,20 @@ use miden_client::Client;
 use miden_client::account::component::{
     AccountComponent,
     AccountComponentMetadata,
+    AuthControlled,
+    BasicFungibleFaucet,
     InitStorageData,
     MIDEN_PACKAGE_EXTENSION,
     StorageSlotSchema,
 };
 use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
-use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey, TransactionAuthenticator};
+use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig};
+use miden_client::keystore::Keystore;
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_client::vm::{Package, SectionId};
 use rand::RngCore;
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::commands::account::set_default_account_if_unset;
 use crate::config::CliConfig;
@@ -98,14 +101,14 @@ pub struct NewWalletCmd {
 }
 
 impl NewWalletCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
     ) -> Result<(), CliError> {
         let package_paths: Vec<PathBuf> = [PathBuf::from("basic-wallet")]
             .into_iter()
-            .chain(self.extra_packages.clone().into_iter())
+            .chain(self.extra_packages.clone())
             .collect();
 
         // Choose account type based on mutability.
@@ -193,7 +196,7 @@ pub struct NewAccountCmd {
 }
 
 impl NewAccountCmd {
-    pub async fn execute<AUTH: TransactionAuthenticator + Sync + 'static>(
+    pub async fn execute<AUTH: Keystore + Sync + 'static>(
         &self,
         mut client: Client<AUTH>,
         keystore: CliKeyStore,
@@ -317,8 +320,7 @@ fn separate_auth_components(
     let mut regular_components = Vec::new();
 
     for component in components {
-        let auth_proc_count =
-            component.get_procedures().into_iter().filter(|(_, is_auth)| *is_auth).count();
+        let auth_proc_count = component.procedures().filter(|(_, is_auth)| *is_auth).count();
 
         match auth_proc_count {
             0 => regular_components.push(component),
@@ -341,11 +343,41 @@ fn separate_auth_components(
     Ok((auth_component, regular_components))
 }
 
+/// Returns `true` when the CLI should inject `AuthControlled::allow_all()` for a
+/// fungible faucet account built from package components.
+///
+/// Why this exists:
+/// - RC fungible faucets require a mint policy manager component in addition to
+///   `BasicFungibleFaucet`.
+/// - The CLI's built-in `basic-fungible-faucet` package only contributes the faucet component
+///   itself; it does not include `AuthControlled`.
+/// - Other faucet creation paths in this repo add `AuthControlled::allow_all()` explicitly, so the
+///   CLI adds it implicitly here to preserve the same behavior and keep the old UX working.
+///
+/// What it does:
+/// - only applies to `AccountType::FungibleFaucet`,
+/// - only triggers when `BasicFungibleFaucet` is present,
+/// - and skips injection if an `AuthControlled` component is already present so user-provided mint
+///   policy components are not duplicated or overridden.
+fn should_add_implicit_auth_controlled(
+    account_type: AccountType,
+    regular_components: &[AccountComponent],
+) -> bool {
+    let has_basic_fungible_faucet = regular_components
+        .iter()
+        .any(|component| component.metadata().name() == BasicFungibleFaucet::NAME);
+    let has_auth_controlled = regular_components
+        .iter()
+        .any(|component| component.metadata().name() == AuthControlled::NAME);
+
+    account_type == AccountType::FungibleFaucet && has_basic_fungible_faucet && !has_auth_controlled
+}
+
 /// Helper function to create the seed, initialize the account builder, add the given components,
 /// and build the account.
 ///
 /// If no auth component is detected in the packages, a Falcon-based auth component will be added.
-async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
     account_type: AccountType,
@@ -363,7 +395,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     // Load the component templates and initialization storage data.
 
-    let cli_config = CliConfig::from_system()?;
+    let cli_config = CliConfig::load()?;
     debug!("Loading packages...");
     let packages = load_packages(&cli_config, package_paths)?;
     debug!("Loaded {} packages", packages.len());
@@ -380,7 +412,15 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     // Process packages and separate auth components from regular components
     let account_components = process_packages(packages, &init_storage_data)?;
-    let (auth_component, regular_components) = separate_auth_components(account_components)?;
+    let (auth_component, mut regular_components) = separate_auth_components(account_components)?;
+
+    // Faucet accounts require a mint policy manager component. The CLI's standard
+    // `basic-fungible-faucet` package only provides the faucet component itself, so add the
+    // default `allow_all` policy manager implicitly.
+    if should_add_implicit_auth_controlled(account_type, &regular_components) {
+        debug!("Adding implicit AuthControlled mint policy component for fungible faucet");
+        regular_components.push(AuthControlled::allow_all().into());
+    }
 
     // Add the auth component (either from packages or default Falcon)
     let key_pair = if let Some(auth_component) = auth_component {
@@ -389,9 +429,11 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
         None
     } else {
         debug!("Adding default Falcon auth component");
-        let kp = AuthSecretKey::new_falcon512_rpo_with_rng(client.rng());
-        builder =
-            builder.with_auth_component(AuthFalcon512Rpo::new(kp.public_key().to_commitment()));
+        let kp = AuthSecretKey::new_falcon512_poseidon2_with_rng(client.rng());
+        builder = builder.with_auth_component(AuthSingleSig::new(
+            kp.public_key().to_commitment(),
+            AuthSchemeId::Falcon512Poseidon2,
+        ));
         Some(kp)
     };
 
@@ -406,21 +448,8 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 
     // Only add the key to the keystore if we generated a default key type (Falcon)
     if let Some(key_pair) = key_pair {
-        let public_key = key_pair.public_key();
-        let public_key_commitment = public_key.to_commitment();
-        keystore.add_key(&key_pair).map_err(CliError::KeyStore)?;
-        if let Err(err) = client
-            .register_account_public_key_commitments(&account.id(), &[public_key])
-            .await
-        {
-            if let Err(rollback_err) = keystore.remove_key(public_key_commitment) {
-                warn!(
-                    ?rollback_err,
-                    "Failed to rollback keystore entry after commitment add failure"
-                );
-            }
-            return Err(err.into());
-        }
+        // Use the Keystore trait method which handles both key storage and account association
+        keystore.add_key(&key_pair, account.id()).await.map_err(CliError::KeyStore)?;
         println!("Generated and stored Falcon512 authentication key in keystore.");
     } else {
         println!("Using custom authentication component from package (no key generated).");
@@ -436,7 +465,7 @@ async fn create_client_account<AUTH: TransactionAuthenticator + Sync + 'static>(
 }
 
 /// Submits a deploy transaction to the node for the specified account.
-async fn deploy_account<AUTH: TransactionAuthenticator + Sync + 'static>(
+async fn deploy_account<AUTH: Keystore + Sync + 'static>(
     client: &mut Client<AUTH>,
     account: &Account,
 ) -> Result<(), CliError> {
@@ -495,6 +524,12 @@ fn process_packages(
                 continue;
             }
 
+            if let Some(default_value) = &requirement.default_value {
+                // Use the schema's default value without prompting the user
+                value_entries.insert(value_name, default_value.clone().into());
+                continue;
+            }
+
             let description = requirement.description.unwrap_or("[No description]".into());
             println!(
                 "Enter value for '{value_name}' - {description} (type: {}): ",
@@ -526,4 +561,52 @@ fn process_packages(
     }
 
     Ok(account_components)
+}
+
+#[cfg(test)]
+mod tests {
+    use miden_client::Felt;
+    use miden_client::account::component::BasicWallet;
+    use miden_client::asset::TokenSymbol;
+
+    use super::*;
+
+    #[test]
+    fn implicit_auth_controlled_is_added_for_basic_faucet_accounts() {
+        let regular_components = vec![
+            BasicFungibleFaucet::new(TokenSymbol::new("BTC").unwrap(), 10, Felt::new(1_000_000))
+                .unwrap()
+                .into(),
+        ];
+
+        assert!(should_add_implicit_auth_controlled(
+            AccountType::FungibleFaucet,
+            &regular_components
+        ));
+    }
+
+    #[test]
+    fn implicit_auth_controlled_is_skipped_when_component_already_present() {
+        let regular_components = vec![
+            BasicFungibleFaucet::new(TokenSymbol::new("BTC").unwrap(), 10, Felt::new(1_000_000))
+                .unwrap()
+                .into(),
+            AuthControlled::allow_all().into(),
+        ];
+
+        assert!(!should_add_implicit_auth_controlled(
+            AccountType::FungibleFaucet,
+            &regular_components
+        ));
+    }
+
+    #[test]
+    fn implicit_auth_controlled_is_not_added_for_non_faucet_accounts() {
+        let regular_components = vec![AccountComponent::from(BasicWallet)];
+
+        assert!(!should_add_implicit_auth_controlled(
+            AccountType::RegularAccountImmutableCode,
+            &regular_components
+        ));
+    }
 }

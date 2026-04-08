@@ -89,6 +89,6 @@ pub(super) fn config_file_exists() -> Result<bool, CliError> {
 
 /// Returns the faucet details map using the config file.
 pub fn load_faucet_details_map() -> Result<FaucetDetailsMap, CliError> {
-    let config = CliConfig::from_system()?;
+    let config = CliConfig::load()?;
     FaucetDetailsMap::new(config.token_symbol_map_filepath)
 }

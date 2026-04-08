@@ -49,8 +49,10 @@ impl AccountVaultDelta {
         self.0
             .fungible()
             .iter()
-            .filter(|&(_, &value)| value >= 0)
-            .map(|(faucet_id, &diff)| FungibleAsset::new(&faucet_id.into(), diff.unsigned_abs()))
+            .filter(|&(_, &value)| value > 0)
+            .map(|(vault_key, &diff)| {
+                FungibleAsset::new(&vault_key.faucet_id().into(), diff.unsigned_abs())
+            })
             .collect()
     }
 
@@ -61,7 +63,9 @@ impl AccountVaultDelta {
             .fungible()
             .iter()
             .filter(|&(_, &value)| value < 0)
-            .map(|(faucet_id, &diff)| FungibleAsset::new(&faucet_id.into(), diff.unsigned_abs()))
+            .map(|(vault_key, &diff)| {
+                FungibleAsset::new(&vault_key.faucet_id().into(), diff.unsigned_abs())
+            })
             .collect()
     }
 }
@@ -89,10 +93,10 @@ impl FungibleAssetDeltaItem {
     }
 }
 
-impl From<(&NativeAccountId, &i64)> for FungibleAssetDeltaItem {
-    fn from(native_fungible_asset_delta_item: (&NativeAccountId, &i64)) -> Self {
+impl From<(&miden_client::asset::AssetVaultKey, &i64)> for FungibleAssetDeltaItem {
+    fn from(native_fungible_asset_delta_item: (&miden_client::asset::AssetVaultKey, &i64)) -> Self {
         Self {
-            faucet_id: (*native_fungible_asset_delta_item.0).into(),
+            faucet_id: native_fungible_asset_delta_item.0.faucet_id().into(),
             amount: *native_fungible_asset_delta_item.1,
         }
     }
@@ -124,7 +128,9 @@ impl FungibleAssetDelta {
     /// Returns the delta amount for a given faucet, if present.
     pub fn amount(&self, faucet_id: &AccountId) -> Option<i64> {
         let native_faucet_id: NativeAccountId = faucet_id.into();
-        self.0.amount(&native_faucet_id)
+        let vault_key = miden_protocol::asset::AssetVaultKey::new_fungible(native_faucet_id)
+            .expect("faucet_id should be a fungible faucet");
+        self.0.amount(&vault_key)
     }
 
     /// Returns the number of distinct fungible assets in the delta.
@@ -187,5 +193,19 @@ impl From<FungibleAssetDelta> for NativeFungibleAssetDelta {
 impl From<&FungibleAssetDelta> for NativeFungibleAssetDelta {
     fn from(fungible_asset_delta: &FungibleAssetDelta) -> Self {
         fungible_asset_delta.0.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn fungible_delta_sign_classification_excludes_zero() {
+        let deltas = [10_i64, 0_i64, -5_i64];
+
+        let added: Vec<i64> = deltas.iter().copied().filter(|&v| v > 0).collect();
+        let removed: Vec<i64> = deltas.iter().copied().filter(|&v| v < 0).collect();
+
+        assert_eq!(added, vec![10]);
+        assert_eq!(removed, vec![-5]);
     }
 }

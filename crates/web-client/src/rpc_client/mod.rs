@@ -7,11 +7,11 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_client::block::BlockNumber;
+use miden_client::builder::DEFAULT_GRPC_TIMEOUT_MS;
 use miden_client::note::{NoteId as NativeNoteId, Nullifier};
 use miden_client::rpc::domain::account::AccountStorageRequirements as NativeAccountStorageRequirements;
 use miden_client::rpc::domain::note::FetchedNote as NativeFetchedNote;
 use miden_client::rpc::{AccountStateAt, GrpcClient, NodeRpcClient};
-use miden_client::transaction::ForeignAccount;
 use note::FetchedNote;
 use wasm_bindgen::prelude::*;
 
@@ -44,7 +44,7 @@ impl RpcClient {
     /// @param endpoint - Endpoint to connect to.
     #[wasm_bindgen(constructor)]
     pub fn new(endpoint: Endpoint) -> Result<RpcClient, JsValue> {
-        let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), 0));
+        let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), DEFAULT_GRPC_TIMEOUT_MS));
 
         Ok(RpcClient { inner: rpc_client })
     }
@@ -136,29 +136,35 @@ impl RpcClient {
         Ok(fetched.into())
     }
 
-    /// Fetches an account proof for a public account from the node.
+    /// Fetches an account proof from the node.
     ///
     /// This is a lighter-weight alternative to `getAccountDetails` that makes a single RPC call
     /// and returns the account proof alongside the account header, storage slot values, and
     /// account code without reconstructing the full account state.
     ///
-    /// Only public accounts are supported. For private accounts, use `getAccountDetails` instead.
+    /// For private accounts, the proof is returned but account details will not be available
+    /// since they are not stored on-chain.
     ///
     /// Useful for reading storage slot values (e.g., faucet metadata) or specific storage map
     /// entries without the overhead of fetching the complete account with all vault assets and
     /// storage map entries.
     ///
-    /// @param `account_id` - The public account to fetch the proof for.
+    /// @param `account_id` - The account to fetch the proof for.
     /// @param `storage_requirements` - Optional storage requirements specifying which storage
     ///   maps and keys to include. When `undefined`, no storage map data is requested.
     /// @param `block_num` - Optional block number to fetch the account state at. When `undefined`,
     ///   fetches the latest state (chain tip).
+    /// @param `known_vault_commitment` - Optional known vault commitment. When provided,
+    ///   vault data is returned only if the account's current vault root differs from this
+    ///   value. Use `Word.new([0, 0, 0, 0])` to always fetch. When `undefined`, vault data
+    ///   is not requested.
     #[wasm_bindgen(js_name = "getAccountProof")]
     pub async fn get_account_proof(
         &self,
         account_id: &AccountId,
         storage_requirements: Option<AccountStorageRequirements>,
         block_num: Option<u32>,
+        known_vault_commitment: Option<Word>,
     ) -> Result<AccountProof, JsValue> {
         let native_id: miden_client::account::AccountId = account_id.into();
 
@@ -170,12 +176,15 @@ impl RpcClient {
             None => AccountStateAt::ChainTip,
         };
 
-        let foreign_account = ForeignAccount::public(native_id, native_requirements)
-            .map_err(|err| js_error_with_context(err, "failed to create foreign account"))?;
-
         let (block_num, proof) = self
             .inner
-            .get_account(foreign_account, account_state, None)
+            .get_account_proof(
+                native_id,
+                native_requirements,
+                account_state,
+                None,
+                known_vault_commitment.map(Into::into),
+            )
             .await
             .map_err(|err| js_error_with_context(err, "failed to get account proof"))?;
 

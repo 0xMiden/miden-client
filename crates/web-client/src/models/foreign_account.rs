@@ -14,7 +14,7 @@ pub struct ForeignAccount(NativeForeignAccount);
 impl ForeignAccount {
     /// Creates a foreign account entry for a public account with given storage requirements.
     pub fn public(
-        account_id: AccountId,
+        account_id: &AccountId,
         storage_requirements: AccountStorageRequirements,
     ) -> Result<ForeignAccount, JsValue> {
         let native_foreign_account =

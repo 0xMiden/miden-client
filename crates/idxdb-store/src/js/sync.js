@@ -1,7 +1,7 @@
 import { getDatabase, } from "./schema.js";
 import { upsertTransactionRecord, insertTransactionScript, } from "./transactions.js";
 import { upsertInputNote, upsertOutputNote } from "./notes.js";
-import { upsertAccountStorage, upsertAccountRecord, upsertVaultAssets, upsertStorageMapEntries, } from "./accounts.js";
+import { applyFullAccountState } from "./accounts.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 export async function getNoteTags(dbId) {
     try {
@@ -79,65 +79,66 @@ export async function applyStateSync(dbId, stateUpdate) {
         db.stateSync,
         db.inputNotes,
         db.outputNotes,
+        db.notesScripts,
         db.transactions,
+        db.transactionScripts,
         db.blockHeaders,
         db.partialBlockchainNodes,
         db.tags,
-        db.notesScripts,
-        db.accountStorages,
-        db.storageMapEntries,
-        db.accountAssets,
-        db.accounts,
-        db.trackedAccounts,
-        db.transactionScripts,
+        db.latestAccountHeaders,
+        db.historicalAccountHeaders,
+        db.latestAccountStorages,
+        db.historicalAccountStorages,
+        db.latestStorageMapEntries,
+        db.historicalStorageMapEntries,
+        db.latestAccountAssets,
+        db.historicalAccountAssets,
     ];
-    return await db.dexie.transaction("rw", tablesToAccess, async () => {
-        // Within a Dexie transaction callback, db.tableName operations are
-        // automatically routed through the active transaction. We do NOT pass
-        // the tx parameter because its table accessors are unreliable at runtime.
-        let inputNotesWriteOp = Promise.all(serializedInputNotes.map((note) => {
-            return upsertInputNote(dbId, note.noteId, note.noteAssets, note.serialNumber, note.inputs, note.noteScriptRoot, note.noteScript, note.nullifier, note.createdAt, note.stateDiscriminant, note.state);
-        }));
-        let outputNotesWriteOp = Promise.all(serializedOutputNotes.map((note) => {
-            return upsertOutputNote(dbId, note.noteId, note.noteAssets, note.recipientDigest, note.metadata, note.nullifier, note.expectedHeight, note.stateDiscriminant, note.state);
-        }));
-        let transactionWriteOp = Promise.all(transactionUpdates.map((transactionRecord) => {
-            let promises = [
-                upsertTransactionRecord(dbId, transactionRecord.id, transactionRecord.details, transactionRecord.blockNum, transactionRecord.statusVariant, transactionRecord.status, transactionRecord.scriptRoot),
-            ];
-            if (transactionRecord.scriptRoot && transactionRecord.txScript) {
-                promises.push(insertTransactionScript(dbId, transactionRecord.scriptRoot, transactionRecord.txScript));
-            }
-            return Promise.all(promises);
-        }));
-        let accountUpdatesWriteOp = Promise.all(accountUpdates.flatMap((accountUpdate) => {
-            return [
-                upsertAccountStorage(dbId, accountUpdate.storageSlots),
-                upsertStorageMapEntries(dbId, accountUpdate.storageMapEntries),
-                upsertVaultAssets(dbId, accountUpdate.assets),
-                upsertAccountRecord(dbId, accountUpdate.accountId, accountUpdate.codeRoot, accountUpdate.storageRoot, accountUpdate.assetVaultRoot, accountUpdate.nonce, accountUpdate.committed, accountUpdate.accountCommitment, accountUpdate.accountSeed),
-            ];
-        }));
+    return await db.dexie.transaction("rw", tablesToAccess, async (tx) => {
         await Promise.all([
-            inputNotesWriteOp,
-            outputNotesWriteOp,
-            transactionWriteOp,
-            accountUpdatesWriteOp,
-            updateSyncHeight(db, blockNum),
-            updatePartialBlockchainNodes(db, serializedNodeIds, serializedNodes),
-            updateCommittedNoteTags(db, committedNoteIds),
+            Promise.all(serializedInputNotes.map((note) => {
+                return upsertInputNote(dbId, note.noteId, note.noteAssets, note.serialNumber, note.inputs, note.noteScriptRoot, note.noteScript, note.nullifier, note.createdAt, note.stateDiscriminant, note.state, note.consumedBlockHeight, note.consumedTxOrder, note.consumerAccountId);
+            })),
+            Promise.all(serializedOutputNotes.map((note) => {
+                return upsertOutputNote(dbId, note.noteId, note.noteAssets, note.recipientDigest, note.metadata, note.nullifier, note.expectedHeight, note.stateDiscriminant, note.state);
+            })),
+            Promise.all(transactionUpdates.map((transactionRecord) => {
+                let promises = [
+                    upsertTransactionRecord(dbId, transactionRecord.id, transactionRecord.details, transactionRecord.blockNum, transactionRecord.statusVariant, transactionRecord.status, transactionRecord.scriptRoot),
+                ];
+                if (transactionRecord.scriptRoot && transactionRecord.txScript) {
+                    promises.push(insertTransactionScript(dbId, transactionRecord.scriptRoot, transactionRecord.txScript));
+                }
+                return Promise.all(promises);
+            })),
+            Promise.all(accountUpdates.map((accountUpdate) => applyFullAccountState(dbId, {
+                accountId: accountUpdate.accountId,
+                nonce: accountUpdate.nonce,
+                storageSlots: accountUpdate.storageSlots,
+                storageMapEntries: accountUpdate.storageMapEntries,
+                assets: accountUpdate.assets,
+                codeRoot: accountUpdate.codeRoot,
+                storageRoot: accountUpdate.storageRoot,
+                vaultRoot: accountUpdate.vaultRoot,
+                committed: accountUpdate.committed,
+                accountCommitment: accountUpdate.accountCommitment,
+                accountSeed: accountUpdate.accountSeed,
+            }))),
+            updateSyncHeight(tx, blockNum),
+            updatePartialBlockchainNodes(tx, serializedNodeIds, serializedNodes),
+            updateCommittedNoteTags(tx, committedNoteIds),
             Promise.all(newBlockHeaders.map((newBlockHeader, i) => {
-                return updateBlockHeader(db, newBlockNums[i], newBlockHeader, partialBlockchainPeaks[i], blockHasRelevantNotes[i] == 1);
+                return updateBlockHeader(tx, newBlockNums[i], newBlockHeader, partialBlockchainPeaks[i], blockHasRelevantNotes[i] == 1);
             })),
         ]);
     });
 }
-async function updateSyncHeight(db, blockNum) {
+async function updateSyncHeight(tx, blockNum) {
     try {
         // Only update if moving forward to prevent race conditions
-        const current = await db.stateSync.get(1);
+        const current = await tx.stateSync.get(1);
         if (!current || current.blockNum < blockNum) {
-            await db.stateSync.update(1, {
+            await tx.stateSync.update(1, {
                 blockNum: blockNum,
             });
         }
@@ -146,7 +147,7 @@ async function updateSyncHeight(db, blockNum) {
         logWebStoreError(error, "Failed to update sync height");
     }
 }
-async function updateBlockHeader(db, blockNum, blockHeader, partialBlockchainPeaks, hasClientNotes) {
+async function updateBlockHeader(tx, blockNum, blockHeader, partialBlockchainPeaks, hasClientNotes) {
     try {
         const data = {
             blockNum: blockNum,
@@ -154,16 +155,16 @@ async function updateBlockHeader(db, blockNum, blockHeader, partialBlockchainPea
             partialBlockchainPeaks,
             hasClientNotes: hasClientNotes.toString(),
         };
-        const existingBlockHeader = await db.blockHeaders.get(blockNum);
+        const existingBlockHeader = await tx.blockHeaders.get(blockNum);
         if (!existingBlockHeader) {
-            await db.blockHeaders.add(data);
+            await tx.blockHeaders.add(data);
         }
     }
     catch (err) {
         logWebStoreError(err, "Failed to insert block header");
     }
 }
-async function updatePartialBlockchainNodes(db, nodeIndexes, nodes) {
+async function updatePartialBlockchainNodes(tx, nodeIndexes, nodes) {
     try {
         if (nodeIndexes.length !== nodes.length) {
             throw new Error("nodeIndexes and nodes arrays must be of the same length");
@@ -176,21 +177,24 @@ async function updatePartialBlockchainNodes(db, nodeIndexes, nodes) {
             node: node,
         }));
         // Use bulkPut to add/overwrite the entries
-        await db.partialBlockchainNodes.bulkPut(data);
+        await tx.partialBlockchainNodes.bulkPut(data);
     }
     catch (err) {
         logWebStoreError(err, "Failed to update partial blockchain nodes");
     }
 }
-async function updateCommittedNoteTags(db, inputNoteIds) {
+async function updateCommittedNoteTags(tx, inputNoteIds) {
     try {
         for (let i = 0; i < inputNoteIds.length; i++) {
             const noteId = inputNoteIds[i];
-            await db.tags.where("source_note_id").equals(noteId).delete();
+            await tx.tags
+                .where("sourceNoteId")
+                .equals(noteId)
+                .delete();
         }
     }
     catch (error) {
-        logWebStoreError(error, "Failed to pudate committed note tags");
+        logWebStoreError(error, "Failed to update committed note tags");
     }
 }
 function reconstructFlattenedVec(flattenedVec) {

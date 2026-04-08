@@ -82,3 +82,23 @@ Returns the hexadecimal encoding of the transaction ID.
 #### Returns
 
 `string`
+
+***
+
+### fromHex()
+
+> `static` **fromHex**(`hex`): `TransactionId`
+
+Creates a `TransactionId` from a hex string.
+
+Fails if the provided string is not a valid hex representation of a `TransactionId`.
+
+#### Parameters
+
+##### hex
+
+`string`
+
+#### Returns
+
+`TransactionId`

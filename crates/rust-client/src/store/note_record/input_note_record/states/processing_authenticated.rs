@@ -46,8 +46,16 @@ impl NoteStateHandler for ProcessingAuthenticatedNoteState {
     fn consumed_externally(
         &self,
         nullifier_block_height: BlockNumber,
+        consumer_account: Option<AccountId>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
-        Ok(Some(ConsumedExternalNoteState { nullifier_block_height }.into()))
+        Ok(Some(
+            ConsumedExternalNoteState {
+                nullifier_block_height,
+                consumer_account,
+                consumed_tx_order: None,
+            }
+            .into(),
+        ))
     }
 
     fn block_header_received(
@@ -85,6 +93,7 @@ impl NoteStateHandler for ProcessingAuthenticatedNoteState {
                 block_note_root: self.block_note_root,
                 nullifier_block_height: block_height,
                 submission_data: self.submission_data,
+                consumed_tx_order: None,
             }
             .into(),
         ))
@@ -103,8 +112,8 @@ impl NoteStateHandler for ProcessingAuthenticatedNoteState {
     }
 }
 
-impl miden_tx::utils::Serializable for ProcessingAuthenticatedNoteState {
-    fn write_into<W: miden_tx::utils::ByteWriter>(&self, target: &mut W) {
+impl miden_tx::utils::serde::Serializable for ProcessingAuthenticatedNoteState {
+    fn write_into<W: miden_tx::utils::serde::ByteWriter>(&self, target: &mut W) {
         self.metadata.write_into(target);
         self.inclusion_proof.write_into(target);
         self.block_note_root.write_into(target);
@@ -112,10 +121,10 @@ impl miden_tx::utils::Serializable for ProcessingAuthenticatedNoteState {
     }
 }
 
-impl miden_tx::utils::Deserializable for ProcessingAuthenticatedNoteState {
-    fn read_from<R: miden_tx::utils::ByteReader>(
+impl miden_tx::utils::serde::Deserializable for ProcessingAuthenticatedNoteState {
+    fn read_from<R: miden_tx::utils::serde::ByteReader>(
         source: &mut R,
-    ) -> Result<Self, miden_tx::utils::DeserializationError> {
+    ) -> Result<Self, miden_tx::utils::serde::DeserializationError> {
         let metadata = NoteMetadata::read_from(source)?;
         let inclusion_proof = NoteInclusionProof::read_from(source)?;
         let block_note_root = Word::read_from(source)?;

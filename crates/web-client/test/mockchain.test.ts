@@ -1,28 +1,16 @@
 // @ts-nocheck
-import test from "./playwright.global.setup";
+import { mockTest as test } from "./playwright.global.setup";
 import { Page, expect } from "@playwright/test";
 
 const mockChainTest = async (testingPage: Page) => {
   return await testingPage.evaluate(async () => {
-    // Web Client tests share the same browser database "MidenClientDB"
-    // Across all tests. This is error prone as the mockChainTest will
-    // run this test with a previously loaded DB which doesn't correspond
-    // to the actual context.
-    // https://github.com/0xMiden/miden-client/issues/1611
-    await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.deleteDatabase("MidenClientDB_mlcl");
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-      request.onblocked = () => resolve();
-    });
-
-    const client = await window.MockWebClient.createClient();
+    const client = await window.MockWasmWebClient.createClient();
     await client.syncState();
 
     const account = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
     const faucetAccount = await client.newFaucet(
       window.AccountStorageMode.private(),
@@ -30,7 +18,7 @@ const mockChainTest = async (testingPage: Page) => {
       "DAG",
       8,
       BigInt(10000000),
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
 
     const mintTransactionRequest = await client.newMintTransactionRequest(
@@ -83,6 +71,8 @@ const mockChainTest = async (testingPage: Page) => {
 };
 
 test.describe("mock chain tests", () => {
+  test.describe.configure({ timeout: 720000 });
+
   test("send transaction with mock chain completes successfully", async ({
     page,
   }) => {

@@ -1,6 +1,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use miden_client::Word as NativeWord;
 use miden_client::rpc::domain::storage_map::StorageMapInfo as NativeStorageMapInfo;
 use wasm_bindgen::prelude::*;
 
@@ -88,7 +89,7 @@ impl From<NativeStorageMapInfo> for StorageMapInfo {
             .map(|u| StorageMapUpdate {
                 block_num: u.block_num.as_u32(),
                 slot_name: u.slot_name.to_string(),
-                key: Word::from(u.key),
+                key: Word::from(NativeWord::from(u.key)),
                 value: Word::from(u.value),
             })
             .collect();

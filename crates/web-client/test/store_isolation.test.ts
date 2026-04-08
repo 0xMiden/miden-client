@@ -6,7 +6,7 @@ test.describe("Store Isolation Tests", () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const client = await window.WebClient.createClient(
+      const client = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
@@ -32,9 +32,13 @@ test.describe("Store Isolation Tests", () => {
     const result = await page.evaluate(async () => {
       const client1 = window.client;
 
-      await client1.newWallet(window.AccountStorageMode.private(), true, 0);
+      await client1.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        window.AuthScheme.AuthRpoFalcon512
+      );
 
-      const client2 = await window.WebClient.createClient(
+      const client2 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
@@ -65,7 +69,7 @@ test.describe("Store Isolation Tests", () => {
 
   test("reconnecting to same store preserves data", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const client1 = await window.WebClient.createClient(
+      const client1 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
@@ -76,11 +80,11 @@ test.describe("Store Isolation Tests", () => {
       const wallet = await client1.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const walletId = wallet.id().toString();
 
-      const client1b = await window.WebClient.createClient(
+      const client1b = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
@@ -104,7 +108,7 @@ test.describe("Store Isolation Tests", () => {
   test("custom store name creates isolated database", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const customStoreName = "MyCustomStore_v1";
-      const client = await window.WebClient.createClient(
+      const client = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
@@ -112,8 +116,16 @@ test.describe("Store Isolation Tests", () => {
       );
       await client.syncState();
 
-      await client.newWallet(window.AccountStorageMode.private(), true, 0);
-      await client.newWallet(window.AccountStorageMode.private(), true, 0);
+      await client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        window.AuthScheme.AuthRpoFalcon512
+      );
+      await client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        window.AuthScheme.AuthRpoFalcon512
+      );
 
       const databases = await window.indexedDB.databases();
       const dbNames = databases.map((db) => db.name);
@@ -135,13 +147,13 @@ test.describe("Store Isolation Tests", () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const client1 = await window.WebClient.createClient(
+      const client1 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
         "ConcurrentStore1"
       );
-      const client2 = await window.WebClient.createClient(
+      const client2 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
@@ -151,9 +163,21 @@ test.describe("Store Isolation Tests", () => {
       await Promise.all([client1.syncState(), client2.syncState()]);
 
       await Promise.all([
-        client1.newWallet(window.AccountStorageMode.private(), true, 0),
-        client1.newWallet(window.AccountStorageMode.private(), true, 0),
-        client2.newWallet(window.AccountStorageMode.private(), true, 0),
+        client1.newWallet(
+          window.AccountStorageMode.private(),
+          true,
+          window.AuthScheme.AuthRpoFalcon512
+        ),
+        client1.newWallet(
+          window.AccountStorageMode.private(),
+          true,
+          window.AuthScheme.AuthRpoFalcon512
+        ),
+        client2.newWallet(
+          window.AccountStorageMode.private(),
+          true,
+          window.AuthScheme.AuthRpoFalcon512
+        ),
       ]);
 
       const [accounts1, accounts2] = await Promise.all([
@@ -173,13 +197,13 @@ test.describe("Store Isolation Tests", () => {
 
   test("multiple accounts per store remain isolated", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const client1 = await window.WebClient.createClient(
+      const client1 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
         "MultiAccount1"
       );
-      const client2 = await window.WebClient.createClient(
+      const client2 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
@@ -191,23 +215,23 @@ test.describe("Store Isolation Tests", () => {
       const wallet1a = await client1.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const wallet1b = await client1.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const wallet1c = await client1.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
 
       const wallet2a = await client2.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
 
       const accounts1 = await client1.getAccounts();
@@ -238,13 +262,13 @@ test.describe("Store Isolation Tests", () => {
 
   test("input notes are isolated between stores", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const client1 = await window.WebClient.createClient(
+      const client1 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,
         "NoteStore1"
       );
-      const client2 = await window.WebClient.createClient(
+      const client2 = await window.WasmWebClient.createClient(
         window.rpcUrl,
         undefined,
         undefined,

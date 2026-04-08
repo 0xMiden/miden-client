@@ -49,18 +49,6 @@ Returns the code commitment for this account.
 
 ***
 
-### commitment()
-
-> **commitment**(): [`Word`](Word.md)
-
-Returns the commitment to the account header, storage, and code.
-
-#### Returns
-
-[`Word`](Word.md)
-
-***
-
 ### free()
 
 > **free**(): `void`
@@ -212,6 +200,18 @@ Returns the account storage commitment.
 #### Returns
 
 [`AccountStorage`](AccountStorage.md)
+
+***
+
+### to\_commitment()
+
+> **to\_commitment**(): [`Word`](Word.md)
+
+Returns the commitment to the account header, storage, and code.
+
+#### Returns
+
+[`Word`](Word.md)
 
 ***
 

@@ -16,7 +16,8 @@ use miden_protocol::errors::{
     StorageMapError,
     TransactionScriptError,
 };
-use miden_protocol::utils::{DeserializationError, HexParseError};
+use miden_protocol::utils::HexParseError;
+use miden_protocol::utils::serde::DeserializationError;
 use miden_protocol::{Word, WordError};
 use miden_tx::DataStoreError;
 use thiserror::Error;
@@ -72,8 +73,6 @@ pub enum StoreError {
     NoteInclusionProofError(#[from] NoteError),
     #[error("note tag {0} is already being tracked")]
     NoteTagAlreadyTracked(u64),
-    #[error("note transport cursor not found in the store; the sync state may be uninitialized")]
-    NoteTransportCursorNotFound,
     #[error("note script with root {0} not found")]
     NoteScriptNotFound(String),
     #[error("failed to parse data retrieved from the database: {0}")]

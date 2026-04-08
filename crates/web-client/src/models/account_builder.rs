@@ -47,10 +47,15 @@ impl AccountBuilder {
     }
 
     /// Sets the account type (regular, faucet, etc.).
+    ///
+    /// Accepts either a numeric WASM enum value (0–3) or a string name
+    /// (`"FungibleFaucet"`, `"NonFungibleFaucet"`,
+    /// `"RegularAccountImmutableCode"`, `"RegularAccountUpdatableCode"`).
     #[wasm_bindgen(js_name = "accountType")]
-    pub fn account_type(mut self, account_type: AccountType) -> Self {
-        self.0 = self.0.account_type(account_type.into());
-        self
+    pub fn account_type(mut self, account_type: &JsValue) -> Result<AccountBuilder, JsValue> {
+        let at = parse_account_type(account_type)?;
+        self.0 = self.0.account_type(at.into());
+        Ok(self)
     }
 
     // TODO: AccountStorageMode as Enum
@@ -99,5 +104,53 @@ impl AccountBuilder {
             account: account.into(),
             seed: seed.into(),
         })
+    }
+}
+
+/// Parses a `JsValue` into an `AccountType`, accepting either a numeric enum
+/// value (0–3) or a string variant name.
+fn parse_account_type(value: &JsValue) -> Result<AccountType, JsValue> {
+    if let Some(n) = value.as_f64() {
+        // Values 0–3 are exactly representable as f64; direct comparison is safe.
+        match account_type_from_f64(n) {
+            Some(at) => Ok(at),
+            None => Err(JsValue::from_str(&format!(
+                "Unknown account type: {n}. Expected 0 (FungibleFaucet), \
+                 1 (NonFungibleFaucet), 2 (RegularAccountImmutableCode), \
+                 or 3 (RegularAccountUpdatableCode)"
+            ))),
+        }
+    } else if let Some(s) = value.as_string() {
+        match s.as_str() {
+            "FungibleFaucet" => Ok(AccountType::FungibleFaucet),
+            "NonFungibleFaucet" => Ok(AccountType::NonFungibleFaucet),
+            "RegularAccountImmutableCode" => Ok(AccountType::RegularAccountImmutableCode),
+            "RegularAccountUpdatableCode" => Ok(AccountType::RegularAccountUpdatableCode),
+            _ => Err(JsValue::from_str(&format!(
+                "Unknown account type: \"{s}\". Expected \"FungibleFaucet\", \
+                 \"NonFungibleFaucet\", \"RegularAccountImmutableCode\", \
+                 or \"RegularAccountUpdatableCode\""
+            ))),
+        }
+    } else {
+        Err(JsValue::from_str("accountType must be a number (0–3) or a string variant name"))
+    }
+}
+
+/// Maps a JS number (f64) to an `AccountType` variant. Returns `None` for
+/// unrecognised values. Small integers 0–3 are exactly representable in f64,
+/// so direct equality is correct here.
+#[allow(clippy::float_cmp)]
+fn account_type_from_f64(n: f64) -> Option<AccountType> {
+    if n == 0.0 {
+        Some(AccountType::FungibleFaucet)
+    } else if n == 1.0 {
+        Some(AccountType::NonFungibleFaucet)
+    } else if n == 2.0 {
+        Some(AccountType::RegularAccountImmutableCode)
+    } else if n == 3.0 {
+        Some(AccountType::RegularAccountUpdatableCode)
+    } else {
+        None
     }
 }
