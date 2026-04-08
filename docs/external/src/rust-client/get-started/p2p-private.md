@@ -14,7 +14,7 @@ In this section, we show you how to make private transactions and send funds to 
 ## Create a second account
 
 :::tip
-Remember to use the [Miden client documentation](https://0xMiden.github.io/miden-docs/miden-client/cli-reference.html) for clarifications.
+Remember to use the [Miden client documentation](https://docs.miden.xyz/next/builder/tools/clients/rust-client/cli/) for clarifications.
 :::
 
 1. Create a second account to send funds with. Previously, we created a type `mutable` account (`Account A`). Now, create another `mutable` (`Account B`) using the following command:
@@ -119,7 +119,7 @@ You have successfully configured and used the Miden client to interact with a Mi
 
 You have performed basic Miden rollup operations like submitting proofs of transactions, generating and consuming notes.
 
-For more information on the Miden client, refer to the [Miden client documentation](https://0xMiden.github.io/miden-docs/miden-client/index.html).
+For more information on the Miden client, refer to the [Miden client documentation](https://docs.miden.xyz/next/builder/tools/clients/).
 
 ## Clear data
 

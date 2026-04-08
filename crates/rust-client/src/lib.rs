@@ -6,7 +6,7 @@
 //! accounts and their state, and facilitates executing, proving, and submitting transactions.
 //!
 //! For a protocol-level overview and guides for getting started, please visit the official
-//! [Miden docs](https://0xMiden.github.io/miden-docs/).
+//! [Miden docs](https://docs.miden.xyz/).
 //!
 //! ## Overview
 //!
