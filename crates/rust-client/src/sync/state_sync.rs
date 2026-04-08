@@ -31,7 +31,12 @@ use super::state_sync_update::TransactionUpdateTracker;
 use super::{AccountUpdates, PublicAccountUpdate, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
-use crate::rpc::domain::account::{AccountDetails, AccountStorageRequirements, FetchedAccount};
+use crate::rpc::domain::account::{
+    AccountDetails,
+    AccountStorageMapDetails,
+    AccountStorageRequirements,
+    FetchedAccount,
+};
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
 use crate::rpc::domain::storage_map::StorageMapUpdate;
 use crate::rpc::domain::transaction::{
@@ -766,9 +771,41 @@ impl StateSync {
     ) -> Result<AccountDelta, ClientError> {
         let store = self.store.as_ref().expect("store required for delta sync");
         let account_id = details.header.id();
+
+        let storage_delta = self
+            .build_storage_delta(details, account_id, sync_height, store.as_ref())
+            .await?;
+
+        let vault_delta =
+            self.build_vault_delta(details, account_id, sync_height, store.as_ref()).await?;
+
+        // --- Nonce delta ---
+        let old_nonce = local_header.nonce().as_canonical_u64();
+        let new_nonce = details.header.nonce().as_canonical_u64();
+        let nonce_delta = Felt::new(new_nonce - old_nonce);
+
+        AccountDelta::new(account_id, storage_delta, vault_delta, nonce_delta).map_err(|err| {
+            ClientError::RpcError(RpcError::InvalidResponse(format!(
+                "failed to construct account delta: {err}"
+            )))
+        })
+    }
+
+    /// Computes the full storage delta (value slots + map slots) for the account.
+    ///
+    /// For value slots, compares the response values against the local store. For map slots,
+    /// oversized maps (`too_many_entries`) fetch incremental delta entries from the sync endpoint
+    /// and deduplicate by key keeping the latest value; non-oversized maps diff the full response
+    /// entries against the local store.
+    async fn build_storage_delta(
+        &self,
+        details: &AccountDetails,
+        account_id: AccountId,
+        sync_height: BlockNumber,
+        store: &dyn Store,
+    ) -> Result<AccountStorageDelta, ClientError> {
         let mut storage_delta = AccountStorageDelta::new();
 
-        // --- Storage value slots: compare local vs response ---
         for slot_header in details.storage_details.header.slots() {
             if slot_header.slot_type() == StorageSlotType::Value {
                 let local_value = store
@@ -788,7 +825,6 @@ impl StateSync {
             }
         }
 
-        // --- Storage map slots ---
         let mut map_delta_cache: Option<Vec<StorageMapUpdate>> = None;
 
         for slot_header in details.storage_details.header.slots() {
@@ -815,93 +851,135 @@ impl StateSync {
                     map_delta_cache = Some(map_info.updates);
                 }
 
-                if let Some(ref delta_updates) = map_delta_cache {
-                    let slot_name: &StorageSlotName = slot_header.name();
-                    let mut relevant: Vec<_> =
-                        delta_updates.iter().filter(|u| &u.slot_name == slot_name).collect();
-                    relevant.sort_by_key(|u| u.block_num);
-
-                    // Deduplicate: keep latest value per key.
-                    let mut seen = BTreeMap::new();
-                    for update in relevant {
-                        seen.insert(update.key, update.value);
-                    }
-
-                    for (key, value) in seen {
-                        storage_delta
-                            .set_map_item(slot_header.name().clone(), key, value)
-                            .map_err(|err| {
-                                ClientError::RpcError(RpcError::InvalidResponse(format!(
-                                    "failed to set storage map delta: {err}"
-                                )))
-                            })?;
-                    }
-                }
+                Self::apply_oversized_map_delta(
+                    map_delta_cache.as_deref().unwrap_or_default(),
+                    slot_header.name(),
+                    &mut storage_delta,
+                )?;
             } else {
-                // Non-oversized map: diff response entries against local map from the store.
-                let response_map = map_details
-                    .entries
-                    .clone()
-                    .into_storage_map()
-                    .ok_or_else(|| {
-                        ClientError::RpcError(RpcError::ExpectedDataMissing(
-                            "expected AllEntries for map, got EntriesWithProofs".into(),
-                        ))
-                    })?
-                    .map_err(|err| {
-                        ClientError::RpcError(RpcError::InvalidResponse(format!(
-                            "the rpc api returned a non-valid map entry: {err}"
-                        )))
-                    })?;
-
-                let local_entries: BTreeMap<StorageMapKey, Word> = store
-                    .get_account_storage(
-                        account_id,
-                        AccountStorageFilter::SlotName(slot_header.name().clone()),
-                    )
-                    .await
-                    .ok()
-                    .and_then(|storage| storage.get(slot_header.name()).cloned())
-                    .map(|slot| match slot.content() {
-                        StorageSlotContent::Map(map) => {
-                            map.entries().map(|(k, v)| (*k, *v)).collect()
-                        },
-                        StorageSlotContent::Value(_) => BTreeMap::new(),
-                    })
-                    .unwrap_or_default();
-
-                let response_entries: BTreeMap<StorageMapKey, Word> =
-                    response_map.entries().map(|(k, v)| (*k, *v)).collect();
-
-                // Entries in response but not in local, or with different values.
-                for (key, value) in &response_entries {
-                    if local_entries.get(key) != Some(value) {
-                        storage_delta
-                            .set_map_item(slot_header.name().clone(), *key, *value)
-                            .map_err(|err| {
-                                ClientError::RpcError(RpcError::InvalidResponse(format!(
-                                    "failed to set storage map delta: {err}"
-                                )))
-                            })?;
-                    }
-                }
-
-                // Entries in local but removed in response (set to empty word).
-                for key in local_entries.keys() {
-                    if !response_entries.contains_key(key) {
-                        storage_delta
-                            .set_map_item(slot_header.name().clone(), *key, Word::default())
-                            .map_err(|err| {
-                                ClientError::RpcError(RpcError::InvalidResponse(format!(
-                                    "failed to set storage map delta for removal: {err}"
-                                )))
-                            })?;
-                    }
-                }
+                Self::apply_full_map_delta(
+                    map_details,
+                    slot_header.name(),
+                    account_id,
+                    store,
+                    &mut storage_delta,
+                )
+                .await?;
             }
         }
 
-        // --- Vault delta ---
+        Ok(storage_delta)
+    }
+
+    /// Applies delta updates from the sync endpoint for an oversized storage map slot.
+    ///
+    /// Filters the cached delta updates to the target slot, sorts by block number, and
+    /// deduplicates by key (keeping the latest value).
+    fn apply_oversized_map_delta(
+        delta_updates: &[StorageMapUpdate],
+        slot_name: &StorageSlotName,
+        storage_delta: &mut AccountStorageDelta,
+    ) -> Result<(), ClientError> {
+        let mut relevant: Vec<_> =
+            delta_updates.iter().filter(|u| u.slot_name == *slot_name).collect();
+        relevant.sort_by_key(|u| u.block_num);
+
+        // Deduplicate: keep latest value per key.
+        let mut seen = BTreeMap::new();
+        for update in relevant {
+            seen.insert(update.key, update.value);
+        }
+
+        for (key, value) in seen {
+            storage_delta.set_map_item(slot_name.clone(), key, value).map_err(|err| {
+                ClientError::RpcError(RpcError::InvalidResponse(format!(
+                    "failed to set storage map delta: {err}"
+                )))
+            })?;
+        }
+
+        Ok(())
+    }
+
+    /// Diffs the full response map entries against the local store for a non-oversized map slot.
+    ///
+    /// Entries present in the response but missing or different locally are added to the delta.
+    /// Entries present locally but absent in the response are set to `Word::default()` (removal).
+    async fn apply_full_map_delta(
+        map_details: &AccountStorageMapDetails,
+        slot_name: &StorageSlotName,
+        account_id: AccountId,
+        store: &dyn Store,
+        storage_delta: &mut AccountStorageDelta,
+    ) -> Result<(), ClientError> {
+        let response_map = map_details
+            .entries
+            .clone()
+            .into_storage_map()
+            .ok_or_else(|| {
+                ClientError::RpcError(RpcError::ExpectedDataMissing(
+                    "expected AllEntries for map, got EntriesWithProofs".into(),
+                ))
+            })?
+            .map_err(|err| {
+                ClientError::RpcError(RpcError::InvalidResponse(format!(
+                    "the rpc api returned a non-valid map entry: {err}"
+                )))
+            })?;
+
+        let local_entries: BTreeMap<StorageMapKey, Word> = store
+            .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
+            .await
+            .ok()
+            .and_then(|storage| storage.get(slot_name).cloned())
+            .map(|slot| match slot.content() {
+                StorageSlotContent::Map(map) => map.entries().map(|(k, v)| (*k, *v)).collect(),
+                StorageSlotContent::Value(_) => BTreeMap::new(),
+            })
+            .unwrap_or_default();
+
+        let response_entries: BTreeMap<StorageMapKey, Word> =
+            response_map.entries().map(|(k, v)| (*k, *v)).collect();
+
+        // Entries in response but not in local, or with different values.
+        for (key, value) in &response_entries {
+            if local_entries.get(key) != Some(value) {
+                storage_delta.set_map_item(slot_name.clone(), *key, *value).map_err(|err| {
+                    ClientError::RpcError(RpcError::InvalidResponse(format!(
+                        "failed to set storage map delta: {err}"
+                    )))
+                })?;
+            }
+        }
+
+        // Entries in local but removed in response (set to empty word).
+        for key in local_entries.keys() {
+            if !response_entries.contains_key(key) {
+                storage_delta.set_map_item(slot_name.clone(), *key, Word::default()).map_err(
+                    |err| {
+                        ClientError::RpcError(RpcError::InvalidResponse(format!(
+                            "failed to set storage map delta for removal: {err}"
+                        )))
+                    },
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Computes the vault delta between local and remote account state.
+    ///
+    /// For oversized vaults (`too_many_assets`), fetches incremental updates from the sync
+    /// endpoint and replays them on top of the local vault. For non-oversized vaults, diffs
+    /// the full response assets against the local vault.
+    async fn build_vault_delta(
+        &self,
+        details: &AccountDetails,
+        account_id: AccountId,
+        sync_height: BlockNumber,
+        store: &dyn Store,
+    ) -> Result<AccountVaultDelta, ClientError> {
         let mut vault_delta = AccountVaultDelta::default();
         let local_vault =
             store.get_account_vault(account_id).await.map_err(ClientError::StoreError)?;
@@ -945,16 +1023,7 @@ impl StateSync {
             Self::compute_vault_delta_from_diff(&local_vault, &final_assets, &mut vault_delta)?;
         }
 
-        // --- Nonce delta ---
-        let old_nonce = local_header.nonce().as_canonical_u64();
-        let new_nonce = details.header.nonce().as_canonical_u64();
-        let nonce_delta = Felt::new(new_nonce - old_nonce);
-
-        AccountDelta::new(account_id, storage_delta, vault_delta, nonce_delta).map_err(|err| {
-            ClientError::RpcError(RpcError::InvalidResponse(format!(
-                "failed to construct account delta: {err}"
-            )))
-        })
+        Ok(vault_delta)
     }
 
     /// Computes a vault delta from the difference between a local vault and a final asset map.
