@@ -47,9 +47,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-14
+          - os: macos-26
             platform-package: node-sdk-darwin-arm64
-          - os: macos-13
+          - os: macos-26-intel
             platform-package: node-sdk-darwin-x64
           - os: ubuntu-24.04
             platform-package: node-sdk-linux-x64-gnu
