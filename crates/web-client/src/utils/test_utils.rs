@@ -71,8 +71,7 @@ impl TestUtils {
             core::iter::empty(),
         );
 
-        let entrypoint: QualifiedProcedureName =
-            "test_program_package_no_metadata::main".parse().unwrap();
+        let entrypoint: QualifiedProcedureName = "nofile::main".parse().unwrap();
         let package = lib_package.make_executable(&entrypoint).unwrap();
 
         let bytes: Vec<u8> = package.to_bytes();
