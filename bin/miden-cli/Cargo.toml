@@ -19,6 +19,7 @@ path = "src/main.rs"
 [features]
 default = ["dap"]
 dap = ["dep:miden-debug", "miden-client/dap"]
+testing = ["miden-client/testing"]
 
 [dependencies]
 # Workspace dependencies

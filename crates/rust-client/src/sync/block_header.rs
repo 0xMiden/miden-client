@@ -2,15 +2,9 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
-use miden_protocol::account::AccountId;
-use miden_protocol::block::account_tree::AccountTree;
-use miden_protocol::block::nullifier_tree::NullifierTree;
-use miden_protocol::block::{BlockHeader, BlockNoteTree, BlockNumber, Blockchain, FeeParameters};
-use miden_protocol::crypto::dsa::ecdsa_k256_keccak::SecretKey;
+use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
-use miden_protocol::crypto::merkle::smt::Smt;
-use miden_protocol::transaction::{OrderedTransactionHeaders, TransactionKernel};
 use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
@@ -19,6 +13,7 @@ use crate::{Client, ClientError};
 
 /// Synthetic faucet account ID used only by the offline bootstrap genesis header so fee
 /// parameters can reference a stable native-asset faucet without requiring node state.
+#[cfg(feature = "testing")]
 const OFFLINE_NATIVE_ASSET_FAUCET_ID: u128 = 0xab00_0000_0000_cd20_0000_ac00_0000_de00;
 
 /// Network information management methods.
@@ -58,6 +53,7 @@ impl<AUTH> Client<AUTH> {
     /// This stores default RPC limits and inserts a synthetic genesis header if one is not
     /// already present in the store. The synthetic header is only intended for local-only
     /// execution and debugging.
+    #[cfg(feature = "testing")]
     pub async fn prepare_offline_bootstrap(&mut self) -> Result<(), ClientError> {
         let limits = self.store.get_rpc_limits().await?.unwrap_or_default();
         self.store.set_rpc_limits(limits).await?;
@@ -120,7 +116,16 @@ impl<AUTH> Client<AUTH> {
     }
 }
 
+#[cfg(feature = "testing")]
 fn synthetic_offline_genesis_header() -> BlockHeader {
+    use miden_protocol::account::AccountId;
+    use miden_protocol::block::account_tree::AccountTree;
+    use miden_protocol::block::nullifier_tree::NullifierTree;
+    use miden_protocol::block::{BlockNoteTree, Blockchain, FeeParameters};
+    use miden_protocol::crypto::dsa::ecdsa_k256_keccak::SecretKey;
+    use miden_protocol::crypto::merkle::smt::Smt;
+    use miden_protocol::transaction::{OrderedTransactionHeaders, TransactionKernel};
+
     let native_asset_id = AccountId::try_from(OFFLINE_NATIVE_ASSET_FAUCET_ID)
         .expect("offline native asset faucet ID should be valid");
     let fee_parameters =
