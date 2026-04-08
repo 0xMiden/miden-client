@@ -25,7 +25,7 @@ crate-type = ["lib"]
 
 [features]
 dap = ["dep:miden-debug"]
-default = ["std"]
+default = ["std", "dap"]
 std = [
   "dep:tokio",
   "miden-protocol/std",
