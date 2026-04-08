@@ -1,5 +1,6 @@
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, presets};
+use miden_client::account::component::TokenMetadata;
 use miden_client::account::{
     Account,
     AccountId,
@@ -15,7 +16,7 @@ use miden_client::{Client, PrettyPrint, ZERO};
 
 use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::utils::{load_faucet_details_map, parse_account_id};
+use crate::utils::parse_account_id;
 use crate::{client_binary_name, create_dynamic_table};
 
 pub const DEFAULT_ACCOUNT_ID_KEY: &str = "default_account_id";
@@ -113,7 +114,7 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
 
         table.add_row(vec![
             acc.id().to_hex(),
-            account_type_display_name(&acc.id())?,
+            account_type_display_name(&client, acc.id()).await,
             acc.id().storage_mode().to_string(),
             acc.nonce().as_canonical_u64().to_string(),
             status,
@@ -159,15 +160,16 @@ pub async fn show_account<AUTH>(
     // Vault Table
     {
         let assets = account.vault().assets();
-        let faucet_details_map = load_faucet_details_map()?;
         println!("Assets: ");
 
         let mut table = create_dynamic_table(&["Asset Type", "Faucet", "Amount"]);
         for asset in assets {
             let (asset_type, faucet, amount) = match asset {
                 Asset::Fungible(fungible_asset) => {
-                    let (faucet, amount) =
-                        faucet_details_map.format_fungible_asset(&fungible_asset)?;
+                    let faucet = get_token_symbol(&client, fungible_asset.faucet_id())
+                        .await
+                        .expect("Fungible faucet should have a token symbol");
+                    let amount = fungible_asset.amount().to_string();
                     ("Fungible Asset", faucet, amount)
                 },
                 Asset::NonFungible(non_fungible_asset) => {
@@ -249,7 +251,10 @@ async fn print_summary_table<AUTH>(
         Cell::new("Account Commitment"),
         Cell::new(account.to_commitment().to_string()),
     ]);
-    table.add_row(vec![Cell::new("Type"), Cell::new(account_type_display_name(&account.id())?)]);
+    table.add_row(vec![
+        Cell::new("Type"),
+        Cell::new(account_type_display_name(client, account.id()).await),
+    ]);
     table.add_row(vec![
         Cell::new("Storage mode"),
         Cell::new(account.id().storage_mode().to_string()),
@@ -272,19 +277,38 @@ async fn print_summary_table<AUTH>(
     Ok(())
 }
 
-/// Returns a display name for the account type.
-fn account_type_display_name(account_id: &AccountId) -> Result<String, CliError> {
-    Ok(match account_id.account_type() {
-        AccountType::FungibleFaucet => {
-            let faucet_details_map = load_faucet_details_map()?;
-            let token_symbol = faucet_details_map.get_token_symbol_or_default(account_id);
+/// Reads the token symbol from a faucet account's storage metadata slot.
+///
+/// Returns `None` if the account is not a fungible faucet or the metadata can't be read.
+async fn get_token_symbol<AUTH>(client: &Client<AUTH>, account_id: AccountId) -> Option<String> {
+    if account_id.account_type() != AccountType::FungibleFaucet {
+        return None;
+    }
 
+    client
+        .account_reader(account_id)
+        .get_storage_item(TokenMetadata::metadata_slot().clone())
+        .await
+        .ok()
+        .and_then(|word| TokenMetadata::try_from(word).ok())
+        .map(|m| m.symbol().to_string())
+}
+
+/// Returns a display name for the account type.
+///
+/// For fungible faucets, `token_symbol` is used if provided.
+async fn account_type_display_name<AUTH>(client: &Client<AUTH>, account_id: AccountId) -> String {
+    match account_id.account_type() {
+        AccountType::FungibleFaucet => {
+            let token_symbol = get_token_symbol(client, account_id)
+                .await
+                .expect("Fungible faucet should have a token symbol");
             format!("Fungible faucet (token symbol: {token_symbol})")
         },
         AccountType::NonFungibleFaucet => "Non-fungible faucet".to_string(),
         AccountType::RegularAccountImmutableCode => "Regular".to_string(),
         AccountType::RegularAccountUpdatableCode => "Regular (updatable)".to_string(),
-    })
+    }
 }
 
 /// Sets the provided account ID as the default account in the client's store, if not set already.
