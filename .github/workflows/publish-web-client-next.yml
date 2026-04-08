@@ -95,8 +95,8 @@ jobs:
   publish:
     needs: [check-version, build-native]
     if: >
-      needs.check-version.result == 'success' &&
-      (needs.build-native.result == 'success' || needs.build-native.result == 'skipped')
+      !cancelled() &&
+      needs.check-version.result == 'success'
     runs-on: ubuntu-24.04
     steps:
       - name: Check out code
