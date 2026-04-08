@@ -3167,7 +3167,9 @@ dependencies = [
 
 [[package]]
 name = "miden-debug"
-version = "0.5.0"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df04a684eeb96efabc63e2800a01945f7f6e19ffd00d3b49064e85f7e1fac444"
 dependencies = [
  "clap",
  "futures",
@@ -3198,7 +3200,9 @@ dependencies = [
 
 [[package]]
 name = "miden-debug-dap"
-version = "0.1.0"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38cd41176322df12836bb4deecd4b619f7cf8239ed7b2c4ac1da7b2830e5199c"
 dependencies = [
  "serde",
  "serde_json",
@@ -3207,7 +3211,9 @@ dependencies = [
 
 [[package]]
 name = "miden-debug-engine"
-version = "0.1.0"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e03dd00bd4dab99dbfdec9fd07009811a7e3b3a988e74a28c6ccb735ac34e138"
 dependencies = [
  "clap",
  "glob",
@@ -7532,38 +7538,3 @@ name = "zmij"
 version = "1.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
-
-[[patch.unused]]
-name = "miden-air"
-version = "0.22.0"
-source = "git+https://github.com/0xMiden/miden-vm.git?rev=2327f4a5c04c7a6ec3aa612612a3fc993d383dc3#2327f4a5c04c7a6ec3aa612612a3fc993d383dc3"
-
-[[patch.unused]]
-name = "miden-core"
-version = "0.22.0"
-source = "git+https://github.com/0xMiden/miden-vm.git?rev=2327f4a5c04c7a6ec3aa612612a3fc993d383dc3#2327f4a5c04c7a6ec3aa612612a3fc993d383dc3"
-
-[[patch.unused]]
-name = "miden-debug-types"
-version = "0.22.0"
-source = "git+https://github.com/0xMiden/miden-vm.git?rev=2327f4a5c04c7a6ec3aa612612a3fc993d383dc3#2327f4a5c04c7a6ec3aa612612a3fc993d383dc3"
-
-[[patch.unused]]
-name = "miden-processor"
-version = "0.22.0"
-source = "git+https://github.com/0xMiden/miden-vm.git?rev=2327f4a5c04c7a6ec3aa612612a3fc993d383dc3#2327f4a5c04c7a6ec3aa612612a3fc993d383dc3"
-
-[[patch.unused]]
-name = "miden-utils-core-derive"
-version = "0.22.0"
-source = "git+https://github.com/0xMiden/miden-vm.git?rev=2327f4a5c04c7a6ec3aa612612a3fc993d383dc3#2327f4a5c04c7a6ec3aa612612a3fc993d383dc3"
-
-[[patch.unused]]
-name = "miden-utils-diagnostics"
-version = "0.22.0"
-source = "git+https://github.com/0xMiden/miden-vm.git?rev=2327f4a5c04c7a6ec3aa612612a3fc993d383dc3#2327f4a5c04c7a6ec3aa612612a3fc993d383dc3"
-
-[[patch.unused]]
-name = "miden-utils-indexing"
-version = "0.22.0"
-source = "git+https://github.com/0xMiden/miden-vm.git?rev=2327f4a5c04c7a6ec3aa612612a3fc993d383dc3#2327f4a5c04c7a6ec3aa612612a3fc993d383dc3"
