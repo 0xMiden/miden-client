@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 
 use miden_client::Word as NativeWord;
 use miden_client::account::StorageSlotName;
+use miden_client::asset::Asset as NativeAsset;
 use miden_client::block::BlockNumber;
 use miden_client::rpc::domain::account::{AccountProof as NativeAccountProof, StorageMapEntries};
 use miden_protocol::account::AccountStorageHeader;
@@ -143,17 +144,12 @@ impl AccountProof {
     /// Returns `undefined` if the account is private or vault data was not requested.
     #[wasm_bindgen(js_name = "vaultFungibleAssets")]
     pub fn vault_fungible_assets(&self) -> Option<Vec<FungibleAsset>> {
-        let (_, details) = self.inner.clone().into_parts();
-        details.map(|d| {
-            d.vault_details
-                .assets
-                .into_iter()
-                .filter_map(|asset| {
-                    if asset.is_fungible() {
-                        Some(asset.unwrap_fungible().into())
-                    } else {
-                        None
-                    }
+        self.inner.vault_details().map(|d| {
+            d.assets
+                .iter()
+                .filter_map(|asset| match asset {
+                    NativeAsset::Fungible(f) => Some((*f).into()),
+                    NativeAsset::NonFungible(_) => None,
                 })
                 .collect()
         })
