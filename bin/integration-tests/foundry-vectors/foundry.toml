@@ -10,7 +10,7 @@ via_ir         = true
 
 remappings = [
   "@agglayer/=lib/zkevm-contracts/contracts/",
-  "@openzeppelin/contracts-upgradeable4/=lib/openzeppelin-contracts-upgradeable/contracts/",
+  "@openzeppelin/contracts-upgradeable4/=lib/openzeppelin-contracts-upgradeable-v4.8/contracts/",
   "forge-std/=lib/forge-std/src/",
 ]
 

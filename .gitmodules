@@ -4,6 +4,7 @@
 [submodule "bin/integration-tests/foundry-vectors/lib/zkevm-contracts"]
 	path = bin/integration-tests/foundry-vectors/lib/zkevm-contracts
 	url = https://github.com/0xPolygonHermez/zkevm-contracts
-[submodule "bin/integration-tests/foundry-vectors/lib/openzeppelin-contracts-upgradeable"]
-	path = bin/integration-tests/foundry-vectors/lib/openzeppelin-contracts-upgradeable
+[submodule "bin/integration-tests/foundry-vectors/lib/openzeppelin-contracts-upgradeable-v4.8"]
+	path = bin/integration-tests/foundry-vectors/lib/openzeppelin-contracts-upgradeable-v4.8
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable
+	branch = release-v4.8
