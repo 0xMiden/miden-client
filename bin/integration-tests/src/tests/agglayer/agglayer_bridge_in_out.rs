@@ -254,11 +254,11 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
     wait_for_tx(&mut ger_manager.client, tx_id).await?;
     println!("[bridge_in_out] CLAIM note submitted");
 
-    // Wait for agglayer faucet to consume the CLAIM note (detected via NoteReader).
-    // The faucet processes the CLAIM as a network transaction and outputs a P2ID note
-    // targeting the destination account.
-    wait_for_note_consumed(&mut ger_manager.client, agglayer_faucet_id, claim_note_id, 30).await?;
-    println!("[bridge_in_out] Faucet consumed CLAIM note (via NoteReader)");
+    // Wait for the bridge to consume the CLAIM note (detected via NoteReader).
+    // The bridge validates the claim and produces a MINT note targeting the faucet,
+    // which in turn mints assets and creates a P2ID note for the destination.
+    wait_for_note_consumed(&mut ger_manager.client, bridge_id, claim_note_id, 30).await?;
+    println!("[bridge_in_out] Bridge consumed CLAIM note (via NoteReader)");
 
     // Now wait for the resulting P2ID note to become consumable by destination
     let consumable_notes =
