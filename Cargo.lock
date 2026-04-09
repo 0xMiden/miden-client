@@ -2300,7 +2300,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.3",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -3451,9 +3451,9 @@ dependencies = [
 
 [[package]]
 name = "miden-node-store"
-version = "0.14.3"
+version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f157e2a0d2426771f625197108051ad6c0edc269332a9a4f6d799057b554d0b"
+checksum = "f4671ffe12e994605c5cdc61aa41a98ede5286c18bceccd7389239137c0d5812"
 dependencies = [
  "anyhow",
  "build-rs",
