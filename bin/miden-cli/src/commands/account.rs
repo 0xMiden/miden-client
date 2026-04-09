@@ -12,6 +12,7 @@ use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::Asset;
 use miden_client::rpc::{GrpcClient, NodeRpcClient};
 use miden_client::transaction::{AccountComponentInterface, AccountInterface};
+use miden_client::utils::base_units_to_tokens;
 use miden_client::{Client, PrettyPrint, ZERO};
 
 use crate::config::CliConfig;
@@ -166,8 +167,11 @@ pub async fn show_account<AUTH>(
         for asset in assets {
             let (asset_type, faucet, amount) = match asset {
                 Asset::Fungible(fungible_asset) => {
-                    let faucet = get_token_symbol(&client, fungible_asset.faucet_id()).await?;
-                    let amount = fungible_asset.amount().to_string();
+                    let metadata =
+                        get_token_metadata(&client, fungible_asset.faucet_id()).await?;
+                    let faucet = metadata.symbol().to_string();
+                    let amount =
+                        base_units_to_tokens(fungible_asset.amount(), metadata.decimals());
                     ("Fungible Asset", faucet, amount)
                 },
                 Asset::NonFungible(non_fungible_asset) => {
@@ -275,11 +279,11 @@ async fn print_summary_table<AUTH>(
     Ok(())
 }
 
-/// Reads the token symbol from a fungible faucet account's storage metadata slot.
-async fn get_token_symbol<AUTH>(
+/// Reads the token metadata from a fungible faucet account's storage metadata slot.
+async fn get_token_metadata<AUTH>(
     client: &Client<AUTH>,
     account_id: AccountId,
-) -> Result<String, CliError> {
+) -> Result<TokenMetadata, CliError> {
     let word = client
         .account_reader(account_id)
         .get_storage_item(TokenMetadata::metadata_slot().clone())
@@ -290,13 +294,12 @@ async fn get_token_symbol<AUTH>(
                 format!("Failed to read token metadata for faucet {account_id}"),
             )
         })?;
-    let metadata = TokenMetadata::try_from(word).map_err(|err| {
+    TokenMetadata::try_from(word).map_err(|err| {
         CliError::Faucet(
             err.into(),
             format!("Failed to parse token metadata for faucet {account_id}"),
         )
-    })?;
-    Ok(metadata.symbol().to_string())
+    })
 }
 
 /// Returns a display name for the account type.
@@ -306,7 +309,8 @@ async fn account_type_display_name<AUTH>(
 ) -> Result<String, CliError> {
     Ok(match account_id.account_type() {
         AccountType::FungibleFaucet => {
-            let token_symbol = get_token_symbol(client, account_id).await?;
+            let token_symbol =
+                get_token_metadata(client, account_id).await?.symbol().to_string();
             format!("Fungible faucet (token symbol: {token_symbol})")
         },
         AccountType::NonFungibleFaucet => "Non-fungible faucet".to_string(),
