@@ -146,8 +146,13 @@ export interface ClientOptions {
    * Defaults to the SDK testnet RPC if omitted.
    */
   rpcUrl?: "testnet" | "devnet" | "localhost" | "local" | (string & {});
-  /** Note transport URL (optional). */
-  noteTransportUrl?: string;
+  /**
+   * Note transport endpoint. Accepts shorthands or a raw URL:
+   * - `"testnet"` — Miden testnet transport (`https://transport.miden.io`)
+   * - `"devnet"` — Miden devnet transport (`https://transport.devnet.miden.io`)
+   * - any other string — treated as a raw note transport endpoint URL
+   */
+  noteTransportUrl?: "testnet" | "devnet" | (string & {});
   /**
    * Prover to use for transactions. Accepts shorthands or a raw URL:
    * - `"local"` — local (in-browser) prover
@@ -858,8 +863,10 @@ export interface KeystoreResource {
 export declare class MidenClient {
   /** Creates and initializes a new MidenClient. */
   static create(options?: ClientOptions): Promise<MidenClient>;
-  /** Creates a client preconfigured for testnet use. Defaults to autoSync: true. */
+  /** Creates a client preconfigured for testnet (rpc, prover, note transport, autoSync). */
   static createTestnet(options?: ClientOptions): Promise<MidenClient>;
+  /** Creates a client preconfigured for devnet (rpc, prover, note transport, autoSync). */
+  static createDevnet(options?: ClientOptions): Promise<MidenClient>;
   /** Creates a mock client for testing. */
   static createMock(options?: MockOptions): Promise<MidenClient>;
 

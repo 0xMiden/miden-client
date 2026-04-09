@@ -206,7 +206,7 @@ impl AccountComponent {
         storage_slots: &StorageSlotArray,
     ) -> Result<AccountComponent, JsValue> {
         let native_package: NativePackage = package.into();
-        let native_library = native_package.unwrap_library().as_ref().clone();
+        let native_library = (*native_package.mast).clone();
         let native_slots: Vec<NativeStorageSlot> = storage_slots
             .__inner
             .iter()

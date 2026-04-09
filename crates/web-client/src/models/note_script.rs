@@ -56,11 +56,13 @@ impl NoteScript {
     }
 
     /// Creates a `NoteScript` from the given `Package`.
-    /// Throws if the package is invalid.
+    /// The package must contain a library with exactly one procedure annotated with
+    /// `@note_script`.
     #[wasm_bindgen(js_name = "fromPackage")]
     pub fn from_package(package: &Package) -> Result<NoteScript, JsValue> {
-        let program = package.as_program()?;
-        let native_note_script = NativeNoteScript::new(program.into());
+        let native_package: miden_client::vm::Package = package.into();
+        let native_note_script = NativeNoteScript::from_package(&native_package)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(native_note_script.into())
     }
 }
