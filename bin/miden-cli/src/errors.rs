@@ -70,9 +70,9 @@ pub enum CliError {
     #[error("export error: {0}")]
     #[diagnostic(code(cli::export_error), help("Check the ID."))]
     Export(String),
-    #[error("faucet error: {1}")]
+    #[error("faucet error: {0}")]
     #[diagnostic(code(cli::faucet_error))]
-    Faucet(#[source] SourceError, String),
+    Faucet(String),
     #[error("import error: {0}")]
     #[diagnostic(code(cli::import_error), help("Check the file name."))]
     Import(String),

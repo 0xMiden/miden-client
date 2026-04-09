@@ -588,18 +588,15 @@ impl NodeRpcClient for GrpcClient {
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
     ) -> Result<ChainMmrInfo, RpcError> {
-        let block_from = block_from.as_u32();
+        let block_range = Some(BlockRange {
+            block_from: block_from.as_u32(),
+            block_to: block_to.map(|b| b.as_u32()),
+        });
 
-        let upper_bound = match block_to {
-            Some(block_to) => {
-                Some(proto::rpc::sync_chain_mmr_request::UpperBound::BlockNum(block_to.as_u32()))
-            },
-            None => Some(proto::rpc::sync_chain_mmr_request::UpperBound::ChainTip(
-                proto::rpc::ChainTip::Committed.into(),
-            )),
+        let request = proto::rpc::SyncChainMmrRequest {
+            block_range,
+            finality: proto::rpc::Finality::Committed as i32,
         };
-
-        let request = proto::rpc::SyncChainMmrRequest { block_from, upper_bound };
 
         let response = self
             .call_with_retry(RpcEndpoint::SyncChainMmr, |mut rpc_api| {
@@ -888,10 +885,7 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
-        let request = proto::blockchain::BlockRequest {
-            block_num: block_num.as_u32(),
-            include_proof: Some(false),
-        };
+        let request = proto::blockchain::BlockNumber { block_num: block_num.as_u32() };
 
         let response = self
             .call_with_retry(RpcEndpoint::GetBlockByNumber, |mut rpc_api| {
