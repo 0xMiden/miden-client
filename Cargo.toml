@@ -53,7 +53,7 @@ miden-node-rpc                   = { version = "0.14" }
 miden-node-store                 = { version = "0.14" }
 miden-node-utils                 = { version = "0.14" }
 miden-node-validator             = { version = "0.14" }
-miden-note-transport-proto-build = { default-features = false, version = "0.2" }
+miden-note-transport-proto-build = { default-features = false, version = "0.3" }
 miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.14" }
 
 # External dependencies
