@@ -341,13 +341,13 @@ async fn build_three_slot_account(
 
 /// Compiles a transaction script that calls a procedure from the slots component.
 fn compile_slot_tx_script(proc_name: &str) -> miden_client::transaction::TransactionScript {
+    let assembler = TransactionKernel::assembler();
     let source_manager = Arc::new(DefaultSourceManager::default());
-    let assembler = TransactionKernel::assembler_with_source_manager(source_manager.clone());
     let module = Module::parser(ModuleKind::Library)
         .parse_str(
             Path::new("external_contract::slots_contract"),
             SLOTS_COMPONENT_MASM,
-            source_manager,
+            source_manager.clone(),
         )
         .unwrap();
     let library = assembler.assemble_library([module]).unwrap();
