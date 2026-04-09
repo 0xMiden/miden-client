@@ -1,7 +1,8 @@
 use alloc::collections::BTreeMap;
 
+use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockHeader;
-use miden_protocol::note::{NoteId, Nullifier};
+use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
 
 use crate::ClientError;
 use crate::rpc::RpcError;
@@ -319,12 +320,39 @@ impl NoteUpdateTracker {
                 false
             };
 
-        if let Some(output_note_record) = self.get_output_note_by_id(*committed_note.note_id()) {
-            // The note belongs to our locally tracked set of output notes
-            output_note_record.inclusion_proof_received(inclusion_proof)?;
-        }
+        self.try_commit_output_note(*committed_note.note_id(), inclusion_proof)?;
 
         Ok(is_tracked_as_input_note)
+    }
+
+    /// Applies inclusion proofs from the transaction sync response to tracked output notes.
+    ///
+    /// This transitions output notes from `Expected` to `Committed` state using the
+    /// inclusion proofs returned by `SyncTransactions`.
+    pub(crate) fn apply_output_note_inclusion_proofs(
+        &mut self,
+        committed_notes: &[CommittedNote],
+    ) -> Result<(), ClientError> {
+        for committed_note in committed_notes {
+            self.try_commit_output_note(
+                *committed_note.note_id(),
+                committed_note.inclusion_proof().clone(),
+            )?;
+        }
+        Ok(())
+    }
+
+    /// If the note is tracked as an output note, transitions it to `Committed` with the
+    /// given inclusion proof. No-op if the note is not tracked.
+    fn try_commit_output_note(
+        &mut self,
+        note_id: NoteId,
+        inclusion_proof: NoteInclusionProof,
+    ) -> Result<(), ClientError> {
+        if let Some(output_note) = self.get_output_note_by_id(note_id) {
+            output_note.inclusion_proof_received(inclusion_proof)?;
+        }
+        Ok(())
     }
 
     /// Applies the necessary state transitions to the [`NoteUpdateTracker`] when a note is
@@ -332,12 +360,15 @@ impl NoteUpdateTracker {
     ///
     /// For input note records two possible scenarios are considered:
     /// 1. The note was being processed by a local transaction that just got committed.
-    /// 2. The note was consumed by an external transaction. If a local transaction was processing
-    ///    the note and it didn't get committed, the transaction should be discarded.
+    /// 2. The note was consumed by a transaction not submitted by this client. This includes
+    ///    consumption by untracked accounts as well as consumption by tracked accounts whose
+    ///    transactions were submitted by other client instances. If a local transaction was
+    ///    processing the note and it didn't get committed, the transaction should be discarded.
     pub(crate) fn apply_nullifiers_state_transitions<'a>(
         &mut self,
         nullifier_update: &NullifierUpdate,
         mut committed_transactions: impl Iterator<Item = &'a TransactionRecord>,
+        external_consumer_account: Option<AccountId>,
     ) -> Result<(), ClientError> {
         let order = self.get_nullifier_order(nullifier_update.nullifier);
 
@@ -356,10 +387,13 @@ impl NoteUpdateTracker {
                         .transaction_committed(consumer_transaction.id, block_number)?;
                 }
             } else {
-                // The note was consumed by an external transaction
-                input_note_update
-                    .inner_mut()
-                    .consumed_externally(nullifier_update.nullifier, nullifier_update.block_num)?;
+                // The note was consumed by a transaction not submitted by this client.
+                // If the consuming account is tracked, external_consumer_account will be Some.
+                input_note_update.inner_mut().consumed_externally(
+                    nullifier_update.nullifier,
+                    nullifier_update.block_num,
+                    external_consumer_account,
+                )?;
             }
             input_note_update.inner_mut().set_consumed_tx_order(order);
         }

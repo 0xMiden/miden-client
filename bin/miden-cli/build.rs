@@ -21,15 +21,14 @@ use miden_client::account::component::{
 use miden_client::assembly::Library;
 use miden_client::utils::Serializable;
 use miden_client::vm::{
-    MastArtifact,
     Package,
     PackageExport,
-    PackageKind,
     PackageManifest,
     ProcedureExport,
     QualifiedProcedureName,
     Section,
     SectionId,
+    TargetType,
 };
 
 const PACKAGE_DIR: &str = "packages";
@@ -95,21 +94,21 @@ pub fn build_package(
         }
     }
 
-    let mast = MastArtifact::Library(Arc::new(library));
+    let mast = Arc::new(library);
 
-    let manifest = PackageManifest::new(exports);
+    let manifest = PackageManifest::new(exports).expect("manifest validation failed");
 
     let account_component_metadata_section =
         Section::new(SectionId::ACCOUNT_COMPONENT_METADATA, metadata.to_bytes());
 
     let package = Package {
-        name: metadata.name().to_string(),
-        version: Some(metadata.version().clone()),
+        name: metadata.name().to_string().into(),
+        version: metadata.version().clone(),
         description: Some(metadata.description().to_string()),
         mast,
         manifest,
         sections: vec![account_component_metadata_section],
-        kind: PackageKind::AccountComponent,
+        kind: TargetType::AccountComponent,
     };
 
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR environment variable not set");

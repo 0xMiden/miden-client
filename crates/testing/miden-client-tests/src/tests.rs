@@ -95,6 +95,7 @@ use miden_protocol::note::{
     NoteType,
 };
 use miden_protocol::testing::account_id::{
+    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
     ACCOUNT_ID_PRIVATE_SENDER,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
@@ -1181,6 +1182,106 @@ async fn p2id_transfer() {
         notes[0].clone().try_into().unwrap(),
     )
     .await;
+}
+
+#[tokio::test]
+async fn input_note_reader_finds_externally_consumed_notes() {
+    let sender_id: AccountId = ACCOUNT_ID_PRIVATE_SENDER.try_into().unwrap();
+    let faucet_id: AccountId = ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap();
+
+    // Build a MockChain with a sender, consumer, and a P2ID note from sender to consumer.
+    let mut builder = MockChainBuilder::new();
+    let consumer = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
+    let consumer_id = consumer.id();
+
+    let asset = Asset::Fungible(FungibleAsset::new(faucet_id, 100u64).unwrap());
+    let p2id_note = builder
+        .add_p2id_note(sender_id, consumer_id, &[asset], NoteType::Public)
+        .unwrap();
+    let p2id_note_id = p2id_note.id();
+
+    let mut chain = builder.build().unwrap();
+    // Block 1: makes the note consumable.
+    chain.prove_next_block().unwrap();
+
+    // Consumer consumes the note directly on the chain (bypassing any client).
+    let tx = Box::pin(
+        chain
+            .build_tx_context(
+                miden_testing::TxContextInput::Account(consumer.clone()),
+                &[],
+                core::slice::from_ref(&p2id_note),
+            )
+            .unwrap()
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    chain.add_pending_executed_transaction(&tx).unwrap();
+    // Block 2: includes the consume transaction.
+    chain.prove_next_block().unwrap();
+
+    // Build a client backed by this chain.
+    let rng = RandomCoin::new(rand::random::<[u64; 4]>().map(Felt::new).into());
+    let keystore_path = std::env::temp_dir();
+    let keystore = FilesystemKeyStore::new(keystore_path).unwrap();
+    let mock_rpc = MockRpcApi::new(chain);
+
+    let mut client = ClientBuilder::new()
+        .rpc(Arc::new(mock_rpc))
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_discard_delta(None)
+        .build()
+        .await
+        .unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    // Register the consumer account so sync_transactions returns its transactions.
+    client.add_account(&consumer, false).await.unwrap();
+
+    // Import the P2ID note as an input note so the client tracks it.
+    let note_file = NoteFile::NoteDetails {
+        details: p2id_note.into(),
+        after_block_num: BlockNumber::from(0u32),
+        tag: None,
+    };
+    client.import_notes(&[note_file]).await.unwrap();
+
+    // Sync: the client should discover the note was consumed externally by the tracked account.
+    client.sync_state().await.unwrap();
+
+    // The note should be in ConsumedExternal state with consumer_account set.
+    let input_note = client.get_input_note(p2id_note_id).await.unwrap().unwrap();
+    assert!(
+        matches!(input_note.state(), InputNoteState::ConsumedExternal(..)),
+        "Note should be in ConsumedExternal state, got: {}",
+        input_note.state(),
+    );
+    assert_eq!(
+        input_note.consumer_account(),
+        Some(consumer_id),
+        "consumer_account should be set to the tracked account that consumed the note",
+    );
+
+    // InputNoteReader should surface the externally-consumed note.
+    let mut reader = client.input_note_reader(consumer_id);
+    let mut collected = Vec::new();
+    while let Some(n) = reader.next().await.unwrap() {
+        collected.push(n);
+    }
+
+    assert_eq!(
+        collected.len(),
+        1,
+        "InputNoteReader should return the externally-consumed note for the tracked consumer",
+    );
+    assert_eq!(collected[0].id(), p2id_note_id);
+    assert_eq!(collected[0].consumer_account(), Some(consumer_id));
 }
 
 #[tokio::test]

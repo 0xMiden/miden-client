@@ -281,7 +281,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
 }
 
 // Initialize the Basic Fungible Faucet library only once.
-static COUNTER_CONTRACT_LIBRARY: LazyLock<Library> = LazyLock::new(|| {
+static COUNTER_CONTRACT_LIBRARY: LazyLock<Arc<Library>> = LazyLock::new(|| {
     let assembler = TransactionKernel::assembler();
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library)
@@ -300,7 +300,7 @@ static COUNTER_CONTRACT_LIBRARY: LazyLock<Library> = LazyLock::new(|| {
 });
 
 /// Returns the Basic Fungible Faucet Library.
-fn counter_contract_library() -> Library {
+fn counter_contract_library() -> Arc<Library> {
     COUNTER_CONTRACT_LIBRARY.clone()
 }
 

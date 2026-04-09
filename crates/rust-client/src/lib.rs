@@ -281,16 +281,15 @@ pub mod vm {
         AdviceInputs,
         AdviceMap,
         AttributeSet,
-        MastArtifact,
         Package,
         PackageExport,
-        PackageKind,
         PackageManifest,
         ProcedureExport,
         Program,
         QualifiedProcedureName,
         Section,
         SectionId,
+        TargetType,
     };
 }
 
