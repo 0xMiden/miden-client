@@ -525,7 +525,6 @@ test.describe("getAccountProof vault commitment", () => {
           emptyWord
         );
         const vaultCommitment = proof1.accountHeader()!.vaultCommitment();
-        const vaultCommitmentHex = vaultCommitment.toHex();
 
         // Query 2: actual vault commitment — matches node state, should skip vault data
         // Note: passing vaultCommitment consumes the Word (wasm ownership transfer)
