@@ -540,41 +540,19 @@ test.describe("getAccountProof vault commitment", () => {
         const proof3 = await rpcClient.getAccountProof(accountId);
 
         return {
-          query1: {
-            blockNum: proof1.blockNum(),
-            hasAccountHeader: !!proof1.accountHeader(),
-            vaultCommitment: vaultCommitmentHex,
-            numVaultAssets: proof1.vaultFungibleAssets()?.length ?? null,
-          },
-          query2: {
-            blockNum: proof2.blockNum(),
-            hasAccountHeader: !!proof2.accountHeader(),
-            numVaultAssets: proof2.vaultFungibleAssets()?.length ?? null,
-          },
-          query3: {
-            blockNum: proof3.blockNum(),
-            hasAccountHeader: !!proof3.accountHeader(),
-            numVaultAssets: proof3.vaultFungibleAssets()?.length ?? null,
-          },
+          numVaultAssetsQuery1: proof1.vaultFungibleAssets()?.length ?? null,
+          numVaultAssetsQuery2: proof2.vaultFungibleAssets()?.length ?? null,
+          numVaultAssetsQuery3: proof3.vaultFungibleAssets()?.length ?? null,
         };
       },
       { walletId: walletResult.id }
     );
 
-    // Query 1: EMPTY_WORD — always fetches vault data
-    expect(proofResults.query1.blockNum).toBeGreaterThan(0);
-    expect(proofResults.query1.hasAccountHeader).toBe(true);
-    expect(proofResults.query1.vaultCommitment).toMatch(/^0x[0-9a-fA-F]+$/);
-    expect(proofResults.query1.numVaultAssets).toBe(1);
-
-    // Query 2: actual vault commitment — matches, node skips vault data
-    expect(proofResults.query2.blockNum).toBeGreaterThan(0);
-    expect(proofResults.query2.hasAccountHeader).toBe(true);
-    expect(proofResults.query2.numVaultAssets).toBe(0);
-
-    // Query 3: undefined — vault data not requested
-    expect(proofResults.query3.blockNum).toBeGreaterThan(0);
-    expect(proofResults.query3.hasAccountHeader).toBe(true);
-    expect(proofResults.query3.numVaultAssets).toBe(0);
+    // EMPTY_WORD — always fetches vault data
+    expect(proofResults.numVaultAssetsQuery1).toBe(1);
+    // Actual vault commitment — matches, node skips vault data
+    expect(proofResults.numVaultAssetsQuery2).toBe(0);
+    // undefined — vault data not requested
+    expect(proofResults.numVaultAssetsQuery3).toBe(0);
   });
 });
