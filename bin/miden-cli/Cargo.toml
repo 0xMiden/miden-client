@@ -17,8 +17,8 @@ name = "miden-client"
 path = "src/main.rs"
 
 [features]
+dap     = ["dep:miden-debug", "miden-client/dap"]
 default = ["dap"]
-dap = ["dep:miden-debug", "miden-client/dap"]
 testing = ["miden-client/testing"]
 
 [dependencies]
