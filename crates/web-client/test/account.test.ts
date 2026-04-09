@@ -525,8 +525,10 @@ test.describe("getAccountProof vault commitment", () => {
           emptyWord
         );
         const vaultCommitment = proof1.accountHeader()!.vaultCommitment();
+        const vaultCommitmentHex = vaultCommitment.toHex();
 
         // Query 2: actual vault commitment — matches node state, should skip vault data
+        // Note: passing vaultCommitment consumes the Word (wasm ownership transfer)
         const proof2 = await rpcClient.getAccountProof(
           accountId,
           undefined,
@@ -541,7 +543,7 @@ test.describe("getAccountProof vault commitment", () => {
           query1: {
             blockNum: proof1.blockNum(),
             hasAccountHeader: !!proof1.accountHeader(),
-            vaultCommitment: vaultCommitment.toHex(),
+            vaultCommitment: vaultCommitmentHex,
             numVaultAssets: proof1.vaultFungibleAssets()?.length ?? null,
           },
           query2: {
