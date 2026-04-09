@@ -114,7 +114,7 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
 
         table.add_row(vec![
             acc.id().to_hex(),
-            account_type_display_name(&client, acc.id()).await,
+            account_type_display_name(&client, acc.id()).await?,
             acc.id().storage_mode().to_string(),
             acc.nonce().as_canonical_u64().to_string(),
             status,
@@ -166,9 +166,7 @@ pub async fn show_account<AUTH>(
         for asset in assets {
             let (asset_type, faucet, amount) = match asset {
                 Asset::Fungible(fungible_asset) => {
-                    let faucet = get_token_symbol(&client, fungible_asset.faucet_id())
-                        .await
-                        .expect("Fungible faucet should have a token symbol");
+                    let faucet = get_token_symbol(&client, fungible_asset.faucet_id()).await?;
                     let amount = fungible_asset.amount().to_string();
                     ("Fungible Asset", faucet, amount)
                 },
@@ -253,7 +251,7 @@ async fn print_summary_table<AUTH>(
     ]);
     table.add_row(vec![
         Cell::new("Type"),
-        Cell::new(account_type_display_name(client, account.id()).await),
+        Cell::new(account_type_display_name(client, account.id()).await?),
     ]);
     table.add_row(vec![
         Cell::new("Storage mode"),
@@ -277,38 +275,44 @@ async fn print_summary_table<AUTH>(
     Ok(())
 }
 
-/// Reads the token symbol from a faucet account's storage metadata slot.
-///
-/// Returns `None` if the account is not a fungible faucet or the metadata can't be read.
-async fn get_token_symbol<AUTH>(client: &Client<AUTH>, account_id: AccountId) -> Option<String> {
-    if account_id.account_type() != AccountType::FungibleFaucet {
-        return None;
-    }
-
-    client
+/// Reads the token symbol from a fungible faucet account's storage metadata slot.
+async fn get_token_symbol<AUTH>(
+    client: &Client<AUTH>,
+    account_id: AccountId,
+) -> Result<String, CliError> {
+    let word = client
         .account_reader(account_id)
         .get_storage_item(TokenMetadata::metadata_slot().clone())
         .await
-        .ok()
-        .and_then(|word| TokenMetadata::try_from(word).ok())
-        .map(|m| m.symbol().to_string())
+        .map_err(|err| {
+            CliError::Faucet(
+                err.into(),
+                format!("Failed to read token metadata for faucet {account_id}"),
+            )
+        })?;
+    let metadata = TokenMetadata::try_from(word).map_err(|err| {
+        CliError::Faucet(
+            err.into(),
+            format!("Failed to parse token metadata for faucet {account_id}"),
+        )
+    })?;
+    Ok(metadata.symbol().to_string())
 }
 
 /// Returns a display name for the account type.
-///
-/// For fungible faucets, `token_symbol` is used if provided.
-async fn account_type_display_name<AUTH>(client: &Client<AUTH>, account_id: AccountId) -> String {
-    match account_id.account_type() {
+async fn account_type_display_name<AUTH>(
+    client: &Client<AUTH>,
+    account_id: AccountId,
+) -> Result<String, CliError> {
+    Ok(match account_id.account_type() {
         AccountType::FungibleFaucet => {
-            let token_symbol = get_token_symbol(client, account_id)
-                .await
-                .expect("Fungible faucet should have a token symbol");
+            let token_symbol = get_token_symbol(client, account_id).await?;
             format!("Fungible faucet (token symbol: {token_symbol})")
         },
         AccountType::NonFungibleFaucet => "Non-fungible faucet".to_string(),
         AccountType::RegularAccountImmutableCode => "Regular".to_string(),
         AccountType::RegularAccountUpdatableCode => "Regular (updatable)".to_string(),
-    }
+    })
 }
 
 /// Sets the provided account ID as the default account in the client's store, if not set already.
