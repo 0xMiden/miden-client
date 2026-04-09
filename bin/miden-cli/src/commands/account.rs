@@ -167,11 +167,9 @@ pub async fn show_account<AUTH>(
         for asset in assets {
             let (asset_type, faucet, amount) = match asset {
                 Asset::Fungible(fungible_asset) => {
-                    let metadata =
-                        get_token_metadata(&client, fungible_asset.faucet_id()).await?;
+                    let metadata = get_token_metadata(&client, fungible_asset.faucet_id()).await?;
                     let faucet = metadata.symbol().to_string();
-                    let amount =
-                        base_units_to_tokens(fungible_asset.amount(), metadata.decimals());
+                    let amount = base_units_to_tokens(fungible_asset.amount(), metadata.decimals());
                     ("Fungible Asset", faucet, amount)
                 },
                 Asset::NonFungible(non_fungible_asset) => {
@@ -309,8 +307,7 @@ async fn account_type_display_name<AUTH>(
 ) -> Result<String, CliError> {
     Ok(match account_id.account_type() {
         AccountType::FungibleFaucet => {
-            let token_symbol =
-                get_token_metadata(client, account_id).await?.symbol().to_string();
+            let token_symbol = get_token_metadata(client, account_id).await?.symbol().to_string();
             format!("Fungible faucet (token symbol: {token_symbol})")
         },
         AccountType::NonFungibleFaucet => "Non-fungible faucet".to_string(),
