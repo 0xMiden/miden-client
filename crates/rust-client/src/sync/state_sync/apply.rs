@@ -240,9 +240,17 @@ fn apply_nullifier_updates(
         let external_consumer = transaction_updates.external_nullifier_account(&update.nullifier);
         let consumed_tx_order = transaction_updates.nullifier_order(&update.nullifier);
 
+        let committed_consumer = note_updates
+            .consumer_transaction_id_by_nullifier(update.nullifier)
+            .and_then(|tx_id| {
+                transaction_updates
+                    .committed_transaction_block(&tx_id)
+                    .map(|block_num| (tx_id, block_num))
+            });
+
         note_updates.apply_nullifiers_state_transitions(
             &update,
-            |tx_id| transaction_updates.committed_transaction_block(tx_id),
+            committed_consumer,
             external_consumer,
             consumed_tx_order,
         )?;

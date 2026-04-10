@@ -339,6 +339,19 @@ impl NoteUpdateTracker {
         Ok(())
     }
 
+    /// Returns the consumer transaction ID of the input note identified by the given nullifier,
+    /// if the note exists and has a consumer transaction.
+    pub(crate) fn consumer_transaction_id_by_nullifier(
+        &self,
+        nullifier: Nullifier,
+    ) -> Option<TransactionId> {
+        let note_id = self.input_notes_by_nullifier.get(&nullifier).copied()?;
+        self.input_notes
+            .get(&note_id)
+            .and_then(|update| update.inner().consumer_transaction_id().copied())
+    }
+
+
     /// Applies the necessary state transitions to the [`NoteUpdateTracker`] when a note is
     /// nullified in a block.
     ///
@@ -351,18 +364,14 @@ impl NoteUpdateTracker {
     pub(crate) fn apply_nullifiers_state_transitions(
         &mut self,
         nullifier_update: &NullifierUpdate,
-        find_committed_block: impl Fn(&TransactionId) -> Option<BlockNumber>,
+        committed_consumer: Option<(TransactionId, BlockNumber)>,
         external_consumer_account: Option<AccountId>,
         consumed_tx_order: Option<u32>,
     ) -> Result<(), ClientError> {
         if let Some(input_note_update) =
             self.get_input_note_update_by_nullifier(nullifier_update.nullifier)
         {
-            if let Some((tx_id, block_number)) = input_note_update
-                .inner()
-                .consumer_transaction_id()
-                .and_then(|tx_id| find_committed_block(tx_id).map(|bn| (*tx_id, bn)))
-            {
+            if let Some((tx_id, block_number)) = committed_consumer {
                 // The note was being processed by a local transaction that just got committed
                 input_note_update.inner_mut().transaction_committed(tx_id, block_number)?;
             } else {
