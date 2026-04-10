@@ -77,13 +77,9 @@ pub use tag::{NoteTagRecord, NoteTagSource};
 mod state_sync;
 pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
 
-mod state_sync_update;
-pub use state_sync_update::{
-    AccountUpdates,
-    BlockUpdates,
-    StateSyncUpdate,
-    TransactionUpdateTracker,
-};
+mod updates;
+pub use state_sync::TransactionUpdateTracker;
+pub use updates::{AccountUpdates, BlockUpdates, StateSyncUpdate};
 
 /// Client synchronization methods.
 impl<AUTH> Client<AUTH>
@@ -137,7 +133,13 @@ where
         let input = self.build_sync_input().await?;
 
         // Get the sync update from the network
-        let state_sync_update = state_sync.sync_state(&mut current_partial_mmr, input).await?;
+        let Some(state_sync_update) =
+            state_sync.sync_state(&mut current_partial_mmr, input).await?
+        else {
+            let block_num = u32::try_from(current_partial_mmr.num_leaves().saturating_sub(1))
+                .map_err(|_| ClientError::InvalidPartialMmrForest)?;
+            return Ok(SyncSummary::new_empty(block_num.into()));
+        };
 
         let sync_summary: SyncSummary = (&state_sync_update).into();
         debug!(sync_summary = ?sync_summary, "Sync summary computed");
