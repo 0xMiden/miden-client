@@ -24,10 +24,10 @@ The client's main responsibility is to maintain a partial view of the blockchain
 
 For more info check:
 
-- [Getting started](https://0xMiden.github.io/miden-docs/miden-client/get-started/prerequisites.html)
-- [CLI Reference](https://0xMiden.github.io/miden-docs/miden-client/cli-reference.html)
-- [Configuration](https://0xMiden.github.io/miden-docs/miden-client/cli-config.html)
-- [Online Documentation](https://0xMiden.github.io/miden-docs/miden-client/index.html)
+- [Getting started](https://docs.miden.xyz/next/builder/tools/clients/rust-client/get-started/)
+- [CLI Reference](https://docs.miden.xyz/next/builder/tools/clients/rust-client/cli/)
+- [Configuration](https://docs.miden.xyz/next/builder/tools/clients/rust-client/cli/cli-config)
+- [Online Documentation](https://docs.miden.xyz/next/builder/tools/clients/)
 
 ## Workspace structure
 
