@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 use js_export_macro::js_export;
 use miden_client::Word as NativeWord;
 use miden_client::account::StorageSlotName;
+use miden_client::asset::Asset as NativeAsset;
 use miden_client::block::BlockNumber;
 use miden_client::rpc::domain::account::{AccountProof as NativeAccountProof, StorageMapEntries};
 use miden_protocol::account::AccountStorageHeader;
@@ -11,6 +12,7 @@ use miden_protocol::account::AccountStorageHeader;
 use super::account_code::AccountCode;
 use super::account_header::AccountHeader;
 use super::account_id::AccountId;
+use super::fungible_asset::FungibleAsset;
 use super::word::Word;
 use crate::js_error_with_context;
 use crate::platform::JsErr;
@@ -135,6 +137,23 @@ impl AccountProof {
             .map_err(|err| js_error_with_context(err, "invalid slot name"))?;
 
         Ok(self.inner.find_map_details(&slot_name).map(|d| d.too_many_entries))
+    }
+
+    /// Returns the fungible assets in the account's vault, if vault details were included
+    /// in the proof response.
+    ///
+    /// Returns `undefined` if the account is private or vault data was not requested.
+    #[wasm_bindgen(js_name = "vaultFungibleAssets")]
+    pub fn vault_fungible_assets(&self) -> Option<Vec<FungibleAsset>> {
+        self.inner.vault_details().map(|d| {
+            d.assets
+                .iter()
+                .filter_map(|asset| match asset {
+                    NativeAsset::Fungible(f) => Some((*f).into()),
+                    NativeAsset::NonFungible(_) => None,
+                })
+                .collect()
+        })
     }
 
     /// Returns the names of all storage slots that have map details available.

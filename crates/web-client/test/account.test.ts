@@ -385,3 +385,7 @@ test.describe("getAccountByKeyCommitment tests", () => {
     expect(result.isFaucet).toBe(true);
   });
 });
+
+// GET_ACCOUNT_PROOF VAULT COMMITMENT TESTS
+// =======================================================================================================
+// Skipped: requires a running node and browser-specific helpers (createNewWallet, fundAccountFromFaucet)
