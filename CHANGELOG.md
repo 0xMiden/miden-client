@@ -4,6 +4,8 @@
 
 ### Enhancements
 
+* Added DAP-backed transaction script debugging support with `--start-debug-adapter` flag on the `exec` CLI command, `execute_program_with_dap` client method, and offline bootstrap mode for node-less execution ([#1959](https://github.com/0xMiden/miden-client/pull/1959)).
+
 * Made `GrpcNoteTransportClient` connection lazy, deferring it to the first RPC call instead of connecting eagerly at client initialization ([#1970](https://github.com/0xMiden/miden-client/pull/1970)).
 * Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)) ([#1737](https://github.com/0xMiden/miden-client/pull/1737), [#1809](https://github.com/0xMiden/miden-client/pull/1809)).
 * Added typed error parsing for node RPC endpoints, enabling programmatic error handling instead of string parsing ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).

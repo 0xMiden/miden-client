@@ -98,6 +98,11 @@ pub struct NewWalletCmd {
     /// authentication transaction.
     #[arg(long, default_value_t = false)]
     pub deploy: bool,
+    /// Seed local-only state so the wallet can be created and used for execution without a node.
+    /// Only available when built with the `testing` feature.
+    #[cfg(feature = "testing")]
+    #[arg(long, default_value_t = false)]
+    pub offline: bool,
 }
 
 impl NewWalletCmd {
@@ -126,6 +131,10 @@ impl NewWalletCmd {
             &package_paths,
             self.init_storage_data_path.clone(),
             self.deploy,
+            #[cfg(feature = "testing")]
+            self.offline,
+            #[cfg(not(feature = "testing"))]
+            false,
         )
         .await?;
 
@@ -193,6 +202,11 @@ pub struct NewAccountCmd {
     /// authentication transaction.
     #[arg(long, default_value_t = false)]
     pub deploy: bool,
+    /// Seed local-only state so the account can be created and used for execution without a node.
+    /// Only available when built with the `testing` feature.
+    #[cfg(feature = "testing")]
+    #[arg(long, default_value_t = false)]
+    pub offline: bool,
 }
 
 impl NewAccountCmd {
@@ -209,6 +223,10 @@ impl NewAccountCmd {
             &self.packages,
             self.init_storage_data_path.clone(),
             self.deploy,
+            #[cfg(feature = "testing")]
+            self.offline,
+            #[cfg(not(feature = "testing"))]
+            false,
         )
         .await?;
 
@@ -385,12 +403,20 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     package_paths: &[PathBuf],
     init_storage_data_path: Option<PathBuf>,
     deploy: bool,
+    #[cfg_attr(not(feature = "testing"), allow(unused))] offline: bool,
 ) -> Result<Account, CliError> {
     if package_paths.is_empty() {
         return Err(CliError::InvalidArgument(format!(
             "Account must contain at least one component. To provide one, pass a package with the -p flag, like so:
 {} -p <package_name>
             ", client_binary_name().display())));
+    }
+
+    #[cfg(feature = "testing")]
+    if deploy && offline {
+        return Err(CliError::InvalidArgument(
+            "`--offline` cannot be combined with `--deploy`".to_string(),
+        ));
     }
 
     // Load the component templates and initialization storage data.
@@ -453,6 +479,12 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
         println!("Generated and stored Falcon512 authentication key in keystore.");
     } else {
         println!("Using custom authentication component from package (no key generated).");
+    }
+
+    #[cfg(feature = "testing")]
+    if offline {
+        client.prepare_offline_bootstrap().await?;
+        println!("Offline mode seeded default RPC limits and a synthetic genesis header.");
     }
 
     client.add_account(&account, false).await?;

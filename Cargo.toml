@@ -55,6 +55,9 @@ miden-node-validator             = { version = "0.14" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
 miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.14" }
 
+# Miden debug dependency
+miden-debug = { default-features = false, features = ["dap", "std"], version = "0.6" }
+
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }
 async-trait = { version = "0.1" }
