@@ -143,7 +143,7 @@ impl AccountProof {
     /// in the proof response.
     ///
     /// Returns `undefined` if the account is private or vault data was not requested.
-    #[wasm_bindgen(js_name = "vaultFungibleAssets")]
+    #[js_export(js_name = "vaultFungibleAssets")]
     pub fn vault_fungible_assets(&self) -> Option<Vec<FungibleAsset>> {
         self.inner.vault_details().map(|d| {
             d.assets
