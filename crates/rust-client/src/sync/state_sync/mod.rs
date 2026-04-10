@@ -8,11 +8,6 @@ use miden_protocol::account::{AccountHeader, AccountId};
 use miden_protocol::crypto::merkle::mmr::PartialMmr;
 use miden_protocol::note::NoteTag;
 
-use super::state_sync_update::{
-    TransactionUpdateTracker,
-    derive_account_commitment_updates,
-    derive_transaction_inclusions,
-};
 use super::{BlockUpdates, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
@@ -22,7 +17,12 @@ use crate::store::{InputNoteRecord, OutputNoteRecord};
 use crate::transaction::TransactionRecord;
 
 mod apply;
+mod derive;
 mod fetch;
+mod transaction_tracker;
+
+use derive::{derive_account_commitment_updates, derive_transaction_inclusions};
+pub use transaction_tracker::TransactionUpdateTracker;
 
 // SYNC REQUEST
 // ================================================================================================
@@ -182,8 +182,7 @@ impl StateSync {
         };
 
         let mut note_updates = NoteUpdateTracker::new(input.input_notes, input.output_notes);
-        let mut transaction_updates =
-            TransactionUpdateTracker::new(input.uncommitted_transactions);
+        let mut transaction_updates = TransactionUpdateTracker::new(input.uncommitted_transactions);
 
         // Derive transaction data once from raw records.
         let account_commitment_updates =

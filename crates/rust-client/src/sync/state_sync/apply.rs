@@ -7,13 +7,12 @@ use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
 use miden_protocol::note::{Note, NoteId, NoteType};
 
-use super::{BlockUpdates, NoteUpdateAction, StateSync};
+use super::{BlockUpdates, NoteUpdateAction, StateSync, TransactionUpdateTracker};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::store::{InputNoteRecord, StoreError};
-use crate::sync::state_sync_update::TransactionUpdateTracker;
 use crate::sync::AccountUpdates;
 
 // APPLY METHODS
@@ -77,12 +76,7 @@ impl StateSync {
 
         for block in note_blocks {
             let found_relevant_note = self
-                .screen_notes(
-                    note_updates,
-                    block.notes,
-                    &block.block_header,
-                    &public_note_records,
-                )
+                .screen_notes(note_updates, block.notes, &block.block_header, &public_note_records)
                 .await?;
 
             if found_relevant_note {
@@ -139,10 +133,8 @@ impl StateSync {
         note_updates: &mut NoteUpdateTracker,
         transaction_updates: &mut TransactionUpdateTracker,
     ) -> Result<(), ClientError> {
-        let nullifiers_tags: Vec<u16> = note_updates
-            .unspent_nullifiers()
-            .map(|nullifier| nullifier.prefix())
-            .collect();
+        let nullifiers_tags: Vec<u16> =
+            note_updates.unspent_nullifiers().map(|nullifier| nullifier.prefix()).collect();
 
         let mut new_nullifiers = self
             .rpc_api
@@ -245,8 +237,7 @@ fn apply_nullifier_updates(
     transaction_updates: &mut TransactionUpdateTracker,
 ) -> Result<(), ClientError> {
     for update in nullifier_updates {
-        let external_consumer =
-            transaction_updates.external_nullifier_account(&update.nullifier);
+        let external_consumer = transaction_updates.external_nullifier_account(&update.nullifier);
         let consumed_tx_order = transaction_updates.nullifier_order(&update.nullifier);
 
         note_updates.apply_nullifiers_state_transitions(
