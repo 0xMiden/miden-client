@@ -96,12 +96,12 @@ impl From<&OutputNote> for NativeRawOutputNote {
 
 impl From<OutputNoteArray> for Vec<NativeRawOutputNote> {
     fn from(output_notes_array: OutputNoteArray) -> Self {
-        output_notes_array.__inner.into_iter().map(Into::into).collect()
+        output_notes_array.into_iter().map(Into::into).collect()
     }
 }
 
 impl From<&OutputNoteArray> for Vec<NativeRawOutputNote> {
     fn from(output_notes_array: &OutputNoteArray) -> Self {
-        output_notes_array.__inner.iter().cloned().map(Into::into).collect()
+        output_notes_array.iter().cloned().map(Into::into).collect()
     }
 }

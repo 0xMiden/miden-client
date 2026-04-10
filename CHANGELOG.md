@@ -69,6 +69,8 @@
 * [FEATURE][web] Exposed `executeProgram` (view call) to the JS side, allowing local execution of a transaction script against an account and inspection of the 16-element stack output without submitting to the network. Added `AdviceInputs` constructor and reverse `From` conversions. ([#1859](https://github.com/0xMiden/miden-client/issues/1859))
 * [FEATURE][web] Added `client.keystore` sub-object API for managing secret keys. Methods: `insert(accountId, secretKey)`, `get(pubKeyCommitment)`, `remove(pubKeyCommitment)`, `getCommitments(accountId)`, `getAccountId(pubKeyCommitment)`. Also available on `MidenClient` as a resource (`client.keystore`). ([#1947](https://github.com/0xMiden/miden-client/pull/1947))
 
+* [FEATURE][web] Added `IntoIterator` implementations to the `declare_js_miden_arrays!` macro, enabling Rust-side iteration over WASM array types via `into_iter()` (by value and by reference) without accessing internal fields directly ([#1965](https://github.com/0xMiden/miden-client/pull/1965)).
+
 ### Fixes
 
 * [FIX][web] Replaced `.unwrap()` panics with proper `Result` returns in `MerklePath.computeRoot()`, `NoteExecutionHint.fromParts()`, `NoteExecutionHint.canBeConsumed()`, `NoteStorage` constructor, and `TransactionStatus.discarded()` WASM bindings ([#1870](https://github.com/0xMiden/miden-client/pull/1870)).

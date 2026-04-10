@@ -106,7 +106,7 @@ impl TransactionRequestBuilder {
     #[wasm_bindgen(js_name = "withForeignAccounts")]
     pub fn with_foreign_accounts(mut self, foreign_accounts: &ForeignAccountArray) -> Self {
         let native_foreign_accounts: Vec<NativeForeignAccount> =
-            foreign_accounts.__inner.iter().map(|account| account.clone().into()).collect();
+            foreign_accounts.iter().map(|account| account.clone().into()).collect();
         self.0 = self.0.foreign_accounts(native_foreign_accounts);
         self
     }
