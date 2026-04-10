@@ -7,12 +7,13 @@
 //! 2. Register faucet in bridge via CONFIG_AGG_BRIDGE note
 //! 3. Create and deploy destination account (basic wallet)
 //!
-//! Bridge-in:
+//! Bridge-in (x2):
 //! 4. Generate CLAIM proof data by calling foundry test for the destination account
 //! 5. Submit UPDATE_GER note -> consumed by bridge as network transaction
 //! 6. Submit CLAIM note -> consumed by bridge as network transaction, which produces MINT note
 //! 7. MINT note consumed by agglayer faucet, which produces P2ID note
 //! 8. Destination account consumes the resulting P2ID note
+//! (Repeated twice to verify the bridge handles multiple independent claims)
 //!
 //! Bridge-out:
 //! 9. Submit B2AGG note from destination account -> consumed by bridge as network transaction
@@ -203,88 +204,91 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
     };
 
     // ============================================================================================
-    // GENERATE CLAIM DATA (always needed - depends on destination account)
+    // PHASE 1: BRIDGE-IN (x2) - two independent claim cycles
     // ============================================================================================
 
-    let (proof_data, leaf_data, ger) =
-        generate_claim_data_for_account(destination_account.id(), Some(&origin_token_address));
-    println!("[bridge_in_out] Claim data generated via foundry");
+    for round in 1..=2 {
+        println!("[bridge_in_out] === Bridge-in round {round} ===");
 
-    let generated_dest_account_id = EthEmbeddedAccountId::try_from(leaf_data.destination_address)
-        .expect("generated destination address should be a valid embedded Miden AccountId")
-        .into_account_id();
-    assert_eq!(
-        generated_dest_account_id,
-        destination_account.id(),
-        "foundry-generated destination must match our wallet's AccountId"
-    );
+        let (proof_data, leaf_data, ger) =
+            generate_claim_data_for_account(destination_account.id(), Some(&origin_token_address));
+        println!("[bridge_in_out] Round {round}: claim data generated via foundry");
 
-    ger_manager.client.sync_state().await?;
+        let generated_dest_account_id =
+            EthEmbeddedAccountId::try_from(leaf_data.destination_address)
+                .expect("generated destination address should be a valid embedded Miden AccountId")
+                .into_account_id();
+        assert_eq!(
+            generated_dest_account_id,
+            destination_account.id(),
+            "foundry-generated destination must match our wallet's AccountId"
+        );
 
-    // ============================================================================================
-    // PHASE 1: BRIDGE-IN
-    // ============================================================================================
+        ger_manager.client.sync_state().await?;
 
-    let update_ger_note =
-        UpdateGerNote::create(ger, ger_manager_id, bridge_id, ger_manager.client.rng())?;
-    let tx_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![update_ger_note])
-        .build()?;
-    let tx_id = ger_manager.client.submit_new_transaction(ger_manager_id, tx_request).await?;
-    wait_for_tx(&mut ger_manager.client, tx_id).await?;
-    println!("[bridge_in_out] UPDATE_GER note submitted");
+        // Submit UPDATE_GER note
+        let update_ger_note =
+            UpdateGerNote::create(ger, ger_manager_id, bridge_id, ger_manager.client.rng())?;
+        let tx_request = TransactionRequestBuilder::new()
+            .own_output_notes(vec![update_ger_note])
+            .build()?;
+        let tx_id = ger_manager.client.submit_new_transaction(ger_manager_id, tx_request).await?;
+        wait_for_tx(&mut ger_manager.client, tx_id).await?;
+        println!("[bridge_in_out] Round {round}: UPDATE_GER note submitted");
 
-    // Wait for bridge to consume the UPDATE_GER note.
-    // Allow extra blocks for CI where the node processes many concurrent network transactions.
-    wait_for_blocks(&mut ger_manager.client, 5).await;
-    println!("[bridge_in_out] Waited for bridge to consume UPDATE_GER note");
+        wait_for_blocks(&mut ger_manager.client, 5).await;
+        println!("[bridge_in_out] Round {round}: waited for bridge to consume UPDATE_GER note");
 
-    let miden_claim_amount = leaf_data
-        .amount
-        .scale_to_token_amount(scale as u32)
-        .expect("amount should scale successfully");
-    println!("[bridge_in_out] Miden claim amount: {:?}", miden_claim_amount);
+        // Submit CLAIM note
+        let miden_claim_amount = leaf_data
+            .amount
+            .scale_to_token_amount(scale as u32)
+            .expect("amount should scale successfully");
+        println!("[bridge_in_out] Round {round}: miden claim amount: {:?}", miden_claim_amount);
 
-    let claim_inputs = ClaimNoteStorage {
-        proof_data,
-        leaf_data,
-        miden_claim_amount,
-    };
-    let claim_note =
-        create_claim_note(claim_inputs, bridge_id, ger_manager_id, ger_manager.client.rng())?;
-    let tx_request = TransactionRequestBuilder::new().own_output_notes(vec![claim_note]).build()?;
-    let tx_id = ger_manager.client.submit_new_transaction(ger_manager_id, tx_request).await?;
-    wait_for_tx(&mut ger_manager.client, tx_id).await?;
-    println!("[bridge_in_out] CLAIM note submitted");
+        let claim_inputs = ClaimNoteStorage {
+            proof_data,
+            leaf_data,
+            miden_claim_amount,
+        };
+        let claim_note =
+            create_claim_note(claim_inputs, bridge_id, ger_manager_id, ger_manager.client.rng())?;
+        let tx_request =
+            TransactionRequestBuilder::new().own_output_notes(vec![claim_note]).build()?;
+        let tx_id = ger_manager.client.submit_new_transaction(ger_manager_id, tx_request).await?;
+        wait_for_tx(&mut ger_manager.client, tx_id).await?;
+        println!("[bridge_in_out] Round {round}: CLAIM note submitted");
 
-    // Wait for agglayer bridge to consume the CLAIM note and create P2ID note.
-    // The bridge processes the CLAIM as a network transaction and outputs a P2ID note
-    // targeting the destination account. This involves a multi-step chain of network
-    // transactions, so we poll with retries rather than waiting a fixed number of blocks.
-    let consumable_notes =
-        wait_for_consumable_notes(&mut user.client, destination_account.id(), 30).await;
-    println!(
-        "[bridge_in_out] Found {} consumable notes for destination",
-        consumable_notes.len()
-    );
+        // Wait for the P2ID note to arrive at the destination
+        let consumable_notes =
+            wait_for_consumable_notes(&mut user.client, destination_account.id(), 30).await;
+        println!(
+            "[bridge_in_out] Round {round}: found {} consumable notes for destination",
+            consumable_notes.len()
+        );
 
-    let notes_to_consume: Vec<_> =
-        consumable_notes.into_iter().map(|(note, _)| note.try_into().unwrap()).collect();
-    let consume_tx = TransactionRequestBuilder::new().build_consume_notes(notes_to_consume)?;
-    let tx_id = user.client.submit_new_transaction(destination_account.id(), consume_tx).await?;
-    wait_for_tx(&mut user.client, tx_id).await?;
-    println!("[bridge_in_out] Destination consumed P2ID note");
+        let notes_to_consume: Vec<_> =
+            consumable_notes.into_iter().map(|(note, _)| note.try_into().unwrap()).collect();
+        let consume_tx = TransactionRequestBuilder::new().build_consume_notes(notes_to_consume)?;
+        let tx_id =
+            user.client.submit_new_transaction(destination_account.id(), consume_tx).await?;
+        wait_for_tx(&mut user.client, tx_id).await?;
+        println!("[bridge_in_out] Round {round}: destination consumed P2ID note");
 
-    user.client.sync_state().await?;
-    let dest_balance = user
-        .client
-        .account_reader(destination_account.id())
-        .get_balance(agglayer_faucet_id)
-        .await?;
-    println!("[bridge_in_out] Destination balance after bridge-in: {}", dest_balance);
-    assert!(dest_balance > 0, "destination should have positive balance after bridge-in");
+        user.client.sync_state().await?;
+        let dest_balance = user
+            .client
+            .account_reader(destination_account.id())
+            .get_balance(agglayer_faucet_id)
+            .await?;
+        println!("[bridge_in_out] Round {round}: destination balance: {}", dest_balance);
+        assert!(
+            dest_balance > 0,
+            "destination should have positive balance after bridge-in round {round}"
+        );
+    }
 
-    println!("[bridge_in_out] Bridge-in phase completed");
+    println!("[bridge_in_out] Both bridge-in rounds completed");
 
     // ============================================================================================
     // PHASE 2: BRIDGE-OUT
