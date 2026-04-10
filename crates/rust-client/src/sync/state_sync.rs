@@ -622,26 +622,7 @@ impl StateSync {
         // changes between the sync_state and the check_nullifier calls)
         new_nullifiers.retain(|update| update.block_num <= state_sync_update.block_num);
 
-        for nullifier_update in new_nullifiers {
-            let external_consumer_account = state_sync_update
-                .transaction_updates
-                .external_nullifier_account(&nullifier_update.nullifier);
-
-            state_sync_update.note_updates.apply_nullifiers_state_transitions(
-                &nullifier_update,
-                state_sync_update.transaction_updates.committed_transactions(),
-                external_consumer_account,
-            )?;
-
-            // Process nullifiers and track the updates of local tracked transactions that were
-            // discarded because the notes that they were processing were nullified by an
-            // another transaction.
-            state_sync_update
-                .transaction_updates
-                .apply_input_note_nullified(nullifier_update.nullifier);
-        }
-
-        Ok(())
+        state_sync_update.apply_nullifier_updates(new_nullifiers)
     }
 
     /// Applies the changes received from the sync response to the transactions tracked by the

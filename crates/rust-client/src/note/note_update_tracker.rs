@@ -1,15 +1,15 @@
 use alloc::collections::BTreeMap;
 
 use miden_protocol::account::AccountId;
-use miden_protocol::block::BlockHeader;
+use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
+use miden_protocol::transaction::TransactionId;
 
 use crate::ClientError;
 use crate::rpc::RpcError;
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::store::{InputNoteRecord, OutputNoteRecord};
-use crate::transaction::{TransactionRecord, TransactionStatus};
 
 // NOTE UPDATE
 // ================================================================================================
@@ -364,10 +364,10 @@ impl NoteUpdateTracker {
     ///    consumption by untracked accounts as well as consumption by tracked accounts whose
     ///    transactions were submitted by other client instances. If a local transaction was
     ///    processing the note and it didn't get committed, the transaction should be discarded.
-    pub(crate) fn apply_nullifiers_state_transitions<'a>(
+    pub(crate) fn apply_nullifiers_state_transitions(
         &mut self,
         nullifier_update: &NullifierUpdate,
-        mut committed_transactions: impl Iterator<Item = &'a TransactionRecord>,
+        find_committed_block: impl Fn(&TransactionId) -> Option<BlockNumber>,
         external_consumer_account: Option<AccountId>,
     ) -> Result<(), ClientError> {
         let order = self.get_nullifier_order(nullifier_update.nullifier);
@@ -375,17 +375,13 @@ impl NoteUpdateTracker {
         if let Some(input_note_update) =
             self.get_input_note_update_by_nullifier(nullifier_update.nullifier)
         {
-            if let Some(consumer_transaction) = committed_transactions
-                .find(|t| input_note_update.inner().consumer_transaction_id() == Some(&t.id))
+            if let Some((tx_id, block_number)) = input_note_update
+                .inner()
+                .consumer_transaction_id()
+                .and_then(|tx_id| find_committed_block(tx_id).map(|bn| (*tx_id, bn)))
             {
                 // The note was being processed by a local transaction that just got committed
-                if let TransactionStatus::Committed { block_number, .. } =
-                    consumer_transaction.status
-                {
-                    input_note_update
-                        .inner_mut()
-                        .transaction_committed(consumer_transaction.id, block_number)?;
-                }
+                input_note_update.inner_mut().transaction_committed(tx_id, block_number)?;
             } else {
                 // The note was consumed by a transaction not submitted by this client.
                 // If the consuming account is tracked, external_consumer_account will be Some.

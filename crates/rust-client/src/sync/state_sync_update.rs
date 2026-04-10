@@ -9,8 +9,10 @@ use miden_protocol::note::{NoteId, Nullifier};
 use miden_protocol::transaction::TransactionId;
 
 use super::SyncSummary;
+use crate::ClientError;
 use crate::account::Account;
 use crate::note::{NoteUpdateTracker, NoteUpdateType};
+use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::transaction::TransactionInclusion;
 use crate::transaction::{DiscardCause, TransactionRecord, TransactionStatus};
 
@@ -93,6 +95,35 @@ impl From<&StateSyncUpdate> for SyncSummary {
                 .collect(),
             value.transaction_updates.committed_transactions().map(|t| t.id).collect(),
         )
+    }
+}
+
+impl StateSyncUpdate {
+    /// Applies nullifier updates to both note and transaction trackers.
+    ///
+    /// For each nullifier:
+    /// 1. Resolves whether a committed local transaction consumed the note.
+    /// 2. Resolves the external consumer account (if any) from the transaction tracker.
+    /// 3. Applies the state transition to the note tracker.
+    /// 4. Discards pending transactions whose input note was nullified.
+    pub fn apply_nullifier_updates(
+        &mut self,
+        nullifier_updates: Vec<NullifierUpdate>,
+    ) -> Result<(), ClientError> {
+        for update in nullifier_updates {
+            let external_consumer =
+                self.transaction_updates.external_nullifier_account(&update.nullifier);
+
+            let transaction_updates = &self.transaction_updates;
+            self.note_updates.apply_nullifiers_state_transitions(
+                &update,
+                |tx_id| transaction_updates.committed_transaction_block(tx_id),
+                external_consumer,
+            )?;
+
+            self.transaction_updates.apply_input_note_nullified(update.nullifier);
+        }
+        Ok(())
     }
 }
 
@@ -205,6 +236,15 @@ impl TransactionUpdateTracker {
     /// available.
     pub fn external_nullifier_account(&self, nullifier: &Nullifier) -> Option<AccountId> {
         self.external_nullifier_accounts.get(nullifier).copied()
+    }
+
+    /// Returns the block number at which the given transaction was committed, if it exists and
+    /// is in the committed state.
+    pub fn committed_transaction_block(&self, id: &TransactionId) -> Option<BlockNumber> {
+        self.transactions.get(id).and_then(|tx| match tx.status {
+            TransactionStatus::Committed { block_number, .. } => Some(block_number),
+            _ => None,
+        })
     }
 
     /// Applies the necessary state transitions to the [`TransactionUpdateTracker`] when a
