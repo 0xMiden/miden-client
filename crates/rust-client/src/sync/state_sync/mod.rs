@@ -9,7 +9,9 @@ use miden_protocol::crypto::merkle::mmr::PartialMmr;
 use miden_protocol::note::NoteTag;
 
 use super::state_sync_update::{
-    TransactionUpdateTracker, derive_account_commitment_updates, derive_transaction_inclusions,
+    TransactionUpdateTracker,
+    derive_account_commitment_updates,
+    derive_transaction_inclusions,
 };
 use super::{BlockUpdates, StateSyncUpdate};
 use crate::ClientError;
@@ -21,7 +23,6 @@ use crate::transaction::TransactionRecord;
 
 mod apply;
 mod fetch;
-use fetch::SyncData;
 
 // SYNC REQUEST
 // ================================================================================================
@@ -157,69 +158,54 @@ impl StateSync {
     /// 2. Advances the partial MMR to the chain tip.
     /// 3. Screens note inclusions and tracks relevant blocks in the MMR.
     /// 4. Updates account states (fetches updated public accounts, flags mismatched private ones).
-    /// 5. Processes transaction inclusions (commits local txs, records external consumers,
-    ///    discards stale/expired txs, commits output notes).
+    /// 5. Processes transaction inclusions (commits local txs, records external consumers, discards
+    ///    stale/expired txs, commits output notes).
     /// 6. Detects notes consumed externally via nullifier sync (optional, see
     ///    [`Self::disable_nullifier_sync`]).
     pub async fn sync_state(
         &self,
         current_partial_mmr: &mut PartialMmr,
         input: StateSyncInput,
-    ) -> Result<StateSyncUpdate, ClientError> {
-        let StateSyncInput {
-            accounts,
-            note_tags,
-            input_notes,
-            output_notes,
-            uncommitted_transactions,
-        } = input;
+    ) -> Result<Option<StateSyncUpdate>, ClientError> {
         let block_num = u32::try_from(current_partial_mmr.forest().num_leaves().saturating_sub(1))
             .map_err(|_| ClientError::InvalidPartialMmrForest)?
             .into();
 
+        let account_ids: Vec<AccountId> = input.accounts.iter().map(AccountHeader::id).collect();
+
+        // Fetch data from the node by calling SyncChainMmr, SyncNotes, and SyncTransactions
+        // endpoints.
+        let Some(sync_data) =
+            self.fetch_sync_data(block_num, &account_ids, &input.note_tags).await?
+        else {
+            return Ok(None);
+        };
+
         let mut update = StateSyncUpdate {
-            block_num,
-            note_updates: NoteUpdateTracker::new(input_notes, output_notes),
-            transaction_updates: TransactionUpdateTracker::new(uncommitted_transactions),
+            block_num: sync_data.chain_tip_header.block_num(),
+            note_updates: NoteUpdateTracker::new(input.input_notes, input.output_notes),
+            transaction_updates: TransactionUpdateTracker::new(input.uncommitted_transactions),
             ..Default::default()
         };
 
-        let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
-        let Some(sync_data) = self
-            .fetch_sync_data(update.block_num, &account_ids, &note_tags)
-            .await?
-        else {
-            return Ok(update);
-        };
-
-        let SyncData {
-            mmr_delta,
-            chain_tip_header,
-            note_blocks,
-            public_notes,
-            transaction_records,
-        } = sync_data;
-
-        update.block_num = chain_tip_header.block_num();
-
         // Derive transaction data once from raw records.
         let account_commitment_updates =
-            derive_account_commitment_updates(&transaction_records);
+            derive_account_commitment_updates(&sync_data.transaction_records);
         let (tx_inclusions, ordered_nullifiers) =
-            derive_transaction_inclusions(transaction_records);
+            derive_transaction_inclusions(sync_data.transaction_records);
 
         // Step 1: Advance MMR to chain tip.
         Self::advance_mmr(
-            mmr_delta,
-            &chain_tip_header,
+            sync_data.mmr_delta,
+            &sync_data.chain_tip_header,
             &mut update.block_updates,
             current_partial_mmr,
         )?;
 
         // Step 2: Screen note inclusions and track relevant blocks in MMR.
         self.process_note_inclusions(
-            note_blocks,
-            public_notes,
+            sync_data.note_blocks,
+            sync_data.public_notes,
             &mut update,
             current_partial_mmr,
         )
@@ -228,14 +214,14 @@ impl StateSync {
         // Step 3: Update account states (fetches updated public accounts from node).
         self.process_account_updates(
             &mut update.account_updates,
-            &accounts,
+            &input.accounts,
             &account_commitment_updates,
         )
         .await?;
 
         // Step 4: Process transaction inclusions, nullifier ordering, and output note commits.
         update.apply_transaction_data(
-            &chain_tip_header,
+            &sync_data.chain_tip_header,
             &tx_inclusions,
             ordered_nullifiers,
             self.tx_discard_delta,
@@ -246,7 +232,7 @@ impl StateSync {
             self.sync_consumed_notes(&mut update, block_num).await?;
         }
 
-        Ok(update)
+        Ok(Some(update))
     }
 }
 
@@ -398,7 +384,11 @@ mod tests {
             uncommitted_transactions: vec![],
         };
 
-        let update = state_sync.sync_state(&mut partial_mmr, sync_input).await.unwrap();
+        let update = state_sync
+            .sync_state(&mut partial_mmr, sync_input)
+            .await
+            .unwrap()
+            .expect("should have synced past genesis");
 
         let updated_notes: Vec<_> = update.note_updates.updated_input_notes().collect();
 
@@ -436,25 +426,36 @@ mod tests {
         let mut partial_mmr = PartialMmr::from_peaks(genesis_peaks);
         assert_eq!(partial_mmr.forest().num_leaves(), 1);
 
-        let update = state_sync.sync_state(&mut partial_mmr, empty()).await.unwrap();
+        let update = state_sync
+            .sync_state(&mut partial_mmr, empty())
+            .await
+            .unwrap()
+            .expect("should have synced past genesis");
 
         assert_eq!(update.block_num, chain_tip_1);
         let forest_1 = partial_mmr.forest();
         assert_eq!(forest_1.num_leaves(), chain_tip_1.as_u32() as usize + 1);
 
+        // Second sync
         mock_rpc.advance_blocks(2);
         let chain_tip_2 = mock_rpc.get_chain_tip_block_num();
 
-        let update = state_sync.sync_state(&mut partial_mmr, empty()).await.unwrap();
+        let update = state_sync
+            .sync_state(&mut partial_mmr, empty())
+            .await
+            .unwrap()
+            .expect("should have synced to new tip");
 
         assert_eq!(update.block_num, chain_tip_2);
         let forest_2 = partial_mmr.forest();
         assert!(forest_2 > forest_1);
         assert_eq!(forest_2.num_leaves(), chain_tip_2.as_u32() as usize + 1);
 
-        let update = state_sync.sync_state(&mut partial_mmr, empty()).await.unwrap();
-
-        assert_eq!(update.block_num, chain_tip_2);
+        // Third sync (no new blocks) — should return None
+        assert!(
+            state_sync.sync_state(&mut partial_mmr, empty()).await.unwrap().is_none(),
+            "should return None when already at chain tip"
+        );
         assert_eq!(partial_mmr.forest(), forest_2);
     }
 

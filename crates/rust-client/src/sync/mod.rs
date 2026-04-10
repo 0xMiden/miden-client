@@ -137,7 +137,12 @@ where
         let input = self.build_sync_input().await?;
 
         // Get the sync update from the network
-        let state_sync_update = state_sync.sync_state(&mut current_partial_mmr, input).await?;
+        let Some(state_sync_update) =
+            state_sync.sync_state(&mut current_partial_mmr, input).await?
+        else {
+            let block_num = self.get_sync_height().await?;
+            return Ok(SyncSummary::new_empty(block_num));
+        };
 
         let sync_summary: SyncSummary = (&state_sync_update).into();
         debug!(sync_summary = ?sync_summary, "Sync summary computed");

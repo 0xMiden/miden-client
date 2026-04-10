@@ -34,12 +34,7 @@ impl StateSync {
         new_authentication_nodes
             .append(&mut current_partial_mmr.add(chain_tip_header.commitment(), false));
 
-        block_updates.insert(
-            chain_tip_header.clone(),
-            false,
-            new_peaks,
-            new_authentication_nodes,
-        );
+        block_updates.insert(chain_tip_header.clone(), false, new_peaks, new_authentication_nodes);
 
         Ok(())
     }

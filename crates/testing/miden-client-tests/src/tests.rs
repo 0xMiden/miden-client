@@ -530,6 +530,7 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
             },
         )
         .await
+        .unwrap()
         .unwrap();
 
     // Only the chain tip block should be stored as a block header.
@@ -613,7 +614,7 @@ async fn sync_state_no_redundant_get_account_calls() {
         output_notes: vec![],
         uncommitted_transactions: vec![],
     };
-    let state_sync_update = state_sync.sync_state(&mut partial_mmr, input).await.unwrap();
+    let state_sync_update = state_sync.sync_state(&mut partial_mmr, input).await.unwrap().unwrap();
 
     // Only 1 updated public account entry, not N duplicates
     assert_eq!(

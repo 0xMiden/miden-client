@@ -6,9 +6,7 @@ use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks};
 use miden_protocol::note::{NoteId, Nullifier};
-use miden_protocol::transaction::TransactionId;
-
-use miden_protocol::transaction::InputNoteCommitment;
+use miden_protocol::transaction::{InputNoteCommitment, TransactionId};
 
 use super::SyncSummary;
 use crate::ClientError;
@@ -107,8 +105,8 @@ impl StateSyncUpdate {
     /// Applies pre-derived transaction data to the update.
     ///
     /// 1. Stores execution-ordered nullifiers for later consumption ordering.
-    /// 2. Processes each transaction inclusion (committing local transactions or recording
-    ///    external consumers for tracked accounts).
+    /// 2. Processes each transaction inclusion (committing local transactions or recording external
+    ///    consumers for tracked accounts).
     /// 3. Discards stale/expired pending transactions.
     /// 4. Transitions tracked output notes to committed using inclusion proofs.
     pub fn apply_transaction_data(
@@ -152,8 +150,7 @@ impl StateSyncUpdate {
         for update in nullifier_updates {
             let external_consumer =
                 self.transaction_updates.external_nullifier_account(&update.nullifier);
-            let consumed_tx_order =
-                self.transaction_updates.nullifier_order(&update.nullifier);
+            let consumed_tx_order = self.transaction_updates.nullifier_order(&update.nullifier);
 
             let transaction_updates = &self.transaction_updates;
             self.note_updates.apply_nullifiers_state_transitions(
@@ -473,9 +470,7 @@ impl AccountUpdates {
 /// `initial_state_commitment` / `final_state_commitment`, and collects each transaction's
 /// input note nullifiers in execution order. Nullifiers from the same account are in execution
 /// order; ordering across different accounts is arbitrary.
-fn compute_ordered_nullifiers(
-    transaction_records: &[RpcTransactionRecord],
-) -> Vec<Nullifier> {
+fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> Vec<Nullifier> {
     // Group transactions by (account_id, block_num).
     let mut groups: BTreeMap<(AccountId, BlockNumber), Vec<&RpcTransactionRecord>> =
         BTreeMap::new();
@@ -673,9 +668,9 @@ mod tests {
                 account_b,
                 word(100),
                 word(200),
-                InputNotes::new_unchecked(vec![InputNoteCommitment::from(
-                    Nullifier::from_raw(word(40)),
-                )]),
+                InputNotes::new_unchecked(vec![InputNoteCommitment::from(Nullifier::from_raw(
+                    word(40),
+                ))]),
                 vec![],
                 fee,
             ),
