@@ -1,9 +1,0 @@
-*.md
-*.yml
-*.yaml
-
-# Generated JS (codegen)
-crates/idxdb-store/src/js/**
-
-# Theme overrides for Docusaurus
-docs/external/src/theme/**

@@ -5,13 +5,11 @@ members = [
   "bin/integration-tests",
   "bin/miden-bench",
   "bin/miden-cli",
-  "crates/idxdb-store",
   "crates/rust-client",
   "crates/sqlite-store",
   "crates/testing/miden-client-tests",
   "crates/testing/node-builder",
   "crates/testing/prover",
-  "crates/web-client",
 ]
 
 default-members = ["bin/miden-cli", "crates/rust-client"]
@@ -33,7 +31,6 @@ opt-level = 1
 
 [workspace.dependencies]
 # Workspace crates
-idxdb-store               = { default-features = false, package = "miden-idxdb-store", path = "crates/idxdb-store", version = "0.14.0" }
 miden-client              = { default-features = false, path = "crates/rust-client", version = "0.14.0" }
 miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-store", version = "0.14.0" }
 
