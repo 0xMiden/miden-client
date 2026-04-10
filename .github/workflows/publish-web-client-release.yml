@@ -43,6 +43,18 @@ jobs:
           yarn install --frozen-lockfile
           yarn build
 
+      - name: Verify WASM is optimized
+        if: steps.check_version.outputs.should_publish == 'true'
+        run: |
+          wasm_file=$(find crates/web-client/dist/assets -name '*.wasm' | head -1)
+          size=$(stat --format=%s "$wasm_file")
+          max_size=$((25 * 1024 * 1024))
+          echo "WASM size: $((size / 1024 / 1024))MB ($size bytes)"
+          if [ "$size" -gt "$max_size" ]; then
+            echo "::error::WASM is $((size / 1024 / 1024))MB — exceeds 25MB limit. wasm-opt likely failed silently."
+            exit 1
+          fi
+
       - name: Publish to npm
         if: steps.check_version.outputs.should_publish == 'true'
         env:
