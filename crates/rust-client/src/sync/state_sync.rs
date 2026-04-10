@@ -25,15 +25,16 @@ use crate::rpc::domain::transaction::{
 use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
 use crate::transaction::TransactionRecord;
 
-// STATE UPDATE DATA
+// SYNC DATA
 // ================================================================================================
 
-/// Raw data fetched from the node needed to sync the client to the chain tip.
+/// Data fetched and derived from the node needed to sync the client to the chain tip.
 ///
-/// Aggregates the responses of `sync_chain_mmr`, `sync_notes`, `get_notes_by_id`, and
-/// `sync_transactions`. This may contain more data than a particular client needs to store — it is
-/// filtered and transformed into a [`StateSyncUpdate`] before being applied.
-struct RawStateSyncData {
+/// Aggregates RPC responses (`sync_chain_mmr`, `sync_notes`, `sync_transactions`) along with
+/// derived data such as account commitment updates and execution-ordered nullifiers. This is an
+/// intermediate representation that is filtered and transformed into a [`StateSyncUpdate`] before
+/// being applied to the store.
+struct SyncData {
     /// MMR delta covering the full range from `current_block` to `chain_tip`.
     mmr_delta: MmrDelta,
     /// Chain tip block header.
@@ -42,11 +43,11 @@ struct RawStateSyncData {
     note_blocks: Vec<NoteSyncBlock>,
     /// Full note bodies for public notes, keyed by note ID.
     public_notes: BTreeMap<NoteId, Note>,
-    /// Account commitment updates for the synced range.
+    /// Latest account state commitment per account, derived from transaction records.
     account_commitment_updates: Vec<(AccountId, Word)>,
-    /// Transaction inclusions for the synced range.
+    /// Transaction inclusions for tracked accounts, derived from transaction records.
     transactions: Vec<TransactionInclusion>,
-    /// Nullifiers for the synced range.
+    /// Execution-ordered nullifiers, derived from transaction records.
     nullifiers: Vec<Nullifier>,
 }
 
@@ -272,12 +273,14 @@ impl StateSync {
         Ok(state_sync_update)
     }
 
-    /// Fetches the sync data from the node by calling the following endpoints:
+    /// Fetches and derives sync data from the node.
+    ///
+    /// Calls the following RPC endpoints:
     /// 1. `sync_chain_mmr` — discovers the chain tip, gets the MMR delta and chain tip header.
-    /// 2. `sync_notes` — loops until the full range to the chain tip is covered (handles paginated
-    ///    responses).
-    /// 3. `get_notes_by_id` — fetches full metadata for notes with attachments.
-    /// 4. `sync_transactions` — gets transaction data for the full range.
+    /// 2. `sync_notes` — fetches note inclusions and public note bodies for the range.
+    /// 3. `sync_transactions` — gets transaction records for tracked accounts, from which
+    ///    account commitment updates, transaction inclusions, and execution-ordered nullifiers
+    ///    are derived.
     ///
     /// Returns `None` when the client is already at the chain tip (no progress).
     async fn fetch_sync_data(
@@ -285,7 +288,7 @@ impl StateSync {
         current_block_num: BlockNumber,
         account_ids: &[AccountId],
         note_tags: &Arc<BTreeSet<NoteTag>>,
-    ) -> Result<Option<RawStateSyncData>, ClientError> {
+    ) -> Result<Option<SyncData>, ClientError> {
         // Step 1: Fetch the MMR delta and chain tip header.
         let chain_mmr_info = self.rpc_api.sync_chain_mmr(current_block_num, None).await?;
         let chain_tip = chain_mmr_info.block_to;
@@ -321,7 +324,7 @@ impl StateSync {
         let (account_commitment_updates, transactions, nullifiers) =
             self.fetch_transaction_data(current_block_num, chain_tip, account_ids).await?;
 
-        Ok(Some(RawStateSyncData {
+        Ok(Some(SyncData {
             mmr_delta: chain_mmr_info.mmr_delta,
             chain_tip_header: chain_mmr_info.block_header,
             note_blocks: sync_notes_result.blocks,
@@ -388,12 +391,12 @@ impl StateSync {
     /// 3. Applies transaction and nullifier updates.
     async fn apply_sync_result(
         &self,
-        sync_data: RawStateSyncData,
+        sync_data: SyncData,
         public_note_records: &BTreeMap<NoteId, InputNoteRecord>,
         state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<(), ClientError> {
-        let RawStateSyncData {
+        let SyncData {
             mmr_delta,
             chain_tip_header,
             note_blocks,
