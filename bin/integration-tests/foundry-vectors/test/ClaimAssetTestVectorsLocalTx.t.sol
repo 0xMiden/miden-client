@@ -23,6 +23,12 @@ import "../src/DepositContractTestHelpers.sol";
  *
  * The output can be used to verify Miden's ability to process L1 bridge transactions.
  */
+/// @dev Miden network ID used as the bridge destination.
+uint32 constant MIDEN_NETWORK_ID = 20;
+
+/// @dev Default bridge amount in wei for test vectors.
+uint256 constant DEFAULT_BRIDGE_AMOUNT = 100_000_000;
+
 contract ClaimAssetTestVectorsLocalTx is Test, DepositContractV2, DepositContractTestHelpers {
     /**
      * @notice Public wrapper for verifyMerkleProof to allow external calls from tests.
@@ -118,9 +124,9 @@ contract ClaimAssetTestVectorsLocalTx is Test, DepositContractV2, DepositContrac
         uint8 leafType = 0;
         uint32 originNetwork = 0;
         address originTokenAddress = _resolveOriginTokenAddress();
-        uint32 destinationNetwork = 20;
+        uint32 destinationNetwork = MIDEN_NETWORK_ID;
         address destinationAddress = _resolveDestinationAddress();
-        uint256 amount = 100000000;
+        uint256 amount = DEFAULT_BRIDGE_AMOUNT;
 
         bytes memory metadata = abi.encode("Test Token", "TEST", uint8(18));
         bytes32 metadataHash = keccak256(metadata);

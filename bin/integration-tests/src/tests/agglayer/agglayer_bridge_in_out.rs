@@ -52,6 +52,15 @@ use super::agglayer_test_utils::generate_claim_data_for_account;
 use super::{AgglayerConfig, create_agglayer_clients, setup_core_accounts};
 use crate::tests::config::ClientConfig;
 
+/// Amount of tokens to bridge out in the bridge-out phase of the test.
+const BRIDGE_OUT_AMOUNT: u64 = 1000;
+
+/// L1 (Ethereum mainnet) network ID used as the bridge-out destination.
+const L1_NETWORK_ID: u32 = 0;
+
+/// Placeholder L1 destination address for the bridge-out test.
+const TEST_L1_DESTINATION: &str = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd";
+
 // BRIDGE-IN-OUT TEST
 // ================================================================================================
 
@@ -141,7 +150,7 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
         },
         None => {
             let (_, leaf_data_preview, _) =
-                generate_claim_data_for_account(destination_account.id(), None);
+                generate_claim_data_for_account(destination_account.id(), None)?;
             let origin_token_address = leaf_data_preview.origin_token_address;
             let origin_network = leaf_data_preview.origin_network;
             let scale = 0u8;
@@ -211,7 +220,7 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
         println!("[bridge_in_out] === Bridge-in round {round} ===");
 
         let (proof_data, leaf_data, ger) =
-            generate_claim_data_for_account(destination_account.id(), Some(&origin_token_address));
+            generate_claim_data_for_account(destination_account.id(), Some(&origin_token_address))?;
         println!("[bridge_in_out] Round {round}: claim data generated via foundry");
 
         let generated_dest_account_id =
@@ -272,8 +281,10 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
             consumable_notes.len()
         );
 
-        let notes_to_consume: Vec<_> =
-            consumable_notes.into_iter().map(|(note, _)| note.try_into().unwrap()).collect();
+        let notes_to_consume: Vec<_> = consumable_notes
+            .into_iter()
+            .map(|(note, _)| note.try_into().map_err(|e| anyhow::anyhow!("{e}")))
+            .collect::<Result<Vec<_>, _>>()?;
         let consume_tx = TransactionRequestBuilder::new().build_consume_notes(notes_to_consume)?;
         let tx_id =
             user.client.submit_new_transaction(destination_account.id(), consume_tx).await?;
@@ -301,22 +312,21 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
 
     user.client.sync_state().await?;
 
-    let bridge_out_amount = 1000u64;
-    let destination_network = 0u32;
-    let l1_destination_address = EthAddress::from_hex("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
-        .expect("valid L1 destination address");
+    let l1_destination_address =
+        EthAddress::from_hex(TEST_L1_DESTINATION).expect("valid L1 destination address");
 
-    let bridge_asset: Asset =
-        FungibleAsset::new(agglayer_faucet_id, bridge_out_amount).unwrap().into();
+    let bridge_asset: Asset = FungibleAsset::new(agglayer_faucet_id, BRIDGE_OUT_AMOUNT)
+        .map_err(|e| anyhow::anyhow!("{e}"))?
+        .into();
     let b2agg_note = B2AggNote::create(
-        destination_network,
+        L1_NETWORK_ID,
         l1_destination_address,
         NoteAssets::new(vec![bridge_asset])?,
         bridge_id,
         destination_account.id(),
         user.client.rng(),
     )?;
-    println!("[bridge_in_out] B2AGG note created with amount: {}", bridge_out_amount);
+    println!("[bridge_in_out] B2AGG note created with amount: {}", BRIDGE_OUT_AMOUNT);
 
     let b2agg_output_tx =
         TransactionRequestBuilder::new().own_output_notes(vec![b2agg_note]).build()?;

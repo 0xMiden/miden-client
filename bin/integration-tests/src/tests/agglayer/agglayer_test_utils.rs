@@ -3,6 +3,7 @@ extern crate alloc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use anyhow::{Context, Result, ensure};
 use miden_agglayer::{
     EthAddress,
     EthAmount,
@@ -135,6 +136,10 @@ pub struct ClaimAssetVector {
 // FOUNDRY TEST VECTOR GENERATION
 // ================================================================================================
 
+/// Maximum random deposit offset to keep foundry execution fast.
+/// Each offset adds one hash operation in the Solidity test.
+const MAX_DEPOSIT_OFFSET: u32 = 1000;
+
 /// Path to the foundry project directory, relative to the crate's manifest directory.
 const FOUNDRY_PROJECT_SUBDIR: &str = "foundry-vectors";
 
@@ -149,14 +154,10 @@ const FOUNDRY_OUTPUT_JSON: &str = "test-vectors/claim_asset_vectors_local_tx.jso
 /// 3. Optionally passes `ORIGIN_TOKEN_ADDRESS` if provided (e.g. from a genesis faucet)
 /// 4. Reads and parses the generated JSON file
 /// 5. Returns the `(ProofData, LeafData, ExitRoot)` tuple
-///
-/// # Panics
-///
-/// Panics if `forge` is not installed, the test fails, or the JSON output cannot be parsed.
 pub fn generate_claim_data_for_account(
     account_id: AccountId,
     origin_token_address: Option<&EthAddress>,
-) -> (ProofData, LeafData, ExitRoot) {
+) -> Result<(ProofData, LeafData, ExitRoot)> {
     let destination_address: EthAddress = EthEmbeddedAccountId::from_account_id(account_id).into();
     let destination_hex = destination_address.to_hex();
     println!(
@@ -168,7 +169,7 @@ pub fn generate_claim_data_for_account(
     // This ensures the path is correct regardless of the test binary's working directory.
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let foundry_dir = std::path::Path::new(manifest_dir).join(FOUNDRY_PROJECT_SUBDIR);
-    assert!(
+    ensure!(
         foundry_dir.join("foundry.toml").exists(),
         "Foundry project not found at {}. Run `forge install` in that directory first.",
         foundry_dir.display()
@@ -177,15 +178,14 @@ pub fn generate_claim_data_for_account(
     // Ensure the test-vectors output directory exists (it is gitignored so may not
     // be present in a fresh checkout).
     let output_dir = foundry_dir.join("test-vectors");
-    std::fs::create_dir_all(&output_dir).unwrap_or_else(|e| {
-        panic!("failed to create test-vectors directory at {}: {}", output_dir.display(), e)
-    });
+    std::fs::create_dir_all(&output_dir).with_context(|| {
+        format!("failed to create test-vectors directory at {}", output_dir.display())
+    })?;
 
     // Generate a random deposit offset so each test run gets a unique leaf_index.
     // This prevents the bridge from rejecting the CLAIM as already spent when
     // running the test multiple times against the same node instance.
-    // Capped to 1000 to keep foundry execution fast (each offset adds one hash).
-    let deposit_offset: u32 = rand::random::<u32>() % 1000;
+    let deposit_offset: u32 = rand::random::<u32>() % MAX_DEPOSIT_OFFSET;
     println!("[foundry] Using deposit offset: {}", deposit_offset);
 
     // Run forge test with the destination address as an environment variable
@@ -204,13 +204,14 @@ pub fn generate_claim_data_for_account(
         cmd.env("ORIGIN_TOKEN_ADDRESS", &addr_hex);
     }
 
-    let output = cmd.output().expect("failed to execute `forge test` — is foundry installed?");
+    let output = cmd.output().context("failed to execute `forge test` - is foundry installed?")?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        panic!("forge test failed!\nstdout:\n{}\nstderr:\n{}", stdout, stderr);
-    }
+    ensure!(
+        output.status.success(),
+        "forge test failed!\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     println!(
         "[foundry] forge test completed successfully:\n{}",
@@ -219,15 +220,15 @@ pub fn generate_claim_data_for_account(
 
     // Read and parse the generated JSON
     let json_path = foundry_dir.join(FOUNDRY_OUTPUT_JSON);
-    let json_content = std::fs::read_to_string(&json_path).unwrap_or_else(|e| {
-        panic!("failed to read generated test vectors from {}: {}", json_path.display(), e)
-    });
+    let json_content = std::fs::read_to_string(&json_path).with_context(|| {
+        format!("failed to read generated test vectors from {}", json_path.display())
+    })?;
 
     let vector: ClaimAssetVector = serde_json::from_str(&json_content)
-        .expect("failed to parse foundry-generated claim asset vectors JSON");
+        .context("failed to parse foundry-generated claim asset vectors JSON")?;
 
     let ger = ExitRoot::new(
-        hex_to_bytes(&vector.proof.global_exit_root).expect("valid global exit root hex"),
+        hex_to_bytes(&vector.proof.global_exit_root).context("invalid global exit root hex")?,
     );
 
     println!(
@@ -235,5 +236,5 @@ pub fn generate_claim_data_for_account(
         destination_hex
     );
 
-    (vector.proof.to_proof_data(), vector.leaf.to_leaf_data(), ger)
+    Ok((vector.proof.to_proof_data(), vector.leaf.to_leaf_data(), ger))
 }
