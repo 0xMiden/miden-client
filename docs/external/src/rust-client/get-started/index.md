@@ -1,19 +1,17 @@
 ---
 title: Getting started
-sidebar_position: 2
+sidebar_position: 1
 ---
 
-This section shows you how to get started with Miden by generating a new Miden account, requesting funds from a public faucet, consuming private notes, and creating public pay-to-id-notes.
+This section shows you how to build a Rust application that interacts with the Miden rollup using the `miden-client` library.
 
-By the end of this tutorial, you will have:
+By the end of these tutorials, you will have:
 
-- Configured the Miden client.
-- Connected to a Miden node.
+- Created a Miden Client instance connected to testnet.
 - Created an account and requested funds from the faucet.
-- Transferred assets between accounts by creating and consuming notes.
+- Transferred assets between accounts using the Rust API — both public and private notes.
 
 ## Prerequisites
 
-### Rust
-
-Download from [the Rust website](https://www.rust-lang.org/learn/get-started).
+- [Rust](https://www.rust-lang.org/learn/get-started) version 1.88 or later
+- `miden-client` and `miden-client-sqlite-store` added to your `Cargo.toml` (see [Installation](../install-and-run.md))
