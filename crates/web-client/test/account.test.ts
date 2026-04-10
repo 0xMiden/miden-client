@@ -543,7 +543,8 @@ test.describe("getAccountProof vault commitment", () => {
         return {
           numVaultAssetsQuery1: vaultAssets.length,
           vaultAssetFaucetId: vaultAssets[0]?.faucetId().toString() ?? null,
-          vaultAssetAmount: vaultAssets[0] != null ? Number(vaultAssets[0].amount()) : null,
+          vaultAssetAmount:
+            vaultAssets[0] != null ? Number(vaultAssets[0].amount()) : null,
           numVaultAssetsQuery2: proof2.vaultFungibleAssets()?.length ?? null,
           numVaultAssetsQuery3: proof3.vaultFungibleAssets()?.length ?? null,
         };
