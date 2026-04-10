@@ -20,7 +20,7 @@ use super::smt_forest::AccountSmtForest;
 ///
 /// Value slots are taken directly from the delta. Map slots are computed incrementally
 /// by applying the map delta entries to the old root via the SMT forest.
-pub fn compute_storage_delta(
+fn compute_storage_delta(
     smt_forest: &mut AccountSmtForest,
     old_map_roots: &BTreeMap<StorageSlotName, Word>,
     delta: &AccountDelta,
