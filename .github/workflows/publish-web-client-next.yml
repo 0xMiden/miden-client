@@ -60,12 +60,8 @@ jobs:
         with:
           ref: next
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
+      - name: Install Rust
+        run: rustup update --no-self-update
 
       - name: Build napi binary
         run: cargo build -p miden-client-web --no-default-features --features nodejs --release
@@ -111,14 +107,10 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
 
-      - name: Set up Rust and wasm target
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-          target: wasm32-unknown-unknown
-          components: rust-src
+      - name: Install Rust and wasm target
+        run: |
+          rustup update --no-self-update
+          rustup target add wasm32-unknown-unknown
 
       - name: Install binaryen (wasm-opt)
         run: sudo apt-get update && sudo apt-get install -y binaryen
