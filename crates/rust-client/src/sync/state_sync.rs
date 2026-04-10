@@ -18,6 +18,7 @@ use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
+use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::transaction::{
     TransactionInclusion,
     TransactionRecord as RpcTransactionRecord,
@@ -464,6 +465,30 @@ impl StateSync {
             &chain_tip_header,
             &transactions,
         );
+
+        // Detect note consumption from transaction nullifiers.
+        //
+        // When a note is created and consumed in the same batch, it's nullifier is not available.
+        // So we need to collect nullifiers from the transaction records. This only works if the
+        // receiver account is tracked by the client.
+        for transaction in &transactions {
+            for nullifier in &transaction.nullifiers {
+                let nullifier_update = NullifierUpdate {
+                    nullifier: *nullifier,
+                    block_num: transaction.block_num,
+                };
+
+                let external_consumer_account = state_sync_update
+                    .transaction_updates
+                    .external_nullifier_account(&nullifier_update.nullifier);
+
+                state_sync_update.note_updates.apply_nullifiers_state_transitions(
+                    &nullifier_update,
+                    state_sync_update.transaction_updates.committed_transactions(),
+                    external_consumer_account,
+                )?;
+            }
+        }
 
         // Transition tracked output notes to Committed using inclusion proofs from the
         // transaction sync response. This covers output notes regardless of whether their
