@@ -2596,7 +2596,7 @@ dependencies = [
 
 [[package]]
 name = "js-export-macro"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "proc-macro2",
  "quote",
