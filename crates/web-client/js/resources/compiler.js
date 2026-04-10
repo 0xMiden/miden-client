@@ -18,7 +18,7 @@ export class CompilerResource {
   async component({ code, slots = [], supportAllTypes = true }) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
-    const builder = this.#inner.createCodeBuilder();
+    const builder = await this.#inner.createCodeBuilder();
     const compiled = builder.compileAccountComponentCode(code);
     const component = wasm.AccountComponent.compile(compiled, slots);
     return supportAllTypes ? component.withSupportsAllTypes() : component;
@@ -34,7 +34,7 @@ export class CompilerResource {
     this.#client.assertNotTerminated();
     // Ensure WASM is initialized (result unused — only #inner needs it)
     await this.#getWasm();
-    const builder = this.#inner.createCodeBuilder();
+    const builder = await this.#inner.createCodeBuilder();
     for (const lib of libraries) {
       if (lib && typeof lib.namespace === "string") {
         // Inline { namespace, code, linking? } — build and link automatically

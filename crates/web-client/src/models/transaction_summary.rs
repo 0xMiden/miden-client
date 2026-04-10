@@ -1,55 +1,55 @@
+use js_export_macro::js_export;
 use miden_client::transaction::TransactionSummary as NativeTransactionSummary;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use super::account_delta::AccountDelta;
 use super::input_notes::InputNotes;
 use super::output_notes::OutputNotes;
 use super::word::Word;
-use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
+use crate::platform::{JsBytes, JsErr};
+use crate::utils::{deserialize_from_bytes, serialize_to_bytes};
 
 /// Represents a transaction summary.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct TransactionSummary(NativeTransactionSummary);
 
-#[wasm_bindgen]
+#[js_export]
 impl TransactionSummary {
     /// Serializes the summary into bytes.
-    pub fn serialize(&self) -> Uint8Array {
-        serialize_to_uint8array(&self.0)
+    pub fn serialize(&self) -> JsBytes {
+        serialize_to_bytes(&self.0)
     }
 
     /// Deserializes a summary from bytes.
-    pub fn deserialize(bytes: &Uint8Array) -> Result<TransactionSummary, JsValue> {
-        deserialize_from_uint8array::<NativeTransactionSummary>(bytes).map(TransactionSummary)
+    pub fn deserialize(bytes: JsBytes) -> Result<TransactionSummary, JsErr> {
+        deserialize_from_bytes::<NativeTransactionSummary>(&bytes).map(TransactionSummary)
     }
 
     /// Returns the account delta described by the summary.
-    #[wasm_bindgen(js_name = "accountDelta")]
-    pub fn account_delta(&self) -> Result<AccountDelta, JsValue> {
+    #[js_export(js_name = "accountDelta")]
+    pub fn account_delta(&self) -> Result<AccountDelta, JsErr> {
         Ok(self.0.account_delta().into())
     }
 
     /// Returns the input notes referenced by the summary.
-    #[wasm_bindgen(js_name = "inputNotes")]
-    pub fn input_notes(&self) -> Result<InputNotes, JsValue> {
+    #[js_export(js_name = "inputNotes")]
+    pub fn input_notes(&self) -> Result<InputNotes, JsErr> {
         Ok(self.0.input_notes().into())
     }
 
     /// Returns the output notes referenced by the summary.
-    #[wasm_bindgen(js_name = "outputNotes")]
-    pub fn output_notes(&self) -> Result<OutputNotes, JsValue> {
+    #[js_export(js_name = "outputNotes")]
+    pub fn output_notes(&self) -> Result<OutputNotes, JsErr> {
         Ok(self.0.output_notes().into())
     }
 
     /// Returns the random salt mixed into the summary commitment.
-    pub fn salt(&self) -> Result<Word, JsValue> {
+    pub fn salt(&self) -> Result<Word, JsErr> {
         Ok(self.0.salt().into())
     }
 
     /// Computes the commitment to this `TransactionSummary`.
-    #[wasm_bindgen(js_name = "toCommitment")]
+    #[js_export(js_name = "toCommitment")]
     pub fn to_commitment(&self) -> Word {
         self.0.to_commitment().into()
     }
@@ -81,3 +81,5 @@ impl From<&NativeTransactionSummary> for TransactionSummary {
         TransactionSummary(transaction_summary.clone())
     }
 }
+
+impl_napi_from_value!(TransactionSummary);

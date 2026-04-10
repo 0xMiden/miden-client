@@ -1,6 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::note::NoteMetadata as NativeNoteMetadata;
 use miden_client::rpc::domain::note::CommittedNote as NativeCommittedNote;
-use wasm_bindgen::prelude::*;
 
 use super::account_id::AccountId;
 use super::note_id::NoteId;
@@ -11,31 +11,31 @@ use super::sparse_merkle_path::SparseMerklePath;
 
 /// Represents a note committed on chain.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct CommittedNote(NativeCommittedNote);
 
-#[wasm_bindgen]
+#[js_export]
 impl CommittedNote {
     /// Returns the note ID.
-    #[wasm_bindgen(js_name = "noteId")]
+    #[js_export(js_name = "noteId")]
     pub fn note_id(&self) -> NoteId {
         (*self.0.note_id()).into()
     }
 
     /// Returns the note index in the block's note tree.
-    #[wasm_bindgen(js_name = "noteIndex")]
+    #[js_export(js_name = "noteIndex")]
     pub fn note_index(&self) -> u16 {
         self.0.inclusion_proof().location().block_note_tree_index()
     }
 
     /// Returns the inclusion path for the note in the block's note tree.
-    #[wasm_bindgen(js_name = "inclusionPath")]
+    #[js_export(js_name = "inclusionPath")]
     pub fn inclusion_path(&self) -> SparseMerklePath {
         self.0.inclusion_proof().note_path().into()
     }
 
     /// Returns the note type (public, private, etc.).
-    #[wasm_bindgen(js_name = "noteType")]
+    #[js_export(js_name = "noteType")]
     pub fn note_type(&self) -> NoteType {
         self.0.note_type().into()
     }
@@ -66,13 +66,13 @@ impl CommittedNote {
     }
 
     /// Returns the full note metadata when the attachment payload is available.
-    #[wasm_bindgen(js_name = "fullMetadata")]
+    #[js_export(js_name = "fullMetadata")]
     pub fn full_metadata(&self) -> Option<NoteMetadata> {
         self.0.metadata().map(Into::into)
     }
 
     /// Returns the inclusion proof for this note.
-    #[wasm_bindgen(js_name = "inclusionProof")]
+    #[js_export(js_name = "inclusionProof")]
     pub fn inclusion_proof(&self) -> NoteInclusionProof {
         self.0.inclusion_proof().into()
     }

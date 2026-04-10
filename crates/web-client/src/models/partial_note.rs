@@ -1,5 +1,5 @@
+use js_export_macro::js_export;
 use miden_client::note::PartialNote as NativePartialNote;
-use wasm_bindgen::prelude::*;
 
 use super::note_assets::NoteAssets;
 use super::note_id::NoteId;
@@ -14,10 +14,10 @@ use super::word::Word;
 /// to compute note ID and note header, but not sufficient to compute note nullifier, and generally
 /// does not have enough info to execute the note.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct PartialNote(NativePartialNote);
 
-#[wasm_bindgen]
+#[js_export]
 impl PartialNote {
     // TODO: new
 
@@ -32,7 +32,7 @@ impl PartialNote {
     }
 
     /// Returns the digest of the recipient information.
-    #[wasm_bindgen(js_name = "recipientDigest")]
+    #[js_export(js_name = "recipientDigest")]
     pub fn recipient_digest(&self) -> Word {
         self.0.recipient_digest().into()
     }

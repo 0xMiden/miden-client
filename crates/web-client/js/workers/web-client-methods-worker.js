@@ -325,14 +325,18 @@ methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION_MOCK] = async (args) => {
 
   const result = await methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION](args);
 
+  const updatedMockChain = (await wasmWebClient.serializeMockChain()).buffer;
+  const updatedMockNoteTransportNode = (
+    await wasmWebClient.serializeMockNoteTransportNode()
+  ).buffer;
+
   return {
     transactionId: result.transactionId,
     submissionHeight: result.submissionHeight,
     serializedTransactionResult: result.serializedTransactionResult,
     serializedTransactionUpdate: result.serializedTransactionUpdate,
-    serializedMockChain: wasmWebClient.serializeMockChain().buffer,
-    serializedMockNoteTransportNode:
-      wasmWebClient.serializeMockNoteTransportNode().buffer,
+    serializedMockChain: updatedMockChain,
+    serializedMockNoteTransportNode: updatedMockNoteTransportNode,
   };
 };
 
@@ -357,14 +361,18 @@ methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER_MOCK] = async (
   const result =
     await methodHandlers[MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER](args);
 
+  const updatedMockChain = (await wasmWebClient.serializeMockChain()).buffer;
+  const updatedMockNoteTransportNode = (
+    await wasmWebClient.serializeMockNoteTransportNode()
+  ).buffer;
+
   return {
     transactionId: result.transactionId,
     submissionHeight: result.submissionHeight,
     serializedTransactionResult: result.serializedTransactionResult,
     serializedTransactionUpdate: result.serializedTransactionUpdate,
-    serializedMockChain: wasmWebClient.serializeMockChain().buffer,
-    serializedMockNoteTransportNode:
-      wasmWebClient.serializeMockNoteTransportNode().buffer,
+    serializedMockChain: updatedMockChain,
+    serializedMockNoteTransportNode: updatedMockNoteTransportNode,
   };
 };
 

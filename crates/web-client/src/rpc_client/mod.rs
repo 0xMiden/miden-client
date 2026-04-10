@@ -6,6 +6,7 @@ use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use js_export_macro::js_export;
 use miden_client::block::BlockNumber;
 use miden_client::builder::DEFAULT_GRPC_TIMEOUT_MS;
 use miden_client::note::{NoteId as NativeNoteId, Nullifier};
@@ -13,7 +14,6 @@ use miden_client::rpc::domain::account::AccountStorageRequirements as NativeAcco
 use miden_client::rpc::domain::note::FetchedNote as NativeFetchedNote;
 use miden_client::rpc::{AccountStateAt, GrpcClient, NodeRpcClient};
 use note::FetchedNote;
-use wasm_bindgen::prelude::*;
 
 use crate::js_error_with_context;
 use crate::models::account_id::AccountId;
@@ -28,22 +28,23 @@ use crate::models::note_sync_info::NoteSyncInfo;
 use crate::models::note_tag::NoteTag;
 use crate::models::storage_map_info::StorageMapInfo;
 use crate::models::word::Word;
+use crate::platform::JsErr;
 
 mod note;
 
 /// RPC Client for interacting with Miden nodes directly.
-#[wasm_bindgen]
+#[js_export]
 pub struct RpcClient {
     inner: Arc<dyn NodeRpcClient>,
 }
 
-#[wasm_bindgen]
+#[js_export]
 impl RpcClient {
     /// Creates a new RPC client instance.
     ///
     /// @param endpoint - Endpoint to connect to.
-    #[wasm_bindgen(constructor)]
-    pub fn new(endpoint: Endpoint) -> Result<RpcClient, JsValue> {
+    #[js_export(constructor)]
+    pub fn new(endpoint: Endpoint) -> Result<RpcClient, JsErr> {
         let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), DEFAULT_GRPC_TIMEOUT_MS));
 
         Ok(RpcClient { inner: rpc_client })
@@ -57,11 +58,8 @@ impl RpcClient {
     ///   be `null`.
     /// - Public notes: Returns the full `note` with `inclusionProof`, alongside its header.
     #[allow(clippy::doc_markdown)]
-    #[wasm_bindgen(js_name = "getNotesById")]
-    pub async fn get_notes_by_id(
-        &self,
-        note_ids: Vec<NoteId>,
-    ) -> Result<Vec<FetchedNote>, JsValue> {
+    #[js_export(js_name = "getNotesById")]
+    pub async fn get_notes_by_id(&self, note_ids: Vec<NoteId>) -> Result<Vec<FetchedNote>, JsErr> {
         let native_note_ids: Vec<NativeNoteId> =
             note_ids.into_iter().map(NativeNoteId::from).collect();
 
@@ -93,8 +91,8 @@ impl RpcClient {
     /// @param script_root - The root hash of the note script to fetch.
     /// @returns Promise that resolves to the `NoteScript`.
     #[allow(clippy::doc_markdown)]
-    #[wasm_bindgen(js_name = "getNoteScriptByRoot")]
-    pub async fn get_note_script_by_root(&self, script_root: &Word) -> Result<NoteScript, JsValue> {
+    #[js_export(js_name = "getNoteScriptByRoot")]
+    pub async fn get_note_script_by_root(&self, script_root: &Word) -> Result<NoteScript, JsErr> {
         let native_script_root = script_root.into();
 
         let note_script = self
@@ -107,11 +105,11 @@ impl RpcClient {
     }
 
     /// Fetches a block header by number. When `block_num` is undefined, returns the latest header.
-    #[wasm_bindgen(js_name = "getBlockHeaderByNumber")]
+    #[js_export(js_name = "getBlockHeaderByNumber")]
     pub async fn get_block_header_by_number(
         &self,
         block_num: Option<u32>,
-    ) -> Result<BlockHeader, JsValue> {
+    ) -> Result<BlockHeader, JsErr> {
         let native_block_num = block_num.map(BlockNumber::from);
         let (header, _proof) =
             self.inner.get_block_header_by_number(native_block_num, false).await.map_err(
@@ -122,11 +120,11 @@ impl RpcClient {
     }
 
     /// Fetches account details for a specific account ID.
-    #[wasm_bindgen(js_name = "getAccountDetails")]
+    #[js_export(js_name = "getAccountDetails")]
     pub async fn get_account_details(
         &self,
         account_id: &AccountId,
-    ) -> Result<FetchedAccount, JsValue> {
+    ) -> Result<FetchedAccount, JsErr> {
         let fetched = self
             .inner
             .get_account_details(account_id.into())
@@ -158,14 +156,14 @@ impl RpcClient {
     ///   vault data is returned only if the account's current vault root differs from this
     ///   value. Use `Word.new([0, 0, 0, 0])` to always fetch. When `undefined`, vault data
     ///   is not requested.
-    #[wasm_bindgen(js_name = "getAccountProof")]
+    #[js_export(js_name = "getAccountProof")]
     pub async fn get_account_proof(
         &self,
         account_id: &AccountId,
         storage_requirements: Option<AccountStorageRequirements>,
         block_num: Option<u32>,
         known_vault_commitment: Option<Word>,
-    ) -> Result<AccountProof, JsValue> {
+    ) -> Result<AccountProof, JsErr> {
         let native_id: miden_client::account::AccountId = account_id.into();
 
         let native_requirements: NativeAccountStorageRequirements =
@@ -200,13 +198,13 @@ impl RpcClient {
     /// @param `block_from` - The starting block number.
     /// @param `block_to` - Optional ending block number. When `undefined`, syncs to chain tip.
     /// @param `account_id` - The account to sync storage maps for.
-    #[wasm_bindgen(js_name = "syncStorageMaps")]
+    #[js_export(js_name = "syncStorageMaps")]
     pub async fn sync_storage_maps(
         &self,
         block_from: u32,
         block_to: Option<u32>,
         account_id: &AccountId,
-    ) -> Result<StorageMapInfo, JsValue> {
+    ) -> Result<StorageMapInfo, JsErr> {
         let native_id: miden_client::account::AccountId = account_id.into();
         let block_from = BlockNumber::from(block_from);
         let block_to = block_to.map(BlockNumber::from);
@@ -221,13 +219,13 @@ impl RpcClient {
     }
 
     /// Fetches notes matching the provided tags from the node.
-    #[wasm_bindgen(js_name = "syncNotes")]
+    #[js_export(js_name = "syncNotes")]
     pub async fn sync_notes(
         &self,
         block_num: u32,
         block_to: Option<u32>,
         note_tags: Vec<NoteTag>,
-    ) -> Result<NoteSyncInfo, JsValue> {
+    ) -> Result<NoteSyncInfo, JsErr> {
         let mut tags = BTreeSet::new();
         for tag in note_tags {
             tags.insert(tag.into());
@@ -247,12 +245,12 @@ impl RpcClient {
 
     // TODO: This can be generalized to retrieve multiple nullifiers
     /// Fetches the block height at which a nullifier was committed, if any.
-    #[wasm_bindgen(js_name = "getNullifierCommitHeight")]
+    #[js_export(js_name = "getNullifierCommitHeight")]
     pub async fn get_nullifier_commit_height(
         &self,
         nullifier: &Word,
         block_num: u32,
-    ) -> Result<Option<u32>, JsValue> {
+    ) -> Result<Option<u32>, JsErr> {
         let native_word: miden_client::Word = nullifier.into();
         // TODO: nullifier JS binding
         let nullifier = Nullifier::from_raw(native_word);

@@ -1,6 +1,6 @@
+use js_export_macro::js_export;
 use miden_client::note::{Note as NativeNote, PartialNote as NativePartialNote};
 use miden_client::transaction::RawOutputNote as NativeRawOutputNote;
-use wasm_bindgen::prelude::*;
 
 use super::note::Note;
 use super::note_assets::NoteAssets;
@@ -12,10 +12,10 @@ use crate::models::miden_arrays::OutputNoteArray;
 
 /// Representation of a note produced by a transaction (full or partial).
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct OutputNote(NativeRawOutputNote);
 
-#[wasm_bindgen]
+#[js_export]
 impl OutputNote {
     /// Wraps a full note output.
     pub fn full(note: &Note) -> OutputNote {
@@ -40,7 +40,7 @@ impl OutputNote {
     }
 
     /// Returns the recipient digest.
-    #[wasm_bindgen(js_name = "recipientDigest")]
+    #[js_export(js_name = "recipientDigest")]
     pub fn recipient_digest(&self) -> Word {
         self.0.recipient_digest().into()
     }
@@ -51,14 +51,17 @@ impl OutputNote {
     }
 
     /// Converts into a full note if the data is present.
-    #[wasm_bindgen(js_name = "intoFull")]
-    pub fn into_full(self) -> Option<Note> {
-        match self.0 {
-            NativeRawOutputNote::Full(note) => Some(note.into()),
+    #[js_export(js_name = "intoFull")]
+    pub fn into_full(&self) -> Option<Note> {
+        match &self.0 {
+            NativeRawOutputNote::Full(note) => Some(note.clone().into()),
             NativeRawOutputNote::Partial(_) => None,
         }
     }
+}
 
+// Internal methods accessible from Rust code (not processed by napi/wasm_bindgen).
+impl OutputNote {
     pub(crate) fn note(&self) -> &NativeRawOutputNote {
         &self.0
     }
@@ -96,12 +99,16 @@ impl From<&OutputNote> for NativeRawOutputNote {
 
 impl From<OutputNoteArray> for Vec<NativeRawOutputNote> {
     fn from(output_notes_array: OutputNoteArray) -> Self {
-        output_notes_array.__inner.into_iter().map(Into::into).collect()
+        let items: Vec<OutputNote> = output_notes_array.into();
+        items.into_iter().map(Into::into).collect()
     }
 }
 
 impl From<&OutputNoteArray> for Vec<NativeRawOutputNote> {
     fn from(output_notes_array: &OutputNoteArray) -> Self {
-        output_notes_array.__inner.iter().cloned().map(Into::into).collect()
+        let items: Vec<OutputNote> = output_notes_array.into();
+        items.into_iter().map(Into::into).collect()
     }
 }
+
+impl_napi_from_value!(OutputNote);

@@ -1,9 +1,9 @@
+use js_export_macro::js_export;
 use miden_client::note::NoteType as NativeNoteType;
-use wasm_bindgen::prelude::*;
 
 /// Visibility level for note contents when published to the network.
 // Keep these masks in sync with `miden-protocol/src/note/note_type.rs`
-#[wasm_bindgen]
+#[js_export]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum NoteType {

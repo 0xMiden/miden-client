@@ -10,10 +10,20 @@
   "browser": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "browser": "./dist/index.js",
+      "node": "./js/node-index.js",
+      "default": "./dist/index.js"
+    }
   },
   "files": [
     "dist",
+    "js/node-index.js",
+    "js/node",
+    "js/client.js",
+    "js/standalone.js",
+    "js/utils.js",
+    "js/resources",
     "../LICENSE.md"
   ],
   "scripts": {
@@ -31,6 +41,7 @@
     "test:remote_prover:devnet": "cross-env TEST_MIDEN_NETWORK=devnet TEST_MIDEN_PROVER_URL=devnet yarn run test:remote_prover",
     "test:remote_prover:testnet": "cross-env TEST_MIDEN_NETWORK=testnet TEST_MIDEN_PROVER_URL=testnet yarn run test:remote_prover",
     "test:clean": "yarn install && yarn playwright install --with-deps && MIDEN_WEB_DEV=true yarn run build && yarn playwright test ",
+    "test:node": "vitest run",
     "test:clean:opt": "yarn install && yarn playwright install --with-deps && yarn run build && yarn playwright test ",
     "typedoc": "typedoc"
   },
@@ -40,6 +51,7 @@
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@types/node": "^24.9.2",
     "@wasm-tool/rollup-plugin-rust": "^3.0.3",
+    "binaryen": "^121.0.0",
     "chai": "^5.1.1",
     "cpr": "^3.0.1",
     "cross-env": "^7.0.3",
@@ -53,7 +65,8 @@
     "ts-node": "^10.9.2",
     "typedoc": "^0.28.1",
     "typedoc-plugin-markdown": "^4.8.1",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^4.1.0"
   },
   "dependencies": {
     "@rollup/plugin-typescript": "^12.3.0",

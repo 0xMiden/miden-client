@@ -122,7 +122,9 @@ export class AccountsResource {
     if (!account) {
       throw new Error(`Account not found: ${id.toString()}`);
     }
-    const keys = await this.#inner.keystore.getCommitments(id);
+    const keys = this.#inner.keystore
+      ? await this.#inner.keystore.getCommitments(id)
+      : await this.#inner.getPublicKeyCommitmentsOfAccount(id);
     return {
       account,
       vault: account.vault(),
@@ -137,7 +139,7 @@ export class AccountsResource {
     const wasm = await this.#getWasm();
     const accountId = resolveAccountRef(accountRef, wasm);
     const faucetId = resolveAccountRef(tokenRef, wasm);
-    const reader = this.#inner.accountReader(accountId);
+    const reader = await this.#inner.accountReader(accountId);
     return await reader.getBalance(faucetId);
   }
 

@@ -48,7 +48,11 @@ export { MidenClient };
 export { createP2IDNote, createP2IDENote, buildSwapTag };
 
 // Internal exports — used by integration tests that need direct access to the low-level WebClient proxy.
-export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
+export {
+  WebClient as WasmWebClient,
+  MockWebClient as MockWasmWebClient,
+  MockWebClient,
+};
 
 // Method classification sets — used by scripts/check-method-classification.js to ensure
 // every WASM export is explicitly categorised. Update when adding new WASM methods.
@@ -68,6 +72,7 @@ const SYNC_METHODS = new Set([
 ]);
 
 const WRITE_METHODS = new Set([
+  "addAccountSecretKeyToWebStore",
   "addTag",
   "executeForSummary",
   "executeProgram",
@@ -92,6 +97,8 @@ const WRITE_METHODS = new Set([
 const READ_METHODS = new Set([
   "accountReader",
   "exportAccountFile",
+  "getAccountAuthByPubKeyCommitment",
+  "getAccountByKeyCommitment",
   "exportNoteFile",
   "exportStore",
   "getAccount",
@@ -104,6 +111,7 @@ const READ_METHODS = new Set([
   "getInputNotes",
   "getOutputNote",
   "getOutputNotes",
+  "getPublicKeyCommitmentsOfAccount",
   "getSetting",
   "getSyncHeight",
   "getTransactions",
@@ -879,9 +887,9 @@ class MockWebClient extends WebClient {
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
     await wasmWebClient.createMockClient(
-      seed,
-      serializedMockChain,
-      serializedMockNoteTransportNode
+      seed ?? null,
+      serializedMockChain ?? null,
+      serializedMockNoteTransportNode ?? null
     );
 
     // Wait for the worker to be ready
@@ -926,9 +934,11 @@ class MockWebClient extends WebClient {
         if (!this.worker) {
           result = await wasmWebClient.syncStateImpl();
         } else {
-          let serializedMockChain = wasmWebClient.serializeMockChain().buffer;
-          let serializedMockNoteTransportNode =
-            wasmWebClient.serializeMockNoteTransportNode().buffer;
+          let serializedMockChain = (await wasmWebClient.serializeMockChain())
+            .buffer;
+          let serializedMockNoteTransportNode = (
+            await wasmWebClient.serializeMockNoteTransportNode()
+          ).buffer;
 
           const wasm = await getWasmOrThrow();
 
@@ -964,9 +974,11 @@ class MockWebClient extends WebClient {
       const wasmWebClient = await this.getWasmWebClient();
       const wasm = await getWasmOrThrow();
       const serializedTransactionRequest = transactionRequest.serialize();
-      const serializedMockChain = wasmWebClient.serializeMockChain().buffer;
-      const serializedMockNoteTransportNode =
-        wasmWebClient.serializeMockNoteTransportNode().buffer;
+      const serializedMockChain = (await wasmWebClient.serializeMockChain())
+        .buffer;
+      const serializedMockNoteTransportNode = (
+        await wasmWebClient.serializeMockNoteTransportNode()
+      ).buffer;
 
       const result = await this.callMethodWithWorker(
         MethodName.SUBMIT_NEW_TRANSACTION_MOCK,
@@ -1018,9 +1030,11 @@ class MockWebClient extends WebClient {
       const wasm = await getWasmOrThrow();
       const serializedTransactionRequest = transactionRequest.serialize();
       const proverPayload = prover.serialize();
-      const serializedMockChain = wasmWebClient.serializeMockChain().buffer;
-      const serializedMockNoteTransportNode =
-        wasmWebClient.serializeMockNoteTransportNode().buffer;
+      const serializedMockChain = (await wasmWebClient.serializeMockChain())
+        .buffer;
+      const serializedMockNoteTransportNode = (
+        await wasmWebClient.serializeMockNoteTransportNode()
+      ).buffer;
 
       const result = await this.callMethodWithWorker(
         MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER_MOCK,

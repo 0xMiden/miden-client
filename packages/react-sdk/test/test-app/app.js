@@ -125,7 +125,7 @@ const TestHarness = () => {
           AuthScheme.AuthRpoFalcon512
         );
 
-        const request = readyClient.newMintTransactionRequest(
+        const request = await readyClient.newMintTransactionRequest(
           wallet.id(),
           faucet.id(),
           NoteType.Public,

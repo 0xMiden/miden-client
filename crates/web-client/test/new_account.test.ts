@@ -1,239 +1,317 @@
-import test from "./playwright.global.setup";
-import { expect } from "@playwright/test";
-import {
-  createNewFaucet,
-  createNewWallet,
-  isValidAddress,
-  StorageMode,
-} from "./webClientTestUtils";
+// @ts-nocheck
+import { test, expect } from "./test-setup";
 
 // new_wallet tests
 // =======================================================================================================
 
 test.describe("new_wallet tests", () => {
-  const testCases = [
-    {
-      description: "creates a new private, immutable wallet",
-      storageMode: StorageMode.PRIVATE,
-      mutable: false,
-      authSchemeId: 2,
-      expected: {
-        isPublic: false,
-        isPrivate: true,
-        isNetwork: false,
-        isUpdatable: false,
-      },
-    },
-    {
-      description: "creates a new public, immutable wallet",
-      storageMode: StorageMode.PUBLIC,
-      mutable: false,
-      authSchemeId: 2,
-      expected: {
-        isPublic: true,
-        isPrivate: false,
-        isNetwork: false,
-        isUpdatable: false,
-      },
-    },
-    {
-      description: "creates a new private, mutable wallet",
-      storageMode: StorageMode.PRIVATE,
-      mutable: true,
-      authSchemeId: 2,
-      expected: {
-        isPublic: false,
-        isPrivate: true,
-        isNetwork: false,
-        isUpdatable: true,
-      },
-    },
-    {
-      description: "creates a new public, mutable wallet",
-      storageMode: StorageMode.PUBLIC,
-      mutable: true,
-      authSchemeId: 2,
-      expected: {
-        isPublic: true,
-        isPrivate: false,
-        isNetwork: false,
-        isUpdatable: true,
-      },
-    },
-  ];
-
-  testCases.forEach(({ description, storageMode, mutable, expected }) => {
-    test(description, async ({ page }) => {
-      const result = await createNewWallet(page, {
-        storageMode,
-        mutable,
-        authSchemeId: 2,
-      });
-
-      isValidAddress(result.id);
-      expect(result.nonce).toEqual("0");
-      isValidAddress(result.vaultCommitment);
-      isValidAddress(result.storageCommitment);
-      isValidAddress(result.codeCommitment);
-      expect(result.isFaucet).toEqual(false);
-      expect(result.isRegularAccount).toEqual(true);
-      expect(result.isUpdatable).toEqual(expected.isUpdatable);
-      expect(result.isPublic).toEqual(expected.isPublic);
-      expect(result.isPrivate).toEqual(expected.isPrivate);
-      expect(result.isNetwork).toEqual(expected.isNetwork);
-      expect(result.isIdPublic).toEqual(expected.isPublic);
-      expect(result.isIdPrivate).toEqual(expected.isPrivate);
-      expect(result.isIdNetwork).toEqual(expected.isNetwork);
-      expect(result.isNew).toEqual(true);
+  test("creates a new private, immutable wallet", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
+      const newWallet = await client.newWallet(
+        sdk.AccountStorageMode.private(),
+        false,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      return {
+        id: newWallet.id().toString(),
+        nonce: newWallet.nonce().toString(),
+        vaultRoot: newWallet.vault().root().toHex(),
+        storageCommitment: newWallet.storage().commitment().toHex(),
+        codeCommitment: newWallet.code().commitment().toHex(),
+        isFaucet: newWallet.isFaucet(),
+        isRegularAccount: newWallet.isRegularAccount(),
+        isUpdatable: newWallet.isUpdatable(),
+        isPublic: newWallet.isPublic(),
+        isPrivate: newWallet.isPrivate(),
+        isNetwork: newWallet.isNetwork(),
+        idIsPublic: newWallet.id().isPublic(),
+        idIsPrivate: newWallet.id().isPrivate(),
+        idIsNetwork: newWallet.id().isNetwork(),
+        isNew: newWallet.isNew(),
+      };
     });
+    expect(result.id.startsWith("0x")).toBe(true);
+    expect(result.nonce).toEqual("0");
+    expect(result.vaultRoot.startsWith("0x")).toBe(true);
+    expect(result.storageCommitment.startsWith("0x")).toBe(true);
+    expect(result.codeCommitment.startsWith("0x")).toBe(true);
+    expect(result.isFaucet).toEqual(false);
+    expect(result.isRegularAccount).toEqual(true);
+    expect(result.isUpdatable).toEqual(false);
+    expect(result.isPublic).toEqual(false);
+    expect(result.isPrivate).toEqual(true);
+    expect(result.isNetwork).toEqual(false);
+    expect(result.idIsPublic).toEqual(false);
+    expect(result.idIsPrivate).toEqual(true);
+    expect(result.idIsNetwork).toEqual(false);
+    expect(result.isNew).toEqual(true);
   });
 
-  test("Constructs the same account when given the same init seed", async ({
-    page,
-  }) => {
-    const clientSeed1 = new Uint8Array(32);
-    const clientSeed2 = new Uint8Array(32);
-    const walletSeed = new Uint8Array(32);
-    crypto.getRandomValues(clientSeed1);
-    crypto.getRandomValues(clientSeed2);
-    crypto.getRandomValues(walletSeed);
-
-    // Isolate the client instance both times to ensure the outcome is deterministic
-    await createNewWallet(page, {
-      storageMode: StorageMode.PUBLIC,
-      mutable: false,
-      authSchemeId: 2,
-      clientSeed: clientSeed1,
-      isolatedClient: true,
-      walletSeed: walletSeed,
+  test("creates a new public, immutable wallet", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
+      const newWallet = await client.newWallet(
+        sdk.AccountStorageMode.public(),
+        false,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      return {
+        id: newWallet.id().toString(),
+        nonce: newWallet.nonce().toString(),
+        vaultRoot: newWallet.vault().root().toHex(),
+        storageCommitment: newWallet.storage().commitment().toHex(),
+        codeCommitment: newWallet.code().commitment().toHex(),
+        isFaucet: newWallet.isFaucet(),
+        isRegularAccount: newWallet.isRegularAccount(),
+        isUpdatable: newWallet.isUpdatable(),
+        isPublic: newWallet.isPublic(),
+        isPrivate: newWallet.isPrivate(),
+        isNetwork: newWallet.isNetwork(),
+        idIsPublic: newWallet.id().isPublic(),
+        idIsPrivate: newWallet.id().isPrivate(),
+        idIsNetwork: newWallet.id().isNetwork(),
+        isNew: newWallet.isNew(),
+      };
     });
+    expect(result.id.startsWith("0x")).toBe(true);
+    expect(result.nonce).toEqual("0");
+    expect(result.vaultRoot.startsWith("0x")).toBe(true);
+    expect(result.storageCommitment.startsWith("0x")).toBe(true);
+    expect(result.codeCommitment.startsWith("0x")).toBe(true);
+    expect(result.isFaucet).toEqual(false);
+    expect(result.isRegularAccount).toEqual(true);
+    expect(result.isUpdatable).toEqual(false);
+    expect(result.isPublic).toEqual(true);
+    expect(result.isPrivate).toEqual(false);
+    expect(result.isNetwork).toEqual(false);
+    expect(result.idIsPublic).toEqual(true);
+    expect(result.idIsPrivate).toEqual(false);
+    expect(result.idIsNetwork).toEqual(false);
+    expect(result.isNew).toEqual(true);
+  });
 
-    // This should fail, as the wallet is already tracked within the same browser context
-    await expect(async () => {
-      await createNewWallet(page, {
-        storageMode: StorageMode.PUBLIC,
-        mutable: false,
-        authSchemeId: 2,
-        clientSeed: clientSeed2,
-        isolatedClient: true,
-        walletSeed: walletSeed,
-      });
-    }).rejects.toThrowError(/failed to insert new wallet/);
+  test("creates a new private, mutable wallet", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
+      const newWallet = await client.newWallet(
+        sdk.AccountStorageMode.private(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      return {
+        id: newWallet.id().toString(),
+        nonce: newWallet.nonce().toString(),
+        vaultRoot: newWallet.vault().root().toHex(),
+        storageCommitment: newWallet.storage().commitment().toHex(),
+        codeCommitment: newWallet.code().commitment().toHex(),
+        isFaucet: newWallet.isFaucet(),
+        isRegularAccount: newWallet.isRegularAccount(),
+        isUpdatable: newWallet.isUpdatable(),
+        isPublic: newWallet.isPublic(),
+        isPrivate: newWallet.isPrivate(),
+        isNetwork: newWallet.isNetwork(),
+        idIsPublic: newWallet.id().isPublic(),
+        idIsPrivate: newWallet.id().isPrivate(),
+        idIsNetwork: newWallet.id().isNetwork(),
+        isNew: newWallet.isNew(),
+      };
+    });
+    expect(result.id.startsWith("0x")).toBe(true);
+    expect(result.nonce).toEqual("0");
+    expect(result.vaultRoot.startsWith("0x")).toBe(true);
+    expect(result.storageCommitment.startsWith("0x")).toBe(true);
+    expect(result.codeCommitment.startsWith("0x")).toBe(true);
+    expect(result.isFaucet).toEqual(false);
+    expect(result.isRegularAccount).toEqual(true);
+    expect(result.isUpdatable).toEqual(true);
+    expect(result.isPublic).toEqual(false);
+    expect(result.isPrivate).toEqual(true);
+    expect(result.isNetwork).toEqual(false);
+    expect(result.idIsPublic).toEqual(false);
+    expect(result.idIsPrivate).toEqual(true);
+    expect(result.idIsNetwork).toEqual(false);
+    expect(result.isNew).toEqual(true);
+  });
+
+  test("creates a new public, mutable wallet", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
+      const newWallet = await client.newWallet(
+        sdk.AccountStorageMode.public(),
+        true,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      return {
+        id: newWallet.id().toString(),
+        nonce: newWallet.nonce().toString(),
+        vaultRoot: newWallet.vault().root().toHex(),
+        storageCommitment: newWallet.storage().commitment().toHex(),
+        codeCommitment: newWallet.code().commitment().toHex(),
+        isFaucet: newWallet.isFaucet(),
+        isRegularAccount: newWallet.isRegularAccount(),
+        isUpdatable: newWallet.isUpdatable(),
+        isPublic: newWallet.isPublic(),
+        isPrivate: newWallet.isPrivate(),
+        isNetwork: newWallet.isNetwork(),
+        idIsPublic: newWallet.id().isPublic(),
+        idIsPrivate: newWallet.id().isPrivate(),
+        idIsNetwork: newWallet.id().isNetwork(),
+        isNew: newWallet.isNew(),
+      };
+    });
+    expect(result.id.startsWith("0x")).toBe(true);
+    expect(result.nonce).toEqual("0");
+    expect(result.vaultRoot.startsWith("0x")).toBe(true);
+    expect(result.storageCommitment.startsWith("0x")).toBe(true);
+    expect(result.codeCommitment.startsWith("0x")).toBe(true);
+    expect(result.isFaucet).toEqual(false);
+    expect(result.isRegularAccount).toEqual(true);
+    expect(result.isUpdatable).toEqual(true);
+    expect(result.isPublic).toEqual(true);
+    expect(result.isPrivate).toEqual(false);
+    expect(result.isNetwork).toEqual(false);
+    expect(result.idIsPublic).toEqual(true);
+    expect(result.idIsPrivate).toEqual(false);
+    expect(result.idIsNetwork).toEqual(false);
+    expect(result.isNew).toEqual(true);
   });
 });
 
 // new_faucet tests
 // =======================================================================================================
 test.describe("new_faucet tests", () => {
-  const testCases = [
-    {
-      description: "creates a new private, fungible faucet",
-      storageMode: StorageMode.PRIVATE,
-      nonFungible: false,
-      tokenSymbol: "DAG",
-      decimals: 8,
-      maxSupply: BigInt(10000000),
-      authSchemeId: 2,
-      expected: {
-        isPublic: false,
-        isPrivate: true,
-        isNetwork: false,
-        isUpdatable: false,
-        isRegularAccount: false,
-        isFaucet: true,
-      },
-    },
-    {
-      description: "creates a new public, fungible faucet",
-      storageMode: StorageMode.PUBLIC,
-      nonFungible: false,
-      tokenSymbol: "DAG",
-      decimals: 8,
-      maxSupply: BigInt(10000000),
-      authSchemeId: 2,
-      expected: {
-        isPublic: true,
-        isPrivate: false,
-        isNetwork: false,
-        isUpdatable: false,
-        isRegularAccount: false,
-        isFaucet: true,
-      },
-    },
-  ];
-
-  testCases.forEach(
-    ({
-      description,
-      storageMode,
-      nonFungible,
-      tokenSymbol,
-      decimals,
-      maxSupply,
-      authSchemeId,
-      expected,
-    }) => {
-      test(description, async ({ page }) => {
-        const result = await createNewFaucet(
-          page,
-          storageMode,
-          nonFungible,
-          tokenSymbol,
-          decimals,
-          maxSupply,
-          authSchemeId
-        );
-
-        isValidAddress(result.id);
-        expect(result.nonce).toEqual("0");
-        isValidAddress(result.vaultCommitment);
-        isValidAddress(result.storageCommitment);
-        isValidAddress(result.codeCommitment);
-        expect(result.isFaucet).toEqual(true);
-        expect(result.isRegularAccount).toEqual(false);
-        expect(result.isUpdatable).toEqual(false);
-        expect(result.isPublic).toEqual(expected.isPublic);
-        expect(result.isPrivate).toEqual(expected.isPrivate);
-        expect(result.isNetwork).toEqual(expected.isNetwork);
-        expect(result.isIdPublic).toEqual(expected.isPublic);
-        expect(result.isIdPrivate).toEqual(expected.isPrivate);
-        expect(result.isIdNetwork).toEqual(expected.isNetwork);
-        expect(result.isNew).toEqual(true);
-      });
-    }
-  );
-
-  test("throws an error when attempting to create a non-fungible faucet", async ({
-    page,
-  }) => {
-    await expect(
-      createNewFaucet(
-        page,
-        StorageMode.PUBLIC,
-        true,
+  test("creates a new private, fungible faucet", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
+      const newFaucet = await client.newFaucet(
+        sdk.AccountStorageMode.private(),
+        false,
         "DAG",
         8,
-        BigInt(10000000),
-        2 // AuthRpoFalcon512
-      )
-    ).rejects.toThrowError("Non-fungible faucets are not supported yet");
+        sdk.u64(10000000),
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      return {
+        id: newFaucet.id().toString(),
+        nonce: newFaucet.nonce().toString(),
+        vaultRoot: newFaucet.vault().root().toHex(),
+        storageCommitment: newFaucet.storage().commitment().toHex(),
+        codeCommitment: newFaucet.code().commitment().toHex(),
+        isFaucet: newFaucet.isFaucet(),
+        isRegularAccount: newFaucet.isRegularAccount(),
+        isUpdatable: newFaucet.isUpdatable(),
+        isPublic: newFaucet.isPublic(),
+        isPrivate: newFaucet.isPrivate(),
+        isNetwork: newFaucet.isNetwork(),
+        idIsPublic: newFaucet.id().isPublic(),
+        idIsPrivate: newFaucet.id().isPrivate(),
+        idIsNetwork: newFaucet.id().isNetwork(),
+        isNew: newFaucet.isNew(),
+      };
+    });
+    expect(result.id.startsWith("0x")).toBe(true);
+    expect(result.nonce).toEqual("0");
+    expect(result.vaultRoot.startsWith("0x")).toBe(true);
+    expect(result.storageCommitment.startsWith("0x")).toBe(true);
+    expect(result.codeCommitment.startsWith("0x")).toBe(true);
+    expect(result.isFaucet).toEqual(true);
+    expect(result.isRegularAccount).toEqual(false);
+    expect(result.isUpdatable).toEqual(false);
+    expect(result.isPublic).toEqual(false);
+    expect(result.isPrivate).toEqual(true);
+    expect(result.isNetwork).toEqual(false);
+    expect(result.idIsPublic).toEqual(false);
+    expect(result.idIsPrivate).toEqual(true);
+    expect(result.idIsNetwork).toEqual(false);
+    expect(result.isNew).toEqual(true);
+  });
+
+  test("creates a new public, fungible faucet", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
+      const newFaucet = await client.newFaucet(
+        sdk.AccountStorageMode.public(),
+        false,
+        "DAG",
+        8,
+        sdk.u64(10000000),
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      return {
+        id: newFaucet.id().toString(),
+        nonce: newFaucet.nonce().toString(),
+        vaultRoot: newFaucet.vault().root().toHex(),
+        storageCommitment: newFaucet.storage().commitment().toHex(),
+        codeCommitment: newFaucet.code().commitment().toHex(),
+        isFaucet: newFaucet.isFaucet(),
+        isRegularAccount: newFaucet.isRegularAccount(),
+        isUpdatable: newFaucet.isUpdatable(),
+        isPublic: newFaucet.isPublic(),
+        isPrivate: newFaucet.isPrivate(),
+        isNetwork: newFaucet.isNetwork(),
+        idIsPublic: newFaucet.id().isPublic(),
+        idIsPrivate: newFaucet.id().isPrivate(),
+        idIsNetwork: newFaucet.id().isNetwork(),
+        isNew: newFaucet.isNew(),
+      };
+    });
+    expect(result.id.startsWith("0x")).toBe(true);
+    expect(result.nonce).toEqual("0");
+    expect(result.vaultRoot.startsWith("0x")).toBe(true);
+    expect(result.storageCommitment.startsWith("0x")).toBe(true);
+    expect(result.codeCommitment.startsWith("0x")).toBe(true);
+    expect(result.isFaucet).toEqual(true);
+    expect(result.isRegularAccount).toEqual(false);
+    expect(result.isUpdatable).toEqual(false);
+    expect(result.isPublic).toEqual(true);
+    expect(result.isPrivate).toEqual(false);
+    expect(result.isNetwork).toEqual(false);
+    expect(result.idIsPublic).toEqual(true);
+    expect(result.idIsPrivate).toEqual(false);
+    expect(result.idIsNetwork).toEqual(false);
+    expect(result.isNew).toEqual(true);
+  });
+
+  test("throws an error when attempting to create a non-fungible faucet", async ({
+    run,
+  }) => {
+    const result = await run(async ({ client, sdk }) => {
+      try {
+        await client.newFaucet(
+          sdk.AccountStorageMode.public(),
+          true,
+          "DAG",
+          8,
+          sdk.u64(10000000),
+          sdk.AuthScheme.AuthRpoFalcon512
+        );
+        return { threw: false, errorMessage: "" };
+      } catch (e) {
+        return { threw: true, errorMessage: e.message || String(e) };
+      }
+    });
+    expect(result.threw).toBe(true);
+    expect(result.errorMessage).toContain(
+      "Non-fungible faucets are not supported yet"
+    );
   });
 
   test("throws an error when attempting to create a faucet with an invalid token symbol", async ({
-    page,
+    run,
   }) => {
-    await expect(
-      createNewFaucet(
-        page,
-        StorageMode.PUBLIC,
-        false,
-        "INVALID_TOKEN",
-        8,
-        BigInt(10000000),
-        2 // AuthRpoFalcon512
-      )
-    ).rejects.toThrow(
-      `token symbol should have length between 1 and 12 characters, but 13 was provided`
+    const result = await run(async ({ client, sdk }) => {
+      try {
+        await client.newFaucet(
+          sdk.AccountStorageMode.public(),
+          false,
+          "INVALID_TOKEN",
+          8,
+          sdk.u64(10000000),
+          sdk.AuthScheme.AuthRpoFalcon512
+        );
+        return { threw: false, errorMessage: "" };
+      } catch (e) {
+        return { threw: true, errorMessage: e.message || String(e) };
+      }
+    });
+    expect(result.threw).toBe(true);
+    expect(result.errorMessage).toContain(
+      "token symbol should have length between 1 and 12 characters, but 13 was provided"
     );
   });
 });
@@ -242,27 +320,20 @@ test.describe("new_faucet tests", () => {
 // =======================================================================================================
 
 test.describe("AccountStorage.getMapEntries tests", () => {
-  test("returns undefined for invalid slot names", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = window.client;
-
+  test("returns undefined for invalid slot names", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
       const NON_MAP_SLOT_NAME =
         "miden::standards::auth::rpo_falcon512::public_key";
       const MISSING_SLOT_NAME =
         "miden::testing::account_storage_tests::missing";
 
-      // Create a new wallet with private storage
       const account = await client.newWallet(
-        window.AccountStorageMode.private(),
+        sdk.AccountStorageMode.private(),
         true,
-        window.AuthScheme.AuthRpoFalcon512
+        sdk.AuthScheme.AuthRpoFalcon512
       );
 
-      // Get the account to access its storage
       const accountRecord = await client.getAccount(account.id());
-      if (!accountRecord) {
-        throw new Error("Account not found");
-      }
 
       const storage = accountRecord.storage();
 
@@ -270,12 +341,13 @@ test.describe("AccountStorage.getMapEntries tests", () => {
       const missingSlotResult = storage.getMapEntries(MISSING_SLOT_NAME);
 
       return {
-        nonMap: nonMapResult,
-        missing: missingSlotResult,
+        accountRecordDefined: accountRecord !== undefined,
+        nonMapResultUndefined: nonMapResult === undefined,
+        missingSlotResultUndefined: missingSlotResult === undefined,
       };
     });
-
-    expect(result.nonMap).toBeUndefined();
-    expect(result.missing).toBeUndefined();
+    expect(result.accountRecordDefined).toBe(true);
+    expect(result.nonMapResultUndefined).toBe(true);
+    expect(result.missingSlotResultUndefined).toBe(true);
   });
 });

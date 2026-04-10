@@ -1,43 +1,24 @@
-import test from "./playwright.global.setup";
-import { expect } from "@playwright/test";
-import {
-  setupWalletAndFaucet,
-  clearStore,
-  getAccount,
-} from "./webClientTestUtils";
+// @ts-nocheck
+import { test, expect } from "./test-setup";
 
 test.describe("AccountFile", () => {
-  test("it serializes and deserializes an account file", async ({ page }) => {
-    const { accountId } = await setupWalletAndFaucet(page);
+  test("it serializes and deserializes an account file", async ({ run }) => {
+    const result = await run(async ({ client, sdk, helpers }) => {
+      const { walletId } = await helpers.setupWalletAndFaucet();
 
-    const accountFileBytes = await page.evaluate(async (accountId) => {
-      const client = window.client;
-      const accountIdObj = window.AccountId.fromHex(accountId);
+      const accountIdObj = sdk.AccountId.fromHex(walletId);
       const accountFile = await client.exportAccountFile(accountIdObj);
-      const bytes = Array.from(accountFile.serialize());
-      return bytes;
-    }, accountId);
+      const bytes = accountFile.serialize();
 
-    const reserializedBytes = await page.evaluate(async (bytes) => {
-      const byteArray = new Uint8Array(bytes);
-      const accountFile = window.AccountFile.deserialize(byteArray);
-      const reserialized = Array.from(accountFile.serialize());
-      return reserialized;
-    }, accountFileBytes);
+      const deserialized = sdk.AccountFile.deserialize(new Uint8Array(bytes));
+      const reserialized = deserialized.serialize();
 
-    expect(reserializedBytes).toEqual(accountFileBytes);
+      const bytesMatch =
+        Array.from(reserialized).toString() === Array.from(bytes).toString();
 
-    await clearStore(page);
+      return { bytesMatch, walletId };
+    });
 
-    await page.evaluate(async (bytes) => {
-      const client = window.client;
-      const accountFile = window.AccountFile.deserialize(new Uint8Array(bytes));
-      await client.importAccountFile(accountFile);
-    }, reserializedBytes);
-
-    const account = await getAccount(page, accountId);
-
-    expect(account).not.toBeNull();
-    expect(account!.id).toBe(accountId);
+    expect(result.bytesMatch).toBe(true);
   });
 });

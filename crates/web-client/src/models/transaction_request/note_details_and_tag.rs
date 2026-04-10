@@ -1,5 +1,5 @@
+use js_export_macro::js_export;
 use miden_client::note::{NoteDetails as NativeNoteDetails, NoteTag as NativeNoteTag};
-use wasm_bindgen::prelude::*;
 
 use crate::models::NoteTag;
 use crate::models::miden_arrays::NoteDetailsAndTagArray;
@@ -7,29 +7,28 @@ use crate::models::note_details::NoteDetails;
 
 /// Pair of note details and tag used when declaring expected notes.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteDetailsAndTag {
     note_details: NoteDetails,
     tag: NoteTag,
 }
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteDetailsAndTag {
     /// Creates a new pair from note details and tag.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new(note_details: NoteDetails, tag: NoteTag) -> NoteDetailsAndTag {
         NoteDetailsAndTag { note_details, tag }
     }
 
     /// Returns the note details.
-    #[wasm_bindgen(getter)]
-    #[wasm_bindgen(js_name = "noteDetails")]
+    #[js_export(getter, js_name = "noteDetails")]
     pub fn note_details(&self) -> NoteDetails {
         self.note_details.clone()
     }
 
     /// Returns the note tag.
-    #[wasm_bindgen(getter)]
+    #[js_export(getter)]
     pub fn tag(&self) -> NoteTag {
         self.tag
     }
@@ -54,12 +53,16 @@ impl From<&NoteDetailsAndTag> for (NativeNoteDetails, NativeNoteTag) {
 
 impl From<NoteDetailsAndTagArray> for Vec<(NativeNoteDetails, NativeNoteTag)> {
     fn from(note_details_and_tag_array: NoteDetailsAndTagArray) -> Self {
-        note_details_and_tag_array.__inner.into_iter().map(Into::into).collect()
+        let items: Vec<NoteDetailsAndTag> = note_details_and_tag_array.into();
+        items.into_iter().map(Into::into).collect()
     }
 }
 
 impl From<&NoteDetailsAndTagArray> for Vec<(NativeNoteDetails, NativeNoteTag)> {
     fn from(note_details_and_tag_array: &NoteDetailsAndTagArray) -> Self {
-        note_details_and_tag_array.__inner.iter().map(Into::into).collect()
+        let items: Vec<NoteDetailsAndTag> = note_details_and_tag_array.into();
+        items.into_iter().map(Into::into).collect()
     }
 }
+
+impl_napi_from_value!(NoteDetailsAndTag);

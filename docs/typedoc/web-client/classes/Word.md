@@ -16,7 +16,7 @@ Runtime consumers should import from index.d.ts, not this file.
 
 > **new Word**(`u64_vec`): `Word`
 
-Creates a word from four u64 values.
+Creates a word from four numeric values.
 
 #### Parameters
 
@@ -90,7 +90,7 @@ Returns the hex representation of the word.
 
 > **toU64s**(): `BigUint64Array`
 
-Returns the word as an array of u64 values.
+Returns the word as an array of numeric values.
 
 #### Returns
 
@@ -121,7 +121,6 @@ Deserializes a word from bytes.
 > `static` **fromHex**(`hex`): `Word`
 
 Creates a Word from a hex string.
-Fails if the provided string is not a valid hex representation of a Word.
 
 #### Parameters
 

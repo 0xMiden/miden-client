@@ -1,13 +1,15 @@
 use core::convert::TryFrom;
 use core::fmt::Debug;
 
+use js_export_macro::js_export;
 use miden_client::auth::AuthSchemeId as NativeAuthSchemeId;
-use wasm_bindgen::prelude::*;
+
+use crate::platform::{JsErr, from_str_err};
 
 /// Authentication schemes supported by the web client.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[wasm_bindgen]
+#[js_export]
 pub enum AuthScheme {
     AuthEcdsaK256Keccak = 1,
     AuthRpoFalcon512 = 2,
@@ -20,7 +22,7 @@ const _: () = {
 };
 
 impl TryFrom<AuthScheme> for NativeAuthSchemeId {
-    type Error = JsValue;
+    type Error = JsErr;
 
     fn try_from(value: AuthScheme) -> Result<Self, Self::Error> {
         match value {
@@ -31,7 +33,7 @@ impl TryFrom<AuthScheme> for NativeAuthSchemeId {
 }
 
 impl TryFrom<NativeAuthSchemeId> for AuthScheme {
-    type Error = JsValue;
+    type Error = JsErr;
 
     fn try_from(value: NativeAuthSchemeId) -> Result<Self, Self::Error> {
         match value {
@@ -42,6 +44,6 @@ impl TryFrom<NativeAuthSchemeId> for AuthScheme {
     }
 }
 
-fn unsupported_scheme_error(scheme: impl Debug) -> JsValue {
-    JsValue::from_str(&format!("unsupported auth scheme: {scheme:?}"))
+fn unsupported_scheme_error(scheme: impl Debug) -> JsErr {
+    from_str_err(&format!("unsupported auth scheme: {scheme:?}"))
 }

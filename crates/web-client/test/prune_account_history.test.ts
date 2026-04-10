@@ -1,44 +1,39 @@
-import test from "./playwright.global.setup";
-import { expect } from "@playwright/test";
-import { setupWalletAndFaucet, mintTransaction } from "./webClientTestUtils";
+// @ts-nocheck
+import { test, expect } from "./test-setup";
 
 test.describe("prune_account_history tests", () => {
-  test("prunes old committed states for a single account", async ({ page }) => {
+  test("prunes old committed states for a single account", async ({ run }) => {
     test.slow();
-    const { accountId, faucetId } = await setupWalletAndFaucet(page);
+    const result = await run(async ({ client, sdk, helpers }) => {
+      const { wallet, faucet } = await helpers.setupWalletAndFaucet();
 
-    // Mint twice : each mint advances the faucet nonce (0  to 1  to 2),
-    // creating historical entries at each step.
-    await mintTransaction(page, accountId, faucetId);
-    await mintTransaction(page, accountId, faucetId);
-
-    // Prune faucet history up to nonce 1 and verify the account is still intact
-    const result = await page.evaluate(async (_faucetId: string) => {
-      const client = window.client;
-      const faucetAccountId = window.AccountId.fromHex(_faucetId);
+      // Mint twice: each mint advances the faucet nonce (0 to 1 to 2),
+      // creating historical entries at each step.
+      await helpers.mockMintAndConsume(wallet.id(), faucet.id());
+      await helpers.mockMintAndConsume(wallet.id(), faucet.id());
 
       // Record state before pruning
-      const accountBefore = await client.getAccount(faucetAccountId);
-      const commitmentBefore = accountBefore!.to_commitment().toHex();
+      const accountBefore = await client.getAccount(faucet.id());
+      const commitmentBefore = accountBefore.to_commitment().toHex();
 
-      // Prune up to nonce 1
+      // Prune faucet history up to nonce 1
       const deleted = await client.pruneAccountHistory(
-        faucetAccountId,
-        new window.Felt(1n)
+        faucet.id(),
+        new sdk.Felt(1n)
       );
 
       // Verify account is still fully readable after pruning
-      const accountAfter = await client.getAccount(faucetAccountId);
-      const commitmentAfter = accountAfter!.to_commitment().toHex();
+      const accountAfter = await client.getAccount(faucet.id());
+      const commitmentAfter = accountAfter.to_commitment().toHex();
 
       return {
         deleted,
         commitmentBefore,
         commitmentAfter,
-        nonce: accountAfter!.nonce().toString(),
-        accountExists: accountAfter !== null && accountAfter !== undefined,
+        nonce: accountAfter.nonce().toString(),
+        accountExists: accountAfter !== undefined,
       };
-    }, faucetId);
+    });
 
     expect(result.deleted).toBeGreaterThan(0);
     expect(result.accountExists).toBe(true);
@@ -46,27 +41,25 @@ test.describe("prune_account_history tests", () => {
     expect(Number(result.nonce)).toBeGreaterThanOrEqual(2);
   });
 
-  test("prune is a no-op when nonce is 0", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = window.client;
-
-      // Create a wallet but don't transact : it has only one historical state
+  test("prune is a no-op when nonce is 0", async ({ run }) => {
+    const result = await run(async ({ client, sdk }) => {
+      // Create a wallet but don't transact: it has only one historical state
       const wallet = await client.newWallet(
-        window.AccountStorageMode.private(),
+        sdk.AccountStorageMode.private(),
         true,
-        window.AuthScheme.AuthRpoFalcon512
+        sdk.AuthScheme.AuthRpoFalcon512
       );
 
-      // Prune with nonce 0 : nothing should be deleted
+      // Prune with nonce 0: nothing should be deleted
       const deleted = await client.pruneAccountHistory(
         wallet.id(),
-        new window.Felt(0n)
+        new sdk.Felt(0n)
       );
       const accountAfter = await client.getAccount(wallet.id());
 
       return {
         deleted,
-        accountExists: accountAfter !== null && accountAfter !== undefined,
+        accountExists: accountAfter !== undefined,
       };
     });
 
@@ -75,39 +68,30 @@ test.describe("prune_account_history tests", () => {
   });
 
   test("can send a transaction after pruning account history", async ({
-    page,
+    run,
   }) => {
     test.slow();
-    const { accountId, faucetId } = await setupWalletAndFaucet(page);
+    const result = await run(async ({ client, sdk, helpers }) => {
+      const { wallet, faucet } = await helpers.setupWalletAndFaucet();
 
-    // Mint twice to build history, then prune, then mint again to verify
-    // the account is still fully functional post-pruning.
-    await mintTransaction(page, accountId, faucetId);
-    await mintTransaction(page, accountId, faucetId);
+      // Mint twice to build history, then prune, then mint again to verify
+      // the account is still fully functional post-pruning.
+      await helpers.mockMintAndConsume(wallet.id(), faucet.id());
+      await helpers.mockMintAndConsume(wallet.id(), faucet.id());
 
-    // Prune faucet history up to nonce 1
-    await page.evaluate(async (_faucetId: string) => {
-      const client = window.client;
-      const faucetAccountId = window.AccountId.fromHex(_faucetId);
-      await client.pruneAccountHistory(faucetAccountId, new window.Felt(1n));
-    }, faucetId);
+      // Prune faucet history up to nonce 1
+      await client.pruneAccountHistory(faucet.id(), new sdk.Felt(1n));
 
-    // Mint again : this should succeed if pruning didn't break anything
-    await mintTransaction(page, accountId, faucetId);
+      // Mint again: this should succeed if pruning didn't break anything
+      await helpers.mockMintAndConsume(wallet.id(), faucet.id());
 
-    const result = await page.evaluate(
-      async ({ _faucetId }: { _faucetId: string }) => {
-        const client = window.client;
-        const faucetAccountId = window.AccountId.fromHex(_faucetId);
-        const account = await client.getAccount(faucetAccountId);
+      const account = await client.getAccount(faucet.id());
 
-        return {
-          accountExists: account !== null && account !== undefined,
-          nonce: account!.nonce().toString(),
-        };
-      },
-      { _faucetId: faucetId }
-    );
+      return {
+        accountExists: account !== undefined,
+        nonce: account.nonce().toString(),
+      };
+    });
 
     expect(result.accountExists).toBe(true);
     expect(Number(result.nonce)).toBeGreaterThanOrEqual(3);
