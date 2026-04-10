@@ -1,5 +1,6 @@
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, presets};
+use miden_client::account::component::TokenMetadata;
 use miden_client::account::{
     Account,
     AccountId,
@@ -11,11 +12,12 @@ use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::Asset;
 use miden_client::rpc::{GrpcClient, NodeRpcClient};
 use miden_client::transaction::{AccountComponentInterface, AccountInterface};
+use miden_client::utils::base_units_to_tokens;
 use miden_client::{Client, PrettyPrint, ZERO};
 
 use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::utils::{load_faucet_details_map, parse_account_id};
+use crate::utils::parse_account_id;
 use crate::{client_binary_name, create_dynamic_table};
 
 pub const DEFAULT_ACCOUNT_ID_KEY: &str = "default_account_id";
@@ -113,7 +115,7 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
 
         table.add_row(vec![
             acc.id().to_hex(),
-            account_type_display_name(&acc.id())?,
+            account_type_display_name(&client, acc.id()).await?,
             acc.id().storage_mode().to_string(),
             acc.nonce().as_canonical_u64().to_string(),
             status,
@@ -159,15 +161,15 @@ pub async fn show_account<AUTH>(
     // Vault Table
     {
         let assets = account.vault().assets();
-        let faucet_details_map = load_faucet_details_map()?;
         println!("Assets: ");
 
         let mut table = create_dynamic_table(&["Asset Type", "Faucet", "Amount"]);
         for asset in assets {
             let (asset_type, faucet, amount) = match asset {
                 Asset::Fungible(fungible_asset) => {
-                    let (faucet, amount) =
-                        faucet_details_map.format_fungible_asset(&fungible_asset)?;
+                    let metadata = get_token_metadata(&client, fungible_asset.faucet_id()).await?;
+                    let faucet = metadata.symbol().to_string();
+                    let amount = base_units_to_tokens(fungible_asset.amount(), metadata.decimals());
                     ("Fungible Asset", faucet, amount)
                 },
                 Asset::NonFungible(non_fungible_asset) => {
@@ -249,7 +251,10 @@ async fn print_summary_table<AUTH>(
         Cell::new("Account Commitment"),
         Cell::new(account.to_commitment().to_string()),
     ]);
-    table.add_row(vec![Cell::new("Type"), Cell::new(account_type_display_name(&account.id())?)]);
+    table.add_row(vec![
+        Cell::new("Type"),
+        Cell::new(account_type_display_name(client, account.id()).await?),
+    ]);
     table.add_row(vec![
         Cell::new("Storage mode"),
         Cell::new(account.id().storage_mode().to_string()),
@@ -272,13 +277,37 @@ async fn print_summary_table<AUTH>(
     Ok(())
 }
 
+/// Reads the token metadata from a fungible faucet account's storage metadata slot.
+async fn get_token_metadata<AUTH>(
+    client: &Client<AUTH>,
+    account_id: AccountId,
+) -> Result<TokenMetadata, CliError> {
+    let word = client
+        .account_reader(account_id)
+        .get_storage_item(TokenMetadata::metadata_slot().clone())
+        .await
+        .map_err(|err| {
+            CliError::Faucet(
+                err.into(),
+                format!("Failed to read token metadata for faucet {account_id}"),
+            )
+        })?;
+    TokenMetadata::try_from(word).map_err(|err| {
+        CliError::Faucet(
+            err.into(),
+            format!("Failed to parse token metadata for faucet {account_id}"),
+        )
+    })
+}
+
 /// Returns a display name for the account type.
-fn account_type_display_name(account_id: &AccountId) -> Result<String, CliError> {
+async fn account_type_display_name<AUTH>(
+    client: &Client<AUTH>,
+    account_id: AccountId,
+) -> Result<String, CliError> {
     Ok(match account_id.account_type() {
         AccountType::FungibleFaucet => {
-            let faucet_details_map = load_faucet_details_map()?;
-            let token_symbol = faucet_details_map.get_token_symbol_or_default(account_id);
-
+            let token_symbol = get_token_metadata(client, account_id).await?.symbol().to_string();
             format!("Fungible faucet (token symbol: {token_symbol})")
         },
         AccountType::NonFungibleFaucet => "Non-fungible faucet".to_string(),

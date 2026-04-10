@@ -1,10 +1,9 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use std::collections::BTreeSet;
-use std::sync::Arc;
 
 use miden_client::account::Address;
-use miden_client::assembly::{CodeBuilder, DefaultSourceManager, Module, ModuleKind, Path};
+use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, PublicKeyCommitment};
 use miden_client::keystore::Keystore;
 use miden_client::store::AccountStorageFilter;
@@ -27,7 +26,6 @@ use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
 };
-use miden_protocol::transaction::TransactionKernel;
 use miden_protocol::{EMPTY_WORD, Felt, Word, ZERO};
 use miden_standards::account::wallets::BasicWallet;
 use miden_standards::testing::mock_account::MockAccountExt;
@@ -341,19 +339,8 @@ async fn build_three_slot_account(
 
 /// Compiles a transaction script that calls a procedure from the slots component.
 fn compile_slot_tx_script(proc_name: &str) -> miden_client::transaction::TransactionScript {
-    let assembler = TransactionKernel::assembler();
-    let source_manager = Arc::new(DefaultSourceManager::default());
-    let module = Module::parser(ModuleKind::Library)
-        .parse_str(
-            Path::new("external_contract::slots_contract"),
-            SLOTS_COMPONENT_MASM,
-            source_manager.clone(),
-        )
-        .unwrap();
-    let library = assembler.assemble_library([module]).unwrap();
-
     CodeBuilder::new()
-        .with_dynamically_linked_library(library)
+        .with_linked_module("external_contract::slots_contract", SLOTS_COMPONENT_MASM)
         .unwrap()
         .compile_tx_script(format!(
             "use external_contract::slots_contract
