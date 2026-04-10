@@ -44,11 +44,9 @@ Public accounts store their state on-chain. Other accounts can read their state 
 
 ```rust
 let key_pair = SecretKey::with_rng(client.rng());
-let anchor_block = client.get_latest_epoch_block().await?;
 let init_seed: [u8; 32] = rand::random();
 
 let new_account = AccountBuilder::new(init_seed)
-    .anchor((&anchor_block).try_into()?)
     .account_type(AccountType::RegularAccountImmutableCode)
     .storage_mode(AccountStorageMode::Public)
     .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
@@ -61,7 +59,7 @@ client.add_account(&new_account, false).await?;
 ```
 
 :::note
-Public accounts require an anchor block from the current epoch. The client fetches this with `get_latest_epoch_block()`. During sync, the client updates public account state by querying the node.
+During sync, the client updates public account state by querying the node.
 :::
 
 ## Creating a mutable wallet

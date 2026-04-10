@@ -21,11 +21,9 @@ use miden_objects::account::auth::AuthRpoFalcon512;
 use miden_objects::account::component::BasicWallet;
 
 let key_pair = SecretKey::with_rng(client.rng());
-let anchor_block = client.get_latest_epoch_block().await?;
 let init_seed: [u8; 32] = rand::random();
 
 let account_c = AccountBuilder::new(init_seed)
-    .anchor((&anchor_block).try_into()?)
     .account_type(AccountType::RegularAccountImmutableCode)
     .storage_mode(AccountStorageMode::Public)
     .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
@@ -62,14 +60,12 @@ let payment = PaymentNoteDescription::new(
 
 let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
     payment,
-    None,
     NoteType::Public, // Public note — recipient can discover it by syncing
-    client.rng(),
+    &mut client.rng(),
 )?;
 
-// Execute and submit
-let tx_result = client.new_transaction(account_a_id, tx_request).await?;
-client.submit_transaction(tx_result).await?;
+// Execute, prove, and submit
+client.submit_new_transaction(account_a_id, tx_request).await?;
 
 println!("Public P2ID note sent!");
 ```
@@ -84,14 +80,13 @@ client.sync_state().await?;
 
 // Get consumable notes for Account C
 let consumable = client.get_consumable_notes(Some(account_c.id())).await?;
-let note_ids: Vec<_> = consumable.iter().map(|n| n.note.id()).collect();
+let notes: Vec<_> = consumable.into_iter().map(|n| n.note).collect();
 
-if !note_ids.is_empty() {
+if !notes.is_empty() {
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(account_c.id(), note_ids)?;
+        .build_consume_notes(notes)?;
 
-    let tx_result = client.new_transaction(account_c.id(), tx_request).await?;
-    client.submit_transaction(tx_result).await?;
+    client.submit_new_transaction(account_c.id(), tx_request).await?;
 
     println!("Notes consumed by Account C!");
 }
@@ -104,8 +99,9 @@ Sync and check Account C's balance:
 ```rust
 client.sync_state().await?;
 
-let (account, _) = client.get_account(account_c.id()).await?;
-println!("Account C vault: {:?}", account.vault());
+let reader = client.account_reader(account_c.id());
+let balance = reader.get_balance(faucet_id).await?;
+println!("Account C balance: {}", balance);
 ```
 
 Account C should now hold the transferred tokens.

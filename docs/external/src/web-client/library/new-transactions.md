@@ -12,7 +12,7 @@ This guide demonstrates how to create and submit different types of transactions
 The simplified API handles the full transaction lifecycle automatically (execute, prove, submit). Each transaction method returns a transaction ID.
 
 ```typescript
-import { MidenClient, AccountType } from "@miden-sdk/ts-sdk";
+import { MidenClient, AccountType } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -40,7 +40,7 @@ try {
 ## Sending Tokens
 
 ```typescript
-import { MidenClient } from "@miden-sdk/ts-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -63,7 +63,7 @@ try {
 ## Minting Tokens
 
 ```typescript
-import { MidenClient } from "@miden-sdk/ts-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -83,7 +83,7 @@ try {
 ## Consuming Notes
 
 ```typescript
-import { MidenClient } from "@miden-sdk/ts-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -114,7 +114,7 @@ try {
 ## Swap Transactions
 
 ```typescript
-import { MidenClient } from "@miden-sdk/ts-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -136,7 +136,7 @@ try {
 For better performance, offload proving to a remote prover:
 
 ```typescript
-import { MidenClient } from "@miden-sdk/ts-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
     // Set a default prover URL for all transactions
@@ -171,7 +171,7 @@ Using a remote prover can significantly improve performance for complex transact
 ## Waiting for Confirmation
 
 ```typescript
-import { MidenClient } from "@miden-sdk/ts-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -201,7 +201,7 @@ try {
 Preview a transaction without submitting it:
 
 ```typescript
-import { MidenClient } from "@miden-sdk/ts-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -224,7 +224,7 @@ try {
 Use `transactions.execute()` to run a custom MASM transaction script against an account. Compile the script first with [`client.compile.txScript()`](./compile.md).
 
 ```typescript
-import { MidenClient, AccountType, AuthSecretKey, StorageSlot } from "@miden-sdk/ts-sdk";
+import { MidenClient, AccountType, AuthSecretKey, StorageSlot } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -361,7 +361,7 @@ try {
 For full control over note inputs/outputs, build a `TransactionRequest` manually and call `submit()`:
 
 ```typescript
-import { MidenClient, TransactionRequestBuilder } from "@miden-sdk/ts-sdk";
+import { MidenClient, TransactionRequestBuilder } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();

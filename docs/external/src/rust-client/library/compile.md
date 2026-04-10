@@ -132,7 +132,8 @@ let component_code = client.code_builder()
     .compile_account_component_code(counter_code)?;
 
 // 2. Create the contract account
-let (account, seed) = AccountBuilder::new(client.rng())
+let init_seed: [u8; 32] = rand::random();
+let account = AccountBuilder::new(init_seed)
     .account_type(AccountType::RegularAccountImmutableCode)
     .storage_mode(AccountStorageMode::Public)
     .with_component(component_code, AccountComponentMetadata::new(
@@ -165,8 +166,7 @@ let tx_request = TransactionRequestBuilder::new()
     .with_custom_script(tx_script)?
     .build()?;
 
-let tx_result = client.new_transaction(account.id(), tx_request).await?;
-client.submit_transaction(tx_result).await?;
+client.submit_new_transaction(account.id(), tx_request).await?;
 ```
 
 See [Creating transactions](./new-transactions.md) for more on `TransactionRequestBuilder`.

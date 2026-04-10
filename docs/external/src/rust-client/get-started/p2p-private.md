@@ -60,14 +60,12 @@ let payment = PaymentNoteDescription::new(
 
 let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
     payment,
-    None,
     NoteType::Private, // Private note — details not publicly visible
-    client.rng(),
+    &mut client.rng(),
 )?;
 
-// Execute and submit
-let tx_result = client.new_transaction(account_a_id, tx_request).await?;
-client.submit_transaction(tx_result).await?;
+// Execute, prove, and submit
+client.submit_new_transaction(account_a_id, tx_request).await?;
 
 println!("Private P2ID note sent!");
 ```
@@ -82,14 +80,13 @@ client.sync_state().await?;
 
 // Get consumable notes for Account B
 let consumable = client.get_consumable_notes(Some(account_b.id())).await?;
-let note_ids: Vec<_> = consumable.iter().map(|n| n.note.id()).collect();
+let notes: Vec<_> = consumable.into_iter().map(|n| n.note).collect();
 
-if !note_ids.is_empty() {
+if !notes.is_empty() {
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(account_b.id(), note_ids)?;
+        .build_consume_notes(notes)?;
 
-    let tx_result = client.new_transaction(account_b.id(), tx_request).await?;
-    client.submit_transaction(tx_result).await?;
+    client.submit_new_transaction(account_b.id(), tx_request).await?;
 
     println!("Notes consumed by Account B!");
 }
@@ -102,11 +99,14 @@ Sync and check both accounts:
 ```rust
 client.sync_state().await?;
 
-let (acct_a, _) = client.get_account(account_a_id).await?;
-let (acct_b, _) = client.get_account(account_b.id()).await?;
+let reader_a = client.account_reader(account_a_id);
+let reader_b = client.account_reader(account_b.id());
 
-println!("Account A vault: {:?}", acct_a.vault());
-println!("Account B vault: {:?}", acct_b.vault());
+let balance_a = reader_a.get_balance(faucet_id).await?;
+let balance_b = reader_b.get_balance(faucet_id).await?;
+
+println!("Account A balance: {}", balance_a);
+println!("Account B balance: {}", balance_b);
 ```
 
 ## Using the note transport network

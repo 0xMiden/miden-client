@@ -61,12 +61,15 @@ println!("Imported {} notes", imported_ids.len());
 
 ### Import from a `.mno` file
 
-Import a note exported as a `.mno` file (e.g., from the faucet):
+To import a note exported as a `.mno` file (e.g., from the faucet), read and deserialize it into a `NoteFile`, then import:
 
 ```rust
-use std::path::Path;
+use std::fs;
+use miden_client::note::NoteFile;
 
-client.import_note_from_file(Path::new("path/to/note.mno")).await?;
+let bytes = fs::read("path/to/note.mno")?;
+let note_file = NoteFile::read_from_bytes(&bytes)?;
+let imported_ids = client.import_notes(&[note_file]).await?;
 ```
 
 After importing, [sync](./sync.md) the client to verify the note's inclusion on-chain. The note's status transitions from `Expected` to `Committed`.

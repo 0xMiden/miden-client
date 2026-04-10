@@ -10,7 +10,7 @@ sidebar_position: 1
 The root provider that initializes the WASM client and provides context to all hooks.
 
 ```tsx
-import { MidenProvider } from "@miden-sdk/react-sdk";
+import { MidenProvider } from "@miden-sdk/react";
 
 <MidenProvider
   config={{
@@ -50,7 +50,7 @@ import { MidenProvider } from "@miden-sdk/react-sdk";
 Access the client instance and core utilities.
 
 ```tsx
-import { useMiden } from "@miden-sdk/react-sdk";
+import { useMiden } from "@miden-sdk/react";
 
 function MyComponent() {
   const {

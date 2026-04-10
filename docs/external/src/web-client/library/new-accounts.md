@@ -10,7 +10,7 @@ This guide demonstrates how to create and work with different types of accounts 
 ## Creating a Regular Wallet Account
 
 ```typescript
-import { MidenClient, AccountType, AuthScheme } from "@miden-sdk/ts-sdk";
+import { MidenClient, AccountType, AuthScheme } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -47,7 +47,7 @@ Custom contracts are regular accounts whose code is provided by the caller. Use 
 Use `client.compile.component()` to compile Miden Assembly (MASM) code into an `AccountComponent`. See the [Compiler resource guide](./compile.md) for full details.
 
 ```typescript
-import { MidenClient, AccountType, AuthSecretKey, StorageSlot } from "@miden-sdk/ts-sdk";
+import { MidenClient, AccountType, AuthSecretKey, StorageSlot } from "@miden-sdk/miden-sdk";
 
 const counterCode = `
     use miden::protocol::active_account
@@ -146,7 +146,7 @@ try {
 ## Creating a Faucet Account
 
 ```typescript
-import { MidenClient, AccountType, AuthScheme } from "@miden-sdk/ts-sdk";
+import { MidenClient, AccountType, AuthScheme } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();

@@ -13,8 +13,8 @@ The TypeScript SDK is a pure TypeScript package that wraps the [WASM bridge](../
 
 ```mermaid
 flowchart LR
-    A["Rust core<br/>(@miden-sdk/rust-sdk)"] -->|"compiled to WASM"| B["WASM bridge<br/>(@miden-sdk/wasm-bridge)"]
-    B -->|"npm dependency"| C["TypeScript SDK<br/>(@miden-sdk/ts-sdk)"]
+    A["Rust core<br/>(@miden-sdk/rust-sdk)"] -->|"compiled to WASM"| B["WASM bridge<br/>(@miden-sdk/miden-sdk)"]
+    B -->|"npm dependency"| C["TypeScript SDK<br/>(@miden-sdk/miden-sdk)"]
     C --> D["Your application"]
 ```
 

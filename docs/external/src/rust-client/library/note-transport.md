@@ -76,9 +76,8 @@ for note in &notes {
 // 1. Create a private note via transaction
 let payment = PaymentNoteDescription::new(vec![asset], sender_id, target_id);
 let tx_request = TransactionRequestBuilder::new()
-    .build_pay_to_id(payment, None, NoteType::Private, client.rng())?;
-let tx_result = client.new_transaction(sender_id, tx_request).await?;
-client.submit_transaction(tx_result).await?;
+    .build_pay_to_id(payment, NoteType::Private, &mut client.rng())?;
+client.submit_new_transaction(sender_id, tx_request).await?;
 
 // 2. Send via transport
 let output_notes = client.get_output_notes(NoteFilter::All).await?;
@@ -92,11 +91,10 @@ client.fetch_private_notes().await?;
 
 // 4. Consume the received note
 let consumable = client.get_consumable_notes(Some(account_id)).await?;
-let note_ids: Vec<_> = consumable.iter().map(|n| n.note.id()).collect();
+let notes: Vec<_> = consumable.into_iter().map(|n| n.note).collect();
 let tx_request = TransactionRequestBuilder::new()
-    .build_consume_notes(account_id, note_ids)?;
-let tx_result = client.new_transaction(account_id, tx_request).await?;
-client.submit_transaction(tx_result).await?;
+    .build_consume_notes(notes)?;
+client.submit_new_transaction(account_id, tx_request).await?;
 ```
 
 :::note

@@ -103,8 +103,12 @@ If you received a private note file, import it:
 ```rust
 use std::path::Path;
 
-// Import the note from the downloaded file
-client.import_note_from_file(Path::new("path/to/note.mno")).await?;
+// Read and import the note from the downloaded file
+use miden_client::note::NoteFile;
+
+let bytes = std::fs::read("path/to/note.mno")?;
+let note_file = NoteFile::read_from_bytes(&bytes)?;
+client.import_notes(&[note_file]).await?;
 ```
 
 Sync the client to confirm the note exists on-chain:
@@ -125,16 +129,15 @@ use miden_client::transaction::TransactionRequestBuilder;
 
 // Get consumable notes for the account
 let consumable_notes = client.get_consumable_notes(Some(new_account.id())).await?;
-let note_ids: Vec<_> = consumable_notes.iter().map(|n| n.note.id()).collect();
+let notes: Vec<_> = consumable_notes.into_iter().map(|n| n.note).collect();
 
-if !note_ids.is_empty() {
+if !notes.is_empty() {
     // Build a consume-notes transaction
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(new_account.id(), note_ids)?;
+        .build_consume_notes(notes)?;
 
-    // Execute and submit the transaction (this generates a ZK proof)
-    let tx_result = client.new_transaction(new_account.id(), tx_request).await?;
-    client.submit_transaction(tx_result).await?;
+    // Execute, prove, and submit the transaction (this generates a ZK proof)
+    client.submit_new_transaction(new_account.id(), tx_request).await?;
 
     println!("Notes consumed — ZK proof generated and submitted!");
 }

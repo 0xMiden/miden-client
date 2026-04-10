@@ -9,28 +9,34 @@ This guide demonstrates how to export accounts and notes from the Miden Client.
 
 ## Exporting notes
 
-Export a note by its ID:
+Retrieve an output note and convert it to a `NoteFile` for export:
 
 ```rust
-let note_data = client.export_note(note_id).await?;
+use miden_client::note::NoteExportType;
+
+let note_record = client.get_output_note(note_id).await?
+    .expect("note exists");
+
+let note_file = note_record.into_note_file(&NoteExportType::Full)?;
 ```
 
 Notes can be exported in different formats depending on how much data to include:
 
-| Format | Description |
+| `NoteExportType` | Description |
 |--------|-------------|
-| ID only | Contains only the note ID (works for public notes that can be fetched from the network) |
-| With details | Contains the note ID, metadata, and creation block number |
-| Full | Contains the complete note with its inclusion proof |
+| `Id` | Contains only the note ID (works for public notes that can be fetched from the network) |
+| `Details` | Contains the note ID, metadata, and creation block number |
+| `Full` | Contains the complete note with its inclusion proof |
 
-Exported notes can be shared with other users and [imported](./import.md) into their clients.
+The resulting `NoteFile` can be serialized and shared with other users for [import](./import.md) into their clients.
 
 ## Exporting accounts
 
 Retrieve the full account state for export:
 
 ```rust
-let account = client.get_account(account_id).await?;
+let account = client.get_account(account_id).await?
+    .expect("account exists");
 ```
 
 The returned `Account` object includes the full account state, code, and vault. It can be serialized and shared with another client via [import](./import.md).

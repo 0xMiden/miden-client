@@ -13,9 +13,9 @@ sidebar_position: 1
 ## Install the SDK
 
 ```bash
-npm install @miden-sdk/ts-sdk
+npm install @miden-sdk/miden-sdk
 # or
-yarn add @miden-sdk/ts-sdk
+yarn add @miden-sdk/miden-sdk
 ```
 
 ## Verify the installation
@@ -23,7 +23,7 @@ yarn add @miden-sdk/ts-sdk
 Create a quick test to confirm everything works:
 
 ```typescript
-import { MidenClient } from "@miden-sdk/ts-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 const client = await MidenClient.create();
 console.log("Miden SDK initialized successfully");

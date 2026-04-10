@@ -9,16 +9,16 @@ This page explains how the React SDK is structured and how its pieces fit togeth
 
 ## How the SDK reaches the browser
 
-The React SDK is a pure TypeScript/React package that wraps the [WASM bridge](../index.md). It consumes `@miden-sdk/wasm-bridge` as a peer dependency and adds React-specific patterns — hooks, context providers, and Zustand state management — on top.
+The React SDK is a pure TypeScript/React package that wraps the [WASM bridge](../index.md). It consumes `@miden-sdk/miden-sdk` as a peer dependency and adds React-specific patterns — hooks, context providers, and Zustand state management — on top.
 
 ```mermaid
 flowchart LR
-    A["Rust core<br/>(@miden-sdk/rust-sdk)"] -->|"compiled to WASM"| B["WASM bridge<br/>(@miden-sdk/wasm-bridge)"]
-    B -->|"peer dependency"| C["React SDK<br/>(@miden-sdk/react-sdk)"]
+    A["Rust core<br/>(@miden-sdk/rust-sdk)"] -->|"compiled to WASM"| B["WASM bridge<br/>(@miden-sdk/miden-sdk)"]
+    B -->|"peer dependency"| C["React SDK<br/>(@miden-sdk/react)"]
     C --> D["Your React app"]
 ```
 
-The React SDK contains no Rust or WASM code of its own. From your perspective, `npm install @miden-sdk/react-sdk @miden-sdk/wasm-bridge` is all you need.
+The React SDK contains no Rust or WASM code of its own. From your perspective, `npm install @miden-sdk/react @miden-sdk/miden-sdk` is all you need.
 
 ## Runtime architecture
 
@@ -30,7 +30,7 @@ flowchart TB
         Components["React components"]
     end
 
-    subgraph ReactSDK["@miden-sdk/react-sdk"]
+    subgraph ReactSDK["@miden-sdk/react"]
         Hooks["Hooks layer<br/>query + mutation hooks"]
         Store["Zustand store<br/>accounts · notes · sync<br/>asset metadata · loading states"]
         Provider["MidenProvider<br/>client lifecycle · auto-sync<br/>exclusive WASM access"]

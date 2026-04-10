@@ -10,7 +10,7 @@ sidebar_position: 5
 Access sync progress and trigger manual synchronization.
 
 ```tsx
-import { useSyncState } from "@miden-sdk/react-sdk";
+import { useSyncState } from "@miden-sdk/react";
 
 function SyncStatus() {
   const { syncHeight, isSyncing, lastSyncTime, error, sync } = useSyncState();
@@ -37,7 +37,7 @@ Auto-sync runs in the background at the interval configured in `MidenProvider` (
 Wait for a transaction to be committed on chain. Polls until the transaction status changes or times out.
 
 ```tsx
-import { useWaitForCommit } from "@miden-sdk/react-sdk";
+import { useWaitForCommit } from "@miden-sdk/react";
 
 const { mutate: waitForCommit, isLoading, error } = useWaitForCommit();
 
@@ -53,7 +53,7 @@ await waitForCommit({
 Wait for a minimum number of consumable notes to arrive for an account. Useful after requesting faucet tokens or receiving a transfer.
 
 ```tsx
-import { useWaitForNotes } from "@miden-sdk/react-sdk";
+import { useWaitForNotes } from "@miden-sdk/react";
 
 const { mutate: waitForNotes, isLoading, error } = useWaitForNotes();
 
@@ -70,7 +70,7 @@ await waitForNotes({
 Manage a temporary session wallet lifecycle: create → fund → consume → ready. Persists state in localStorage for recovery across page reloads.
 
 ```tsx
-import { useSessionAccount } from "@miden-sdk/react-sdk";
+import { useSessionAccount } from "@miden-sdk/react";
 
 const {
   initialize,        // Start the create → fund → consume flow

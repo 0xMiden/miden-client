@@ -11,29 +11,37 @@ This guide demonstrates how to retrieve and inspect existing accounts using the 
 
 ```rust
 let account_id = AccountId::from_hex("0x1234...")?;
-let (account, _seed) = client.get_account(account_id).await?;
+let account = client.get_account(account_id).await?;
 
-println!("Account ID: {:?}", account.id());
-println!("Nonce: {:?}", account.nonce());
-println!("Vault: {:?}", account.vault());
+if let Some(account) = account {
+    println!("Account ID: {:?}", account.id());
+    println!("Nonce: {:?}", account.nonce());
+    println!("Vault: {:?}", account.vault());
+}
 ```
 
 ## List all accounts
 
 ```rust
-let accounts = client.get_accounts().await?;
+let account_headers = client.get_account_headers().await?;
 
-for (account, _seed) in &accounts {
-    println!("Account: {:?}", account.id());
+for (header, status) in &account_headers {
+    println!("Account: {:?}, Status: {:?}", header.id(), status);
 }
 ```
 
 ## Check account balance
 
-After syncing, inspect an account's vault to see its assets:
+After syncing, use an `AccountReader` to check an account's balance, or retrieve the full account to inspect its vault:
 
 ```rust
-let (account, _) = client.get_account(account_id).await?;
+// Using AccountReader (lightweight — fetches only what you need)
+let reader = client.account_reader(account_id);
+let balance = reader.get_balance(faucet_id).await?;
+println!("Balance: {}", balance);
+
+// Or retrieve the full account
+let account = client.get_account(account_id).await?.expect("account exists");
 
 for asset in account.vault().assets() {
     match asset {

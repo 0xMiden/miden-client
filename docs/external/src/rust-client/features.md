@@ -11,10 +11,9 @@ Build and execute transactions programmatically using `TransactionRequestBuilder
 
 ```rust
 let tx_request = TransactionRequestBuilder::new()
-    .build_pay_to_id(payment_description, None, NoteType::Private, client.rng())?;
+    .build_pay_to_id(payment_description, NoteType::Private, &mut client.rng())?;
 
-let result = client.new_transaction(sender_id, tx_request).await?;
-client.submit_transaction(result).await?;
+client.submit_new_transaction(sender_id, tx_request).await?;
 ```
 
 ### Proof generation

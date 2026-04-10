@@ -14,13 +14,18 @@ Every transaction follows this pattern:
 ```rust
 // 1. Build a TransactionRequest
 let tx_request = TransactionRequestBuilder::new()
-    .build_pay_to_id(payment, None, NoteType::Private, client.rng())?;
+    .build_pay_to_id(payment, NoteType::Private, &mut client.rng())?;
 
-// 2. Execute the transaction (produces a proof)
-let tx_result = client.new_transaction(sender_id, tx_request).await?;
+// 2. Execute, prove, and submit in one call
+client.submit_new_transaction(sender_id, tx_request).await?;
+```
 
-// 3. Submit to the network
-client.submit_transaction(tx_result).await?;
+For more control, use the staged flow:
+
+```rust
+let tx_result = client.execute_transaction(sender_id, tx_request).await?;
+let proven_tx = client.prove_transaction(&tx_result).await?;
+client.submit_proven_transaction(proven_tx, tx_result).await?;
 ```
 
 After submission, the transaction is tracked locally. Sync to confirm it has been committed on-chain.
@@ -49,13 +54,11 @@ let payment = PaymentNoteDescription::new(
 
 let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
     payment,
-    None,              // Optional recall height
     NoteType::Private, // or NoteType::Public
-    client.rng(),
+    &mut client.rng(),
 )?;
 
-let tx_result = client.new_transaction(sender_id, tx_request).await?;
-client.submit_transaction(tx_result).await?;
+client.submit_new_transaction(sender_id, tx_request).await?;
 ```
 
 ### Note types
@@ -67,14 +70,16 @@ client.submit_transaction(tx_result).await?;
 
 ### Recallable notes
 
-Pass a recall height to allow the sender to reclaim the note if the recipient hasn't consumed it:
+Set a reclaim height on the payment description to allow the sender to reclaim the note if the recipient hasn't consumed it:
 
 ```rust
+let payment = PaymentNoteDescription::new(vec![asset], sender_id, target_id)
+    .with_reclaim_height(100.into()); // Sender can reclaim after block 100
+
 let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
     payment,
-    Some(100),         // Sender can reclaim after block 100
     NoteType::Public,
-    client.rng(),
+    &mut client.rng(),
 )?;
 ```
 
@@ -85,14 +90,13 @@ Consume notes to receive assets into an account:
 ```rust
 // Get consumable notes for an account
 let consumable = client.get_consumable_notes(Some(account_id)).await?;
-let note_ids: Vec<_> = consumable.iter().map(|n| n.note.id()).collect();
+let notes: Vec<_> = consumable.into_iter().map(|n| n.note).collect();
 
-if !note_ids.is_empty() {
+if !notes.is_empty() {
     let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(account_id, note_ids)?;
+        .build_consume_notes(notes)?;
 
-    let tx_result = client.new_transaction(account_id, tx_request).await?;
-    client.submit_transaction(tx_result).await?;
+    client.submit_new_transaction(account_id, tx_request).await?;
 }
 ```
 
@@ -105,21 +109,14 @@ let faucet_id = AccountId::from_hex("0xFAUCET...")?;
 let target_id = AccountId::from_hex("0xTARGET...")?;
 let asset = FungibleAsset::new(faucet_id, 1000)?.into();
 
-let payment = PaymentNoteDescription::new(
-    vec![asset],
-    faucet_id,
+let tx_request = TransactionRequestBuilder::new().build_mint_fungible_asset(
+    asset,
     target_id,
-);
-
-let tx_request = TransactionRequestBuilder::new().build_pay_to_id(
-    payment,
-    None,
     NoteType::Public,
-    client.rng(),
+    &mut client.rng(),
 )?;
 
-let tx_result = client.new_transaction(faucet_id, tx_request).await?;
-client.submit_transaction(tx_result).await?;
+client.submit_new_transaction(faucet_id, tx_request).await?;
 ```
 
 ## Swap transactions
@@ -130,16 +127,20 @@ Create an atomic swap — offer one asset in exchange for another:
 let offered_asset = FungibleAsset::new(faucet_a_id, 100)?.into();
 let requested_asset = FungibleAsset::new(faucet_b_id, 200)?.into();
 
-let tx_request = TransactionRequestBuilder::new().build_swap(
+let swap_data = SwapNoteDescription::new(
     source_account_id,
     offered_asset,
     requested_asset,
+);
+
+let tx_request = TransactionRequestBuilder::new().build_swap(
+    swap_data,
     NoteType::Public,
-    client.rng(),
+    NoteType::Private, // payback note type
+    &mut client.rng(),
 )?;
 
-let tx_result = client.new_transaction(source_account_id, tx_request).await?;
-client.submit_transaction(tx_result).await?;
+client.submit_new_transaction(source_account_id, tx_request).await?;
 ```
 
 When another account consumes the swap note, it receives the offered asset and the requested asset is removed from its vault into a new note the original account can consume.
@@ -172,13 +173,12 @@ Use `TransactionRequestBuilder` for full control over inputs, outputs, and scrip
 
 ```rust
 let tx_request = TransactionRequestBuilder::new()
-    .with_custom_script(transaction_script)?
-    .with_own_output_notes(output_notes)
-    .with_expected_output_notes(expected_notes)
+    .custom_script(transaction_script)?
+    .own_output_notes(output_notes)
+    .expected_output_notes(expected_notes)
     .build()?;
 
-let tx_result = client.new_transaction(account_id, tx_request).await?;
-client.submit_transaction(tx_result).await?;
+client.submit_new_transaction(account_id, tx_request).await?;
 ```
 
 :::note

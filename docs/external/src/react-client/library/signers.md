@@ -12,7 +12,7 @@ The SDK supports external wallet providers through a `SignerContext` that plugs 
 Access the current signer's connection state.
 
 ```tsx
-import { useSigner } from "@miden-sdk/react-sdk";
+import { useSigner } from "@miden-sdk/react";
 
 function WalletButton() {
   const { isConnected, connect, disconnect, name } = useSigner();
@@ -87,7 +87,7 @@ import {
   MidenProvider,
   MultiSignerProvider,
   SignerSlot,
-} from "@miden-sdk/react-sdk";
+} from "@miden-sdk/react";
 import { ParaSignerProvider } from "@miden-sdk/use-miden-para-react";
 import { TurnkeySignerProvider } from "@miden-sdk/miden-turnkey-react";
 import { MidenFiSignerProvider } from "@miden-sdk/miden-wallet-adapter-react";
@@ -95,7 +95,7 @@ import { MidenFiSignerProvider } from "@miden-sdk/miden-wallet-adapter-react";
 function App() {
   return (
     <MultiSignerProvider>
-      <ParaSignerProvider apiKey="your-key" environment="BETA">
+      <ParaSignerProvider apiKey="your-key" environment="PRODUCTION">
         <SignerSlot />
       </ParaSignerProvider>
       <TurnkeySignerProvider>
@@ -119,7 +119,7 @@ function App() {
 List registered signers and switch between them.
 
 ```tsx
-import { useMultiSigner } from "@miden-sdk/react-sdk";
+import { useMultiSigner } from "@miden-sdk/react";
 
 function SignerSelector() {
   const multiSigner = useMultiSigner();

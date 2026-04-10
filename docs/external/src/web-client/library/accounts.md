@@ -10,7 +10,7 @@ This guide demonstrates how to retrieve and work with existing accounts using th
 ## Retrieving a Single Account
 
 ```typescript
-import { MidenClient } from "@miden-sdk/ts-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -61,7 +61,7 @@ Once imported, the account is stored locally and kept up to date automatically v
 ## Listing All Accounts
 
 ```typescript
-import { MidenClient } from "@miden-sdk/ts-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -79,7 +79,7 @@ try {
 ## Getting Account Details
 
 ```typescript
-import { MidenClient } from "@miden-sdk/ts-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -100,7 +100,7 @@ try {
 ## Checking Account Balance
 
 ```typescript
-import { MidenClient } from "@miden-sdk/ts-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
@@ -116,7 +116,7 @@ try {
 ## Address Management
 
 ```typescript
-import { MidenClient } from "@miden-sdk/ts-sdk";
+import { MidenClient } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
