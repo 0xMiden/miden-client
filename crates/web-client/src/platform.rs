@@ -65,7 +65,7 @@ pub(crate) fn js_to_bytes(js_bytes: &JsBytes) -> Vec<u8> {
 pub(crate) struct AsyncCell<T>(std::cell::RefCell<T>);
 
 #[cfg(feature = "nodejs")]
-pub(crate) struct AsyncCell<T>(tokio::sync::Mutex<SendWrapper<T>>);
+pub(crate) struct AsyncCell<T>(tokio::sync::Mutex<T>);
 
 #[cfg(feature = "browser")]
 impl<T> AsyncCell<T> {
@@ -87,30 +87,15 @@ impl<T> AsyncCell<T> {
 }
 
 #[cfg(feature = "nodejs")]
-impl<T> AsyncCell<T> {
+impl<T: Send> AsyncCell<T> {
     pub fn new(val: T) -> Self {
-        Self(tokio::sync::Mutex::new(SendWrapper(val)))
+        Self(tokio::sync::Mutex::new(val))
     }
 
     pub async fn lock(&self) -> impl core::ops::DerefMut<Target = T> + '_ {
-        tokio::sync::MutexGuard::map(self.0.lock().await, |w| &mut w.0)
+        self.0.lock().await
     }
 }
-
-/// Wrapper that unsafely implements `Send` and `Sync` for its inner value.
-///
-/// SAFETY: napi-rs with `tokio_rt` uses a multi-threaded tokio runtime, so futures
-/// spawned from async napi functions can be polled on different worker threads.
-/// This is sound because the concrete types behind our trait objects (`SqliteStore`,
-/// `GrpcClient`, `FilesystemKeyStore`) are all `Send + Sync` — only the `dyn Trait`
-/// bounds lack `Send`. Access is further serialized by `tokio::sync::Mutex` in `AsyncCell`.
-#[cfg(feature = "nodejs")]
-pub(crate) struct SendWrapper<T>(pub T);
-
-#[cfg(feature = "nodejs")]
-unsafe impl<T> Send for SendWrapper<T> {}
-#[cfg(feature = "nodejs")]
-unsafe impl<T> Sync for SendWrapper<T> {}
 
 // NUMERIC TYPES
 // ================================================================================================
