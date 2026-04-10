@@ -475,7 +475,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// retrieving node information even when there's a version mismatch.
     async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError>;
 
-    /// Fetches the status of an specific network note ID.
+    /// Fetches the status of a specific network note ID.
     ///
     /// This is useful for debugging when a network note fails.
     async fn get_network_note_status(
