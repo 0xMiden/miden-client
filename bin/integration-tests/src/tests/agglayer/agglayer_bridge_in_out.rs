@@ -226,7 +226,7 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
 
         ger_manager.client.sync_state().await?;
 
-        // Submit UPDATE_GER note
+        // Submit UPDATE_GER note: done by the ger manager
         let update_ger_note =
             UpdateGerNote::create(ger, ger_manager_id, bridge_id, ger_manager.client.rng())?;
         let tx_request = TransactionRequestBuilder::new()
@@ -239,7 +239,7 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
         wait_for_blocks(&mut ger_manager.client, 5).await;
         println!("[bridge_in_out] Round {round}: waited for bridge to consume UPDATE_GER note");
 
-        // Submit CLAIM note
+        // Submit CLAIM note: done by the user (or could also be a claim manager entity)
         let miden_claim_amount = leaf_data
             .amount
             .scale_to_token_amount(scale as u32)
@@ -251,12 +251,17 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
             leaf_data,
             miden_claim_amount,
         };
-        let claim_note =
-            create_claim_note(claim_inputs, bridge_id, ger_manager_id, ger_manager.client.rng())?;
+        let claim_note = create_claim_note(
+            claim_inputs,
+            bridge_id,
+            destination_account.id(),
+            user.client.rng(),
+        )?;
         let tx_request =
             TransactionRequestBuilder::new().own_output_notes(vec![claim_note]).build()?;
-        let tx_id = ger_manager.client.submit_new_transaction(ger_manager_id, tx_request).await?;
-        wait_for_tx(&mut ger_manager.client, tx_id).await?;
+        let tx_id =
+            user.client.submit_new_transaction(destination_account.id(), tx_request).await?;
+        wait_for_tx(&mut user.client, tx_id).await?;
         println!("[bridge_in_out] Round {round}: CLAIM note submitted");
 
         // Wait for the P2ID note to arrive at the destination
