@@ -167,10 +167,6 @@ pub struct NoteUpdateTracker {
     input_notes_by_nullifier: BTreeMap<Nullifier, NoteId>,
     /// Fast lookup map from nullifier to output note id.
     output_notes_by_nullifier: BTreeMap<Nullifier, NoteId>,
-    /// Map from nullifier to its per-account position in the consuming transaction order.
-    /// Nullifiers from the same account are in execution order; ordering across different
-    /// accounts is not guaranteed.
-    nullifier_order: BTreeMap<Nullifier, u32>,
 }
 
 impl NoteUpdateTracker {
@@ -266,18 +262,6 @@ impl NoteUpdateTracker {
         input_note_unspent_nullifiers.chain(output_note_unspent_nullifiers)
     }
 
-    /// Appends nullifiers to the per-account ordered nullifier list.
-    ///
-    /// Nullifiers from the same account must be in execution order; ordering across different
-    /// accounts is not guaranteed.
-    pub fn extend_nullifiers(&mut self, nullifiers: impl IntoIterator<Item = Nullifier>) {
-        for nullifier in nullifiers {
-            let next_pos =
-                u32::try_from(self.nullifier_order.len()).expect("nullifier count exceeds u32");
-            self.nullifier_order.entry(nullifier).or_insert(next_pos);
-        }
-    }
-
     // UPDATE METHODS
     // --------------------------------------------------------------------------------------------
 
@@ -369,9 +353,8 @@ impl NoteUpdateTracker {
         nullifier_update: &NullifierUpdate,
         find_committed_block: impl Fn(&TransactionId) -> Option<BlockNumber>,
         external_consumer_account: Option<AccountId>,
+        consumed_tx_order: Option<u32>,
     ) -> Result<(), ClientError> {
-        let order = self.get_nullifier_order(nullifier_update.nullifier);
-
         if let Some(input_note_update) =
             self.get_input_note_update_by_nullifier(nullifier_update.nullifier)
         {
@@ -391,7 +374,7 @@ impl NoteUpdateTracker {
                     external_consumer_account,
                 )?;
             }
-            input_note_update.inner_mut().set_consumed_tx_order(order);
+            input_note_update.inner_mut().set_consumed_tx_order(consumed_tx_order);
         }
 
         if let Some(output_note_record) =
@@ -406,12 +389,6 @@ impl NoteUpdateTracker {
 
     // PRIVATE HELPERS
     // --------------------------------------------------------------------------------------------
-
-    /// Returns the position of the given nullifier in the consuming transaction order, or `None`
-    /// if it is not present.
-    fn get_nullifier_order(&self, nullifier: Nullifier) -> Option<u32> {
-        self.nullifier_order.get(&nullifier).copied()
-    }
 
     /// Returns a mutable reference to the input note record with the provided ID if it exists.
     fn get_input_note_by_id(&mut self, note_id: NoteId) -> Option<&mut InputNoteRecord> {
