@@ -511,6 +511,8 @@ impl NodeRpcClient for MockRpcApi {
                         .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
                         .collect();
 
+                    // NOTE: The mock returns all entries even when too_many_entries is set.
+                    // In production, the node would return partial data for oversized maps.
                     let too_many_entries = entries.len() > self.oversize_threshold;
                     let account_storage_map_detail = AccountStorageMapDetails {
                         slot_name: slot_name.clone(),

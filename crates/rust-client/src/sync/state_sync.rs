@@ -24,7 +24,7 @@ use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
 use miden_protocol::note::{Note, NoteId, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::InputNoteCommitment;
-use miden_protocol::{Felt, Word};
+use miden_protocol::{EMPTY_WORD, Felt, Word};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -523,6 +523,8 @@ impl StateSync {
         account_commitment_updates: &[(AccountId, Word)],
         block_num: BlockNumber,
     ) -> Result<(), ClientError> {
+        // "Public" here includes both Public and Network accounts, since both have
+        // their state stored on-chain and follow the same sync path.
         let (public_accounts, private_accounts): (Vec<_>, Vec<_>) =
             accounts.iter().partition(|a| !a.id().is_private());
 
@@ -576,14 +578,14 @@ impl StateSync {
             let (storage_requirements, known_code) =
                 self.fetch_local_account_hints(account_id).await;
 
-            let (_proof_block_num, proof) = self
+            let (proof_block_num, proof) = self
                 .rpc_api
                 .get_account_proof(
                     account_id,
                     storage_requirements,
                     AccountStateAt::ChainTip,
                     known_code,
-                    None,
+                    Some(EMPTY_WORD),
                 )
                 .await
                 .map_err(ClientError::RpcError)?;
@@ -606,7 +608,9 @@ impl StateSync {
                 if self.store.is_some() {
                     // Delta path: build an AccountDelta from incremental updates,
                     // fetching storage slots and vault from the store on demand.
-                    let delta = self.build_account_delta(&details, local_header, block_num).await?;
+                    let delta = self
+                        .build_account_delta(&details, local_header, block_num, proof_block_num)
+                        .await?;
                     account_updates.extend(AccountUpdates::new(
                         vec![PublicAccountUpdate::Delta {
                             new_header: details.header.clone(),
@@ -630,6 +634,7 @@ impl StateSync {
                                 Vec::new(),
                             ));
                         },
+                        // This should not happen since we only fetch public accounts here.
                         FetchedAccount::Private(..) => {},
                     }
                 }
@@ -767,17 +772,19 @@ impl StateSync {
         &self,
         details: &AccountDetails,
         local_header: &AccountHeader,
-        sync_height: BlockNumber,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
     ) -> Result<AccountDelta, ClientError> {
         let store = self.store.as_ref().expect("store required for delta sync");
         let account_id = details.header.id();
 
         let storage_delta = self
-            .build_storage_delta(details, account_id, sync_height, store.as_ref())
+            .build_storage_delta(details, account_id, block_from, block_to, store.as_ref())
             .await?;
 
-        let vault_delta =
-            self.build_vault_delta(details, account_id, sync_height, store.as_ref()).await?;
+        let vault_delta = self
+            .build_vault_delta(details, account_id, block_from, block_to, store.as_ref())
+            .await?;
 
         // --- Nonce delta ---
         let old_nonce = local_header.nonce().as_canonical_u64();
@@ -801,7 +808,8 @@ impl StateSync {
         &self,
         details: &AccountDetails,
         account_id: AccountId,
-        sync_height: BlockNumber,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
         store: &dyn Store,
     ) -> Result<AccountStorageDelta, ClientError> {
         let mut storage_delta = AccountStorageDelta::new();
@@ -845,7 +853,7 @@ impl StateSync {
                 if map_delta_cache.is_none() {
                     let map_info = self
                         .rpc_api
-                        .sync_storage_maps(sync_height, None, account_id)
+                        .sync_storage_maps(block_from, Some(block_to), account_id)
                         .await
                         .map_err(ClientError::RpcError)?;
                     map_delta_cache = Some(map_info.updates);
@@ -977,7 +985,8 @@ impl StateSync {
         &self,
         details: &AccountDetails,
         account_id: AccountId,
-        sync_height: BlockNumber,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
         store: &dyn Store,
     ) -> Result<AccountVaultDelta, ClientError> {
         let mut vault_delta = AccountVaultDelta::default();
@@ -988,7 +997,7 @@ impl StateSync {
             // Oversized vault: fetch delta from sync endpoint.
             let vault_info = self
                 .rpc_api
-                .sync_account_vault(sync_height, None, account_id)
+                .sync_account_vault(block_from, Some(block_to), account_id)
                 .await
                 .map_err(ClientError::RpcError)?;
 

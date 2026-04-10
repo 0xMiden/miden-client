@@ -3021,6 +3021,7 @@ async fn sync_storage_maps_pagination_from_middle() {
 /// internally handles the oversized storage maps.
 #[tokio::test]
 async fn sync_large_public_account() {
+    // 1. Create a public account with a large storage map.
     let map_slot = StorageSlot::with_map(
         StorageSlotName::new("test::large_map").unwrap(),
         StorageMap::with_entries(
