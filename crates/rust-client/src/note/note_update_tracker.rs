@@ -351,7 +351,6 @@ impl NoteUpdateTracker {
             .and_then(|update| update.inner().consumer_transaction_id().copied())
     }
 
-
     /// Applies the necessary state transitions to the [`NoteUpdateTracker`] when a note is
     /// nullified in a block.
     ///
