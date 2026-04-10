@@ -111,7 +111,7 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         let executed_transaction = tx_update.executed_transaction();
 
-        let updated_fungible_assets = Self::get_account_fungible_assets_for_delta(
+        let old_vault_assets = Self::get_account_fungible_assets_for_delta(
             conn,
             executed_transaction.account_id(),
             executed_transaction.account_delta(),
@@ -163,7 +163,7 @@ impl SqliteStore {
             &mut smt_forest,
             &executed_transaction.initial_account().into(),
             executed_transaction.final_account(),
-            updated_fungible_assets,
+            &old_vault_assets,
             &old_map_roots,
             executed_transaction.account_delta(),
         )?;

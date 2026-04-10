@@ -64,6 +64,9 @@ pub(crate) mod data_store;
 mod errors;
 pub use errors::*;
 
+mod delta;
+pub use delta::{AppliedAccountDelta, apply_account_delta_to_forest, compute_vault_delta};
+
 mod smt_forest;
 pub use smt_forest::AccountSmtForest;
 

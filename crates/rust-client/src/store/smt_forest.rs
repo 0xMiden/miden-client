@@ -64,6 +64,19 @@ impl AccountSmtForest {
         Ok((asset, witness))
     }
 
+    /// Retrieves the vault asset and its witness, returning `Ok(None)` if the key is not tracked.
+    pub fn try_get_asset_and_witness(
+        &self,
+        vault_root: Word,
+        vault_key: AssetVaultKey,
+    ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
+        match self.get_asset_and_witness(vault_root, vault_key) {
+            Ok((asset, witness)) => Ok(Some((asset, witness))),
+            Err(StoreError::MerkleStoreError(MerkleError::UntrackedKey(_))) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+
     /// Retrieves the storage map witness for a specific map item.
     pub fn get_storage_map_item_witness(
         &self,
