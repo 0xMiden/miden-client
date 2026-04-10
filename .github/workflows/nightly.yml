@@ -71,9 +71,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: "next"
-      - name: Add wasm target
-        if: matrix.package == 'miden-client-web' || matrix.package == 'miden-idxdb-store'
-        run: rustup target add wasm32-unknown-unknown
       - name: Install binstall
         uses: cargo-bins/cargo-binstall@main
       - name: Install cargo-msrv
@@ -95,8 +92,4 @@ jobs:
           cargo msrv show --manifest-path "${{ steps.pkg.outputs.manifest_path }}"
       - name: Check MSRV
         run: |
-          EXTRA_ARGS=""
-          if [[ "${{ matrix.package }}" == "miden-client-web" || "${{ matrix.package }}" == "miden-idxdb-store" ]]; then
-            EXTRA_ARGS="--target wasm32-unknown-unknown"
-          fi
-          cargo msrv verify --manifest-path "${{ steps.pkg.outputs.manifest_path }}" $EXTRA_ARGS
+          cargo msrv verify --manifest-path "${{ steps.pkg.outputs.manifest_path }}"

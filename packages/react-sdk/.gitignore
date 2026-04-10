@@ -1,6 +1,0 @@
-node_modules/
-dist/
-*.tsbuildinfo
-.eslintcache
-test-results/
-playwright-report/

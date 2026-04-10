@@ -44,37 +44,6 @@ jobs:
           tool: taplo-cli@0.10.0
       - run: make toml-check
 
-  eslint:
-    name: Typescript eslint checks
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - run: make rust-client-ts-lint
-
-  react-sdk-lint:
-    name: React SDK lint and typecheck
-    runs-on: ubuntu-24.04
-    needs: [wasm-bindgen-types]
-    steps:
-      - uses: actions/checkout@v6
-      - name: Fetch web client dist
-        uses: actions/download-artifact@v4
-        with:
-          name: web-client-artifacts
-          path: ./crates/web-client/dist
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      - name: Check React SDK version sync
-        run: node scripts/check-react-sdk-sync.js
-      - name: Install dependencies
-        run: ./scripts/retry-yarn-install.sh packages/react-sdk
-      - name: Run lint
-        run: make react-sdk-lint
-      - name: Run typecheck
-        run: cd ./packages/react-sdk && yarn typecheck
-
   clippy:
     name: Clippy
     runs-on: ubuntu-24.04
@@ -87,19 +56,6 @@ jobs:
       - name: make - clippy
         run: make clippy
 
-  clippy-wasm:
-    name: Clippy WASM
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - name: Install Rust with nightly clippy
-        run: |
-          rustup update --no-self-update nightly
-          rustup target add --toolchain nightly wasm32-unknown-unknown
-          rustup +nightly component add clippy
-      - name: make - clippy-wasm
-        run: make clippy-wasm
-
   format:
     name: Format check
     runs-on: ubuntu-24.04
@@ -109,45 +65,8 @@ jobs:
         run: |
           rustup update --no-self-update nightly
           rustup +nightly component add rustfmt
-      - name: Install prettier
-        run: yarn install
       - name: make - format-check
         run: make format-check
-
-  wasm-bindgen-types:
-    name: Wasm bindgen types
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-          cache-dependency-path: |
-            crates/web-client/yarn.lock
-            crates/idxdb-store/src/yarn.lock
-      - name: Install Rust with wasm target
-        run: |
-          rustup update --no-self-update
-          rustup target add wasm32-unknown-unknown
-      - name: Install dependencies
-        working-directory: crates/web-client
-        run: yarn install --frozen-lockfile
-      - name: Build web client
-        working-directory: crates/web-client
-        run: yarn build
-      - name: Check bindgen type coverage
-        working-directory: crates/web-client
-        run: yarn check:wasm-types
-      - name: Check method classification
-        working-directory: crates/web-client
-        run: yarn check:method-classification
-      - name: Upload web client dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-client-artifacts
-          path: ./crates/web-client/dist
 
   rustdocs:
     name: Build rust documentation
