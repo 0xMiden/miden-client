@@ -17,6 +17,7 @@ FEATURES_CLIENT=--features "std"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 PROVER_DIR="crates/testing/prover"
+TEST_MIDEN_NOTE_TRANSPORT_URL?=http://127.0.0.1:57292
 
 # --- Linting -------------------------------------------------------------------------------------
 
