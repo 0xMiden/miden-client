@@ -21,6 +21,16 @@ pub enum SyncTarget {
     ProvenChainTip,
 }
 
+impl From<SyncTarget> for proto::rpc::sync_chain_mmr_request::UpperBound {
+    fn from(target: SyncTarget) -> Self {
+        match target {
+            SyncTarget::BlockNumber(block_num) => Self::BlockNum(block_num.as_u32()),
+            SyncTarget::CommittedChainTip => Self::ChainTip(proto::rpc::ChainTip::Committed.into()),
+            SyncTarget::ProvenChainTip => Self::ChainTip(proto::rpc::ChainTip::Proven.into()),
+        }
+    }
+}
+
 // CHAIN MMR INFO
 // ================================================================================================
 

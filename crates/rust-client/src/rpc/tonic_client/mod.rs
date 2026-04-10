@@ -590,19 +590,7 @@ impl NodeRpcClient for GrpcClient {
     ) -> Result<ChainMmrInfo, RpcError> {
         let block_from = block_from.as_u32();
 
-        let upper_bound = Some(match upper_bound {
-            SyncTarget::BlockNumber(block_num) => {
-                proto::rpc::sync_chain_mmr_request::UpperBound::BlockNum(block_num.as_u32())
-            },
-            SyncTarget::CommittedChainTip => {
-                proto::rpc::sync_chain_mmr_request::UpperBound::ChainTip(
-                    proto::rpc::ChainTip::Committed.into(),
-                )
-            },
-            SyncTarget::ProvenChainTip => proto::rpc::sync_chain_mmr_request::UpperBound::ChainTip(
-                proto::rpc::ChainTip::Proven.into(),
-            ),
-        });
+        let upper_bound = Some(upper_bound.into());
 
         let request = proto::rpc::SyncChainMmrRequest { block_from, upper_bound };
 
