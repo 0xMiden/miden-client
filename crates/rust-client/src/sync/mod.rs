@@ -140,8 +140,9 @@ where
         let Some(state_sync_update) =
             state_sync.sync_state(&mut current_partial_mmr, input).await?
         else {
-            let block_num = self.get_sync_height().await?;
-            return Ok(SyncSummary::new_empty(block_num));
+            let block_num = u32::try_from(current_partial_mmr.num_leaves().saturating_sub(1))
+                .map_err(|_| ClientError::InvalidPartialMmrForest)?;
+            return Ok(SyncSummary::new_empty(block_num.into()));
         };
 
         let sync_summary: SyncSummary = (&state_sync_update).into();

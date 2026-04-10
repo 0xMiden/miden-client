@@ -9,10 +9,8 @@ use miden_protocol::note::{NoteId, Nullifier};
 use miden_protocol::transaction::{InputNoteCommitment, TransactionId};
 
 use super::SyncSummary;
-use crate::ClientError;
 use crate::account::Account;
 use crate::note::{NoteUpdateTracker, NoteUpdateType};
-use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::transaction::{
     TransactionInclusion,
     TransactionRecord as RpcTransactionRecord,
@@ -101,70 +99,6 @@ impl From<&StateSyncUpdate> for SyncSummary {
     }
 }
 
-impl StateSyncUpdate {
-    /// Applies pre-derived transaction data to the update.
-    ///
-    /// 1. Stores execution-ordered nullifiers for later consumption ordering.
-    /// 2. Processes each transaction inclusion (committing local transactions or recording external
-    ///    consumers for tracked accounts).
-    /// 3. Discards stale/expired pending transactions.
-    /// 4. Transitions tracked output notes to committed using inclusion proofs.
-    pub fn apply_transaction_data(
-        &mut self,
-        chain_tip_header: &BlockHeader,
-        tx_inclusions: &[TransactionInclusion],
-        ordered_nullifiers: Vec<Nullifier>,
-        tx_discard_delta: Option<u32>,
-    ) -> Result<(), ClientError> {
-        self.transaction_updates.extend_nullifiers(ordered_nullifiers);
-
-        for transaction_inclusion in tx_inclusions {
-            self.transaction_updates.apply_transaction_inclusion(
-                transaction_inclusion,
-                u64::from(chain_tip_header.timestamp()),
-            );
-        }
-
-        self.transaction_updates
-            .apply_sync_height_update(chain_tip_header.block_num(), tx_discard_delta);
-
-        for transaction in tx_inclusions {
-            self.note_updates
-                .apply_output_note_inclusion_proofs(&transaction.output_notes)?;
-        }
-
-        Ok(())
-    }
-
-    /// Applies nullifier updates to both note and transaction trackers.
-    ///
-    /// For each nullifier:
-    /// 1. Resolves whether a committed local transaction consumed the note.
-    /// 2. Resolves the external consumer account (if any) from the transaction tracker.
-    /// 3. Applies the state transition to the note tracker.
-    /// 4. Discards pending transactions whose input note was nullified.
-    pub fn apply_nullifier_updates(
-        &mut self,
-        nullifier_updates: Vec<NullifierUpdate>,
-    ) -> Result<(), ClientError> {
-        for update in nullifier_updates {
-            let external_consumer =
-                self.transaction_updates.external_nullifier_account(&update.nullifier);
-            let consumed_tx_order = self.transaction_updates.nullifier_order(&update.nullifier);
-
-            let transaction_updates = &self.transaction_updates;
-            self.note_updates.apply_nullifiers_state_transitions(
-                &update,
-                |tx_id| transaction_updates.committed_transaction_block(tx_id),
-                external_consumer,
-                consumed_tx_order,
-            )?;
-
-            self.transaction_updates.apply_input_note_nullified(update.nullifier);
-        }
-        Ok(())
-    }
-}
 
 /// Contains all the block information that needs to be added in the client's store after a sync.
 #[derive(Debug, Clone, Default)]
@@ -306,6 +240,31 @@ impl TransactionUpdateTracker {
             TransactionStatus::Committed { block_number, .. } => Some(block_number),
             _ => None,
         })
+    }
+
+    /// Processes transaction inclusions from the sync response.
+    ///
+    /// 1. Stores execution-ordered nullifiers for later consumption ordering.
+    /// 2. Processes each transaction inclusion (committing local transactions or recording
+    ///    external consumers for tracked accounts).
+    /// 3. Discards stale/expired pending transactions.
+    pub fn apply_transaction_inclusions(
+        &mut self,
+        chain_tip_header: &BlockHeader,
+        tx_inclusions: &[TransactionInclusion],
+        ordered_nullifiers: Vec<Nullifier>,
+        tx_discard_delta: Option<u32>,
+    ) {
+        self.extend_nullifiers(ordered_nullifiers);
+
+        for transaction_inclusion in tx_inclusions {
+            self.apply_transaction_inclusion(
+                transaction_inclusion,
+                u64::from(chain_tip_header.timestamp()),
+            );
+        }
+
+        self.apply_sync_height_update(chain_tip_header.block_num(), tx_discard_delta);
     }
 
     /// Applies the necessary state transitions to the [`TransactionUpdateTracker`] when a

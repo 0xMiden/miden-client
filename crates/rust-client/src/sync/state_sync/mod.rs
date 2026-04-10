@@ -167,7 +167,7 @@ impl StateSync {
         current_partial_mmr: &mut PartialMmr,
         input: StateSyncInput,
     ) -> Result<Option<StateSyncUpdate>, ClientError> {
-        let block_num = u32::try_from(current_partial_mmr.forest().num_leaves().saturating_sub(1))
+        let block_num = u32::try_from(current_partial_mmr.num_leaves().saturating_sub(1))
             .map_err(|_| ClientError::InvalidPartialMmrForest)?
             .into();
 
@@ -181,12 +181,9 @@ impl StateSync {
             return Ok(None);
         };
 
-        let mut update = StateSyncUpdate {
-            block_num: sync_data.chain_tip_header.block_num(),
-            note_updates: NoteUpdateTracker::new(input.input_notes, input.output_notes),
-            transaction_updates: TransactionUpdateTracker::new(input.uncommitted_transactions),
-            ..Default::default()
-        };
+        let mut note_updates = NoteUpdateTracker::new(input.input_notes, input.output_notes);
+        let mut transaction_updates =
+            TransactionUpdateTracker::new(input.uncommitted_transactions);
 
         // Derive transaction data once from raw records.
         let account_commitment_updates =
@@ -195,10 +192,9 @@ impl StateSync {
             derive_transaction_inclusions(sync_data.transaction_records);
 
         // Step 1: Advance MMR to chain tip.
-        Self::advance_mmr(
+        let mut block_updates = Self::advance_mmr(
             sync_data.mmr_delta,
             &sync_data.chain_tip_header,
-            &mut update.block_updates,
             current_partial_mmr,
         )?;
 
@@ -206,33 +202,47 @@ impl StateSync {
         self.process_note_inclusions(
             sync_data.note_blocks,
             sync_data.public_notes,
-            &mut update,
+            &mut block_updates,
+            &mut note_updates,
             current_partial_mmr,
         )
         .await?;
 
         // Step 3: Update account states (fetches updated public accounts from node).
-        self.process_account_updates(
-            &mut update.account_updates,
-            &input.accounts,
-            &account_commitment_updates,
-        )
-        .await?;
+        let account_updates = self
+            .process_account_updates(&input.accounts, &account_commitment_updates)
+            .await?;
 
-        // Step 4: Process transaction inclusions, nullifier ordering, and output note commits.
-        update.apply_transaction_data(
+        // Step 4: Process transaction inclusions and commit output notes.
+        transaction_updates.apply_transaction_inclusions(
             &sync_data.chain_tip_header,
             &tx_inclusions,
             ordered_nullifiers,
             self.tx_discard_delta,
-        )?;
+        );
+
+        for tx in &tx_inclusions {
+            note_updates.apply_output_note_inclusion_proofs(&tx.output_notes)?;
+        }
 
         // Step 5: Detect notes consumed externally via nullifier sync.
         if self.sync_nullifiers {
-            self.sync_consumed_notes(&mut update, block_num).await?;
+            self.sync_consumed_notes(
+                sync_data.chain_tip_header.block_num(),
+                block_num,
+                &mut note_updates,
+                &mut transaction_updates,
+            )
+            .await?;
         }
 
-        Ok(Some(update))
+        Ok(Some(StateSyncUpdate {
+            block_num: sync_data.chain_tip_header.block_num(),
+            block_updates,
+            note_updates,
+            transaction_updates,
+            account_updates,
+        }))
     }
 }
 

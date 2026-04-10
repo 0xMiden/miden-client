@@ -7,11 +7,13 @@ use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
 use miden_protocol::note::{Note, NoteId, NoteType};
 
-use super::{BlockUpdates, NoteUpdateAction, StateSync, StateSyncUpdate};
+use super::{BlockUpdates, NoteUpdateAction, StateSync};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
+use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::store::{InputNoteRecord, StoreError};
+use crate::sync::state_sync_update::TransactionUpdateTracker;
 use crate::sync::AccountUpdates;
 
 // APPLY METHODS
@@ -25,18 +27,18 @@ impl StateSync {
     pub(super) fn advance_mmr(
         mmr_delta: MmrDelta,
         chain_tip_header: &BlockHeader,
-        block_updates: &mut BlockUpdates,
         current_partial_mmr: &mut PartialMmr,
-    ) -> Result<(), ClientError> {
+    ) -> Result<BlockUpdates, ClientError> {
         let mut new_authentication_nodes =
             current_partial_mmr.apply(mmr_delta).map_err(StoreError::MmrError)?;
         let new_peaks = current_partial_mmr.peaks();
         new_authentication_nodes
             .append(&mut current_partial_mmr.add(chain_tip_header.commitment(), false));
 
+        let mut block_updates = BlockUpdates::default();
         block_updates.insert(chain_tip_header.clone(), false, new_peaks, new_authentication_nodes);
 
-        Ok(())
+        Ok(block_updates)
     }
 
     /// Screens note inclusions and tracks relevant blocks in the MMR.
@@ -49,7 +51,8 @@ impl StateSync {
         &self,
         note_blocks: Vec<NoteSyncBlock>,
         public_notes: BTreeMap<NoteId, Note>,
-        update: &mut StateSyncUpdate,
+        block_updates: &mut BlockUpdates,
+        note_updates: &mut NoteUpdateTracker,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<(), ClientError> {
         // Build input note records for public notes from the fetched note bodies and the
@@ -75,7 +78,7 @@ impl StateSync {
         for block in note_blocks {
             let found_relevant_note = self
                 .screen_notes(
-                    &mut update.note_updates,
+                    note_updates,
                     block.notes,
                     &block.block_header,
                     &public_note_records,
@@ -86,7 +89,7 @@ impl StateSync {
                 Self::track_block_in_mmr(
                     &block.block_header,
                     &block.mmr_path,
-                    &mut update.block_updates,
+                    block_updates,
                     current_partial_mmr,
                 )?;
             }
@@ -101,10 +104,9 @@ impl StateSync {
     /// whose commitment doesn't match the node (potentially locked).
     pub(super) async fn process_account_updates(
         &self,
-        account_updates: &mut AccountUpdates,
         accounts: &[AccountHeader],
         account_commitment_updates: &[(AccountId, Word)],
-    ) -> Result<(), ClientError> {
+    ) -> Result<AccountUpdates, ClientError> {
         let (public_accounts, private_accounts): (Vec<_>, Vec<_>) =
             accounts.iter().partition(|account_header| !account_header.id().is_private());
 
@@ -122,10 +124,7 @@ impl StateSync {
             .copied()
             .collect::<Vec<_>>();
 
-        account_updates
-            .extend(AccountUpdates::new(updated_public_accounts, mismatched_private_accounts));
-
-        Ok(())
+        Ok(AccountUpdates::new(updated_public_accounts, mismatched_private_accounts))
     }
 
     /// Detects notes consumed externally by querying the node for new nullifiers.
@@ -135,25 +134,26 @@ impl StateSync {
     /// input notes were nullified are discarded.
     pub(super) async fn sync_consumed_notes(
         &self,
-        update: &mut StateSyncUpdate,
+        chain_tip_block_num: BlockNumber,
         current_block_num: BlockNumber,
+        note_updates: &mut NoteUpdateTracker,
+        transaction_updates: &mut TransactionUpdateTracker,
     ) -> Result<(), ClientError> {
-        let nullifiers_tags: Vec<u16> = update
-            .note_updates
+        let nullifiers_tags: Vec<u16> = note_updates
             .unspent_nullifiers()
             .map(|nullifier| nullifier.prefix())
             .collect();
 
         let mut new_nullifiers = self
             .rpc_api
-            .sync_nullifiers(&nullifiers_tags, current_block_num, Some(update.block_num))
+            .sync_nullifiers(&nullifiers_tags, current_block_num, Some(chain_tip_block_num))
             .await?;
 
         // Discard nullifiers newer than the synced block (possible if the chain tip advances
         // between the sync_state and sync_nullifiers calls).
-        new_nullifiers.retain(|n| n.block_num <= update.block_num);
+        new_nullifiers.retain(|n| n.block_num <= chain_tip_block_num);
 
-        update.apply_nullifier_updates(new_nullifiers)
+        apply_nullifier_updates(new_nullifiers, note_updates, transaction_updates)
     }
 
     // PRIVATE HELPERS
@@ -227,4 +227,36 @@ impl StateSync {
 
         Ok(())
     }
+}
+
+// HELPERS
+// ================================================================================================
+
+/// Applies nullifier updates to both note and transaction trackers.
+///
+/// For each nullifier:
+/// 1. Resolves whether a committed local transaction consumed the note.
+/// 2. Resolves the external consumer account (if any) from the transaction tracker.
+/// 3. Applies the state transition to the note tracker.
+/// 4. Discards pending transactions whose input note was nullified.
+fn apply_nullifier_updates(
+    nullifier_updates: Vec<NullifierUpdate>,
+    note_updates: &mut NoteUpdateTracker,
+    transaction_updates: &mut TransactionUpdateTracker,
+) -> Result<(), ClientError> {
+    for update in nullifier_updates {
+        let external_consumer =
+            transaction_updates.external_nullifier_account(&update.nullifier);
+        let consumed_tx_order = transaction_updates.nullifier_order(&update.nullifier);
+
+        note_updates.apply_nullifiers_state_transitions(
+            &update,
+            |tx_id| transaction_updates.committed_transaction_block(tx_id),
+            external_consumer,
+            consumed_tx_order,
+        )?;
+
+        transaction_updates.apply_input_note_nullified(update.nullifier);
+    }
+    Ok(())
 }
