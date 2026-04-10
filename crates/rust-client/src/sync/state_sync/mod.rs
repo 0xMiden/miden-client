@@ -173,8 +173,7 @@ impl StateSync {
 
         let account_ids: Vec<AccountId> = input.accounts.iter().map(AccountHeader::id).collect();
 
-        // Fetch data from the node by calling SyncChainMmr, SyncNotes, and SyncTransactions
-        // endpoints.
+        // Fetch sync data from the node for the given accounts and note tags.
         let Some(sync_data) =
             self.fetch_sync_data(block_num, &account_ids, &input.note_tags).await?
         else {
@@ -184,7 +183,7 @@ impl StateSync {
         let mut note_updates = NoteUpdateTracker::new(input.input_notes, input.output_notes);
         let mut transaction_updates = TransactionUpdateTracker::new(input.uncommitted_transactions);
 
-        // Derive transaction data once from raw records.
+        // Derive transaction data from the fetched records.
         let account_commitment_updates =
             derive_account_commitment_updates(&sync_data.transaction_records);
         let (tx_inclusions, ordered_nullifiers) =

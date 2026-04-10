@@ -77,9 +77,9 @@ pub use tag::{NoteTagRecord, NoteTagSource};
 mod state_sync;
 pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
 
-mod state_sync_update;
+mod updates;
 pub use state_sync::TransactionUpdateTracker;
-pub use state_sync_update::{AccountUpdates, BlockUpdates, StateSyncUpdate};
+pub use updates::{AccountUpdates, BlockUpdates, StateSyncUpdate};
 
 /// Client synchronization methods.
 impl<AUTH> Client<AUTH>
