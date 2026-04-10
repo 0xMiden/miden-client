@@ -1,9 +1,10 @@
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use core::convert::TryInto;
 
 use miden_protocol::Word;
 
-use crate::rpc::{RpcError, generated as proto};
+use crate::rpc::RpcError;
+use crate::rpc::generated::{self as proto};
 
 /// Represents node status info with fields converted into domain types.
 pub struct RpcStatusInfo {
@@ -33,6 +34,73 @@ pub struct MempoolStatsInfo {
     pub unbatched_transactions: u64,
     pub proposed_batches: u64,
     pub proven_batches: u64,
+}
+
+pub enum NetworkNoteStatus {
+    /// The note is awaiting execution or being retried after transient failures.
+    Pending,
+    /// The note has been consumed by a transaction that was sent to the block producer.
+    Processed,
+    /// The note exceeded the maximum retry count and will not be retried.
+    Discarded,
+    /// The note's consuming transaction has been committed on-chain.
+    Committed,
+}
+
+impl core::fmt::Display for NetworkNoteStatus {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            NetworkNoteStatus::Pending => write!(f, "Pending"),
+            NetworkNoteStatus::Processed => write!(f, "Processed"),
+            NetworkNoteStatus::Discarded => write!(f, "Discarded"),
+            NetworkNoteStatus::Committed => write!(f, "Committed"),
+        }
+    }
+}
+
+pub struct NetworkNoteStatusInfo {
+    pub status: NetworkNoteStatus,
+    pub last_error: Option<String>,
+    pub attempt_count: u32,
+    pub last_attempt_block_num: Option<u32>,
+}
+
+impl TryFrom<i32> for NetworkNoteStatus {
+    type Error = RpcError;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        let value: proto::rpc::NetworkNoteStatus = value
+            .try_into()
+            .map_err(|_| RpcError::ExpectedDataMissing("NetworkNoteStatus".to_string()))?;
+
+        match value {
+            proto::rpc::NetworkNoteStatus::Unspecified => {
+                Err(RpcError::ExpectedDataMissing("NetworkNoteStatus".to_string()))
+            },
+            proto::rpc::NetworkNoteStatus::Pending => Ok(NetworkNoteStatus::Pending),
+            proto::rpc::NetworkNoteStatus::Processed => Ok(NetworkNoteStatus::Processed),
+            proto::rpc::NetworkNoteStatus::Discarded => Ok(NetworkNoteStatus::Discarded),
+            proto::rpc::NetworkNoteStatus::Committed => Ok(NetworkNoteStatus::Committed),
+        }
+    }
+}
+
+impl TryFrom<proto::rpc::GetNetworkNoteStatusResponse> for NetworkNoteStatusInfo {
+    type Error = RpcError;
+
+    fn try_from(value: proto::rpc::GetNetworkNoteStatusResponse) -> Result<Self, Self::Error> {
+        let status = value.status.try_into()?;
+        let last_error = value.last_error;
+        let attempt_count = value.attempt_count;
+        let last_attempt_block_num = value.last_attempt_block_num;
+
+        Ok(NetworkNoteStatusInfo {
+            status,
+            last_error,
+            attempt_count,
+            last_attempt_block_num,
+        })
+    }
 }
 
 impl TryFrom<proto::rpc::RpcStatus> for RpcStatusInfo {

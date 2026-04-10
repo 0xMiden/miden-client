@@ -69,7 +69,7 @@ pub use errors::*;
 mod endpoint;
 pub(crate) use domain::limits::RPC_LIMITS_STORE_SETTING;
 pub use domain::limits::RpcLimits;
-pub use domain::status::RpcStatusInfo;
+pub use domain::status::{NetworkNoteStatus, NetworkNoteStatusInfo, RpcStatusInfo};
 pub use endpoint::Endpoint;
 
 #[cfg(not(feature = "testing"))]
@@ -474,6 +474,14 @@ pub trait NodeRpcClient: Send + Sync {
     /// This is useful for diagnostics when version negotiation fails, as it allows
     /// retrieving node information even when there's a version mismatch.
     async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError>;
+
+    /// Fetches the status of a specific network note ID.
+    ///
+    /// This is useful for debugging when a network note fails.
+    async fn get_network_note_status(
+        &self,
+        note_id: NoteId,
+    ) -> Result<NetworkNoteStatusInfo, RpcError>;
 }
 
 // RPC API ENDPOINT
@@ -497,6 +505,7 @@ pub enum RpcEndpoint {
     SyncAccountVault,
     SyncTransactions,
     GetLimits,
+    GetNetworkNoteStatus,
 }
 
 impl RpcEndpoint {
@@ -518,6 +527,7 @@ impl RpcEndpoint {
             RpcEndpoint::SyncAccountVault => "SyncAccountVault",
             RpcEndpoint::SyncTransactions => "SyncTransactions",
             RpcEndpoint::GetLimits => "GetLimits",
+            RpcEndpoint::GetNetworkNoteStatus => "GetNetworkNoteStatus",
         }
     }
 }
@@ -544,6 +554,7 @@ impl fmt::Display for RpcEndpoint {
             RpcEndpoint::SyncAccountVault => write!(f, "sync_account_vault"),
             RpcEndpoint::SyncTransactions => write!(f, "sync_transactions"),
             RpcEndpoint::GetLimits => write!(f, "get_limits"),
+            RpcEndpoint::GetNetworkNoteStatus => write!(f, "get_network_note_status"),
         }
     }
 }

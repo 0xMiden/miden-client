@@ -6,6 +6,7 @@ pub mod export;
 pub mod import;
 pub mod info;
 pub mod init;
+pub mod network_note_status;
 pub mod new_account;
 pub mod new_transactions;
 pub mod notes;

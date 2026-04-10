@@ -22,6 +22,7 @@ use crate::models::account_storage_requirements::AccountStorageRequirements;
 use crate::models::block_header::BlockHeader;
 use crate::models::endpoint::Endpoint;
 use crate::models::fetched_account::FetchedAccount;
+use crate::models::network_note_status::NetworkNoteStatusInfo;
 use crate::models::note_id::NoteId;
 use crate::models::note_script::NoteScript;
 use crate::models::note_sync_info::NoteSyncInfo;
@@ -243,6 +244,30 @@ impl RpcClient {
             .map_err(|err| js_error_with_context(err, "failed to sync notes"))?;
 
         Ok(info.into())
+    }
+
+    /// Fetches the processing status of a network note by its ID.
+    ///
+    /// Returns information about the note's current status in the network,
+    /// including whether it is pending, processed, discarded, or committed,
+    /// along with error details and attempt count.
+    ///
+    /// @param `note_id` - The ID of the note to query.
+    /// @returns Promise that resolves to a `NetworkNoteStatusInfo` object.
+    #[wasm_bindgen(js_name = "getNetworkNoteStatus")]
+    pub async fn get_network_note_status(
+        &self,
+        note_id: &NoteId,
+    ) -> Result<NetworkNoteStatusInfo, JsValue> {
+        let native_note_id: NativeNoteId = note_id.into();
+
+        let status_info = self
+            .inner
+            .get_network_note_status(native_note_id)
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to get network note status"))?;
+
+        Ok(status_info.into())
     }
 
     // TODO: This can be generalized to retrieve multiple nullifiers
