@@ -440,10 +440,11 @@ impl GrpcClient {
     async fn fetch_full_vault(
         &self,
         account_id: AccountId,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
     ) -> Result<Vec<Asset>, RpcError> {
-        let vault_info =
-            self.sync_account_vault(BlockNumber::from(0), block_to, account_id).await?;
+        let vault_info = self
+            .sync_account_vault(BlockNumber::from(0), Some(block_to), account_id)
+            .await?;
         let mut updates = vault_info.updates;
         updates.sort_by_key(|u| u.block_num);
         Ok(updates
@@ -588,15 +589,18 @@ impl NodeRpcClient for GrpcClient {
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
     ) -> Result<ChainMmrInfo, RpcError> {
-        let block_range = Some(BlockRange {
-            block_from: block_from.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        });
+        let block_from = block_from.as_u32();
 
-        let request = proto::rpc::SyncChainMmrRequest {
-            block_range,
-            finality: proto::rpc::Finality::Committed as i32,
+        let upper_bound = match block_to {
+            Some(block_to) => {
+                Some(proto::rpc::sync_chain_mmr_request::UpperBound::BlockNum(block_to.as_u32()))
+            },
+            None => Some(proto::rpc::sync_chain_mmr_request::UpperBound::ChainTip(
+                proto::rpc::ChainTip::Committed.into(),
+            )),
         };
+
+        let request = proto::rpc::SyncChainMmrRequest { block_from, upper_bound };
 
         let response = self
             .call_with_retry(RpcEndpoint::SyncChainMmr, |mut rpc_api| {
@@ -638,7 +642,7 @@ impl NodeRpcClient for GrpcClient {
             let account_id = details.header.id();
             let nonce = details.header.nonce();
             let assets = if details.vault_details.too_many_assets {
-                self.fetch_full_vault(account_id, Some(block_number)).await?
+                self.fetch_full_vault(account_id, block_number).await?
             } else {
                 details.vault_details.assets
             };
@@ -742,8 +746,7 @@ impl NodeRpcClient for GrpcClient {
                 .into_domain(&known_codes_by_commitment, &storage_requirements)?;
 
             if details.vault_details.too_many_assets {
-                details.vault_details.assets =
-                    self.fetch_full_vault(account_id, Some(block_num)).await?;
+                details.vault_details.assets = self.fetch_full_vault(account_id, block_num).await?;
             }
 
             Some(details)
@@ -883,7 +886,10 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
-        let request = proto::blockchain::BlockNumber { block_num: block_num.as_u32() };
+        let request = proto::blockchain::BlockRequest {
+            block_num: block_num.as_u32(),
+            include_proof: Some(false),
+        };
 
         let response = self
             .call_with_retry(RpcEndpoint::GetBlockByNumber, |mut rpc_api| {
