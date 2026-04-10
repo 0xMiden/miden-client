@@ -7,10 +7,12 @@ use miden_client::account::{AccountFile, AccountId, AccountStorageMode};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::crypto::FeltRng;
 use miden_client::keystore::Keystore;
+use miden_client::note::NoteId;
 use miden_client::testing::common::{
     FilesystemKeyStore,
     TestClient,
     insert_new_wallet,
+    wait_for_blocks,
     wait_for_node,
     wait_for_tx,
 };
@@ -257,4 +259,42 @@ pub async fn setup_core_accounts(
             Ok((bridge_admin_account.id(), ger_manager_account.id(), bridge_account.id()))
         },
     }
+}
+
+/// Polls `sync_state` + `InputNoteReader` until the note with `note_id` appears
+/// as consumed by `consumer_account_id`.
+///
+/// This simulates the Gateway "indexer" pattern: watching the chain for specific
+/// note consumption events rather than waiting a fixed number of blocks.
+pub async fn wait_for_note_consumed(
+    client: &mut TestClient,
+    consumer_account_id: AccountId,
+    note_id: NoteId,
+    max_attempts: u32,
+) -> Result<()> {
+    for attempt in 0..max_attempts {
+        client.sync_state().await?;
+
+        let mut reader = client.input_note_reader(consumer_account_id);
+        while let Some(note) = reader.next().await? {
+            if note.id() == note_id {
+                println!(
+                    "[NoteReader] Note {} consumed by {} (detected on attempt {})",
+                    note_id.to_hex(),
+                    consumer_account_id,
+                    attempt + 1
+                );
+                return Ok(());
+            }
+        }
+
+        // Wait one block before retrying
+        wait_for_blocks(client, 1).await;
+    }
+    anyhow::bail!(
+        "Note {} was not consumed by {} after {} attempts",
+        note_id.to_hex(),
+        consumer_account_id,
+        max_attempts
+    );
 }
