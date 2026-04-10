@@ -79,12 +79,34 @@ contract ClaimAssetTestVectorsLocalTx is Test, DepositContractV2, DepositContrac
     }
 
     /**
+     * @notice Resolves the deposit offset from the DEPOSIT_OFFSET environment variable.
+     *         Falls back to 0 if the env var is not set.
+     *
+     *         The deposit offset controls how many dummy leaves are added before the real
+     *         deposit, resulting in a different leaf_index each time. This is critical for
+     *         repeated test runs against the same node, because the bridge tracks claim
+     *         nullifiers by (leaf_index, source_bridge_network) and rejects duplicates.
+     * @return The number of dummy deposits to insert before the real one
+     */
+    function _resolveDepositOffset() internal view returns (uint256) {
+        try vm.envUint("DEPOSIT_OFFSET") returns (uint256 offset) {
+            console.log("Using deposit offset from DEPOSIT_OFFSET env var:", offset);
+            return offset;
+        } catch {
+            return 0;
+        }
+    }
+
+    /**
      * @notice Generates bridge asset test vectors with VALID Merkle proofs.
      *         Simulates a user calling bridgeAsset() to bridge tokens from L1 to Miden.
      *
      *         The destination address can be overridden via the DESTINATION_ADDRESS env var.
      *         This allows the Rust integration test to create a real wallet, convert its
      *         AccountId to an Ethereum address format, and pass it to this test.
+     *
+     *         Set DEPOSIT_OFFSET to a unique value per run to avoid claim nullifier collisions
+     *         when running multiple times against the same node instance.
      *
      *         Output file: test-vectors/claim_asset_vectors_local_tx.json
      */
@@ -102,6 +124,16 @@ contract ClaimAssetTestVectorsLocalTx is Test, DepositContractV2, DepositContrac
 
         bytes memory metadata = abi.encode("Test Token", "TEST", uint8(18));
         bytes32 metadataHash = keccak256(metadata);
+
+        // ====== ADD DUMMY DEPOSITS FOR UNIQUE LEAF INDEX ======
+
+        // Insert dummy leaves so the real deposit lands at a unique leaf_index.
+        // The bridge tracks claimed deposits by Poseidon2(leaf_index, source_bridge_network),
+        // so each test run needs a different leaf_index to avoid ERR_CLAIM_ALREADY_SPENT.
+        uint256 depositOffset = _resolveDepositOffset();
+        for (uint256 i = 0; i < depositOffset; i++) {
+            _addLeaf(keccak256(abi.encodePacked("dummy_deposit", i)));
+        }
 
         // ====== COMPUTE LEAF VALUE AND ADD TO TREE ======
 

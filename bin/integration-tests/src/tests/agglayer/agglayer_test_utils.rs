@@ -181,6 +181,13 @@ pub fn generate_claim_data_for_account(
         panic!("failed to create test-vectors directory at {}: {}", output_dir.display(), e)
     });
 
+    // Generate a random deposit offset so each test run gets a unique leaf_index.
+    // This prevents the bridge from rejecting the CLAIM as already spent when
+    // running the test multiple times against the same node instance.
+    // Capped to 1000 to keep foundry execution fast (each offset adds one hash).
+    let deposit_offset: u32 = rand::random::<u32>() % 1000;
+    println!("[foundry] Using deposit offset: {}", deposit_offset);
+
     // Run forge test with the destination address as an environment variable
     let mut cmd = std::process::Command::new("forge");
     cmd.arg("test")
@@ -188,6 +195,7 @@ pub fn generate_claim_data_for_account(
         .arg("--match-contract")
         .arg("ClaimAssetTestVectorsLocalTx")
         .env("DESTINATION_ADDRESS", &destination_hex)
+        .env("DEPOSIT_OFFSET", deposit_offset.to_string())
         .current_dir(&foundry_dir);
 
     if let Some(addr) = origin_token_address {
