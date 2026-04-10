@@ -1,9 +1,11 @@
 use alloc::collections::BTreeMap;
 
+use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockHeader;
 use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
 
 use crate::ClientError;
+use crate::rpc::RpcError;
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::store::{InputNoteRecord, OutputNoteRecord};
@@ -60,7 +62,8 @@ impl InputNoteUpdate {
         &self.note
     }
 
-    /// Returns a mutable reference to the inner note record. If the u
+    /// Returns a mutable reference to the inner note record. If the update type is `None` or
+    /// `Update`, it will be set to `Update`.
     fn inner_mut(&mut self) -> &mut InputNoteRecord {
         self.update_type = match self.update_type {
             NoteUpdateType::None | NoteUpdateType::Update => NoteUpdateType::Update,
@@ -78,6 +81,13 @@ impl InputNoteUpdate {
     /// Returns the identifier of the inner note.
     pub fn id(&self) -> NoteId {
         self.note.id()
+    }
+
+    /// Returns the per-account position of the consuming transaction within the account's
+    /// execution chain for the block. `None` for non-consumed notes or when the order has not
+    /// been determined yet.
+    pub fn consumed_tx_order(&self) -> Option<u32> {
+        self.note.state().consumed_tx_order()
     }
 }
 
@@ -157,6 +167,10 @@ pub struct NoteUpdateTracker {
     input_notes_by_nullifier: BTreeMap<Nullifier, NoteId>,
     /// Fast lookup map from nullifier to output note id.
     output_notes_by_nullifier: BTreeMap<Nullifier, NoteId>,
+    /// Map from nullifier to its per-account position in the consuming transaction order.
+    /// Nullifiers from the same account are in execution order; ordering across different
+    /// accounts is not guaranteed.
+    nullifier_order: BTreeMap<Nullifier, u32>,
 }
 
 impl NoteUpdateTracker {
@@ -252,6 +266,18 @@ impl NoteUpdateTracker {
         input_note_unspent_nullifiers.chain(output_note_unspent_nullifiers)
     }
 
+    /// Appends nullifiers to the per-account ordered nullifier list.
+    ///
+    /// Nullifiers from the same account must be in execution order; ordering across different
+    /// accounts is not guaranteed.
+    pub fn extend_nullifiers(&mut self, nullifiers: impl IntoIterator<Item = Nullifier>) {
+        for nullifier in nullifiers {
+            let next_pos =
+                u32::try_from(self.nullifier_order.len()).expect("nullifier count exceeds u32");
+            self.nullifier_order.entry(nullifier).or_insert(next_pos);
+        }
+    }
+
     // UPDATE METHODS
     // --------------------------------------------------------------------------------------------
 
@@ -276,16 +302,17 @@ impl NoteUpdateTracker {
         committed_note: &CommittedNote,
         block_header: &BlockHeader,
     ) -> Result<bool, ClientError> {
-        let inclusion_proof = NoteInclusionProof::new(
-            block_header.block_num(),
-            committed_note.note_index(),
-            committed_note.inclusion_path().clone(),
-        )?;
+        let inclusion_proof = committed_note.inclusion_proof().clone();
+
         let is_tracked_as_input_note =
             if let Some(input_note_record) = self.get_input_note_by_id(*committed_note.note_id()) {
-                // The note belongs to our locally tracked set of input notes
-                input_note_record
-                    .inclusion_proof_received(inclusion_proof.clone(), committed_note.metadata())?;
+                let metadata = committed_note.metadata().cloned().ok_or_else(|| {
+                    ClientError::RpcError(RpcError::ExpectedDataMissing(format!(
+                        "full metadata for committed note {}",
+                        committed_note.note_id()
+                    )))
+                })?;
+                input_note_record.inclusion_proof_received(inclusion_proof.clone(), metadata)?;
                 input_note_record.block_header_received(block_header)?;
 
                 true
@@ -293,12 +320,39 @@ impl NoteUpdateTracker {
                 false
             };
 
-        if let Some(output_note_record) = self.get_output_note_by_id(*committed_note.note_id()) {
-            // The note belongs to our locally tracked set of output notes
-            output_note_record.inclusion_proof_received(inclusion_proof)?;
-        }
+        self.try_commit_output_note(*committed_note.note_id(), inclusion_proof)?;
 
         Ok(is_tracked_as_input_note)
+    }
+
+    /// Applies inclusion proofs from the transaction sync response to tracked output notes.
+    ///
+    /// This transitions output notes from `Expected` to `Committed` state using the
+    /// inclusion proofs returned by `SyncTransactions`.
+    pub(crate) fn apply_output_note_inclusion_proofs(
+        &mut self,
+        committed_notes: &[CommittedNote],
+    ) -> Result<(), ClientError> {
+        for committed_note in committed_notes {
+            self.try_commit_output_note(
+                *committed_note.note_id(),
+                committed_note.inclusion_proof().clone(),
+            )?;
+        }
+        Ok(())
+    }
+
+    /// If the note is tracked as an output note, transitions it to `Committed` with the
+    /// given inclusion proof. No-op if the note is not tracked.
+    fn try_commit_output_note(
+        &mut self,
+        note_id: NoteId,
+        inclusion_proof: NoteInclusionProof,
+    ) -> Result<(), ClientError> {
+        if let Some(output_note) = self.get_output_note_by_id(note_id) {
+            output_note.inclusion_proof_received(inclusion_proof)?;
+        }
+        Ok(())
     }
 
     /// Applies the necessary state transitions to the [`NoteUpdateTracker`] when a note is
@@ -306,31 +360,42 @@ impl NoteUpdateTracker {
     ///
     /// For input note records two possible scenarios are considered:
     /// 1. The note was being processed by a local transaction that just got committed.
-    /// 2. The note was consumed by an external transaction. If a local transaction was processing
-    ///    the note and it didn't get committed, the transaction should be discarded.
+    /// 2. The note was consumed by a transaction not submitted by this client. This includes
+    ///    consumption by untracked accounts as well as consumption by tracked accounts whose
+    ///    transactions were submitted by other client instances. If a local transaction was
+    ///    processing the note and it didn't get committed, the transaction should be discarded.
     pub(crate) fn apply_nullifiers_state_transitions<'a>(
         &mut self,
         nullifier_update: &NullifierUpdate,
         mut committed_transactions: impl Iterator<Item = &'a TransactionRecord>,
+        external_consumer_account: Option<AccountId>,
     ) -> Result<(), ClientError> {
-        if let Some(input_note_record) =
-            self.get_input_note_by_nullifier(nullifier_update.nullifier)
+        let order = self.get_nullifier_order(nullifier_update.nullifier);
+
+        if let Some(input_note_update) =
+            self.get_input_note_update_by_nullifier(nullifier_update.nullifier)
         {
             if let Some(consumer_transaction) = committed_transactions
-                .find(|t| input_note_record.consumer_transaction_id() == Some(&t.id))
+                .find(|t| input_note_update.inner().consumer_transaction_id() == Some(&t.id))
             {
                 // The note was being processed by a local transaction that just got committed
                 if let TransactionStatus::Committed { block_number, .. } =
                     consumer_transaction.status
                 {
-                    input_note_record
+                    input_note_update
+                        .inner_mut()
                         .transaction_committed(consumer_transaction.id, block_number)?;
                 }
             } else {
-                // The note was consumed by an external transaction
-                input_note_record
-                    .consumed_externally(nullifier_update.nullifier, nullifier_update.block_num)?;
+                // The note was consumed by a transaction not submitted by this client.
+                // If the consuming account is tracked, external_consumer_account will be Some.
+                input_note_update.inner_mut().consumed_externally(
+                    nullifier_update.nullifier,
+                    nullifier_update.block_num,
+                    external_consumer_account,
+                )?;
             }
+            input_note_update.inner_mut().set_consumed_tx_order(order);
         }
 
         if let Some(output_note_record) =
@@ -346,6 +411,12 @@ impl NoteUpdateTracker {
     // PRIVATE HELPERS
     // --------------------------------------------------------------------------------------------
 
+    /// Returns the position of the given nullifier in the consuming transaction order, or `None`
+    /// if it is not present.
+    fn get_nullifier_order(&self, nullifier: Nullifier) -> Option<u32> {
+        self.nullifier_order.get(&nullifier).copied()
+    }
+
     /// Returns a mutable reference to the input note record with the provided ID if it exists.
     fn get_input_note_by_id(&mut self, note_id: NoteId) -> Option<&mut InputNoteRecord> {
         self.input_notes.get_mut(&note_id).map(InputNoteUpdate::inner_mut)
@@ -356,14 +427,14 @@ impl NoteUpdateTracker {
         self.output_notes.get_mut(&note_id).map(OutputNoteUpdate::inner_mut)
     }
 
-    /// Returns a mutable reference to the input note record with the provided nullifier if it
+    /// Returns a mutable reference to the input note update with the provided nullifier if it
     /// exists.
-    fn get_input_note_by_nullifier(
+    fn get_input_note_update_by_nullifier(
         &mut self,
         nullifier: Nullifier,
-    ) -> Option<&mut InputNoteRecord> {
+    ) -> Option<&mut InputNoteUpdate> {
         let note_id = self.input_notes_by_nullifier.get(&nullifier).copied()?;
-        self.input_notes.get_mut(&note_id).map(InputNoteUpdate::inner_mut)
+        self.input_notes.get_mut(&note_id)
     }
 
     /// Returns a mutable reference to the output note record with the provided nullifier if it

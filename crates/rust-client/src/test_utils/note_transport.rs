@@ -8,8 +8,14 @@ use core::task::{Context, Poll};
 use chrono::Utc;
 use futures::Stream;
 use miden_protocol::note::{NoteHeader, NoteTag};
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+};
 use miden_tx::utils::sync::RwLock;
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 use crate::note_transport::{
     NoteInfo,

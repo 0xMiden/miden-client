@@ -8,7 +8,6 @@ import {
 } from "../store/MidenStore";
 import { NoteFilter } from "@miden-sdk/miden-sdk";
 import type { NotesFilter, NotesResult, NoteSummary } from "../types";
-import { runExclusiveDirect } from "../utils/runExclusive";
 import { getNoteSummary } from "../utils/notes";
 import { useAssetMetadata } from "./useAssetMetadata";
 import { parseAccountId } from "../utils/accountParsing";
@@ -50,8 +49,7 @@ import { getNoteFilterType } from "../utils/noteFilters";
  * ```
  */
 export function useNotes(options?: NotesFilter): NotesResult {
-  const { client, isReady, runExclusive } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady } = useMiden();
   const notes = useNotesStore();
   const consumableNotes = useConsumableNotesStore();
   const isLoadingNotes = useMidenStore((state) => state.isLoadingNotes);
@@ -71,27 +69,18 @@ export function useNotes(options?: NotesFilter): NotesResult {
     setError(null);
 
     try {
-      const { fetchedNotes, fetchedConsumable } = await runExclusiveSafe(
-        async () => {
-          const filterType = getNoteFilterType(options?.status);
-          const filter = new NoteFilter(filterType);
+      const filterType = getNoteFilterType(options?.status);
+      const filter = new NoteFilter(filterType);
 
-          const notesResult = await client.getInputNotes(filter);
+      const fetchedNotes = await client.getInputNotes(filter);
 
-          let consumableResult;
-          if (options?.accountId) {
-            const accountIdObj = parseAccountId(options.accountId);
-            consumableResult = await client.getConsumableNotes(accountIdObj);
-          } else {
-            consumableResult = await client.getConsumableNotes();
-          }
-
-          return {
-            fetchedNotes: notesResult,
-            fetchedConsumable: consumableResult,
-          };
-        }
-      );
+      let fetchedConsumable;
+      if (options?.accountId) {
+        const accountIdObj = parseAccountId(options.accountId);
+        fetchedConsumable = await client.getConsumableNotes(accountIdObj);
+      } else {
+        fetchedConsumable = await client.getConsumableNotes();
+      }
 
       // Smart refetch: only update store if note IDs changed (prevents unnecessary re-renders)
       setNotesIfChanged(fetchedNotes);
@@ -104,7 +93,6 @@ export function useNotes(options?: NotesFilter): NotesResult {
   }, [
     client,
     isReady,
-    runExclusive,
     options?.status,
     options?.accountId,
     setLoadingNotes,

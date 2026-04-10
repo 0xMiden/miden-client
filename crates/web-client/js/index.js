@@ -16,11 +16,16 @@ import {
 export * from "../Cargo.toml";
 
 export const AccountType = Object.freeze({
-  MutableWallet: "MutableWallet",
-  ImmutableWallet: "ImmutableWallet",
-  FungibleFaucet: "FungibleFaucet",
-  ImmutableContract: "ImmutableContract",
-  MutableContract: "MutableContract",
+  // WASM-compatible numeric values — usable with AccountBuilder directly
+  FungibleFaucet: 0,
+  NonFungibleFaucet: 1,
+  RegularAccountImmutableCode: 2,
+  RegularAccountUpdatableCode: 3,
+  // SDK-friendly aliases (same numeric values as their WASM equivalents)
+  MutableWallet: 3,
+  ImmutableWallet: 2,
+  ImmutableContract: 2,
+  MutableContract: 3,
 });
 
 export const AuthScheme = Object.freeze({
@@ -44,6 +49,75 @@ export { createP2IDNote, createP2IDENote, buildSwapTag };
 
 // Internal exports — used by integration tests that need direct access to the low-level WebClient proxy.
 export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
+
+// Method classification sets — used by scripts/check-method-classification.js to ensure
+// every WASM export is explicitly categorised. Update when adding new WASM methods.
+const SYNC_METHODS = new Set([
+  "buildSwapTag",
+  "createCodeBuilder",
+  "newConsumeTransactionRequest",
+  "newMintTransactionRequest",
+  "newSendTransactionRequest",
+  "newSwapTransactionRequest",
+  "proveBlock",
+  "serializeMockChain",
+  "serializeMockNoteTransportNode",
+  "setDebugMode",
+  "storeIdentifier",
+  "usesMockChain",
+]);
+
+const WRITE_METHODS = new Set([
+  "addTag",
+  "executeForSummary",
+  "executeProgram",
+  "fetchAllPrivateNotes",
+  "fetchPrivateNotes",
+  "forceImportStore",
+  "importAccountById",
+  "importAccountFile",
+  "importNoteFile",
+  "importPublicAccountFromSeed",
+  "insertAccountAddress",
+  "newAccount",
+  "pruneAccountHistory",
+  "removeAccountAddress",
+  "removeTag",
+  "removeSetting",
+  "sendPrivateNote",
+  "setSetting",
+  "submitProvenTransaction",
+]);
+
+const READ_METHODS = new Set([
+  "accountReader",
+  "exportAccountFile",
+  "exportNoteFile",
+  "exportStore",
+  "getAccount",
+  "getAccountCode",
+  "getAccountStorage",
+  "getAccountVault",
+  "getAccounts",
+  "getConsumableNotes",
+  "getInputNote",
+  "getInputNotes",
+  "getOutputNote",
+  "getOutputNotes",
+  "getSetting",
+  "getSyncHeight",
+  "getTransactions",
+  "listSettingKeys",
+  "listTags",
+  "executeProgram",
+]);
+
+const MOCK_STORE_NAME = "mock_client_db";
+
+// Suppress unused-variable warnings — these sets exist solely for the CI lint check.
+void SYNC_METHODS;
+void WRITE_METHODS;
+void READ_METHODS;
 
 const buildTypedArraysExport = (exportObject) => {
   return Object.entries(exportObject).reduce(
@@ -532,16 +606,6 @@ class WebClient {
     });
   }
 
-  async addAccountSecretKeyToWebStore(accountId, secretKey) {
-    return this._serializeWasmCall(async () => {
-      const wasmWebClient = await this.getWasmWebClient();
-      return await wasmWebClient.addAccountSecretKeyToWebStore(
-        accountId,
-        secretKey
-      );
-    });
-  }
-
   async submitNewTransaction(accountId, transactionRequest) {
     try {
       if (!this.worker) {
@@ -770,7 +834,16 @@ class WebClient {
 
 class MockWebClient extends WebClient {
   constructor(seed, logLevel) {
-    super(null, null, seed, "mock", undefined, undefined, undefined, logLevel);
+    super(
+      null,
+      null,
+      seed,
+      MOCK_STORE_NAME,
+      undefined,
+      undefined,
+      undefined,
+      logLevel
+    );
   }
 
   initializeWorker() {

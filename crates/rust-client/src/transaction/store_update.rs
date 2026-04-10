@@ -3,7 +3,13 @@ use alloc::vec::Vec;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{NoteDetails, NoteTag};
 use miden_protocol::transaction::ExecutedTransaction;
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+};
 
 use crate::note::NoteUpdateTracker;
 use crate::sync::NoteTagRecord;

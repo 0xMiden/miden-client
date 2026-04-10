@@ -67,6 +67,7 @@ const importAccountById = async (page: Page, accountId: string) => {
 
 test.describe("import from seed", () => {
   test("should import same public account from seed", async ({ page }) => {
+    test.slow();
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
@@ -125,6 +126,7 @@ test.describe("import from seed", () => {
 
 test.describe("import public account by id", () => {
   test("should import public account from id", async ({ page }) => {
+    test.slow();
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 

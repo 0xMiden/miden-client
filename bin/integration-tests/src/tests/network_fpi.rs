@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use miden_client::account::AccountStorageMode;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::testing::common::{execute_tx_and_sync, insert_new_wallet, wait_for_blocks};
-use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
+use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::{Felt, Word, ZERO};
 
 use super::fpi::{FPI_STORAGE_VALUE, MAP_KEY, MAP_SLOT_NAME, deploy_foreign_account};
@@ -101,8 +101,8 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
             push.{proc_root}
 
             # push the foreign account id
-            push.{account_id_suffix} push.{account_id_prefix}
-            # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, pad(16)]
+            push.{account_id_prefix} push.{account_id_suffix}
+            # => [foreign_id_suffix, foreign_id_prefix, FOREIGN_PROC_ROOT, pad(16)]
 
             exec.tx::execute_foreign_procedure
 
@@ -125,9 +125,7 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
         &mut client2.rng(),
     )?;
 
-    let tx_request = TransactionRequestBuilder::new()
-        .own_output_notes([OutputNote::Full(network_note)])
-        .build()?;
+    let tx_request = TransactionRequestBuilder::new().own_output_notes([network_note]).build()?;
 
     execute_tx_and_sync(&mut client2, sender_account.id(), tx_request).await?;
 
@@ -145,7 +143,7 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
 
     assert_eq!(
         updated_network_account.storage().get_item(&COUNTER_SLOT_NAME)?,
-        Word::from([ZERO, ZERO, ZERO, Felt::new(2)])
+        Word::from([Felt::new(2), ZERO, ZERO, ZERO])
     );
 
     Ok(())

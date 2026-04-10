@@ -245,7 +245,7 @@ Creates a `NoteFile` from an output note, choosing details when present.
 
 ##### note
 
-[`OutputNote`](OutputNote.md)
+`OutputNote`
 
 #### Returns
 

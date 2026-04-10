@@ -16,7 +16,8 @@ use miden_protocol::errors::{
     StorageMapError,
     TransactionScriptError,
 };
-use miden_protocol::utils::{DeserializationError, HexParseError};
+use miden_protocol::utils::HexParseError;
+use miden_protocol::utils::serde::DeserializationError;
 use miden_protocol::{Word, WordError};
 use miden_tx::DataStoreError;
 use thiserror::Error;

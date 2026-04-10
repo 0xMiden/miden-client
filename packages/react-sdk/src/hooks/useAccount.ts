@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { useMidenStore, useSyncStateStore } from "../store/MidenStore";
-import { AccountId } from "@miden-sdk/miden-sdk";
 import type { AccountResult, AssetBalance } from "../types";
-import { runExclusiveDirect } from "../utils/runExclusive";
 import { ensureAccountBech32 } from "../utils/accountBech32";
-import { parseAccountId } from "../utils/accountParsing";
+import { parseAccountId, type AccountRef } from "../utils/accountParsing";
 import { useAssetMetadata } from "./useAssetMetadata";
 
 /**
@@ -37,11 +35,8 @@ import { useAssetMetadata } from "./useAssetMetadata";
  * }
  * ```
  */
-export function useAccount(
-  accountId: string | AccountId | undefined
-): AccountResult {
-  const { client, isReady, runExclusive } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+export function useAccount(accountId: AccountRef | undefined): AccountResult {
+  const { client, isReady } = useMiden();
   const accountDetails = useMidenStore((state) => state.accountDetails);
   const setAccountDetails = useMidenStore((state) => state.setAccountDetails);
   const { lastSyncTime } = useSyncStateStore();
@@ -53,11 +48,7 @@ export function useAccount(
   const accountIdStr = useMemo(() => {
     if (!accountId) return undefined;
     if (typeof accountId === "string") return accountId;
-    // AccountId object - convert to string
-    if (typeof (accountId as AccountId).toString === "function") {
-      return (accountId as AccountId).toString();
-    }
-    return String(accountId);
+    return parseAccountId(accountId).toString();
   }, [accountId]);
 
   // Get cached account
@@ -73,9 +64,7 @@ export function useAccount(
 
     try {
       const accountIdObj = parseAccountId(accountIdStr);
-      const fetchedAccount = await runExclusiveSafe(() =>
-        client.getAccount(accountIdObj)
-      );
+      const fetchedAccount = await client.getAccount(accountIdObj);
       if (fetchedAccount) {
         ensureAccountBech32(fetchedAccount);
         setAccountDetails(accountIdStr, fetchedAccount);
@@ -85,7 +74,7 @@ export function useAccount(
     } finally {
       setIsLoading(false);
     }
-  }, [client, isReady, runExclusive, accountIdStr, setAccountDetails]);
+  }, [client, isReady, accountIdStr, setAccountDetails]);
 
   // Initial fetch
   useEffect(() => {

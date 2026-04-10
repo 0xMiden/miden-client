@@ -20,6 +20,8 @@ Compile MASM source into an AccountComponent.
 
 [`CompileComponentOptions`](CompileComponentOptions.md)
 
+Component source code, storage slots, and auth options.
+
 #### Returns
 
 `Promise`\<`AccountComponent`\>
@@ -37,6 +39,8 @@ Compile MASM source into a TransactionScript.
 ##### options
 
 [`CompileTxScriptOptions`](CompileTxScriptOptions.md)
+
+Script source code and optional libraries to link.
 
 #### Returns
 

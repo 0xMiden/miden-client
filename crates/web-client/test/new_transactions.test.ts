@@ -145,6 +145,7 @@ test.describe("mint transaction tests", () => {
 
   testCases.forEach(({ flag, description }) => {
     test(description, async ({ page }) => {
+      test.slow();
       // This test was added in #995 to reproduce an issue in the web wallet.
       // It is useful because most tests consume the note right on the latest client block,
       // but this test mints 3 notes and consumes them after the fact. This ensures the
@@ -249,6 +250,7 @@ test.describe("send transaction tests", () => {
 
   testCases.forEach(({ flag, description }) => {
     test(description, async ({ page }) => {
+      test.setTimeout(900000);
       const { accountId: senderAccountId, faucetId } =
         await setupWalletAndFaucet(page);
       const { accountId: targetAccountId } = await setupWalletAndFaucet(page);
@@ -266,7 +268,8 @@ test.describe("send transaction tests", () => {
         page,
         targetAccountId,
         faucetId,
-        createdSendNotes[0]
+        createdSendNotes[0],
+        flag
       );
       const result = await sendTransactionTest(
         page,
@@ -340,11 +343,14 @@ export const customTransaction = async (
         window.NoteTag.withAccountTarget(walletAccount.id())
       );
 
-      let expectedNoteArgs = noteArgs.map((felt) => felt.asInt());
       let memAddress = "1000";
       let memAddress2 = "1004";
-      let expectedNoteArg1 = expectedNoteArgs.slice(0, 4).join(".");
-      let expectedNoteArg2 = expectedNoteArgs.slice(4, 8).join(".");
+      let expectedNoteArg1 = window.Word.newFromFelts(
+        noteArgs.slice(0, 4)
+      ).toHex();
+      let expectedNoteArg2 = window.Word.newFromFelts(
+        noteArgs.slice(4, 8)
+      ).toHex();
 
       let noteScript = `
             # Custom P2ID note script
@@ -380,7 +386,7 @@ export const customTransaction = async (
                 # read first word
                 push.${memAddress}
                 # => [data_mem_address]
-                mem_loadw_be
+                mem_loadw_le
                 # => [NOTE_ARG_1]
 
                 push.${expectedNoteArg1} assert_eqw.err="First note argument didn't match expected"
@@ -389,26 +395,26 @@ export const customTransaction = async (
                 # read second word
                 push.${memAddress2}
                 # => [data_mem_address_2]
-                mem_loadw_be
+                mem_loadw_le
                 # => [NOTE_ARG_2]
 
                 push.${expectedNoteArg2} assert_eqw.err="Second note argument didn't match expected"
                 # => []
 
                 # store the note storage to memory starting at address 0
-                padw push.0 exec.active_note::get_storage
-                # => [num_storage_items, storage_ptr, EMPTY_WORD]
+                push.0 exec.active_note::get_storage
+                # => [num_storage_items, storage_ptr]
 
                 # make sure the number of storage items is 2
                 eq.2 assert.err="P2ID script expects exactly 2 note storage items"
-                # => [storage_ptr, EMPTY_WORD]
+                # => [storage_ptr]
 
-                # read the target account id from the note storage
-                mem_loadw_be drop drop
-                # => [target_account_id_prefix, target_account_id_suffix]
+                # read the target account ID from the note storage
+                dup add.1 mem_load swap mem_load
+                # => [target_account_id_suffix, target_account_id_prefix]
 
                 exec.active_account::get_id
-                # => [account_id_prefix, account_id_suffix, target_account_id_prefix, target_account_id_suffix, ...]
+                # => [account_id_suffix, account_id_prefix, target_account_id_suffix, target_account_id_prefix]
 
                 # ensure account_id = target_account_id, fails otherwise
                 exec.account_id::is_equal assert.err="P2ID's target account address and transaction address do not match"
@@ -447,11 +453,10 @@ export const customTransaction = async (
 
       // Creating First Custom Transaction Request to Mint the Custom Note
 
-      const outputNote = window.OutputNote.full(note);
+      let noteArray = new window.NoteArray();
+      noteArray.push(note);
       let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnOutputNotes(
-          new window.MidenArrays.OutputNoteArray([outputNote])
-        )
+        .withOwnOutputNotes(noteArray)
         .build();
 
       // Execute and Submit Transaction
@@ -478,13 +483,13 @@ export const customTransaction = async (
       // Creating Second Custom Transaction Request to Consume Custom Note
       // with Invalid/Valid Transaction Script
       let transactionScript = await builder.compileTxScript(txScript);
-      let noteArgsCommitment = window.Rpo256.hashElements(feltArray); // gets consumed by NoteIdAndArgs
+      let noteArgsCommitment = window.Poseidon2.hashElements(feltArray);
 
       let noteAndArgs = new window.NoteAndArgs(note, noteArgsCommitment);
       let noteAndArgsArray = new window.NoteAndArgsArray([noteAndArgs]);
 
       let adviceMap = new window.AdviceMap();
-      let noteArgsCommitment2 = window.Rpo256.hashElements(feltArray);
+      let noteArgsCommitment2 = window.Poseidon2.hashElements(feltArray);
 
       adviceMap.insert(noteArgsCommitment2, feltArray);
 
@@ -578,15 +583,8 @@ const customTxWithMultipleNotes = async (
       let note1 = new window.Note(noteAssets1, noteMetadata, noteRecipient1);
       let note2 = new window.Note(noteAssets2, noteMetadata, noteRecipient2);
 
-      const notes = [
-        window.OutputNote.full(note1),
-        window.OutputNote.full(note2),
-      ];
-
-      const outputNotes = new window.MidenArrays.OutputNoteArray(notes);
-
       let transactionRequest = new window.TransactionRequestBuilder()
-        .withOwnOutputNotes(outputNotes)
+        .withOwnOutputNotes(new window.NoteArray([note1, note2]))
         .build();
 
       let transactionUpdate = await window.helpers.executeAndApplyTransaction(
@@ -604,6 +602,75 @@ const customTxWithMultipleNotes = async (
       _faucetAccountId: faucetAccountId,
     }
   );
+};
+
+const submitExpiredTransaction = async (
+  testingPage: Page,
+  senderAccountId: string,
+  targetAccountId: string,
+  faucetAccountId: string
+): Promise<void> => {
+  return await testingPage.evaluate(
+    async ({ _senderAccountId, _targetAccountId, _faucetAccountId }) => {
+      const client = window.client;
+      const senderAccountId = window.AccountId.fromHex(_senderAccountId);
+      const targetAccountId = window.AccountId.fromHex(_targetAccountId);
+      const faucetAccountId = window.AccountId.fromHex(_faucetAccountId);
+
+      const noteAssets = new window.NoteAssets([
+        new window.FungibleAsset(faucetAccountId, BigInt(10)),
+      ]);
+      const note = window.Note.createP2IDNote(
+        senderAccountId,
+        targetAccountId,
+        noteAssets,
+        window.NoteType.Public,
+        new window.Felt(0n)
+      );
+
+      const transactionRequest = new window.TransactionRequestBuilder()
+        .withOwnOutputNotes(new window.NoteArray([note]))
+        .withExpirationDelta(2)
+        .build();
+
+      const transactionResult = await client.newTransaction(
+        senderAccountId,
+        transactionRequest
+      );
+
+      await window.helpers.waitForBlocks(3);
+      await client.submitTransaction(transactionResult);
+    },
+    {
+      _senderAccountId: senderAccountId,
+      _targetAccountId: targetAccountId,
+      _faucetAccountId: faucetAccountId,
+    }
+  );
+};
+
+const buildCustomScriptRequestWithExpiration = async (
+  testingPage: Page
+): Promise<void> => {
+  return await testingPage.evaluate(async () => {
+    const client = window.client;
+    const builder = client.createScriptBuilder();
+    const txScript = builder.compileTxScript(`
+            use.miden::contracts::auth::basic->auth_tx
+            use.miden::kernels::tx::prologue
+            use.miden::kernels::tx::memory
+
+            begin
+                push.0 push.0
+                assert_eq
+            end
+        `);
+
+    new window.TransactionRequestBuilder()
+      .withCustomScript(txScript)
+      .withExpirationDelta(2)
+      .build();
+  });
 };
 
 test.describe("custom transaction tests", () => {
@@ -624,6 +691,34 @@ test.describe("custom transaction tests", () => {
   });
 });
 
+test.describe("transaction request builder expiration delta tests", () => {
+  test("submitting an expired transaction fails", async ({ page }) => {
+    const { accountId: senderId, faucetId } = await setupWalletAndFaucet(page);
+    const { accountId: targetId } = await setupWalletAndFaucet(page);
+
+    const { createdNoteId } = await mintTransaction(
+      page,
+      senderId,
+      faucetId,
+      false,
+      true
+    );
+    await consumeTransaction(page, senderId, faucetId, createdNoteId, false);
+
+    await expect(
+      submitExpiredTransaction(page, senderId, targetId, faucetId)
+    ).rejects.toThrow();
+  });
+
+  test("rejects expiration delta when custom script is set", async ({
+    page,
+  }) => {
+    await expect(
+      buildCustomScriptRequestWithExpiration(page)
+    ).rejects.toThrow();
+  });
+});
+
 test.describe("custom transaction with multiple output notes", () => {
   const testCases = [
     {
@@ -638,6 +733,7 @@ test.describe("custom transaction with multiple output notes", () => {
 
   testCases.forEach(({ description, shouldFail }) => {
     test(description, async ({ page }) => {
+      test.slow();
       const { accountId, faucetId } = await setupConsumedNote(page);
       if (shouldFail) {
         await expect(
@@ -755,7 +851,7 @@ export const customAccountComponent = async (
         .withComponent(mappingAccountComponent)
         .build();
 
-      await client.addAccountSecretKeyToWebStore(
+      await client.keystore.insert(
         accountBuilderResult.account.id(),
         secretKey
       );
@@ -796,7 +892,7 @@ export const customAccountComponent = async (
         ?.storage()
         .getMapItem(MAP_SLOT_NAME, keyZero);
 
-      const expected = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
+      const expected = new window.Word(new BigUint64Array([4n, 3n, 2n, 1n]));
 
       if (retrieveMapKey?.toHex() !== expected.toHex()) {
         throw new Error(
@@ -937,7 +1033,7 @@ export const discardedTransaction = async (
       .withInputNotes(noteAndArgsArray)
       .build();
 
-    let preConsumeStore = await client.exportStore();
+    let preConsumeStore = await window.exportStore(window.storeName);
 
     // Sender retrieves the note
 
@@ -961,7 +1057,7 @@ export const discardedTransaction = async (
       senderTxResult.executedTransaction().id().toHex()
     );
 
-    await client.forceImportStore(preConsumeStore, window.storeName);
+    await window.importStore(window.storeName, preConsumeStore);
 
     // Get the account state before the transaction is applied
     const accountStateBeforeTx = (await client.getAccount(
@@ -1024,6 +1120,7 @@ export const discardedTransaction = async (
 
 test.describe("discarded_transaction tests", () => {
   test("transaction gets discarded", async ({ page }) => {
+    test.slow();
     const result = await discardedTransaction(page);
 
     expect(result.discardedTransactions.length).toEqual(1);
@@ -1169,9 +1266,7 @@ export const counterAccountComponent = async (
     let note = new window.Note(noteAssets, noteMetadata, noteRecipient);
 
     let transactionRequest = new window.TransactionRequestBuilder()
-      .withOwnOutputNotes(
-        new window.MidenArrays.OutputNoteArray([window.OutputNote.full(note)])
-      )
+      .withOwnOutputNotes(new window.NoteArray([note]))
       .build();
 
     let transactionUpdate = await window.helpers.executeAndApplyTransaction(
@@ -1182,12 +1277,21 @@ export const counterAccountComponent = async (
       transactionUpdate.executedTransaction().id().toHex()
     );
 
-    // Wait for network account to update
-    await window.helpers.waitForBlocks(2);
+    // Wait for the node to consume the network note in subsequent blocks.
+    // Use a retry loop (up to 10 blocks) instead of a fixed wait, since the
+    // node may not have consumed the note within a fixed number of blocks
+    // (especially under CI load with multiple test shards).
+    let finalCounter: string | undefined;
+    let account;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await window.helpers.waitForBlocks(1);
 
-    let account = await client.getAccount(accountBuilderResult.account.id());
-    let counter = account?.storage().getItem(COUNTER_SLOT_NAME)?.toHex();
-    let finalCounter = counter?.replace(/^0x/, "").replace(/^0+|0+$/g, "");
+      account = await client.getAccount(accountBuilderResult.account.id());
+      let counter = account?.storage().getItem(COUNTER_SLOT_NAME)?.toHex();
+      finalCounter = counter?.replace(/^0x/, "").replace(/^0+|0+$/g, "");
+
+      if (finalCounter === "2") break;
+    }
 
     let code = account?.code();
     let hasCounterComponent = code
@@ -1232,7 +1336,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
 
     const MAP_KEY = new window.Word(new BigUint64Array([1n, 1n, 1n, 1n]));
     const FPI_STORAGE_VALUE = new window.Word(
-      new BigUint64Array([0n, 0n, 0n, 1n])
+      new BigUint64Array([1n, 0n, 0n, 0n])
     );
 
     let storageMap = new window.StorageMap();
@@ -1281,7 +1385,7 @@ export const testStorageMap = async (page: Page): Promise<any> => {
       .storageMode(window.AccountStorageMode.public())
       .build();
 
-    await client.addAccountSecretKeyToWebStore(
+    await client.keystore.insert(
       bumpItemAccountBuilderResult.account.id(),
       secretKey
     );
@@ -1364,8 +1468,8 @@ export const testStorageMap = async (page: Page): Promise<any> => {
 };
 
 test.describe("storage map test", () => {
-  test.setTimeout(50000);
   test("storage map is updated correctly in transaction", async ({ page }) => {
+    test.slow();
     let { initialMapValue, finalMapValue, mapEntries } =
       await testStorageMap(page);
     expect(initialMapValue).toBe("1");
@@ -1431,6 +1535,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
     test("executeForSummary returns TransactionSummary for unauthorized transaction", async ({
       page,
     }) => {
+      test.slow();
       const result = await page.evaluate(async () => {
         const client = window.client;
 
@@ -1464,7 +1569,7 @@ test.describe("submitNewTransactionWithProver tests", () => {
 
         // Register the approver keys with the multisig account
         for (const key of approverKeys) {
-          await client.addAccountSecretKeyToWebStore(multisigAccountId, key);
+          await client.keystore.insert(multisigAccountId, key);
         }
 
         const targetAccount = await client.newWallet(

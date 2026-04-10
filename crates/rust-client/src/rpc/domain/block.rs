@@ -1,6 +1,6 @@
 use miden_protocol::block::{BlockHeader, BlockNumber, FeeParameters};
 use miden_protocol::crypto::dsa::ecdsa_k256_keccak;
-use miden_protocol::utils::{Deserializable, Serializable};
+use miden_protocol::utils::serde::{Deserializable, Serializable};
 
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::errors::RpcConversionError;

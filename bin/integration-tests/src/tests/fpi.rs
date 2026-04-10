@@ -1,9 +1,12 @@
+use std::collections::BTreeMap;
+
 use anyhow::{Context, Result};
 use miden_client::account::component::{AccountComponent, AccountComponentMetadata};
 use miden_client::account::{
     Account,
     AccountBuilder,
     AccountStorageMode,
+    AccountType,
     PartialAccount,
     PartialStorage,
     StorageMap,
@@ -78,8 +81,8 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
             push.{proc_root}
 
             # push the foreign account id
-            push.{account_id_suffix} push.{account_id_prefix}
-            # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT,
+            push.{account_id_prefix} push.{account_id_suffix}
+            # => [foreign_id_suffix, foreign_id_prefix, FOREIGN_PROC_ROOT,
             #     slot_id_prefix, slot_id_suffix, KEY, pad(10)]
 
             exec.tx::execute_foreign_procedure
@@ -102,10 +105,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
 
     // We create a new client here to force the creation of a new, fresh prover with no previous
     // MAST forest data.
-    let (mut client2, keystore2) =
-        ClientConfig::new(client_config.rpc_endpoint, client_config.rpc_timeout_ms)
-            .into_client()
-            .await?;
+    let (mut client2, keystore2) = client_config.clone().into_client().await?;
 
     // NOTE: Syncing the client is important because the client needs to be beyond the account
     // creation block
@@ -124,15 +124,15 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
             wallet.id(),
             tx_script,
             AdviceInputs::default(),
-            [ForeignAccount::public(foreign_account_id, storage_requirements)?].into(),
+            BTreeMap::from([(
+                foreign_account_id,
+                ForeignAccount::public(foreign_account_id, storage_requirements)?,
+            )]),
         )
         .await?;
 
     let mut expected_stack = [Felt::new(0); 16];
-    expected_stack[3] = FPI_STORAGE_VALUE[0];
-    expected_stack[2] = FPI_STORAGE_VALUE[1];
-    expected_stack[1] = FPI_STORAGE_VALUE[2];
-    expected_stack[0] = FPI_STORAGE_VALUE[3];
+    expected_stack[..4].copy_from_slice(&FPI_STORAGE_VALUE);
 
     assert_eq!(output_stack, expected_stack);
     Ok(())
@@ -185,8 +185,8 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
                 push.{inner_proc_root}
 
                 # push the foreign account id
-                push.{account_id_suffix} push.{account_id_prefix}
-                # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT,
+                push.{account_id_prefix} push.{account_id_suffix}
+                # => [foreign_id_suffix, foreign_id_prefix, FOREIGN_PROC_ROOT,
                 #     slot_id_prefix, slot_id_suffix, KEY, pad(10)]
 
                 exec.tx::execute_foreign_procedure
@@ -222,8 +222,8 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
             push.{outer_proc_root}
 
             # push the foreign account id
-            push.{account_id_suffix} push.{account_id_prefix}
-            # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT, pad(16)]
+            push.{account_id_prefix} push.{account_id_suffix}
+            # => [foreign_id_suffix, foreign_id_prefix, FOREIGN_PROC_ROOT, pad(16)]
 
             exec.tx::execute_foreign_procedure
             # => [result(16)]
@@ -260,10 +260,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
 
     // We create a new client here to force the creation of a new, fresh prover with no previous
     // MAST forest data.
-    let (mut client2, keystore2) =
-        ClientConfig::new(client_config.rpc_endpoint, client_config.rpc_timeout_ms)
-            .into_client()
-            .await?;
+    let (mut client2, keystore2) = client_config.clone().into_client().await?;
 
     let (native_account, ..) = insert_new_wallet(
         &mut client2,
@@ -274,6 +271,157 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     .await?;
 
     _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
+
+    Ok(())
+}
+
+/// Tests that foreign accounts are lazily loaded via RPC when not specified upfront
+/// in the `TransactionRequestBuilder`.
+pub async fn test_lazy_fpi_loading(client_config: ClientConfig) -> Result<()> {
+    let (mut client, keystore) = client_config.clone().into_client().await?;
+    wait_for_node(&mut client).await;
+
+    // Create a simple foreign account with a constant-returning procedure.
+    let constant_value: Word = [Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)].into();
+
+    let (foreign_account, proc_root) = deploy_foreign_account(
+        &mut client,
+        &keystore,
+        AccountStorageMode::Public,
+        format!(
+            r#"
+            pub proc get_constant
+                push.{constant_value}
+                swapw dropw
+            end"#,
+        ),
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+    let foreign_account_id = foreign_account.id();
+
+    // Build FPI transaction script.
+    let tx_script = format!(
+        "
+        use miden::protocol::tx
+        begin
+            push.{proc_root}
+            push.{account_id_prefix} push.{account_id_suffix}
+            exec.tx::execute_foreign_procedure
+            push.{constant_value} assert_eqw
+        end
+        ",
+        account_id_prefix = foreign_account_id.prefix().as_u64(),
+        account_id_suffix = foreign_account_id.suffix(),
+    );
+    let tx_script = client.code_builder().compile_tx_script(&tx_script)?;
+    client.sync_state().await?;
+
+    // Wait for blocks so the account is committed on-chain.
+    wait_for_blocks(&mut client, 2).await;
+
+    // Create a new client to ensure no cached data.
+    let (mut client2, keystore2) = client_config.clone().into_client().await?;
+
+    client2.sync_state().await?;
+
+    let (native_account, ..) = insert_new_wallet(
+        &mut client2,
+        AccountStorageMode::Public,
+        &keystore2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    wait_for_blocks_no_sync(&mut client2, 2).await;
+
+    // Before the transaction there are no cached foreign accounts.
+    let cached = client2.test_store().get_foreign_account_code(vec![foreign_account_id]).await?;
+    assert!(cached.is_empty());
+
+    // Build request WITHOUT specifying foreign accounts — lazy loading should handle it.
+    let tx_request = TransactionRequestBuilder::new().custom_script(tx_script).build()?;
+
+    let _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
+
+    // After the transaction the foreign account code should be cached.
+    let cached = client2.test_store().get_foreign_account_code(vec![foreign_account_id]).await?;
+    assert_eq!(cached.len(), 1);
+
+    Ok(())
+}
+
+/// Tests that lazy loading a public foreign account that reads from a storage map works
+/// even when no `AccountStorageRequirements` are specified upfront.
+///
+/// The executor first lazy-loads the foreign account (with empty storage requirements),
+/// then when the procedure reads from the storage map, `get_storage_map_witness` detects
+/// the cache miss and makes a second RPC call to fetch the storage map entries.
+pub async fn test_lazy_fpi_loading_with_storage_map(client_config: ClientConfig) -> Result<()> {
+    let (mut client, keystore) = client_config.clone().into_client().await?;
+    wait_for_node(&mut client).await;
+
+    // Deploy a foreign account with a storage map (same as standard FPI tests).
+    let (foreign_account, proc_root) = deploy_foreign_account(
+        &mut client,
+        &keystore,
+        AccountStorageMode::Public,
+        format!(
+            r#"
+            const STORAGE_MAP_SLOT = word("{MAP_SLOT_NAME}")
+            pub proc get_fpi_map_item
+                push.{map_key}
+                push.STORAGE_MAP_SLOT[0..2]
+                exec.::miden::protocol::active_account::get_map_item
+                swapw dropw
+            end"#,
+            map_key = Word::from(MAP_KEY)
+        ),
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    let foreign_account_id = foreign_account.id();
+
+    let tx_script = format!(
+        "
+        use miden::protocol::tx
+        begin
+            push.{proc_root}
+            push.{account_id_prefix} push.{account_id_suffix}
+            exec.tx::execute_foreign_procedure
+            push.{fpi_value} assert_eqw
+        end
+        ",
+        fpi_value = Word::from(FPI_STORAGE_VALUE),
+        account_id_prefix = foreign_account_id.prefix().as_u64(),
+        account_id_suffix = foreign_account_id.suffix(),
+    );
+
+    let tx_script = client.code_builder().compile_tx_script(&tx_script)?;
+    client.sync_state().await?;
+
+    wait_for_blocks(&mut client, 2).await;
+
+    // Create a new client to ensure no cached data.
+    let (mut client2, keystore2) = client_config.clone().into_client().await?;
+    client2.sync_state().await?;
+
+    let (native_account, ..) = insert_new_wallet(
+        &mut client2,
+        AccountStorageMode::Public,
+        &keystore2,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    wait_for_blocks_no_sync(&mut client2, 2).await;
+
+    // Build request WITHOUT specifying the foreign account — lazy loading should handle
+    // both the account inputs and the storage map entries via separate RPC calls.
+    let tx_request = TransactionRequestBuilder::new().custom_script(tx_script).build()?;
+
+    let _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
 
     Ok(())
 }
@@ -334,8 +482,8 @@ async fn standard_fpi(
             push.{proc_root}
 
             # push the foreign account id
-            push.{account_id_suffix} push.{account_id_prefix}
-            # => [foreign_id_prefix, foreign_id_suffix, FOREIGN_PROC_ROOT,
+            push.{account_id_prefix} push.{account_id_suffix}
+            # => [foreign_id_suffix, foreign_id_prefix, FOREIGN_PROC_ROOT,
             #     slot_id_prefix, slot_id_suffix, KEY, pad(10)]
 
             exec.tx::execute_foreign_procedure
@@ -395,10 +543,7 @@ async fn standard_fpi(
 
     // We create a new client here to force the creation of a new, fresh prover with no previous
     // MAST forest data.
-    let (mut client2, keystore2) =
-        ClientConfig::new(client_config.rpc_endpoint, client_config.rpc_timeout_ms)
-            .into_client()
-            .await?;
+    let (mut client2, keystore2) = client_config.clone().into_client().await?;
 
     // NOTE: Syncing the client is important because the client needs to be beyond the account
     // creation block
@@ -466,17 +611,17 @@ fn foreign_account_with_code(
     let get_item_component = AccountComponent::new(
         component_code,
         vec![map_slot],
-        AccountComponentMetadata::new("miden::testing::fpi_component").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::fpi_component", AccountType::all()),
     )
     .map_err(|err| anyhow::anyhow!(err))
     .context("failed to create foreign account component")?;
 
     let (key_pair, auth_component) = match auth_scheme {
-        AuthSchemeId::Falcon512Rpo => {
-            let key_pair = AuthSecretKey::new_falcon512_rpo();
+        AuthSchemeId::Falcon512Poseidon2 => {
+            let key_pair = AuthSecretKey::new_falcon512_poseidon2();
             let auth_component: AccountComponent = AuthSingleSig::new(
                 key_pair.public_key().to_commitment(),
-                AuthSchemeId::Falcon512Rpo,
+                AuthSchemeId::Falcon512Poseidon2,
             )
             .into();
             (key_pair, auth_component)

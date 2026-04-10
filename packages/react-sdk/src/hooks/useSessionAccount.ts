@@ -9,7 +9,6 @@ import type {
 } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
 import { ensureAccountBech32 } from "../utils/accountBech32";
 import { MidenError } from "../utils/errors";
 
@@ -45,8 +44,7 @@ import { MidenError } from "../utils/errors";
 export function useSessionAccount(
   options: UseSessionAccountOptions
 ): UseSessionAccountReturn {
-  const { client, isReady, sync, runExclusive } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady, sync } = useMiden();
   const setAccounts = useMidenStore((state) => state.setAccounts);
 
   const [sessionAccountId, setSessionAccountId] = useState<string | null>(null);
@@ -115,17 +113,14 @@ export function useSessionAccount(
 
         const resolvedStorageMode = getStorageMode(storageMode);
 
-        const wallet = await runExclusiveSafe(async () => {
-          const w = await client.newWallet(
-            resolvedStorageMode,
-            mutable,
-            authScheme
-          );
-          ensureAccountBech32(w);
-          const accounts = await client.getAccounts();
-          setAccounts(accounts);
-          return w;
-        });
+        const wallet = await client.newWallet(
+          resolvedStorageMode,
+          mutable,
+          authScheme
+        );
+        ensureAccountBech32(wallet);
+        const accounts = await client.getAccounts();
+        setAccounts(accounts);
 
         if (cancelledRef.current) return;
 
@@ -144,7 +139,6 @@ export function useSessionAccount(
       setStep("consuming");
       await waitAndConsume(
         client as unknown as WaitAndConsumeClient,
-        runExclusiveSafe,
         walletId,
         pollIntervalMs,
         maxWaitMs,
@@ -172,7 +166,6 @@ export function useSessionAccount(
     client,
     isReady,
     sync,
-    runExclusiveSafe,
     sessionAccountId,
     storageMode,
     mutable,
@@ -230,7 +223,6 @@ type WaitAndConsumeClient = {
 
 async function waitAndConsume(
   client: WaitAndConsumeClient,
-  runExclusiveSafe: <T>(fn: () => Promise<T>) => Promise<T>,
   walletId: string,
   pollIntervalMs: number,
   maxWaitMs: number,
@@ -241,26 +233,19 @@ async function waitAndConsume(
   while (Date.now() < deadline) {
     if (cancelledRef.current) return;
 
-    await runExclusiveSafe(() =>
-      (client as { syncState: () => Promise<unknown> }).syncState()
-    );
+    await (client as { syncState: () => Promise<unknown> }).syncState();
 
     if (cancelledRef.current) return;
 
-    // Fetch and consume in a single exclusive block to avoid WASM pointer
-    // staleness between separate runExclusiveSafe calls.
-    const consumed = await runExclusiveSafe(async () => {
-      const accountIdObj = parseAccountId(walletId);
-      const consumable = await client.getConsumableNotes(accountIdObj);
-      if (consumable.length === 0) return false;
+    const accountIdObj = parseAccountId(walletId);
+    const consumable = await client.getConsumableNotes(accountIdObj);
+    if (consumable.length > 0) {
       const notes = consumable.map((c) => c.inputNoteRecord().toNote());
       const txRequest = client.newConsumeTransactionRequest(notes);
       const freshAccountId = parseAccountId(walletId);
       await client.submitNewTransaction(freshAccountId, txRequest);
-      return true;
-    });
-
-    if (consumed) return;
+      return;
+    }
 
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }

@@ -4,7 +4,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use miden_tx::utils::{Deserializable, Serializable};
+use miden_tx::utils::serde::{Deserializable, Serializable};
 
 use super::Client;
 use crate::errors::ClientError;

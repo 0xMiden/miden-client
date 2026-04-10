@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::asset::FungibleAsset;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
-use miden_client::crypto::{FeltRng, MerkleStore, MerkleTree, NodeIndex, Rpo256, RpoRandomCoin};
+use miden_client::crypto::{FeltRng, MerkleStore, MerkleTree, NodeIndex, Poseidon2, RandomCoin};
 use miden_client::note::{
     Note,
     NoteAssets,
@@ -17,7 +17,6 @@ use miden_client::testing::common::*;
 use miden_client::transaction::{
     AdviceMap,
     InputNote,
-    OutputNote,
     TransactionRequest,
     TransactionRequestBuilder,
 };
@@ -83,7 +82,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
 
     // If these args were to be modified, the transaction would fail because the note code expects
     // these exact arguments
-    let note_args_commitment = Rpo256::hash_elements(&NOTE_ARGS);
+    let note_args_commitment = Poseidon2::hash_elements(&NOTE_ARGS);
 
     let note_args_map = vec![(note.clone(), Some(note_args_commitment))];
     let mut advice_map = AdviceMap::default();
@@ -119,7 +118,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
     let transaction_request = TransactionRequestBuilder::new()
         .input_notes(note_args_map)
         .custom_script(tx_script)
-        .script_arg([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into())
+        .script_arg([Felt::new(4), Felt::new(3), Felt::new(2), Felt::new(1)].into())
         .extend_advice_map(advice_map)
         .build()?;
 
@@ -186,7 +185,7 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
 
     // If these args were to be modified, the transaction would fail because the note code expects
     // these exact arguments
-    let note_args_commitment = Rpo256::hash_elements(&NOTE_ARGS);
+    let note_args_commitment = Poseidon2::hash_elements(&NOTE_ARGS);
 
     let note_args_map = vec![(note, Some(note_args_commitment))];
     let mut advice_map = AdviceMap::default();
@@ -207,7 +206,7 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
              push.{num_leaves} push.4000 mem_store
 
              # merkle root -> mem[4004]
-             push.{} push.4004 mem_storew_be dropw
+             push.{} push.4004 mem_storew_le dropw
         ",
         merkle_root.to_hex()
     );
@@ -297,9 +296,8 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
     let note = Note::new(note_assets, note_metadata, note_recipient);
 
     // Send transaction and wait for it to be committed
-    let tx_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Full(note.clone())])
-        .build()?;
+    let tx_request =
+        TransactionRequestBuilder::new().own_output_notes(vec![note.clone()]).build()?;
 
     let note = tx_request
         .expected_output_own_notes()
@@ -334,12 +332,11 @@ async fn mint_custom_note(
     target_account_id: AccountId,
 ) -> Result<Note> {
     // Prepare transaction
-    let mut random_coin = RpoRandomCoin::new(Default::default());
+    let mut random_coin = RandomCoin::new(Default::default());
     let note = create_custom_note(client, faucet_account_id, target_account_id, &mut random_coin)?;
 
-    let transaction_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Full(note.clone())])
-        .build()?;
+    let transaction_request =
+        TransactionRequestBuilder::new().own_output_notes(vec![note.clone()]).build()?;
 
     execute_tx_and_sync(client, faucet_account_id, transaction_request).await?;
     Ok(note)
@@ -352,15 +349,15 @@ fn create_custom_note(
     client: &TestClient,
     faucet_account_id: AccountId,
     target_account_id: AccountId,
-    rng: &mut RpoRandomCoin,
+    rng: &mut RandomCoin,
 ) -> Result<Note> {
-    let expected_note_args = NOTE_ARGS.iter().map(|x| x.as_int().to_string()).collect::<Vec<_>>();
-
     let mem_addr: u32 = 1000;
 
+    let word_1: Word = NOTE_ARGS[0..4].try_into().unwrap();
+    let word_2: Word = NOTE_ARGS[4..8].try_into().unwrap();
     let note_script = include_str!("../asm/custom_p2id.masm")
-        .replace("{expected_note_arg_1}", &expected_note_args[0..=3].join("."))
-        .replace("{expected_note_arg_2}", &expected_note_args[4..=7].join("."))
+        .replace("{expected_note_arg_1}", &word_1.to_hex())
+        .replace("{expected_note_arg_2}", &word_2.to_hex())
         .replace("{mem_address}", &mem_addr.to_string())
         .replace("{mem_address_2}", &(mem_addr + 4).to_string());
     let note_script = client

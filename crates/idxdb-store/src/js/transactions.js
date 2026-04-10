@@ -84,7 +84,7 @@ export async function getTransactions(dbId, filter) {
         logWebStoreError(err, "Failed to get transactions");
     }
 }
-export async function insertTransactionScript(dbId, scriptRoot, txScript) {
+export async function insertTransactionScript(dbId, scriptRoot, txScript, tx) {
     try {
         const db = getDatabase(dbId);
         const scriptRootArray = new Uint8Array(scriptRoot);
@@ -93,13 +93,13 @@ export async function insertTransactionScript(dbId, scriptRoot, txScript) {
             scriptRoot: scriptRootBase64,
             txScript: mapOption(txScript, (txScript) => new Uint8Array(txScript)),
         };
-        await db.transactionScripts.put(data);
+        await (tx || db).transactionScripts.put(data);
     }
     catch (error) {
         logWebStoreError(error, "Failed to insert transaction script");
     }
 }
-export async function upsertTransactionRecord(dbId, transactionId, details, blockNum, statusVariant, status, scriptRoot) {
+export async function upsertTransactionRecord(dbId, transactionId, details, blockNum, statusVariant, status, scriptRoot, tx) {
     try {
         const db = getDatabase(dbId);
         const data = {
@@ -110,7 +110,7 @@ export async function upsertTransactionRecord(dbId, transactionId, details, bloc
             statusVariant,
             status,
         };
-        await db.transactions.put(data);
+        await (tx || db).transactions.put(data);
     }
     catch (err) {
         logWebStoreError(err, "Failed to insert proven transaction data");

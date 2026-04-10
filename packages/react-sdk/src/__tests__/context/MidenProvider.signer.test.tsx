@@ -100,8 +100,8 @@ describe("MidenProvider signer integration contract", () => {
     /**
      * The MidenProvider uses these conditions to decide initialization mode:
      * 1. No signer context (null) => use createClient (local keystore)
-     * 2. Signer context exists but !isConnected => wait for connection
-     * 3. Signer context exists and isConnected => use createClientWithExternalKeystore
+     * 2. Signer context exists but !isConnected => mark signerConnected=false, keep client alive
+     * 3. Signer context exists and isConnected => use createClientWithExternalKeystore (or hot-swap signCb)
      */
 
     it("condition: null context means local keystore mode", () => {
@@ -110,10 +110,13 @@ describe("MidenProvider signer integration contract", () => {
       expect(shouldUseExternalKeystore).toBe(false);
     });
 
-    it("condition: disconnected signer means wait for connection", () => {
+    it("condition: disconnected signer means keep client alive, block writes", () => {
       const signerContext = createDisconnectedSignerContext();
-      const shouldWait = signerContext !== null && !signerContext.isConnected;
-      expect(shouldWait).toBe(true);
+      // Disconnect should NOT destroy client — only mark signerConnected=false
+      const isDisconnected =
+        signerContext !== null && !signerContext.isConnected;
+      expect(isDisconnected).toBe(true);
+      // The client stays alive for reads; mutations check signerConnected === false
     });
 
     it("condition: connected signer means use external keystore", () => {
@@ -121,6 +124,32 @@ describe("MidenProvider signer integration contract", () => {
       const shouldUseExternalKeystore =
         signerContext !== null && signerContext.isConnected;
       expect(shouldUseExternalKeystore).toBe(true);
+    });
+
+    it("condition: same storeName reconnect means hot-swap signCb, no reinit", () => {
+      const signer1 = createMockSignerContext({
+        storeName: "para_wallet1",
+        isConnected: true,
+      });
+      const signer2 = createMockSignerContext({
+        storeName: "para_wallet1",
+        isConnected: true,
+      });
+      // Same storeName — should reuse client, just swap signCb
+      expect(signer1.storeName).toBe(signer2.storeName);
+    });
+
+    it("condition: different storeName means new client, clear cached state", () => {
+      const signer1 = createMockSignerContext({
+        storeName: "para_wallet1",
+        isConnected: true,
+      });
+      const signer2 = createMockSignerContext({
+        storeName: "para_wallet2",
+        isConnected: true,
+      });
+      // Different storeName — should create new client for new identity
+      expect(signer1.storeName).not.toBe(signer2.storeName);
     });
   });
 

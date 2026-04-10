@@ -2,7 +2,8 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::Word;
-use miden_client::note::{NoteScript, Nullifier};
+use miden_client::account::AccountId;
+use miden_client::note::{BlockNumber, NoteScript, Nullifier};
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
@@ -20,6 +21,7 @@ use crate::promise::await_js;
 
 mod js_bindings;
 use js_bindings::{
+    idxdb_get_input_note_by_offset,
     idxdb_get_input_notes,
     idxdb_get_input_notes_from_ids,
     idxdb_get_input_notes_from_nullifiers,
@@ -95,6 +97,35 @@ impl IdxdbStore {
             .collect::<Result<Vec<Nullifier>, _>>()
     }
 
+    pub(crate) async fn get_input_note_by_offset(
+        &self,
+        filter: NoteFilter,
+        consumer: AccountId,
+        block_start: Option<BlockNumber>,
+        block_end: Option<BlockNumber>,
+        offset: u32,
+    ) -> Result<Option<InputNoteRecord>, StoreError> {
+        let states = input_note_state_discriminants(&filter).ok_or_else(|| {
+            StoreError::QueryError(
+                "get_input_note_by_offset only supports state-based filters".to_string(),
+            )
+        })?;
+        let consumer_hex = consumer.to_hex();
+        let promise = idxdb_get_input_note_by_offset(
+            self.db_id(),
+            states,
+            consumer_hex,
+            block_start.map(|b| b.as_u32()),
+            block_end.map(|b| b.as_u32()),
+            offset,
+        );
+
+        let notes: Vec<InputNoteIdxdbObject> =
+            await_js(promise, "failed to get input note by offset").await?;
+
+        notes.into_iter().next().map(parse_input_note_idxdb_object).transpose()
+    }
+
     pub(crate) async fn upsert_input_notes(
         &self,
         notes: &[InputNoteRecord],
@@ -118,6 +149,34 @@ impl IdxdbStore {
     }
 }
 
+/// Returns the input note state discriminants for a state-based [`NoteFilter`], or `None` for
+/// filters that operate on IDs/nullifiers.
+fn input_note_state_discriminants(filter: &NoteFilter) -> Option<Vec<u8>> {
+    match filter {
+        NoteFilter::All => Some(vec![]),
+        NoteFilter::Consumed => Some(vec![
+            InputNoteState::STATE_CONSUMED_AUTHENTICATED_LOCAL,
+            InputNoteState::STATE_CONSUMED_UNAUTHENTICATED_LOCAL,
+            InputNoteState::STATE_CONSUMED_EXTERNAL,
+        ]),
+        NoteFilter::Committed => Some(vec![InputNoteState::STATE_COMMITTED]),
+        NoteFilter::Expected => Some(vec![InputNoteState::STATE_EXPECTED]),
+        NoteFilter::Processing => Some(vec![
+            InputNoteState::STATE_PROCESSING_AUTHENTICATED,
+            InputNoteState::STATE_PROCESSING_UNAUTHENTICATED,
+        ]),
+        NoteFilter::Unverified => Some(vec![InputNoteState::STATE_UNVERIFIED]),
+        NoteFilter::Unspent => Some(vec![
+            InputNoteState::STATE_EXPECTED,
+            InputNoteState::STATE_COMMITTED,
+            InputNoteState::STATE_UNVERIFIED,
+            InputNoteState::STATE_PROCESSING_AUTHENTICATED,
+            InputNoteState::STATE_PROCESSING_UNAUTHENTICATED,
+        ]),
+        NoteFilter::List(_) | NoteFilter::Unique(_) | NoteFilter::Nullifiers(_) => None,
+    }
+}
+
 // Provide extension methods for NoteFilter via a local trait
 pub(crate) trait NoteFilterExt {
     fn to_input_notes_promise(&self, db_id: &str) -> Promise;
@@ -134,34 +193,8 @@ impl NoteFilterExt for NoteFilter {
             | NoteFilter::Processing
             | NoteFilter::Unspent
             | NoteFilter::Unverified => {
-                let states: Vec<u8> = match self {
-                    NoteFilter::All => vec![],
-                    NoteFilter::Consumed => vec![
-                        InputNoteState::STATE_CONSUMED_AUTHENTICATED_LOCAL,
-                        InputNoteState::STATE_CONSUMED_UNAUTHENTICATED_LOCAL,
-                        InputNoteState::STATE_CONSUMED_EXTERNAL,
-                    ],
-                    NoteFilter::Committed => vec![InputNoteState::STATE_COMMITTED],
-                    NoteFilter::Expected => vec![InputNoteState::STATE_EXPECTED],
-                    NoteFilter::Processing => {
-                        vec![
-                            InputNoteState::STATE_PROCESSING_AUTHENTICATED,
-                            InputNoteState::STATE_PROCESSING_UNAUTHENTICATED,
-                        ]
-                    },
-                    NoteFilter::Unverified => vec![InputNoteState::STATE_UNVERIFIED],
-                    NoteFilter::Unspent => vec![
-                        InputNoteState::STATE_EXPECTED,
-                        InputNoteState::STATE_COMMITTED,
-                        InputNoteState::STATE_UNVERIFIED,
-                        InputNoteState::STATE_PROCESSING_AUTHENTICATED,
-                        InputNoteState::STATE_PROCESSING_UNAUTHENTICATED,
-                    ],
-                    _ => unreachable!(), // Safety net, should never be reached
-                };
-
-                // Assuming `js_fetch_notes` is your JavaScript function that handles simple string
-                // filters
+                let states = input_note_state_discriminants(self)
+                    .expect("state-based filters always return Some");
                 idxdb_get_input_notes(db_id, states)
             },
             NoteFilter::List(ids) => {

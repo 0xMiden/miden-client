@@ -133,7 +133,7 @@ const { mutate: consume } = useConsume();
 
 await consume({
   accountId: myAccountId,
-  noteIds: [noteId1, noteId2],  // optional: consume specific notes
+  notes: [noteId1, noteId2],  // note IDs, InputNoteRecords, or Note objects
 });
 ```
 
@@ -288,7 +288,7 @@ const { client, account, setAccount } = useTurnkeySigner();
 ```tsx
 import { MidenFiSignerProvider } from "@miden-sdk/wallet-adapter-react";
 
-<MidenFiSignerProvider network="Testnet">
+<MidenFiSignerProvider network="testnet">
   <MidenProvider config={{ rpcUrl: "testnet" }}>
     <App />
   </MidenProvider>

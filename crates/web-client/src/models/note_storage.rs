@@ -19,10 +19,11 @@ pub struct NoteStorage(NativeNoteStorage);
 impl NoteStorage {
     /// Creates note storage from a list of field elements.
     #[wasm_bindgen(constructor)]
-    pub fn new(felt_array: &FeltArray) -> NoteStorage {
+    pub fn new(felt_array: &FeltArray) -> Result<NoteStorage, JsValue> {
         let native_felts = felt_array.into();
-        let native_note_storage = NativeNoteStorage::new(native_felts).unwrap();
-        NoteStorage(native_note_storage)
+        let native_note_storage = NativeNoteStorage::new(native_felts)
+            .map_err(|err| JsValue::from_str(&format!("Invalid note storage: {err}")))?;
+        Ok(NoteStorage(native_note_storage))
     }
 
     /// Returns the raw storage items as an array of field elements.

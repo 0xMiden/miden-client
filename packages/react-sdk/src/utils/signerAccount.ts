@@ -3,6 +3,7 @@ import type {
   SignerAccountConfig,
   SignerAccountType,
 } from "../context/SignerContext";
+import { parseAccountId } from "./accountParsing";
 
 // SIGNER ACCOUNT INITIALIZATION
 // ================================================================================================
@@ -48,6 +49,11 @@ function isPrivateStorageMode(
  * 3. Attempts to import from chain if public/network storage mode
  * 4. Creates the account locally if it doesn't exist
  *
+ * When `importAccountId` is set on the config, steps 2-4 are skipped entirely
+ * and the account is imported from the chain by ID. This is the fast path for
+ * wallets that create accounts externally (e.g., via a vault with HD key
+ * derivation) and already know the on-chain account ID.
+ *
  * @param client - The WebClient instance
  * @param config - The signer account configuration
  * @returns The account ID as a string
@@ -61,6 +67,21 @@ export async function initializeSignerAccount(
 
   // Sync first to get latest state
   await client.syncState();
+
+  // Fast path: import existing account by ID instead of rebuilding from scratch.
+  if (config.importAccountId) {
+    const accountId = parseAccountId(config.importAccountId);
+    try {
+      await client.importAccountById(accountId);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes("already being tracked")) {
+        throw e;
+      }
+    }
+    await client.syncState();
+    return config.importAccountId;
+  }
 
   // Convert Uint8Array commitment to Word (required by SDK)
   const commitmentWord = Word.deserialize(config.publicKeyCommitment);

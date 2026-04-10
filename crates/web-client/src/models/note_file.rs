@@ -126,15 +126,16 @@ impl NoteFile {
     }
 
     /// Creates a `NoteFile` from an output note, choosing details when present.
-    #[wasm_bindgen(js_name = fromOutputNote)]
+    #[wasm_bindgen(js_name = "fromOutputNote")]
     pub fn from_output_note(note: &OutputNote) -> Self {
         let native_note = note.note();
-        match (native_note.assets(), native_note.recipient()) {
-            (Some(assets), Some(recipient)) => {
+        match native_note.recipient() {
+            Some(recipient) => {
+                let assets = native_note.assets();
                 let details = NativeNoteDetails::new(assets.clone(), recipient.clone());
                 Self { inner: details.into() }
             },
-            _ => Self { inner: native_note.id().into() },
+            None => Self { inner: native_note.id().into() },
         }
     }
 

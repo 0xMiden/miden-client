@@ -3,6 +3,7 @@
 
 use std::rc::Rc;
 
+use miden_client::note::BlockNumber;
 use miden_client::store::{InputNoteState, NoteFilter, OutputNoteState};
 use rusqlite::types::Value;
 
@@ -87,8 +88,7 @@ pub(super) fn note_filter_output_notes_condition(filter: &NoteFilter) -> (String
 // NOTE FILTER (INPUT NOTES)
 // ================================================================================================
 
-pub(super) fn note_filter_to_query_input_notes(filter: &NoteFilter) -> (String, NoteQueryParams) {
-    let base = "SELECT
+const INPUT_NOTES_BASE_QUERY: &str = "SELECT
                 note.assets,
                 note.serial_number,
                 note.inputs,
@@ -99,8 +99,50 @@ pub(super) fn note_filter_to_query_input_notes(filter: &NoteFilter) -> (String, 
                 LEFT OUTER JOIN notes_scripts AS script
                     ON note.script_root = script.script_root";
 
+pub(super) fn note_filter_to_query_input_notes(filter: &NoteFilter) -> (String, NoteQueryParams) {
     let (condition, params) = note_filter_input_notes_condition(filter);
-    let query = format!("{base} WHERE {condition}");
+    let query = if matches!(filter, NoteFilter::Consumed) {
+        format!(
+            "{INPUT_NOTES_BASE_QUERY} WHERE {condition} \
+             ORDER BY note.consumed_block_height ASC, \
+                      note.consumed_tx_order IS NULL, note.consumed_tx_order ASC, \
+                      note.note_id ASC"
+        )
+    } else {
+        format!("{INPUT_NOTES_BASE_QUERY} WHERE {condition}")
+    };
+
+    (query, params)
+}
+
+/// Returns a query that fetches a single input note at the given offset from the filtered set,
+/// restricted to a consumer account and optionally to a block range.
+pub(super) fn note_filter_to_query_input_note_by_offset(
+    filter: &NoteFilter,
+    consumer: &str,
+    block_start: Option<BlockNumber>,
+    block_end: Option<BlockNumber>,
+    offset: u32,
+) -> (String, NoteQueryParams) {
+    use core::fmt::Write;
+    let (mut condition, mut params) = note_filter_input_notes_condition(filter);
+
+    params.push(Rc::new(vec![Value::Text(consumer.to_string())]));
+    condition.push_str(" AND note.consumer_account_id IN rarray(?)");
+    condition.push_str(" AND note.consumed_tx_order IS NOT NULL");
+
+    if let Some(start) = block_start {
+        let _ = write!(condition, " AND note.consumed_block_height >= {}", start.as_u32());
+    }
+    if let Some(end) = block_end {
+        let _ = write!(condition, " AND note.consumed_block_height <= {}", end.as_u32());
+    }
+
+    let query = format!(
+        "{INPUT_NOTES_BASE_QUERY} WHERE {condition} \
+         ORDER BY note.consumed_block_height ASC, note.consumed_tx_order ASC, note.note_id ASC \
+         LIMIT 1 OFFSET {offset}"
+    );
 
     (query, params)
 }

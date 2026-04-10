@@ -1,14 +1,9 @@
 import { describe, it, expect, afterEach } from "vitest";
 import Dexie from "dexie";
+import { uniqueDbName } from "./test-utils.js";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
-
-// Unique DB names to avoid collisions between tests.
-let dbCounter = 0;
-function uniqueDbName(): string {
-  return `test-miden-${++dbCounter}-${Date.now()}`;
-}
 
 // Track DBs for cleanup.
 const openDbs: Dexie[] = [];

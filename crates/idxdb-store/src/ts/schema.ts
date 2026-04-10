@@ -3,6 +3,10 @@ import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
+
+/** Mirrors `StorageSlotType::Map`, originally defined in miden-protocol. */
+export const STORAGE_SLOT_TYPE_MAP = 1;
+
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -34,7 +38,10 @@ export async function openDatabase(
   clientVersion: string
 ): Promise<string> {
   const db = new MidenDatabase(network);
-  await db.open(clientVersion);
+  const success = await db.open(clientVersion);
+  if (!success) {
+    throw new Error(`Failed to open IndexedDB database: ${network}`);
+  }
   databaseRegistry.set(network, db);
   return network;
 }
@@ -79,9 +86,9 @@ export interface ILatestAccountStorage {
 
 export interface IHistoricalAccountStorage {
   accountId: string;
-  nonce: string;
+  replacedAtNonce: string;
   slotName: string;
-  slotValue: string;
+  oldSlotValue: string | null;
   slotType: number;
 }
 
@@ -94,25 +101,23 @@ export interface ILatestStorageMapEntry {
 
 export interface IHistoricalStorageMapEntry {
   accountId: string;
-  nonce: string;
+  replacedAtNonce: string;
   slotName: string;
   key: string;
-  value: string | null;
+  oldValue: string | null;
 }
 
 export interface ILatestAccountAsset {
   accountId: string;
   vaultKey: string;
-  faucetIdPrefix: string;
   asset: string;
 }
 
 export interface IHistoricalAccountAsset {
   accountId: string;
-  nonce: string;
+  replacedAtNonce: string;
   vaultKey: string;
-  faucetIdPrefix: string;
-  asset: string | null;
+  oldAsset: string | null;
 }
 
 export interface IAccountAuth {
@@ -127,6 +132,19 @@ export interface IAccountKeyMapping {
 
 export interface IAccount {
   id: string;
+  codeRoot: string;
+  storageRoot: string;
+  vaultRoot: string;
+  nonce: string;
+  committed: boolean;
+  accountSeed?: Uint8Array;
+  accountCommitment: string;
+  locked: boolean;
+}
+
+export interface IHistoricalAccount {
+  id: string;
+  replacedAtNonce: string;
   codeRoot: string;
   storageRoot: string;
   vaultRoot: string;
@@ -166,6 +184,9 @@ export interface IInputNote {
   nullifier: string;
   serializedCreatedAt: string;
   state: Uint8Array;
+  consumedBlockHeight?: number;
+  consumedTxOrder?: number;
+  consumerAccountId?: string;
 }
 
 export interface IOutputNote {
@@ -220,7 +241,6 @@ export interface ISetting {
 
 export interface JsVaultAsset {
   vaultKey: string;
-  faucetIdPrefix: string;
   asset: string;
 }
 
@@ -246,9 +266,9 @@ const V1_STORES: Record<string, string> = {
   [Table.AccountCode]: indexes("root"),
   [Table.LatestAccountStorage]: indexes("[accountId+slotName]", "accountId"),
   [Table.HistoricalAccountStorage]: indexes(
-    "[accountId+nonce+slotName]",
+    "[accountId+replacedAtNonce+slotName]",
     "accountId",
-    "[accountId+nonce]"
+    "[accountId+replacedAtNonce]"
   ),
   [Table.LatestStorageMapEntries]: indexes(
     "[accountId+slotName+key]",
@@ -256,19 +276,15 @@ const V1_STORES: Record<string, string> = {
     "[accountId+slotName]"
   ),
   [Table.HistoricalStorageMapEntries]: indexes(
-    "[accountId+nonce+slotName+key]",
+    "[accountId+replacedAtNonce+slotName+key]",
     "accountId",
-    "[accountId+nonce]"
+    "[accountId+replacedAtNonce]"
   ),
-  [Table.LatestAccountAssets]: indexes(
-    "[accountId+vaultKey]",
-    "accountId",
-    "faucetIdPrefix"
-  ),
+  [Table.LatestAccountAssets]: indexes("[accountId+vaultKey]", "accountId"),
   [Table.HistoricalAccountAssets]: indexes(
-    "[accountId+nonce+vaultKey]",
+    "[accountId+replacedAtNonce+vaultKey]",
     "accountId",
-    "[accountId+nonce]"
+    "[accountId+replacedAtNonce]"
   ),
   [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
   [Table.AccountKeyMapping]: indexes(
@@ -280,12 +296,17 @@ const V1_STORES: Record<string, string> = {
   [Table.HistoricalAccountHeaders]: indexes(
     "&accountCommitment",
     "id",
-    "[id+nonce]"
+    "[id+replacedAtNonce]"
   ),
   [Table.Addresses]: indexes("address", "id"),
   [Table.Transactions]: indexes("id", "statusVariant"),
   [Table.TransactionScripts]: indexes("scriptRoot"),
-  [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+  [Table.InputNotes]: indexes(
+    "noteId",
+    "nullifier",
+    "stateDiscriminant",
+    "[consumedBlockHeight+consumedTxOrder+noteId]"
+  ),
   [Table.OutputNotes]: indexes(
     "noteId",
     "recipientDigest",
@@ -301,6 +322,37 @@ const V1_STORES: Record<string, string> = {
   [Table.Settings]: indexes("key"),
 };
 
+// Dexie dynamically adds table accessors to Transaction objects at runtime,
+// but the Transaction type doesn't declare them. This augmentation bridges that gap
+// so that code passing a Transaction (e.g. `await t.inputNotes.put(...)`) type-checks.
+declare module "dexie" {
+  interface Transaction {
+    inputNotes: Table<IInputNote, string>;
+    outputNotes: Table<IOutputNote, string>;
+    notesScripts: Table<INotesScript, string>;
+    transactions: Table<ITransaction, string>;
+    transactionScripts: Table<ITransactionScript, string>;
+    tags: Table<ITag, number>;
+    latestAccountHeaders: Table<IAccount, string>;
+    historicalAccountHeaders: Table<IAccount, string>;
+    latestAccountStorages: Table<ILatestAccountStorage, string>;
+    historicalAccountStorages: Table<IHistoricalAccountStorage, string>;
+    latestStorageMapEntries: Table<ILatestStorageMapEntry, string>;
+    historicalStorageMapEntries: Table<IHistoricalStorageMapEntry, string>;
+    latestAccountAssets: Table<ILatestAccountAsset, string>;
+    historicalAccountAssets: Table<IHistoricalAccountAsset, string>;
+    accountCodes: Table<IAccountCode, string>;
+    accountAuths: Table<IAccountAuth, string>;
+    accountKeyMappings: Table<IAccountKeyMapping, string>;
+    addresses: Table<IAddress, string>;
+    stateSync: Table<IStateSync, number>;
+    blockHeaders: Table<IBlockHeader, number>;
+    partialBlockchainNodes: Table<IPartialBlockchainNode, number>;
+    foreignAccountCode: Table<IForeignAccountCode, string>;
+    settings: Table<ISetting, string>;
+  }
+}
+
 export type MidenDexie = Dexie & {
   accountCodes: Dexie.Table<IAccountCode, string>;
   latestAccountStorages: Dexie.Table<ILatestAccountStorage, string>;
@@ -312,7 +364,7 @@ export type MidenDexie = Dexie & {
   accountAuths: Dexie.Table<IAccountAuth, string>;
   accountKeyMappings: Dexie.Table<IAccountKeyMapping, string>;
   latestAccountHeaders: Dexie.Table<IAccount, string>;
-  historicalAccountHeaders: Dexie.Table<IAccount, string>;
+  historicalAccountHeaders: Dexie.Table<IHistoricalAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
   transactionScripts: Dexie.Table<ITransactionScript, string>;
@@ -339,7 +391,7 @@ export class MidenDatabase {
   accountAuths: Dexie.Table<IAccountAuth, string>;
   accountKeyMappings: Dexie.Table<IAccountKeyMapping, string>;
   latestAccountHeaders: Dexie.Table<IAccount, string>;
-  historicalAccountHeaders: Dexie.Table<IAccount, string>;
+  historicalAccountHeaders: Dexie.Table<IHistoricalAccount, string>;
   addresses: Dexie.Table<IAddress, string>;
   transactions: Dexie.Table<ITransaction, string>;
   transactionScripts: Dexie.Table<ITransactionScript, string>;
@@ -436,9 +488,10 @@ export class MidenDatabase {
     this.latestAccountHeaders = this.dexie.table<IAccount, string>(
       Table.LatestAccountHeaders
     );
-    this.historicalAccountHeaders = this.dexie.table<IAccount, string>(
-      Table.HistoricalAccountHeaders
-    );
+    this.historicalAccountHeaders = this.dexie.table<
+      IHistoricalAccount,
+      string
+    >(Table.HistoricalAccountHeaders);
     this.addresses = this.dexie.table<IAddress, string>(Table.Addresses);
     this.transactions = this.dexie.table<ITransaction, string>(
       Table.Transactions

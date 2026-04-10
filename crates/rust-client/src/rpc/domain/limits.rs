@@ -3,7 +3,13 @@
 
 use core::convert::TryFrom;
 
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+};
 
 use crate::rpc::RpcEndpoint;
 use crate::rpc::errors::RpcConversionError;

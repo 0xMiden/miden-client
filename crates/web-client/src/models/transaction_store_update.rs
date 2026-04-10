@@ -28,7 +28,7 @@ impl TransactionStoreUpdate {
         self.0.submission_height().as_u32()
     }
 
-    /// Returns the notes created by the transaction.
+    /// Returns the output notes created by the transaction.
     #[wasm_bindgen(js_name = "createdNotes")]
     pub fn created_notes(&self) -> OutputNotes {
         self.0.executed_transaction().output_notes().into()

@@ -8,7 +8,6 @@ import type {
   TransactionHistoryResult,
   TransactionStatus,
 } from "../types";
-import { runExclusiveDirect } from "../utils/runExclusive";
 
 /**
  * Hook to query transaction history and track transaction state.
@@ -33,8 +32,7 @@ import { runExclusiveDirect } from "../utils/runExclusive";
 export function useTransactionHistory(
   options: TransactionHistoryOptions = {}
 ): TransactionHistoryResult {
-  const { client, isReady, runExclusive } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady } = useMiden();
   const { lastSyncTime } = useSyncStateStore();
 
   const [records, setRecords] = useState<TransactionRecord[]>([]);
@@ -69,9 +67,7 @@ export function useTransactionHistory(
         rawIds,
         idsHex
       );
-      const fetched = await runExclusiveSafe(() =>
-        client.getTransactions(resolvedFilter)
-      );
+      const fetched = await client.getTransactions(resolvedFilter);
       const filtered = localFilterHexes
         ? fetched.filter((record) =>
             localFilterHexes.includes(normalizeHex(record.id().toHex()))
@@ -83,7 +79,7 @@ export function useTransactionHistory(
     } finally {
       setIsLoading(false);
     }
-  }, [client, isReady, runExclusiveSafe, filter, rawIds, idsHex]);
+  }, [client, isReady, filter, rawIds, idsHex]);
 
   useEffect(() => {
     if (!isReady) return;

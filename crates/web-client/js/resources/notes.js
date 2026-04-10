@@ -1,4 +1,8 @@
-import { resolveAccountRef, resolveAddress } from "../utils.js";
+import {
+  resolveAccountRef,
+  resolveAddress,
+  resolveNoteIdHex,
+} from "../utils.js";
 
 export class NotesResource {
   #inner;
@@ -20,7 +24,7 @@ export class NotesResource {
 
   async get(noteId) {
     this.#client.assertNotTerminated();
-    const result = await this.#inner.getInputNote(noteId);
+    const result = await this.#inner.getInputNote(resolveNoteIdHex(noteId));
     return result ?? null;
   }
 
@@ -35,7 +39,8 @@ export class NotesResource {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
     const accountId = resolveAccountRef(opts.account, wasm);
-    return await this.#inner.getConsumableNotes(accountId);
+    const consumable = await this.#inner.getConsumableNotes(accountId);
+    return consumable.map((c) => c.inputNoteRecord());
   }
 
   async import(noteFile) {
@@ -47,7 +52,7 @@ export class NotesResource {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
     const format = opts?.format ?? wasm.NoteExportFormat.Full;
-    return await this.#inner.exportNoteFile(noteId, format);
+    return await this.#inner.exportNoteFile(resolveNoteIdHex(noteId), format);
   }
 
   async fetchPrivate(opts) {
@@ -62,11 +67,27 @@ export class NotesResource {
   async sendPrivate(opts) {
     this.#client.assertNotTerminated();
     const wasm = await this.#getWasm();
-    const noteRecord = await this.#inner.getInputNote(opts.noteId);
-    if (!noteRecord) {
-      throw new Error(`Note not found: ${opts.noteId}`);
+
+    let note;
+    const input = opts.note;
+    // Check if input is a Note object (has .id() and .assets() but not .toNote())
+    if (
+      input &&
+      typeof input === "object" &&
+      typeof input.id === "function" &&
+      typeof input.assets === "function" &&
+      typeof input.toNote !== "function"
+    ) {
+      note = input;
+    } else {
+      const noteHex = resolveNoteIdHex(input);
+      const noteRecord = await this.#inner.getInputNote(noteHex);
+      if (!noteRecord) {
+        throw new Error(`Note not found: ${noteHex}`);
+      }
+      note = noteRecord.toNote();
     }
-    const note = noteRecord.toNote();
+
     const address = resolveAddress(opts.to, wasm);
     await this.#inner.sendPrivateNote(note, address);
   }
@@ -78,7 +99,9 @@ function buildNoteFilter(query, wasm) {
   }
 
   if (query.ids) {
-    const noteIds = query.ids.map((id) => wasm.NoteId.fromHex(id));
+    const noteIds = query.ids.map((id) =>
+      wasm.NoteId.fromHex(resolveNoteIdHex(id))
+    );
     return new wasm.NoteFilter(wasm.NoteFilterTypes.List, noteIds);
   }
 

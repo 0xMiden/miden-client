@@ -2,29 +2,30 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use miden_client::account::component::{AccountComponent, AccountComponentMetadata};
 use miden_client::account::{
     Account,
+    AccountBuilder,
     AccountId,
     AccountStorageMode,
+    AccountType,
     StorageMap,
     StorageMapKey,
     StorageSlot,
     StorageSlotName,
 };
-use miden_client::assembly::{
-    CodeBuilder,
-    DefaultSourceManager,
-    MastForest,
-    Module,
-    ModuleKind,
-    Path,
-};
+use miden_client::assembly::{CodeBuilder, DefaultSourceManager, Module, ModuleKind, Path};
 use miden_client::asset::{Asset, FungibleAsset};
-use miden_client::auth::RPO_FALCON_SCHEME_ID;
+use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteFile, NoteScript, NoteType};
-use miden_client::rpc::domain::account::FetchedAccount;
+use miden_client::note::{NoteFile, NoteType};
+use miden_client::rpc::AccountStateAt;
+use miden_client::rpc::domain::account::{
+    AccountStorageRequirements,
+    FetchedAccount,
+    StorageMapEntries,
+};
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
@@ -44,7 +45,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{ClientError, Deserializable, Felt, Serializable};
+use miden_client::{ClientError, EMPTY_WORD, Felt, Word};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use tracing::info;
 
@@ -1350,7 +1351,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let mut storage_map = StorageMap::new();
     storage_map.insert(
         StorageMapKey::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into()),
-        [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(1)].into(),
+        [Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)].into(),
     )?;
 
     let map_slot_name =
@@ -1449,19 +1450,9 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .await
         .unwrap();
 
-    // Remove debug decorators from original note script, as they are not persisted on submission
-    // (https://github.com/0xMiden/miden-base/issues/1812)
-    let mut mast = (*note.script().mast()).clone();
-    mast.strip_decorators();
-
-    // normalize CSR storage to match deserialized form
-    let mast_bytes = mast.to_bytes();
-    let mast = MastForest::read_from_bytes(&mast_bytes)?;
-    let note_script = NoteScript::from_parts(Arc::new(mast), note.script().entrypoint());
-
     assert_eq!(node_nullifier.nullifier, nullifier);
     assert_eq!(node_nullifier_proof.leaf().entries().first().unwrap().0, nullifier.as_word());
-    assert_eq!(note_script, retrieved_note_script);
+    assert_eq!(note.script().root(), retrieved_note_script.root());
     assert!(!sync_storage_maps.updates.is_empty());
     assert!(!account_vault_info.updates.is_empty());
     assert!(!transactions_info.transaction_records.is_empty());
@@ -1550,5 +1541,244 @@ pub async fn test_output_only_note(client_config: ClientConfig) -> Result<()> {
 
     let output_note = client.get_output_note(note_id).await.unwrap();
     assert!(output_note.is_some());
+    Ok(())
+}
+
+/// Tests that `get_account_proof` with `AccountStorageRequirements` correctly filters storage
+/// map entries by key.
+///
+/// Creates a public account with a map slot containing 2 entries, then verifies:
+/// - Requesting with empty keys returns `AllEntries` with both entries.
+/// - Requesting with one specific key returns `EntriesWithProofs` with just that entry's proof.
+pub async fn test_get_account_storage_map_key_filtering(client_config: ClientConfig) -> Result<()> {
+    let (mut client, keystore) = client_config.into_client().await?;
+    wait_for_node(&mut client).await;
+
+    let map_slot_name =
+        StorageSlotName::new("miden::testing::client::map").expect("valid slot name");
+    let map_key_1 =
+        StorageMapKey::new([Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)].into());
+    let map_value_1 = Word::from([Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)]);
+    let map_key_2 =
+        StorageMapKey::new([Felt::new(20), Felt::new(20), Felt::new(20), Felt::new(20)].into());
+    let map_value_2 = Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+
+    let mut storage_map = StorageMap::new();
+    storage_map.insert(map_key_1, map_value_1)?;
+    storage_map.insert(map_key_2, map_value_2)?;
+
+    let map_slot = StorageSlot::with_map(map_slot_name.clone(), storage_map);
+    let component_code = CodeBuilder::default()
+        .compile_component_code(
+            "miden::testing::map_key_filtering",
+            "pub proc dummy\n push.1\n end".to_string(),
+        )
+        .context("failed to compile component code")?;
+    let component = AccountComponent::new(
+        component_code,
+        vec![map_slot],
+        AccountComponentMetadata::new("miden::testing::map_key_filtering", AccountType::all()),
+    )
+    .map_err(|err| anyhow::anyhow!(err))?;
+
+    let key_pair = AuthSecretKey::new_falcon512_poseidon2();
+    let auth_component: AccountComponent =
+        AuthSingleSig::new(key_pair.public_key().to_commitment(), AuthSchemeId::Falcon512Poseidon2)
+            .into();
+
+    let account = AccountBuilder::new(Default::default())
+        .with_component(component)
+        .with_auth_component(auth_component)
+        .storage_mode(AccountStorageMode::Public)
+        .build()
+        .context("failed to build account")?;
+    let account_id = account.id();
+
+    keystore.add_key(&key_pair, account_id).await.context("failed to add key")?;
+    client.add_account(&account, false).await?;
+
+    // Deploy the account (first tx updates nonce)
+    let tx_id = client
+        .submit_new_transaction(account_id, TransactionRequestBuilder::new().build()?)
+        .await?;
+    wait_for_tx(&mut client, tx_id).await?;
+
+    let rpc = client.test_rpc_api();
+
+    // Request all entries (empty keys)
+    let requirements_all = AccountStorageRequirements::new([(map_slot_name.clone(), [].iter())]);
+    let (_, proof_all) = rpc
+        .get_account_proof(account_id, requirements_all, AccountStateAt::ChainTip, None, None)
+        .await?;
+    let map_all = proof_all
+        .find_map_details(&map_slot_name)
+        .context("expected storage map details")?;
+
+    assert!(
+        matches!(map_all.entries, StorageMapEntries::AllEntries(ref e) if e.len() == 2),
+        "expected AllEntries with 2 entries, got {:?}",
+        map_all.entries,
+    );
+
+    // Request one specific key
+    let requirements_one = AccountStorageRequirements::new([(map_slot_name.clone(), [&map_key_1])]);
+    let (_, proof_one) = rpc
+        .get_account_proof(account_id, requirements_one, AccountStateAt::ChainTip, None, None)
+        .await?;
+    let map_one = proof_one
+        .find_map_details(&map_slot_name)
+        .context("expected storage map details")?;
+
+    match &map_one.entries {
+        StorageMapEntries::EntriesWithProofs(proofs) => {
+            assert_eq!(proofs.len(), 1, "expected 1 proof");
+            let hashed_key = map_key_1.hash().as_word();
+            let value = proofs[0].get(&hashed_key);
+            assert!(value.is_some(), "proof should contain the requested key");
+            assert_eq!(value.unwrap(), map_value_1, "value should match the requested key's value");
+        },
+        other => anyhow::bail!("expected EntriesWithProofs, got {:?}", other),
+    }
+
+    Ok(())
+}
+
+/// Tests that `get_account_proof` returns vault details based on the `known_vault_commitment`
+/// parameter.
+///
+/// Creates a public faucet and wallet, mints tokens so the wallet holds assets,
+/// then calls `get_account_proof` three times with different vault commitment values:
+/// - `Some(EMPTY_WORD)`: always fetches vault data (commitment never matches).
+/// - `Some(actual_root)`: commitment matches the node's state, so assets are empty.
+/// - `None`: vault data not requested, so assets are empty.
+pub async fn test_get_account_proof_returns_vault_details(
+    client_config: ClientConfig,
+) -> Result<()> {
+    let (mut client, keystore) = client_config.into_client().await?;
+    wait_for_node(&mut client).await;
+
+    let (wallet, faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Public,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    // Mint tokens so the wallet has assets in its vault
+    let tx_id = mint_and_consume(&mut client, wallet.id(), faucet.id(), NoteType::Public).await;
+    wait_for_tx(&mut client, tx_id).await?;
+
+    let rpc = client.test_rpc_api();
+
+    // Query 1: Some(EMPTY_WORD) — always fetches vault data since EMPTY_WORD never matches
+    let (_, proof) = rpc
+        .get_account_proof(
+            wallet.id(),
+            AccountStorageRequirements::default(),
+            AccountStateAt::ChainTip,
+            None,
+            Some(EMPTY_WORD),
+        )
+        .await?;
+
+    let (_, details) = proof.into_parts();
+    let details = details.context("expected account details for public account")?;
+    let vault_root = details.header.vault_root();
+
+    assert_eq!(
+        details.vault_details.assets.len(),
+        1,
+        "expected exactly 1 asset (the minted fungible token)"
+    );
+
+    // Query 2: Some(actual_root) — commitment matches, node returns empty assets
+    let (_, proof) = rpc
+        .get_account_proof(
+            wallet.id(),
+            AccountStorageRequirements::default(),
+            AccountStateAt::ChainTip,
+            None,
+            Some(vault_root),
+        )
+        .await?;
+
+    let (_, details) = proof.into_parts();
+    let details = details.context("expected account details for public account")?;
+
+    assert!(
+        details.vault_details.assets.is_empty(),
+        "expected empty assets when vault commitment matches"
+    );
+
+    // Query 3: None — vault data not requested, node returns empty assets
+    let (_, proof) = rpc
+        .get_account_proof(
+            wallet.id(),
+            AccountStorageRequirements::default(),
+            AccountStateAt::ChainTip,
+            None,
+            None,
+        )
+        .await?;
+
+    let (_, details) = proof.into_parts();
+    let details = details.context("expected account details for public account")?;
+
+    assert!(
+        details.vault_details.assets.is_empty(),
+        "expected empty assets when vault commitment is not requested"
+    );
+
+    Ok(())
+}
+
+/// Tests that pruning account history removes old committed states without affecting
+/// the current account state. Sets up a faucet, mints twice to build up history,
+/// then verifies that `prune_account_history` deletes intermediate states while
+/// keeping the account readable and unchanged.
+pub async fn test_prune_account_history(client_config: ClientConfig) -> Result<()> {
+    let (mut client, authenticator) = client_config.into_client().await?;
+    wait_for_node(&mut client).await;
+
+    let (basic_account, faucet_account) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    let faucet_id = faucet_account.id();
+    let wallet_id = basic_account.id();
+
+    // Mint twice: each mint advances the faucet nonce, creating historical entries.
+    let (tx_id_1, _) = mint_note(&mut client, wallet_id, faucet_id, NoteType::Public).await;
+    wait_for_tx(&mut client, tx_id_1).await?;
+
+    let (tx_id_2, _) = mint_note(&mut client, wallet_id, faucet_id, NoteType::Public).await;
+    wait_for_tx(&mut client, tx_id_2).await?;
+
+    // Record faucet state before pruning.
+    let faucet_before = client.get_account(faucet_id).await?.unwrap();
+
+    // Prune faucet history up to nonce 1: should remove old committed states.
+    let deleted = client.prune_account_history(faucet_id, Felt::new(1)).await?;
+    assert!(deleted > 0, "Should have pruned old committed states");
+
+    // Account should still be fully readable and unchanged.
+    let faucet_after = client.get_account(faucet_id).await?.unwrap();
+    assert_eq!(
+        faucet_before.to_commitment(),
+        faucet_after.to_commitment(),
+        "Account state should be identical after pruning"
+    );
+
+    // Both accounts should still be readable.
+    assert!(client.get_account(wallet_id).await?.is_some());
+    assert!(client.get_account(faucet_id).await?.is_some());
+
+    info!(deleted_single = deleted, "Prune account history test completed");
+
     Ok(())
 }

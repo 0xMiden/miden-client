@@ -38,6 +38,12 @@ Returns the client-level default prover.
 
 ***
 
+### keystore
+
+> `readonly` **keystore**: [`KeystoreResource`](../interfaces/KeystoreResource.md)
+
+***
+
 ### notes
 
 > `readonly` **notes**: [`NotesResource`](../interfaces/NotesResource.md)
@@ -82,18 +88,6 @@ Returns the client-level default prover.
 
 ***
 
-### exportStore()
-
-> **exportStore**(): `Promise`\<[`StoreSnapshot`](../interfaces/StoreSnapshot.md)\>
-
-Exports the client store as a versioned snapshot.
-
-#### Returns
-
-`Promise`\<[`StoreSnapshot`](../interfaces/StoreSnapshot.md)\>
-
-***
-
 ### getSyncHeight()
 
 > **getSyncHeight**(): `Promise`\<`number`\>
@@ -103,24 +97,6 @@ Returns the current sync height.
 #### Returns
 
 `Promise`\<`number`\>
-
-***
-
-### importStore()
-
-> **importStore**(`snapshot`): `Promise`\<`void`\>
-
-Imports a previously exported store snapshot.
-
-#### Parameters
-
-##### snapshot
-
-[`StoreSnapshot`](../interfaces/StoreSnapshot.md)
-
-#### Returns
-
-`Promise`\<`void`\>
 
 ***
 
@@ -157,6 +133,18 @@ Serializes the mock note transport node state.
 #### Returns
 
 `Uint8Array`
+
+***
+
+### storeIdentifier()
+
+> **storeIdentifier**(): `string`
+
+Returns the identifier of the underlying store (e.g. IndexedDB database name, file path).
+
+#### Returns
+
+`string`
 
 ***
 
@@ -222,6 +210,24 @@ Creates and initializes a new MidenClient.
 
 ***
 
+### createDevnet()
+
+> `static` **createDevnet**(`options?`): `Promise`\<`MidenClient`\>
+
+Creates a client preconfigured for devnet (rpc, prover, note transport, autoSync).
+
+#### Parameters
+
+##### options?
+
+[`ClientOptions`](../interfaces/ClientOptions.md)
+
+#### Returns
+
+`Promise`\<`MidenClient`\>
+
+***
+
 ### createMock()
 
 > `static` **createMock**(`options?`): `Promise`\<`MidenClient`\>
@@ -244,7 +250,7 @@ Creates a mock client for testing.
 
 > `static` **createTestnet**(`options?`): `Promise`\<`MidenClient`\>
 
-Creates a client preconfigured for testnet use. Defaults to autoSync: true.
+Creates a client preconfigured for testnet (rpc, prover, note transport, autoSync).
 
 #### Parameters
 

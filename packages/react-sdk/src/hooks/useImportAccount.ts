@@ -11,8 +11,8 @@ import type {
 import type { ImportAccountOptions } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
-import { runExclusiveDirect } from "../utils/runExclusive";
 import { ensureAccountBech32 } from "../utils/accountBech32";
+import { assertSignerConnected } from "../utils/errors";
 
 export interface UseImportAccountResult {
   /** Import an existing account into the client */
@@ -57,8 +57,7 @@ type AccountFileWithAccount = AccountFileType & {
  * ```
  */
 export function useImportAccount(): UseImportAccountResult {
-  const { client, isReady, runExclusive } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady, signerConnected } = useMiden();
   const setAccounts = useMidenStore((state) => state.setAccounts);
 
   const [account, setAccount] = useState<Account | null>(null);
@@ -71,6 +70,8 @@ export function useImportAccount(): UseImportAccountResult {
         throw new Error("Miden client is not ready");
       }
 
+      assertSignerConnected(signerConnected);
+
       setIsImporting(true);
       setError(null);
 
@@ -78,7 +79,7 @@ export function useImportAccount(): UseImportAccountResult {
         type AccountHeaders = Awaited<ReturnType<WebClient["getAccounts"]>>;
         let accountsAfter: AccountHeaders | null = null;
 
-        const imported = await runExclusiveSafe(async () => {
+        const imported = await (async (): Promise<Account> => {
           switch (options.type) {
             case "file": {
               const accountsBefore = await client.getAccounts();
@@ -145,7 +146,7 @@ export function useImportAccount(): UseImportAccountResult {
               throw new Error("Account not found after import");
             }
             case "id": {
-              const accountId = resolveAccountId(options.accountId);
+              const accountId = parseAccountId(options.accountId);
               await client.importAccountById(accountId);
               const fetchedAccount = await client.getAccount(accountId);
               if (!fetchedAccount) {
@@ -163,7 +164,7 @@ export function useImportAccount(): UseImportAccountResult {
               );
             }
           }
-        });
+        })();
 
         ensureAccountBech32(imported);
         const accounts = accountsAfter ?? (await client.getAccounts());
@@ -179,7 +180,7 @@ export function useImportAccount(): UseImportAccountResult {
         setIsImporting(false);
       }
     },
-    [client, isReady, runExclusive, setAccounts]
+    [client, isReady, setAccounts, signerConnected]
   );
 
   const reset = useCallback(() => {
@@ -195,10 +196,6 @@ export function useImportAccount(): UseImportAccountResult {
     error,
     reset,
   };
-}
-
-function resolveAccountId(accountId: string | AccountIdType): AccountIdType {
-  return parseAccountId(accountId);
 }
 
 async function resolveAccountFile(

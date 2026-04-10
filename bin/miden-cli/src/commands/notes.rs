@@ -269,7 +269,7 @@ async fn show_note<AUTH: Keystore + Sync>(
             },
             Asset::NonFungible(non_fungible_asset) => (
                 "Non Fungible Asset",
-                non_fungible_asset.faucet_id_prefix().to_hex(),
+                non_fungible_asset.faucet_id().prefix().to_hex(),
                 1.0.to_string(),
             ),
         };
