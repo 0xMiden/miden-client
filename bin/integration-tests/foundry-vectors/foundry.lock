@@ -1,0 +1,14 @@
+{
+  "lib/forge-std": {
+    "rev": "f494b0c2c045dda3df3d761bc82209b9a015c4e7"
+  },
+  "lib/openzeppelin-contracts-upgradeable-v4.8": {
+    "branch": {
+      "name": "release-v4.8",
+      "rev": "58fa0f81c4036f1a3b616fdffad2fd27e5d5ce21"
+    }
+  },
+  "lib/zkevm-contracts": {
+    "rev": "110bda5a03e70ee7331bc06407a8e79226d3e520"
+  }
+}

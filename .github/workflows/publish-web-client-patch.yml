@@ -1,12 +1,13 @@
 # This workflow publishes the web-client and react-sdk packages to npm if a patch release
 # label is applied to the PR and the corresponding package.json version is bumped.
+# It triggers on PRs merged to any branch except main.
 
-name: Publish Web Client SDK to NPM on Next
+name: Publish Web Client SDK to NPM
 
 on:
   pull_request:
-    branches:
-      - next
+    branches-ignore:
+      - main
     types:
       - closed
 
@@ -25,7 +26,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: next
+          ref: ${{ github.event.pull_request.base.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
