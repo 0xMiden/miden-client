@@ -1277,12 +1277,21 @@ export const counterAccountComponent = async (
       transactionUpdate.executedTransaction().id().toHex()
     );
 
-    // Wait for network account to update
-    await window.helpers.waitForBlocks(2);
+    // Wait for the node to consume the network note in subsequent blocks.
+    // Use a retry loop (up to 10 blocks) instead of a fixed wait, since the
+    // node may not have consumed the note within a fixed number of blocks
+    // (especially under CI load with multiple test shards).
+    let finalCounter: string | undefined;
+    let account;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await window.helpers.waitForBlocks(1);
 
-    let account = await client.getAccount(accountBuilderResult.account.id());
-    let counter = account?.storage().getItem(COUNTER_SLOT_NAME)?.toHex();
-    let finalCounter = counter?.replace(/^0x/, "").replace(/^0+|0+$/g, "");
+      account = await client.getAccount(accountBuilderResult.account.id());
+      let counter = account?.storage().getItem(COUNTER_SLOT_NAME)?.toHex();
+      finalCounter = counter?.replace(/^0x/, "").replace(/^0+|0+$/g, "");
+
+      if (finalCounter === "2") break;
+    }
 
     let code = account?.code();
     let hasCounterComponent = code
