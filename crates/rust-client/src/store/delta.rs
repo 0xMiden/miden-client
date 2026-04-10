@@ -16,11 +16,11 @@ use miden_protocol::crypto::merkle::MerkleError;
 use super::StoreError;
 use super::smt_forest::AccountSmtForest;
 
-/// Computes updated storage slot roots from the delta using the SMT forest.
+/// Applies storage slot changes from the delta to the SMT forest.
 ///
 /// Value slots are taken directly from the delta. Map slots are computed incrementally
 /// by applying the map delta entries to the old root via the SMT forest.
-fn compute_storage_delta(
+fn apply_storage_delta_to_forest(
     smt_forest: &mut AccountSmtForest,
     old_map_roots: &BTreeMap<StorageSlotName, Word>,
     delta: &AccountDelta,
@@ -134,9 +134,9 @@ pub fn apply_account_delta_to_forest(
         .ok_or(StoreError::AccountDataNotFound(account_id))?;
 
     let (updated_assets, removed_vault_keys) = compute_vault_delta(old_vault_assets, delta)?;
-    let old_vault_root = final_roots[0];
+    let vault_root = final_roots.first_mut().ok_or(StoreError::AccountDataNotFound(account_id))?;
     let new_vault_root = smt_forest.update_asset_nodes(
-        old_vault_root,
+        *vault_root,
         updated_assets.iter().copied(),
         removed_vault_keys.iter().copied(),
     )?;
@@ -148,10 +148,10 @@ pub fn apply_account_delta_to_forest(
         }));
     }
 
-    final_roots[0] = new_vault_root;
+    *vault_root = new_vault_root;
 
-    // Compute storage delta via SMT forest
-    let updated_storage_slots = compute_storage_delta(smt_forest, old_map_roots, delta)?;
+    // Apply storage delta to the SMT forest
+    let updated_storage_slots = apply_storage_delta_to_forest(smt_forest, old_map_roots, delta)?;
 
     // Update map roots in final_roots with new values from the delta
     let default_map_root = StorageMap::default().root();
