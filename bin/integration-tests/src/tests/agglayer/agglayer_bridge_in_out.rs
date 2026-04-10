@@ -9,12 +9,13 @@
 //!
 //! Bridge-in:
 //! 4. Generate CLAIM proof data by calling foundry test for the destination account
-//! 5. Submit UPDATE_GER note → consumed by bridge as network transaction
-//! 6. Submit CLAIM note → consumed by agglayer faucet as network transaction
-//! 7. Destination account consumes the resulting P2ID note
+//! 5. Submit UPDATE_GER note -> consumed by bridge as network transaction
+//! 6. Submit CLAIM note -> consumed by bridge as network transaction, which produces MINT note
+//! 7. MINT note consumed by agglayer faucet, which produces P2ID note
+//! 8. Destination account consumes the resulting P2ID note
 //!
 //! Bridge-out:
-//! 8. Submit B2AGG note from destination account → consumed by bridge as network transaction
+//! 9. Submit B2AGG note from destination account -> consumed by bridge as network transaction
 
 extern crate alloc;
 
