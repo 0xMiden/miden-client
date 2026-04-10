@@ -81,6 +81,7 @@ mod state_sync_update;
 pub use state_sync_update::{
     AccountUpdates,
     BlockUpdates,
+    PublicAccountUpdate,
     StateSyncUpdate,
     TransactionUpdateTracker,
 };
@@ -131,8 +132,12 @@ where
 
         // Build sync state components
         let note_screener = self.note_screener();
-        let state_sync =
-            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
+        let state_sync = StateSync::new(
+            self.rpc_api.clone(),
+            Some(self.store.clone()),
+            Arc::new(note_screener),
+            self.tx_discard_delta,
+        );
         let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
         let input = self.build_sync_input().await?;
 
@@ -165,7 +170,7 @@ where
             .get_account_headers()
             .await?
             .into_iter()
-            .map(|(acc_header, _)| acc_header)
+            .map(|(header, _status)| header)
             .collect();
 
         let note_tags = self.store.get_unique_note_tags().await?;

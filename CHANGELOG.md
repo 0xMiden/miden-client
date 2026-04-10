@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.1 (TBD)
+
+### Enhancements
+
+* Optimized `get_account_details` so it only fetches the delta of large public accounts when syncing ([#1916](https://github.com/0xMiden/miden-client/pull/1916)).
+
 ## 0.14.0 (2026-04-07)
 
 ### Enhancements

@@ -58,6 +58,7 @@ pub type MockClient<AUTH> = Client<AUTH>;
 pub struct MockRpcApi {
     account_commitment_updates: Arc<RwLock<BTreeMap<BlockNumber, BTreeMap<AccountId, Word>>>>,
     pub mock_chain: Arc<RwLock<MockChain>>,
+    oversize_threshold: usize,
 }
 
 impl Default for MockRpcApi {
@@ -75,7 +76,17 @@ impl MockRpcApi {
         Self {
             account_commitment_updates: Arc::new(RwLock::new(build_account_updates(&mock_chain))),
             mock_chain: Arc::new(RwLock::new(mock_chain)),
+            oversize_threshold: 1000,
         }
+    }
+
+    /// Sets the oversize threshold for `get_account_proof`. Any storage map with more
+    /// entries than this threshold, or a vault with more assets, will have the
+    /// `too_many_entries` / `too_many_assets` flags set in the response.
+    #[must_use]
+    pub fn with_oversize_threshold(mut self, threshold: usize) -> Self {
+        self.oversize_threshold = threshold;
+        self
     }
 
     /// Returns the current MMR of the blockchain.
@@ -441,6 +452,7 @@ impl NodeRpcClient for MockRpcApi {
     }
 
     /// Returns the node's tracked account details for the specified account ID.
+    /// Always returns the full account for public accounts.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         let summary =
             self.account_commitment_updates
@@ -499,7 +511,9 @@ impl NodeRpcClient for MockRpcApi {
                         .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
                         .collect();
 
-                    let too_many_entries = entries.len() > 1000;
+                    // NOTE: The mock returns all entries even when too_many_entries is set.
+                    // In production, the node would return partial data for oversized maps.
+                    let too_many_entries = entries.len() > self.oversize_threshold;
                     let account_storage_map_detail = AccountStorageMapDetails {
                         slot_name: slot_name.clone(),
                         too_many_entries,
@@ -522,7 +536,7 @@ impl NodeRpcClient for MockRpcApi {
                 assets.push(asset);
             }
             let vault_details = AccountVaultDetails {
-                too_many_assets: assets.len() > 1000,
+                too_many_assets: assets.len() > self.oversize_threshold,
                 assets,
             };
 
