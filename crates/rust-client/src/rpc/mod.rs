@@ -49,7 +49,7 @@ use core::fmt;
 use domain::account::{AccountProof, FetchedAccount};
 use domain::note::{FetchedNote, NoteSyncInfo, SyncNotesResult};
 use domain::nullifier::NullifierUpdate;
-use domain::sync::ChainMmrInfo;
+use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountCode, AccountHeader, AccountId};
 use miden_protocol::address::NetworkId;
@@ -95,15 +95,6 @@ pub enum AccountStateAt {
     ChainTip,
     /// Gets the state at a specific block number
     Block(BlockNumber),
-}
-
-/// The chain tip finality variant to sync up to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChainTip {
-    /// Sync up to the latest committed block.
-    Committed,
-    /// Sync up to the latest proven block.
-    Proven,
 }
 
 // NODE RPC CLIENT TRAIT
@@ -171,11 +162,14 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches the MMR delta for a given block range using the `/SyncChainMmr` RPC endpoint.
     ///
     /// - `block_from` is the last block number already present in the caller's MMR.
-    /// - `chain_tip` determines the finality of the chain tip to sync up to.
+    /// - `upper_bound` determines the upper bound of the sync range. Can be a specific block number
+    ///   (`BlockNumber`), or a chain tip finality level: `CommittedChainTip` syncs up to the latest
+    ///   committed block (the chain tip), while `ProvenChainTip` syncs up to the latest proven
+    ///   block which may be behind the committed tip.
     async fn sync_chain_mmr(
         &self,
         block_from: BlockNumber,
-        chain_tip: ChainTip,
+        upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError>;
 
     /// Fetches the current state of an account from the node using the `/GetAccountDetails` RPC

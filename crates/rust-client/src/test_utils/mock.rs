@@ -38,9 +38,9 @@ use crate::rpc::domain::note::{
 };
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
-use crate::rpc::domain::sync::ChainMmrInfo;
+use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::transaction::{TransactionRecord, TransactionsInfo};
-use crate::rpc::{AccountStateAt, ChainTip, NodeRpcClient, RpcError, RpcStatusInfo};
+use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError, RpcStatusInfo};
 
 pub type MockClient<AUTH> = Client<AUTH>;
 
@@ -351,12 +351,17 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_chain_mmr(
         &self,
         block_from: BlockNumber,
-        _chain_tip: ChainTip,
+        upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError> {
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = chain_tip;
+        // The mock chain doesn't distinguish committed vs proven tips, but respects
+        // explicit block numbers.
+        let target_block = match upper_bound {
+            SyncTarget::BlockNumber(block_num) => block_num.min(chain_tip),
+            SyncTarget::CommittedChainTip | SyncTarget::ProvenChainTip => chain_tip,
+        };
 
-        let from_forest = if block_from == chain_tip {
+        let from_forest = if block_from == target_block {
             target_block.as_usize()
         } else {
             block_from.as_u32() as usize + 1

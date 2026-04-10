@@ -39,7 +39,7 @@ use super::{
     Endpoint, FetchedAccount, NodeRpcClient, RpcEndpoint, NoteSyncInfo, RpcError,
     RpcStatusInfo,
 };
-use crate::rpc::domain::sync::ChainMmrInfo;
+use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::transaction::TransactionsInfo;
@@ -49,7 +49,7 @@ use crate::rpc::generated::rpc::account_request::account_detail_request::storage
 use crate::rpc::generated::rpc::account_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::generated::rpc::BlockRange;
 use crate::rpc::domain::limits::RpcLimits;
-use crate::rpc::{AccountStateAt, ChainTip, generated as proto};
+use crate::rpc::{AccountStateAt, generated as proto};
 
 mod api_client;
 mod retry;
@@ -586,16 +586,23 @@ impl NodeRpcClient for GrpcClient {
     async fn sync_chain_mmr(
         &self,
         block_from: BlockNumber,
-        chain_tip: ChainTip,
+        upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError> {
         let block_from = block_from.as_u32();
 
-        let proto_chain_tip = match chain_tip {
-            ChainTip::Committed => proto::rpc::ChainTip::Committed,
-            ChainTip::Proven => proto::rpc::ChainTip::Proven,
-        };
-        let upper_bound =
-            Some(proto::rpc::sync_chain_mmr_request::UpperBound::ChainTip(proto_chain_tip.into()));
+        let upper_bound = Some(match upper_bound {
+            SyncTarget::BlockNumber(block_num) => {
+                proto::rpc::sync_chain_mmr_request::UpperBound::BlockNum(block_num.as_u32())
+            },
+            SyncTarget::CommittedChainTip => {
+                proto::rpc::sync_chain_mmr_request::UpperBound::ChainTip(
+                    proto::rpc::ChainTip::Committed.into(),
+                )
+            },
+            SyncTarget::ProvenChainTip => proto::rpc::sync_chain_mmr_request::UpperBound::ChainTip(
+                proto::rpc::ChainTip::Proven.into(),
+            ),
+        });
 
         let request = proto::rpc::SyncChainMmrRequest { block_from, upper_bound };
 

@@ -4,6 +4,23 @@ use miden_protocol::crypto::merkle::mmr::MmrDelta;
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::{RpcError, generated as proto};
 
+// SYNC UPPER BOUND
+// ================================================================================================
+
+/// Upper bound for chain MMR synchronization.
+///
+/// Determines how far ahead to sync: either to a specific block number or to a chain tip
+/// finality level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncTarget {
+    /// Sync up to a specific block number (inclusive).
+    BlockNumber(BlockNumber),
+    /// Sync up to the latest committed block (the chain tip).
+    CommittedChainTip,
+    /// Sync up to the latest proven block, which may be behind the committed tip.
+    ProvenChainTip,
+}
+
 // CHAIN MMR INFO
 // ================================================================================================
 
