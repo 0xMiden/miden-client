@@ -8,7 +8,9 @@ use miden_protocol::account::{AccountHeader, AccountId};
 use miden_protocol::crypto::merkle::mmr::PartialMmr;
 use miden_protocol::note::NoteTag;
 
-use super::state_sync_update::TransactionUpdateTracker;
+use super::state_sync_update::{
+    TransactionUpdateTracker, derive_account_commitment_updates, derive_transaction_inclusions,
+};
 use super::{BlockUpdates, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
@@ -150,21 +152,15 @@ impl StateSync {
     /// input, or assemble it manually for custom sync. The `current_partial_mmr` is taken by
     /// mutable reference so callers can keep it in memory across syncs.
     ///
-    /// During the sync process, the following steps are performed:
-    /// 1. A request is sent to the node to get the state updates. This request includes tracked
-    ///    account IDs and the tags of notes that might have changed or that might be of interest to
-    ///    the client.
-    /// 2. A response is received with the current state of the network. The response includes
-    ///    information about new and committed notes, updated accounts, and committed transactions.
-    /// 3. Tracked public accounts are updated and private accounts are validated against the node
-    ///    state.
-    /// 4. Tracked notes are updated with their new states. Notes might be committed or nullified
-    ///    during the sync processing.
-    /// 5. New notes are checked, and only relevant ones are stored. Relevance is determined by the
-    ///    [`OnNoteReceived`] callback.
-    /// 6. Transactions are updated with their new states. Transactions might be committed or
-    ///    discarded.
-    /// 7. The MMR is updated with the new peaks and authentication nodes.
+    /// The sync process:
+    /// 1. Fetches sync data from the node (MMR delta, note inclusions, transaction records).
+    /// 2. Advances the partial MMR to the chain tip.
+    /// 3. Screens note inclusions and tracks relevant blocks in the MMR.
+    /// 4. Updates account states (fetches updated public accounts, flags mismatched private ones).
+    /// 5. Processes transaction inclusions (commits local txs, records external consumers,
+    ///    discards stale/expired txs, commits output notes).
+    /// 6. Detects notes consumed externally via nullifier sync (optional, see
+    ///    [`Self::disable_nullifier_sync`]).
     pub async fn sync_state(
         &self,
         current_partial_mmr: &mut PartialMmr,
@@ -188,7 +184,6 @@ impl StateSync {
             ..Default::default()
         };
 
-        let note_tags = Arc::new(note_tags);
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
         let Some(sync_data) = self
             .fetch_sync_data(update.block_num, &account_ids, &note_tags)
@@ -202,12 +197,16 @@ impl StateSync {
             chain_tip_header,
             note_blocks,
             public_notes,
-            account_commitment_updates,
-            transactions,
-            nullifiers,
+            transaction_records,
         } = sync_data;
 
         update.block_num = chain_tip_header.block_num();
+
+        // Derive transaction data once from raw records.
+        let account_commitment_updates =
+            derive_account_commitment_updates(&transaction_records);
+        let (tx_inclusions, ordered_nullifiers) =
+            derive_transaction_inclusions(transaction_records);
 
         // Step 1: Advance MMR to chain tip.
         Self::advance_mmr(
@@ -237,8 +236,8 @@ impl StateSync {
         // Step 4: Process transaction inclusions, nullifier ordering, and output note commits.
         update.apply_transaction_data(
             &chain_tip_header,
-            &transactions,
-            nullifiers,
+            &tx_inclusions,
+            ordered_nullifiers,
             self.tx_discard_delta,
         )?;
 
@@ -562,7 +561,7 @@ mod tests {
         let mut partial_mmr = PartialMmr::from_peaks(genesis_peaks);
 
         let sync_data = state_sync
-            .fetch_sync_data(BlockNumber::GENESIS, &[], &Arc::new(note_tags.clone()))
+            .fetch_sync_data(BlockNumber::GENESIS, &[], &note_tags)
             .await
             .unwrap()
             .expect("should have progressed past genesis");
