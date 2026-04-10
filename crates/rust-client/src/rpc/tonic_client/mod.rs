@@ -49,7 +49,7 @@ use crate::rpc::generated::rpc::account_request::account_detail_request::storage
 use crate::rpc::generated::rpc::account_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::generated::rpc::BlockRange;
 use crate::rpc::domain::limits::RpcLimits;
-use crate::rpc::{AccountStateAt, generated as proto};
+use crate::rpc::{AccountStateAt, ChainTip, generated as proto};
 
 mod api_client;
 mod retry;
@@ -586,18 +586,16 @@ impl NodeRpcClient for GrpcClient {
     async fn sync_chain_mmr(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        chain_tip: ChainTip,
     ) -> Result<ChainMmrInfo, RpcError> {
         let block_from = block_from.as_u32();
 
-        let upper_bound = match block_to {
-            Some(block_to) => {
-                Some(proto::rpc::sync_chain_mmr_request::UpperBound::BlockNum(block_to.as_u32()))
-            },
-            None => Some(proto::rpc::sync_chain_mmr_request::UpperBound::ChainTip(
-                proto::rpc::ChainTip::Committed.into(),
-            )),
+        let proto_chain_tip = match chain_tip {
+            ChainTip::Committed => proto::rpc::ChainTip::Committed,
+            ChainTip::Proven => proto::rpc::ChainTip::Proven,
         };
+        let upper_bound =
+            Some(proto::rpc::sync_chain_mmr_request::UpperBound::ChainTip(proto_chain_tip.into()));
 
         let request = proto::rpc::SyncChainMmrRequest { block_from, upper_bound };
 
@@ -885,10 +883,14 @@ impl NodeRpcClient for GrpcClient {
         Ok(proofs)
     }
 
-    async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
+    async fn get_block_by_number(
+        &self,
+        block_num: BlockNumber,
+        include_proof: bool,
+    ) -> Result<ProvenBlock, RpcError> {
         let request = proto::blockchain::BlockRequest {
             block_num: block_num.as_u32(),
-            include_proof: Some(false),
+            include_proof: Some(include_proof),
         };
 
         let response = self

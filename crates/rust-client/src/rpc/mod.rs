@@ -97,6 +97,15 @@ pub enum AccountStateAt {
     Block(BlockNumber),
 }
 
+/// The chain tip finality variant to sync up to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChainTip {
+    /// Sync up to the latest committed block.
+    Committed,
+    /// Sync up to the latest proven block.
+    Proven,
+}
+
 // NODE RPC CLIENT TRAIT
 // ================================================================================================
 
@@ -138,7 +147,13 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Given a block number, fetches the block corresponding to that height from the node using
     /// the `/GetBlockByNumber` RPC endpoint.
-    async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError>;
+    ///
+    /// If `include_proof` is set to true, the block proof will be included in the response.
+    async fn get_block_by_number(
+        &self,
+        block_num: BlockNumber,
+        include_proof: bool,
+    ) -> Result<ProvenBlock, RpcError>;
 
     /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById`
     /// RPC endpoint.
@@ -156,11 +171,11 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches the MMR delta for a given block range using the `/SyncChainMmr` RPC endpoint.
     ///
     /// - `block_from` is the last block number already present in the caller's MMR.
-    /// - `block_to` is the optional upper bound of the range. If `None`, syncs up to the chain tip.
+    /// - `chain_tip` determines the finality of the chain tip to sync up to.
     async fn sync_chain_mmr(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        chain_tip: ChainTip,
     ) -> Result<ChainMmrInfo, RpcError>;
 
     /// Fetches the current state of an account from the node using the `/GetAccountDetails` RPC

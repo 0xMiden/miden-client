@@ -40,7 +40,7 @@ use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::sync::ChainMmrInfo;
 use crate::rpc::domain::transaction::{TransactionRecord, TransactionsInfo};
-use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError, RpcStatusInfo};
+use crate::rpc::{AccountStateAt, ChainTip, NodeRpcClient, RpcError, RpcStatusInfo};
 
 pub type MockClient<AUTH> = Client<AUTH>;
 
@@ -351,10 +351,10 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_chain_mmr(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        _chain_tip: ChainTip,
     ) -> Result<ChainMmrInfo, RpcError> {
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+        let target_block = chain_tip;
 
         let from_forest = if block_from == chain_tip {
             target_block.as_usize()
@@ -582,7 +582,11 @@ impl NodeRpcClient for MockRpcApi {
             .collect())
     }
 
-    async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
+    async fn get_block_by_number(
+        &self,
+        block_num: BlockNumber,
+        _include_proof: bool,
+    ) -> Result<ProvenBlock, RpcError> {
         let block = self
             .mock_chain
             .read()
