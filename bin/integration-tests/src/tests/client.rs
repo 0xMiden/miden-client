@@ -1330,6 +1330,20 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         consume_notes(&mut client, first_basic_account.id(), std::slice::from_ref(&note)).await;
     wait_for_tx(&mut client, tx_id).await?;
 
+    let (proof_block_num, account_proof) = client
+        .test_rpc_api()
+        .get_account_proof(
+            first_basic_account.id(),
+            AccountStorageRequirements::default(),
+            AccountStateAt::ChainTip,
+            None,
+            None,
+        )
+        .await?;
+    assert!(proof_block_num >= first_block_num);
+    assert_eq!(account_proof.account_id(), first_basic_account.id());
+    assert!(account_proof.account_header().is_some());
+
     // Define the account code for the custom library
     let custom_code = r#"
         use miden::protocol::native_account
