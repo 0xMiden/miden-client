@@ -1,5 +1,5 @@
-use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use miden_client::keystore::Keystore;
@@ -17,9 +17,13 @@ use crate::utils::parse_account_id;
 #[derive(Debug, Clone, Parser)]
 #[command(about = "Call a procedure on a local account and display the result and state delta")]
 pub struct CallCmd {
-    /// Account ID and procedure name in the format `<ACCOUNT_ID>::<PROCEDURE_NAME>`.
-    #[arg(value_name = "account_id::procedure_name")]
-    target: String,
+    /// Account ID to execute the procedure against.
+    #[arg(value_name = "ACCOUNT_ID")]
+    account_id: String,
+
+    /// Procedure name or MAST root hash (0x-prefixed hex).
+    #[arg(value_name = "PROCEDURE")]
+    procedure: String,
 
     /// Positional arguments to push onto the stack before calling the procedure.
     #[arg(value_name = "args")]
@@ -35,35 +39,47 @@ impl CallCmd {
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
-        // Sync state to ensure we have the latest block data
-        client.sync_state().await?;
+        if client.get_sync_height().await? == 0.into() {
+            return Err(CliError::InvalidArgument(
+                "Client has not been synced yet. Run `miden-client sync` first.".to_string(),
+            ));
+        }
 
-        // Parse target
-        let (account_id_str, procedure_name) = parse_target(&self.target)?;
-        let account_id = parse_account_id(&client, &account_id_str).await?;
+        let account_id = parse_account_id(&client, &self.account_id).await?;
 
-        // Load the package and resolve the procedure
         let package = load_package(&self.package)?;
-        let digest = resolve_procedure_digest(&package, &procedure_name)?;
 
-        // Print signature and determine result count
-        let result_count = print_manifest_signature(&package, &procedure_name);
+        let (digest, result_count) = if self.procedure.starts_with("0x") {
+            let digest = Word::try_from(self.procedure.as_str()).map_err(|e| {
+                CliError::InvalidArgument(format!(
+                    "Invalid procedure hash '{}': {e}",
+                    self.procedure
+                ))
+            })?;
+            (digest, 0)
+        } else {
+            let digest = resolve_procedure_digest(&package, &self.procedure)?;
+            let result_count = print_manifest_signature(&package, &self.procedure);
+            (digest, result_count)
+        };
 
-        // Parse arguments
         let args = parse_args(&self.args)?;
 
-        let library = package.unwrap_library();
+        let library = &*package.mast;
 
         // 1) Read-only execution to get return values
-        let read_script = generate_tx_script(&digest, &args, result_count);
+        // When result_count is unknown (0), use args.len() to preserve values on
+        // the stack so print_output_stack can auto-detect non-zero results.
+        let read_result_count = if result_count > 0 { result_count } else { args.len() };
+        let read_script = generate_tx_script(&digest, &args, read_result_count);
 
         let read_tx_script = client
             .code_builder()
-            .with_statically_linked_library(&library)?
+            .with_statically_linked_library(library)?
             .compile_tx_script(&read_script)?;
 
         let output_stack = client
-            .execute_program(account_id, read_tx_script, AdviceInputs::default(), BTreeSet::new())
+            .execute_program(account_id, read_tx_script, AdviceInputs::default(), BTreeMap::new())
             .await?;
 
         // Print result
@@ -73,7 +89,7 @@ impl CallCmd {
         let delta_script = generate_tx_script(&digest, &args, 0);
         let delta_tx_script = client
             .code_builder()
-            .with_statically_linked_library(&library)?
+            .with_statically_linked_library(library)?
             .compile_tx_script(&delta_script)?;
 
         let tx_request = TransactionRequestBuilder::new()
@@ -85,10 +101,10 @@ impl CallCmd {
 
         match client.execute_transaction(account_id, tx_request).await {
             Ok(tx_result) => {
-                print_delta(tx_result.executed_transaction().account_delta());
+                print_delta(tx_result.executed_transaction());
             },
             Err(e) => {
-                println!("\n(Could not compute state delta: {e})");
+                println!("\n(Could not compute state delta: {e:?})");
             },
         }
 
@@ -99,18 +115,7 @@ impl CallCmd {
 // HELPERS
 // ================================================================================================
 
-fn parse_target(target: &str) -> Result<(String, String), CliError> {
-    let parts: Vec<&str> = target.splitn(2, "::").collect();
-    if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
-        return Err(CliError::InvalidArgument(format!(
-            "Invalid target '{}'. Expected ACCOUNT_ID::PROCEDURE_NAME",
-            target
-        )));
-    }
-    Ok((parts[0].to_string(), parts[1].to_string()))
-}
-
-fn load_package(path: &PathBuf) -> Result<Package, CliError> {
+fn load_package(path: &Path) -> Result<Package, CliError> {
     if !path.exists() {
         return Err(CliError::InvalidArgument(format!(
             "Package file not found: {}",
@@ -125,11 +130,7 @@ fn load_package(path: &PathBuf) -> Result<Package, CliError> {
 }
 
 fn resolve_procedure_digest(package: &Package, procedure_name: &str) -> Result<Word, CliError> {
-    if !package.is_library() {
-        return Err(CliError::InvalidArgument("Package does not contain a library.".to_string()));
-    }
-
-    let library = package.unwrap_library();
+    let library = &*package.mast;
     for module_info in library.module_infos() {
         if let Some(digest) = module_info.get_procedure_digest_by_name(procedure_name) {
             return Ok(digest);
@@ -217,7 +218,11 @@ fn print_output_stack(stack: &[Felt; 16], expected_results: usize) {
     let count = if expected_results > 0 {
         expected_results
     } else {
-        stack.iter().rposition(|v| v.as_int() != 0).map(|pos| pos + 1).unwrap_or(0)
+        stack
+            .iter()
+            .rposition(|v| v.as_canonical_u64() != 0)
+            .map(|pos| pos + 1)
+            .unwrap_or(0)
     };
 
     if count == 0 {
@@ -243,7 +248,7 @@ fn generate_tx_script(digest: &Word, args: &[u64], result_count: usize) -> Strin
     script.push_str(&format!("    call.{}\n", digest.to_hex()));
 
     // Drop pushed args from under the results to restore stack depth to 16
-    let to_drop: usize = args.len();
+    let to_drop = args.len();
     if to_drop > 0 {
         match result_count {
             0 => {
@@ -268,12 +273,11 @@ fn generate_tx_script(digest: &Word, args: &[u64], result_count: usize) -> Strin
     script
 }
 
-fn print_delta(delta: &miden_client::account::AccountDelta) {
+fn print_delta(executed_tx: &miden_client::transaction::ExecutedTransaction) {
+    let delta = executed_tx.account_delta();
     let has_values = delta.storage().values().next().is_some();
     let has_maps = delta.storage().maps().next().is_some();
-    let has_vault = !delta.vault().is_empty();
-
-    if !has_values && !has_maps && !has_vault {
+    if !has_values && !has_maps && delta.nonce_delta() == Felt::new(0) {
         println!("\nState delta: no changes");
         return;
     }
@@ -292,15 +296,21 @@ fn print_delta(delta: &miden_client::account::AccountDelta) {
         let mut table = create_dynamic_table(&["Storage Slot", "Map Key", "New Value"]);
         for (slot, map_delta) in delta.storage().maps() {
             for (key, value) in map_delta.entries() {
-                table.add_row(vec![slot.to_string(), key.inner().to_hex(), value.to_hex()]);
+                table.add_row(vec![slot.to_string(), Word::from(*key).to_hex(), value.to_hex()]);
             }
         }
         println!("{table}");
     }
 
-    if has_vault {
-        println!("Vault changes detected.");
-    }
+    let nonce_before = executed_tx.initial_account().nonce();
+    let nonce_after = executed_tx.final_account().nonce();
+    println!("Nonce: {} -> {}", nonce_before, nonce_after);
 
-    println!("Nonce delta: {}", delta.nonce_delta());
+    let output_notes: Vec<_> = executed_tx.output_notes().iter().collect();
+    if !output_notes.is_empty() {
+        println!("\nOutput notes ({}):", output_notes.len());
+        for note in &output_notes {
+            println!("  - {}", note.id().to_hex());
+        }
+    }
 }

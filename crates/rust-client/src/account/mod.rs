@@ -95,6 +95,8 @@ pub mod component {
         StorageSchema,
         StorageSlotSchema,
         StorageValueName,
+        ValueSlotSchema,
+        WordSchema,
     };
     pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
     pub use miden_standards::account::auth::*;
