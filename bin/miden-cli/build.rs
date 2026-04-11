@@ -9,8 +9,13 @@ use miden_client::account::component::{
     AuthSingleSigAcl,
     BasicFungibleFaucet,
     BasicWallet,
+    FeltSchema,
     MIDEN_PACKAGE_EXTENSION,
     NoAuth,
+    StorageSchema,
+    StorageSlotSchema,
+    ValueSlotSchema,
+    WordSchema,
     basic_fungible_faucet_library,
     basic_wallet_library,
     multisig_library,
@@ -18,7 +23,8 @@ use miden_client::account::component::{
     singlesig_acl_library,
     singlesig_library,
 };
-use miden_client::assembly::Library;
+use miden_client::account::{AccountType, StorageSlotName};
+use miden_client::assembly::{CodeBuilder, Library};
 use miden_client::utils::Serializable;
 use miden_client::vm::{
     Package,
@@ -63,6 +69,59 @@ fn main() {
     // Multisig auth
     let multisig_metadata = AuthMultisig::component_metadata();
     build_package("multisig-auth", multisig_library(), &multisig_metadata, Some("auth"));
+
+    // Call-test component (for CLI tests — arithmetic + storage procedures)
+    let call_test_code = r#"
+        use miden::protocol::native_account
+        use miden::core::word
+        use miden::core::sys
+
+        const STORED_VALUE = word("miden::testing::call_test::stored_value")
+
+        pub proc add
+            add
+        end
+
+        pub proc set_value
+            push.STORED_VALUE[0..2]
+            exec.native_account::set_item
+            dropw
+            exec.sys::truncate_stack
+        end
+    "#;
+
+    let call_test_library: Library = CodeBuilder::default()
+        .compile_component_code("miden::testing::call_test", call_test_code)
+        .expect("failed to compile call-test component")
+        .into();
+
+    let slot_name =
+        StorageSlotName::new("miden::testing::call_test::stored_value").expect("valid slot name");
+
+    let word_schema = WordSchema::new_value([
+        FeltSchema::new_void(),
+        FeltSchema::new_void(),
+        FeltSchema::new_void(),
+        FeltSchema::new_void(),
+    ]);
+
+    let storage_schema = StorageSchema::new([(
+        slot_name,
+        StorageSlotSchema::Value(ValueSlotSchema::new(None, word_schema)),
+    )])
+    .expect("valid storage schema");
+
+    let call_test_metadata = AccountComponentMetadata::new("call-test", AccountType::all())
+        .with_storage_schema(storage_schema);
+
+    build_package("call-test", call_test_library, &call_test_metadata, Some("test"));
+
+    // Expose the path so integration tests can find it
+    let out_dir = env::var("OUT_DIR").expect("OUT_DIR not set");
+
+    let call_test_path =
+        PathBuf::from(&out_dir).join(PACKAGE_DIR).join("test").join("call-test.masp");
+    println!("cargo:rustc-env=CALL_TEST_MASP={}", call_test_path.display());
 
     // ACL auth
     let acl_metadata = AuthSingleSigAcl::component_metadata();

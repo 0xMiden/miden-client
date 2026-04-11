@@ -1,5 +1,6 @@
 pub mod account;
 pub mod address;
+pub mod call;
 pub mod clear_config;
 pub mod exec;
 pub mod export;

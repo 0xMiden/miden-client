@@ -1246,6 +1246,214 @@ fn exec_parse() {
     failure_cmd.current_dir(&temp_dir).assert().failure();
 }
 
+// CALL COMMAND TESTS
+// ================================================================================================
+
+/// Tests that the `call` command fails when no arguments are provided.
+#[test]
+fn call_empty_command() {
+    let temp_dir = init_cli().1;
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(cmd.args(["call"]).current_dir(&temp_dir));
+}
+
+/// Tests that the `call` command fails when the package file does not exist.
+#[test]
+fn call_nonexistent_package() {
+    let temp_dir = init_cli().1;
+
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &basic_account_id,
+        "some_procedure",
+        "--package",
+        "nonexistent/path/package.masp",
+    ]);
+
+    cmd.current_dir(&temp_dir).assert().failure();
+}
+
+/// Tests that the `call` command fails when the procedure name is not found in the package.
+#[test]
+fn call_nonexistent_procedure() {
+    let temp_dir = init_cli().1;
+
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let package_path = temp_dir.join(MIDEN_DIR).join("packages/basic-wallet.masp");
+
+    sync_cli(&temp_dir);
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &basic_account_id,
+        "nonexistent_procedure",
+        "--package",
+        package_path.to_str().unwrap(),
+    ]);
+
+    cmd.current_dir(&temp_dir).assert().failure();
+}
+
+/// Helper: creates an account with the call-test.masp package and returns (temp_dir, account_id,
+/// masp_path).
+fn setup_call_test_account() -> (PathBuf, String, PathBuf) {
+    let temp_dir = init_cli().1;
+
+    // Copy the build-generated call-test .masp into the temp dir
+    let masp_src = PathBuf::from(env!("CALL_TEST_MASP"));
+    let masp_dst = temp_dir.join("call_test.masp");
+    fs::copy(&masp_src, &masp_dst).unwrap();
+
+    // Init storage for the stored_value slot
+    let init_toml = r#"
+"miden::testing::call_test::stored_value" = "0x0000000000000000000000000000000000000000000000000000000000000000"
+"#;
+    let init_path = temp_dir.join("call_test_init.toml");
+    fs::write(&init_path, init_toml).unwrap();
+
+    // Create account with the custom package
+    let mut create_cmd = cargo_bin_cmd!("miden-client");
+    create_cmd.args([
+        "new-account",
+        "--account-type",
+        "regular-account-immutable-code",
+        "-s",
+        "public",
+        "-p",
+        "auth/no-auth",
+        "-p",
+        masp_dst.to_str().unwrap(),
+        "-i",
+        init_path.to_str().unwrap(),
+    ]);
+
+    let output = create_cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "Failed to create account: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Parse account ID from output: "...account -s <ID>"
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let account_id = stdout
+        .split_whitespace()
+        .skip_while(|&w| w != "-s")
+        .nth(1)
+        .expect("Could not parse account ID from new-account output")
+        .to_string();
+
+    sync_cli(&temp_dir);
+
+    (temp_dir, account_id, masp_dst)
+}
+
+/// Helper: resolves the MAST root hash of a procedure from a .masp package file.
+fn resolve_procedure_hash(masp_path: &Path, procedure_name: &str) -> String {
+    use miden_client::Deserializable;
+    use miden_client::vm::Package;
+
+    let bytes = fs::read(masp_path).expect("Failed to read .masp file");
+    let package = Package::read_from_bytes(&bytes).expect("Failed to deserialize package");
+
+    for module_info in package.mast.module_infos() {
+        if let Some(digest) = module_info.get_procedure_digest_by_name(procedure_name) {
+            return digest.to_hex();
+        }
+    }
+
+    panic!("Procedure '{procedure_name}' not found in package");
+}
+
+/// Tests calling a procedure by name (add) with felt arguments.
+#[test]
+fn call_procedure_by_name() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args(["call", &account_id, "add", "3", "7", "--package", masp_path.to_str().unwrap()]);
+
+    cmd.current_dir(&temp_dir).assert().success();
+}
+
+/// Tests calling a procedure by MAST root hash (0x-prefixed hex).
+#[test]
+fn call_procedure_by_hash() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    let add_hash = resolve_procedure_hash(&masp_path, "add");
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &account_id,
+        &add_hash,
+        "3",
+        "7",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
+
+    cmd.current_dir(&temp_dir).assert().success();
+}
+
+/// Tests that transaction execution produces a nonce change in the state delta.
+#[test]
+fn call_shows_nonce_delta() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args(["call", &account_id, "add", "1", "2", "--package", masp_path.to_str().unwrap()]);
+
+    let output = cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "Call failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Nonce:"), "Expected nonce delta in output:\n{stdout}");
+}
+
+/// Tests calling set_value and verifying storage delta is shown.
+#[test]
+fn call_set_value_shows_storage_delta() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    // set_value expects [VALUE (4 felts)] on the stack
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &account_id,
+        "set_value",
+        "42",
+        "0",
+        "0",
+        "0",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
+
+    let output = cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "Call failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Storage Slot"),
+        "Expected storage delta in output:\n{stdout}"
+    );
+}
+
 // AUTH COMPONENT TESTS
 // ================================================================================================
 
