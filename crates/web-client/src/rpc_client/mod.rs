@@ -107,16 +107,22 @@ impl RpcClient {
     }
 
     /// Fetches a block header by number. When `block_num` is undefined, returns the latest header.
+    ///
+    /// @param `block_num` - Optional block number. When `undefined`, returns the latest header.
+    /// @param `include_mmr_proof` - When `true`, includes the MMR proof in the response. Defaults
+    ///   to `false` when `undefined`.
     #[wasm_bindgen(js_name = "getBlockHeaderByNumber")]
     pub async fn get_block_header_by_number(
         &self,
         block_num: Option<u32>,
+        include_mmr_proof: Option<bool>,
     ) -> Result<BlockHeader, JsValue> {
         let native_block_num = block_num.map(BlockNumber::from);
-        let (header, _proof) =
-            self.inner.get_block_header_by_number(native_block_num, false).await.map_err(
-                |err| js_error_with_context(err, "failed to get block header by number"),
-            )?;
+        let (header, _proof) = self
+            .inner
+            .get_block_header_by_number(native_block_num, include_mmr_proof.unwrap_or(false))
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to get block header by number"))?;
 
         Ok(header.into())
     }
