@@ -72,7 +72,7 @@ export async function removeNoteTag(dbId, tag, sourceNoteId, sourceAccountId) {
 }
 export async function applyStateSync(dbId, stateUpdate) {
     const db = getDatabase(dbId);
-    const { blockNum, flattenedNewBlockHeaders, flattenedPartialBlockChainPeaks, newBlockNums, newBlockForests, blockHasRelevantNotes, serializedNodeIds, serializedNodes, committedNoteIds, serializedInputNotes, serializedOutputNotes, accountUpdates, transactionUpdates, } = stateUpdate;
+    const { blockNum, flattenedNewBlockHeaders, flattenedPartialBlockChainPeaks, newBlockNums, blockHasRelevantNotes, serializedNodeIds, serializedNodes, committedNoteIds, serializedInputNotes, serializedOutputNotes, accountUpdates, transactionUpdates, } = stateUpdate;
     const newBlockHeaders = reconstructFlattenedVec(flattenedNewBlockHeaders);
     const partialBlockchainPeaks = reconstructFlattenedVec(flattenedPartialBlockChainPeaks);
     const tablesToAccess = [
@@ -128,7 +128,7 @@ export async function applyStateSync(dbId, stateUpdate) {
             updatePartialBlockchainNodes(tx, serializedNodeIds, serializedNodes),
             updateCommittedNoteTags(tx, committedNoteIds),
             Promise.all(newBlockHeaders.map((newBlockHeader, i) => {
-                return updateBlockHeader(tx, newBlockNums[i], newBlockHeader, partialBlockchainPeaks[i], newBlockForests[i], blockHasRelevantNotes[i] == 1);
+                return updateBlockHeader(tx, newBlockNums[i], newBlockHeader, partialBlockchainPeaks[i], blockHasRelevantNotes[i] == 1);
             })),
         ]);
     });
@@ -147,13 +147,12 @@ async function updateSyncHeight(tx, blockNum) {
         logWebStoreError(error, "Failed to update sync height");
     }
 }
-async function updateBlockHeader(tx, blockNum, blockHeader, partialBlockchainPeaks, forest, hasClientNotes) {
+async function updateBlockHeader(tx, blockNum, blockHeader, partialBlockchainPeaks, hasClientNotes) {
     try {
         const data = {
             blockNum: blockNum,
             header: blockHeader,
             partialBlockchainPeaks,
-            forest,
             hasClientNotes: hasClientNotes.toString(),
         };
         const existingBlockHeader = await tx.blockHeaders.get(blockNum);

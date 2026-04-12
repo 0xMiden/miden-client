@@ -433,24 +433,17 @@ impl StateSync {
             if found_relevant_note {
                 let block_pos = block.block_header.block_num().as_usize();
 
-                let nodes_before: BTreeMap<_, _> =
-                    current_partial_mmr.nodes().map(|(k, v)| (*k, *v)).collect();
-
                 if !current_partial_mmr.is_tracked(block_pos) {
                     current_partial_mmr
                         .track(block_pos, block.block_header.commitment(), &block.mmr_path)
                         .map_err(StoreError::MmrError)?;
                 }
 
-                // Always collect new authentication nodes — even when the block was
-                // already tracked from the MMR delta, the delta's nodes may not include
-                // the full authentication path needed to reconstruct the PartialMmr
-                // from storage later.
-                let track_auth_nodes: Vec<_> = current_partial_mmr
-                    .nodes()
-                    .filter(|(k, _)| !nodes_before.contains_key(k))
-                    .map(|(k, v)| (*k, *v))
-                    .collect();
+                // Collect all current authentication nodes. The BTreeMap in
+                // BlockUpdates deduplicates against nodes already recorded from
+                // the MMR delta or earlier blocks.
+                let track_auth_nodes: Vec<_> =
+                    current_partial_mmr.nodes().map(|(k, v)| (*k, *v)).collect();
 
                 state_sync_update.block_updates.insert(
                     block.block_header,

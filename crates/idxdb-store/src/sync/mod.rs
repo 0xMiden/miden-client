@@ -124,7 +124,6 @@ impl IdxdbStore {
             block_headers_as_bytes,
             new_mmr_peaks_as_bytes,
             block_nums,
-            block_forests,
             block_has_relevant_notes,
             serialized_node_ids,
             serialized_nodes,
@@ -199,7 +198,6 @@ impl IdxdbStore {
             flattened_new_block_headers: flatten_nested_u8_vec(block_headers_as_bytes),
             new_block_nums: block_nums,
             flattened_partial_blockchain_peaks: flatten_nested_u8_vec(new_mmr_peaks_as_bytes),
-            new_block_forests: block_forests,
             block_has_relevant_notes,
             serialized_node_ids,
             serialized_nodes,
@@ -230,15 +228,8 @@ impl IdxdbStore {
     }
 }
 
-type SerializedBlockData = (
-    Vec<Vec<u8>>,
-    Vec<Vec<u8>>,
-    Vec<u32>,
-    Vec<u32>,
-    Vec<u8>,
-    Vec<String>,
-    Vec<String>,
-);
+type SerializedBlockData =
+    (Vec<Vec<u8>>, Vec<Vec<u8>>, Vec<u32>, Vec<u8>, Vec<String>, Vec<String>);
 
 fn serialize_block_updates(
     block_updates: &BlockUpdates,
@@ -246,17 +237,12 @@ fn serialize_block_updates(
     let mut block_headers_as_bytes = Vec::new();
     let mut new_mmr_peaks_as_bytes = Vec::new();
     let mut block_nums = Vec::new();
-    let mut block_forests = Vec::new();
     let mut block_has_relevant_notes = Vec::new();
 
     for (block_header, has_client_notes, mmr_peaks) in block_updates.block_headers() {
         block_headers_as_bytes.push(block_header.to_bytes());
         new_mmr_peaks_as_bytes.push(mmr_peaks.peaks().to_vec().to_bytes());
         block_nums.push(block_header.block_num().as_u32());
-        block_forests.push(
-            u32::try_from(mmr_peaks.forest().num_leaves())
-                .expect("forest num_leaves should fit in u32"),
-        );
         block_has_relevant_notes.push(u8::from(*has_client_notes));
     }
 
@@ -265,7 +251,7 @@ fn serialize_block_updates(
     let mut serialized_nodes = Vec::with_capacity(auth_nodes_len);
     for (id, node) in block_updates.new_authentication_nodes() {
         let SerializedPartialBlockchainNodeData { id, node } =
-            serialize_partial_blockchain_node(*id, *node)?;
+            serialize_partial_blockchain_node(id, node)?;
         serialized_node_ids.push(id);
         serialized_nodes.push(node);
     }
@@ -274,7 +260,6 @@ fn serialize_block_updates(
         block_headers_as_bytes,
         new_mmr_peaks_as_bytes,
         block_nums,
-        block_forests,
         block_has_relevant_notes,
         serialized_node_ids,
         serialized_nodes,

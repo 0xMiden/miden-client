@@ -104,8 +104,9 @@ pub struct BlockUpdates {
     /// the MMR peaks for the block.
     block_headers: BTreeMap<BlockNumber, (BlockHeader, bool, MmrPeaks)>,
     /// New authentication nodes that are meant to be stored in order to authenticate block
-    /// headers.
-    new_authentication_nodes: Vec<(InOrderIndex, Word)>,
+    /// headers. Stored in a `BTreeMap` to naturally deduplicate nodes that appear across
+    /// multiple block insertions.
+    new_authentication_nodes: BTreeMap<InOrderIndex, Word>,
 }
 
 impl BlockUpdates {
@@ -120,6 +121,12 @@ impl BlockUpdates {
         peaks: MmrPeaks,
         new_authentication_nodes: Vec<(InOrderIndex, Word)>,
     ) {
+        debug_assert_eq!(
+            peaks.forest().num_leaves(),
+            block_header.block_num().as_usize(),
+            "MMR peaks stored for a block header must use that block number as the forest",
+        );
+
         self.block_headers
             .entry(block_header.block_num())
             .and_modify(|(_, existing_has_notes, _)| {
@@ -147,8 +154,8 @@ impl BlockUpdates {
 
     /// Returns the new authentication nodes that are meant to be stored in order to authenticate
     /// block headers.
-    pub fn new_authentication_nodes(&self) -> &[(InOrderIndex, Word)] {
-        &self.new_authentication_nodes
+    pub fn new_authentication_nodes(&self) -> Vec<(InOrderIndex, Word)> {
+        self.new_authentication_nodes.iter().map(|(&k, &v)| (k, v)).collect()
     }
 }
 
