@@ -49,7 +49,8 @@ impl IdxdbStore {
         partial_blockchain_peaks: MmrPeaks,
         has_client_notes: bool,
     ) -> Result<(), StoreError> {
-        let forest = partial_blockchain_peaks.forest().num_leaves() as u32;
+        let forest = u32::try_from(partial_blockchain_peaks.forest().num_leaves())
+            .expect("forest num_leaves should fit in u32");
         let partial_blockchain_peaks = partial_blockchain_peaks.peaks().to_vec();
         let SerializedBlockHeaderData {
             block_num,
@@ -57,7 +58,12 @@ impl IdxdbStore {
             partial_blockchain_peaks,
             forest,
             has_client_notes,
-        } = serialize_block_header(block_header, &partial_blockchain_peaks, forest, has_client_notes);
+        } = serialize_block_header(
+            block_header,
+            &partial_blockchain_peaks,
+            forest,
+            has_client_notes,
+        );
 
         let promise = idxdb_insert_block_header(
             self.db_id(),
@@ -191,10 +197,7 @@ impl IdxdbStore {
 
             // Use the stored forest value if available; fall back to block_num for
             // records written before the forest field was added.
-            let forest_size = mmr_peaks_idxdb
-                .forest
-                .map(|f| f as usize)
-                .unwrap_or(block_num.as_usize());
+            let forest_size = mmr_peaks_idxdb.forest.map_or(block_num.as_usize(), |f| f as usize);
 
             return MmrPeaks::new(Forest::new(forest_size), mmr_peaks_nodes)
                 .map_err(StoreError::MmrError);

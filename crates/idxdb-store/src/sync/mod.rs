@@ -230,8 +230,15 @@ impl IdxdbStore {
     }
 }
 
-type SerializedBlockData =
-    (Vec<Vec<u8>>, Vec<Vec<u8>>, Vec<u32>, Vec<u32>, Vec<u8>, Vec<String>, Vec<String>);
+type SerializedBlockData = (
+    Vec<Vec<u8>>,
+    Vec<Vec<u8>>,
+    Vec<u32>,
+    Vec<u32>,
+    Vec<u8>,
+    Vec<String>,
+    Vec<String>,
+);
 
 fn serialize_block_updates(
     block_updates: &BlockUpdates,
@@ -246,7 +253,10 @@ fn serialize_block_updates(
         block_headers_as_bytes.push(block_header.to_bytes());
         new_mmr_peaks_as_bytes.push(mmr_peaks.peaks().to_vec().to_bytes());
         block_nums.push(block_header.block_num().as_u32());
-        block_forests.push(mmr_peaks.forest().num_leaves() as u32);
+        block_forests.push(
+            u32::try_from(mmr_peaks.forest().num_leaves())
+                .expect("forest num_leaves should fit in u32"),
+        );
         block_has_relevant_notes.push(u8::from(*has_client_notes));
     }
 
