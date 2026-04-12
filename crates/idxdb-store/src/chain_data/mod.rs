@@ -49,19 +49,28 @@ impl IdxdbStore {
         partial_blockchain_peaks: MmrPeaks,
         has_client_notes: bool,
     ) -> Result<(), StoreError> {
+        let forest = u32::try_from(partial_blockchain_peaks.forest().num_leaves())
+            .expect("forest num_leaves should fit in u32");
         let partial_blockchain_peaks = partial_blockchain_peaks.peaks().to_vec();
         let SerializedBlockHeaderData {
             block_num,
             header,
             partial_blockchain_peaks,
+            forest,
             has_client_notes,
-        } = serialize_block_header(block_header, &partial_blockchain_peaks, has_client_notes);
+        } = serialize_block_header(
+            block_header,
+            &partial_blockchain_peaks,
+            forest,
+            has_client_notes,
+        );
 
         let promise = idxdb_insert_block_header(
             self.db_id(),
             block_num,
             header,
             partial_blockchain_peaks,
+            forest,
             has_client_notes,
         );
         await_ok(promise, "failed to insert block header").await?;
@@ -186,7 +195,11 @@ impl IdxdbStore {
         if let Some(peaks) = mmr_peaks_idxdb.peaks {
             let mmr_peaks_nodes: Vec<Word> = Vec::<Word>::read_from_bytes(&peaks)?;
 
-            return MmrPeaks::new(Forest::new(block_num.as_usize()), mmr_peaks_nodes)
+            // Use the stored forest value if available; fall back to block_num for
+            // records written before the forest field was added.
+            let forest_size = mmr_peaks_idxdb.forest.map_or(block_num.as_usize(), |f| f as usize);
+
+            return MmrPeaks::new(Forest::new(forest_size), mmr_peaks_nodes)
                 .map_err(StoreError::MmrError);
         }
 
