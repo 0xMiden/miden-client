@@ -159,7 +159,6 @@ interface JsStateSyncUpdate {
   flattenedNewBlockHeaders: FlattenedU8Vec;
   flattenedPartialBlockChainPeaks: FlattenedU8Vec;
   newBlockNums: number[];
-  newBlockForests: number[];
   blockHasRelevantNotes: Uint8Array;
   serializedNodeIds: string[];
   serializedNodes: string[];
@@ -180,7 +179,6 @@ export async function applyStateSync(
     flattenedNewBlockHeaders,
     flattenedPartialBlockChainPeaks,
     newBlockNums,
-    newBlockForests,
     blockHasRelevantNotes,
     serializedNodeIds,
     serializedNodes,
@@ -307,7 +305,6 @@ export async function applyStateSync(
             newBlockNums[i],
             newBlockHeader,
             partialBlockchainPeaks[i],
-            newBlockForests[i],
             blockHasRelevantNotes[i] == 1
           );
         })
@@ -339,7 +336,6 @@ async function updateBlockHeader(
   blockNum: number,
   blockHeader: Uint8Array,
   partialBlockchainPeaks: Uint8Array,
-  forest: number,
   hasClientNotes: boolean
 ) {
   try {
@@ -347,7 +343,6 @@ async function updateBlockHeader(
       blockNum: blockNum,
       header: blockHeader,
       partialBlockchainPeaks,
-      forest,
       hasClientNotes: hasClientNotes.toString(),
     };
 

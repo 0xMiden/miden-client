@@ -32,7 +32,4 @@ pub struct PartialBlockchainNodeIdxdbObject {
 pub struct PartialBlockchainPeaksIdxdbObject {
     #[serde(deserialize_with = "base64_to_vec_u8_optional", default)]
     pub peaks: Option<Vec<u8>>,
-    /// The forest (number of leaves) at the time the peaks were captured.
-    /// Older records may not have this field, in which case `block_num` is used as fallback.
-    pub forest: Option<u32>,
 }
