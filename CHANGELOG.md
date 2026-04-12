@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.1 (TBD)
+
+### Fixes
+
+* [FIX][web] Fixed `syncState` failure ("mmr peaks are invalid: number of one bits in leaves does not equal peak length") caused by reconstructing `MmrPeaks` with `block_num` instead of the actual forest size at peak-capture time. The IndexedDB store now persists the forest value alongside peaks in both the `insert_block_header` and `apply_state_sync` code paths. ([#1997](https://github.com/0xMiden/miden-client/pull/1997)).
+* [FIX][web] Fixed `syncState` failure ("inconsistent partial mmr: tracked leaf at position N has no value in nodes") caused by skipping authentication node collection for blocks already tracked from the MMR delta during large catch-up syncs. Authentication nodes are now always collected for note-relevant blocks regardless of prior tracking state. ([#1997](https://github.com/0xMiden/miden-client/pull/1997)).
+
 ## 0.14.0 (2026-04-07)
 
 ### Enhancements
