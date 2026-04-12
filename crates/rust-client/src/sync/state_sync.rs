@@ -433,24 +433,17 @@ impl StateSync {
             if found_relevant_note {
                 let block_pos = block.block_header.block_num().as_usize();
 
-                let nodes_before: BTreeMap<_, _> =
-                    current_partial_mmr.nodes().map(|(k, v)| (*k, *v)).collect();
-
                 if !current_partial_mmr.is_tracked(block_pos) {
                     current_partial_mmr
                         .track(block_pos, block.block_header.commitment(), &block.mmr_path)
                         .map_err(StoreError::MmrError)?;
                 }
 
-                // Always collect new authentication nodes — even when the block was
-                // already tracked from the MMR delta, the delta's nodes may not include
-                // the full authentication path needed to reconstruct the PartialMmr
-                // from storage later.
-                let track_auth_nodes: Vec<_> = current_partial_mmr
-                    .nodes()
-                    .filter(|(k, _)| !nodes_before.contains_key(k))
-                    .map(|(k, v)| (*k, *v))
-                    .collect();
+                // Collect all current authentication nodes. The BTreeMap in
+                // BlockUpdates deduplicates against nodes already recorded from
+                // the MMR delta or earlier blocks.
+                let track_auth_nodes: Vec<_> =
+                    current_partial_mmr.nodes().map(|(k, v)| (*k, *v)).collect();
 
                 state_sync_update.block_updates.insert(
                     block.block_header,
@@ -1308,15 +1301,12 @@ mod tests {
 
         // Apply the delta and chain tip, then track all note blocks — this
         // simulates what apply_sync_result does internally.
-        let mut all_auth_nodes: Vec<(InOrderIndex, Word)> =
-            partial_mmr.apply(sync_data.mmr_delta).unwrap();
+        let mut stored_nodes: alloc::collections::BTreeMap<InOrderIndex, Word> =
+            partial_mmr.apply(sync_data.mmr_delta).unwrap().into_iter().collect();
         partial_mmr.add(sync_data.chain_tip_header.commitment(), false);
 
         for block in &sync_data.note_blocks {
             let block_pos = block.block_header.block_num().as_usize();
-
-            let nodes_before: alloc::collections::BTreeMap<_, _> =
-                partial_mmr.nodes().map(|(k, v)| (*k, *v)).collect();
 
             if !partial_mmr.is_tracked(block_pos) {
                 partial_mmr
@@ -1324,18 +1314,9 @@ mod tests {
                     .unwrap();
             }
 
-            // Collect new nodes — this is the pattern from the fix.
-            let new_nodes: Vec<_> = partial_mmr
-                .nodes()
-                .filter(|(k, _)| !nodes_before.contains_key(k))
-                .map(|(k, v)| (*k, *v))
-                .collect();
-            all_auth_nodes.extend(new_nodes);
+            // Collect all nodes — the BTreeMap deduplicates naturally.
+            stored_nodes.extend(partial_mmr.nodes().map(|(k, v)| (*k, *v)));
         }
-
-        // Verify: every note block's leaf node must be present.
-        let stored_nodes: alloc::collections::BTreeMap<InOrderIndex, Word> =
-            all_auth_nodes.into_iter().collect();
 
         for &bn in &note_block_nums {
             let leaf_idx = InOrderIndex::from_leaf_pos(bn.as_usize());
