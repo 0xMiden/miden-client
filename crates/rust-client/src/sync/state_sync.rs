@@ -1352,7 +1352,7 @@ mod tests {
         let all_nodes: alloc::collections::BTreeMap<InOrderIndex, Word> =
             partial_mmr.nodes().map(|(k, v)| (*k, *v)).chain(stored_nodes).collect();
         let tracked_leaves: BTreeSet<usize> =
-            note_block_nums.iter().map(|bn| bn.as_usize()).collect();
+            note_block_nums.iter().map(BlockNumber::as_usize).collect();
 
         let result = PartialMmr::from_parts(peaks, all_nodes, tracked_leaves);
         assert!(
