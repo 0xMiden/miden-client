@@ -6,6 +6,7 @@ use miden_client::account::component::{AccountComponent, AccountComponentMetadat
 use miden_client::account::{
     Account,
     AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
     AccountId,
     AccountStorageMode,
     AccountType,
@@ -1590,7 +1591,7 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
         .with_component(component)
         .with_auth_component(auth_component)
         .storage_mode(AccountStorageMode::Public)
-        .build()
+        .build_with_schema_commitment()
         .context("failed to build account")?;
     let account_id = account.id();
 

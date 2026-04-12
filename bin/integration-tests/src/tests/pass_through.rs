@@ -1,6 +1,13 @@
 use anyhow::Result;
 use miden_client::account::component::BasicWallet;
-use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType};
+use miden_client::account::{
+    Account,
+    AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
+    AccountId,
+    AccountStorageMode,
+    AccountType,
+};
 use miden_client::assembly::CodeBuilder;
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::{
@@ -212,7 +219,7 @@ async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
         .storage_mode(AccountStorageMode::Private)
         .with_auth_component(auth_component)
         .with_component(BasicWallet)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     client.add_account(&account, false).await?;

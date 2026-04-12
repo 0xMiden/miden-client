@@ -5,6 +5,7 @@ use miden_client::account::component::{AccountComponent, AccountComponentMetadat
 use miden_client::account::{
     Account,
     AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
     AccountStorageMode,
     AccountType,
     PartialAccount,
@@ -644,7 +645,7 @@ fn foreign_account_with_code(
         .with_component(get_item_component.clone())
         .with_auth_component(auth_component)
         .storage_mode(storage_mode)
-        .build()
+        .build_with_schema_commitment()
         .context("failed to build foreign account")?;
 
     let proc_root = get_item_component

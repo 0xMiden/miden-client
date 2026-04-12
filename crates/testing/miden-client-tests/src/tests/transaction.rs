@@ -33,6 +33,7 @@ use miden_protocol::testing::account_id::{
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
 };
 use miden_protocol::{Felt, Word};
+use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::wallets::BasicWallet;
 
 use super::PaymentNoteDescription;
@@ -246,7 +247,7 @@ async fn lazy_foreign_account_loading() {
             AuthSchemeId::Falcon512Poseidon2,
         ))
         .storage_mode(AccountStorageMode::Public)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
     let foreign_account_id = foreign_account.id();
 
