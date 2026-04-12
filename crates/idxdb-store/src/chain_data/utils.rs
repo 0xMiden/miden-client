@@ -17,6 +17,7 @@ pub struct SerializedBlockHeaderData {
     pub block_num: u32,
     pub header: Vec<u8>,
     pub partial_blockchain_peaks: Vec<u8>,
+    pub forest: u32,
     pub has_client_notes: bool,
 }
 
@@ -28,6 +29,7 @@ pub struct SerializedPartialBlockchainNodeData {
 pub fn serialize_block_header(
     block_header: &BlockHeader,
     partial_blockchain_peaks: &[Word],
+    forest: u32,
     has_client_notes: bool,
 ) -> SerializedBlockHeaderData {
     let block_num = block_header.block_num().as_u32();
@@ -38,6 +40,7 @@ pub fn serialize_block_header(
         block_num,
         header,
         partial_blockchain_peaks,
+        forest,
         has_client_notes,
     }
 }

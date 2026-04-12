@@ -214,6 +214,7 @@ export interface IBlockHeader {
   blockNum: number;
   header: Uint8Array;
   partialBlockchainPeaks: Uint8Array;
+  forest?: number;
   hasClientNotes: string;
 }
 
