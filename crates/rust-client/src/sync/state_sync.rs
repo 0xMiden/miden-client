@@ -755,7 +755,7 @@ fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> V
     result
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "testing"))]
 mod tests {
     use alloc::collections::BTreeSet;
     use alloc::sync::Arc;

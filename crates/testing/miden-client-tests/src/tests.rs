@@ -107,6 +107,7 @@ use miden_protocol::testing::account_id::{
 use miden_protocol::transaction::{RawOutputNote, TransactionKernel};
 use miden_protocol::vm::AdviceInputs;
 use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
+use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::faucets::BasicFungibleFaucet;
 use miden_standards::account::interface::AccountInterfaceError;
 use miden_standards::account::mint_policies::AuthControlled;
@@ -2477,7 +2478,7 @@ async fn empty_storage_map() {
         ))
         .with_component(BasicWallet)
         .with_component(component)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     let account_id = account.id();
@@ -2595,7 +2596,7 @@ async fn storage_and_vault_proofs() {
         ))
         .with_component(BasicWallet)
         .with_component(bump_item_component)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
@@ -3143,7 +3144,7 @@ async fn insert_new_wallet(
             AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(BasicWallet)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
@@ -3172,7 +3173,7 @@ async fn insert_new_ecdsa_wallet(
             AuthSchemeId::EcdsaK256Keccak,
         ))
         .with_component(BasicWallet)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
@@ -3206,7 +3207,7 @@ async fn insert_new_fungible_faucet(
         ))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .with_component(AuthControlled::allow_all())
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
@@ -3242,7 +3243,7 @@ async fn insert_new_ecdsa_fungible_faucet(
         ))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .with_component(AuthControlled::allow_all())
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
@@ -3321,7 +3322,7 @@ async fn storage_and_vault_proofs_ecdsa() {
         ))
         .with_component(BasicWallet)
         .with_component(bump_item_component)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();

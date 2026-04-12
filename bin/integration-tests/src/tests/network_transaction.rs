@@ -6,6 +6,7 @@ use miden_client::account::component::{AccountComponent, AccountComponentMetadat
 use miden_client::account::{
     Account,
     AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
     AccountId,
     AccountStorageMode,
     AccountType,
@@ -153,7 +154,7 @@ async fn get_counter_contract_account(
         .storage_mode(storage_mode)
         .with_component(counter_component)
         .with_auth_component(incr_nonce_auth)
-        .build()
+        .build_with_schema_commitment()
         .context("failed to build account with counter contract")?;
 
     Ok(account)

@@ -75,12 +75,21 @@ export class AccountsResource {
     const authComponent =
       wasm.AccountComponent.createAuthComponentFromSecretKey(opts.auth);
 
+    // Schema commitment from `build()` is not a substitute for contract code; require explicit
+    // `components` so auth-only contracts are rejected at this layer.
+    const components = opts.components ?? [];
+    if (components.length === 0) {
+      throw new Error(
+        "Contract accounts require at least one non-auth procedure: pass at least one entry in `components`."
+      );
+    }
+
     let builder = new wasm.AccountBuilder(opts.seed)
       .accountType(accountTypeEnum)
       .storageMode(storageMode)
       .withAuthComponent(authComponent);
 
-    for (const component of opts.components ?? []) {
+    for (const component of components) {
       builder = builder.withComponent(component);
     }
 

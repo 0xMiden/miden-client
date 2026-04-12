@@ -1,6 +1,11 @@
 use miden_client::Felt;
 use miden_client::account::component::{AuthControlled, BasicFungibleFaucet};
-use miden_client::account::{AccountBuilder, AccountComponent, AccountType};
+use miden_client::account::{
+    AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
+    AccountComponent,
+    AccountType,
+};
 use miden_client::asset::TokenSymbol;
 use miden_client::auth::{AuthSchemeId as NativeAuthScheme, AuthSecretKey, AuthSingleSig};
 use miden_client::block::BlockNumber;
@@ -120,7 +125,7 @@ impl WebClient {
                         .map_err(|err| js_error_with_context(err, "failed to create new faucet"))?,
                 )
                 .with_component(AuthControlled::allow_all())
-                .build()
+                .build_with_schema_commitment()
             {
                 Ok(result) => result,
                 Err(err) => {
