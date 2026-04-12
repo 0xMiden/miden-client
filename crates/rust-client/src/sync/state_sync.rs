@@ -1290,8 +1290,7 @@ mod tests {
         // Use MockScreener (discards notes) — we don't need notes to be
         // committed for this test. What matters is that the note blocks
         // returned by sync_notes are tracked in the MMR with their auth nodes.
-        let state_sync =
-            StateSync::new(Arc::new(mock_rpc.clone()), Arc::new(MockScreener), None);
+        let state_sync = StateSync::new(Arc::new(mock_rpc.clone()), Arc::new(MockScreener), None);
 
         // Fetch sync data to learn which blocks have notes.
         let genesis_peaks = mock_rpc.get_mmr().peaks_at(Forest::new(1)).unwrap();
@@ -1350,11 +1349,8 @@ mod tests {
 
         // The critical check: PartialMmr::from_parts must succeed.
         let peaks = partial_mmr.peaks();
-        let all_nodes: alloc::collections::BTreeMap<InOrderIndex, Word> = partial_mmr
-            .nodes()
-            .map(|(k, v)| (*k, *v))
-            .chain(stored_nodes)
-            .collect();
+        let all_nodes: alloc::collections::BTreeMap<InOrderIndex, Word> =
+            partial_mmr.nodes().map(|(k, v)| (*k, *v)).chain(stored_nodes).collect();
         let tracked_leaves: BTreeSet<usize> =
             note_block_nums.iter().map(|bn| bn.as_usize()).collect();
 
