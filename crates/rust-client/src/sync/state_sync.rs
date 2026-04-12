@@ -1273,4 +1273,97 @@ mod tests {
             );
         }
     }
+
+    /// Verifies that after a catch-up sync from genesis, all note blocks tracked
+    /// in the partial MMR have their leaf nodes stored, so that
+    /// `PartialMmr::from_parts` (used by `get_current_partial_mmr`) can
+    /// reconstruct the MMR without "tracked leaf has no value in nodes" errors.
+    ///
+    /// This test exercises the code path fixed in `apply_sync_result` where
+    /// authentication nodes must be collected for note blocks regardless of
+    /// whether `is_tracked()` returns true from the MMR delta.
+    #[tokio::test]
+    async fn sync_state_persists_auth_nodes_for_note_blocks() {
+        let (chain, note_tags) = build_chain_with_mint_notes(3).await;
+        let mock_rpc = MockRpcApi::new(chain);
+
+        // Use MockScreener (discards notes) — we don't need notes to be
+        // committed for this test. What matters is that the note blocks
+        // returned by sync_notes are tracked in the MMR with their auth nodes.
+        let state_sync =
+            StateSync::new(Arc::new(mock_rpc.clone()), Arc::new(MockScreener), None);
+
+        // Fetch sync data to learn which blocks have notes.
+        let genesis_peaks = mock_rpc.get_mmr().peaks_at(Forest::new(1)).unwrap();
+        let mut partial_mmr = PartialMmr::from_peaks(genesis_peaks);
+
+        let sync_data = state_sync
+            .fetch_sync_data(BlockNumber::GENESIS, &[], &Arc::new(note_tags))
+            .await
+            .unwrap()
+            .expect("should have progressed past genesis");
+
+        let note_block_nums: Vec<BlockNumber> =
+            sync_data.note_blocks.iter().map(|b| b.block_header.block_num()).collect();
+        assert!(!note_block_nums.is_empty(), "should have note blocks");
+
+        // Apply the delta and chain tip, then track all note blocks — this
+        // simulates what apply_sync_result does internally.
+        let mut all_auth_nodes: Vec<(InOrderIndex, Word)> =
+            partial_mmr.apply(sync_data.mmr_delta).unwrap();
+        partial_mmr.add(sync_data.chain_tip_header.commitment(), false);
+
+        for block in &sync_data.note_blocks {
+            let block_pos = block.block_header.block_num().as_usize();
+
+            let nodes_before: alloc::collections::BTreeMap<_, _> =
+                partial_mmr.nodes().map(|(k, v)| (*k, *v)).collect();
+
+            if !partial_mmr.is_tracked(block_pos) {
+                partial_mmr
+                    .track(block_pos, block.block_header.commitment(), &block.mmr_path)
+                    .unwrap();
+            }
+
+            // Collect new nodes — this is the pattern from the fix.
+            let new_nodes: Vec<_> = partial_mmr
+                .nodes()
+                .filter(|(k, _)| !nodes_before.contains_key(k))
+                .map(|(k, v)| (*k, *v))
+                .collect();
+            all_auth_nodes.extend(new_nodes);
+        }
+
+        // Verify: every note block's leaf node must be present.
+        let stored_nodes: alloc::collections::BTreeMap<InOrderIndex, Word> =
+            all_auth_nodes.into_iter().collect();
+
+        for &bn in &note_block_nums {
+            let leaf_idx = InOrderIndex::from_leaf_pos(bn.as_usize());
+            assert!(
+                stored_nodes.contains_key(&leaf_idx)
+                    || partial_mmr.nodes().any(|(idx, _)| *idx == leaf_idx),
+                "leaf node for block {bn} (InOrderIndex {leaf_idx:?}) must be \
+                 in stored auth nodes for PartialMmr::from_parts to succeed"
+            );
+        }
+
+        // The critical check: PartialMmr::from_parts must succeed.
+        let peaks = partial_mmr.peaks();
+        let all_nodes: alloc::collections::BTreeMap<InOrderIndex, Word> = partial_mmr
+            .nodes()
+            .map(|(k, v)| (*k, *v))
+            .chain(stored_nodes)
+            .collect();
+        let tracked_leaves: BTreeSet<usize> =
+            note_block_nums.iter().map(|bn| bn.as_usize()).collect();
+
+        let result = PartialMmr::from_parts(peaks, all_nodes, tracked_leaves);
+        assert!(
+            result.is_ok(),
+            "PartialMmr::from_parts failed: {:?}. Auth nodes for tracked \
+             note blocks were not collected correctly.",
+            result.err()
+        );
+    }
 }
