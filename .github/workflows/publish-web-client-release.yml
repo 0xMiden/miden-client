@@ -23,14 +23,8 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
 
-      - name: Set up Rust and wasm target
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-          target: wasm32-unknown-unknown
-          components: rust-src
+      - name: Install Rust toolchain
+        run: rustup update --no-self-update
 
       - name: Ensure release tag has version bump
         id: check_version
