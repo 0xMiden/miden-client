@@ -121,13 +121,11 @@ impl BlockUpdates {
         peaks: MmrPeaks,
         new_authentication_nodes: Vec<(InOrderIndex, Word)>,
     ) {
-        if !has_client_notes {
-            debug_assert_eq!(
-                peaks.forest().num_leaves(),
-                block_header.block_num().as_usize(),
-                "MMR peaks for the sync-height block must use that block number as the forest",
-            );
-        }
+        debug_assert_eq!(
+            peaks.forest().num_leaves(),
+            block_header.block_num().as_usize(),
+            "MMR peaks stored for a block header must use that block number as the forest",
+        );
 
         self.block_headers
             .entry(block_header.block_num())
