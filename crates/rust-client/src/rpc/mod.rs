@@ -49,7 +49,7 @@ use core::fmt;
 use domain::account::{AccountProof, FetchedAccount};
 use domain::note::{FetchedNote, NoteSyncInfo, SyncNotesResult};
 use domain::nullifier::NullifierUpdate;
-use domain::sync::ChainMmrInfo;
+use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountCode, AccountHeader, AccountId};
 use miden_protocol::address::NetworkId;
@@ -138,7 +138,13 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Given a block number, fetches the block corresponding to that height from the node using
     /// the `/GetBlockByNumber` RPC endpoint.
-    async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError>;
+    ///
+    /// If `include_proof` is set to true, the block proof will be included in the response.
+    async fn get_block_by_number(
+        &self,
+        block_num: BlockNumber,
+        include_proof: bool,
+    ) -> Result<ProvenBlock, RpcError>;
 
     /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById`
     /// RPC endpoint.
@@ -156,11 +162,14 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches the MMR delta for a given block range using the `/SyncChainMmr` RPC endpoint.
     ///
     /// - `block_from` is the last block number already present in the caller's MMR.
-    /// - `block_to` is the optional upper bound of the range. If `None`, syncs up to the chain tip.
+    /// - `upper_bound` determines the upper bound of the sync range. Can be a specific block number
+    ///   (`BlockNumber`), or a chain tip finality level: `CommittedChainTip` syncs up to the latest
+    ///   committed block (the chain tip), while `ProvenChainTip` syncs up to the latest proven
+    ///   block which may be behind the committed tip.
     async fn sync_chain_mmr(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError>;
 
     /// Fetches the current state of an account from the node using the `/GetAccountDetails` RPC

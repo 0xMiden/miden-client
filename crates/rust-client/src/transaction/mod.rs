@@ -911,13 +911,19 @@ pub(crate) async fn fetch_public_account_inputs(
     let known_account_code: Option<AccountCode> =
         store.get_foreign_account_code(vec![account_id]).await?.into_values().next();
 
+    // Get vault assets only if known commitment doesn't match the current one.
+    let known_vault_commitment = store
+        .get_account_header(account_id)
+        .await?
+        .map_or(EMPTY_WORD, |(header, _)| header.vault_root());
+
     let (_, account_proof) = rpc_api
         .get_account_proof(
             account_id,
             storage_requirements.clone(),
             account_state_at,
             known_account_code,
-            Some(EMPTY_WORD),
+            Some(known_vault_commitment),
         )
         .await?;
 
