@@ -77,7 +77,9 @@ fn handle_impl(outer_attr: &TokenStream2, mut item: ItemImpl) -> TokenStream2 {
     let self_ty = &item.self_ty;
     let generics = &item.generics;
 
-    // Partition methods: those with JsU64 in signature vs those without.
+    // Partition methods into:
+    // - shared methods, which can stay in one cfg-gated impl block
+    // - JsU64 methods, which need platform-specific signatures generated later
     let mut shared_methods: Vec<ImplItemFn> = Vec::new();
     let mut jsu64_methods: Vec<ImplItemFn> = Vec::new();
     let mut other_items: Vec<ImplItem> = Vec::new(); // const, type, etc.
@@ -85,12 +87,17 @@ fn handle_impl(outer_attr: &TokenStream2, mut item: ItemImpl) -> TokenStream2 {
     for member in item.items.drain(..) {
         match member {
             ImplItem::Fn(mut method) => {
-                // Strip #[js_export(...)] from the method — we'll re-emit it.
+                // Strip #[js_export(...)] from the method before rebuilding the export attrs.
+                // Impl-level export attrs are added on the enclosing impl block, while
+                // method-level args (constructor, getter, js_name, etc.) are re-emitted on
+                // the generated method items below.
                 let method_attr = extract_js_export_attr(&mut method);
                 let method_attr_tokens = method_attr.unwrap_or_default();
 
                 if has_jsu64(&method) {
-                    // Tag the method with its js_export args for later.
+                    // JsU64 maps to different JS-facing Rust types on each platform, so these
+                    // methods cannot stay in the shared impl block. Stash the original js_export
+                    // args on the AST node so each platform-specific clone can recover them later.
                     method.attrs.push(syn::parse_quote!(#[__js_export_args(#method_attr_tokens)]));
                     jsu64_methods.push(method);
                 } else {
@@ -162,6 +169,7 @@ enum Platform {
 }
 
 fn make_platform_method(method: &ImplItemFn, platform: Platform) -> ImplItemFn {
+    // Clone once per platform so both generated variants start from the same source method.
     let mut method = method.clone();
 
     // Extract the stashed __js_export_args and apply platform-specific attribute.
