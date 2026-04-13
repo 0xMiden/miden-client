@@ -85,8 +85,7 @@ impl KeyIndex {
         })?;
 
         // Create the temp file in the same directory as the index so the subsequent atomic
-        // rename stays on the same filesystem (e.g. on Linux, `std::env::temp_dir()` is often
-        // a tmpfs mount, which would make a cross-device rename fail).
+        // rename stays on the same filesystem.
         let mut temp_file = tempfile::NamedTempFile::new_in(keys_directory)
             .map_err(keystore_error("error creating temp index file"))?;
         temp_file
