@@ -854,15 +854,9 @@ where
         TransactionExecutor<'store, 'auth, STORE, AUTH, miden_debug::DapExecutor>,
         TransactionExecutorError,
     > {
-        let mut executor = TransactionExecutor::new(data_store)
-            .with_program_executor::<miden_debug::DapExecutor>()
-            .with_options(self.exec_options)?;
-        if let Some(authenticator) = self.authenticator.as_deref() {
-            executor = executor.with_authenticator(authenticator);
-        }
-        executor = executor.with_source_manager(self.source_manager.clone());
-
-        Ok(executor)
+        Ok(self
+            .build_executor(data_store)?
+            .with_program_executor::<miden_debug::DapExecutor>())
     }
 }
 

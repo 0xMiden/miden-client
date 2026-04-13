@@ -100,8 +100,8 @@ pub struct NewWalletCmd {
     pub deploy: bool,
     /// Seed local-only state so the wallet can be created and used for execution without a node.
     /// Only available when built with the `testing` feature.
-    #[cfg(feature = "testing")]
-    #[arg(long, default_value_t = false)]
+    #[cfg_attr(feature = "testing", arg(long, default_value_t = false))]
+    #[cfg_attr(not(feature = "testing"), arg(skip = false))]
     pub offline: bool,
 }
 
@@ -131,10 +131,7 @@ impl NewWalletCmd {
             &package_paths,
             self.init_storage_data_path.clone(),
             self.deploy,
-            #[cfg(feature = "testing")]
             self.offline,
-            #[cfg(not(feature = "testing"))]
-            false,
         )
         .await?;
 
@@ -204,8 +201,8 @@ pub struct NewAccountCmd {
     pub deploy: bool,
     /// Seed local-only state so the account can be created and used for execution without a node.
     /// Only available when built with the `testing` feature.
-    #[cfg(feature = "testing")]
-    #[arg(long, default_value_t = false)]
+    #[cfg_attr(feature = "testing", arg(long, default_value_t = false))]
+    #[cfg_attr(not(feature = "testing"), arg(skip = false))]
     pub offline: bool,
 }
 
@@ -223,10 +220,7 @@ impl NewAccountCmd {
             &self.packages,
             self.init_storage_data_path.clone(),
             self.deploy,
-            #[cfg(feature = "testing")]
             self.offline,
-            #[cfg(not(feature = "testing"))]
-            false,
         )
         .await?;
 
@@ -403,7 +397,7 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     package_paths: &[PathBuf],
     init_storage_data_path: Option<PathBuf>,
     deploy: bool,
-    #[cfg_attr(not(feature = "testing"), allow(unused))] offline: bool,
+    offline: bool,
 ) -> Result<Account, CliError> {
     if package_paths.is_empty() {
         return Err(CliError::InvalidArgument(format!(
@@ -412,7 +406,6 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
             ", client_binary_name().display())));
     }
 
-    #[cfg(feature = "testing")]
     if deploy && offline {
         return Err(CliError::InvalidArgument(
             "`--offline` cannot be combined with `--deploy`".to_string(),
