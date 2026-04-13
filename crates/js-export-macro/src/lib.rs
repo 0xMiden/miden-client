@@ -73,6 +73,11 @@ fn handle_enum(attr: &TokenStream2, item: ItemEnum) -> TokenStream2 {
 // Impl block handler
 // ================================================================================================
 
+struct JsU64Method {
+    method: ImplItemFn,
+    export_args: TokenStream2,
+}
+
 fn handle_impl(outer_attr: &TokenStream2, mut item: ItemImpl) -> TokenStream2 {
     let self_ty = &item.self_ty;
     let generics = &item.generics;
@@ -81,7 +86,7 @@ fn handle_impl(outer_attr: &TokenStream2, mut item: ItemImpl) -> TokenStream2 {
     // - shared methods, which can stay in one cfg-gated impl block
     // - JsU64 methods, which need platform-specific signatures generated later
     let mut shared_methods: Vec<ImplItemFn> = Vec::new();
-    let mut jsu64_methods: Vec<ImplItemFn> = Vec::new();
+    let mut jsu64_methods: Vec<JsU64Method> = Vec::new();
     let mut other_items: Vec<ImplItem> = Vec::new(); // const, type, etc.
 
     for member in item.items.drain(..) {
@@ -97,11 +102,8 @@ fn handle_impl(outer_attr: &TokenStream2, mut item: ItemImpl) -> TokenStream2 {
                 if has_jsu64(&method) {
                     // JsU64 maps to different JS-facing Rust types on each platform, so these
                     // methods cannot stay in the shared impl block; `make_platform_method`
-                    // rebuilds them as browser/node-specific clones. Stash the original
-                    // js_export args on the AST node so each platform-specific clone can
-                    // recover them later.
-                    method.attrs.push(syn::parse_quote!(#[__js_export_args(#method_attr_tokens)]));
-                    jsu64_methods.push(method);
+                    // rebuilds them as browser/node-specific clones.
+                    jsu64_methods.push(JsU64Method { method, export_args: method_attr_tokens });
                 } else {
                     // Annotate the method inline with dual cfg_attr.
                     let wasm = wasm_attr(&method_attr_tokens);
@@ -135,11 +137,11 @@ fn handle_impl(outer_attr: &TokenStream2, mut item: ItemImpl) -> TokenStream2 {
     if !jsu64_methods.is_empty() {
         let browser_methods: Vec<ImplItemFn> = jsu64_methods
             .iter()
-            .map(|m| make_platform_method(m, Platform::Browser))
+            .map(|m| make_platform_method(&m.method, &m.export_args, Platform::Browser))
             .collect();
         let nodejs_methods: Vec<ImplItemFn> = jsu64_methods
             .iter()
-            .map(|m| make_platform_method(m, Platform::Nodejs))
+            .map(|m| make_platform_method(&m.method, &m.export_args, Platform::Nodejs))
             .collect();
 
         output.extend(quote! {
@@ -170,12 +172,15 @@ enum Platform {
     Nodejs,
 }
 
-fn make_platform_method(method: &ImplItemFn, platform: Platform) -> ImplItemFn {
+fn make_platform_method(
+    method: &ImplItemFn,
+    args: &TokenStream2,
+    platform: Platform,
+) -> ImplItemFn {
     // Clone once per platform so both generated variants start from the same source method.
     let mut method = method.clone();
 
-    // Extract the stashed __js_export_args and apply platform-specific attribute.
-    let args = extract_stashed_args(&mut method);
+    // Apply the original method-level export args to each platform-specific clone.
     match platform {
         Platform::Browser => {
             if args.is_empty() {
@@ -204,22 +209,6 @@ fn make_platform_method(method: &ImplItemFn, platform: Platform) -> ImplItemFn {
     replacer.visit_impl_item_fn_mut(&mut method);
 
     method
-}
-
-/// Extract the `#[__js_export_args(...)]` marker we stashed earlier.
-fn extract_stashed_args(method: &mut ImplItemFn) -> TokenStream2 {
-    let mut args = TokenStream2::new();
-    method.attrs.retain(|attr| {
-        if attr.path().is_ident("__js_export_args") {
-            if let syn::Meta::List(list) = &attr.meta {
-                args = list.tokens.clone();
-            }
-            false
-        } else {
-            true
-        }
-    });
-    args
 }
 
 // ================================================================================================
