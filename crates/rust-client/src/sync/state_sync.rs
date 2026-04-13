@@ -18,6 +18,7 @@ use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
+use crate::rpc::domain::sync::SyncTarget;
 use crate::rpc::domain::transaction::{
     TransactionInclusion,
     TransactionRecord as RpcTransactionRecord,
@@ -287,7 +288,10 @@ impl StateSync {
         note_tags: &Arc<BTreeSet<NoteTag>>,
     ) -> Result<Option<RawStateSyncData>, ClientError> {
         // Step 1: Fetch the MMR delta and chain tip header.
-        let chain_mmr_info = self.rpc_api.sync_chain_mmr(current_block_num, None).await?;
+        let chain_mmr_info = self
+            .rpc_api
+            .sync_chain_mmr(current_block_num, SyncTarget::CommittedChainTip)
+            .await?;
         let chain_tip = chain_mmr_info.block_to;
 
         // No progress — already at the tip.
