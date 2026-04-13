@@ -159,6 +159,9 @@ export default [
         generateBundle(_, bundle) {
           for (const [, chunk] of Object.entries(bundle)) {
             if (chunk.type !== "chunk" || !chunk.code) continue;
+            // Replace import.meta references for classic script compatibility.
+            // Downstream bundlers (Vite) will transform these URLs before our
+            // replacement runs, so the hashed paths are preserved.
             chunk.code = chunk.code.replace(/import\.meta\.url/g, "self.location.href");
             chunk.code = chunk.code.replace(/import\.meta\.env/g, "undefined");
             chunk.code = chunk.code.replace(/^export\s*\{[^}]*\};?\s*$/gm, "");
