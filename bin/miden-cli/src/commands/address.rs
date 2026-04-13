@@ -39,14 +39,12 @@ impl From<CliAddressInterface> for AddressInterface {
 pub enum AddressSubCommand {
     /// List all addresses an account can be referenced by
     List { account_id: Option<String> },
-    /// Add a new address
+    /// Add a new address (encoded as a bech32 string) for the given account
     Add {
-        /// Account to add
+        /// Account to add the address to
         account_id: String,
-        /// Interface number for add/remove operations
-        interface: CliAddressInterface,
-        /// Optional tag length
-        tag_len: Option<u8>,
+        /// Address encoded as a bech32 string
+        address: String,
     },
     /// Remove the given address
     Remove {
@@ -54,6 +52,15 @@ pub enum AddressSubCommand {
         account_id: String,
         /// Address to remove
         address: String,
+    },
+    /// Encode an address from its components and print the bech32 string
+    Encode {
+        /// Account ID to encode the address for
+        account_id: String,
+        /// Interface for the address
+        interface: CliAddressInterface,
+        /// Optional tag length
+        tag_len: Option<u8>,
     },
 }
 
@@ -72,8 +79,13 @@ impl AddressCmd {
                 let network_id = cli_config.rpc.endpoint.0.to_network_id();
                 list_account_addresses(client, account_id, network_id).await?;
             },
-            Some(AddressSubCommand::Add { interface, account_id, tag_len }) => {
-                add_address(client, account_id.clone(), interface.clone(), *tag_len).await?;
+            Some(AddressSubCommand::Add { account_id, address }) => {
+                add_address(client, account_id.clone(), address.clone()).await?;
+            },
+            Some(AddressSubCommand::Encode { account_id, interface, tag_len }) => {
+                let cli_config = CliConfig::load()?;
+                let network_id = cli_config.rpc.endpoint.0.to_network_id();
+                encode_address(account_id, interface.clone(), *tag_len, network_id)?;
             },
             Some(AddressSubCommand::Remove { account_id, address }) => {
                 remove_address(client, account_id.clone(), address.clone()).await?;
@@ -142,11 +154,28 @@ async fn list_account_addresses<AUTH>(
 async fn add_address<AUTH>(
     mut client: Client<AUTH>,
     account_id: String,
-    interface: CliAddressInterface,
-    tag_len: Option<u8>,
+    address_str: String,
 ) -> Result<(), CliError> {
     let account_id = parse_account_id(&client, &account_id).await?;
-    let interface = interface.into();
+    let (_, address) =
+        Address::decode(&address_str).map_err(|e| CliError::Address(e, address_str))?;
+
+    let note_tag = NoteTag::with_account_target(account_id);
+    client.add_address(address, account_id).await?;
+
+    println!("Address added: Account Id {account_id} - Note tag: {note_tag}");
+    Ok(())
+}
+
+fn encode_address(
+    account_id: &str,
+    interface: CliAddressInterface,
+    tag_len: Option<u8>,
+    network_id: NetworkId,
+) -> Result<(), CliError> {
+    let account_id = miden_client::account::AccountId::from_hex(account_id)
+        .map_err(|e| CliError::Input(format!("Invalid account ID: {e}")))?;
+    let interface: AddressInterface = interface.into();
     let routing_params = match tag_len {
         Some(tag_len) => RoutingParameters::new(interface)
             .with_note_tag_len(tag_len)
@@ -154,11 +183,9 @@ async fn add_address<AUTH>(
         None => RoutingParameters::new(interface),
     };
     let address = Address::new(account_id).with_routing_parameters(routing_params);
+    let bech32 = address.encode(network_id);
 
-    let note_tag = NoteTag::with_account_target(account_id);
-    client.add_address(address, account_id).await?;
-
-    println!("Address added: Account Id {account_id} - Note tag: {note_tag}");
+    println!("{bech32}");
     Ok(())
 }
 
