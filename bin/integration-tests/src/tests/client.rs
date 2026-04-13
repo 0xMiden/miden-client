@@ -1321,6 +1321,21 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     assert_eq!(&block_header, block.header());
 
+    // Test get_account_proof retrieval
+    let (proof_block_num, account_proof) = client
+        .test_rpc_api()
+        .get_account_proof(
+            first_basic_account.id(),
+            AccountStorageRequirements::default(),
+            AccountStateAt::ChainTip,
+            None,
+            None,
+        )
+        .await?;
+    assert!(proof_block_num >= first_block_num);
+    assert_eq!(account_proof.account_id(), first_basic_account.id());
+    assert!(account_proof.account_header().is_some());
+
     let (tx_id, note) =
         mint_note(&mut client, first_basic_account.id(), faucet_account.id(), NoteType::Public)
             .await;
