@@ -96,8 +96,10 @@ fn handle_impl(outer_attr: &TokenStream2, mut item: ItemImpl) -> TokenStream2 {
 
                 if has_jsu64(&method) {
                     // JsU64 maps to different JS-facing Rust types on each platform, so these
-                    // methods cannot stay in the shared impl block. Stash the original js_export
-                    // args on the AST node so each platform-specific clone can recover them later.
+                    // methods cannot stay in the shared impl block; `make_platform_method`
+                    // rebuilds them as browser/node-specific clones. Stash the original
+                    // js_export args on the AST node so each platform-specific clone can
+                    // recover them later.
                     method.attrs.push(syn::parse_quote!(#[__js_export_args(#method_attr_tokens)]));
                     jsu64_methods.push(method);
                 } else {
