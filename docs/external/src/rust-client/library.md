@@ -137,3 +137,57 @@ client.submit_transaction(transaction_execution_result).await?
 
 You can decide whether you want the note details to be public or private through the `note_type` parameter.
 You may also customize the transaction request with the other `TransactionRequestBuilder` methods. This allows you to run custom code, with custom note arguments and additional output/input notes as well.
+
+## Note screening
+
+The `NoteScreener` lets you check whether notes can be consumed by the accounts tracked in the client's store.
+
+### Checking a single note
+
+```rust
+use miden_client::note::NoteScreener;
+
+let screener = NoteScreener::new(store.clone(), rpc_api.clone());
+let consumability = screener.can_consume(&note).await?;
+
+for (account_id, status) in &consumability {
+    println!("Account {} can consume note: {:?}", account_id, status);
+}
+```
+
+### Batch checking
+
+For multiple notes, use `can_consume_batch` to check all notes against all tracked accounts at once:
+
+```rust
+let screener = NoteScreener::new(store.clone(), rpc_api.clone());
+let results = screener.can_consume_batch(&notes).await?;
+
+for (note_id, consumabilities) in &results {
+    for (account_id, status) in consumabilities {
+        println!("Note {} consumable by {}: {:?}", note_id, account_id, status);
+    }
+}
+```
+
+### Checking against a specific account
+
+To check which notes a specific account can consume together:
+
+```rust
+let screener = NoteScreener::new(store.clone(), rpc_api.clone());
+let info = screener.check_notes_consumability(account_id, notes).await?;
+
+// `info` contains which notes succeeded and which failed
+```
+
+### Providing custom transaction arguments
+
+If your notes require specific advice inputs for consumption, provide custom `TransactionArgs`:
+
+```rust
+let screener = NoteScreener::new(store.clone(), rpc_api.clone())
+    .with_transaction_args(tx_args);
+
+let consumability = screener.can_consume(&note).await?;
+```

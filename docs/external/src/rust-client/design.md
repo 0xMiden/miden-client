@@ -55,9 +55,49 @@ These private keys are used by the executor to sign and authenticate transaction
 
 ## Note Screener
 
-The note screener is used to check the consumability of notes by tracked accounts. It performs fast static checks (e.g. checking the inputs for well known notes) and also dry runs of consumption transactions.
+The note screener determines which notes are relevant to the client by checking whether any tracked account can consume them. It does this by performing dry runs of consumption transactions using the `NoteConsumptionChecker` from the `miden-tx` crate internally.
 
-It can find the tracked accounts that can consume a note, and whether the note can be consumed at the moment or in the future.
+### Core functionality
+
+The `NoteScreener` is constructed with a reference to the client's store and RPC client:
+
+```rust
+let screener = NoteScreener::new(store, rpc_api);
+```
+
+It provides three main methods:
+
+- **`can_consume(note)`**: Checks whether any tracked account can consume a single note. Returns a list of `(AccountId, NoteConsumptionStatus)` pairs for each account that could consume it.
+- **`can_consume_batch(notes)`**: Checks a batch of notes against all tracked accounts. Returns a map from `NoteId` to the list of accounts that can consume each note.
+- **`check_notes_consumability(account_id, notes)`**: Checks a set of notes against a specific account by attempting to execute them together. Returns a `NoteConsumptionInfo` that splits notes into those that succeeded and those that failed.
+
+### Transaction arguments
+
+The screener supports an optional builder method for providing custom transaction arguments:
+
+```rust
+let screener = NoteScreener::new(store, rpc_api)
+    .with_transaction_args(tx_args);
+```
+
+If not set, the screener uses default `TransactionArgs` with an empty advice map.
+
+### Sync integration
+
+The `NoteScreener` implements the `OnNoteReceived` trait, which serves as a callback during state sync. When the client syncs with the network and receives note commitment updates, this callback determines what to do with each note:
+
+- If the note is already tracked (as an input or output note), it is committed.
+- If the note is public and matches a tracked note tag, it is inserted.
+- If the note is public and untracked, the screener checks its consumability — if any tracked account can consume it, the note is inserted; otherwise it is discarded.
+- If the note is private and untracked, it is discarded since its contents cannot be inspected.
+
+The callback returns a `NoteUpdateAction` enum (`Commit`, `Insert`, or `Discard`) that instructs the sync component on how to handle the note.
+
+Custom implementations of `OnNoteReceived` can be provided to the `StateSync` component to override this default behavior.
+
+### Security note
+
+During consumability checks, the screener deliberately does **not** attach a real authenticator to the transaction executor. This prevents external signers (e.g. wallet extensions) from being invoked during sync, which would produce unwanted confirmation popups. The `NoteConsumptionChecker` handles the missing authenticator gracefully by returning `ConsumableWithAuthorization` instead of calling `get_signature()`.
 
 ## State Sync component
 
