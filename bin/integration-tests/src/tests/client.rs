@@ -1345,6 +1345,15 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     assert_eq!(account_proof.account_id(), first_basic_account.id());
     assert!(account_proof.account_header().is_some());
 
+    // The witness's merkle path should resolve to the account root committed
+    // in the block header for `proof_block_num`.
+    let (proof_block_header, _) = client
+        .test_rpc_api()
+        .get_block_header_by_number(Some(proof_block_num), false)
+        .await?;
+    let computed_account_root = account_proof.account_witness().clone().into_proof().compute_root();
+    assert_eq!(computed_account_root, proof_block_header.account_root());
+
     // Define the account code for the custom library
     let custom_code = r#"
         use miden::protocol::native_account
