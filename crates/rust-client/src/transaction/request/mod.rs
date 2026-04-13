@@ -10,7 +10,6 @@ use miden_protocol::Word;
 use miden_protocol::account::AccountId;
 use miden_protocol::assembly::SourceManagerSync;
 use miden_protocol::asset::{Asset, NonFungibleAsset};
-use miden_protocol::assembly::SourceManagerSync;
 use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::store::MerkleStore;
 use miden_protocol::errors::{
