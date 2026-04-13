@@ -331,6 +331,8 @@ impl TransactionRequest {
         match &self.script_template {
             Some(TransactionScriptTemplate::CustomScript(script)) => Ok(script.clone()),
             Some(TransactionScriptTemplate::SendNotes(notes)) => {
+                // TODO: We could pass `SourceManager` to this call, but it needs to be supported
+                // in the protocol struct (however, this should also not fail to build often)
                 Ok(account_interface.build_send_notes_script(notes, self.expiration_delta)?)
             },
             None => {
