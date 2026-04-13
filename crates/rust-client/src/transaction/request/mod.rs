@@ -3,11 +3,14 @@
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
+use miden_protocol::assembly::SourceManagerSync;
 use miden_protocol::asset::{Asset, NonFungibleAsset};
+use miden_protocol::assembly::SourceManagerSync;
 use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::store::MerkleStore;
 use miden_protocol::errors::{
@@ -314,9 +317,17 @@ impl TransactionRequest {
 
     /// Builds the transaction script based on the account capabilities and the transaction request.
     /// The debug mode enables the script debug logs.
+    ///
+    /// The provided `source_manager` is used when compiling scripts owned by the request (currently
+    /// the empty fallback script) so that any source information attached to the produced
+    /// [`TransactionScript`] is registered in the same source manager used by the executor. Scripts
+    /// supplied by the caller via [`TransactionScriptTemplate::CustomScript`] are expected to have
+    /// already been compiled against the client's source manager (e.g. via
+    /// [`Client::code_builder`](crate::Client::code_builder)).
     pub(crate) fn build_transaction_script(
         &self,
         account_interface: &AccountInterface,
+        source_manager: Arc<dyn SourceManagerSync>,
     ) -> Result<TransactionScript, TransactionRequestError> {
         match &self.script_template {
             Some(TransactionScriptTemplate::CustomScript(script)) => Ok(script.clone()),
@@ -324,7 +335,8 @@ impl TransactionRequest {
                 Ok(account_interface.build_send_notes_script(notes, self.expiration_delta)?)
             },
             None => {
-                let empty_script = CodeBuilder::new().compile_tx_script("begin nop end")?;
+                let empty_script = CodeBuilder::with_source_manager(source_manager)
+                    .compile_tx_script("begin nop end")?;
 
                 Ok(empty_script)
             },

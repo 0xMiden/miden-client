@@ -8,14 +8,7 @@ use std::sync::Arc;
 
 use miden_client::account::{Address, AddressInterface};
 use miden_client::address::RoutingParameters;
-use miden_client::assembly::{
-    Assembler,
-    CodeBuilder,
-    DefaultSourceManager,
-    Module,
-    ModuleKind,
-    Path,
-};
+use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{
     AuthSchemeId,
     AuthSecretKey,
@@ -104,7 +97,7 @@ use miden_protocol::testing::account_id::{
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
-use miden_protocol::transaction::{RawOutputNote, TransactionKernel};
+use miden_protocol::transaction::RawOutputNote;
 use miden_protocol::vm::AdviceInputs;
 use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
 use miden_standards::account::faucets::BasicFungibleFaucet;
@@ -2559,18 +2552,11 @@ async fn storage_and_vault_proofs() {
     .unwrap();
 
     // Build script that bumps the storage map item and adds a new one each time.
-    let assembler: Assembler = TransactionKernel::assembler();
-    let source_manager = Arc::new(DefaultSourceManager::default());
-    let module = Module::parser(ModuleKind::Library)
-        .parse_str(
-            Path::new("external_contract::bump_item_contract"),
-            BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
-            source_manager.clone(),
-        )
-        .unwrap();
-    let library = assembler.assemble_library([module]).unwrap();
     let tx_script = CodeBuilder::new()
-        .with_dynamically_linked_library(library)
+        .with_linked_module(
+            "external_contract::bump_item_contract",
+            BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
+        )
         .unwrap()
         .compile_tx_script(
             "use external_contract::bump_item_contract
@@ -3285,18 +3271,11 @@ async fn storage_and_vault_proofs_ecdsa() {
     .unwrap();
 
     // Build script that bumps the storage map item and adds a new one each time.
-    let assembler: Assembler = TransactionKernel::assembler();
-    let source_manager = Arc::new(DefaultSourceManager::default());
-    let module = Module::parser(ModuleKind::Library)
-        .parse_str(
-            Path::new("external_contract::bump_item_contract"),
-            BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
-            source_manager.clone(),
-        )
-        .unwrap();
-    let library = assembler.clone().assemble_library([module]).unwrap();
     let tx_script = CodeBuilder::new()
-        .with_dynamically_linked_library(&library)
+        .with_linked_module(
+            "external_contract::bump_item_contract",
+            BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
+        )
         .unwrap()
         .compile_tx_script(
             "use external_contract::bump_item_contract
