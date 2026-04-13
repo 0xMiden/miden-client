@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.1 (TBD)
+
+### Fixes
+
+* [FIX][web] Fixed `syncState` failure ("inconsistent partial mmr: tracked leaf at position N has no value in nodes") caused by skipping authentication node collection for blocks already tracked from the MMR delta during large catch-up syncs. Authentication nodes are now always collected for note-relevant blocks regardless of prior tracking state. ([#1997](https://github.com/0xMiden/miden-client/pull/1997)).
+
 ## 0.14.0 (2026-04-07)
 
 ### Enhancements
