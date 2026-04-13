@@ -3,33 +3,51 @@ title: Installation
 sidebar_position: 1
 ---
 
-## Software prerequisites
+## Prerequisites
 
-- [Rust installation](https://www.rust-lang.org/tools/install) minimum version 1.88.
+- [Rust](https://www.rust-lang.org/tools/install) version 1.88 or later.
 
-## Install the client
+## Add the dependency
 
-Run the following command to install the miden-client:
+Add `miden-client` to your project's `Cargo.toml`:
 
-```sh
-cargo install miden-client-cli --locked
+```toml
+[dependencies]
+miden-client = { version = "0.14" }
 ```
 
-This installs the `miden-client` binary (at `~/.cargo/bin/miden-client`).
+### Feature flags
 
-## Run the client
+The crate exposes several feature flags for optional functionality:
 
-If the install worked correctly, you should be able to check the version by running:
+- **`tonic`** — Enables gRPC-based RPC client (required for network communication)
+- **`testing`** — Enables test utilities and mock implementations
 
-```sh
-miden-client --version
+Enable features as needed:
+
+```toml
+[dependencies]
+miden-client = { version = "0.14", features = ["tonic", "testing"] }
 ```
 
-Once installed, you may run:
-```sh
-miden-client --help
+### SQLite store
+
+For persistent storage, add the SQLite store crate:
+
+```toml
+[dependencies]
+miden-client = { version = "0.14" }
+miden-client-sqlite-store = { version = "0.14" }
 ```
 
-This will show you the available commands and options for the client.
+## Verify
 
-An more in depth tutorial can be fund in the [Getting started section](./get-started).
+Confirm the dependency resolves correctly:
+
+```sh
+cargo check
+```
+
+## Next steps
+
+Head to the [getting started tutorials](./get-started/index.md) to create your first account and execute a transaction using the Rust API.

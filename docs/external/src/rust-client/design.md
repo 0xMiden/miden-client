@@ -3,7 +3,7 @@ title: Design
 sidebar_position: 4
 ---
 
-The Miden client has the following architectural components:
+The Miden Client has the following architectural components:
 
 - [Store](#store)
 - [RPC client](#rpc-client)
