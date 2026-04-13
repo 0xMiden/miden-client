@@ -117,7 +117,10 @@ export default [
               // Export __wbg_init and the WASM URL so loadWasm() can call
               // __wbg_init with the correct URL explicitly.
               // Only add if not already exported (prevent double-apply).
-              if (!chunk.code.includes("__wbg_init,") && !chunk.code.includes(", __wbg_init")) {
+              if (
+                !chunk.code.includes("__wbg_init,") &&
+                !chunk.code.includes(", __wbg_init")
+              ) {
                 chunk.code = chunk.code.replace(
                   /export \{([^}]+)\};(\s*)$/m,
                   "export { $1, __wbg_init, module$$1 as __wasm_url };$2"
@@ -162,11 +165,20 @@ export default [
             // Replace import.meta references for classic script compatibility.
             // Downstream bundlers (Vite) will transform these URLs before our
             // replacement runs, so the hashed paths are preserved.
-            chunk.code = chunk.code.replace(/import\.meta\.url/g, "self.location.href");
+            chunk.code = chunk.code.replace(
+              /import\.meta\.url/g,
+              "self.location.href"
+            );
             chunk.code = chunk.code.replace(/import\.meta\.env/g, "undefined");
             chunk.code = chunk.code.replace(/^export\s*\{[^}]*\};?\s*$/gm, "");
-            chunk.code = chunk.code.replace(/^export\s+default\s+/gm, "var _default = ");
-            chunk.code = chunk.code.replace(/^export\s+(const|let|var|function|class|async)\s/gm, "$1 ");
+            chunk.code = chunk.code.replace(
+              /^export\s+default\s+/gm,
+              "var _default = "
+            );
+            chunk.code = chunk.code.replace(
+              /^export\s+(const|let|var|function|class|async)\s/gm,
+              "$1 "
+            );
             chunk.code = "(async function() {\n" + chunk.code + "\n})();";
           }
         },

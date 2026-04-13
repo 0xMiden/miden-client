@@ -11,6 +11,7 @@ async function loadWasm() {
     // own import.meta.url, which downstream bundlers handle correctly).
     if (wasmModule && typeof wasmModule.__wbg_init === "function") {
       await wasmModule.__wbg_init({
+        // eslint-disable-next-line camelcase -- wasm-bindgen init API parameter name
         module_or_path: wasmModule.__wasm_url,
       });
     }
