@@ -77,11 +77,6 @@ pub struct JsStateSyncUpdate {
     #[wasm_bindgen(js_name = "flattenedPartialBlockChainPeaks")]
     pub flattened_partial_blockchain_peaks: FlattenedU8Vec,
 
-    /// The forest (number of MMR leaves) at peak-capture time for each block.
-    /// Same length as `new_block_nums`.
-    #[wasm_bindgen(js_name = "newBlockForests")]
-    pub new_block_forests: Vec<u32>,
-
     /// For each block in this update, stores a boolean (as u8) indicating whether
     /// that block contains notes relevant to this client. Index i corresponds to
     /// the ith block, with 1 meaning relevant and 0 meaning not relevant.

@@ -6,7 +6,6 @@ export async function insertBlockHeader(
   blockNum: number,
   header: Uint8Array,
   partialBlockchainPeaks: Uint8Array,
-  forest: number,
   hasClientNotes: boolean
 ) {
   try {
@@ -15,7 +14,6 @@ export async function insertBlockHeader(
       blockNum: blockNum,
       header,
       partialBlockchainPeaks,
-      forest,
       hasClientNotes: hasClientNotes.toString(),
     };
 
@@ -144,7 +142,6 @@ export async function getPartialBlockchainPeaksByBlockNum(
 
     return {
       peaks: partialBlockchainPeaksBase64,
-      forest: blockHeader.forest !== undefined ? blockHeader.forest : null,
     };
   } catch (err) {
     logWebStoreError(err, "Failed to get partial blockchain peaks");

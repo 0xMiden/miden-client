@@ -46,7 +46,6 @@ extern "C" {
         block_num: u32,
         header: Vec<u8>,
         partial_blockchain_peaks: Vec<u8>,
-        forest: u32,
         has_client_notes: bool,
     ) -> js_sys::Promise;
 

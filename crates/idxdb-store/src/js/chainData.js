@@ -1,13 +1,12 @@
 import { getDatabase } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
-export async function insertBlockHeader(dbId, blockNum, header, partialBlockchainPeaks, forest, hasClientNotes) {
+export async function insertBlockHeader(dbId, blockNum, header, partialBlockchainPeaks, hasClientNotes) {
     try {
         const db = getDatabase(dbId);
         const data = {
             blockNum: blockNum,
             header,
             partialBlockchainPeaks,
-            forest,
             hasClientNotes: hasClientNotes.toString(),
         };
         await db.blockHeaders.put(data);
@@ -108,7 +107,6 @@ export async function getPartialBlockchainPeaksByBlockNum(dbId, blockNum) {
         const partialBlockchainPeaksBase64 = uint8ArrayToBase64(blockHeader.partialBlockchainPeaks);
         return {
             peaks: partialBlockchainPeaksBase64,
-            forest: blockHeader.forest !== undefined ? blockHeader.forest : null,
         };
     }
     catch (err) {
