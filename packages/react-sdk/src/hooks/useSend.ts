@@ -166,8 +166,12 @@ export function useSend(): UseSendResult {
               new NoteAttachment()
             );
 
+            // NoteArray constructor consumes its elements; use push(&note)
+            // to keep `p2idNote` valid so the caller can use the returned Note.
+            const ownOutputs = new NoteArray();
+            ownOutputs.push(p2idNote);
             const txRequest = new TransactionRequestBuilder()
-              .withOwnOutputNotes(new NoteArray([p2idNote]))
+              .withOwnOutputNotes(ownOutputs)
               .build();
 
             const execFromId = parseAccountId(options.from);
