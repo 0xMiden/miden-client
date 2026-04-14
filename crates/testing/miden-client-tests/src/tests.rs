@@ -126,9 +126,16 @@ mod transport;
 /// stale.
 const TX_DISCARD_DELTA: u32 = 20;
 
-/// Number of storage map entries used to create accounts that exceed the `too_many_entries`
-/// threshold (default mock threshold is 1000).
+/// Number of storage map entries used to create accounts that exceed the oversize threshold.
 const NUM_STORAGE_MAP_ENTRIES_LARGE_ACCOUNT: u64 = 2001;
+
+/// Number of faucets (and therefore fungible assets) used in oversized-account tests.
+const NUM_FAUCETS_LARGE_ACCOUNT: u64 = 10;
+
+/// Oversize threshold used for the mock RPC in large-account tests.
+/// Both storage map entries and vault assets must exceed this to trigger
+/// the `too_many_entries` / `too_many_assets` flags.
+const OVERSIZE_THRESHOLD: usize = 5;
 
 // TESTS
 // ================================================================================================
@@ -3021,7 +3028,7 @@ async fn sync_storage_maps_pagination_from_middle() {
 /// internally handles the oversized storage maps.
 #[tokio::test]
 async fn sync_large_public_account() {
-    // 1. Create a public account with a large storage map.
+    // 1. Create a public account with a large storage map and many vault assets.
     let map_slot = StorageSlot::with_map(
         StorageSlotName::new("test::large_map").unwrap(),
         StorageMap::with_entries(
@@ -3036,8 +3043,29 @@ async fn sync_large_public_account() {
     );
 
     let mut builder = MockChainBuilder::new();
+
+    // Create faucets so we can give the account enough assets to exceed the oversize threshold.
+    let faucets: Vec<Account> = (0..NUM_FAUCETS_LARGE_ACCOUNT)
+        .map(|i| {
+            // TokenSymbol requires uppercase ASCII letters only.
+            let symbol = format!("TK{}", (b'A' + u8::try_from(i).unwrap()) as char);
+            builder
+                .add_existing_basic_faucet(miden_testing::Auth::IncrNonce, &symbol, 1_000_000, None)
+                .unwrap()
+        })
+        .collect();
+
+    let assets: Vec<Asset> = faucets
+        .iter()
+        .map(|faucet| Asset::Fungible(FungibleAsset::new(faucet.id(), 100).unwrap()))
+        .collect();
+
     let mock_account = builder
-        .add_existing_mock_account_with_storage(miden_testing::Auth::IncrNonce, [map_slot])
+        .add_existing_mock_account_with_storage_and_assets(
+            miden_testing::Auth::IncrNonce,
+            [map_slot],
+            assets,
+        )
         .unwrap();
     let original_account = mock_account.clone();
     let mut mock_chain = builder.build().unwrap();
@@ -3057,8 +3085,9 @@ async fn sync_large_public_account() {
     mock_chain.add_pending_executed_transaction(&tx).unwrap();
     mock_chain.prove_next_block().unwrap();
 
-    // 3. Create MockRpcApi.
-    let rpc_api = MockRpcApi::new(mock_chain);
+    // 3. Create MockRpcApi with a low oversize threshold so both the storage map
+    // and vault trigger the `too_many_entries` / `too_many_assets` flags.
+    let rpc_api = MockRpcApi::new(mock_chain).with_oversize_threshold(OVERSIZE_THRESHOLD);
     let arc_rpc_api = Arc::new(rpc_api.clone());
 
     // 4. Build a client and add the ORIGINAL (pre-tx) account.
@@ -3111,6 +3140,14 @@ async fn sync_large_public_account() {
         map.entries().count(),
         usize::try_from(NUM_STORAGE_MAP_ENTRIES_LARGE_ACCOUNT).unwrap(),
         "all map entries should be preserved after sync"
+    );
+
+    // Verify the vault assets are preserved.
+    let synced_assets: Vec<Asset> = synced_account.vault().assets().collect();
+    assert_eq!(
+        synced_assets.len(),
+        usize::try_from(NUM_FAUCETS_LARGE_ACCOUNT).unwrap(),
+        "all vault assets should be preserved after sync"
     );
 }
 
