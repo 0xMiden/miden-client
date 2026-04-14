@@ -223,12 +223,9 @@ where
             .filter_map(|n| n.inclusion_proof().map(|p| p.location().block_num().as_usize()))
             .collect();
 
-        // Blocks to untrack: tracked but no longer have live notes (excluding genesis).
-        let blocks_to_untrack: Vec<usize> = tracked_blocks
-            .iter()
-            .copied()
-            .filter(|&b| b != BlockNumber::GENESIS.as_usize() && !live_blocks.contains(&b))
-            .collect();
+        // Blocks to untrack: tracked but no longer have live notes.
+        let blocks_to_untrack: Vec<usize> =
+            tracked_blocks.difference(&live_blocks).copied().collect();
 
         if blocks_to_untrack.is_empty() {
             return Ok(());
