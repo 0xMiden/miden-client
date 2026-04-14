@@ -44,9 +44,7 @@ export class TransactionsResource {
       );
 
       const request = new wasm.TransactionRequestBuilder()
-        .withOwnOutputNotes(
-          new wasm.OutputNoteArray([wasm.OutputNote.full(note)])
-        )
+        .withOwnOutputNotes(new wasm.NoteArray([note]))
         .build();
 
       const { txId, result } = await this.#submitOrSubmitWithProver(
