@@ -37,13 +37,7 @@ describe("insertBlockHeader: add-if-not-exists semantics", () => {
   it("inserts a brand-new row when none exists (genesis path)", async () => {
     const dbId = await openTestDb();
 
-    await insertBlockHeader(
-      dbId,
-      BLOCK_NUM,
-      HEADER_V1,
-      PEAKS_FROM_SYNC,
-      false
-    );
+    await insertBlockHeader(dbId, BLOCK_NUM, HEADER_V1, PEAKS_FROM_SYNC, false);
 
     const stored = await getDatabase(dbId).blockHeaders.get(BLOCK_NUM);
     expect(stored).toBeDefined();
@@ -61,13 +55,7 @@ describe("insertBlockHeader: add-if-not-exists semantics", () => {
     const dbId = await openTestDb();
 
     // Step 1: sync writes correct peaks for block N.
-    await insertBlockHeader(
-      dbId,
-      BLOCK_NUM,
-      HEADER_V1,
-      PEAKS_FROM_SYNC,
-      false
-    );
+    await insertBlockHeader(dbId, BLOCK_NUM, HEADER_V1, PEAKS_FROM_SYNC, false);
 
     // Step 2: authenticated-block backfill tries to overwrite with wrong peaks.
     await insertBlockHeader(
@@ -87,9 +75,8 @@ describe("insertBlockHeader: add-if-not-exists semantics", () => {
     // preserved bytes (it base64-encodes them so we decode).
     const peaks = await getPartialBlockchainPeaksByBlockNum(dbId, BLOCK_NUM);
     expect(peaks).toBeDefined();
-    const decoded = Uint8Array.from(
-      atob(peaks!.peaks!),
-      (c) => c.charCodeAt(0)
+    const decoded = Uint8Array.from(atob(peaks!.peaks!), (c) =>
+      c.charCodeAt(0)
     );
     expect(decoded).toEqual(PEAKS_FROM_SYNC);
   });
@@ -102,13 +89,7 @@ describe("insertBlockHeader: add-if-not-exists semantics", () => {
     // path must match or `get_tracked_block_header_numbers` misses this block.
     const dbId = await openTestDb();
 
-    await insertBlockHeader(
-      dbId,
-      BLOCK_NUM,
-      HEADER_V1,
-      PEAKS_FROM_SYNC,
-      false
-    );
+    await insertBlockHeader(dbId, BLOCK_NUM, HEADER_V1, PEAKS_FROM_SYNC, false);
 
     let stored = await getDatabase(dbId).blockHeaders.get(BLOCK_NUM);
     expect(stored!.hasClientNotes).toBe("false");
@@ -136,13 +117,7 @@ describe("insertBlockHeader: add-if-not-exists semantics", () => {
     // contain a client note, subsequent writes should not flip that back.
     const dbId = await openTestDb();
 
-    await insertBlockHeader(
-      dbId,
-      BLOCK_NUM,
-      HEADER_V1,
-      PEAKS_FROM_SYNC,
-      true
-    );
+    await insertBlockHeader(dbId, BLOCK_NUM, HEADER_V1, PEAKS_FROM_SYNC, true);
 
     await insertBlockHeader(
       dbId,

@@ -47,7 +47,10 @@ export async function insertBlockHeader(
 
 /** Detect Dexie's primary-key collision error across sync + bulk wrappings. */
 function isConstraintError(err: unknown): boolean {
-  const e = err as { name?: string; inner?: { name?: string } } | null | undefined;
+  const e = err as
+    | { name?: string; inner?: { name?: string } }
+    | null
+    | undefined;
   return e?.name === "ConstraintError" || e?.inner?.name === "ConstraintError";
 }
 
