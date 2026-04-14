@@ -266,6 +266,20 @@ pub trait Store: Send + Sync {
     /// block.
     async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError>;
 
+    /// Removes MMR authentication nodes and marks block headers as no longer having relevant
+    /// notes.
+    ///
+    /// `block_nums` are the blocks to untrack (their `has_client_notes` flag is set to `false`).
+    /// `node_indices` are the in-order indices of authentication nodes to delete from the
+    /// partial blockchain nodes table.
+    ///
+    /// Both operations must be performed atomically to keep the store consistent.
+    async fn untrack_blocks(
+        &self,
+        block_nums: &[BlockNumber],
+        node_indices: &[InOrderIndex],
+    ) -> Result<(), StoreError>;
+
     /// Prunes historical account states for the specified account up to the given nonce.
     ///
     /// Deletes all historical entries with `replaced_at_nonce <= up_to_nonce` from the

@@ -288,6 +288,14 @@ impl Store for IdxdbStore {
         self.prune_irrelevant_blocks().await
     }
 
+    async fn untrack_blocks(
+        &self,
+        block_nums: &[BlockNumber],
+        node_indices: &[InOrderIndex],
+    ) -> Result<(), StoreError> {
+        self.untrack_blocks(block_nums, node_indices).await
+    }
+
     async fn prune_account_history(
         &self,
         account_id: AccountId,

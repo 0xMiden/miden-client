@@ -284,6 +284,19 @@ impl Store for SqliteStore {
         self.interact_with_connection(SqliteStore::prune_irrelevant_blocks).await
     }
 
+    async fn untrack_blocks(
+        &self,
+        block_nums: &[BlockNumber],
+        node_indices: &[InOrderIndex],
+    ) -> Result<(), StoreError> {
+        let block_nums = block_nums.to_vec();
+        let node_indices = node_indices.to_vec();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::untrack_blocks(conn, &block_nums, &node_indices)
+        })
+        .await
+    }
+
     async fn prune_account_history(
         &self,
         account_id: AccountId,

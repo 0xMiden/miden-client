@@ -150,6 +150,26 @@ export async function getPartialBlockchainNodesUpToInOrderIndex(dbId, maxInOrder
         logWebStoreError(err, "Failed to get partial blockchain nodes up to index");
     }
 }
+export async function untrackBlocks(dbId, blockNums, nodeIds) {
+    try {
+        const db = getDatabase(dbId);
+        const numericNodeIds = nodeIds.map(Number);
+        await db.dexie.transaction("rw", db.blockHeaders, db.partialBlockchainNodes, async () => {
+            if (numericNodeIds.length > 0) {
+                await db.partialBlockchainNodes.bulkDelete(numericNodeIds);
+            }
+            if (blockNums.length > 0) {
+                await db.blockHeaders
+                    .where("blockNum")
+                    .anyOf(blockNums)
+                    .modify({ hasClientNotes: "false" });
+            }
+        });
+    }
+    catch (err) {
+        logWebStoreError(err, "Failed to untrack blocks");
+    }
+}
 export async function pruneIrrelevantBlocks(dbId) {
     try {
         const db = getDatabase(dbId);

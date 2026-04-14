@@ -189,6 +189,37 @@ export async function getPartialBlockchainNodesUpToInOrderIndex(
   }
 }
 
+export async function untrackBlocks(
+  dbId: string,
+  blockNums: number[],
+  nodeIds: string[]
+) {
+  try {
+    const db = getDatabase(dbId);
+    const numericNodeIds = nodeIds.map(Number);
+
+    await db.dexie.transaction(
+      "rw",
+      db.blockHeaders,
+      db.partialBlockchainNodes,
+      async () => {
+        if (numericNodeIds.length > 0) {
+          await db.partialBlockchainNodes.bulkDelete(numericNodeIds);
+        }
+
+        if (blockNums.length > 0) {
+          await db.blockHeaders
+            .where("blockNum")
+            .anyOf(blockNums)
+            .modify({ hasClientNotes: "false" });
+        }
+      }
+    );
+  } catch (err) {
+    logWebStoreError(err, "Failed to untrack blocks");
+  }
+}
+
 export async function pruneIrrelevantBlocks(dbId: string) {
   try {
     const db = getDatabase(dbId);

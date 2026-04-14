@@ -55,12 +55,14 @@
 //! `committed_note_updates` and `consumed_note_updates`) to understand how the sync data is
 //! processed and applied to the local store.
 
+use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::max;
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockNumber;
+use miden_protocol::crypto::merkle::mmr::InOrderIndex;
 use miden_protocol::note::NoteId;
 use miden_protocol::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
@@ -149,7 +151,9 @@ where
             .await
             .map_err(ClientError::StoreError)?;
 
-        // Remove irrelevant block headers
+        // Prune MMR authentication nodes for blocks whose notes have all been consumed,
+        // then remove irrelevant block headers.
+        self.prune_mmr_authentication_nodes().await?;
         self.store.prune_irrelevant_blocks().await?;
 
         Ok(sync_summary)
@@ -191,8 +195,60 @@ where
     pub async fn apply_state_sync(&mut self, update: StateSyncUpdate) -> Result<(), ClientError> {
         self.store.apply_state_sync(update).await?;
 
-        // Remove irrelevant block headers
+        // Prune MMR authentication nodes for blocks whose notes have all been consumed,
+        // then remove irrelevant block headers.
+        self.prune_mmr_authentication_nodes().await?;
         self.store.prune_irrelevant_blocks().await?;
+
+        Ok(())
+    }
+
+    /// Prunes MMR authentication nodes for blocks whose input notes have all been consumed.
+    ///
+    /// This identifies tracked blocks (blocks with `has_client_notes = true`) that no longer
+    /// have any unspent input notes, untracks them from the `PartialMmr`, and atomically
+    /// removes the redundant authentication nodes from the store while marking those blocks
+    /// as irrelevant.
+    async fn prune_mmr_authentication_nodes(&self) -> Result<(), ClientError> {
+        // Get blocks currently tracked in the MMR.
+        let tracked_blocks = self.store.get_tracked_block_header_numbers().await?;
+        if tracked_blocks.is_empty() {
+            return Ok(());
+        }
+
+        // Determine which blocks still have live (unspent) input notes.
+        let unspent_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
+        let live_blocks: BTreeSet<usize> = unspent_notes
+            .iter()
+            .filter_map(|n| n.inclusion_proof().map(|p| p.location().block_num().as_usize()))
+            .collect();
+
+        // Blocks to untrack: tracked but no longer have live notes (excluding genesis).
+        let blocks_to_untrack: Vec<usize> = tracked_blocks
+            .iter()
+            .copied()
+            .filter(|&b| b != BlockNumber::GENESIS.as_usize() && !live_blocks.contains(&b))
+            .collect();
+
+        if blocks_to_untrack.is_empty() {
+            return Ok(());
+        }
+
+        // Build the PartialMmr and untrack each block, collecting removed auth nodes.
+        let mut partial_mmr = self.store.get_current_partial_mmr().await?;
+        let mut nodes_to_remove: Vec<InOrderIndex> = Vec::new();
+        for &block_pos in &blocks_to_untrack {
+            let removed = partial_mmr.untrack(block_pos);
+            nodes_to_remove.extend(removed.iter().map(|(idx, _)| *idx));
+        }
+
+        // Atomically remove auth nodes and mark blocks as irrelevant.
+        let block_nums: Vec<BlockNumber> = blocks_to_untrack
+            .iter()
+            .map(|&b| BlockNumber::from(u32::try_from(b).expect("block number fits in u32")))
+            .collect();
+
+        self.store.untrack_blocks(&block_nums, &nodes_to_remove).await?;
 
         Ok(())
     }

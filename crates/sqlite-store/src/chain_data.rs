@@ -228,6 +228,49 @@ impl SqliteStore {
         Ok(())
     }
 
+    /// Removes MMR authentication nodes and marks block headers as no longer having relevant
+    /// notes.
+    pub fn untrack_blocks(
+        conn: &mut Connection,
+        block_nums: &[BlockNumber],
+        node_indices: &[InOrderIndex],
+    ) -> Result<(), StoreError> {
+        // Early return to avoid opening a transaction when there is nothing to do.
+        if block_nums.is_empty() && node_indices.is_empty() {
+            return Ok(());
+        }
+
+        let tx = conn.transaction().into_store_error()?;
+
+        if !node_indices.is_empty() {
+            let id_values = node_indices
+                .iter()
+                .map(|id| Value::Integer(i64::try_from(id.inner()).expect("id is a valid i64")))
+                .collect::<Vec<_>>();
+
+            tx.execute(
+                "DELETE FROM partial_blockchain_nodes WHERE id IN rarray(?)",
+                params![Rc::new(id_values)],
+            )
+            .into_store_error()?;
+        }
+
+        if !block_nums.is_empty() {
+            let block_values = block_nums
+                .iter()
+                .map(|b| Value::Integer(i64::from(b.as_u32())))
+                .collect::<Vec<_>>();
+
+            tx.execute(
+                "UPDATE block_headers SET has_client_notes = 0 WHERE block_num IN rarray(?)",
+                params![Rc::new(block_values)],
+            )
+            .into_store_error()?;
+        }
+
+        tx.commit().into_store_error()
+    }
+
     /// Removes block headers that do not contain any client notes and aren't the genesis or last
     /// block.
     pub fn prune_irrelevant_blocks(conn: &mut Connection) -> Result<(), StoreError> {
@@ -393,6 +436,7 @@ mod test {
     use miden_client::Word;
     use miden_client::block::BlockHeader;
     use miden_client::crypto::{Forest, InOrderIndex, MmrPeaks};
+    use miden_client::note::BlockNumber;
     use miden_client::store::Store;
     use miden_protocol::crypto::merkle::mmr::Mmr;
     use miden_protocol::transaction::TransactionKernel;
@@ -586,5 +630,149 @@ mod test {
                 mmr.open(block_num).unwrap().merkle_path()
             );
         }
+    }
+
+    /// Tests that untracking blocks removes their redundant authentication nodes while
+    /// preserving nodes needed by blocks that remain tracked.
+    #[tokio::test]
+    async fn untrack_blocks_removes_redundant_auth_nodes() {
+        let store = create_test_store().await;
+        const TOTAL_BLOCKS: usize = 64;
+
+        let tx_kernel_commitment = TransactionKernel.to_commitment();
+        let block_headers: Vec<BlockHeader> = (0..TOTAL_BLOCKS)
+            .map(|block_num| {
+                BlockHeader::mock(
+                    u32::try_from(block_num).unwrap(),
+                    None,
+                    None,
+                    &[],
+                    tx_kernel_commitment,
+                )
+            })
+            .collect();
+
+        // Build a full MMR and track three specific blocks.
+        let mut mmr = Mmr::default();
+        for header in &block_headers {
+            mmr.add(header.commitment());
+        }
+
+        let tracked_set: BTreeSet<usize> = [10, 30, 50].iter().copied().collect();
+
+        // Collect all authentication nodes for the tracked blocks.
+        let mut tracked_nodes: BTreeMap<InOrderIndex, Word> = BTreeMap::new();
+        for &block_num in &tracked_set {
+            let header = &block_headers[block_num];
+            tracked_nodes.insert(InOrderIndex::from_leaf_pos(block_num), header.commitment());
+            let proof = mmr.open(block_num).expect("valid proof");
+            let mut idx = InOrderIndex::from_leaf_pos(block_num);
+            for node in proof.merkle_path().nodes() {
+                tracked_nodes.insert(idx.sibling(), *node);
+                idx = idx.parent();
+            }
+        }
+        let tracked_nodes_vec: Vec<(InOrderIndex, Word)> = tracked_nodes.into_iter().collect();
+
+        let peaks_by_block: Vec<MmrPeaks> = (0..TOTAL_BLOCKS)
+            .map(|block_num| mmr.peaks_at(Forest::new(block_num)).expect("valid peaks"))
+            .collect();
+
+        // Persist blocks and nodes.
+        let block_headers_clone = block_headers.clone();
+        store
+            .interact_with_connection(move |conn| {
+                let tx = conn.transaction().unwrap();
+                for block_num in 0..TOTAL_BLOCKS {
+                    let has_notes = tracked_set.contains(&block_num);
+                    SqliteStore::insert_block_header_tx(
+                        &tx,
+                        &block_headers_clone[block_num],
+                        &peaks_by_block[block_num],
+                        has_notes,
+                    )
+                    .unwrap();
+                }
+                SqliteStore::insert_partial_blockchain_nodes_tx(&tx, &tracked_nodes_vec).unwrap();
+
+                // Set sync height to last block.
+                tx.execute(
+                    "UPDATE state_sync SET block_num = ?",
+                    params![i64::try_from(TOTAL_BLOCKS - 1).unwrap()],
+                )
+                .unwrap();
+                tx.commit().unwrap();
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        // Count initial nodes.
+        let initial_node_count: i64 = store
+            .interact_with_connection(|conn| {
+                Ok(conn
+                    .query_row("SELECT COUNT(*) FROM partial_blockchain_nodes", [], |r| r.get(0))
+                    .unwrap())
+            })
+            .await
+            .unwrap();
+        assert!(initial_node_count > 0);
+
+        // Rebuild the PartialMmr and untrack block 30 (simulate: all notes consumed).
+        let mut partial_mmr = Store::get_current_partial_mmr(&store).await.unwrap();
+        let removed_nodes = partial_mmr.untrack(30);
+        let removed_indices: Vec<InOrderIndex> =
+            removed_nodes.iter().map(|(idx, _)| *idx).collect();
+
+        // Execute the store operation.
+        let block_nums_to_untrack = vec![BlockNumber::from(30u32)];
+        store.untrack_blocks(&block_nums_to_untrack, &removed_indices).await.unwrap();
+
+        // Verify: fewer nodes in the table.
+        let final_node_count: i64 = store
+            .interact_with_connection(|conn| {
+                Ok(conn
+                    .query_row("SELECT COUNT(*) FROM partial_blockchain_nodes", [], |r| r.get(0))
+                    .unwrap())
+            })
+            .await
+            .unwrap();
+        assert!(
+            final_node_count < initial_node_count,
+            "expected fewer nodes after untrack, got {final_node_count} vs {initial_node_count}"
+        );
+
+        // Verify: block 30 is no longer tracked.
+        let block_30_has_notes: bool = store
+            .interact_with_connection(|conn| {
+                Ok(conn
+                    .query_row(
+                        "SELECT has_client_notes FROM block_headers WHERE block_num = 30",
+                        [],
+                        |r| r.get(0),
+                    )
+                    .unwrap())
+            })
+            .await
+            .unwrap();
+        assert!(!block_30_has_notes, "block 30 should no longer be tracked");
+
+        // Verify: the PartialMmr can be rebuilt and remaining tracked blocks (10, 50)
+        // still have valid authentication paths.
+        let rebuilt_mmr = Store::get_current_partial_mmr(&store).await.unwrap();
+        assert_eq!(rebuilt_mmr.peaks().hash_peaks(), mmr.peaks().hash_peaks());
+
+        for &block_num in &[10, 50] {
+            let partial_proof = rebuilt_mmr.open(block_num).expect("partial mmr query succeeds");
+            assert!(partial_proof.is_some(), "block {block_num} should still be provable");
+            assert_eq!(
+                partial_proof.unwrap().merkle_path(),
+                mmr.open(block_num).unwrap().merkle_path()
+            );
+        }
+
+        // Verify: block 30 is no longer provable.
+        let block_30_proof = rebuilt_mmr.open(30).expect("open should not error");
+        assert!(block_30_proof.is_none(), "block 30 should no longer be provable");
     }
 }
