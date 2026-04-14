@@ -17,7 +17,19 @@ export async function insertBlockHeader(
       hasClientNotes: hasClientNotes.toString(),
     };
 
-    await db.blockHeaders.put(data);
+    // Add-if-not-exists semantics, matching SQLite's `INSERT OR IGNORE` in
+    // `insert_block_header_tx`. `insertBlockHeader` is called both by the
+    // genesis flow (no existing row) and by `get_and_store_authenticated_block`
+    // for backfilled past blocks. In the backfill case, overwriting the row
+    // previously written by `applyStateSync` would replace the correct
+    // historical peaks (popcount == block_num) with peaks for the caller's
+    // current PartialMmr forest (popcount == current sync height). Later
+    // reads of those peaks trip the `InvalidPeaks` validation and can wedge
+    // sync for the rest of the session.
+    await db.blockHeaders.add(data).catch((err: { name?: string }) => {
+      if (err?.name === "ConstraintError") return; // row already exists, keep it
+      throw err;
+    });
   } catch (err) {
     logWebStoreError(err);
   }
