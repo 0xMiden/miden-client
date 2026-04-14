@@ -36,6 +36,7 @@ use miden_client::vm::{
     SectionId,
     TargetType,
 };
+use midenc_hir_type::{CallConv, FunctionType, Type};
 
 const PACKAGE_DIR: &str = "packages";
 
@@ -114,7 +115,21 @@ fn main() {
     let call_test_metadata = AccountComponentMetadata::new("call-test", AccountType::all())
         .with_storage_schema(storage_schema);
 
-    build_package("call-test", call_test_library, &call_test_metadata, Some("test"));
+    let call_test_signatures = [
+        ("add", FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt], [Type::Felt])),
+        (
+            "set_value",
+            FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt, Type::Felt, Type::Felt], []),
+        ),
+    ];
+
+    build_package_with_signatures(
+        "call-test",
+        call_test_library,
+        &call_test_metadata,
+        Some("test"),
+        &call_test_signatures,
+    );
 
     // Expose the path so integration tests can find it
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR not set");
@@ -136,6 +151,19 @@ pub fn build_package(
     metadata: &AccountComponentMetadata,
     subdirectory: Option<&str>,
 ) {
+    build_package_with_signatures(package_name, library, metadata, subdirectory, &[]);
+}
+
+/// Like [`build_package`] but lets the caller attach an explicit [`FunctionType`] to specific
+/// procedure exports by (unqualified) procedure name. Useful for MASM-source packages where
+/// the library does not carry type information.
+pub fn build_package_with_signatures(
+    package_name: &str,
+    library: Library,
+    metadata: &AccountComponentMetadata,
+    subdirectory: Option<&str>,
+    signature_overrides: &[(&str, FunctionType)],
+) {
     // NOTE: Taken from the miden-compiler's build_package function:
     // https://github.com/0xMiden/compiler/blob/61ee77f57c07c197323728642f8feca972b24217/midenc-compile/src/stages/assemble.rs#L71-L88
     // Gather all of the procedure metadata for exports of this package
@@ -143,10 +171,14 @@ pub fn build_package(
     for module_info in library.module_infos() {
         for (_, proc_info) in module_info.procedures() {
             let name = QualifiedProcedureName::new(module_info.path(), proc_info.name.clone());
+            let override_sig = signature_overrides
+                .iter()
+                .find(|(n, _)| *n == proc_info.name.as_str())
+                .map(|(_, sig)| sig.clone());
             let export = ProcedureExport {
                 path: name.into_inner(),
                 digest: proc_info.digest,
-                signature: proc_info.signature.as_deref().cloned(),
+                signature: override_sig.or_else(|| proc_info.signature.as_deref().cloned()),
                 attributes: proc_info.attributes.clone(),
             };
             exports.push(PackageExport::Procedure(export));

@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
@@ -49,21 +50,32 @@ impl CallCmd {
 
         let package = load_package(&self.package)?;
 
-        let (digest, result_count) = if self.procedure.starts_with("0x") {
+        let (digest, param_count, result_count) = if self.procedure.starts_with("0x") {
             let digest = Word::try_from(self.procedure.as_str()).map_err(|e| {
                 CliError::InvalidArgument(format!(
                     "Invalid procedure hash '{}': {e}",
                     self.procedure
                 ))
             })?;
-            (digest, 0)
+            (digest, None, 0)
         } else {
             let digest = resolve_procedure_digest(&package, &self.procedure)?;
-            let result_count = print_manifest_signature(&package, &self.procedure);
-            (digest, result_count)
+            let (param_count, result_count) = print_manifest_signature(&package, &self.procedure);
+            (digest, param_count, result_count)
         };
 
         let args = parse_args(&self.args)?;
+
+        if let Some(expected) = param_count
+            && args.len() != expected
+        {
+            return Err(CliError::InvalidArgument(format!(
+                "Procedure '{}' expects {} argument(s), got {}.",
+                self.procedure,
+                expected,
+                args.len()
+            )));
+        }
 
         let library = &*package.mast;
 
@@ -154,18 +166,18 @@ fn parse_args(args: &[String]) -> Result<Vec<u64>, CliError> {
     args.iter()
         .map(|arg| {
             arg.parse::<u64>().map_err(|_| {
-                CliError::InvalidArgument(format!("Invalid argument '{}'. Expected u64.", arg))
+                CliError::InvalidArgument(format!("Invalid argument '{arg}'. Expected u64."))
             })
         })
         .collect()
 }
 
-fn print_manifest_signature(package: &Package, procedure_name: &str) -> usize {
+fn print_manifest_signature(package: &Package, procedure_name: &str) -> (Option<usize>, usize) {
     use miden_client::vm::PackageExport;
 
     let kebab_name = procedure_name.replace('_', "-");
-    let quoted_kebab = format!("\"{}\"", kebab_name);
-    let quoted_name = format!("\"{}\"", procedure_name);
+    let quoted_kebab = format!("\"{kebab_name}\"");
+    let quoted_name = format!("\"{procedure_name}\"");
 
     for export in package.manifest.exports() {
         let PackageExport::Procedure(proc_export) = export else {
@@ -181,29 +193,26 @@ fn print_manifest_signature(package: &Package, procedure_name: &str) -> usize {
             continue;
         }
 
-        match &proc_export.signature {
-            Some(sig) => {
-                let params: Vec<String> = sig.params.iter().map(|p| format!("{p:?}")).collect();
-                let results: Vec<String> = sig.results.iter().map(|r| format!("{r:?}")).collect();
+        if let Some(sig) = &proc_export.signature {
+            let params: Vec<String> = sig.params.iter().map(|p| format!("{p:?}")).collect();
+            let results: Vec<String> = sig.results.iter().map(|r| format!("{r:?}")).collect();
 
-                let ret_str = if results.is_empty() {
-                    String::new()
-                } else {
-                    format!(" -> ({})", results.join(", "))
-                };
+            let ret_str = if results.is_empty() {
+                String::new()
+            } else {
+                format!(" -> ({})", results.join(", "))
+            };
 
-                println!("Raw Signature: {}({}){}\n", procedure_name, params.join(", "), ret_str);
+            let params_str = params.join(", ");
+            println!("Raw Signature: {procedure_name}({params_str}){ret_str}\n");
 
-                return sig.results.len();
-            },
-            None => {
-                println!("Raw Signature: {}(...) [no type info]\n", procedure_name);
-                return 0;
-            },
+            return (Some(sig.params.len()), sig.results.len());
         }
+        println!("Raw Signature: {procedure_name}(...) [no type info]\n");
+        return (None, 0);
     }
 
-    println!("(procedure '{}' not found in manifest exports)", procedure_name);
+    println!("(procedure '{procedure_name}' not found in manifest exports)");
     println!("Available exports:");
     for export in package.manifest.exports() {
         if let PackageExport::Procedure(p) = export {
@@ -211,18 +220,14 @@ fn print_manifest_signature(package: &Package, procedure_name: &str) -> usize {
         }
     }
     println!();
-    0
+    (None, 0)
 }
 
 fn print_output_stack(stack: &[Felt; 16], expected_results: usize) {
     let count = if expected_results > 0 {
         expected_results
     } else {
-        stack
-            .iter()
-            .rposition(|v| v.as_canonical_u64() != 0)
-            .map(|pos| pos + 1)
-            .unwrap_or(0)
+        stack.iter().rposition(|v| v.as_canonical_u64() != 0).map_or(0, |pos| pos + 1)
     };
 
     if count == 0 {
@@ -231,8 +236,8 @@ fn print_output_stack(stack: &[Felt; 16], expected_results: usize) {
         println!("\nResult: {}", stack[0]);
     } else {
         println!("\nResult ({count} values):");
-        for i in 0..count {
-            println!("  [{i}]: {}", stack[i]);
+        for (i, val) in stack.iter().enumerate().take(count) {
+            println!("  [{i}]: {val}");
         }
     }
 }
@@ -242,10 +247,10 @@ fn generate_tx_script(digest: &Word, args: &[u64], result_count: usize) -> Strin
 
     // Push args in reverse so first arg ends up on top
     for arg in args.iter().rev() {
-        script.push_str(&format!("    push.{arg}\n"));
+        writeln!(script, "    push.{arg}").unwrap();
     }
 
-    script.push_str(&format!("    call.{}\n", digest.to_hex()));
+    writeln!(script, "    call.{}", digest.to_hex()).unwrap();
 
     // Drop pushed args from under the results to restore stack depth to 16
     let to_drop = args.len();
@@ -263,7 +268,7 @@ fn generate_tx_script(digest: &Word, args: &[u64], result_count: usize) -> Strin
             },
             n => {
                 for _ in 0..to_drop {
-                    script.push_str(&format!("    movup.{n} drop\n"));
+                    writeln!(script, "    movup.{n} drop").unwrap();
                 }
             },
         }
@@ -304,7 +309,7 @@ fn print_delta(executed_tx: &miden_client::transaction::ExecutedTransaction) {
 
     let nonce_before = executed_tx.initial_account().nonce();
     let nonce_after = executed_tx.final_account().nonce();
-    println!("Nonce: {} -> {}", nonce_before, nonce_after);
+    println!("Nonce: {nonce_before} -> {nonce_after}");
 
     let output_notes: Vec<_> = executed_tx.output_notes().iter().collect();
     if !output_notes.is_empty() {

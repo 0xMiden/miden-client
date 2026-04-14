@@ -36,7 +36,8 @@ tracing            = { workspace = true }
 tracing-subscriber = { version = "0.3" }
 
 [build-dependencies]
-miden-client = { features = ["std"], workspace = true }
+miden-client    = { features = ["std"], workspace = true }
+midenc-hir-type = "0.5"
 
 [dev-dependencies]
 anyhow       = { workspace = true }

@@ -12,6 +12,7 @@
 * Made new-account construction use merged storage schema commitment (`build_with_schema_commitment`), re-exported `AccountBuilderSchemaCommitmentExt`, added WASM `buildWithoutSchemaCommitment()`, and fixed contract `accounts.create()` to require explicit `components` ([#1996](https://github.com/0xMiden/miden-client/pull/1996)).
 * Fixed the faucet token symbol display when showing account details ([#1985](https://github.com/0xMiden/miden-client/pull/1985)).
 * [FEATURE][rust,cli,web] Added `get_network_note_status` to `NodeRpcClient` trait for querying the processing status of notes submitted to the network (pending, nullifier-inflight, discarded, nullifier-committed), along with attempt count and error details. Exposed as `miden-client network-note-status <note_id>` CLI command and `RpcClient.getNetworkNoteStatus()` in the web client. ([#1981](https://github.com/0xMiden/miden-client/pull/1981))
+* Added `miden-cli call` command for invoking account procedures directly from the CLI.
 
 ## 0.14.4 (TBA)
 
@@ -49,6 +50,9 @@
 * [FIX][web] Fixed `transactions.send({ returnNote: true })` throwing `expected instance of NoteArray`. The JS wrapper was still building `OutputNoteArray` after the WASM binding for `withOwnOutputNotes` switched to `NoteArray` ([#2011](https://github.com/0xMiden/miden-client/issues/2011)).
 * [FIX][rust] Fixed `FilesystemKeyStore::add_key` failing on Linux when the system temp dir is on a different filesystem than the keys directory ([#2009](https://github.com/0xMiden/miden-client/pull/2009)).
 * [FIX][rust] Made source manager handling consistent when building transaction scripts. The empty fallback script is now compiled against the client's source manager instead of a fresh one, so any source information on the produced `TransactionScript` is registered with the same source manager used by the executor ([#2006](https://github.com/0xMiden/miden-client/pull/2006)).
+=======
+* Added `miden-cli call` command for invoking account procedures directly from the CLI.
+>>>>>>> 08a4f716 (fix errors from CI,validate call arg count against signature + test)
 
 ## 0.14.0 (2026-04-07)
 

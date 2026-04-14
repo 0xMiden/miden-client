@@ -1299,8 +1299,8 @@ fn call_nonexistent_procedure() {
     cmd.current_dir(&temp_dir).assert().failure();
 }
 
-/// Helper: creates an account with the call-test.masp package and returns (temp_dir, account_id,
-/// masp_path).
+/// Helper: creates an account with the `call-test.masp` package and returns (`temp_dir`,
+/// `account_id`, `masp_path`).
 fn setup_call_test_account() -> (PathBuf, String, PathBuf) {
     let temp_dir = init_cli().1;
 
@@ -1421,7 +1421,7 @@ fn call_shows_nonce_delta() {
     assert!(stdout.contains("Nonce:"), "Expected nonce delta in output:\n{stdout}");
 }
 
-/// Tests calling set_value and verifying storage delta is shown.
+/// Tests calling `set_value` and verifying storage delta is shown.
 #[test]
 fn call_set_value_shows_storage_delta() {
     let (temp_dir, account_id, masp_path) = setup_call_test_account();
@@ -1448,9 +1448,43 @@ fn call_set_value_shows_storage_delta() {
     );
 
     let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Storage Slot"), "Expected storage delta in output:\n{stdout}");
+}
+
+/// Tests that calling a `add` with the wrong number of arguments fails
+#[test]
+fn call_rejects_wrong_arg_count() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    // Too few: 1 arg for a 2-arg procedure.
+    let mut too_few = cargo_bin_cmd!("miden-client");
+    too_few.args(["call", &account_id, "add", "3", "--package", masp_path.to_str().unwrap()]);
+    let out = too_few.current_dir(&temp_dir).output().unwrap();
+    assert!(!out.status.success(), "Expected failure for too-few args");
+    let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stdout.contains("Storage Slot"),
-        "Expected storage delta in output:\n{stdout}"
+        stderr.contains("expects 2 argument") && stderr.contains("got 1"),
+        "Unexpected stderr:\n{stderr}"
+    );
+
+    // Too many: 3 args for a 2-arg procedure.
+    let mut too_many = cargo_bin_cmd!("miden-client");
+    too_many.args([
+        "call",
+        &account_id,
+        "add",
+        "3",
+        "7",
+        "11",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
+    let out = too_many.current_dir(&temp_dir).output().unwrap();
+    assert!(!out.status.success(), "Expected failure for too-many args");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("expects 2 argument") && stderr.contains("got 3"),
+        "Unexpected stderr:\n{stderr}"
     );
 }
 
