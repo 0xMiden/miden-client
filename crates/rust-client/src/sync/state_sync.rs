@@ -948,7 +948,8 @@ mod tests {
     /// This ensures committed notes get their inclusion proofs set during sync.
     struct CommitAllScreener;
 
-    #[async_trait(?Send)]
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
     impl OnNoteReceived for CommitAllScreener {
         async fn on_note_received(
             &self,

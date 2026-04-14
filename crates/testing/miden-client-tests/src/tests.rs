@@ -489,7 +489,8 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
     // for every sync step. This means only the chain tip will have `include_block = true`.
     struct DiscardAllNotes;
 
-    #[async_trait(?Send)]
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
     impl OnNoteReceived for DiscardAllNotes {
         async fn on_note_received(
             &self,
@@ -564,7 +565,8 @@ async fn sync_state_no_redundant_get_account_calls() {
 
     struct DiscardAllNotes;
 
-    #[async_trait(?Send)]
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
     impl OnNoteReceived for DiscardAllNotes {
         async fn on_note_received(
             &self,

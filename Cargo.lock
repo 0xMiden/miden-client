@@ -3018,7 +3018,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-service"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "miden-client",
  "miden-protocol",
