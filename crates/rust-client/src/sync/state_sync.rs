@@ -644,8 +644,7 @@ impl StateSync {
                 }
             } else {
                 // Small account: build directly from the response details.
-                let account =
-                    Self::build_account_from_details(&details).map_err(ClientError::RpcError)?;
+                let account = Account::try_from(&details).map_err(ClientError::RpcError)?;
                 account_updates.extend(AccountUpdates::new(
                     vec![PublicAccountUpdate::Full(account)],
                     Vec::new(),
@@ -690,75 +689,6 @@ impl StateSync {
             }
         });
         AccountStorageRequirements::new(map_slots)
-    }
-
-    /// Builds an [`Account`] directly from [`AccountDetails`] without any delta logic.
-    ///
-    /// This is used for accounts whose storage maps and vault fit within the node's size threshold.
-    fn build_account_from_details(details: &AccountDetails) -> Result<Account, RpcError> {
-        let mut slots: Vec<StorageSlot> = Vec::new();
-
-        for slot_header in details.storage_details.header.slots() {
-            match slot_header.slot_type() {
-                StorageSlotType::Value => {
-                    slots.push(StorageSlot::with_value(
-                        slot_header.name().clone(),
-                        slot_header.value(),
-                    ));
-                },
-                StorageSlotType::Map => {
-                    let map_details = details
-                        .storage_details
-                        .find_map_details(slot_header.name())
-                        .ok_or_else(|| {
-                            RpcError::ExpectedDataMissing(format!(
-                                "slot '{}' is a map but has no map_details in response",
-                                slot_header.name()
-                            ))
-                        })?;
-
-                    let storage_map = map_details
-                        .entries
-                        .clone()
-                        .into_storage_map()
-                        .ok_or_else(|| {
-                            RpcError::ExpectedDataMissing(
-                                "expected AllEntries for full account fetch, got EntriesWithProofs"
-                                    .into(),
-                            )
-                        })?
-                        .map_err(|err| {
-                            RpcError::InvalidResponse(format!(
-                                "the rpc api returned a non-valid map entry: {err}"
-                            ))
-                        })?;
-
-                    slots.push(StorageSlot::with_map(slot_header.name().clone(), storage_map));
-                },
-            }
-        }
-
-        let asset_vault = AssetVault::new(&details.vault_details.assets).map_err(|err| {
-            RpcError::InvalidResponse(format!("rpc api returned non-valid assets: {err}"))
-        })?;
-
-        let account_storage = AccountStorage::new(slots).map_err(|err| {
-            RpcError::InvalidResponse(format!("rpc api returned non-valid storage slots: {err}"))
-        })?;
-
-        Account::new(
-            details.header.id(),
-            asset_vault,
-            account_storage,
-            details.code.clone(),
-            details.header.nonce(),
-            None,
-        )
-        .map_err(|err| {
-            RpcError::InvalidResponse(format!(
-                "failed to construct account from rpc api response: {err}"
-            ))
-        })
     }
 
     /// Builds an [`AccountDelta`] from incremental RPC sync data, fetching local account
