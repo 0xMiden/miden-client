@@ -6,6 +6,7 @@
 
 * [FIX][web] Fixed `syncState` failure ("inconsistent partial mmr: tracked leaf at position N has no value in nodes") caused by skipping authentication node collection for blocks already tracked from the MMR delta during large catch-up syncs. Authentication nodes are now always collected for note-relevant blocks regardless of prior tracking state. ([#1997](https://github.com/0xMiden/miden-client/pull/1997)).
 * [FIX][web] Fixed `transactions.send({ returnNote: true })` throwing `expected instance of NoteArray`. The JS wrapper was still building `OutputNoteArray` after the WASM binding for `withOwnOutputNotes` switched to `NoteArray` ([#2011](https://github.com/0xMiden/miden-client/issues/2011)).
+* [FIX][rust] Fixed `FilesystemKeyStore::add_key` failing on Linux when the system temp dir is on a different filesystem than the keys directory ([#2009](https://github.com/0xMiden/miden-client/pull/2009)).
 * [FIX][rust] Made source manager handling consistent when building transaction scripts. The empty fallback script is now compiled against the client's source manager instead of a fresh one, so any source information on the produced `TransactionScript` is registered with the same source manager used by the executor ([#2006](https://github.com/0xMiden/miden-client/pull/2006)).
 
 ## 0.14.0 (2026-04-07)

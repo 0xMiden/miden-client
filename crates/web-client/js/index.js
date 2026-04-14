@@ -284,9 +284,11 @@ class WebClient {
     if (typeof Worker !== "undefined") {
       console.log("WebClient: Web Workers are available.");
       // Create the worker.
+      // Classic worker (not module) — the worker is built as a self-contained
+      // async-IIFE by the rollup config, compatible with all browsers including
+      // Safari/WKWebView which is extremely slow with module workers.
       this.worker = new Worker(
-        new URL("./workers/web-client-methods-worker.js", import.meta.url),
-        { type: "module" }
+        new URL("./workers/web-client-methods-worker.js", import.meta.url)
       );
 
       // Map to track pending worker requests.
