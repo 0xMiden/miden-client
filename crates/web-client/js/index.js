@@ -59,6 +59,7 @@ const SYNC_METHODS = new Set([
   "newMintTransactionRequest",
   "newSendTransactionRequest",
   "newSwapTransactionRequest",
+  "advanceBlocks",
   "proveBlock",
   "serializeMockChain",
   "serializeMockNoteTransportNode",

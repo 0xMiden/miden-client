@@ -231,6 +231,13 @@ export class MidenClient {
     return this.#inner.proveBlock();
   }
 
+  /** Advances the mock chain by `numBlocks` empty blocks at once. Only available on mock clients. */
+  advanceBlocks(numBlocks) {
+    this.assertNotTerminated();
+    this.#assertMock("advanceBlocks");
+    return this.#inner.advanceBlocks(numBlocks);
+  }
+
   /** Returns true if this client uses a mock chain. */
   usesMockChain() {
     return this.#isMock;

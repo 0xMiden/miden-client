@@ -105,6 +105,18 @@ impl WebClient {
         }
     }
 
+    /// Advances the mock chain by `num_blocks` empty blocks at once.
+    #[wasm_bindgen(js_name = "advanceBlocks")]
+    pub fn advance_blocks(&mut self, num_blocks: u32) -> Result<(), JsValue> {
+        match self.mock_rpc_api.as_ref() {
+            Some(api) => {
+                api.advance_blocks(num_blocks);
+                Ok(())
+            },
+            None => Err(JsValue::from_str("WebClient does not have a mock chain.")),
+        }
+    }
+
     #[wasm_bindgen(js_name = "usesMockChain")]
     pub fn uses_mock_chain(&self) -> bool {
         self.mock_rpc_api.is_some()

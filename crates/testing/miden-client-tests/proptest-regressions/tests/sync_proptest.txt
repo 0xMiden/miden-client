@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 3e2bfe2d0e6061be5a07573af2d6bc33a1d8ad867327b0907e9d1c9b383ab835 # shrinks to initial_height = 248, steps = [Step { action: MintToBob, blocks_after: 121 }, Step { action: ConsumeBob, blocks_after: 6 }, Step { action: BobSendsAlice, blocks_after: 458 }, Step { action: MintToAlice, blocks_after: 45 }, Step { action: ConsumeBob, blocks_after: 3 }]
+cc c03647317ee4e8ca44f06c640b2778bff0ac294ff315b2097f018f9fd3b7e3b3 # shrinks to initial_gap = 248, steps = [Step { action: MintToBob, gap: 0 }, Step { action: MintToAlice, gap: 0 }, Step { action: ConsumeBob, gap: 0 }, Step { action: MintToBob, gap: 45 }, Step { action: AliceSendsBob, gap: 2 }, Step { action: BobSendsAlice, gap: 0 }, Step { action: MintToAlice, gap: 4 }, Step { action: ConsumeBob, gap: 677 }]

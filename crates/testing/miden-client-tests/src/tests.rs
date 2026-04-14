@@ -119,6 +119,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
 
 pub mod store;
+mod sync_proptest;
 mod transaction;
 mod transport;
 
