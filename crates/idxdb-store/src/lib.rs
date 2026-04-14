@@ -284,16 +284,12 @@ impl Store for IdxdbStore {
         self.get_partial_blockchain_peaks_by_block_num(block_num).await
     }
 
-    async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError> {
-        self.prune_irrelevant_blocks().await
-    }
-
-    async fn untrack_blocks(
+    async fn prune_irrelevant_blocks(
         &self,
-        block_nums: &[BlockNumber],
-        node_indices: &[InOrderIndex],
+        blocks_to_untrack: &[BlockNumber],
+        node_indices_to_remove: &[InOrderIndex],
     ) -> Result<(), StoreError> {
-        self.untrack_blocks(block_nums, node_indices).await
+        self.prune_irrelevant_blocks(blocks_to_untrack, node_indices_to_remove).await
     }
 
     async fn prune_account_history(

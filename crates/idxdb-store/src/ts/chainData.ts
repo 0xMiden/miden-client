@@ -189,56 +189,53 @@ export async function getPartialBlockchainNodesUpToInOrderIndex(
   }
 }
 
-export async function untrackBlocks(
+export async function pruneIrrelevantBlocks(
   dbId: string,
-  blockNums: number[],
-  nodeIds: string[]
+  blocksToUntrack: number[],
+  nodeIdsToRemove: string[]
 ) {
   try {
     const db = getDatabase(dbId);
-    const numericNodeIds = nodeIds.map(Number);
+    const numericNodeIds = nodeIdsToRemove.map(Number);
+
+    const syncHeight = await db.stateSync.get(1);
+    if (syncHeight == undefined) {
+      throw Error("SyncHeight is undefined -- is the state sync table empty?");
+    }
 
     await db.dexie.transaction(
       "rw",
       db.blockHeaders,
       db.partialBlockchainNodes,
       async () => {
+        // 1. Delete stale MMR authentication nodes.
         if (numericNodeIds.length > 0) {
           await db.partialBlockchainNodes.bulkDelete(numericNodeIds);
         }
 
-        if (blockNums.length > 0) {
+        // 2. Mark untracked blocks as irrelevant.
+        if (blocksToUntrack.length > 0) {
           await db.blockHeaders
             .where("blockNum")
-            .anyOf(blockNums)
+            .anyOf(blocksToUntrack)
             .modify({ hasClientNotes: "false" });
         }
+
+        // 3. Delete irrelevant block headers.
+        const allMatchingRecords = await db.blockHeaders
+          .where("hasClientNotes")
+          .equals("false")
+          .and(
+            (record) =>
+              record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum
+          )
+          .toArray();
+
+        await db.blockHeaders.bulkDelete(
+          allMatchingRecords.map((r) => r.blockNum)
+        );
       }
     );
-  } catch (err) {
-    logWebStoreError(err, "Failed to untrack blocks");
-  }
-}
-
-export async function pruneIrrelevantBlocks(dbId: string) {
-  try {
-    const db = getDatabase(dbId);
-    const syncHeight = await db.stateSync.get(1);
-
-    if (syncHeight == undefined) {
-      throw Error("SyncHeight is undefined -- is the state sync table empty?");
-    }
-
-    const allMatchingRecords = await db.blockHeaders
-      .where("hasClientNotes")
-      .equals("false")
-      .and(
-        (record) =>
-          record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum
-      )
-      .toArray();
-
-    await db.blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
   } catch (err) {
     logWebStoreError(err, "Failed to prune irrelevant blocks");
   }

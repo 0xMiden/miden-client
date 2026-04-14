@@ -280,19 +280,15 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError> {
-        self.interact_with_connection(SqliteStore::prune_irrelevant_blocks).await
-    }
-
-    async fn untrack_blocks(
+    async fn prune_irrelevant_blocks(
         &self,
-        block_nums: &[BlockNumber],
-        node_indices: &[InOrderIndex],
+        blocks_to_untrack: &[BlockNumber],
+        node_indices_to_remove: &[InOrderIndex],
     ) -> Result<(), StoreError> {
-        let block_nums = block_nums.to_vec();
-        let node_indices = node_indices.to_vec();
+        let blocks_to_untrack = blocks_to_untrack.to_vec();
+        let node_indices_to_remove = node_indices_to_remove.to_vec();
         self.interact_with_connection(move |conn| {
-            SqliteStore::untrack_blocks(conn, &block_nums, &node_indices)
+            SqliteStore::prune_irrelevant_blocks(conn, &blocks_to_untrack, &node_indices_to_remove)
         })
         .await
     }
