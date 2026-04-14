@@ -26,7 +26,7 @@ const importWalletFromSeed = async (
       );
       return {
         accountId: account.id().toString(),
-        accountCommitment: account.commitment().toHex(),
+        accountCommitment: account.to_commitment().toHex(),
       };
     },
     {
@@ -60,19 +60,20 @@ const importAccountById = async (page: Page, accountId: string) => {
     const account = await client.getAccount(_accountId);
     return {
       accountId: account?.id().toString(),
-      accountCommitment: account?.commitment().toHex(),
+      accountCommitment: account?.to_commitment().toHex(),
     };
   }, accountId);
 };
 
 test.describe("import from seed", () => {
   test("should import same public account from seed", async ({ page }) => {
+    test.slow();
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
     const mutable = false;
     const storageMode = StorageMode.PUBLIC;
-    const authSchemeId = 0;
+    const authSchemeId = 2;
 
     const initialWallet = await createNewWallet(page, {
       storageMode,
@@ -125,12 +126,13 @@ test.describe("import from seed", () => {
 
 test.describe("import public account by id", () => {
   test("should import public account from id", async ({ page }) => {
+    test.slow();
     const walletSeed = new Uint8Array(32);
     crypto.getRandomValues(walletSeed);
 
     const mutable = false;
     const storageMode = StorageMode.PUBLIC;
-    const authSchemeId = 0;
+    const authSchemeId = 2;
 
     const initialWallet = await createNewWallet(page, {
       storageMode,

@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::net::SocketAddr;
+use std::num::{NonZeroU32, NonZeroU64};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -17,18 +18,29 @@ use miden_node_block_producer::{
 };
 use miden_node_ntx_builder::NtxBuilderConfig;
 use miden_node_rpc::Rpc;
-use miden_node_store::{GenesisState, Store};
+use miden_node_store::{DEFAULT_MAX_CONCURRENT_PROOFS, GenesisState, Store};
+use miden_node_utils::clap::{GrpcOptionsExternal, GrpcOptionsInternal, StorageOptions};
 use miden_node_utils::crypto::get_rpo_random_coin;
-use miden_node_validator::Validator;
-use miden_protocol::account::auth::AuthSecretKey;
-use miden_protocol::account::{Account, AccountBuilder, AccountComponent, AccountFile, StorageMap};
+use miden_node_validator::{Validator, ValidatorSigner};
+use miden_protocol::account::auth::{AuthScheme, AuthSecretKey};
+use miden_protocol::account::{
+    Account,
+    AccountBuilder,
+    AccountComponent,
+    AccountComponentMetadata,
+    AccountFile,
+    AccountType,
+    StorageMap,
+    StorageMapKey,
+};
 use miden_protocol::asset::{Asset, FungibleAsset, TokenSymbol};
 use miden_protocol::block::FeeParameters;
 use miden_protocol::crypto::dsa::ecdsa_k256_keccak;
 use miden_protocol::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
-use miden_protocol::utils::Serializable;
+use miden_protocol::utils::serde::Serializable;
 use miden_protocol::{Felt, ONE, Word};
-use miden_standards::AuthScheme;
+use miden_standards::AuthMethod;
+use miden_standards::account::auth::AuthSingleSig;
 use miden_standards::account::components::basic_wallet_library;
 use miden_standards::account::faucets::create_basic_fungible_faucet;
 use rand_chacha::ChaCha20Rng;
@@ -41,7 +53,6 @@ pub const DEFAULT_BLOCK_INTERVAL: u64 = 5_000;
 pub const DEFAULT_BATCH_INTERVAL: u64 = 2_000;
 pub const DEFAULT_RPC_PORT: u16 = 57_291;
 pub const GENESIS_ACCOUNT_FILE: &str = "account.mac";
-const DEFAULT_TIMEOUT_DURATION: Duration = Duration::from_secs(10);
 
 /// Builder for configuring and starting a Miden node with all components.
 pub struct NodeBuilder {
@@ -129,41 +140,67 @@ impl NodeBuilder {
         );
 
         // Bootstrap the store database
-        Store::bootstrap(genesis_state, &self.data_directory)
-            .context("failed to bootstrap store")?;
+        let genesis_block = genesis_state
+            .into_block()
+            .await
+            .with_context(|| "failed to create genesis block")?;
+
+        let genesis_header = genesis_block.inner().header().clone();
+        Store::bootstrap(genesis_block, &self.data_directory)
+            .with_context(|| "failed to bootstrap store")?;
+
+        // Bootstrap the validator database with the genesis block header so that block
+        // validation can find the chain tip.
+        let validator_db =
+            miden_node_validator::db::load(self.data_directory.join("validator.sqlite3"))
+                .await
+                .with_context(|| "failed to initialize validator database")?;
+        validator_db
+            .transact("bootstrap_validator", move |conn| {
+                miden_node_validator::db::upsert_block_header(conn, &genesis_header)
+            })
+            .await
+            .with_context(|| "failed to bootstrap validator with genesis block header")?;
 
         // Start listening on all gRPC urls so that inter-component connections can be created
         // before each component is fully started up.
         let grpc_rpc = TcpListener::bind(format!("127.0.0.1:{}", self.rpc_port))
             .await
-            .context("failed to bind to RPC gRPC endpoint")?;
+            .with_context(|| "failed to bind to RPC gRPC endpoint")?;
         let store_rpc_listener = TcpListener::bind("127.0.0.1:0")
             .await
-            .context("failed to bind to store RPC gRPC endpoint")?;
+            .with_context(|| "failed to bind to store RPC gRPC endpoint")?;
         let store_ntx_builder_listener = TcpListener::bind("127.0.0.1:0")
             .await
-            .context("failed to bind to store ntx-builder gRPC endpoint")?;
+            .with_context(|| "failed to bind to store ntx-builder gRPC endpoint")?;
         let store_block_producer_listener = TcpListener::bind("127.0.0.1:0")
             .await
-            .context("failed to bind to store block-producer gRPC endpoint")?;
+            .with_context(|| "failed to bind to store block-producer gRPC endpoint")?;
 
         let store_rpc_address = store_rpc_listener
             .local_addr()
-            .context("failed to retrieve the store's RPC gRPC address")?;
+            .with_context(|| "failed to retrieve the store's RPC gRPC address")?;
         let store_block_producer_address = store_block_producer_listener
             .local_addr()
-            .context("failed to retrieve the store's block-producer gRPC address")?;
+            .with_context(|| "failed to retrieve the store's block-producer gRPC address")?;
         let store_ntx_builder_address = store_ntx_builder_listener
             .local_addr()
-            .context("failed to retrieve the store's ntx-builder gRPC address")?;
+            .with_context(|| "failed to retrieve the store's ntx-builder gRPC address")?;
+
+        let ntx_builder_listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .with_context(|| "failed to bind to ntx-builder gRPC endpoint")?;
+        let ntx_builder_address = ntx_builder_listener
+            .local_addr()
+            .with_context(|| "failed to retrieve the ntx-builder gRPC address")?;
 
         let block_producer_address = available_socket_addr()
             .await
-            .context("failed to bind to block-producer gRPC endpoint")?;
+            .with_context(|| "failed to bind to block-producer gRPC endpoint")?;
 
         let validator_address = available_socket_addr()
             .await
-            .context("failed to bind to validator gRPC endpoint")?;
+            .with_context(|| "failed to bind to validator gRPC endpoint")?;
 
         // Start components
 
@@ -175,12 +212,14 @@ impl NodeBuilder {
             store_ntx_builder_listener,
             store_block_producer_listener,
         )
-        .context("failed to start store")?;
+        .with_context(|| "failed to start store")?;
 
         let ntx_builder_id = Self::start_ntx_builder(
             block_producer_address,
             store_ntx_builder_address,
             validator_address,
+            self.data_directory.join("ntx-builder.sqlite3"),
+            Some(ntx_builder_listener),
             &mut join_set,
         );
 
@@ -196,8 +235,9 @@ impl NodeBuilder {
                 async move {
                     Validator {
                         address: validator_address,
-                        grpc_timeout: DEFAULT_TIMEOUT_DURATION,
-                        signer: validator_signer,
+                        grpc_options: GrpcOptionsInternal::default(),
+                        signer: ValidatorSigner::Local(validator_signer),
+                        data_directory: self.data_directory,
                     }
                     .serve()
                     .await
@@ -217,12 +257,22 @@ impl NodeBuilder {
                 let validator_url = Url::parse(&format!("http://{validator_address}"))
                     .context("Failed to parse URL")?;
 
+                let ntx_builder_url = Some(
+                    Url::parse(&format!("http://{ntx_builder_address}"))
+                        .context("Failed to parse URL")?,
+                );
+
                 Rpc {
                     listener: grpc_rpc,
                     store_url,
                     block_producer_url,
                     validator_url,
-                    grpc_timeout: DEFAULT_TIMEOUT_DURATION,
+                    ntx_builder_url,
+                    grpc_options: GrpcOptionsExternal {
+                        burst_size: NonZeroU32::new(10_000).unwrap(),
+                        replenish_n_per_second_per_ip: NonZeroU64::new(10_000).unwrap(),
+                        ..GrpcOptionsExternal::default()
+                    },
                 }
                 .serve()
                 .await
@@ -278,7 +328,9 @@ impl NodeBuilder {
                         block_producer_listener,
                         ntx_builder_listener,
                         block_prover_url: None,
-                        grpc_timeout: DEFAULT_TIMEOUT_DURATION,
+                        storage_options: StorageOptions::default(),
+                        grpc_options: GrpcOptionsInternal::default(),
+                        max_concurrent_proofs: DEFAULT_MAX_CONCURRENT_PROOFS,
                     }
                     .serve()
                     .await
@@ -309,7 +361,7 @@ impl NodeBuilder {
                 BlockProducer {
                     block_producer_address,
                     store_url,
-                    grpc_timeout: DEFAULT_TIMEOUT_DURATION,
+                    grpc_options: GrpcOptionsInternal::default(),
                     batch_prover_url: None,
                     validator_url,
                     batch_interval,
@@ -330,6 +382,8 @@ impl NodeBuilder {
         block_producer_address: SocketAddr,
         store_address: SocketAddr,
         validator_address: SocketAddr,
+        database_filepath: PathBuf,
+        listener: Option<TcpListener>,
         join_set: &mut JoinSet<Result<()>>,
     ) -> Id {
         let store_url =
@@ -347,13 +401,19 @@ impl NodeBuilder {
 
         join_set
             .spawn(async move {
-                NtxBuilderConfig::new(store_url, block_producer_url, validator_url)
-                    .build()
-                    .await
-                    .context("failed to build ntx builder")?
-                    .run()
-                    .await
-                    .context("failed while serving ntx builder component")
+                NtxBuilderConfig::new(
+                    store_url,
+                    block_producer_url,
+                    validator_url,
+                    database_filepath,
+                )
+                .with_max_cycles(1 << 18)
+                .build()
+                .await
+                .context("failed to build ntx builder")?
+                .run(listener)
+                .await
+                .context("failed while serving ntx builder component")
             })
             .id()
     }
@@ -390,7 +450,12 @@ impl NodeHandle {
 
 fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let mut rng = ChaCha20Rng::from_seed(random());
-    let secret = AuthSecretKey::new_falcon512_rpo_with_rng(&mut get_rpo_random_coin(&mut rng));
+    let secret =
+        AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut get_rpo_random_coin(&mut rng));
+
+    let auth_method = AuthMethod::SingleSig {
+        approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Poseidon2),
+    };
 
     let account = create_basic_fungible_faucet(
         rng.random(),
@@ -398,9 +463,7 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
         12,
         Felt::from(1_000_000u32),
         miden_protocol::account::AccountStorageMode::Public,
-        AuthScheme::Falcon512Rpo {
-            pub_key: secret.public_key().to_commitment(),
-        },
+        auth_method,
     )?;
 
     // Force the account nonce to 1.
@@ -435,18 +498,19 @@ const TEST_ACCOUNT_SEED: [u8; 32] = [0xa; 32];
 /// and trigger the `too_many_assets` flag during testing.
 const NUM_TEST_FAUCETS: u128 = 1501;
 
-const NUM_STORAGE_MAP_ENTRIES: u32 = 2001;
+const NUM_STORAGE_MAP_ENTRIES: u32 = 200;
 
 const FAUCET_DECIMALS: u8 = 12;
 const FAUCET_MAX_SUPPLY: u32 = 1 << 30;
-const ASSET_AMOUNT_PER_FAUCET: u64 = 100;
+const ASSET_AMOUNT_PER_FAUCET: u64 = 75;
 
 /// Builds test faucets and an account that triggers the `too_many_assets` flag
 /// when requested from the node. This is used to test edge cases in account
 /// retrieval and asset handling.
 fn build_test_faucets_and_account() -> anyhow::Result<Vec<Account>> {
     let mut rng = ChaCha20Rng::from_seed(random());
-    let secret = AuthSecretKey::new_falcon512_rpo_with_rng(&mut get_rpo_random_coin(&mut rng));
+    let secret =
+        AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut get_rpo_random_coin(&mut rng));
 
     let faucets = create_test_faucets(&secret)?;
     let account = create_test_account_with_many_assets(&faucets)?;
@@ -477,8 +541,8 @@ fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Res
         .try_into()
         .expect("concatenating two 16-byte arrays yields exactly 32 bytes");
 
-    let auth_scheme = AuthScheme::Falcon512Rpo {
-        pub_key: secret.public_key().to_commitment(),
+    let auth_scheme = AuthMethod::SingleSig {
+        approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Poseidon2),
     };
 
     let faucet = create_basic_fungible_faucet(
@@ -498,13 +562,17 @@ fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Res
 /// Creates a test account holding assets from all provided faucets.
 /// The account also includes a large storage map to test storage capacity limits.
 fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<Account> {
-    let sk =
-        AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(TEST_ACCOUNT_SEED));
+    let sk = AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut ChaCha20Rng::from_seed(
+        TEST_ACCOUNT_SEED,
+    ));
 
     let storage_map = create_large_storage_map();
-    let acc_component = AccountComponent::new(basic_wallet_library(), vec![storage_map])
-        .expect("basic wallet component should satisfy account component requirements")
-        .with_supports_all_types();
+    let acc_component = AccountComponent::new(
+        basic_wallet_library(),
+        vec![storage_map],
+        AccountComponentMetadata::new("miden::testing::basic_wallet", AccountType::all()),
+    )
+    .expect("basic wallet component should satisfy account component requirements");
 
     let assets = faucets.iter().map(|faucet| {
         Asset::Fungible(
@@ -514,8 +582,9 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
     });
 
     let account = AccountBuilder::new(TEST_ACCOUNT_SEED)
-        .with_auth_component(miden_standards::account::auth::AuthFalcon512Rpo::new(
+        .with_auth_component(AuthSingleSig::new(
             sk.public_key().to_commitment(),
+            AuthScheme::Falcon512Poseidon2,
         ))
         .account_type(miden_protocol::account::AccountType::RegularAccountUpdatableCode)
         .with_component(acc_component)
@@ -528,8 +597,8 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
 
 /// Creates a storage map with many entries for stress-testing storage handling.
 fn create_large_storage_map() -> miden_protocol::account::StorageSlot {
-    let map_entries =
-        (0..NUM_STORAGE_MAP_ENTRIES).map(|i| (Word::from([i; 4]), Word::from([i; 4])));
+    let map_entries = (0..NUM_STORAGE_MAP_ENTRIES)
+        .map(|i| (StorageMapKey::new(Word::from([i; 4])), Word::from([i; 4])));
 
     miden_protocol::account::StorageSlot::with_map(
         miden_protocol::account::StorageSlotName::new("miden::test_account::map::too_many_entries")

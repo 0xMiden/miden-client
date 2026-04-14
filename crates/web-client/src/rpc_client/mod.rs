@@ -7,6 +7,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_client::block::BlockNumber;
+use miden_client::builder::DEFAULT_GRPC_TIMEOUT_MS;
 use miden_client::note::{NoteId as NativeNoteId, Nullifier};
 use miden_client::rpc::domain::account::AccountStorageRequirements as NativeAccountStorageRequirements;
 use miden_client::rpc::domain::note::FetchedNote as NativeFetchedNote;
@@ -17,6 +18,7 @@ use wasm_bindgen::prelude::*;
 use crate::js_error_with_context;
 use crate::models::account_id::AccountId;
 use crate::models::account_proof::AccountProof;
+use crate::models::account_storage_requirements::AccountStorageRequirements;
 use crate::models::block_header::BlockHeader;
 use crate::models::endpoint::Endpoint;
 use crate::models::fetched_account::FetchedAccount;
@@ -24,6 +26,7 @@ use crate::models::note_id::NoteId;
 use crate::models::note_script::NoteScript;
 use crate::models::note_sync_info::NoteSyncInfo;
 use crate::models::note_tag::NoteTag;
+use crate::models::storage_map_info::StorageMapInfo;
 use crate::models::word::Word;
 
 mod note;
@@ -41,7 +44,7 @@ impl RpcClient {
     /// @param endpoint - Endpoint to connect to.
     #[wasm_bindgen(constructor)]
     pub fn new(endpoint: Endpoint) -> Result<RpcClient, JsValue> {
-        let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), 0));
+        let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), DEFAULT_GRPC_TIMEOUT_MS));
 
         Ok(RpcClient { inner: rpc_client })
     }
@@ -91,7 +94,7 @@ impl RpcClient {
     /// @returns Promise that resolves to the `NoteScript`.
     #[allow(clippy::doc_markdown)]
     #[wasm_bindgen(js_name = "getNoteScriptByRoot")]
-    pub async fn get_note_script_by_root(&self, script_root: Word) -> Result<NoteScript, JsValue> {
+    pub async fn get_note_script_by_root(&self, script_root: &Word) -> Result<NoteScript, JsValue> {
         let native_script_root = script_root.into();
 
         let note_script = self
@@ -104,16 +107,22 @@ impl RpcClient {
     }
 
     /// Fetches a block header by number. When `block_num` is undefined, returns the latest header.
+    ///
+    /// @param `block_num` - Optional block number. When `undefined`, returns the latest header.
+    /// @param `include_mmr_proof` - When `true`, includes the MMR proof in the response. Defaults
+    ///   to `false` when `undefined`.
     #[wasm_bindgen(js_name = "getBlockHeaderByNumber")]
     pub async fn get_block_header_by_number(
         &self,
         block_num: Option<u32>,
+        include_mmr_proof: Option<bool>,
     ) -> Result<BlockHeader, JsValue> {
         let native_block_num = block_num.map(BlockNumber::from);
-        let (header, _proof) =
-            self.inner.get_block_header_by_number(native_block_num, false).await.map_err(
-                |err| js_error_with_context(err, "failed to get block header by number"),
-            )?;
+        let (header, _proof) = self
+            .inner
+            .get_block_header_by_number(native_block_num, include_mmr_proof.unwrap_or(false))
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to get block header by number"))?;
 
         Ok(header.into())
     }
@@ -136,30 +145,85 @@ impl RpcClient {
     /// Fetches an account proof from the node.
     ///
     /// This is a lighter-weight alternative to `getAccountDetails` that makes a single RPC call
-    /// and returns the account proof and, for public accounts, the account header, storage slot
-    /// values, and account code without reconstructing the full account state.
+    /// and returns the account proof alongside the account header, storage slot values, and
+    /// account code without reconstructing the full account state.
     ///
     /// For private accounts, the proof is returned but account details will not be available
     /// since they are not stored on-chain.
     ///
-    /// Useful for reading storage slot values (e.g., faucet metadata) without the overhead of
-    /// fetching the complete account with all vault assets and storage map entries.
+    /// Useful for reading storage slot values (e.g., faucet metadata) or specific storage map
+    /// entries without the overhead of fetching the complete account with all vault assets and
+    /// storage map entries.
+    ///
+    /// @param `account_id` - The account to fetch the proof for.
+    /// @param `storage_requirements` - Optional storage requirements specifying which storage
+    ///   maps and keys to include. When `undefined`, no storage map data is requested.
+    /// @param `block_num` - Optional block number to fetch the account state at. When `undefined`,
+    ///   fetches the latest state (chain tip).
+    /// @param `known_vault_commitment` - Optional known vault commitment. When provided,
+    ///   vault data is returned only if the account's current vault root differs from this
+    ///   value. Use `Word.new([0, 0, 0, 0])` to always fetch. When `undefined`, vault data
+    ///   is not requested.
     #[wasm_bindgen(js_name = "getAccountProof")]
-    pub async fn get_account_proof(&self, account_id: &AccountId) -> Result<AccountProof, JsValue> {
+    pub async fn get_account_proof(
+        &self,
+        account_id: &AccountId,
+        storage_requirements: Option<AccountStorageRequirements>,
+        block_num: Option<u32>,
+        known_vault_commitment: Option<Word>,
+    ) -> Result<AccountProof, JsValue> {
         let native_id: miden_client::account::AccountId = account_id.into();
+
+        let native_requirements: NativeAccountStorageRequirements =
+            storage_requirements.map(Into::into).unwrap_or_default();
+
+        let account_state = match block_num {
+            Some(num) => AccountStateAt::Block(BlockNumber::from(num)),
+            None => AccountStateAt::ChainTip,
+        };
 
         let (block_num, proof) = self
             .inner
             .get_account_proof(
                 native_id,
-                NativeAccountStorageRequirements::default(),
-                AccountStateAt::ChainTip,
+                native_requirements,
+                account_state,
                 None,
+                known_vault_commitment.map(Into::into),
             )
             .await
-            .map_err(|err| js_error_with_context(err, "failed to get account"))?;
+            .map_err(|err| js_error_with_context(err, "failed to get account proof"))?;
 
         Ok(AccountProof::new(proof, block_num))
+    }
+
+    /// Syncs storage map updates for an account within a block range.
+    ///
+    /// This is used when `AccountProof.hasStorageMapTooManyEntries()` returns `true` for a
+    /// slot, indicating the storage map was too large to return inline. This endpoint fetches
+    /// the full storage map data with pagination support.
+    ///
+    /// @param `block_from` - The starting block number.
+    /// @param `block_to` - Optional ending block number. When `undefined`, syncs to chain tip.
+    /// @param `account_id` - The account to sync storage maps for.
+    #[wasm_bindgen(js_name = "syncStorageMaps")]
+    pub async fn sync_storage_maps(
+        &self,
+        block_from: u32,
+        block_to: Option<u32>,
+        account_id: &AccountId,
+    ) -> Result<StorageMapInfo, JsValue> {
+        let native_id: miden_client::account::AccountId = account_id.into();
+        let block_from = BlockNumber::from(block_from);
+        let block_to = block_to.map(BlockNumber::from);
+
+        let info = self
+            .inner
+            .sync_storage_maps(block_from, block_to, native_id)
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to sync storage maps"))?;
+
+        Ok(info.into())
     }
 
     /// Fetches notes matching the provided tags from the node.
@@ -192,7 +256,7 @@ impl RpcClient {
     #[wasm_bindgen(js_name = "getNullifierCommitHeight")]
     pub async fn get_nullifier_commit_height(
         &self,
-        nullifier: Word,
+        nullifier: &Word,
         block_num: u32,
     ) -> Result<Option<u32>, JsValue> {
         let native_word: miden_client::Word = nullifier.into();

@@ -3,7 +3,6 @@ import { useMiden } from "../context/MidenProvider";
 import { TransactionFilter } from "@miden-sdk/miden-sdk";
 import type { TransactionId } from "@miden-sdk/miden-sdk";
 import type { WaitForCommitOptions } from "../types";
-import { runExclusiveDirect } from "../utils/runExclusive";
 
 export interface UseWaitForCommitResult {
   /** Wait for a transaction to be committed on-chain */
@@ -28,8 +27,7 @@ type ClientWithTransactions = {
 };
 
 export function useWaitForCommit(): UseWaitForCommitResult {
-  const { client, isReady, runExclusive } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady } = useMiden();
 
   const waitForCommit = useCallback(
     async (txId: string | TransactionId, options?: WaitForCommitOptions) => {
@@ -42,20 +40,17 @@ export function useWaitForCommit(): UseWaitForCommitResult {
       const targetHex = normalizeHex(
         typeof txId === "string" ? txId : txId.toHex()
       );
+      const deadline = Date.now() + timeoutMs;
 
-      let waited = 0;
+      while (Date.now() < deadline) {
+        await (client as unknown as ClientWithTransactions).syncState();
 
-      while (waited < timeoutMs) {
-        await runExclusiveSafe(() =>
-          (client as ClientWithTransactions).syncState()
-        );
-
-        const records = await runExclusiveSafe(() =>
-          (client as ClientWithTransactions).getTransactions(
-            typeof txId === "string"
-              ? TransactionFilter.all()
-              : TransactionFilter.ids([txId])
-          )
+        const records = await (
+          client as unknown as ClientWithTransactions
+        ).getTransactions(
+          typeof txId === "string"
+            ? TransactionFilter.all()
+            : TransactionFilter.ids([txId])
         );
 
         const record = records.find(
@@ -73,12 +68,11 @@ export function useWaitForCommit(): UseWaitForCommitResult {
         }
 
         await new Promise((resolve) => setTimeout(resolve, intervalMs));
-        waited += intervalMs;
       }
 
       throw new Error("Timeout waiting for transaction commit");
     },
-    [client, isReady, runExclusiveSafe]
+    [client, isReady]
   );
 
   return { waitForCommit };

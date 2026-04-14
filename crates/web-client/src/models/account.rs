@@ -46,8 +46,8 @@ impl Account {
     }
 
     /// Returns the commitment to the account header, storage, and code.
-    pub fn commitment(&self) -> Word {
-        self.0.commitment().into()
+    pub fn to_commitment(&self) -> Word {
+        self.0.to_commitment().into()
     }
 
     /// Returns the account nonce, which is incremented on every state update.

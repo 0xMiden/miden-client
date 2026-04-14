@@ -9,7 +9,7 @@ use miden_client::note::BlockNumber;
 use miden_client::store::{BlockRelevance, PartialBlockchainFilter, StoreError};
 use miden_client::utils::Deserializable;
 
-use super::WebStore;
+use super::IdxdbStore;
 use crate::promise::{await_js, await_js_value, await_ok};
 
 mod js_bindings;
@@ -19,6 +19,7 @@ use js_bindings::{
     idxdb_get_partial_blockchain_nodes_all,
     idxdb_get_partial_blockchain_nodes_up_to_inorder_index,
     idxdb_get_partial_blockchain_peaks_by_block_num,
+    idxdb_get_tracked_block_header_numbers,
     idxdb_get_tracked_block_headers,
     idxdb_insert_block_header,
     idxdb_insert_partial_blockchain_nodes,
@@ -41,7 +42,7 @@ use utils::{
     serialize_partial_blockchain_node,
 };
 
-impl WebStore {
+impl IdxdbStore {
     pub(crate) async fn insert_block_header(
         &self,
         block_header: &BlockHeader,
@@ -112,6 +113,16 @@ impl WebStore {
         results
     }
 
+    pub(crate) async fn get_tracked_block_header_numbers(
+        &self,
+    ) -> Result<BTreeSet<usize>, StoreError> {
+        let promise = idxdb_get_tracked_block_header_numbers(self.db_id());
+        let block_nums: Vec<u32> =
+            await_js(promise, "failed to get tracked block header numbers").await?;
+
+        Ok(block_nums.into_iter().map(|n| n as usize).collect())
+    }
+
     pub(crate) async fn get_partial_blockchain_nodes(
         &self,
         filter: PartialBlockchainFilter,
@@ -130,7 +141,18 @@ impl WebStore {
                 let promise = idxdb_get_partial_blockchain_nodes(self.db_id(), formatted_list);
                 let js_value =
                     await_js_value(promise, "failed to get partial blockchain nodes").await?;
-                process_partial_blockchain_nodes_from_js_value(js_value)
+                let nodes = process_partial_blockchain_nodes_from_js_value(js_value)?;
+
+                // Verify that all requested nodes were found. Missing nodes indicate
+                // that MMR authentication nodes were not persisted during a previous
+                // sync (e.g. the browser extension was closed mid-sync).
+                for id in &ids {
+                    if !nodes.contains_key(id) {
+                        return Err(StoreError::PartialBlockchainNodeNotFound(id.inner() as u64));
+                    }
+                }
+
+                Ok(nodes)
             },
             PartialBlockchainFilter::Forest(forest) => {
                 if forest.is_empty() {

@@ -28,13 +28,14 @@ use miden_client::account::{
     AccountStorageMode,
     AccountType,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotName,
 };
 #[cfg(test)]
 use miden_client::assembly::CodeBuilder;
 #[cfg(test)]
-use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey};
+use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig};
 
 /// Configuration for generating large accounts (used in tests)
 #[cfg(test)]
@@ -109,7 +110,10 @@ end
 /// Creates a large account with the specified configuration (used in tests)
 #[cfg(test)]
 fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account, AuthSecretKey)> {
-    let sk = AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(config.seed));
+    use miden_client::account::component::{AccountComponentMetadata, BasicWallet};
+
+    let sk =
+        AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut ChaCha20Rng::from_seed(config.seed));
 
     // Create storage map slots
     let mut storage_slots = Vec::new();
@@ -133,17 +137,23 @@ fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account,
     let reader_component_code = CodeBuilder::default()
         .compile_component_code("miden::bench::storage_reader", &reader_code)
         .map_err(|e| anyhow::anyhow!("Failed to compile reader component: {e}"))?;
-    let reader_component = AccountComponent::new(reader_component_code, storage_slots)
-        .map_err(|e| anyhow::anyhow!("Failed to create reader component: {e}"))?
-        .with_supports_all_types();
+    let reader_component = AccountComponent::new(
+        reader_component_code,
+        storage_slots,
+        AccountComponentMetadata::new("miden::testing::storage_reader", AccountType::all()),
+    )
+    .map_err(|e| anyhow::anyhow!("Failed to create reader component: {e}"))?;
 
     // Wallet component: provides standard wallet operations (no storage slots)
-    let wallet_component = AccountComponent::new(basic_wallet_library(), vec![])
-        .expect("basic wallet component should satisfy account component requirements")
-        .with_supports_all_types();
+    let wallet_component =
+        AccountComponent::new(basic_wallet_library(), vec![], BasicWallet::component_metadata())
+            .expect("basic wallet component should satisfy account component requirements");
 
     let account = AccountBuilder::new(config.seed)
-        .with_auth_component(AuthFalcon512Rpo::new(sk.public_key().to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            sk.public_key().to_commitment(),
+            AuthSchemeId::Falcon512Poseidon2,
+        ))
         .account_type(AccountType::RegularAccountUpdatableCode)
         .with_component(wallet_component)
         .with_component(reader_component)
@@ -161,7 +171,7 @@ fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account,
 pub fn random_word(rng: &mut impl Rng) -> [Felt; 4] {
     loop {
         let word: [Felt; 4] = std::array::from_fn(|_| Felt::new(rng.random::<u64>() >> 1));
-        if word.iter().any(|f| f.as_int() != 0) {
+        if word.iter().any(|f| f.as_canonical_u64() != 0) {
             return word;
         }
     }
@@ -184,7 +194,7 @@ fn create_large_storage_slot(name: &str, num_entries: usize, seed: u32) -> Stora
             let key_val = seed.wrapping_mul(1000).wrapping_add(i);
             let key = [Felt::new(key_val as u64); 4];
             let value = random_word(&mut rng);
-            (key.into(), value.into())
+            (StorageMapKey::new(key.into()), value.into())
         })
         .collect();
 

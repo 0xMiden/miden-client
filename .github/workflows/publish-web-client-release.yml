@@ -32,6 +32,10 @@ jobs:
           target: wasm32-unknown-unknown
           components: rust-src
 
+      - name: Install binaryen (wasm-opt)
+        run: |
+          sudo apt-get update && sudo apt-get install -y binaryen
+
       - name: Ensure release tag has version bump
         id: check_version
         run: ./scripts/check-web-client-version-release.sh "$GITHUB_SHA"

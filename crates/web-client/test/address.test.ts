@@ -20,7 +20,7 @@ const instanceAddress = async ({
         const newAccount = await client.newWallet(
           window.AccountStorageMode.private(),
           true,
-          0
+          window.AuthScheme.AuthRpoFalcon512
         );
         _accountId = newAccount.id();
       }
@@ -38,7 +38,7 @@ const instanceNewAddressBech32 = async (page: Page, networkId: string) => {
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
     const address = window.Address.fromAccountId(
       newAccount.id(),
@@ -65,7 +65,7 @@ const instanceAddressTestNoteTag = async (page: Page) => {
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
     const address = window.Address.fromAccountId(
       newAccount.id(),
@@ -152,7 +152,7 @@ test.describe("Bech32 tests", () => {
       const newAccount = await window.client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
       const accountId = newAccount.id();
       const asBech32 = accountId.toBech32(
@@ -181,7 +181,7 @@ const instanceAddressRemoveThenInsert = async (page: Page) => {
     const newAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
     const accountId = newAccount.id().toString();
     const address = window.Address.fromAccountId(newAccount.id(), null);
@@ -192,12 +192,15 @@ const instanceAddressRemoveThenInsert = async (page: Page) => {
     // Then we add it again
     await client.insertAccountAddress(newAccount.id(), address);
 
-    const store = await client.exportStore();
+    const store = await window.exportStore(window.storeName);
     const parsedStore = JSON.parse(store);
     const retrievedAddressRecord = parsedStore.addresses[0];
-    const retrievedAddress = window.Address.deserialize(
-      retrievedAddressRecord.address
+    // Uint8Array export is done as base64 string, so we need to decode it before deserializing
+    const addressBytes = Uint8Array.from(
+      atob(retrievedAddressRecord.address.data),
+      (c) => c.charCodeAt(0)
     );
+    const retrievedAddress = window.Address.deserialize(addressBytes);
     const retrievedId = retrievedAddressRecord.id;
 
     return {

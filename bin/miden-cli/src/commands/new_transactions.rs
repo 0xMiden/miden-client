@@ -8,15 +8,15 @@ use miden_client::keystore::Keystore;
 use miden_client::note::{
     BlockNumber,
     NoteType as MidenNoteType,
-    build_swap_tag,
+    SwapNote,
     get_input_note_with_id_prefix,
 };
 use miden_client::store::NoteRecordError;
 use miden_client::transaction::{
     ExecutedTransaction,
     InputNote,
-    OutputNote,
     PaymentNoteDescription,
+    RawOutputNote,
     SwapTransactionData,
     TransactionRequest,
     TransactionRequestBuilder,
@@ -264,7 +264,7 @@ impl SwapCmd {
         )
         .await?;
 
-        let payback_note_tag: u32 = build_swap_tag(
+        let payback_note_tag: u32 = SwapNote::build_tag(
             (&self.note_type).into(),
             &swap_transaction.offered_asset(),
             &swap_transaction.requested_asset(),
@@ -340,10 +340,8 @@ impl ConsumeNotesCmd {
         }
 
         if input_notes.is_empty() {
-            return Err(CliError::Transaction(
-                "No input notes were provided and the store does not contain any notes consumable by {account_id}".into(),
-                "Input notes check failed".to_string(),
-            ));
+            println!("Did not find any consumable notes for {account_id}.");
+            return Ok(());
         }
 
         let transaction_request = TransactionRequestBuilder::new()
@@ -401,13 +399,13 @@ async fn execute_transaction<AUTH: Keystore + Send + Sync + 'static>(
     let output_notes = executed_transaction
         .output_notes()
         .iter()
-        .map(OutputNote::id)
+        .map(RawOutputNote::id)
         .collect::<Vec<_>>();
 
     println!("Proving transaction...");
 
     let prover = if delegated_proving {
-        let cli_config = CliConfig::from_system()?;
+        let cli_config = CliConfig::load()?;
         let remote_prover_endpoint =
             cli_config.remote_prover_endpoint.as_ref().ok_or(CliError::Config(
                 "Remote prover endpoint".to_string().into(),
@@ -499,9 +497,9 @@ fn print_transaction_details(executed_tx: &ExecutedTransaction) -> Result<(), Cl
         let faucet_details_map = load_faucet_details_map()?;
         let mut table = create_dynamic_table(&["Asset Type", "Faucet ID", "Amount"]);
 
-        for (faucet_id, amount) in account_delta.vault().fungible().iter() {
-            let asset =
-                FungibleAsset::new(*faucet_id, amount.unsigned_abs()).map_err(CliError::Asset)?;
+        for (vault_key, amount) in account_delta.vault().fungible().iter() {
+            let asset = FungibleAsset::new(vault_key.faucet_id(), amount.unsigned_abs())
+                .map_err(CliError::Asset)?;
             let (faucet_fmt, amount_fmt) = faucet_details_map.format_fungible_asset(&asset)?;
 
             if amount.is_positive() {
@@ -516,14 +514,14 @@ fn print_transaction_details(executed_tx: &ExecutedTransaction) -> Result<(), Cl
                 NonFungibleDeltaAction::Add => {
                     table.add_row(vec![
                         "Non Fungible Asset",
-                        &asset.faucet_id_prefix().to_hex(),
+                        &asset.faucet_id().prefix().to_hex(),
                         "1",
                     ]);
                 },
                 NonFungibleDeltaAction::Remove => {
                     table.add_row(vec![
                         "Non Fungible Asset",
-                        &asset.faucet_id_prefix().to_hex(),
+                        &asset.faucet_id().prefix().to_hex(),
                         "-1",
                     ]);
                 },

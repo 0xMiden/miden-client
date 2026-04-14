@@ -1,13 +1,8 @@
 use miden_client::Felt;
-use miden_client::account::component::BasicFungibleFaucet;
+use miden_client::account::component::{AuthControlled, BasicFungibleFaucet};
 use miden_client::account::{AccountBuilder, AccountComponent, AccountType};
 use miden_client::asset::TokenSymbol;
-use miden_client::auth::{
-    AuthEcdsaK256Keccak,
-    AuthFalcon512Rpo,
-    AuthSchemeId as NativeAuthScheme,
-    AuthSecretKey,
-};
+use miden_client::auth::{AuthSchemeId as NativeAuthScheme, AuthSecretKey, AuthSingleSig};
 use miden_client::block::BlockNumber;
 use miden_client::keystore::Keystore;
 use rand::rngs::StdRng;
@@ -19,7 +14,6 @@ use super::models::account_storage_mode::AccountStorageMode;
 use super::models::auth::AuthScheme;
 use super::models::auth_secret_key::AuthSecretKey as WebAuthSecretKey;
 use crate::helpers::generate_wallet;
-use crate::models::account_id::AccountId;
 use crate::{WebClient, js_error_with_context};
 
 impl WebClient {
@@ -50,7 +44,7 @@ impl WebClient {
         init_seed: Option<Vec<u8>>,
     ) -> Result<Account, JsValue> {
         self.maybe_sync_before_account_creation().await;
-        let keystore = self.keystore.clone();
+        let keystore = self.inner_keystore()?.clone();
         if let Some(client) = self.get_mut_inner() {
             let (new_account, key_pair) =
                 generate_wallet(storage_mode, mutable, init_seed, auth_scheme).await?;
@@ -61,7 +55,6 @@ impl WebClient {
                 .map_err(|err| js_error_with_context(err, "failed to insert new wallet"))?;
 
             keystore
-                .expect("KeyStore should be initialized")
                 .add_key(&key_pair, new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
@@ -87,7 +80,7 @@ impl WebClient {
             return Err(JsValue::from_str("Non-fungible faucets are not supported yet"));
         }
 
-        let keystore = self.keystore.clone();
+        let keystore = self.inner_keystore()?.clone();
 
         if let Some(client) = self.get_mut_inner() {
             let mut seed = [0u8; 32];
@@ -96,29 +89,24 @@ impl WebClient {
             let mut faucet_rng = StdRng::from_seed(seed);
 
             let native_scheme: NativeAuthScheme = auth_scheme.try_into()?;
-            let (key_pair, auth_component) = match native_scheme {
-                NativeAuthScheme::Falcon512Rpo => {
-                    let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(&mut faucet_rng);
-                    let auth_component: AccountComponent =
-                        AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
-                    (key_pair, auth_component)
+            let key_pair = match native_scheme {
+                NativeAuthScheme::Falcon512Poseidon2 => {
+                    AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut faucet_rng)
                 },
                 NativeAuthScheme::EcdsaK256Keccak => {
-                    let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut faucet_rng);
-                    let auth_component: AccountComponent =
-                        AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
-                    (key_pair, auth_component)
+                    AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut faucet_rng)
                 },
                 _ => {
                     let message = format!("unsupported auth scheme: {native_scheme:?}");
                     return Err(JsValue::from_str(&message));
                 },
             };
+            let auth_component: AccountComponent =
+                AuthSingleSig::new(key_pair.public_key().to_commitment(), native_scheme).into();
 
             let symbol =
                 TokenSymbol::new(token_symbol).map_err(|e| JsValue::from_str(&e.to_string()))?;
-            let max_supply = Felt::try_from(max_supply.to_le_bytes().as_slice())
-                .expect("u64 can be safely converted to a field element");
+            let max_supply = Felt::new(max_supply);
 
             let mut init_seed = [0u8; 32];
             faucet_rng.fill_bytes(&mut init_seed);
@@ -131,6 +119,7 @@ impl WebClient {
                     BasicFungibleFaucet::new(symbol, decimals, max_supply)
                         .map_err(|err| js_error_with_context(err, "failed to create new faucet"))?,
                 )
+                .with_component(AuthControlled::allow_all())
                 .build()
             {
                 Ok(result) => result,
@@ -141,7 +130,6 @@ impl WebClient {
             };
 
             keystore
-                .expect("KeyStore should be initialized")
                 .add_key(&key_pair, new_account.id())
                 .await
                 .map_err(|err| err.to_string())?;
@@ -174,21 +162,37 @@ impl WebClient {
         }
     }
 
-    #[wasm_bindgen(js_name = "addAccountSecretKeyToWebStore")]
-    pub async fn add_account_secret_key_to_web_store(
+    /// Inserts an account and its secret key in one call, matching how
+    /// `newWallet` / `newFaucet` already work internally.  If the key
+    /// insertion fails the account is still persisted (same as wallet/faucet),
+    /// but callers only need a single await instead of two.
+    #[wasm_bindgen(js_name = "newAccountWithSecretKey")]
+    pub async fn new_account_with_secret_key(
         &mut self,
-        account_id: &AccountId,
+        account: &Account,
         secret_key: &WebAuthSecretKey,
     ) -> Result<(), JsValue> {
-        let keystore = self.keystore.as_ref().expect("KeyStore should be initialized");
-        let native_secret_key: AuthSecretKey = secret_key.into();
-        let native_account_id = account_id.into();
+        self.maybe_sync_before_account_creation().await;
+        if let Some(client) = self.get_mut_inner() {
+            let native_account: miden_client::account::Account = account.into();
+            let account_id = native_account.id();
 
-        keystore
-            .add_key(&native_secret_key, native_account_id)
-            .await
-            .map_err(|err| err.to_string())?;
+            client
+                .add_account(&native_account, false)
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to insert new account"))?;
 
-        Ok(())
+            let keystore = self.inner_keystore()?;
+            let native_secret_key: AuthSecretKey = secret_key.into();
+
+            keystore
+                .add_key(&native_secret_key, account_id)
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to add secret key"))?;
+
+            Ok(())
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
     }
 }

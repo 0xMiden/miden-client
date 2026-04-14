@@ -1,11 +1,6 @@
 use miden_client::account::component::{AccountComponent, BasicWallet};
 use miden_client::account::{Account, AccountBuilder, AccountType};
-use miden_client::auth::{
-    AuthEcdsaK256Keccak,
-    AuthFalcon512Rpo,
-    AuthSchemeId as NativeAuthScheme,
-    AuthSecretKey,
-};
+use miden_client::auth::{AuthSchemeId as NativeAuthScheme, AuthSecretKey, AuthSingleSig};
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use wasm_bindgen::JsValue;
@@ -41,24 +36,20 @@ pub(crate) async fn generate_wallet(
     };
 
     let native_scheme: NativeAuthScheme = auth_scheme.try_into()?;
-    let (key_pair, auth_component) = match native_scheme {
-        NativeAuthScheme::Falcon512Rpo => {
-            let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(&mut rng);
-            let auth_component: AccountComponent =
-                AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()).into();
-            (key_pair, auth_component)
+    let key_pair = match native_scheme {
+        NativeAuthScheme::Falcon512Poseidon2 => {
+            AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut rng)
         },
         NativeAuthScheme::EcdsaK256Keccak => {
-            let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng);
-            let auth_component: AccountComponent =
-                AuthEcdsaK256Keccak::new(key_pair.public_key().to_commitment()).into();
-            (key_pair, auth_component)
+            AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng)
         },
         _ => {
             let message = format!("unsupported auth scheme: {native_scheme:?}");
             return Err(JsValue::from_str(&message));
         },
     };
+    let auth_component: AccountComponent =
+        AuthSingleSig::new(key_pair.public_key().to_commitment(), native_scheme).into();
 
     let account_type = if mutable {
         AccountType::RegularAccountUpdatableCode

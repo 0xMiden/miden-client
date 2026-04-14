@@ -8,6 +8,7 @@ use miden_client::account::{
     AccountId,
     Address,
     StorageMap,
+    StorageMapKey,
     StorageSlot,
     StorageSlotName,
     StorageSlotType,
@@ -163,19 +164,22 @@ pub(crate) fn query_vault_assets(
     conn: &Connection,
     account_id: AccountId,
 ) -> Result<Vec<Asset>, StoreError> {
-    const VAULT_QUERY: &str = "SELECT asset FROM latest_account_assets WHERE account_id = ?";
+    const VAULT_QUERY: &str =
+        "SELECT vault_key, asset FROM latest_account_assets WHERE account_id = ?";
 
     conn.prepare(VAULT_QUERY)
         .into_store_error()?
         .query_map(params![account_id.to_hex()], |row| {
-            let asset: String = row.get(0)?;
-            Ok(asset)
+            let vault_key: String = row.get(0)?;
+            let asset: String = row.get(1)?;
+            Ok((vault_key, asset))
         })
         .into_store_error()?
         .map(|result| {
-            let asset_str: String = result.into_store_error()?;
-            let word = Word::try_from(asset_str)?;
-            Ok(Asset::try_from(word)?)
+            let (vault_key_str, asset_str): (String, String) = result.into_store_error()?;
+            let key_word = Word::try_from(vault_key_str)?;
+            let value_word = Word::try_from(asset_str)?;
+            Ok(Asset::from_key_value_words(key_word, value_word)?)
         })
         .collect::<Result<Vec<Asset>, StoreError>>()
 }
@@ -282,9 +286,9 @@ pub(crate) fn query_storage_maps(
             let (slot_name, key, value) = result.into_store_error()?;
             let slot_name = StorageSlotName::new(slot_name)
                 .map_err(|err| StoreError::ParsingError(err.to_string()))?;
-            Ok((slot_name, Word::try_from(key)?, Word::try_from(value)?))
+            Ok((slot_name, StorageMapKey::new(Word::try_from(key)?), Word::try_from(value)?))
         })
-        .collect::<Result<Vec<(StorageSlotName, Word, Word)>, StoreError>>()?;
+        .collect::<Result<Vec<(StorageSlotName, StorageMapKey, Word)>, StoreError>>()?;
 
     let mut maps = BTreeMap::new();
     for (slot_name, key, value) in map_entries {

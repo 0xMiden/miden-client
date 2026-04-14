@@ -28,7 +28,9 @@ impl NoteAssets {
 
     /// Adds a fungible asset to the collection.
     pub fn push(&mut self, asset: &FungibleAsset) {
-        self.0.add_asset(asset.into()).unwrap();
+        let mut assets: Vec<miden_client::asset::Asset> = self.0.iter().copied().collect();
+        assets.push(asset.into());
+        self.0 = NativeNoteAssets::new(assets).unwrap();
     }
 
     /// Returns all fungible assets contained in the note.

@@ -16,8 +16,12 @@ interface MidenStoreState {
   initError: Error | null;
   config: MidenConfig;
 
+  // Signer connection state (null = no signer provider)
+  signerConnected: boolean | null;
+
   // Sync state
   sync: SyncState;
+  syncPaused: boolean;
 
   // Cached data
   accounts: AccountHeader[];
@@ -25,6 +29,9 @@ interface MidenStoreState {
   notes: InputNoteRecord[];
   consumableNotes: ConsumableNoteRecord[];
   assetMetadata: Map<string, AssetMetadata>;
+
+  // Temporal note tracking — records when each note ID was first observed
+  noteFirstSeen: Map<string, number>;
 
   // Loading states
   isLoadingAccounts: boolean;
@@ -35,18 +42,24 @@ interface MidenStoreState {
   setInitializing: (isInitializing: boolean) => void;
   setInitError: (error: Error | null) => void;
   setConfig: (config: MidenConfig) => void;
+  setSignerConnected: (connected: boolean | null) => void;
 
   setSyncState: (sync: Partial<SyncState>) => void;
+  setSyncPaused: (paused: boolean) => void;
 
   setAccounts: (accounts: AccountHeader[]) => void;
   setAccountDetails: (accountId: string, account: Account) => void;
   setNotes: (notes: InputNoteRecord[]) => void;
+  setNotesIfChanged: (notes: InputNoteRecord[]) => void;
   setConsumableNotes: (notes: ConsumableNoteRecord[]) => void;
+  setConsumableNotesIfChanged: (notes: ConsumableNoteRecord[]) => void;
   setAssetMetadata: (assetId: string, metadata: AssetMetadata) => void;
 
   setLoadingAccounts: (isLoading: boolean) => void;
   setLoadingNotes: (isLoading: boolean) => void;
 
+  /** Clear cached data (accounts, notes, metadata, sync) but keep client, isReady, and config */
+  resetInMemoryState: () => void;
   reset: () => void;
 }
 
@@ -57,27 +70,39 @@ const initialSyncState: SyncState = {
   error: null,
 };
 
-const initialState = {
-  client: null,
-  isReady: false,
-  isInitializing: false,
-  initError: null,
-  config: {},
+function freshCachedState() {
+  return {
+    sync: { ...initialSyncState },
 
-  sync: initialSyncState,
+    syncPaused: false,
 
-  accounts: [],
-  accountDetails: new Map<string, Account>(),
-  notes: [],
-  consumableNotes: [],
-  assetMetadata: new Map<string, AssetMetadata>(),
+    accounts: [] as AccountHeader[],
+    accountDetails: new Map<string, Account>(),
+    notes: [] as InputNoteRecord[],
+    consumableNotes: [] as ConsumableNoteRecord[],
+    assetMetadata: new Map<string, AssetMetadata>(),
+    noteFirstSeen: new Map<string, number>(),
 
-  isLoadingAccounts: false,
-  isLoadingNotes: false,
-};
+    isLoadingAccounts: false,
+    isLoadingNotes: false,
+  };
+}
+
+function freshState() {
+  return {
+    client: null as WebClient | null,
+    isReady: false,
+    isInitializing: false,
+    initError: null as Error | null,
+    config: {} as MidenConfig,
+    signerConnected: null as boolean | null,
+
+    ...freshCachedState(),
+  };
+}
 
 export const useMidenStore = create<MidenStoreState>()((set) => ({
-  ...initialState,
+  ...freshState(),
 
   setClient: (client) =>
     set({
@@ -98,10 +123,14 @@ export const useMidenStore = create<MidenStoreState>()((set) => ({
 
   setConfig: (config) => set({ config }),
 
+  setSignerConnected: (signerConnected) => set({ signerConnected }),
+
   setSyncState: (sync) =>
     set((state) => ({
       sync: { ...state.sync, ...sync },
     })),
+
+  setSyncPaused: (syncPaused) => set({ syncPaused }),
 
   setAccounts: (accounts) => set({ accounts }),
 
@@ -112,9 +141,89 @@ export const useMidenStore = create<MidenStoreState>()((set) => ({
       return { accountDetails: newMap };
     }),
 
-  setNotes: (notes) => set({ notes }),
+  setNotes: (notes) =>
+    set((state) => {
+      const now = Date.now();
+      const newFirstSeen = new Map<string, number>();
+      for (const note of notes) {
+        try {
+          const id = note.id().toString();
+          newFirstSeen.set(id, state.noteFirstSeen.get(id) ?? now);
+        } catch {
+          // Skip if id() fails
+        }
+      }
+      return { notes, noteFirstSeen: newFirstSeen };
+    }),
+
+  setNotesIfChanged: (notes) =>
+    set((state) => {
+      const safeId = (n: InputNoteRecord): string | null => {
+        try {
+          return n.id().toString();
+        } catch {
+          return null;
+        }
+      };
+      const prevIds = new Set<string>();
+      for (const n of state.notes) {
+        const id = safeId(n);
+        if (id) prevIds.add(id);
+      }
+      const newIds = new Set<string>();
+      for (const n of notes) {
+        const id = safeId(n);
+        if (id) newIds.add(id);
+      }
+      if (
+        prevIds.size === newIds.size &&
+        [...prevIds].every((id) => newIds.has(id))
+      ) {
+        return {};
+      }
+      const now = Date.now();
+      const newFirstSeen = new Map<string, number>();
+      for (const note of notes) {
+        try {
+          const id = note.id().toString();
+          // Preserve existing timestamp or record new one
+          newFirstSeen.set(id, state.noteFirstSeen.get(id) ?? now);
+        } catch {
+          // Skip
+        }
+      }
+      return { notes, noteFirstSeen: newFirstSeen };
+    }),
 
   setConsumableNotes: (consumableNotes) => set({ consumableNotes }),
+
+  setConsumableNotesIfChanged: (consumableNotes) =>
+    set((state) => {
+      const safeId = (n: ConsumableNoteRecord): string | null => {
+        try {
+          return n.inputNoteRecord().id().toString();
+        } catch {
+          return null;
+        }
+      };
+      const prevIds = new Set<string>();
+      for (const n of state.consumableNotes) {
+        const id = safeId(n);
+        if (id) prevIds.add(id);
+      }
+      const newIds = new Set<string>();
+      for (const n of consumableNotes) {
+        const id = safeId(n);
+        if (id) newIds.add(id);
+      }
+      if (
+        prevIds.size === newIds.size &&
+        [...prevIds].every((id) => newIds.has(id))
+      ) {
+        return {};
+      }
+      return { consumableNotes };
+    }),
 
   setAssetMetadata: (assetId, metadata) =>
     set((state) => {
@@ -127,12 +236,16 @@ export const useMidenStore = create<MidenStoreState>()((set) => ({
 
   setLoadingNotes: (isLoadingNotes) => set({ isLoadingNotes }),
 
-  reset: () => set(initialState),
+  resetInMemoryState: () => set(freshCachedState()),
+
+  reset: () => set(freshState()),
 }));
 
 // Selector hooks for optimal re-renders
 export const useClient = () => useMidenStore((state) => state.client);
 export const useIsReady = () => useMidenStore((state) => state.isReady);
+export const useSignerConnected = () =>
+  useMidenStore((state) => state.signerConnected);
 export const useIsInitializing = () =>
   useMidenStore((state) => state.isInitializing);
 export const useInitError = () => useMidenStore((state) => state.initError);
@@ -144,3 +257,5 @@ export const useConsumableNotesStore = () =>
   useMidenStore((state) => state.consumableNotes);
 export const useAssetMetadataStore = () =>
   useMidenStore((state) => state.assetMetadata);
+export const useNoteFirstSeenStore = () =>
+  useMidenStore((state) => state.noteFirstSeen);

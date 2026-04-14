@@ -219,29 +219,159 @@ try {
 }
 ```
 
-## Custom Transactions
+## Custom Script Transactions
 
-For advanced use cases, build a `TransactionRequest` manually and submit it:
+Use `transactions.execute()` to run a custom MASM transaction script against an account. Compile the script first with [`client.compile.txScript()`](./compile.md).
 
 ```typescript
-import {
-    MidenClient,
-    TransactionRequestBuilder,
-    TransactionScript,
-    TransactionProver
-} from "@miden-sdk/miden-sdk";
+import { MidenClient, AccountType, AuthSecretKey, StorageSlot } from "@miden-sdk/miden-sdk";
 
 try {
     const client = await MidenClient.create();
 
-    // Build a custom transaction request
+    // Compile the script (and any libraries it depends on)
+    const script = await client.compile.txScript({
+        code: `
+            use external_contract::counter_contract
+            begin
+                call.counter_contract::increment_count
+            end
+        `,
+        libraries: [
+            { namespace: "external_contract::counter_contract", code: counterContractCode }
+        ]
+    });
+
+    // Execute the script against the contract account
+    const txId = await client.transactions.execute({
+        account: contractAccount.id(),
+        script
+    });
+
+    console.log("Transaction ID:", txId.toHex());
+} catch (error) {
+    console.error("Custom transaction failed:", error.message);
+}
+```
+
+### Foreign Procedure Invocation (FPI)
+
+Pass `foreignAccounts` to allow the transaction to read state from other contracts:
+
+```typescript
+try {
+    const client = await MidenClient.create();
+
+    // Get the procedure hash of the foreign contract's function
+    const counterComponent = await client.compile.component({
+        code: counterContractCode,
+        slots: [StorageSlot.emptyValue("miden::tutorials::counter")]
+    });
+    const getCountHash = counterComponent.getProcedureHash("get_count");
+
+    // Compile the FPI script
+    const script = await client.compile.txScript({
+        code: `
+            use external_contract::count_reader_contract
+            use miden::core::sys
+            begin
+                push.${getCountHash}
+                push.${counterAccount.id().suffix()}
+                push.${counterAccount.id().prefix()}
+                call.count_reader_contract::copy_count
+                exec.sys::truncate_stack
+            end
+        `,
+        libraries: [
+            // "dynamic" linking (default) — foreign contract code lives on-chain
+            { namespace: "external_contract::count_reader_contract", code: countReaderCode }
+        ]
+    });
+
+    const txId = await client.transactions.execute({
+        account: countReaderAccount.id(),
+        script,
+        foreignAccounts: [
+            // Bare AccountRef — client fetches storage requirements automatically
+            counterAccount.id(),
+            // Or with explicit storage requirements:
+            // { id: counterAccount.id(), storage: requirements }
+        ]
+    });
+
+    console.log("FPI transaction:", txId.toHex());
+} catch (error) {
+    console.error("FPI transaction failed:", error.message);
+}
+```
+
+## Execute Program (View Call)
+
+Use `transactions.executeProgram()` to execute a transaction script locally against an account and inspect the resulting stack output — without submitting anything to the network. This is useful for reading on-chain state (e.g. querying a storage map or computing a derived value).
+
+```typescript
+import { MidenClient } from "@miden-sdk/miden-sdk";
+
+try {
+    const client = await MidenClient.create();
+
+    // Compile a read-only script
+    const script = await client.compile.txScript({
+        code: `
+            use external_contract::counter_contract
+            begin
+                call.counter_contract::get_count
+            end
+        `,
+        libraries: [
+            { namespace: "external_contract::counter_contract", code: counterContractCode }
+        ]
+    });
+
+    // Execute locally — returns a FeltArray (16-element stack output)
+    const result = await client.transactions.executeProgram({
+        account: contractAccount.id(),
+        script,
+        foreignAccounts: [counterAccount.id()]
+    });
+
+    // Read the stack output
+    const count = result.get(0).asInt();
+    console.log("Current count:", count);
+} catch (error) {
+    console.error("Execute program failed:", error.message);
+}
+```
+
+### Options
+
+| Option | Type | Required | Description |
+|--------|------|----------|-------------|
+| `account` | `AccountRef` | Yes | Account to execute against |
+| `script` | `TransactionScript` | Yes | Compiled script to execute |
+| `adviceInputs` | `AdviceInputs` | No | Advice inputs (defaults to empty) |
+| `foreignAccounts` | `(AccountRef \| { id, storage? })[]` | No | Foreign accounts for FPI reads |
+
+:::note
+`executeProgram` runs entirely locally. It does not prove, submit, or modify any state. Think of it as a "view call" similar to `eth_call` in Ethereum.
+:::
+
+### Advanced: Manual Transaction Request
+
+For full control over note inputs/outputs, build a `TransactionRequest` manually and call `submit()`:
+
+```typescript
+import { MidenClient, TransactionRequestBuilder } from "@miden-sdk/miden-sdk";
+
+try {
+    const client = await MidenClient.create();
+
     const request = new TransactionRequestBuilder()
         .withCustomScript(transactionScript)
         .withOwnOutputNotes(outputNotes)
         .withExpectedOutputNotes(expectedNotes)
         .build();
 
-    // Submit the custom request
     const txId = await client.transactions.submit(wallet, request);
     console.log("Custom transaction:", txId.toString());
 } catch (error) {
@@ -251,4 +381,30 @@ try {
 
 :::note
 Custom transactions require understanding of the Miden VM and its instruction set. See the integration tests in [`new_transactions.test.ts`](https://github.com/0xMiden/miden-client/blob/main/crates/web-client/test/new_transactions.test.ts) for examples.
+:::
+
+### Expiring a Manual Transaction Request
+
+For short-lived transaction requests, set an expiration delta on the builder:
+
+```typescript
+import { MidenClient, TransactionRequestBuilder } from "@miden-sdk/miden-sdk";
+
+try {
+    const client = await MidenClient.create();
+
+    const request = new TransactionRequestBuilder()
+        .withOwnOutputNotes(outputNotes)
+        .withExpirationDelta(10)
+        .build();
+
+    const txId = await client.transactions.submit(wallet, request);
+    console.log("Expiring transaction:", txId.toString());
+} catch (error) {
+    console.error("Expiring transaction failed:", error.message);
+}
+```
+
+:::note
+`withExpirationDelta()` is intended for builder flows that derive the transaction script from the request. It cannot be combined with `withCustomScript()`. When using a custom script, the expiration can be set manually within the script itself.
 :::

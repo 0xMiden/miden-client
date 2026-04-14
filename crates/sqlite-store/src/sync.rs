@@ -5,15 +5,15 @@ use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use miden_client::Word;
+use miden_client::account::AccountId;
 use miden_client::note::{BlockNumber, NoteTag};
-use miden_client::store::StoreError;
+use miden_client::store::{AccountSmtForest, StoreError};
 use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
 use miden_client::utils::{Deserializable, Serializable};
 use rusqlite::{Connection, Transaction, params};
 
 use super::SqliteStore;
 use crate::note::apply_note_updates_tx;
-use crate::smt_forest::AccountSmtForest;
 use crate::sql_error::SqlResultExt;
 use crate::transaction::upsert_transaction_record;
 use crate::{insert_sql, subst};
@@ -164,13 +164,18 @@ impl SqliteStore {
         }
 
         // Remove the accounts that are originated from the discarded transactions
-        let account_hashes_to_delete: Vec<Word> = transaction_updates
+        let discarded_states: Vec<(AccountId, Word)> = transaction_updates
             .discarded_transactions()
-            .map(|tx| tx.details.final_account_state)
+            .map(|tx| (tx.details.account_id, tx.details.final_account_state))
             .collect();
 
         let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-        Self::undo_account_state(&tx, &mut smt_forest, &account_hashes_to_delete)?;
+        Self::undo_account_state(&tx, &mut smt_forest, &discarded_states)?;
+
+        // For committed transactions, release the old staged roots.
+        for committed_tx in transaction_updates.committed_transactions() {
+            smt_forest.commit_roots(committed_tx.details.account_id);
+        }
 
         // Update public accounts on the db that have been updated onchain
         for account in account_updates.updated_public_accounts() {

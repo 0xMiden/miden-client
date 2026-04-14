@@ -13,10 +13,19 @@ export {
 // Signer Context (for external signer providers)
 export { SignerContext, useSigner } from "./context/SignerContext";
 
+// Multi-Signer Context (for apps with multiple signer providers)
+export {
+  MultiSignerProvider,
+  SignerSlot,
+  useMultiSigner,
+} from "./context/MultiSignerProvider";
+export type { MultiSignerContextValue } from "./context/MultiSignerProvider";
+
 // Query Hooks
 export { useAccounts } from "./hooks/useAccounts";
 export { useAccount } from "./hooks/useAccount";
 export { useNotes } from "./hooks/useNotes";
+export { useNoteStream } from "./hooks/useNoteStream";
 export { useTransactionHistory } from "./hooks/useTransactionHistory";
 export { useSyncState } from "./hooks/useSyncState";
 export { useAssetMetadata } from "./hooks/useAssetMetadata";
@@ -27,19 +36,26 @@ export { useCreateFaucet } from "./hooks/useCreateFaucet";
 export { useImportAccount } from "./hooks/useImportAccount";
 export { useSend } from "./hooks/useSend";
 export { useMultiSend } from "./hooks/useMultiSend";
-export { useInternalTransfer } from "./hooks/useInternalTransfer";
 export { useWaitForCommit } from "./hooks/useWaitForCommit";
 export { useWaitForNotes } from "./hooks/useWaitForNotes";
 export { useMint } from "./hooks/useMint";
 export { useConsume } from "./hooks/useConsume";
 export { useSwap } from "./hooks/useSwap";
 export { useTransaction } from "./hooks/useTransaction";
+export { useExecuteProgram } from "./hooks/useExecuteProgram";
+export { useSessionAccount } from "./hooks/useSessionAccount";
+export { useExportStore } from "./hooks/useExportStore";
+export { useImportStore } from "./hooks/useImportStore";
+export { useImportNote } from "./hooks/useImportNote";
+export { useExportNote } from "./hooks/useExportNote";
+export { useSyncControl } from "./hooks/useSyncControl";
 
 // Types
 export type {
   MidenConfig,
   RpcUrlConfig,
   ProverConfig,
+  ProverTarget,
   ProverUrls,
   MidenState,
   TransactionStage,
@@ -61,11 +77,9 @@ export type {
   CreateFaucetOptions,
   ImportAccountOptions,
   SendOptions,
+  SendResult,
   MultiSendRecipient,
   MultiSendOptions,
-  InternalTransferOptions,
-  InternalTransferChainOptions,
-  InternalTransferResult,
   WaitForCommitOptions,
   WaitForNotesOptions,
   MintOptions,
@@ -73,6 +87,17 @@ export type {
   SwapOptions,
   ExecuteTransactionOptions,
   TransactionResult,
+  ExecuteProgramOptions,
+  ExecuteProgramResult,
+  // Note stream types
+  StreamedNote,
+  UseNoteStreamOptions,
+  UseNoteStreamReturn,
+  // Session account types
+  UseSessionAccountOptions,
+  UseSessionAccountReturn,
+  SessionAccountStep,
+  AccountRef,
   // Signer types (for external signer providers)
   SignCallback,
   SignerAccountType,
@@ -94,16 +119,34 @@ export type {
   TransactionRecord,
   TransactionRequest,
   NoteType,
+  Note,
   AccountStorageMode,
 } from "./types";
 
 // Default configuration values
-export { DEFAULTS } from "./types";
+export { DEFAULTS, AuthScheme } from "./types";
 
 // Utilities
 export { toBech32AccountId } from "./utils/accountBech32";
 export { formatAssetAmount, parseAssetAmount } from "./utils/amounts";
 export { getNoteSummary, formatNoteSummary } from "./utils/notes";
+export { normalizeAccountId, accountIdsEqual } from "./utils/accountId";
+export {
+  readNoteAttachment,
+  createNoteAttachment,
+} from "./utils/noteAttachment";
+export type { NoteAttachmentData } from "./utils/noteAttachment";
+export { bytesToBigInt, bigIntToBytes, concatBytes } from "./utils/bytes";
+export { MidenError, wrapWasmError } from "./utils/errors";
+export type { MidenErrorCode } from "./utils/errors";
+export { waitForWalletDetection } from "./utils/walletDetection";
+export type { WalletAdapterLike } from "./utils/walletDetection";
+export {
+  migrateStorage,
+  clearMidenStorage,
+  createMidenStorage,
+} from "./utils/storage";
+export type { MigrateStorageOptions } from "./utils/storage";
 
 // Hook result types
 export type { UseCreateWalletResult } from "./hooks/useCreateWallet";
@@ -111,12 +154,20 @@ export type { UseCreateFaucetResult } from "./hooks/useCreateFaucet";
 export type { UseImportAccountResult } from "./hooks/useImportAccount";
 export type { UseSendResult } from "./hooks/useSend";
 export type { UseMultiSendResult } from "./hooks/useMultiSend";
-export type { UseInternalTransferResult } from "./hooks/useInternalTransfer";
 export type { UseWaitForCommitResult } from "./hooks/useWaitForCommit";
 export type { UseWaitForNotesResult } from "./hooks/useWaitForNotes";
 export type { UseMintResult } from "./hooks/useMint";
 export type { UseConsumeResult } from "./hooks/useConsume";
 export type { UseSwapResult } from "./hooks/useSwap";
 export type { UseTransactionResult } from "./hooks/useTransaction";
+export type { UseExportStoreResult } from "./hooks/useExportStore";
+export type {
+  UseImportStoreResult,
+  ImportStoreOptions,
+} from "./hooks/useImportStore";
+export type { UseImportNoteResult } from "./hooks/useImportNote";
+export type { UseExportNoteResult } from "./hooks/useExportNote";
+export type { UseSyncControlResult } from "./hooks/useSyncControl";
+export type { UseExecuteProgramResult } from "./hooks/useExecuteProgram";
 export type { UseSyncStateResult } from "./hooks/useSyncState";
 export type { UseTransactionHistoryResult } from "./hooks/useTransactionHistory";

@@ -1,4 +1,4 @@
-import test from "./playwright.global.setup";
+import { mockTest as test } from "./playwright.global.setup";
 import { Page, expect } from "@playwright/test";
 
 test("transport basic", async ({ page }) => {
@@ -13,13 +13,13 @@ test("transport basic", async ({ page }) => {
     const senderAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0,
+      window.AuthScheme.AuthRpoFalcon512,
       senderSeed
     );
     const recipientAccount = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0,
+      window.AuthScheme.AuthRpoFalcon512,
       recipientSeed
     );
 

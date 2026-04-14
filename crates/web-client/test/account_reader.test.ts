@@ -11,7 +11,7 @@ test.describe("AccountReader tests", () => {
       const account = await client.newWallet(
         window.AccountStorageMode.private(),
         true,
-        0
+        window.AuthScheme.AuthRpoFalcon512
       );
 
       const reader = client.accountReader(account.id());
@@ -26,7 +26,7 @@ test.describe("AccountReader tests", () => {
         readerId: reader.accountId().toString(),
         accountNonce: account.nonce().toString(),
         readerNonce: nonce.toString(),
-        accountCommitment: account.commitment().toHex(),
+        accountCommitment: account.to_commitment().toHex(),
         readerCommitment: commitment.toHex(),
         accountCodeCommitment: account.code().commitment().toHex(),
         readerCodeCommitment: codeCommitment.toHex(),

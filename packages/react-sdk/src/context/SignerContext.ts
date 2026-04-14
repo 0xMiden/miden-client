@@ -1,5 +1,8 @@
 import { createContext, useContext } from "react";
-import type { AccountStorageMode } from "@miden-sdk/miden-sdk";
+import type {
+  AccountStorageMode,
+  AccountComponent,
+} from "@miden-sdk/miden-sdk";
 
 // SIGNER CONTEXT
 // ================================================================================================
@@ -16,6 +19,27 @@ export type SignCallback = (
   pubKey: Uint8Array,
   signingInputs: Uint8Array
 ) => Promise<Uint8Array>;
+
+/**
+ * Get-key callback for WebClient.createClientWithExternalKeystore.
+ * Called to retrieve a secret key by its public key commitment.
+ *
+ * @param pubKey - Public key commitment bytes
+ * @returns Promise resolving to the secret key bytes
+ */
+export type GetKeyCallback = (pubKey: Uint8Array) => Promise<Uint8Array>;
+
+/**
+ * Insert-key callback for WebClient.createClientWithExternalKeystore.
+ * Called when the SDK needs to persist a newly-generated key pair.
+ *
+ * @param pubKey - Public key commitment bytes
+ * @param secretKey - Secret key bytes to store
+ */
+export type InsertKeyCallback = (
+  pubKey: Uint8Array,
+  secretKey: Uint8Array
+) => void;
 
 /**
  * Account type for signer accounts.
@@ -40,6 +64,14 @@ export interface SignerAccountConfig {
   storageMode: AccountStorageMode;
   /** Optional seed for deterministic account ID */
   accountSeed?: Uint8Array;
+  /** Optional custom account components to include in the account (e.g. from a compiled .masp package) */
+  customComponents?: AccountComponent[];
+  /**
+   * Optional existing account ID to import instead of building from scratch.
+   * When provided, skips AccountBuilder and imports the account by ID from the chain.
+   * Useful for wallets that create accounts externally (e.g., via a vault).
+   */
+  importAccountId?: string;
 }
 
 /**
@@ -50,6 +82,10 @@ export interface SignerAccountConfig {
 export interface SignerContextValue {
   /** Sign callback for external keystore */
   signCb: SignCallback;
+  /** Optional get-key callback for external keystore (retrieves secret key by public key) */
+  getKeyCb?: GetKeyCallback;
+  /** Optional insert-key callback for external keystore (persists newly-generated key pair) */
+  insertKeyCb?: InsertKeyCallback;
   /** Account config for initialization (only valid when connected) */
   accountConfig: SignerAccountConfig;
   /** Store name suffix for IndexedDB isolation (e.g., "para_walletId") */

@@ -28,7 +28,7 @@
 
 ### storage?
 
-> `optional` **storage**: `"private"` \| `"public"`
+> `optional` **storage**: [`StorageMode`](../type-aliases/StorageMode.md)
 
 ***
 
@@ -40,4 +40,6 @@
 
 ### type
 
-> **type**: `"FungibleFaucet"`
+> **type**: [`AccountTypeValue`](../type-aliases/AccountTypeValue.md)
+
+Use `AccountType.FungibleFaucet` or `AccountType.NonFungibleFaucet`.

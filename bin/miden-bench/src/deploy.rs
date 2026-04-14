@@ -3,7 +3,12 @@
 use std::path::Path;
 use std::time::Instant;
 
-use miden_client::account::component::{AccountComponent, basic_wallet_library};
+use miden_client::account::component::{
+    AccountComponent,
+    AccountComponentMetadata,
+    BasicWallet,
+    basic_wallet_library,
+};
 use miden_client::account::{
     Account,
     AccountBuilder,
@@ -15,7 +20,7 @@ use miden_client::account::{
     StorageSlotName,
 };
 use miden_client::assembly::CodeBuilder;
-use miden_client::auth::{AuthFalcon512Rpo, AuthSecretKey};
+use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig};
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::{Client, Serializable};
@@ -51,7 +56,7 @@ fn create_account_with_empty_maps(
     num_maps: usize,
     seed: [u8; 32],
 ) -> anyhow::Result<(Account, AuthSecretKey)> {
-    let sk = AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(seed));
+    let sk = AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut ChaCha20Rng::from_seed(seed));
 
     // Create empty storage map slots
     let storage_slots: Vec<StorageSlot> = (0..num_maps)
@@ -69,9 +74,12 @@ fn create_account_with_empty_maps(
     let expansion_component_code = CodeBuilder::default()
         .compile_component_code("miden::bench::storage_expander", &expansion_code)
         .map_err(|e| anyhow::anyhow!("Failed to compile expansion component: {e}"))?;
-    let expansion_component = AccountComponent::new(expansion_component_code, storage_slots)
-        .map_err(|e| anyhow::anyhow!("Failed to create expansion component: {e}"))?
-        .with_supports_all_types();
+    let expansion_component = AccountComponent::new(
+        expansion_component_code,
+        storage_slots,
+        AccountComponentMetadata::new("miden::testing::storage_expander", AccountType::all()),
+    )
+    .map_err(|e| anyhow::anyhow!("Failed to create expansion component: {e}"))?;
 
     // Reader component: provides get_map_item_slot_N procedures (needed for transaction benchmarks)
     let descriptors: Vec<SlotDescriptor> = (0..num_maps)
@@ -84,17 +92,23 @@ fn create_account_with_empty_maps(
     let reader_component_code = CodeBuilder::default()
         .compile_component_code("miden::bench::storage_reader", &reader_code)
         .map_err(|e| anyhow::anyhow!("Failed to compile reader component: {e}"))?;
-    let reader_component = AccountComponent::new(reader_component_code, vec![])
-        .map_err(|e| anyhow::anyhow!("Failed to create reader component: {e}"))?
-        .with_supports_all_types();
+    let reader_component = AccountComponent::new(
+        reader_component_code,
+        vec![],
+        AccountComponentMetadata::new("miden::testing::storage_reader", AccountType::all()),
+    )
+    .map_err(|e| anyhow::anyhow!("Failed to create reader component: {e}"))?;
 
     // Basic wallet for normal operations
-    let wallet_component = AccountComponent::new(basic_wallet_library(), vec![])
-        .expect("basic wallet component should satisfy account component requirements")
-        .with_supports_all_types();
+    let wallet_component =
+        AccountComponent::new(basic_wallet_library(), vec![], BasicWallet::component_metadata())
+            .expect("basic wallet component should satisfy account component requirements");
 
     let account = AccountBuilder::new(seed)
-        .with_auth_component(AuthFalcon512Rpo::new(sk.public_key().to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            sk.public_key().to_commitment(),
+            AuthSchemeId::Falcon512Poseidon2,
+        ))
         .account_type(AccountType::RegularAccountUpdatableCode)
         .with_component(wallet_component)
         .with_component(expansion_component)

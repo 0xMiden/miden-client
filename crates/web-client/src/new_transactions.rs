@@ -1,7 +1,13 @@
+use alloc::collections::BTreeMap;
+
 use miden_client::ClientError;
+use miden_client::account::AccountId as NativeAccountId;
 use miden_client::asset::FungibleAsset;
 use miden_client::note::{BlockNumber, Note as NativeNote};
+#[cfg(feature = "testing")]
+use miden_client::transaction::LocalTransactionProver;
 use miden_client::transaction::{
+    ForeignAccount as NativeForeignAccount,
     PaymentNoteDescription,
     ProvenTransaction as NativeProvenTransaction,
     SwapTransactionData,
@@ -15,12 +21,16 @@ use wasm_bindgen::prelude::*;
 
 use crate::models::NoteType;
 use crate::models::account_id::AccountId;
+use crate::models::advice_inputs::AdviceInputs;
+use crate::models::felt::Felt;
+use crate::models::miden_arrays::{FeltArray, ForeignAccountArray};
 use crate::models::note::Note;
 use crate::models::proven_transaction::ProvenTransaction;
 use crate::models::provers::TransactionProver;
 use crate::models::transaction_id::TransactionId;
 use crate::models::transaction_request::TransactionRequest;
 use crate::models::transaction_result::TransactionResult;
+use crate::models::transaction_script::TransactionScript;
 use crate::models::transaction_store_update::TransactionStoreUpdate;
 use crate::models::transaction_summary::TransactionSummary;
 use crate::{WebClient, js_error_with_context};
@@ -147,6 +157,45 @@ impl WebClient {
         }
     }
 
+    /// Executes the provided transaction script against the specified account
+    /// and returns the resulting stack output. This is a local-only "view call"
+    /// that does not submit anything to the network.
+    #[wasm_bindgen(js_name = "executeProgram")]
+    pub async fn execute_program(
+        &mut self,
+        account_id: &AccountId,
+        tx_script: &TransactionScript,
+        advice_inputs: &AdviceInputs,
+        foreign_accounts: &ForeignAccountArray,
+    ) -> Result<FeltArray, JsValue> {
+        if let Some(client) = self.get_mut_inner() {
+            let foreign_accounts_map: BTreeMap<NativeAccountId, NativeForeignAccount> =
+                foreign_accounts
+                    .__inner
+                    .iter()
+                    .map(|a| {
+                        let fa: NativeForeignAccount = a.clone().into();
+                        (fa.account_id(), fa)
+                    })
+                    .collect();
+
+            let result = client
+                .execute_program(
+                    account_id.into(),
+                    tx_script.into(),
+                    advice_inputs.into(),
+                    foreign_accounts_map,
+                )
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to execute program"))?;
+
+            let felt_vec: Vec<Felt> = result.iter().map(|f| Felt::from(*f)).collect();
+            Ok(felt_vec.into())
+        } else {
+            Err(JsValue::from_str("Client not initialized"))
+        }
+    }
+
     /// Generates a transaction proof using either the provided prover or the client's default
     /// prover if none is supplied.
     #[wasm_bindgen(js_name = "proveTransaction")]
@@ -155,6 +204,14 @@ impl WebClient {
         transaction_result: &TransactionResult,
         prover: Option<TransactionProver>,
     ) -> Result<ProvenTransaction, JsValue> {
+        #[cfg(feature = "testing")]
+        if prover.is_none() && self.mock_rpc_api.is_some() {
+            return LocalTransactionProver::default()
+                .prove_dummy(transaction_result.native().executed_transaction().clone())
+                .map(Into::into)
+                .map_err(|err| js_error_with_context(err, "failed to prove transaction"));
+        }
+
         if let Some(client) = self.get_mut_inner() {
             let prover_arc =
                 prover.map_or_else(|| client.prover(), |custom_prover| custom_prover.get_prover());

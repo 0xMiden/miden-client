@@ -10,6 +10,7 @@ import {
   WebClient,
   MockWebClient,
   AccountStorageMode,
+  AuthScheme,
   NoteType,
 } from "@miden-sdk/miden-sdk";
 
@@ -113,7 +114,7 @@ const TestHarness = () => {
         const wallet = await readyClient.newWallet(
           AccountStorageMode.private(),
           true,
-          0
+          AuthScheme.AuthRpoFalcon512
         );
         const faucet = await readyClient.newFaucet(
           AccountStorageMode.private(),
@@ -121,7 +122,7 @@ const TestHarness = () => {
           "TEST",
           8,
           BigInt(1000000),
-          0
+          AuthScheme.AuthRpoFalcon512
         );
 
         const request = readyClient.newMintTransactionRequest(
@@ -143,7 +144,7 @@ const TestHarness = () => {
         const wallet = await readyClient.newWallet(
           AccountStorageMode.private(),
           true,
-          0
+          AuthScheme.AuthRpoFalcon512
         );
         const accountFile = await readyClient.exportAccountFile(wallet.id());
         const imported = await importAccount({

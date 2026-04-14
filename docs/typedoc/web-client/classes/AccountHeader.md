@@ -40,18 +40,6 @@ Returns the code commitment.
 
 ***
 
-### commitment()
-
-> **commitment**(): [`Word`](Word.md)
-
-Returns the full account commitment.
-
-#### Returns
-
-[`Word`](Word.md)
-
-***
-
 ### free()
 
 > **free**(): `void`
@@ -91,6 +79,18 @@ Returns the current nonce.
 > **storageCommitment**(): [`Word`](Word.md)
 
 Returns the storage commitment.
+
+#### Returns
+
+[`Word`](Word.md)
+
+***
+
+### to\_commitment()
+
+> **to\_commitment**(): [`Word`](Word.md)
+
+Returns the full account commitment.
 
 #### Returns
 

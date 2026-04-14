@@ -68,7 +68,7 @@ impl AddressCmd {
     pub async fn execute<AUTH>(&self, client: Client<AUTH>) -> Result<(), CliError> {
         match &self.command {
             Some(AddressSubCommand::List { account_id: Some(account_id) }) => {
-                let cli_config = CliConfig::from_system()?;
+                let cli_config = CliConfig::load()?;
                 let network_id = cli_config.rpc.endpoint.0.to_network_id();
                 list_account_addresses(client, account_id, network_id).await?;
             },
@@ -80,7 +80,7 @@ impl AddressCmd {
             },
             _ => {
                 // List all addresses as default
-                let cli_config = CliConfig::from_system()?;
+                let cli_config = CliConfig::load()?;
                 let network_id = cli_config.rpc.endpoint.0.to_network_id();
                 list_all_addresses(client, network_id).await?;
             },
@@ -153,9 +153,7 @@ async fn add_address<AUTH>(
             .map_err(|e| CliError::Address(e, String::new()))?,
         None => RoutingParameters::new(interface),
     };
-    let address = Address::new(account_id)
-        .with_routing_parameters(routing_params)
-        .map_err(|err| CliError::Address(err, "Failed to set routing params".to_string()))?;
+    let address = Address::new(account_id).with_routing_parameters(routing_params);
 
     let note_tag = NoteTag::with_account_target(account_id);
     client.add_address(address, account_id).await?;

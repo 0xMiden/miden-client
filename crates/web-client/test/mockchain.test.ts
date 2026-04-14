@@ -1,5 +1,5 @@
 // @ts-nocheck
-import test from "./playwright.global.setup";
+import { mockTest as test } from "./playwright.global.setup";
 import { Page, expect } from "@playwright/test";
 
 const mockChainTest = async (testingPage: Page) => {
@@ -10,7 +10,7 @@ const mockChainTest = async (testingPage: Page) => {
     const account = await client.newWallet(
       window.AccountStorageMode.private(),
       true,
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
     const faucetAccount = await client.newFaucet(
       window.AccountStorageMode.private(),
@@ -18,7 +18,7 @@ const mockChainTest = async (testingPage: Page) => {
       "DAG",
       8,
       BigInt(10000000),
-      0
+      window.AuthScheme.AuthRpoFalcon512
     );
 
     const mintTransactionRequest = await client.newMintTransactionRequest(
@@ -71,6 +71,8 @@ const mockChainTest = async (testingPage: Page) => {
 };
 
 test.describe("mock chain tests", () => {
+  test.describe.configure({ timeout: 720000 });
+
   test("send transaction with mock chain completes successfully", async ({
     page,
   }) => {

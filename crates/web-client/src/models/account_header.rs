@@ -21,8 +21,8 @@ pub struct AccountHeader(NativeAccountHeader);
 #[wasm_bindgen]
 impl AccountHeader {
     /// Returns the full account commitment.
-    pub fn commitment(&self) -> Word {
-        self.0.commitment().into()
+    pub fn to_commitment(&self) -> Word {
+        self.0.to_commitment().into()
     }
 
     /// Returns the account ID.

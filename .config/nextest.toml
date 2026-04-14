@@ -5,6 +5,19 @@ retries        = { backoff = "exponential", count = 2, delay = "1s", jitter = tr
 slow-timeout   = { period = "3m", terminate-after = 2 }
 status-level   = "skip"
 
+# The integration tests all share a node instance, so cap concurrency to reduce
+# pressure on the node until the node-side contention issue is resolved.
+[test-groups.integration]
+max-threads = 2
+
+[[profile.default.overrides]]
+filter           = "package(miden-client-unit-tests)"
+threads-required = 3
+
+[[profile.default.overrides]]
+filter     = "binary(integration)"
+test-group = "integration"
+
 [[profile.default.overrides]]
 filter  = "test(import_genesis_accounts_can_be_used_for_transactions)"
 retries = 0

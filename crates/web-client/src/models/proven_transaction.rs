@@ -4,7 +4,6 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys::Uint8Array;
 
 use crate::models::account_id::AccountId;
-use crate::models::output_notes::OutputNotes;
 use crate::models::transaction_id::TransactionId;
 use crate::models::word::Word;
 use crate::utils::{deserialize_from_uint8array, serialize_to_uint8array};
@@ -51,11 +50,8 @@ impl ProvenTransaction {
         self.0.expiration_block_num().as_u32()
     }
 
-    /// Returns notes created by this transaction.
-    #[wasm_bindgen(js_name = "outputNotes")]
-    pub fn output_notes(&self) -> OutputNotes {
-        self.0.output_notes().into()
-    }
+    // Note: proven output notes are not exposed in the web client yet.
+    // The web client only exposes executed output notes via OutputNote/OutputNotes.
 
     /// Returns the commitment of the reference block.
     #[wasm_bindgen(js_name = "refBlockCommitment")]

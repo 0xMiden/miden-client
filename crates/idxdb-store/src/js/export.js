@@ -7,7 +7,10 @@ import { uint8ArrayToBase64 } from "./utils.js";
 async function recursivelyTransformForExport(obj) {
     switch (obj.type) {
         case "Uint8Array":
-            return Array.from(obj.value);
+            return {
+                __type: "Uint8Array",
+                data: uint8ArrayToBase64(obj.value),
+            };
         case "Blob":
             return {
                 __type: "Blob",

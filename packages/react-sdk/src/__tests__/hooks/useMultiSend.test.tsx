@@ -178,5 +178,80 @@ describe("useMultiSend", () => {
       );
       expect(mockClient.sendPrivateNote).not.toHaveBeenCalled();
     });
+
+    it("should reject concurrent sends with SEND_BUSY", async () => {
+      let resolveExecute: () => void;
+      const executePromise = new Promise((resolve) => {
+        resolveExecute = () => resolve(createMockTransactionResult());
+      });
+
+      const mockClient = createMockWebClient({
+        executeTransaction: vi.fn().mockReturnValue(executePromise),
+        proveTransaction: vi.fn().mockResolvedValue({}),
+        submitProvenTransaction: vi.fn().mockResolvedValue(100),
+        applyTransaction: vi.fn().mockResolvedValue({}),
+      });
+
+      mockUseMiden.mockReturnValue({
+        client: mockClient,
+        isReady: true,
+        sync: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const { result } = renderHook(() => useMultiSend());
+
+      let firstSend: Promise<any>;
+      act(() => {
+        firstSend = result.current.sendMany({
+          from: "0xsender",
+          assetId: "0xfaucet",
+          recipients: [{ to: "0xrecipient", amount: 100n }],
+        });
+      });
+
+      await expect(
+        result.current.sendMany({
+          from: "0xsender",
+          assetId: "0xfaucet",
+          recipients: [{ to: "0xrecipient", amount: 100n }],
+        })
+      ).rejects.toThrow("A send is already in progress");
+
+      await act(async () => {
+        resolveExecute!();
+        await firstSend;
+      });
+    });
+
+    it("should skip sync when skipSync is true", async () => {
+      const mockSync = vi.fn().mockResolvedValue(undefined);
+      const mockTxResult = createMockTransactionResult();
+      const mockClient = createMockWebClient({
+        executeTransaction: vi.fn().mockResolvedValue(mockTxResult),
+        proveTransaction: vi.fn().mockResolvedValue({}),
+        submitProvenTransaction: vi.fn().mockResolvedValue(100),
+        applyTransaction: vi.fn().mockResolvedValue({}),
+      });
+
+      mockUseMiden.mockReturnValue({
+        client: mockClient,
+        isReady: true,
+        sync: mockSync,
+      });
+
+      const { result } = renderHook(() => useMultiSend());
+
+      await act(async () => {
+        await result.current.sendMany({
+          from: "0xsender",
+          assetId: "0xfaucet",
+          recipients: [{ to: "0xrecipient", amount: 100n }],
+          skipSync: true,
+        });
+      });
+
+      // Sync called only once (post-send), not before
+      expect(mockSync).toHaveBeenCalledTimes(1);
+    });
   });
 });

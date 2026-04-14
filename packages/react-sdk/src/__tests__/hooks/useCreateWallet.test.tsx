@@ -81,7 +81,7 @@ describe("useCreateWallet", () => {
       expect(mockClient.newWallet).toHaveBeenCalledWith(
         expect.anything(), // storageMode.private()
         true, // mutable (default)
-        0, // authScheme (default: Falcon)
+        2, // authScheme (default: AuthRpoFalcon512)
         undefined // initSeed
       );
     });

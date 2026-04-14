@@ -3,7 +3,13 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_protocol::account::{AccountHeader, AccountId, StorageMapWitness, StorageSlotName};
+use miden_protocol::account::{
+    AccountHeader,
+    AccountId,
+    StorageMapKey,
+    StorageMapWitness,
+    StorageSlotName,
+};
 use miden_protocol::address::Address;
 use miden_protocol::asset::{Asset, AssetVaultKey};
 use miden_protocol::{Felt, Word};
@@ -59,7 +65,7 @@ impl AccountReader {
     /// Retrieves the account commitment (hash of the full state).
     pub async fn commitment(&self) -> Result<Word, ClientError> {
         let (header, _) = self.header().await?;
-        Ok(header.commitment())
+        Ok(header.to_commitment())
     }
 
     /// Retrieves the storage commitment (root of the storage tree).
@@ -113,7 +119,7 @@ impl AccountReader {
     /// To load the entire vault, use
     /// [`Client::get_account_vault`](crate::Client::get_account_vault).
     pub async fn get_balance(&self, faucet_id: AccountId) -> Result<u64, ClientError> {
-        if let Some(vault_key) = AssetVaultKey::from_account_id(faucet_id)
+        if let Some(vault_key) = AssetVaultKey::new_fungible(faucet_id)
             && let Some((Asset::Fungible(fungible_asset), _)) =
                 self.store.get_account_asset(self.account_id, vault_key).await?
         {
@@ -150,7 +156,7 @@ impl AccountReader {
     pub async fn get_storage_map_item(
         &self,
         slot_name: impl Into<StorageSlotName>,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<Word, ClientError> {
         let (value, _witness) =
             self.store.get_account_map_item(self.account_id, slot_name.into(), key).await?;
@@ -166,7 +172,7 @@ impl AccountReader {
     pub async fn get_storage_map_witness(
         &self,
         slot_name: impl Into<StorageSlotName>,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), ClientError> {
         self.store
             .get_account_map_item(self.account_id, slot_name.into(), key)

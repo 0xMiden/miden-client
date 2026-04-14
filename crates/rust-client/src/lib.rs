@@ -135,7 +135,7 @@ mod test_utils;
 
 pub mod errors;
 
-pub use miden_protocol::utils::{Deserializable, Serializable, SliceReader};
+pub use miden_protocol::utils::serde::{Deserializable, Serializable, SliceReader};
 
 // RE-EXPORTS
 // ================================================================================================
@@ -171,13 +171,21 @@ pub mod asset {
         NonFungibleAssetDelta,
         NonFungibleDeltaAction,
     };
+    pub use miden_protocol::account::{
+        AccountStorageHeader,
+        StorageMapWitness,
+        StorageSlotContent,
+        StorageSlotHeader,
+    };
     pub use miden_protocol::asset::{
         Asset,
         AssetVault,
+        AssetVaultKey,
         AssetWitness,
         FungibleAsset,
         NonFungibleAsset,
         NonFungibleAssetDetails,
+        PartialVault,
         TokenSymbol,
     };
 }
@@ -192,11 +200,19 @@ pub mod auth {
         PublicKeyCommitment,
         Signature,
     };
-    pub use miden_standards::AuthScheme;
-    pub use miden_standards::account::auth::{AuthEcdsaK256Keccak, AuthFalcon512Rpo, NoAuth};
+    pub use miden_standards::account::auth::{
+        AuthMultisig,
+        AuthMultisigConfig,
+        AuthSingleSig,
+        AuthSingleSigAcl,
+        AuthSingleSigAclConfig,
+        NoAuth,
+    };
     pub use miden_tx::auth::{BasicAuthenticator, SigningInputs, TransactionAuthenticator};
 
-    pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::Falcon512Rpo;
+    pub use crate::account::component::AuthScheme;
+
+    pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::Falcon512Poseidon2;
     pub const ECDSA_K256_KECCAK_SCHEME_ID: AuthSchemeId = AuthSchemeId::EcdsaK256Keccak;
 }
 
@@ -210,9 +226,14 @@ pub mod block {
 /// the `miden_standards` crate.
 pub mod crypto {
     pub mod rpo_falcon512 {
-        pub use miden_protocol::crypto::dsa::falcon512_rpo::{PublicKey, SecretKey, Signature};
+        pub use miden_protocol::crypto::dsa::falcon512_poseidon2::{
+            PublicKey,
+            SecretKey,
+            Signature,
+        };
     }
-    pub use miden_protocol::crypto::hash::blake::{Blake3_160, Blake3Digest};
+    pub use miden_protocol::crypto::hash::blake::Blake3Digest;
+    pub use miden_protocol::crypto::hash::poseidon2::Poseidon2;
     pub use miden_protocol::crypto::hash::rpo::Rpo256;
     pub use miden_protocol::crypto::merkle::mmr::{
         Forest,
@@ -222,10 +243,24 @@ pub mod crypto {
         MmrProof,
         PartialMmr,
     };
-    pub use miden_protocol::crypto::merkle::smt::{LeafIndex, SMT_DEPTH, SmtLeaf, SmtProof};
+    pub use miden_protocol::crypto::merkle::smt::{
+        LeafIndex,
+        SMT_DEPTH,
+        Smt,
+        SmtForest,
+        SmtLeaf,
+        SmtProof,
+    };
     pub use miden_protocol::crypto::merkle::store::MerkleStore;
-    pub use miden_protocol::crypto::merkle::{MerklePath, MerkleTree, NodeIndex, SparseMerklePath};
-    pub use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
+    pub use miden_protocol::crypto::merkle::{
+        EmptySubtreeRoots,
+        MerkleError,
+        MerklePath,
+        MerkleTree,
+        NodeIndex,
+        SparseMerklePath,
+    };
+    pub use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
 }
 
 /// Provides types for working with addresses within the Miden network.
@@ -242,20 +277,19 @@ pub mod address {
 
 /// Provides types for working with the virtual machine within the Miden network.
 pub mod vm {
-    // TODO: Remove this re-export once miden-protocol exposes PackageKind/ProcedureExport.
-    pub use miden_mast_package::{PackageKind, ProcedureExport};
     pub use miden_protocol::vm::{
         AdviceInputs,
         AdviceMap,
         AttributeSet,
-        MastArtifact,
         Package,
         PackageExport,
         PackageManifest,
+        ProcedureExport,
         Program,
         QualifiedProcedureName,
         Section,
         SectionId,
+        TargetType,
     };
 }
 
@@ -269,7 +303,6 @@ pub use miden_protocol::{
     MIN_TX_EXECUTION_CYCLES,
     ONE,
     PrettyPrint,
-    StarkField,
     Word,
     ZERO,
 };
@@ -379,11 +412,8 @@ where
     }
 
     /// Returns an instance of [`note::NoteScreener`] configured for this client.
-    pub fn note_screener(&self) -> note::NoteScreener<AUTH>
-    where
-        AUTH: Sync,
-    {
-        note::NoteScreener::new(self.store.clone(), self.authenticator.clone())
+    pub fn note_screener(&self) -> note::NoteScreener {
+        note::NoteScreener::new(self.store.clone(), self.rpc_api.clone())
     }
 
     /// Returns a reference to the client's random number generator. This can be used to generate
@@ -395,9 +425,19 @@ where
     pub fn prover(&self) -> Arc<dyn TransactionProver + Send + Sync> {
         self.tx_prover.clone()
     }
+
+    pub fn authenticator(&self) -> Option<&Arc<AUTH>> {
+        self.authenticator.as_ref()
+    }
 }
 
 impl<AUTH> Client<AUTH> {
+    /// Returns the identifier of the underlying store (e.g. `IndexedDB` database name, `SQLite`
+    /// file path).
+    pub fn store_identifier(&self) -> &str {
+        self.store.identifier()
+    }
+
     // LIMITS
     // --------------------------------------------------------------------------------------------
 

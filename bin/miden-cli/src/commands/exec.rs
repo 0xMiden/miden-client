@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -37,7 +37,7 @@ pub struct ExecCmd {
     ///
     /// The input file should contain a TOML table called `inputs`, as in the following example:
     ///    inputs = [
-    ///        { key = "0x0000001000000000000000000000000000000000000000000000000000000000", values = ["13", "9"]},
+    ///        { key = "0x0000000000000000000000000000000000000000000000000000001000000000", values = ["13", "9"]},
     ///        { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]},
     ///    ]
     #[arg(long, short)]
@@ -88,7 +88,7 @@ impl ExecCmd {
         let tx_script = client.code_builder().compile_tx_script(&program)?;
 
         let result = client
-            .execute_program(account_id, tx_script, advice_inputs, BTreeSet::new())
+            .execute_program(account_id, tx_script, advice_inputs, BTreeMap::new())
             .await;
 
         match result {

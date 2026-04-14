@@ -16,6 +16,7 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     getAccount: vi.fn().mockResolvedValue(null),
     newWallet: vi.fn().mockResolvedValue({}),
     newFaucet: vi.fn().mockResolvedValue({}),
+    newAccount: vi.fn().mockResolvedValue(undefined),
     syncState: vi.fn().mockResolvedValue({ blockNum: vi.fn(() => 100) }),
     getSyncHeight: vi.fn().mockResolvedValue(100),
     getInputNotes: vi.fn().mockResolvedValue([]),
@@ -42,12 +43,24 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     submitProvenTransaction: vi.fn().mockResolvedValue(0),
     applyTransaction: vi.fn().mockResolvedValue({}),
     sendPrivateNote: vi.fn().mockResolvedValue(undefined),
+    exportStore: vi.fn().mockResolvedValue({ tables: {} }),
+    forceImportStore: vi.fn().mockResolvedValue(undefined),
+    exportNoteFile: vi
+      .fn()
+      .mockResolvedValue({ serialize: () => new Uint8Array([1, 2, 3]) }),
+    importNoteFile: vi
+      .fn()
+      .mockResolvedValue({ toString: () => "0xnote_imported" }),
     importAccountFile: vi.fn().mockResolvedValue("Imported account"),
     importAccountById: vi.fn().mockResolvedValue(undefined),
     importPublicAccountFromSeed: vi.fn().mockResolvedValue({}),
     exportAccountFile: vi
       .fn()
       .mockResolvedValue({ serialize: () => new Uint8Array() }),
+    signCb: null as
+      | ((pubKey: Uint8Array, signingInputs: Uint8Array) => Promise<Uint8Array>)
+      | null,
+    setSignCb: vi.fn(),
     free: vi.fn(),
   };
 
@@ -72,6 +85,10 @@ vi.mock("@miden-sdk/miden-sdk", () => {
   }
 
   return {
+    AuthScheme: {
+      AuthRpoFalcon512: 2,
+      AuthEcdsaK256Keccak: 1,
+    },
     WebClient,
     WasmWebClient: WebClient,
     AccountId: {
@@ -108,8 +125,8 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     },
     NoteType: {
       Private: 2,
-      Encrypted: 3,
       Public: 1,
+      Encrypted: 3,
     },
     Note: {
       createP2IDNote: vi.fn(
@@ -146,15 +163,46 @@ vi.mock("@miden-sdk/miden-sdk", () => {
         this.amount = amount;
       }
     },
-    NoteAttachment: class NoteAttachment {},
-    OutputNoteArray: class OutputNoteArray {
+    NoteAttachmentKind: {
+      None: 0,
+      Word: 1,
+      Array: 2,
+    },
+    NoteAttachmentScheme: {
+      none: vi.fn(() => ({ type: "none" })),
+    },
+    Word: Object.assign(
+      class Word {
+        values: BigUint64Array;
+        constructor(values: BigUint64Array) {
+          this.values = values;
+        }
+        toU64s() {
+          return Array.from(this.values);
+        }
+      },
+      {
+        deserialize: vi.fn(
+          () =>
+            new (class Word {
+              values = new BigUint64Array(4);
+            })()
+        ),
+      }
+    ),
+    NoteAttachment: Object.assign(class NoteAttachment {}, {
+      newWord: vi.fn(
+        (_scheme: unknown, _word: unknown) => new (class NoteAttachment {})()
+      ),
+      newArray: vi.fn(
+        (_scheme: unknown, _words: unknown[]) => new (class NoteAttachment {})()
+      ),
+    }),
+    NoteArray: class NoteArray {
       notes: unknown[];
       constructor(notes: unknown[]) {
         this.notes = notes;
       }
-    },
-    OutputNote: {
-      full: vi.fn((note: unknown) => ({ note })),
     },
     NoteAndArgs: class NoteAndArgs {
       note: unknown;
@@ -175,6 +223,31 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       withInputNotes = vi.fn(() => this);
       build = vi.fn(() => ({}));
     },
+    NoteFile: {
+      deserialize: vi.fn(() => ({ noteId: "0xnote_deserialized" })),
+    },
+    NoteExportFormat: {
+      Full: "Full",
+      Partial: "Partial",
+    },
+    TransactionProver: {
+      newLocalProver: vi.fn(() => ({ type: "local" })),
+      newRemoteProver: vi.fn((url: string, timeout: unknown) => ({
+        type: "remote",
+        url,
+        timeout,
+      })),
+    },
+    AdviceInputs: class AdviceInputs {},
+    ForeignAccount: Object.assign(class ForeignAccount {}, {
+      public: vi.fn(
+        (_id: unknown, _storage: unknown) => new (class ForeignAccount {})()
+      ),
+    }),
+    ForeignAccountArray: class ForeignAccountArray {
+      constructor(_accounts?: unknown[]) {}
+    },
+    AccountStorageRequirements: class AccountStorageRequirements {},
     NoteFilter: vi.fn().mockImplementation(() => ({
       free: vi.fn(),
     })),
@@ -188,6 +261,13 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       Unique: 6,
       Nullifiers: 7,
       Unverified: 8,
+    },
+    TransactionId: {
+      fromHex: vi.fn((hex: string) => ({
+        toString: vi.fn(() => hex),
+        toHex: vi.fn(() => hex),
+        free: vi.fn(),
+      })),
     },
     TransactionFilter: {
       all: vi.fn(() => ({})),
@@ -210,6 +290,42 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       static deserialize() {
         return new AccountFile();
       }
+    },
+    AccountType: {
+      RegularAccountImmutableCode: 0,
+      RegularAccountUpdatableCode: 1,
+      FungibleFaucet: 2,
+      NonFungibleFaucet: 3,
+    },
+    AccountBuilder: class AccountBuilder {
+      _seed: Uint8Array;
+      constructor(seed: Uint8Array) {
+        this._seed = seed;
+      }
+      withAuthComponent() {
+        return this;
+      }
+      accountType() {
+        return this;
+      }
+      storageMode() {
+        return this;
+      }
+      withBasicWalletComponent() {
+        return this;
+      }
+      withComponent() {
+        return this;
+      }
+      build() {
+        const mockAccount = {
+          id: vi.fn(() => createMockAccountId("0xsigner_account")),
+        };
+        return { account: mockAccount };
+      }
+    },
+    AccountComponent: {
+      createAuthComponentFromCommitment: vi.fn(() => ({})),
     },
   };
 });

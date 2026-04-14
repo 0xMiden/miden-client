@@ -1,14 +1,15 @@
 export const formatAssetAmount = (
-  amount: bigint,
+  amount: bigint | number,
   decimals?: number
 ): string => {
+  const amt = BigInt(amount);
   if (!decimals || decimals <= 0) {
-    return amount.toString();
+    return amt.toString();
   }
 
   const factor = 10n ** BigInt(decimals);
-  const whole = amount / factor;
-  const fraction = amount % factor;
+  const whole = amt / factor;
+  const fraction = amt % factor;
 
   if (fraction === 0n) {
     return whole.toString();

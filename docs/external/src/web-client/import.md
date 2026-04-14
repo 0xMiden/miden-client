@@ -11,7 +11,7 @@ This guide demonstrates how to import accounts, notes, and store data using the 
 
 ### Importing by Account ID
 
-Import a public account by its ID (fetches state from the network):
+Import a public account by its ID (fetches state from the network). The argument is an `AccountRef` — any of a hex string, bech32 string, `AccountId`, `Account`, or `AccountHeader`:
 
 ```typescript
 import { MidenClient } from "@miden-sdk/miden-sdk";
@@ -19,12 +19,21 @@ import { MidenClient } from "@miden-sdk/miden-sdk";
 try {
     const client = await MidenClient.create();
 
-    const account = await client.accounts.import("0x1234...");
+    // All of the following are equivalent:
+    const account = await client.accounts.import("0x1234...");                       // hex string
+    const account = await client.accounts.import("mtst1arjemrxne8lj5qz4mg9c8mtyxg954483"); // bech32 string
+    const account = await client.accounts.import(accountId);                         // AccountId object
+    const account = await client.accounts.import(existingAccount);                   // Account object
+
     console.log("Imported account:", account.id().toString());
 } catch (error) {
     console.error("Failed to import account:", error.message);
 }
 ```
+
+:::tip
+If you are not sure whether the account is already stored locally, use [`accounts.getOrImport()`](./accounts.md#get-or-import-an-account) instead — it skips the network call when the account is already present.
+:::
 
 ### Importing from an Account File
 

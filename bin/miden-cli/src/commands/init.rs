@@ -183,11 +183,19 @@ impl InitCmd {
             cli_config.remote_prover_timeout = Duration::from_millis(timeout);
         }
 
-        cli_config.note_transport =
-            self.note_transport_endpoint.as_ref().map(|rpc| NoteTransportConfig {
+        cli_config.note_transport = if let Some(rpc) = &self.note_transport_endpoint {
+            Some(NoteTransportConfig {
                 endpoint: rpc.clone(),
                 ..Default::default()
-            });
+            })
+        } else {
+            // Auto-configure note transport for known networks
+            match &self.network {
+                Some(Network::Testnet) => Some(NoteTransportConfig::default()),
+                Some(Network::Devnet) => Some(NoteTransportConfig::devnet()),
+                _ => None,
+            }
+        };
 
         cli_config.max_block_number_delta = self.block_delta;
 

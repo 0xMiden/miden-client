@@ -6,6 +6,7 @@ import { getDatabase } from "./schema.js";
 import { logWebStoreError } from "./utils.js";
 type ImportableInput =
   | { type: "Blob"; value: { __type: "Blob"; data: string } }
+  | { type: "Uint8Array"; value: { __type: "Uint8Array"; data: string } }
   | { type: "Array"; value: any[] }
   | { type: "Object"; value: Record<string, any> }
   | { type: "Primitive"; value: any };
@@ -16,6 +17,8 @@ async function recursivelyTransformForImport(
   switch (obj.type) {
     case "Blob":
       return new Blob([base64ToUint8Array(obj.value.data)]);
+    case "Uint8Array":
+      return base64ToUint8Array(obj.value.data);
     case "Array":
       return await Promise.all(
         obj.value.map((v) =>
@@ -42,6 +45,9 @@ async function recursivelyTransformForImport(
 function getImportType(value: any): ImportableInput["type"] {
   if (value && typeof value === "object" && value.__type === "Blob") {
     return "Blob";
+  }
+  if (value && typeof value === "object" && value.__type === "Uint8Array") {
+    return "Uint8Array";
   }
   if (Array.isArray(value)) return "Array";
   if (value && typeof value === "object") return "Object";

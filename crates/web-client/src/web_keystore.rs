@@ -2,15 +2,6 @@ use alloc::collections::BTreeSet;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 
-use idxdb_store::auth::{
-    get_account_auth_by_pub_key_commitment,
-    get_account_id_by_key_commitment,
-    get_key_commitments_by_account_id,
-    insert_account_auth,
-    insert_account_key_mapping,
-    remove_account_auth,
-    remove_all_mappings_for_key,
-};
 use miden_client::account::AccountId;
 use miden_client::auth::{
     AuthSecretKey,
@@ -32,6 +23,15 @@ use crate::web_keystore_callbacks::{
     InsertKeyCallback,
     SignCallback,
     decode_secret_key_from_bytes,
+};
+use crate::web_keystore_db::{
+    get_account_auth_by_pub_key_commitment,
+    get_account_id_by_key_commitment,
+    get_key_commitments_by_account_id,
+    insert_account_auth,
+    insert_account_key_mapping,
+    remove_account_auth,
+    remove_all_mappings_for_key,
 };
 
 /// A web-based keystore that stores keys in [browser's local storage](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API)
@@ -140,8 +140,8 @@ impl<R: Rng> TransactionAuthenticator for WebKeyStore<R> {
         let mut rng = self.rng.write();
 
         let signature = match secret_key {
-            Some(AuthSecretKey::Falcon512Rpo(k)) => {
-                Signature::Falcon512Rpo(k.sign_with_rng(message, &mut rng))
+            Some(AuthSecretKey::Falcon512Poseidon2(k)) => {
+                Signature::Falcon512Poseidon2(k.sign_with_rng(message, &mut rng))
             },
             Some(AuthSecretKey::EcdsaK256Keccak(k)) => Signature::EcdsaK256Keccak(k.sign(message)),
             Some(other_k) => other_k.sign(message),

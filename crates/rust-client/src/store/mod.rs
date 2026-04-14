@@ -26,13 +26,13 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use miden_protocol::Word;
 use miden_protocol::account::{
     Account,
     AccountCode,
     AccountHeader,
     AccountId,
     AccountStorage,
+    StorageMapKey,
     StorageMapWitness,
     StorageSlot,
     StorageSlotContent,
@@ -45,7 +45,8 @@ use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, Partia
 use miden_protocol::errors::AccountError;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::TransactionId;
-use miden_tx::utils::{Deserializable, Serializable};
+use miden_protocol::{Felt, Word};
+use miden_tx::utils::serde::{Deserializable, Serializable};
 
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::rpc::{RPC_LIMITS_STORE_SETTING, RpcLimits};
@@ -62,6 +63,9 @@ pub(crate) mod data_store;
 
 mod errors;
 pub use errors::*;
+
+mod smt_forest;
+pub use smt_forest::AccountSmtForest;
 
 mod account;
 pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
@@ -92,6 +96,13 @@ pub use note_record::{
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait Store: Send + Sync {
+    /// Returns an identifier for this store (e.g. `IndexedDB` database name, `SQLite` file path).
+    ///
+    /// This allows callers to retrieve store-specific identity information (such as the `IndexedDB`
+    /// database name) for standalone operations like `exportStore`/`importStore`, without making
+    /// import/export a responsibility of the client.
+    fn identifier(&self) -> &str;
+
     /// Returns the current timestamp tracked by the store, measured in non-leap seconds since
     /// Unix epoch. If the store implementation is incapable of tracking time, it should return
     /// `None`.
@@ -126,6 +137,9 @@ pub trait Store: Send + Sync {
     // --------------------------------------------------------------------------------------------
 
     /// Retrieves the input notes from the store.
+    ///
+    /// When `filter` is [`NoteFilter::Consumed`], notes are sorted by their on-chain execution
+    /// order.
     async fn get_input_notes(&self, filter: NoteFilter)
     -> Result<Vec<InputNoteRecord>, StoreError>;
 
@@ -134,6 +148,22 @@ pub trait Store: Send + Sync {
         &self,
         filter: NoteFilter,
     ) -> Result<Vec<OutputNoteRecord>, StoreError>;
+
+    /// Retrieves a single input note at the given offset from the filtered set for the given
+    /// consumer account. Optionally restricts to a block range via `block_start` and
+    /// `block_end`. Returns `None` when the offset is past the end of the matching notes.
+    ///
+    /// # Ordering
+    ///
+    /// Notes are sorted by their per-account on-chain execution order.
+    async fn get_input_note_by_offset(
+        &self,
+        filter: NoteFilter,
+        consumer: AccountId,
+        block_start: Option<BlockNumber>,
+        block_end: Option<BlockNumber>,
+        offset: u32,
+    ) -> Result<Option<InputNoteRecord>, StoreError>;
 
     /// Returns the nullifiers of all unspent input notes.
     ///
@@ -189,6 +219,12 @@ pub trait Store: Send + Sync {
     /// Retrieves a list of [`BlockHeader`] that include relevant notes to the client.
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError>;
 
+    /// Retrieves the block numbers of block headers that include relevant notes to the client.
+    ///
+    /// This is a lightweight alternative to [`Store::get_tracked_block_headers`] that avoids
+    /// deserializing full block headers when only the block numbers are needed.
+    async fn get_tracked_block_header_numbers(&self) -> Result<BTreeSet<usize>, StoreError>;
+
     /// Retrieves all MMR authentication nodes based on [`PartialBlockchainFilter`].
     async fn get_partial_blockchain_nodes(
         &self,
@@ -229,6 +265,22 @@ pub trait Store: Send + Sync {
     /// Removes block headers that do not contain any client notes and aren't the genesis or last
     /// block.
     async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError>;
+
+    /// Prunes historical account states for the specified account up to the given nonce.
+    ///
+    /// Deletes all historical entries with `replaced_at_nonce <= up_to_nonce` from the
+    /// historical tables (headers, storage, storage map entries, and assets).
+    ///
+    /// Also removes orphaned `account_code` entries that are no longer referenced by any
+    /// account header.
+    ///
+    /// Returns the total number of rows deleted, including historical entries and orphaned
+    /// account code.
+    async fn prune_account_history(
+        &self,
+        account_id: AccountId,
+        up_to_nonce: Felt,
+    ) -> Result<usize, StoreError>;
 
     // ACCOUNT
     // --------------------------------------------------------------------------------------------
@@ -368,7 +420,10 @@ pub trait Store: Send + Sync {
     /// Applies the state sync update to the store. An update involves:
     ///
     /// - Inserting the new block header to the store alongside new MMR peaks information.
-    /// - Updating the corresponding tracked input/output notes.
+    /// - Updating the corresponding tracked input/output notes. Consumed notes carry consumption
+    ///   metadata — `consumed_block_height`, `consumed_tx_order`, and `consumer_account_id` — in
+    ///   their note state. Implementations must persist these fields so that ordered queries (see
+    ///   [`Store::get_input_note_by_offset`]) work correctly.
     /// - Removing note tags that are no longer relevant.
     /// - Updating transactions in the store, marking as `committed` or `discarded`.
     ///   - In turn, validating private account's state transitions. If a private account's
@@ -460,9 +515,15 @@ pub trait Store: Send + Sync {
         let has_client_notes = has_client_notes.into();
         current_partial_mmr.add(current_block.commitment(), has_client_notes);
 
-        // Only track the latest leaf if it is relevant (it has client notes) _and_ the forest
-        // actually has a single leaf tree bit
-        let track_latest = has_client_notes && current_partial_mmr.forest().has_single_leaf_tree();
+        // Build tracked_leaves from blocks that have client notes.
+        let mut tracked_leaves = self.get_tracked_block_header_numbers().await?;
+
+        // Also track the latest leaf if it is relevant (it has client notes) _and_ the forest
+        // actually has a single leaf tree bit.
+        if has_client_notes && current_partial_mmr.forest().has_single_leaf_tree() {
+            let latest_leaf = current_partial_mmr.forest().num_leaves().saturating_sub(1);
+            tracked_leaves.insert(latest_leaf);
+        }
 
         let tracked_nodes = self
             .get_partial_blockchain_nodes(PartialBlockchainFilter::Forest(
@@ -471,7 +532,7 @@ pub trait Store: Send + Sync {
             .await?;
 
         let current_partial_mmr =
-            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, track_latest);
+            PartialMmr::from_parts(current_partial_mmr.peaks(), tracked_nodes, tracked_leaves)?;
 
         Ok(current_partial_mmr)
     }
@@ -539,7 +600,7 @@ pub trait Store: Send + Sync {
         &self,
         account_id: AccountId,
         slot_name: StorageSlotName,
-        key: Word,
+        key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
         let storage = self
             .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))

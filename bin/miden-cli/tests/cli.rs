@@ -11,7 +11,7 @@ use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::address::AddressInterface;
 use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
 use miden_client::builder::ClientBuilder;
-use miden_client::crypto::{FeltRng, RpoRandomCoin};
+use miden_client::crypto::{FeltRng, RandomCoin};
 use miden_client::keystore::Keystore;
 use miden_client::note::{
     Note,
@@ -33,10 +33,11 @@ use miden_client::testing::common::{
     execute_tx_and_sync,
     insert_new_wallet,
 };
-use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
+use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Serializable;
 use miden_client::{self, Client, DebugMode, Felt};
 use miden_client_cli::MIDEN_DIR;
+use miden_client_cli::config::Network;
 use miden_client_sqlite_store::SqliteStore;
 use predicates::str::contains;
 use rand::Rng;
@@ -295,8 +296,10 @@ async fn mint_with_untracked_account() -> Result<()> {
         &fungible_faucet_account_id,
     );
 
-    // Sleep for a while to ensure the note is committed on the node
-    sync_until_committed_note(&temp_dir);
+    // Wait until the faucet's mint transaction is committed on the node.
+    // We sync for a committed transaction (not note) because the target account is untracked,
+    // so the output note's tag won't be requested during sync and the note will never appear.
+    sync_until_committed_transaction(&temp_dir);
     Ok(())
 }
 
@@ -311,7 +314,7 @@ async fn token_symbol_mapping() -> Result<()> {
     // Create a token symbol mapping file in the MIDEN_DIR directory
     let token_symbol_map_path = temp_dir.join(MIDEN_DIR).join("token_symbol_map.toml");
     let token_symbol_map_content =
-        format!(r#"BTC = {{ id = "{fungible_faucet_account_id}", decimals = 10 }}"#,);
+        format!(r#"BTC = {{ id = "{fungible_faucet_account_id}", decimals = 10 }}"#);
     fs::write(&token_symbol_map_path, token_symbol_map_content).unwrap();
 
     sync_cli(&temp_dir);
@@ -329,7 +332,12 @@ async fn token_symbol_mapping() -> Result<()> {
     ]);
 
     let output = mint_cmd.current_dir(&temp_dir).output().unwrap();
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "token_symbol mint failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let note_id = String::from_utf8(output.stdout)
         .unwrap()
@@ -372,7 +380,7 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
 
         let cargo_workspace_dir =
             env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let source_path = format!("{cargo_workspace_dir}/../../data/{genesis_account_filename}",);
+        let source_path = format!("{cargo_workspace_dir}/../../data/{genesis_account_filename}");
 
         std::fs::copy(source_path, new_file_path).unwrap();
     }
@@ -413,8 +421,9 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
         &fungible_faucet_account_id,
     );
 
-    // Wait until the note is committed on the node
-    sync_until_committed_note(&temp_dir);
+    // Wait until the mint transaction is committed on the node.
+    // We sync for a committed transaction (not note) because the target account is untracked.
+    sync_until_committed_transaction(&temp_dir);
     Ok(())
 }
 
@@ -618,6 +627,9 @@ async fn consume_unauthenticated_note() -> Result<()> {
     // Mint
     let note_id = mint_cli(&temp_dir, &wallet_account_id, &fungible_faucet_account_id);
 
+    // Wait for the mint transaction to be committed on the node
+    sync_until_committed_transaction(&temp_dir);
+
     // Consume the note, internally this checks that the note was consumed correctly
     consume_note_cli(&temp_dir, &wallet_account_id, &[&note_id]);
     Ok(())
@@ -697,20 +709,16 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     let note_script = client.code_builder().compile_note_script(note_script).unwrap();
     let inputs = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
-    let note_metadata = NoteMetadata::new(
-        account.id(),
-        NoteType::Private,
-        NoteTag::with_account_target(account.id()),
-    );
+    let note_metadata = NoteMetadata::new(account.id(), NoteType::Private)
+        .with_tag(NoteTag::with_account_target(account.id()));
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note_recipient = NoteRecipient::new(serial_num, note_script, inputs);
     let note = Note::new(note_assets, note_metadata, note_recipient);
 
     // Send transaction and wait for it to be committed
     client.sync_state().await?;
-    let transaction_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![OutputNote::Full(note.clone())])
-        .build()?;
+    let transaction_request =
+        TransactionRequestBuilder::new().own_output_notes(vec![note.clone()]).build()?;
     execute_tx_and_sync(&mut client, account.id(), transaction_request).await?;
 
     // Export the note
@@ -846,7 +854,8 @@ async fn list_addresses_remove() -> Result<()> {
 
     // Remove the Unspecified wallet from the account
     let mut remove_address_cmd = cargo_bin_cmd!("miden-client");
-    let unspecified_wallet_address = regex::Regex::new(r"mlcl1[0-9a-z]+")
+    // Match any bech32 Miden address (HRP varies by network: mlcl, mdev, mtst, mm, etc.)
+    let unspecified_wallet_address = regex::Regex::new(r"m[a-z]{1,4}1[0-9a-z]+")
         .unwrap()
         .find(&formatted_output)
         .unwrap()
@@ -901,7 +910,7 @@ async fn new_wallet_with_deploy_flag() -> Result<()> {
     // Verify that the nonce is non-zero (account was deployed)
     // By convention, a nonce of 0 indicates an undeployed account
     assert!(
-        nonce.as_int() > 0,
+        nonce.as_canonical_u64() > 0,
         "Account nonce should be non-zero after deployment, but got: {nonce}"
     );
 
@@ -914,11 +923,13 @@ async fn new_wallet_with_deploy_flag() -> Result<()> {
 /// Initializes a CLI with the network in the config file and returns the store path and the temp
 /// directory where the CLI is running.
 fn init_cli() -> (PathBuf, PathBuf, Endpoint) {
-    // Try to read from env first or default to localhost
-    let endpoint = match std::env::var("TEST_MIDEN_RPC_ENDPOINT") {
-        Ok(endpoint) => Endpoint::try_from(endpoint.as_str()).unwrap(),
-        Err(_) => Endpoint::localhost(),
-    };
+    // Try to read from env first or default to localhost.
+    // Accepts "devnet", "testnet", "localhost", or a custom RPC endpoint string.
+    let network: Network = std::env::var("TEST_MIDEN_NETWORK")
+        .unwrap_or_else(|_| "localhost".to_string())
+        .parse()
+        .unwrap();
+    let endpoint = Endpoint::try_from(network.to_rpc_endpoint().as_str()).unwrap();
 
     let store_path = create_test_store_path();
     let temp_dir = init_cli_with_store_path(&store_path, &endpoint);
@@ -960,10 +971,15 @@ fn set_isolated_miden_home() -> PathBuf {
     path
 }
 
+struct SyncResult {
+    committed_notes: u64,
+    committed_transactions: u64,
+}
+
 // Syncs CLI on directory. It'll try syncing until the command executes successfully. If it never
 // executes successfully, eventually the test will time out (provided the nextest config has a
-// timeout set). It returns the number of updated notes after the sync.
-fn sync_cli(cli_path: &Path) -> u64 {
+// timeout set). It returns the number of committed notes and transactions after the sync.
+fn sync_cli(cli_path: &Path) -> SyncResult {
     loop {
         let mut sync_cmd = cargo_bin_cmd!("miden-client");
         sync_cmd.args(["sync"]);
@@ -971,19 +987,25 @@ fn sync_cli(cli_path: &Path) -> u64 {
         let output = sync_cmd.current_dir(cli_path).output().unwrap();
 
         if output.status.success() {
-            let updated_notes = String::from_utf8(output.stdout)
-                .unwrap()
+            let stdout = String::from_utf8(output.stdout).unwrap();
+
+            let committed_notes = stdout
                 .lines()
                 .find_map(|line| {
-                    if let Some(rest) = line.strip_prefix("Committed notes: ") {
-                        rest.trim().parse::<u64>().ok()
-                    } else {
-                        None
-                    }
+                    line.strip_prefix("Committed notes: ")
+                        .and_then(|rest| rest.trim().parse::<u64>().ok())
                 })
                 .unwrap();
 
-            return updated_notes;
+            let committed_transactions = stdout
+                .lines()
+                .find_map(|line| {
+                    line.strip_prefix("Committed transactions: ")
+                        .and_then(|rest| rest.trim().parse::<u64>().ok())
+                })
+                .unwrap();
+
+            return SyncResult { committed_notes, committed_transactions };
         }
         std::thread::sleep(std::time::Duration::from_secs(3));
     }
@@ -993,6 +1015,7 @@ fn sync_cli(cli_path: &Path) -> u64 {
 /// successfully given account using the CLI given by `cli_path`.
 fn mint_cli(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String {
     let mut mint_cmd = cargo_bin_cmd!("miden-client");
+    mint_cmd.env("MIDEN_DEBUG", "true");
     mint_cmd.args([
         "mint",
         "--target",
@@ -1005,7 +1028,12 @@ fn mint_cli(cli_path: &Path, target_account_id: &str, faucet_id: &str) -> String
     ]);
 
     let output = mint_cmd.current_dir(cli_path).output().unwrap();
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "mint_cli failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     String::from_utf8(output.stdout)
         .unwrap()
@@ -1050,7 +1078,14 @@ fn send_cli(cli_path: &Path, from_account_id: &str, to_account_id: &str, faucet_
 
 /// Syncs until a tracked note gets committed.
 fn sync_until_committed_note(cli_path: &Path) {
-    while sync_cli(cli_path) == 0 {
+    while sync_cli(cli_path).committed_notes == 0 {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+}
+
+/// Syncs until a tracked transaction gets committed.
+fn sync_until_committed_transaction(cli_path: &Path) {
+    while sync_cli(cli_path).committed_transactions == 0 {
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
 }
@@ -1074,7 +1109,7 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         ["miden::standards::fungible_faucets::metadata"]
         decimals="10"
         max_supply="10000000"
-        ticker="BTC"
+        symbol="BTC"
         "#;
     let file_path = cli_path.join(INIT_DATA_FILENAME);
     fs::write(&file_path, init_storage_data_toml).unwrap();
@@ -1114,8 +1149,9 @@ fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         output.status.success(),
         "Failed to create wallet {}",
         String::from_utf8(output.stderr)
-            .map(|err_msg| format!("with error: {err_msg}"))
-            .unwrap_or(". Also failed to access the Command's stderr".to_string())
+            .map_or(". Also failed to access the Command's stderr".to_string(), |err_msg| format!(
+                "with error: {err_msg}"
+            ))
     );
 
     std::str::from_utf8(&output.stdout)
@@ -1142,7 +1178,7 @@ async fn create_rust_client_with_store_path(
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
 
-    let rng = Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()));
+    let rng = Box::new(RandomCoin::new(coin_seed.map(Felt::new).into()));
 
     let keystore = FilesystemKeyStore::new(temp_dir())?;
 
@@ -1243,16 +1279,22 @@ fn create_account_with_multisig_auth() {
     // threshold_config is a value slot with [threshold, num_approvers, 0, 0]
     // approver_public_keys and procedure_thresholds are map slots
     let init_storage_data_toml = r#"
-        "miden::standards::auth::falcon512_rpo_multisig::threshold_config.threshold" = "2"
-        "miden::standards::auth::falcon512_rpo_multisig::threshold_config.num_approvers" = "3"
+        "miden::standards::auth::multisig::threshold_config.threshold" = "2"
+        "miden::standards::auth::multisig::threshold_config.num_approvers" = "3"
 
-        "miden::standards::auth::falcon512_rpo_multisig::approver_public_keys" = [
+        "miden::standards::auth::multisig::approver_public_keys" = [
             { key = ["0", "0", "0", "0"], value = "0x0000000000000000000000000000000000000000000000000000000000000001" },
-            { key = ["0", "0", "0", "1"], value = "0x0000000000000000000000000000000000000000000000000000000000000002" },
-            { key = ["0", "0", "0", "2"], value = "0x0000000000000000000000000000000000000000000000000000000000000003" }
+            { key = ["1", "0", "0", "0"], value = "0x0000000000000000000000000000000000000000000000000000000000000002" },
+            { key = ["2", "0", "0", "0"], value = "0x0000000000000000000000000000000000000000000000000000000000000003" }
         ]
 
-        "miden::standards::auth::falcon512_rpo_multisig::procedure_thresholds" = [
+        "miden::standards::auth::multisig::approver_schemes" = [
+            { key = ["0", "0", "0", "0"], value = ["2", "0", "0", "0"] },
+            { key = ["1", "0", "0", "0"], value = ["2", "0", "0", "0"] },
+            { key = ["2", "0", "0", "0"], value = ["2", "0", "0", "0"] }
+        ]
+
+        "miden::standards::auth::multisig::procedure_thresholds" = [
             { key = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07", value = "1" }
         ]
         "#;
@@ -1284,12 +1326,13 @@ fn create_account_with_acl_auth() {
 
     // Create init storage data file for acl-auth with a test public key
     let init_storage_data_toml = r#"
-        "miden::standards::auth::rpo_falcon512_acl::public_key" = "0x0000000000000000000000000000000000000000000000000000000000000001"
-        "miden::standards::auth::rpo_falcon512_acl::config.num_tracked_procs" = "1"
-        "miden::standards::auth::rpo_falcon512_acl::config.allow_unauthorized_output_notes" = "0"
-        "miden::standards::auth::rpo_falcon512_acl::config.allow_unauthorized_input_notes" = "0"
+        "miden::standards::auth::singlesig_acl::pub_key" = "0x0000000000000000000000000000000000000000000000000000000000000001"
+        "miden::standards::auth::singlesig_acl::scheme" = "Falcon512Poseidon2"
+        "miden::standards::auth::singlesig_acl::config.num_trigger_procs" = "1"
+        "miden::standards::auth::singlesig_acl::config.allow_unauthorized_output_notes" = "0"
+        "miden::standards::auth::singlesig_acl::config.allow_unauthorized_input_notes" = "0"
 
-        "miden::standards::auth::rpo_falcon512_acl::trigger_procedure_roots" = [
+        "miden::standards::auth::singlesig_acl::trigger_procedure_roots" = [
             { key = ["0", "0", "0", "0"], value = "0xd2d1b6229d7cfb9f2ada31c5cb61453cf464f91828e124437c708eec55b9cd07" }
         ]
         "#;
@@ -1319,9 +1362,10 @@ fn create_account_with_acl_auth() {
 fn create_account_with_ecdsa_auth() {
     let temp_dir = init_cli().1;
 
-    // Create init storage data file for ecdsa-auth with a test public key
+    // Create init storage data file for ecdsa-auth with a test public key and scheme
     let init_storage_data_toml = r#"
-        "miden::standards::auth::ecdsa_k256_keccak::public_key"="0x0000000000000000000000000000000000000000000000000000000000000001"
+        "miden::standards::auth::singlesig::pub_key" = "0x0000000000000000000000000000000000000000000000000000000000000001"
+        "miden::standards::auth::singlesig::scheme" = "EcdsaK256Keccak"
         "#;
     let file_path = temp_dir.join("ecdsa_init_data.toml");
     fs::write(&file_path, init_storage_data_toml).unwrap();
@@ -1344,13 +1388,13 @@ fn create_account_with_ecdsa_auth() {
     create_account_cmd.current_dir(&temp_dir).assert().success();
 }
 
-// FROM_SYSTEM_USER_CONFIG TESTS
+// CLICLIENT::NEW TESTS
 // ================================================================================================
-/// Tests that `CliClient::from_system_user_config()` successfully creates a client with the same
+/// Tests that `CliClient::new()` successfully creates a client with the same
 /// configuration as the CLI tool when a local config exists.
 #[tokio::test]
 #[serial_test::file_serial]
-async fn test_from_system_user_config_with_local_config() -> Result<()> {
+async fn test_new_with_local_config() -> Result<()> {
     // Initialize a local CLI configuration
     let (store_path, temp_dir, _endpoint) = init_cli();
 
@@ -1361,9 +1405,8 @@ async fn test_from_system_user_config_with_local_config() -> Result<()> {
     let original_dir = env::current_dir().unwrap();
     env::set_current_dir(&temp_dir)?;
 
-    // Create a client using from_system_user_config - should pick up local config
-    let client_result =
-        miden_client_cli::CliClient::from_system_user_config(DebugMode::Disabled).await;
+    // Create a client using new - should pick up local config
+    let client_result = miden_client_cli::CliClient::new(DebugMode::Disabled).await;
 
     // Restore original directory
     env::set_current_dir(original_dir)?;
@@ -1385,11 +1428,11 @@ async fn test_from_system_user_config_with_local_config() -> Result<()> {
     Ok(())
 }
 
-/// Tests that `CliClient::from_system_user_config()` silently initializes with default config
+/// Tests that `CliClient::new()` silently initializes with default config
 /// when no configuration exists.
 #[tokio::test]
 #[serial_test::file_serial]
-async fn test_from_system_user_config_silent_init() -> Result<()> {
+async fn test_new_silent_init() -> Result<()> {
     // Create a temporary directory with no .miden configuration
     let temp_dir = temp_dir().join(format!("cli-test-silent-init-{}", rand::rng().random::<u64>()));
     std::fs::create_dir_all(&temp_dir)?;
@@ -1406,8 +1449,7 @@ async fn test_from_system_user_config_silent_init() -> Result<()> {
     env::set_current_dir(&temp_dir)?;
 
     // Create a client - should succeed via silent initialization
-    let client_result =
-        miden_client_cli::CliClient::from_system_user_config(DebugMode::Disabled).await;
+    let client_result = miden_client_cli::CliClient::new(DebugMode::Disabled).await;
 
     // Restore original directory
     env::set_current_dir(original_dir)?;
@@ -1428,10 +1470,10 @@ async fn test_from_system_user_config_silent_init() -> Result<()> {
     Ok(())
 }
 
-/// Tests that `CliConfig::from_system()` prioritizes local config over global config.
+/// Tests that `CliConfig::load()` prioritizes local config over global config.
 #[tokio::test]
 #[serial_test::file_serial]
-async fn test_from_system_user_config_local_priority() -> Result<()> {
+async fn test_load_local_priority() -> Result<()> {
     // Use isolated global miden directory
     let _miden_home = set_isolated_miden_home();
 

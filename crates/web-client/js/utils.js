@@ -124,22 +124,89 @@ export function resolveAuthScheme(scheme, wasm) {
 }
 
 /**
- * Resolves a simplified AccountType string to a boolean `mutable` flag
+ * Resolves an AccountType value to a boolean `mutable` flag
  * for the underlying WASM `newWallet()` / `importPublicAccountFromSeed()` calls.
  *
- * @param {string | undefined} accountType - "MutableWallet", "ImmutableWallet", or undefined.
- *   Defaults to mutable wallet when undefined.
+ * Accepts the numeric WASM enum values (2 = immutable, 3 = mutable) or the
+ * legacy string aliases ("MutableWallet", "ImmutableWallet"). Defaults to
+ * mutable when undefined.
+ *
+ * @param {number | string | undefined} accountType
  * @returns {boolean} Whether the account code is mutable.
  */
 export function resolveAccountMutability(accountType) {
-  if (accountType == null || accountType === "MutableWallet") {
+  if (
+    accountType == null ||
+    accountType === "MutableWallet" ||
+    accountType === 3
+  ) {
     return true;
   }
-  if (accountType === "ImmutableWallet") {
+  if (accountType === "ImmutableWallet" || accountType === 2) {
     return false;
   }
   throw new Error(
-    `Unknown wallet account type: "${accountType}". Expected "MutableWallet" or "ImmutableWallet".`
+    `Unknown wallet account type: "${accountType}". Expected AccountType.MutableWallet (3) or AccountType.ImmutableWallet (2).`
+  );
+}
+
+/**
+ * Resolves a NoteInput (string | NoteId | InputNoteRecord | Note) to a hex string.
+ *
+ * - Strings are passed through unchanged.
+ * - NoteId WASM objects are converted via `.toString()`.
+ * - InputNoteRecord and Note objects (with an `.id()` method) are resolved via `.id().toString()`.
+ *
+ * @param {string | object} input - The note reference to resolve.
+ * @returns {string} The hex note ID string.
+ */
+export function resolveNoteIdHex(input) {
+  if (input == null) {
+    throw new Error("Note ID cannot be null or undefined");
+  }
+  if (typeof input === "string") {
+    return input;
+  }
+  // NoteId WASM object — has toString() but not id() (unlike InputNoteRecord/Note).
+  // Check for constructor.fromHex to distinguish from plain objects (which also inherit toString).
+  if (
+    typeof input.toString === "function" &&
+    typeof input.id !== "function" &&
+    input.constructor?.fromHex !== undefined
+  ) {
+    return input.toString();
+  }
+  // InputNoteRecord, Note, or other object with id() returning NoteId
+  if (typeof input.id === "function") {
+    return input.id().toString();
+  }
+  throw new TypeError(
+    `Cannot resolve note ID: expected string, NoteId, InputNoteRecord, or Note, got ${typeof input}`
+  );
+}
+
+/**
+ * Resolves a TransactionId reference (string | TransactionId) to a hex string.
+ *
+ * - Strings are passed through unchanged.
+ * - TransactionId WASM objects are converted via `.toHex()`.
+ *
+ * @param {string | object} input - The transaction ID reference to resolve.
+ * @returns {string} The hex transaction ID string.
+ */
+export function resolveTransactionIdHex(input) {
+  if (input == null) {
+    throw new Error("Transaction ID cannot be null or undefined");
+  }
+  if (typeof input === "string") {
+    return input;
+  }
+  // TransactionId WASM object — toHex() returns hex
+  if (typeof input.toHex === "function") {
+    return input.toHex();
+  }
+  throw new TypeError(
+    `Cannot resolve transaction ID: expected string or TransactionId, got ${typeof input}`
   );
 }
 

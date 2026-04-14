@@ -111,6 +111,19 @@ export async function getTrackedBlockHeaders(dbId: string) {
   }
 }
 
+export async function getTrackedBlockHeaderNumbers(dbId: string) {
+  try {
+    const db = getDatabase(dbId);
+    const blockNums = await db.blockHeaders
+      .where("hasClientNotes")
+      .equals("true")
+      .primaryKeys();
+    return blockNums;
+  } catch (err) {
+    logWebStoreError(err, "Failed to get tracked block header numbers");
+  }
+}
+
 export async function getPartialBlockchainPeaksByBlockNum(
   dbId: string,
   blockNum: number
@@ -151,7 +164,9 @@ export async function getPartialBlockchainNodes(dbId: string, ids: string[]) {
     const numericIds = ids.map((id) => Number(id));
     const results = await db.partialBlockchainNodes.bulkGet(numericIds);
 
-    return results;
+    // bulkGet returns undefined for missing keys — filter them out so the
+    // Rust deserializer does not choke on undefined values.
+    return results.filter((r) => r !== undefined);
   } catch (err) {
     logWebStoreError(err, "Failed to get partial blockchain nodes");
   }

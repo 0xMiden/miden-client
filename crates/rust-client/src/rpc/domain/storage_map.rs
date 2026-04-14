@@ -2,7 +2,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
-use miden_protocol::account::StorageSlotName;
+use miden_protocol::account::{StorageMapKey, StorageSlotName};
 use miden_protocol::block::BlockNumber;
 
 use crate::rpc::domain::MissingFieldHelper;
@@ -60,7 +60,7 @@ pub struct StorageMapUpdate {
     /// Name of the storage slot.
     pub slot_name: StorageSlotName,
     /// The storage map key
-    pub key: Word,
+    pub key: StorageMapKey,
     /// The storage map value.
     pub value: Word,
 }
@@ -77,7 +77,7 @@ impl TryFrom<proto::rpc::StorageMapUpdate> for StorageMapUpdate {
         let slot_name = StorageSlotName::new(value.slot_name)
             .map_err(|err| RpcConversionError::InvalidField(err.to_string()))?;
 
-        let key: Word = value
+        let key: StorageMapKey = value
             .key
             .ok_or(proto::rpc::StorageMapUpdate::missing_field(stringify!(key)))?
             .try_into()?;
