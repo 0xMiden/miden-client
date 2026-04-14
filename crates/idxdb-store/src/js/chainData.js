@@ -150,39 +150,34 @@ export async function getPartialBlockchainNodesUpToInOrderIndex(dbId, maxInOrder
         logWebStoreError(err, "Failed to get partial blockchain nodes up to index");
     }
 }
-export async function untrackBlocks(dbId, blockNums, nodeIds) {
+export async function pruneIrrelevantBlocks(dbId, blocksToUntrack, nodeIdsToRemove) {
     try {
         const db = getDatabase(dbId);
-        const numericNodeIds = nodeIds.map(Number);
-        await db.dexie.transaction("rw", db.blockHeaders, db.partialBlockchainNodes, async () => {
-            if (numericNodeIds.length > 0) {
-                await db.partialBlockchainNodes.bulkDelete(numericNodeIds);
-            }
-            if (blockNums.length > 0) {
-                await db.blockHeaders
-                    .where("blockNum")
-                    .anyOf(blockNums)
-                    .modify({ hasClientNotes: "false" });
-            }
-        });
-    }
-    catch (err) {
-        logWebStoreError(err, "Failed to untrack blocks");
-    }
-}
-export async function pruneIrrelevantBlocks(dbId) {
-    try {
-        const db = getDatabase(dbId);
+        const numericNodeIds = nodeIdsToRemove.map(Number);
         const syncHeight = await db.stateSync.get(1);
         if (syncHeight == undefined) {
             throw Error("SyncHeight is undefined -- is the state sync table empty?");
         }
-        const allMatchingRecords = await db.blockHeaders
-            .where("hasClientNotes")
-            .equals("false")
-            .and((record) => record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum)
-            .toArray();
-        await db.blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
+        await db.dexie.transaction("rw", db.blockHeaders, db.partialBlockchainNodes, async () => {
+            // 1. Delete stale MMR authentication nodes.
+            if (numericNodeIds.length > 0) {
+                await db.partialBlockchainNodes.bulkDelete(numericNodeIds);
+            }
+            // 2. Mark untracked blocks as irrelevant.
+            if (blocksToUntrack.length > 0) {
+                await db.blockHeaders
+                    .where("blockNum")
+                    .anyOf(blocksToUntrack)
+                    .modify({ hasClientNotes: "false" });
+            }
+            // 3. Delete irrelevant block headers.
+            const allMatchingRecords = await db.blockHeaders
+                .where("hasClientNotes")
+                .equals("false")
+                .and((record) => record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum)
+                .toArray();
+            await db.blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
+        });
     }
     catch (err) {
         logWebStoreError(err, "Failed to prune irrelevant blocks");

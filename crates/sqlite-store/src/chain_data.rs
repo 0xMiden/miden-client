@@ -228,22 +228,23 @@ impl SqliteStore {
         Ok(())
     }
 
-    /// Removes MMR authentication nodes and marks block headers as no longer having relevant
-    /// notes.
-    pub fn untrack_blocks(
+    /// Prunes irrelevant block data from the store.
+    ///
+    /// This performs three operations in a single transaction:
+    /// 1. Deletes MMR authentication nodes at the given `node_indices`.
+    /// 2. Sets `has_client_notes = false` for `blocks_to_untrack`.
+    /// 3. Deletes block headers with `has_client_notes = false` that are not the genesis or
+    ///    sync-height block.
+    pub fn prune_irrelevant_blocks(
         conn: &mut Connection,
-        block_nums: &[BlockNumber],
-        node_indices: &[InOrderIndex],
+        blocks_to_untrack: &[BlockNumber],
+        node_indices_to_remove: &[InOrderIndex],
     ) -> Result<(), StoreError> {
-        // Early return to avoid opening a transaction when there is nothing to do.
-        if block_nums.is_empty() && node_indices.is_empty() {
-            return Ok(());
-        }
-
         let tx = conn.transaction().into_store_error()?;
 
-        if !node_indices.is_empty() {
-            let id_values = node_indices
+        // 1. Delete stale MMR authentication nodes.
+        if !node_indices_to_remove.is_empty() {
+            let id_values = node_indices_to_remove
                 .iter()
                 .map(|id| Value::Integer(i64::try_from(id.inner()).expect("id is a valid i64")))
                 .collect::<Vec<_>>();
@@ -255,8 +256,9 @@ impl SqliteStore {
             .into_store_error()?;
         }
 
-        if !block_nums.is_empty() {
-            let block_values = block_nums
+        // 2. Mark untracked blocks as irrelevant.
+        if !blocks_to_untrack.is_empty() {
+            let block_values = blocks_to_untrack
                 .iter()
                 .map(|b| Value::Integer(i64::from(b.as_u32())))
                 .collect::<Vec<_>>();
@@ -268,13 +270,7 @@ impl SqliteStore {
             .into_store_error()?;
         }
 
-        tx.commit().into_store_error()
-    }
-
-    /// Removes block headers that do not contain any client notes and aren't the genesis or last
-    /// block.
-    pub fn prune_irrelevant_blocks(conn: &mut Connection) -> Result<(), StoreError> {
-        let tx = conn.transaction().into_store_error()?;
+        // 3. Delete irrelevant block headers.
         let genesis: u32 = BlockNumber::GENESIS.as_u32();
 
         let sync_block: Option<u32> = tx
@@ -284,12 +280,10 @@ impl SqliteStore {
 
         if let Some(sync_height) = sync_block {
             tx.execute(
-                r"
-            DELETE FROM block_headers
-            WHERE has_client_notes = 0
-              AND block_num > ?1
-              AND block_num < ?2
-            ",
+                "DELETE FROM block_headers \
+                 WHERE has_client_notes = 0 \
+                 AND block_num > ?1 \
+                 AND block_num < ?2",
                 rusqlite::params![genesis, sync_height],
             )
             .into_store_error()?;
@@ -598,7 +592,7 @@ mod test {
                 .unwrap();
 
             // Prune
-            store.prune_irrelevant_blocks().await.unwrap();
+            store.prune_irrelevant_blocks(&[], &[]).await.unwrap();
 
             // Assert blocks
             let remaining_headers: i64 = store
@@ -726,7 +720,10 @@ mod test {
 
         // Execute the store operation.
         let block_nums_to_untrack = vec![BlockNumber::from(30u32)];
-        store.untrack_blocks(&block_nums_to_untrack, &removed_indices).await.unwrap();
+        store
+            .prune_irrelevant_blocks(&block_nums_to_untrack, &removed_indices)
+            .await
+            .unwrap();
 
         // Verify: fewer nodes in the table.
         let final_node_count: i64 = store
@@ -742,20 +739,20 @@ mod test {
             "expected fewer nodes after untrack, got {final_node_count} vs {initial_node_count}"
         );
 
-        // Verify: block 30 is no longer tracked.
-        let block_30_has_notes: bool = store
+        // Verify: block 30 header was deleted (it had has_client_notes set to false and
+        // was below sync_height, so prune_irrelevant_blocks removed it).
+        let block_30_exists: bool = store
             .interact_with_connection(|conn| {
                 Ok(conn
-                    .query_row(
-                        "SELECT has_client_notes FROM block_headers WHERE block_num = 30",
-                        [],
-                        |r| r.get(0),
-                    )
-                    .unwrap())
+                    .query_row("SELECT COUNT(*) FROM block_headers WHERE block_num = 30", [], |r| {
+                        r.get::<_, i64>(0)
+                    })
+                    .unwrap()
+                    > 0)
             })
             .await
             .unwrap();
-        assert!(!block_30_has_notes, "block 30 should no longer be tracked");
+        assert!(!block_30_exists, "block 30 should have been pruned");
 
         // Verify: the PartialMmr can be rebuilt and remaining tracked blocks (10, 50)
         // still have valid authentication paths.

@@ -24,7 +24,6 @@ use js_bindings::{
     idxdb_insert_block_header,
     idxdb_insert_partial_blockchain_nodes,
     idxdb_prune_irrelevant_blocks,
-    idxdb_untrack_blocks,
 };
 
 mod models;
@@ -217,28 +216,19 @@ impl IdxdbStore {
         Ok(())
     }
 
-    pub(crate) async fn untrack_blocks(
+    pub(crate) async fn prune_irrelevant_blocks(
         &self,
-        block_nums: &[BlockNumber],
-        node_indices: &[InOrderIndex],
+        blocks_to_untrack: &[BlockNumber],
+        node_indices_to_remove: &[InOrderIndex],
     ) -> Result<(), StoreError> {
-        if block_nums.is_empty() && node_indices.is_empty() {
-            return Ok(());
-        }
+        let block_nums_vec: Vec<u32> = blocks_to_untrack.iter().map(BlockNumber::as_u32).collect();
+        let node_ids_vec: Vec<String> = node_indices_to_remove
+            .iter()
+            .map(|id| (Into::<usize>::into(*id)).to_string())
+            .collect();
 
-        let block_nums_vec: Vec<u32> = block_nums.iter().map(BlockNumber::as_u32).collect();
-        let node_ids_vec: Vec<String> =
-            node_indices.iter().map(|id| (Into::<usize>::into(*id)).to_string()).collect();
-
-        let promise = idxdb_untrack_blocks(self.db_id(), block_nums_vec, node_ids_vec);
-        await_ok(promise, "failed to untrack blocks").await?;
-
-        Ok(())
-    }
-
-    pub(crate) async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError> {
-        let promise = idxdb_prune_irrelevant_blocks(self.db_id());
-        await_ok(promise, "failed to prune block header").await?;
+        let promise = idxdb_prune_irrelevant_blocks(self.db_id(), block_nums_vec, node_ids_vec);
+        await_ok(promise, "failed to prune irrelevant blocks").await?;
 
         Ok(())
     }

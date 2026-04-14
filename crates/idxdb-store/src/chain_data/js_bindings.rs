@@ -59,13 +59,10 @@ extern "C" {
     // DELETES
     // ================================================================================================
 
-    #[wasm_bindgen(js_name = untrackBlocks)]
-    pub fn idxdb_untrack_blocks(
-        db_id: &str,
-        block_nums: Vec<u32>,
-        node_ids: Vec<String>,
-    ) -> js_sys::Promise;
-
     #[wasm_bindgen(js_name = pruneIrrelevantBlocks)]
-    pub fn idxdb_prune_irrelevant_blocks(db_id: &str) -> js_sys::Promise;
+    pub fn idxdb_prune_irrelevant_blocks(
+        db_id: &str,
+        blocks_to_untrack: Vec<u32>,
+        node_ids_to_remove: Vec<String>,
+    ) -> js_sys::Promise;
 }
