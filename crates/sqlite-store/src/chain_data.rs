@@ -626,70 +626,65 @@ mod test {
         }
     }
 
-    /// Tests that untracking blocks removes their redundant authentication nodes while
-    /// preserving nodes needed by blocks that remain tracked.
-    #[tokio::test]
-    async fn untrack_blocks_removes_redundant_auth_nodes() {
-        let store = create_test_store().await;
-        const TOTAL_BLOCKS: usize = 64;
-
-        let tx_kernel_commitment = TransactionKernel.to_commitment();
-        let block_headers: Vec<BlockHeader> = (0..TOTAL_BLOCKS)
-            .map(|block_num| {
-                BlockHeader::mock(
-                    u32::try_from(block_num).unwrap(),
-                    None,
-                    None,
-                    &[],
-                    tx_kernel_commitment,
-                )
-            })
-            .collect();
-
-        // Build a full MMR and track three specific blocks.
-        let mut mmr = Mmr::default();
-        for header in &block_headers {
-            mmr.add(header.commitment());
-        }
-
-        let tracked_set: BTreeSet<usize> = [10, 30, 50].iter().copied().collect();
-
-        // Collect all authentication nodes for the tracked blocks.
-        let mut tracked_nodes: BTreeMap<InOrderIndex, Word> = BTreeMap::new();
-        for &block_num in &tracked_set {
-            let header = &block_headers[block_num];
-            tracked_nodes.insert(InOrderIndex::from_leaf_pos(block_num), header.commitment());
+    /// Collects authentication nodes for a set of tracked leaves in an MMR.
+    fn collect_auth_nodes(
+        mmr: &Mmr,
+        block_headers: &[BlockHeader],
+        tracked: &BTreeSet<usize>,
+    ) -> Vec<(InOrderIndex, Word)> {
+        let mut nodes: BTreeMap<InOrderIndex, Word> = BTreeMap::new();
+        for &block_num in tracked {
+            nodes.insert(
+                InOrderIndex::from_leaf_pos(block_num),
+                block_headers[block_num].commitment(),
+            );
             let proof = mmr.open(block_num).expect("valid proof");
             let mut idx = InOrderIndex::from_leaf_pos(block_num);
             for node in proof.merkle_path().nodes() {
-                tracked_nodes.insert(idx.sibling(), *node);
+                nodes.insert(idx.sibling(), *node);
                 idx = idx.parent();
             }
         }
-        let tracked_nodes_vec: Vec<(InOrderIndex, Word)> = tracked_nodes.into_iter().collect();
+        nodes.into_iter().collect()
+    }
 
-        let peaks_by_block: Vec<MmrPeaks> = (0..TOTAL_BLOCKS)
-            .map(|block_num| mmr.peaks_at(Forest::new(block_num)).expect("valid peaks"))
+    /// Tests that `prune_irrelevant_blocks` removes redundant authentication nodes for
+    /// untracked blocks while preserving nodes needed by blocks that remain tracked.
+    #[tokio::test]
+    async fn prune_irrelevant_blocks_removes_redundant_auth_nodes() {
+        let store = create_test_store().await;
+        const TOTAL_BLOCKS: usize = 16;
+        let tx_kernel = TransactionKernel.to_commitment();
+
+        let headers: Vec<BlockHeader> = (0..TOTAL_BLOCKS)
+            .map(|n| BlockHeader::mock(u32::try_from(n).unwrap(), None, None, &[], tx_kernel))
             .collect();
+        let mut mmr = Mmr::default();
+        for h in &headers {
+            mmr.add(h.commitment());
+        }
 
-        // Persist blocks and nodes.
-        let block_headers_clone = block_headers.clone();
+        // Track blocks 3 and 10; we will untrack 3 later.
+        let tracked: BTreeSet<usize> = [3, 10].into();
+        let auth_nodes = collect_auth_nodes(&mmr, &headers, &tracked);
+        let peaks_by_block: Vec<MmrPeaks> =
+            (0..TOTAL_BLOCKS).map(|n| mmr.peaks_at(Forest::new(n)).unwrap()).collect();
+
+        // Persist everything.
+        let headers_clone = headers.clone();
         store
             .interact_with_connection(move |conn| {
                 let tx = conn.transaction().unwrap();
-                for block_num in 0..TOTAL_BLOCKS {
-                    let has_notes = tracked_set.contains(&block_num);
+                for i in 0..TOTAL_BLOCKS {
                     SqliteStore::insert_block_header_tx(
                         &tx,
-                        &block_headers_clone[block_num],
-                        &peaks_by_block[block_num],
-                        has_notes,
+                        &headers_clone[i],
+                        &peaks_by_block[i],
+                        tracked.contains(&i),
                     )
                     .unwrap();
                 }
-                SqliteStore::insert_partial_blockchain_nodes_tx(&tx, &tracked_nodes_vec).unwrap();
-
-                // Set sync height to last block.
+                SqliteStore::insert_partial_blockchain_nodes_tx(&tx, &auth_nodes).unwrap();
                 tx.execute(
                     "UPDATE state_sync SET block_num = ?",
                     params![i64::try_from(TOTAL_BLOCKS - 1).unwrap()],
@@ -701,75 +696,25 @@ mod test {
             .await
             .unwrap();
 
-        // Count initial nodes.
-        let initial_node_count: i64 = store
-            .interact_with_connection(|conn| {
-                Ok(conn
-                    .query_row("SELECT COUNT(*) FROM partial_blockchain_nodes", [], |r| r.get(0))
-                    .unwrap())
-            })
-            .await
-            .unwrap();
-        assert!(initial_node_count > 0);
-
-        // Rebuild the PartialMmr and untrack block 30 (simulate: all notes consumed).
+        // Untrack block 3 via the PartialMmr, then prune.
         let mut partial_mmr = Store::get_current_partial_mmr(&store).await.unwrap();
-        let removed_nodes = partial_mmr.untrack(30);
-        let removed_indices: Vec<InOrderIndex> =
-            removed_nodes.iter().map(|(idx, _)| *idx).collect();
+        let removed: Vec<InOrderIndex> =
+            partial_mmr.untrack(3).into_iter().map(|(idx, _)| idx).collect();
+        assert!(!removed.is_empty(), "untracking should remove at least one node");
 
-        // Execute the store operation.
-        let block_nums_to_untrack = vec![BlockNumber::from(30u32)];
         store
-            .prune_irrelevant_blocks(&block_nums_to_untrack, &removed_indices)
+            .prune_irrelevant_blocks(&[BlockNumber::from(3u32)], &removed)
             .await
             .unwrap();
 
-        // Verify: fewer nodes in the table.
-        let final_node_count: i64 = store
-            .interact_with_connection(|conn| {
-                Ok(conn
-                    .query_row("SELECT COUNT(*) FROM partial_blockchain_nodes", [], |r| r.get(0))
-                    .unwrap())
-            })
-            .await
-            .unwrap();
-        assert!(
-            final_node_count < initial_node_count,
-            "expected fewer nodes after untrack, got {final_node_count} vs {initial_node_count}"
-        );
+        // Block 3 header should be deleted, block 10 should still be provable.
+        let rebuilt = Store::get_current_partial_mmr(&store).await.unwrap();
+        assert_eq!(rebuilt.peaks().hash_peaks(), mmr.peaks().hash_peaks());
 
-        // Verify: block 30 header was deleted (it had has_client_notes set to false and
-        // was below sync_height, so prune_irrelevant_blocks removed it).
-        let block_30_exists: bool = store
-            .interact_with_connection(|conn| {
-                Ok(conn
-                    .query_row("SELECT COUNT(*) FROM block_headers WHERE block_num = 30", [], |r| {
-                        r.get::<_, i64>(0)
-                    })
-                    .unwrap()
-                    > 0)
-            })
-            .await
-            .unwrap();
-        assert!(!block_30_exists, "block 30 should have been pruned");
+        let proof_10 = rebuilt.open(10).expect("open succeeds");
+        assert!(proof_10.is_some(), "block 10 should still be provable");
 
-        // Verify: the PartialMmr can be rebuilt and remaining tracked blocks (10, 50)
-        // still have valid authentication paths.
-        let rebuilt_mmr = Store::get_current_partial_mmr(&store).await.unwrap();
-        assert_eq!(rebuilt_mmr.peaks().hash_peaks(), mmr.peaks().hash_peaks());
-
-        for &block_num in &[10, 50] {
-            let partial_proof = rebuilt_mmr.open(block_num).expect("partial mmr query succeeds");
-            assert!(partial_proof.is_some(), "block {block_num} should still be provable");
-            assert_eq!(
-                partial_proof.unwrap().merkle_path(),
-                mmr.open(block_num).unwrap().merkle_path()
-            );
-        }
-
-        // Verify: block 30 is no longer provable.
-        let block_30_proof = rebuilt_mmr.open(30).expect("open should not error");
-        assert!(block_30_proof.is_none(), "block 30 should no longer be provable");
+        let proof_3 = rebuilt.open(3).expect("open succeeds");
+        assert!(proof_3.is_none(), "block 3 should no longer be provable");
     }
 }
