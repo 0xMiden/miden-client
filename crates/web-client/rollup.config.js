@@ -133,10 +133,15 @@ export default [
       },
     ],
   },
-  // Build the worker file as a self-contained classic script.
-  // Safari/WKWebView is extremely slow with module workers ({type: "module"}).
-  // Using format: "es" + inlineDynamicImports ensures everything is in one file.
-  // The wrap-worker-classic plugin converts it to an async-IIFE classic script.
+  // Classic worker build.
+  //
+  // Safari/WKWebView is extremely slow with module workers ({type: "module"}),
+  // so we ship a self-contained async-IIFE classic script alongside the module
+  // variant below. `wrap-worker-classic` rewrites `import.meta.url` →
+  // `self.location.href` (the only form a classic worker can see at runtime),
+  // strips `export` clauses, and wraps the rollup ESM output in an async IIFE.
+  //
+  // Output: dist/workers/web-client-methods-worker.js
   {
     input: "./js/workers/web-client-methods-worker.js",
     output: {
@@ -184,5 +189,44 @@ export default [
         },
       },
     ],
+  },
+  // Module worker build.
+  //
+  // Same input as above, but emitted as a plain ES module (.mjs) without the
+  // classic IIFE wrapping. `import.meta.url` is preserved, which lets webpack
+  // 5's asset tracer statically resolve `new URL("assets/miden_client_web.wasm",
+  // import.meta.url)` inside the Cargo-bindgen glue and copy the WASM file into
+  // the bundler's output correctly. Issue #2046: v0.14.1's classic-only worker
+  // rewrites that reference to `self.location.href`, which webpack cannot trace,
+  // producing a 404 on the WASM file for Next.js/webpack consumers.
+  //
+  // Output: dist/workers/web-client-methods-worker.mjs
+  {
+    input: "./js/workers/web-client-methods-worker.js",
+    output: {
+      dir: `dist/workers`,
+      format: "es",
+      sourcemap: true,
+      // Two deliberate choices here:
+      //
+      // 1. NOT inlining dynamic imports. Keeping the
+      //    `await import("./Cargo-*.js")` as a real dynamic ESM import
+      //    lets webpack's module-graph analysis follow the Cargo glue and
+      //    copy the sibling `miden_client_web.wasm` that the glue references
+      //    via `new URL("assets/...", import.meta.url)`. With
+      //    `inlineDynamicImports`, the URL literal ends up buried inside the
+      //    worker bundle and webpack's worker sub-compilation never sees it
+      //    as a graph dependency.
+      //
+      // 2. `.js` extension, not `.mjs`. Webpack 5 routes `.mjs` worker files
+      //    through `type: "asset/resource"` (copy-only, no sub-compilation),
+      //    so dynamic imports inside them never get chunked and runtime fetch
+      //    404s on the Cargo glue. `.js` with `{ type: "module" }` on the
+      //    Worker constructor triggers the proper worker sub-compilation and
+      //    all chunking works. The `.module` infix disambiguates this file
+      //    from the classic worker output that sits alongside it.
+      entryFileNames: "[name].module.js",
+    },
+    plugins: [resolve(), commonjs()],
   },
 ];
