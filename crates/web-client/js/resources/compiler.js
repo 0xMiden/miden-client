@@ -52,4 +52,29 @@ export class CompilerResource {
     }
     return builder.compileTxScript(code);
   }
+
+  /**
+   * Compiles a note script, optionally linking named libraries inline.
+   *
+   * @param {{ code: string, libraries?: Array<{ namespace: string, code: string, linking?: "dynamic" | "static" }> }} opts
+   * @returns {Promise<NoteScript>}
+   */
+  async noteScript({ code, libraries = [] }) {
+    this.#client.assertNotTerminated();
+    await this.#getWasm();
+    const builder = this.#inner.createCodeBuilder();
+    for (const lib of libraries) {
+      if (lib && typeof lib.namespace === "string") {
+        const built = builder.buildLibrary(lib.namespace, lib.code);
+        if (lib.linking === "static") {
+          builder.linkStaticLibrary(built);
+        } else {
+          builder.linkDynamicLibrary(built);
+        }
+      } else {
+        builder.linkDynamicLibrary(lib);
+      }
+    }
+    return builder.compileNoteScript(code);
+  }
 }

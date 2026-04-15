@@ -44,6 +44,11 @@ export const StorageMode = Object.freeze({
   Network: "network",
 });
 
+export const Linking = Object.freeze({
+  Dynamic: "dynamic",
+  Static: "static",
+});
+
 export { MidenClient };
 export { createP2IDNote, createP2IDENote, buildSwapTag };
 

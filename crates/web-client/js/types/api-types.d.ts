@@ -29,6 +29,7 @@ import type {
   AuthSecretKey,
   AccountStorageRequirements,
   TransactionScript,
+  NoteScript,
   AdviceInputs,
   FeltArray,
 } from "./crates/miden_client_web";
@@ -104,6 +105,18 @@ export declare const StorageMode: {
 
 /** Union of valid StorageMode string values. */
 export type StorageMode = "public" | "private" | "network";
+
+/**
+ * Library linking mode for script compilation.
+ * Use `Linking.Dynamic` or `Linking.Static` instead of raw strings.
+ */
+export declare const Linking: {
+  readonly Dynamic: "dynamic";
+  readonly Static: "static";
+};
+
+/** Union of valid Linking string values. */
+export type Linking = "dynamic" | "static";
 
 /**
  * Union of all values in the AccountType const.
@@ -770,14 +783,21 @@ export interface CompileTxScriptLibrary {
   /** MASM source code for the library. */
   code: string;
   /**
-   * `"dynamic"` (default) — procedures are linked via DYNCALL at runtime.
-   * `"static"` — procedures are inlined at compile time.
+   * `Linking.Dynamic` (default) — procedures are linked via DYNCALL at runtime.
+   * `Linking.Static` — procedures are inlined at compile time.
    */
-  linking?: "dynamic" | "static";
+  linking?: Linking;
 }
 
 export interface CompileTxScriptOptions {
   /** MASM source code for the transaction script. */
+  code: string;
+  /** Component libraries to link. */
+  libraries?: CompileTxScriptLibrary[];
+}
+
+export interface CompileNoteScriptOptions {
+  /** MASM source code for the note script. */
   code: string;
   /** Component libraries to link. */
   libraries?: CompileTxScriptLibrary[];
@@ -796,6 +816,12 @@ export interface CompilerResource {
    * @param options - Script source code and optional libraries to link.
    */
   txScript(options: CompileTxScriptOptions): Promise<TransactionScript>;
+  /**
+   * Compile MASM source into a NoteScript.
+   *
+   * @param options - Script source code and optional libraries to link.
+   */
+  noteScript(options: CompileNoteScriptOptions): Promise<NoteScript>;
 }
 
 export interface TagsResource {
