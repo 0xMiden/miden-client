@@ -216,6 +216,31 @@ The downloaded notes will be added to the store.
 miden-client notes --fetch
 ```
 
+### `network-note-status`
+
+Query the network for the processing status of a note. This is useful for diagnosing issues with network transactions (NTX), such as notes that are stuck or have been discarded.
+
+```sh
+miden-client network-note-status <NOTE_ID>
+```
+
+The command displays a table with the following information:
+
+- **Status**: The current processing state of the note (`Pending`, `Processed`, `Discarded`, or `Committed`).
+- **Attempt Count**: The number of times the node has attempted to process the note.
+- **Last Error**: The last error encountered during processing, if any.
+- **Last Attempt Block**: The block number of the most recent processing attempt.
+
+The note ID must be provided as a full hex string:
+
+```sh
+miden-client network-note-status 0x70b7ecba1db44c3aa75e87a3394de95463cc094d7794b706e02a9228342faeb0
+```
+
+:::note
+This command queries the Miden node directly and does not require the note to be tracked locally.
+:::
+
 ### `sync`
 
 Sync the client with the latest state of the Miden network. Shows a brief summary at the end.
