@@ -1150,8 +1150,6 @@ impl StateSync {
         Ok(())
     }
 
-    /// Applies the changes received from the sync response to the transactions tracked by the
-    /// client and updates the `transaction_updates` accordingly.
     /// Detects output notes consumed via same-batch note erasure.
     ///
     /// When a note is created and consumed in the same batch, note erasure removes it from
@@ -1171,6 +1169,8 @@ impl StateSync {
         }
     }
 
+    /// Applies the changes received from the sync response to the transactions tracked by the
+    /// client and updates the `transaction_updates` accordingly.
     ///
     /// The transaction updates might include:
     /// * New transactions that were committed in the block.
@@ -1797,5 +1797,78 @@ mod tests {
                 "block {bn} with notes should be tracked in partial MMR"
             );
         }
+    }
+
+    /// Tests that `detect_erased_notes` marks output notes as consumed when a committed
+    /// transaction's header lists a note that the node doesn't have.
+    ///
+    /// This simulates same-batch note erasure: the transaction was committed, its header
+    /// says it produced a note, but the note was erased and doesn't exist on the node.
+    #[tokio::test]
+    async fn detect_erased_notes_marks_missing_output_notes_as_consumed() {
+        use miden_protocol::block::BlockNumber;
+        use miden_protocol::note::{
+            NoteAssets, NoteMetadata, NoteRecipient, NoteStorage, NoteType,
+        };
+        use miden_protocol::testing::account_id::ACCOUNT_ID_SENDER;
+        use miden_protocol::transaction::TransactionId;
+
+        use crate::store::{OutputNoteRecord, OutputNoteState};
+
+        let mock_rpc = MockRpcApi::default();
+        let _state_sync =
+            StateSync::new(Arc::new(mock_rpc.clone()), None, Arc::new(MockScreener), None);
+
+        // Create a public output note. It won't be in the mock chain (simulating erasure).
+        let sender_id: AccountId = ACCOUNT_ID_SENDER.try_into().unwrap();
+        let metadata = NoteMetadata::new(sender_id, NoteType::Public);
+        let script =
+            CodeBuilder::new().compile_note_script("begin nop end").unwrap();
+        let recipient = NoteRecipient::new(
+            Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
+            script,
+            NoteStorage::new(vec![]).unwrap(),
+        );
+        let output_note = OutputNoteRecord::new(
+            recipient.digest(),
+            NoteAssets::new(vec![]).unwrap(),
+            metadata,
+            OutputNoteState::ExpectedFull { recipient },
+            BlockNumber::from(1u32),
+        );
+        let note_id = output_note.id();
+
+        // Build a StateSyncUpdate with the output note in the tracker.
+        let mut state_sync_update = StateSyncUpdate {
+            block_num: BlockNumber::from(5u32),
+            note_updates: NoteUpdateTracker::new(vec![], vec![output_note]),
+            ..Default::default()
+        };
+
+        // Simulate a committed transaction that claims to have produced this note,
+        // but the node's committed output notes are empty (erased).
+        let transactions = vec![TransactionInclusion {
+            transaction_id: TransactionId::from_raw(Word::from([1, 2, 3, 4u32])),
+            block_num: BlockNumber::from(3u32),
+            account_id: sender_id,
+            initial_state_commitment: Word::default(),
+            nullifiers: vec![],
+            output_notes: vec![],
+            erased_output_note_ids: vec![note_id],
+        }];
+
+        StateSync::detect_erased_notes(&mut state_sync_update, &transactions);
+
+        let updated = state_sync_update
+            .note_updates
+            .updated_output_notes()
+            .find(|n| n.id() == note_id)
+            .expect("output note should be in the update");
+
+        assert!(
+            updated.inner().is_consumed(),
+            "output note should be consumed after erasure detection, but state is: {}",
+            updated.inner().state()
+        );
     }
 }
