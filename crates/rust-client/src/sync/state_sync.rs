@@ -38,7 +38,6 @@ use crate::rpc::domain::account::{
     FetchedAccount,
 };
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
-use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::storage_map::StorageMapUpdate;
 use crate::rpc::domain::transaction::{
     TransactionInclusion,
