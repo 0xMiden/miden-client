@@ -352,28 +352,28 @@ impl NoteUpdateTracker {
         note_id: NoteId,
         block_num: BlockNumber,
     ) -> Result<(), ClientError> {
-        if let Some(output_note) = self.get_output_note_by_id(note_id) {
-            if !output_note.is_consumed() && !output_note.is_committed() {
-                if let Some(nullifier) = output_note.nullifier() {
-                    output_note.nullifier_received(nullifier, block_num)?;
-                }
-            }
+        if let Some(output_note) = self.get_output_note_by_id(note_id)
+            && !output_note.is_consumed()
+            && !output_note.is_committed()
+            && let Some(nullifier) = output_note.nullifier()
+        {
+            output_note.nullifier_received(nullifier, block_num)?;
         }
 
         // Also mark the corresponding input note if tracked.
-        if let Some(input_note_update) = self.input_notes.get_mut(&note_id) {
-            if !input_note_update.inner().is_consumed() {
-                let nullifier = input_note_update.inner().nullifier();
-                let consumer = input_note_update.inner().metadata().and_then(|m| {
-                    miden_standards::note::NetworkAccountTarget::try_from(m.attachment())
-                        .ok()
-                        .map(|t| t.target_id())
-                });
-                input_note_update
-                    .inner_mut()
-                    .consumed_externally(nullifier, block_num, consumer)?;
-                input_note_update.inner_mut().set_consumed_tx_order(Some(0));
-            }
+        if let Some(input_note_update) = self.input_notes.get_mut(&note_id)
+            && !input_note_update.inner().is_consumed()
+        {
+            let nullifier = input_note_update.inner().nullifier();
+            let consumer = input_note_update.inner().metadata().and_then(|m| {
+                miden_standards::note::NetworkAccountTarget::try_from(m.attachment())
+                    .ok()
+                    .map(|t| t.target_id())
+            });
+            input_note_update
+                .inner_mut()
+                .consumed_externally(nullifier, block_num, consumer)?;
+            input_note_update.inner_mut().set_consumed_tx_order(Some(0));
         }
 
         Ok(())
