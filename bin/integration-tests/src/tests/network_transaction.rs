@@ -12,14 +12,7 @@ use miden_client::account::{
     StorageSlot,
     StorageSlotName,
 };
-use miden_client::assembly::{
-    CodeBuilder,
-    DefaultSourceManager,
-    Library,
-    Module,
-    ModuleKind,
-    Path,
-};
+use miden_client::assembly::{CodeBuilder, Library, Module, ModuleKind, Path, SourceManagerSync};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{
     NetworkAccountTarget,
@@ -105,8 +98,9 @@ pub(crate) async fn deploy_counter_contract(
 
     client.add_account(&acc, false).await?;
 
-    let mut script_builder = CodeBuilder::new();
-    script_builder.link_dynamic_library(&counter_contract_library())?;
+    let source_manager = client.source_manager().expect("source manager not set");
+    let mut script_builder = CodeBuilder::with_source_manager(source_manager.clone());
+    script_builder.link_dynamic_library(&counter_contract_library(source_manager))?;
     let tx_script = script_builder.compile_tx_script(INCR_SCRIPT_CODE)?;
 
     // Build a transaction request with the custom script
@@ -182,9 +176,14 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
 
     let mut network_notes = vec![];
 
+    let source_manager = client.source_manager().expect("source manager not set");
     for _ in 0..BUMP_NOTE_NUMBER {
-        let network_note =
-            get_network_note(native_account.id(), network_account.id(), &mut client.rng())?;
+        let network_note = get_network_note(
+            native_account.id(),
+            network_account.id(),
+            source_manager.clone(),
+            &mut client.rng(),
+        )?;
         network_notes.push(network_note);
     }
 
@@ -234,7 +233,9 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
             .await?
             .0;
 
-    let network_note = get_network_note(wallet.id(), network_account.id(), &mut client.rng())?;
+    let source_manager = client.source_manager().expect("source manager not set");
+    let network_note =
+        get_network_note(wallet.id(), network_account.id(), source_manager, &mut client.rng())?;
     // Prepare both transactions
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![network_note.clone()])
@@ -280,10 +281,10 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     Ok(())
 }
 
-// Initialize the Basic Fungible Faucet library only once.
-static COUNTER_CONTRACT_LIBRARY: LazyLock<Arc<Library>> = LazyLock::new(|| {
-    let assembler = TransactionKernel::assembler();
-    let source_manager = Arc::new(DefaultSourceManager::default());
+/// Compiles the counter contract library using the provided source manager so that all source
+/// spans are registered in the same manager used by the client's executor.
+fn counter_contract_library(source_manager: Arc<dyn SourceManagerSync>) -> Arc<Library> {
+    let assembler = TransactionKernel::assembler_with_source_manager(source_manager.clone());
     let module = Module::parser(ModuleKind::Library)
         .parse_str(
             Path::new("external_contract::counter_contract"),
@@ -297,25 +298,22 @@ static COUNTER_CONTRACT_LIBRARY: LazyLock<Arc<Library>> = LazyLock::new(|| {
         .assemble_library([module])
         .map_err(|err| anyhow!(err))
         .unwrap()
-});
-
-/// Returns the Basic Fungible Faucet Library.
-fn counter_contract_library() -> Arc<Library> {
-    COUNTER_CONTRACT_LIBRARY.clone()
 }
 
 fn get_network_note<T: Rng>(
     sender: AccountId,
     network_account: AccountId,
+    source_manager: Arc<dyn SourceManagerSync>,
     rng: &mut T,
 ) -> Result<Note> {
-    get_network_note_with_script(sender, network_account, INCR_SCRIPT_CODE, rng)
+    get_network_note_with_script(sender, network_account, INCR_SCRIPT_CODE, source_manager, rng)
 }
 
 pub(crate) fn get_network_note_with_script<T: Rng>(
     sender: AccountId,
     network_account: AccountId,
     script: &str,
+    source_manager: Arc<dyn SourceManagerSync>,
     rng: &mut T,
 ) -> Result<Note> {
     let target = NetworkAccountTarget::new(network_account, NoteExecutionHint::Always)?;
@@ -324,8 +322,8 @@ pub(crate) fn get_network_note_with_script<T: Rng>(
         .with_tag(NoteTag::with_account_target(network_account))
         .with_attachment(attachment);
 
-    let script = CodeBuilder::new()
-        .with_dynamically_linked_library(counter_contract_library())?
+    let script = CodeBuilder::with_source_manager(source_manager.clone())
+        .with_dynamically_linked_library(counter_contract_library(source_manager))?
         .compile_note_script(script)?;
     let recipient = NoteRecipient::new(
         Word::new([

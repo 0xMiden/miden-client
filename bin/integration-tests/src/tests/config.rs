@@ -5,6 +5,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
+use miden_client::assembly::DefaultSourceManager;
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::RandomCoin;
 use miden_client::grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
@@ -150,6 +151,7 @@ impl ClientConfig {
             .rng(Box::new(rng))
             .sqlite_store(store_config)
             .authenticator(Arc::new(keystore.clone()))
+            .source_manager(Arc::new(DefaultSourceManager::default()))
             .in_debug_mode(DebugMode::Disabled)
             .tx_discard_delta(None);
 

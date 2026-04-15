@@ -83,6 +83,7 @@ pub fn build_chunk_tx_request(
 
     let tx_script = client
         .code_builder()
+        .expect("source manager not set")
         .with_linked_module("bench_reader::storage_reader", reader_code.as_str())?
         .compile_tx_script(&script_code)?;
     Ok(TransactionRequestBuilder::new().custom_script(tx_script).build()?)

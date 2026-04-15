@@ -96,7 +96,10 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
         account_id_suffix = foreign_account_id.suffix(),
     );
 
-    let tx_script = client.code_builder().compile_tx_script(&code)?;
+    let tx_script = client
+        .code_builder()
+        .expect("source manager not set")
+        .compile_tx_script(&code)?;
     client.sync_state().await?;
 
     let map_slot_name = StorageSlotName::new(MAP_SLOT_NAME).expect("slot name should be valid");
@@ -240,7 +243,10 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
         account_id_suffix = outer_foreign_account_id.suffix(),
     );
 
-    let tx_script = client.code_builder().compile_tx_script(&tx_script)?;
+    let tx_script = client
+        .code_builder()
+        .expect("source manager not set")
+        .compile_tx_script(&tx_script)?;
     client.sync_state().await?;
 
     // Create transaction request with FPI
@@ -314,7 +320,10 @@ pub async fn test_lazy_fpi_loading(client_config: ClientConfig) -> Result<()> {
         account_id_prefix = foreign_account_id.prefix().as_u64(),
         account_id_suffix = foreign_account_id.suffix(),
     );
-    let tx_script = client.code_builder().compile_tx_script(&tx_script)?;
+    let tx_script = client
+        .code_builder()
+        .expect("source manager not set")
+        .compile_tx_script(&tx_script)?;
     client.sync_state().await?;
 
     // Wait for blocks so the account is committed on-chain.
@@ -398,7 +407,10 @@ pub async fn test_lazy_fpi_loading_with_storage_map(client_config: ClientConfig)
         account_id_suffix = foreign_account_id.suffix(),
     );
 
-    let tx_script = client.code_builder().compile_tx_script(&tx_script)?;
+    let tx_script = client
+        .code_builder()
+        .expect("source manager not set")
+        .compile_tx_script(&tx_script)?;
     client.sync_state().await?;
 
     wait_for_blocks(&mut client, 2).await;
@@ -501,7 +513,10 @@ async fn standard_fpi(
         account_id_suffix = foreign_account_id.suffix(),
     );
 
-    let tx_script = client.code_builder().compile_tx_script(&tx_script)?;
+    let tx_script = client
+        .code_builder()
+        .expect("source manager not set")
+        .compile_tx_script(&tx_script)?;
     client.sync_state().await?;
 
     // Before the transaction there are no cached foreign accounts

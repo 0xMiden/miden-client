@@ -77,6 +77,7 @@ async fn submit_expansion_batches(
 
         let tx_script = client
             .code_builder()
+            .expect("source manager not set")
             .with_linked_module("expander::storage_expander", expansion_code)?
             .compile_tx_script(&script_code)?;
 

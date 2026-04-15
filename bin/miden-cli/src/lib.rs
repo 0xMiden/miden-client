@@ -7,6 +7,7 @@ use clap::{Parser, Subcommand};
 use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets};
 use errors::CliError;
 use miden_client::account::AccountHeader;
+use miden_client::assembly::DefaultSourceManager;
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
@@ -140,6 +141,7 @@ impl CliClient {
             .sqlite_store(config.store_filepath.clone())
             .grpc_client(&config.rpc.endpoint.clone().into(), Some(config.rpc.timeout_ms))
             .authenticator(Arc::new(keystore))
+            .source_manager(Arc::new(DefaultSourceManager::default()))
             .in_debug_mode(debug_mode)
             .tx_discard_delta(Some(TX_DISCARD_DELTA));
 

@@ -16,6 +16,7 @@ use std::sync::Arc;
 use miden_client::{
     ClientError,
     RemoteTransactionProver,
+    assembly::DefaultSourceManager,
     builder::ClientBuilder,
     transaction::{LocalTransactionProver, ProvingOptions},
 };
@@ -30,6 +31,7 @@ let mut client = ClientBuilder::new()
     .store(store)
     .rpc(rpc)
     .authenticator(authenticator)
+    .source_manager(Arc::new(DefaultSourceManager::default()))
     .build()
     .await?;
 

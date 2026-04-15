@@ -706,7 +706,7 @@ async fn debug_mode_outputs_logs() -> Result<()> {
                 assert_eq
             end
             ";
-    let note_script = client.code_builder().compile_note_script(note_script).unwrap();
+    let note_script = client.code_builder().unwrap().compile_note_script(note_script).unwrap();
     let inputs = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
     let note_metadata = NoteMetadata::new(account.id(), NoteType::Private)
@@ -1187,6 +1187,7 @@ async fn create_rust_client_with_store_path(
         .rng(rng)
         .store(store)
         .authenticator(Arc::new(keystore.clone()))
+        .source_manager(Arc::new(miden_client::assembly::DefaultSourceManager::default()))
         .in_debug_mode(DebugMode::Enabled)
         .build()
         .await?;

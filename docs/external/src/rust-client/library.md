@@ -18,6 +18,7 @@ The recommended way to create a client is using the `ClientBuilder`. For standar
 ```rust
 use std::sync::Arc;
 use miden_client::builder::ClientBuilder;
+use miden_client::assembly::DefaultSourceManager;
 use miden_client_sqlite_store::SqliteStore;
 
 // Create store
@@ -28,6 +29,7 @@ let store = Arc::new(sqlite_store);
 let client = ClientBuilder::for_testnet()
     .store(store)
     .filesystem_keystore("path/to/keys")?
+    .source_manager(Arc::new(DefaultSourceManager::default()))
     .build()
     .await?;
 ```
@@ -42,6 +44,7 @@ For custom configurations, use `ClientBuilder::new()` and configure each compone
 ```rust
 use std::sync::Arc;
 use miden_client::builder::ClientBuilder;
+use miden_client::assembly::DefaultSourceManager;
 use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client_sqlite_store::SqliteStore;
 
@@ -56,6 +59,7 @@ let client = ClientBuilder::new()
     .grpc_client(&endpoint, None)
     .store(store)
     .filesystem_keystore("path/to/keys")?
+    .source_manager(Arc::new(DefaultSourceManager::default()))
     // Optional: custom prover via .prover(Arc::new(prover))
     // Optional: note transport via .note_transport(Arc::new(nt_client))
     // Optional: debug mode via .in_debug_mode(DebugMode::Enabled)

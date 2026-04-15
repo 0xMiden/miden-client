@@ -75,6 +75,7 @@ use miden_protocol::account::{
     StorageSlotContent,
     StorageSlotName,
 };
+use miden_protocol::assembly::DefaultSourceManager;
 use miden_protocol::asset::{Asset, AssetVaultKey, AssetWitness, FungibleAsset, TokenSymbol};
 use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
 use miden_protocol::note::{
@@ -969,7 +970,11 @@ async fn execute_program() {
         end
         ";
 
-    let tx_script = client.code_builder().compile_tx_script(code).unwrap();
+    let tx_script = client
+        .code_builder()
+        .expect("source manager not set")
+        .compile_tx_script(code)
+        .unwrap();
 
     let output_stack = Box::pin(client.execute_program(
         wallet.id(),
@@ -1240,6 +1245,7 @@ async fn input_note_reader_finds_externally_consumed_notes() {
         .rng(Box::new(rng))
         .sqlite_store(create_test_store_path())
         .authenticator(Arc::new(keystore))
+        .source_manager(Arc::new(DefaultSourceManager::default()))
         .in_debug_mode(DebugMode::Enabled)
         .tx_discard_delta(None)
         .build()
@@ -2787,7 +2793,11 @@ async fn consume_note_with_custom_script() {
             nop
         end
     ";
-    let note_script = client.code_builder().compile_note_script(custom_note_script).unwrap();
+    let note_script = client
+        .code_builder()
+        .expect("source manager not set")
+        .compile_note_script(custom_note_script)
+        .unwrap();
 
     let note_storage = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
@@ -3090,6 +3100,7 @@ async fn sync_large_public_account() {
         .rng(Box::new(rng))
         .sqlite_store(create_test_store_path())
         .authenticator(Arc::new(keystore))
+        .source_manager(Arc::new(DefaultSourceManager::default()))
         .in_debug_mode(DebugMode::Enabled)
         .build()
         .await
@@ -3167,6 +3178,7 @@ pub async fn create_test_client_builder()
         .rng(Box::new(rng))
         .sqlite_store(create_test_store_path())
         .authenticator(Arc::new(keystore.clone()))
+        .source_manager(Arc::new(DefaultSourceManager::default()))
         .in_debug_mode(DebugMode::Enabled)
         .tx_discard_delta(None);
 
