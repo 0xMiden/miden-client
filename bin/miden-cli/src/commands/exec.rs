@@ -1,4 +1,7 @@
 use std::collections::BTreeMap;
+use std::fs;
+#[cfg(feature = "dap")]
+use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -54,7 +57,7 @@ pub struct ExecCmd {
     /// and wait for a DAP client to connect before executing.
     #[cfg(feature = "dap")]
     #[arg(long = "start-debug-adapter")]
-    start_debug_adapter: Option<std::net::SocketAddr>,
+    start_debug_adapter: Option<SocketAddr>,
 }
 
 impl ExecCmd {
@@ -70,7 +73,7 @@ impl ExecCmd {
             ));
         }
 
-        let program = std::fs::read_to_string(script_path)?;
+        let program = fs::read_to_string(script_path)?;
 
         let account_id =
             get_input_acc_id_by_prefix_or_default(&client, self.account_id.clone()).await?;
@@ -85,7 +88,7 @@ impl ExecCmd {
                     ));
                 }
 
-                let input_data = std::fs::read_to_string(input_file)?;
+                let input_data = fs::read_to_string(input_file)?;
                 deserialize_tx_inputs(&input_data)?
             },
             None => vec![],
@@ -150,7 +153,7 @@ impl ExecCmd {
 
             let script_path = PathBuf::from(&self.script_path);
             loop {
-                let program = std::fs::read_to_string(&script_path)?;
+                let program = fs::read_to_string(&script_path)?;
                 let tx_script = client.code_builder().compile_tx_script(&program)?;
 
                 let result = client
@@ -164,7 +167,7 @@ impl ExecCmd {
 
                 if config_handle.restart_requested() {
                     config_handle.reset_restart();
-                    eprintln!("Recompiling from source and restarting debug session...");
+                    println!("Recompiling from source and restarting debug session...");
                     continue;
                 }
 

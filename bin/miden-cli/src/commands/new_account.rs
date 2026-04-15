@@ -100,7 +100,10 @@ pub struct NewWalletCmd {
     pub deploy: bool,
     /// Seed local-only state so the wallet can be created and used for execution without a node.
     /// Only available when built with the `testing` feature.
-    #[cfg_attr(feature = "testing", arg(long, default_value_t = false))]
+    #[cfg_attr(
+        feature = "testing",
+        arg(long, default_value_t = false, conflicts_with = "deploy")
+    )]
     #[cfg_attr(not(feature = "testing"), arg(skip = false))]
     pub offline: bool,
 }
@@ -201,7 +204,10 @@ pub struct NewAccountCmd {
     pub deploy: bool,
     /// Seed local-only state so the account can be created and used for execution without a node.
     /// Only available when built with the `testing` feature.
-    #[cfg_attr(feature = "testing", arg(long, default_value_t = false))]
+    #[cfg_attr(
+        feature = "testing",
+        arg(long, default_value_t = false, conflicts_with = "deploy")
+    )]
     #[cfg_attr(not(feature = "testing"), arg(skip = false))]
     pub offline: bool,
 }
@@ -406,12 +412,6 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
             ", client_binary_name().display())));
     }
 
-    if deploy && offline {
-        return Err(CliError::InvalidArgument(
-            "`--offline` cannot be combined with `--deploy`".to_string(),
-        ));
-    }
-
     // Load the component templates and initialization storage data.
 
     let cli_config = CliConfig::load()?;
@@ -473,6 +473,8 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     } else {
         println!("Using custom authentication component from package (no key generated).");
     }
+
+    let _ = offline;
 
     #[cfg(feature = "testing")]
     if offline {

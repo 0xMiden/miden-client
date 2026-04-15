@@ -5,16 +5,13 @@ use miden_protocol::Word;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
+#[cfg(feature = "testing")]
+use miden_protocol::transaction::TransactionKernel;
 use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
 use crate::store::{BlockRelevance, StoreError};
 use crate::{Client, ClientError};
-
-/// Synthetic faucet account ID used only by the offline bootstrap genesis header so fee
-/// parameters can reference a stable native-asset faucet without requiring node state.
-#[cfg(feature = "testing")]
-const OFFLINE_NATIVE_ASSET_FAUCET_ID: u128 = 0xab00_0000_0000_cd20_0000_ac00_0000_de00;
 
 /// Network information management methods.
 impl<AUTH> Client<AUTH> {
@@ -118,35 +115,7 @@ impl<AUTH> Client<AUTH> {
 
 #[cfg(feature = "testing")]
 fn synthetic_offline_genesis_header() -> BlockHeader {
-    use miden_protocol::account::AccountId;
-    use miden_protocol::block::account_tree::AccountTree;
-    use miden_protocol::block::nullifier_tree::NullifierTree;
-    use miden_protocol::block::{BlockNoteTree, Blockchain, FeeParameters};
-    use miden_protocol::crypto::dsa::ecdsa_k256_keccak::SecretKey;
-    use miden_protocol::crypto::merkle::smt::Smt;
-    use miden_protocol::transaction::{OrderedTransactionHeaders, TransactionKernel};
-
-    let native_asset_id = AccountId::try_from(OFFLINE_NATIVE_ASSET_FAUCET_ID)
-        .expect("offline native asset faucet ID should be valid");
-    let fee_parameters =
-        FeeParameters::new(native_asset_id, 500).expect("offline fee params should be valid");
-    let validator_key = SecretKey::with_rng(&mut rand::rng()).public_key();
-    let transactions = OrderedTransactionHeaders::new_unchecked(Vec::new());
-
-    BlockHeader::new(
-        0,
-        Word::empty(),
-        BlockNumber::GENESIS,
-        Blockchain::new().commitment(),
-        AccountTree::<Smt>::default().root(),
-        NullifierTree::<Smt>::default().root(),
-        BlockNoteTree::empty().root(),
-        transactions.commitment(),
-        TransactionKernel.to_commitment(),
-        validator_key,
-        fee_parameters,
-        0,
-    )
+    BlockHeader::mock(BlockNumber::GENESIS, None, None, &[], TransactionKernel.to_commitment())
 }
 
 // UTILS
@@ -219,22 +188,17 @@ pub(crate) async fn fetch_block_header(
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec::Vec;
-
     use miden_protocol::block::account_tree::AccountTree;
-    use miden_protocol::block::nullifier_tree::NullifierTree;
-    use miden_protocol::block::{BlockHeader, BlockNoteTree, BlockNumber, Blockchain};
+    use miden_protocol::block::{BlockHeader, BlockNumber};
     use miden_protocol::crypto::merkle::MerklePath;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, Mmr, PartialMmr};
     use miden_protocol::crypto::merkle::smt::Smt;
-    use miden_protocol::transaction::{OrderedTransactionHeaders, TransactionKernel};
+    use miden_protocol::transaction::TransactionKernel;
     use miden_protocol::{Felt, Word};
 
-    use super::{
-        adjust_merkle_path_for_forest,
-        authenticated_block_nodes,
-        synthetic_offline_genesis_header,
-    };
+    #[cfg(feature = "testing")]
+    use super::synthetic_offline_genesis_header;
+    use super::{adjust_merkle_path_for_forest, authenticated_block_nodes};
 
     fn word(n: u64) -> Word {
         Word::new([Felt::new(n), Felt::new(0), Felt::new(0), Felt::new(0)])
@@ -355,19 +319,12 @@ mod tests {
     }
 
     #[test]
-    fn synthetic_offline_genesis_header_matches_empty_chain_state() {
+    #[cfg(feature = "testing")]
+    fn synthetic_offline_genesis_header_uses_mock_genesis() {
         let genesis = synthetic_offline_genesis_header();
 
         assert_eq!(genesis.block_num(), BlockNumber::GENESIS);
-        assert_eq!(genesis.prev_block_commitment(), Word::empty());
-        assert_eq!(genesis.chain_commitment(), Blockchain::new().commitment());
         assert_eq!(genesis.account_root(), AccountTree::<Smt>::default().root());
-        assert_eq!(genesis.nullifier_root(), NullifierTree::<Smt>::default().root());
-        assert_eq!(genesis.note_root(), BlockNoteTree::empty().root());
-        assert_eq!(
-            genesis.tx_commitment(),
-            OrderedTransactionHeaders::new_unchecked(Vec::new()).commitment()
-        );
         assert_eq!(genesis.tx_kernel_commitment(), TransactionKernel.to_commitment());
     }
 }
