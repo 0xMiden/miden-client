@@ -43,10 +43,12 @@ export class TransactionsResource {
         new wasm.NoteAttachment()
       );
 
+      // NoteArray constructor consumes its elements; use push(&note) to keep
+      // `note` valid so we can return it to the caller below.
+      const ownOutputs = new wasm.NoteArray();
+      ownOutputs.push(note);
       const request = new wasm.TransactionRequestBuilder()
-        .withOwnOutputNotes(
-          new wasm.OutputNoteArray([wasm.OutputNote.full(note)])
-        )
+        .withOwnOutputNotes(ownOutputs)
         .build();
 
       const { txId, result } = await this.#submitOrSubmitWithProver(

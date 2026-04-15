@@ -69,6 +69,8 @@ pub use smt_forest::AccountSmtForest;
 
 mod account;
 pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
+
+pub use crate::sync::PublicAccountUpdate;
 mod note_record;
 pub use note_record::{
     InputNoteRecord,
@@ -251,10 +253,12 @@ pub trait Store: Send + Sync {
 
     /// Inserts a block header into the store, alongside peaks information at the block's height.
     ///
-    /// `has_client_notes` describes whether the block has relevant notes to the client; this means
-    /// the client might want to authenticate merkle paths based on this value.
-    /// If the block header exists and `has_client_notes` is `true` then the `has_client_notes`
-    /// column is updated to `true` to signify that the block now contains a relevant note.
+    /// Insert-if-not-exists with a one-way flag upgrade: on conflict with an existing row,
+    /// `header` and `partial_blockchain_peaks` are preserved (peaks are per-block and must
+    /// stay consistent with that block's forest), and `has_client_notes` is only upgraded
+    /// from `false` to `true`; never downgraded.
+    // TODO: this method's name only tells half the story. The insert is conditional and
+    // the flag has its own upgrade rule. Revisit the name in a follow-up.
     async fn insert_block_header(
         &self,
         block_header: &BlockHeader,

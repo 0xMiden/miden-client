@@ -2,13 +2,20 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_client::Word;
-use miden_client::account::AccountId;
+use miden_client::account::{AccountId, StorageMap, StorageSlotType};
 use miden_client::note::{BlockNumber, NoteId, NoteTag};
 use miden_client::store::StoreError;
-use miden_client::sync::{BlockUpdates, NoteTagRecord, NoteTagSource, StateSyncUpdate};
+use miden_client::sync::{
+    BlockUpdates,
+    NoteTagRecord,
+    NoteTagSource,
+    PublicAccountUpdate,
+    StateSyncUpdate,
+};
 use miden_client::utils::{Deserializable, Serializable};
 
 use super::IdxdbStore;
+use super::account::utils::{apply_transaction_delta, compute_storage_delta, compute_vault_delta};
 use super::chain_data::utils::{
     SerializedPartialBlockchainNodeData,
     serialize_partial_blockchain_node,
@@ -108,6 +115,7 @@ impl IdxdbStore {
         Ok(removed_tags)
     }
 
+    #[allow(clippy::too_many_lines)]
     pub(super) async fn apply_state_sync(
         &self,
         state_sync_update: StateSyncUpdate,
@@ -181,16 +189,103 @@ impl IdxdbStore {
             .map(serialize_transaction_record)
             .collect();
 
-        // Update SMT forest for public account updates (insert nodes + replace roots atomically)
+        // Separate full updates from delta updates
+        let mut full_accounts = Vec::new();
+        let mut delta_updates = Vec::new();
+        for update in account_updates.updated_public_accounts() {
+            match update {
+                PublicAccountUpdate::Full(account) => full_accounts.push(account),
+                PublicAccountUpdate::Delta { new_header, delta } => {
+                    delta_updates.push((new_header, delta));
+                },
+            }
+        }
+
+        // Update SMT forest for full account updates (insert nodes + replace roots atomically)
         {
             let mut smt_forest = self.smt_forest.write();
-            for account in account_updates.updated_public_accounts() {
+            for account in &full_accounts {
                 smt_forest.insert_and_register_account_state(
                     account.id(),
                     account.vault(),
                     account.storage(),
                 )?;
             }
+        }
+
+        // Apply delta updates incrementally
+        for (new_header, delta) in &delta_updates {
+            let account_id = new_header.id();
+
+            // Load targeted data for delta computation
+            let vault_keys: Vec<String> = delta
+                .vault()
+                .fungible()
+                .iter()
+                .map(|(vault_key, _)| vault_key.to_string())
+                .collect();
+            let old_vault_assets = self.get_vault_assets(account_id, vault_keys).await?;
+
+            let map_slot_names: Vec<String> =
+                delta.storage().maps().map(|(slot_name, _)| slot_name.to_string()).collect();
+            let old_map_roots = self.get_storage_map_roots(account_id, map_slot_names).await?;
+
+            let (updated_storage_slots, updated_assets, removed_vault_keys) = {
+                let mut smt_forest = self.smt_forest.write();
+
+                let mut final_roots = smt_forest
+                    .get_roots(&account_id)
+                    .cloned()
+                    .ok_or(StoreError::AccountDataNotFound(account_id))?;
+
+                // Storage: compute new map roots via SMT forest
+                let updated_storage_slots =
+                    compute_storage_delta(&mut smt_forest, &old_map_roots, delta)?;
+
+                // Update map roots in final_roots with new values from the delta
+                let default_map_root = StorageMap::default().root();
+                for (slot_name, (new_root, slot_type)) in &updated_storage_slots {
+                    if *slot_type == StorageSlotType::Map {
+                        let old_root =
+                            old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
+                        if let Some(root) = final_roots.iter_mut().find(|r| **r == old_root) {
+                            *root = *new_root;
+                        } else {
+                            final_roots.push(*new_root);
+                        }
+                    }
+                }
+
+                // Vault: compute new asset values and update SMT forest
+                let old_vault_root = final_roots[0];
+                let (updated_assets, removed_vault_keys) =
+                    compute_vault_delta(&old_vault_assets, delta)?;
+                let new_vault_root = smt_forest.update_asset_nodes(
+                    old_vault_root,
+                    updated_assets.iter().copied(),
+                    removed_vault_keys.iter().copied(),
+                )?;
+                final_roots[0] = new_vault_root;
+
+                // For sync updates, replace roots directly (not staged)
+                smt_forest.replace_roots(account_id, final_roots);
+
+                (updated_storage_slots, updated_assets, removed_vault_keys)
+            };
+
+            apply_transaction_delta(
+                self.db_id(),
+                account_id,
+                new_header,
+                &updated_storage_slots,
+                &updated_assets,
+                &removed_vault_keys,
+                delta,
+            )
+            .await
+            .map_err(|err| {
+                StoreError::DatabaseError(format!("failed to apply sync account delta: {err:?}"))
+            })?;
         }
 
         let state_update = JsStateSyncUpdate {
@@ -204,8 +299,7 @@ impl IdxdbStore {
             committed_note_ids,
             serialized_input_notes,
             serialized_output_notes,
-            account_updates: account_updates
-                .updated_public_accounts()
+            account_updates: full_accounts
                 .iter()
                 .map(|account| JsAccountUpdate::from_account(account, None))
                 .collect(),

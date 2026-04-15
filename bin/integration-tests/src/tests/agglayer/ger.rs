@@ -1,5 +1,18 @@
 use anyhow::{Context, Result};
 use miden_agglayer::{AggLayerBridge, ExitRoot, UpdateGerNote};
+use miden_client::crypto::FeltRng;
+use miden_client::note::{
+    NetworkAccountTarget,
+    Note,
+    NoteAssets,
+    NoteAttachment,
+    NoteExecutionHint,
+    NoteMetadata,
+    NoteRecipient,
+    NoteStorage,
+    NoteTag,
+    NoteType,
+};
 use miden_client::testing::common::wait_for_tx;
 use miden_client::transaction::TransactionRequestBuilder;
 
@@ -30,8 +43,24 @@ pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()>
     let ger_bytes: [u8; 32] = rand::random();
     let ger = ExitRoot::from(ger_bytes);
     println!("Submitting UpdateGerNote with random GER: {ger_bytes:02x?}");
-    let update_ger_note =
-        UpdateGerNote::create(ger, ger_manager_id, bridge_id, ger_manager.client.rng())?;
+    // WORKAROUND: UpdateGerNote::create uses NoteTag(0) which prevents the ntx-builder
+    // from discovering the note. Build the note manually with the correct tag.
+    let update_ger_note = {
+        let storage_values = ger.to_elements().to_vec();
+        let note_storage = NoteStorage::new(storage_values)?;
+        let serial_num = ger_manager.client.rng().draw_word();
+        let recipient = NoteRecipient::new(serial_num, UpdateGerNote::script(), note_storage);
+
+        let attachment = NoteAttachment::from(
+            NetworkAccountTarget::new(bridge_id, NoteExecutionHint::Always)
+                .map_err(|e| anyhow::anyhow!("{e}"))?,
+        );
+        let metadata = NoteMetadata::new(ger_manager_id, NoteType::Public)
+            .with_tag(NoteTag::with_account_target(bridge_id))
+            .with_attachment(attachment);
+
+        Note::new(NoteAssets::new(vec![])?, metadata, recipient)
+    };
     let update_ger_note_id = update_ger_note.id();
 
     let tx_request = TransactionRequestBuilder::new()

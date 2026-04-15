@@ -26,6 +26,7 @@ crate-type = ["lib"]
 [features]
 default = ["std"]
 std = [
+  "dep:tempfile",
   "dep:tokio",
   "miden-protocol/std",
   "miden-remote-prover-client/std",
@@ -57,6 +58,7 @@ prost-types  = { version = "0.14" }
 rand         = { workspace = true }
 serde        = { workspace = true }
 serde_json   = { version = "1.0" }
+tempfile     = { optional = true, version = "3.0" }
 thiserror    = { workspace = true }
 tokio        = { features = ["time"], optional = true, workspace = true }
 tonic        = { default-features = false, features = ["codegen"], version = "0.14" }

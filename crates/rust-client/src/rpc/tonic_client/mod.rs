@@ -588,14 +588,10 @@ impl NodeRpcClient for GrpcClient {
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
     ) -> Result<ChainMmrInfo, RpcError> {
-        let block_range = Some(BlockRange {
-            block_from: block_from.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        });
-
         let request = proto::rpc::SyncChainMmrRequest {
-            block_range,
-            finality: proto::rpc::Finality::Committed as i32,
+            block_from: block_from.as_u32(),
+            upper_bound: block_to
+                .map(|b| proto::rpc::sync_chain_mmr_request::UpperBound::BlockNum(b.as_u32())),
         };
 
         let response = self
@@ -628,25 +624,27 @@ impl NodeRpcClient for GrpcClient {
         if account_id.is_private() {
             Ok(FetchedAccount::new_private(account_id, update_summary))
         } else {
-            // An account with public state has to fetch all of its state.
-            // Even more so, an account with a large state will have to do
-            // a couple of extra requests to fetch all of its data.
             let details =
                 full_account_proof.into_parts().1.ok_or(RpcError::ExpectedDataMissing(
                     "GetAccountDetails returned a public account without details".to_owned(),
                 ))?;
+
             let account_id = details.header.id();
             let nonce = details.header.nonce();
+
+            // If the vault exceeds the node's size threshold, download the full vault
+            // via the sync endpoint; otherwise use the assets from the response directly.
             let assets = if details.vault_details.too_many_assets {
                 self.fetch_full_vault(account_id, Some(block_number)).await?
             } else {
                 details.vault_details.assets
             };
 
+            // build_storage_slots handles too_many_entries maps internally via
+            // sync_storage_maps.
             let slots = self
                 .build_storage_slots(account_id, &details.storage_details, Some(block_number))
                 .await?;
-            let seed = None;
             let asset_vault = AssetVault::new(&assets).map_err(|err| {
                 RpcError::InvalidResponse(format!("api rpc returned non-valid assets: {err}"))
             })?;
@@ -656,7 +654,7 @@ impl NodeRpcClient for GrpcClient {
                 ))
             })?;
             let account =
-                Account::new(account_id, asset_vault, account_storage, details.code, nonce, seed)
+                Account::new(account_id, asset_vault, account_storage, details.code, nonce, None)
                     .map_err(|err| {
                     RpcError::InvalidResponse(format!(
                         "failed to instance an account from the rpc api response: {err}"
@@ -883,7 +881,10 @@ impl NodeRpcClient for GrpcClient {
     }
 
     async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
-        let request = proto::blockchain::BlockNumber { block_num: block_num.as_u32() };
+        let request = proto::blockchain::BlockRequest {
+            block_num: block_num.as_u32(),
+            include_proof: Some(true),
+        };
 
         let response = self
             .call_with_retry(RpcEndpoint::GetBlockByNumber, |mut rpc_api| {

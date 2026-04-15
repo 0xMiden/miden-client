@@ -36,6 +36,13 @@ import type {
 // Import the full namespace for the MidenArrayConstructors type
 import type * as WasmExports from "./crates/miden_client_web";
 
+// Source of truth for standalone-wrapper return types. By deriving them from
+// the wasm-bindgen-generated namespace (rather than hand-writing `: Note`),
+// the declarations below cannot drift from the actual runtime behavior — the
+// exact class of bug behind #2042. Any forwarder-style wrapper should follow
+// the same pattern: `ReturnType<WasmModule["Class"]["method"]>`.
+type WasmModule = typeof import("./crates/miden_client_web");
+
 // ════════════════════════════════════════════════════════════════
 // Callback types for external keystore support
 // ════════════════════════════════════════════════════════════════
@@ -908,13 +915,19 @@ export declare class MidenClient {
 // ════════════════════════════════════════════════════════════════
 
 /** Creates a P2ID (Pay-to-ID) note. */
-export declare function createP2IDNote(options: NoteOptions): OutputNote;
+export declare function createP2IDNote(
+  options: NoteOptions
+): ReturnType<WasmModule["Note"]["createP2IDNote"]>;
 
 /** Creates a P2IDE (Pay-to-ID with Expiration) note. */
-export declare function createP2IDENote(options: P2IDEOptions): OutputNote;
+export declare function createP2IDENote(
+  options: P2IDEOptions
+): ReturnType<WasmModule["Note"]["createP2IDENote"]>;
 
 /** Builds a swap tag for note matching. Returns a NoteTag (use `.asU32()` for the numeric value). */
-export declare function buildSwapTag(options: BuildSwapTagOptions): NoteTag;
+export declare function buildSwapTag(
+  options: BuildSwapTagOptions
+): ReturnType<WasmModule["WebClient"]["buildSwapTag"]>;
 
 /** Exports the entire contents of an IndexedDB store as a JSON string. */
 export declare function exportStore(storeName: string): Promise<string>;

@@ -827,6 +827,41 @@ impl SqliteStore {
         Ok(())
     }
 
+    /// Applies an incremental delta to a public account's state during sync.
+    pub(crate) fn apply_sync_account_delta(
+        tx: &Transaction<'_>,
+        smt_forest: &mut AccountSmtForest,
+        new_header: &AccountHeader,
+        delta: &AccountDelta,
+    ) -> Result<(), StoreError> {
+        let account_id = new_header.id();
+
+        // Read current header from the store.
+        let init_header = query_latest_account_headers(tx, "id = ?", params![account_id.to_hex()])?
+            .into_iter()
+            .next()
+            .map(|(header, _)| header)
+            .ok_or(StoreError::AccountDataNotFound(account_id))?;
+
+        // Read the fungible assets that will be affected by the delta.
+        // Transaction derefs to Connection, so we can pass it where Connection is expected.
+        let updated_fungible_assets =
+            Self::get_account_fungible_assets_for_delta(tx, account_id, delta)?;
+
+        // Read the old map roots for slots affected by the delta.
+        let old_map_roots = Self::get_storage_map_roots_for_delta(tx, account_id, delta)?;
+
+        Self::apply_account_delta(
+            tx,
+            smt_forest,
+            &init_header,
+            new_header,
+            updated_fungible_assets,
+            &old_map_roots,
+            delta,
+        )
+    }
+
     /// Locks the account if the mismatched digest doesn't belong to a previous account state (stale
     /// data).
     pub(crate) fn lock_account_on_unexpected_commitment(
