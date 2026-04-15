@@ -258,11 +258,11 @@ impl RpcClient {
     ///
     /// @param `note_id` - The ID of the note to query.
     /// @returns Promise that resolves to a `NetworkNoteStatusInfo` object.
-    #[wasm_bindgen(js_name = "getNetworkNoteStatus")]
+    #[js_export(js_name = "getNetworkNoteStatus")]
     pub async fn get_network_note_status(
         &self,
         note_id: &NoteId,
-    ) -> Result<NetworkNoteStatusInfo, JsValue> {
+    ) -> Result<NetworkNoteStatusInfo, JsErr> {
         let native_note_id: NativeNoteId = note_id.into();
 
         let status_info = self
