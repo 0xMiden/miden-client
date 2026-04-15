@@ -43,6 +43,7 @@ miden-client.toml
 !packages/react-sdk/
 !packages/react-sdk/**
 packages/react-sdk/dist/
+packages/react-sdk/yarn.lock
 !packages/vite-plugin/
 !packages/vite-plugin/**
 packages/vite-plugin/dist/

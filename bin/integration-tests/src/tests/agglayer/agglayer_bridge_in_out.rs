@@ -40,16 +40,11 @@ use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::crypto::FeltRng;
 use miden_client::note::NoteAssets;
-use miden_client::testing::common::{
-    insert_new_wallet,
-    wait_for_blocks,
-    wait_for_consumable_notes,
-    wait_for_tx,
-};
+use miden_client::testing::common::{insert_new_wallet, wait_for_consumable_notes, wait_for_tx};
 use miden_client::transaction::TransactionRequestBuilder;
 
 use super::agglayer_test_utils::generate_claim_data_for_account;
-use super::{AgglayerConfig, create_agglayer_clients, setup_core_accounts};
+use super::{AgglayerConfig, create_agglayer_clients, setup_core_accounts, wait_for_note_consumed};
 use crate::tests::config::ClientConfig;
 
 /// Amount of tokens to bridge out in the bridge-out phase of the test.
@@ -192,6 +187,7 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
                 bridge_id,
                 bridge_admin.client.rng(),
             )?;
+            let config_note_id = config_note.id();
             let config_output_tx = TransactionRequestBuilder::new()
                 .own_output_notes(vec![config_note.clone()])
                 .build()?;
@@ -205,8 +201,8 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
             // Wait for bridge to consume the config note as network transaction.
             // In CI, the node's network transaction queue may be congested from parallel tests,
             // so we allow more blocks than the minimum needed locally.
-            wait_for_blocks(&mut bridge_admin.client, 5).await;
-            println!("[bridge_in_out] Waited for bridge to consume CONFIG_AGG_BRIDGE note");
+            wait_for_note_consumed(&mut bridge_admin.client, bridge_id, config_note_id, 30).await?;
+            println!("[bridge_in_out] Bridge consumed CONFIG_AGG_BRIDGE note (via NoteReader)");
 
             (agglayer_faucet.id(), origin_token_address, scale)
         },
@@ -238,6 +234,7 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
         // Submit UPDATE_GER note: done by the ger manager
         let update_ger_note =
             UpdateGerNote::create(ger, ger_manager_id, bridge_id, ger_manager.client.rng())?;
+        let update_ger_note_id = update_ger_note.id();
         let tx_request = TransactionRequestBuilder::new()
             .own_output_notes(vec![update_ger_note])
             .build()?;
@@ -245,8 +242,8 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
         wait_for_tx(&mut ger_manager.client, tx_id).await?;
         println!("[bridge_in_out] Round {round}: UPDATE_GER note submitted");
 
-        wait_for_blocks(&mut ger_manager.client, 5).await;
-        println!("[bridge_in_out] Round {round}: waited for bridge to consume UPDATE_GER note");
+        wait_for_note_consumed(&mut ger_manager.client, bridge_id, update_ger_note_id, 30).await?;
+        println!("[bridge_in_out] Round {round}: bridge consumed UPDATE_GER note (via NoteReader)");
 
         // Submit CLAIM note: done by the user (or could also be a claim manager entity)
         let miden_claim_amount = leaf_data
@@ -266,6 +263,7 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
             destination_account.id(),
             user.client.rng(),
         )?;
+        let claim_note_id = claim_note.id();
         let tx_request =
             TransactionRequestBuilder::new().own_output_notes(vec![claim_note]).build()?;
         let tx_id =
@@ -273,7 +271,13 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
         wait_for_tx(&mut user.client, tx_id).await?;
         println!("[bridge_in_out] Round {round}: CLAIM note submitted");
 
-        // Wait for the P2ID note to arrive at the destination
+        // Wait for the bridge to consume the CLAIM note (detected via NoteReader).
+        // The bridge validates the claim and produces a MINT note targeting the faucet,
+        // which in turn mints assets and creates a P2ID note for the destination.
+        wait_for_note_consumed(&mut user.client, bridge_id, claim_note_id, 30).await?;
+        println!("[bridge_in_out] Round {round}: bridge consumed CLAIM note (via NoteReader)");
+
+        // Now wait for the resulting P2ID note to become consumable by destination
         let consumable_notes =
             wait_for_consumable_notes(&mut user.client, destination_account.id(), 30).await;
         println!(
@@ -326,6 +330,7 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
         destination_account.id(),
         user.client.rng(),
     )?;
+    let b2agg_note_id = b2agg_note.id();
     println!("[bridge_in_out] B2AGG note created with amount: {}", BRIDGE_OUT_AMOUNT);
 
     let b2agg_output_tx =
@@ -339,8 +344,8 @@ pub async fn test_agglayer_bridge_in_out(client_config: ClientConfig) -> Result<
 
     // Wait for bridge to consume the B2AGG note as network transaction.
     // Allow extra blocks for CI where the node processes many concurrent network transactions.
-    wait_for_blocks(&mut user.client, 5).await;
-    println!("[bridge_in_out] Waited for bridge to consume B2AGG note");
+    wait_for_note_consumed(&mut user.client, bridge_id, b2agg_note_id, 30).await?;
+    println!("[bridge_in_out] Bridge consumed B2AGG note (via NoteReader)");
 
     println!("[bridge_in_out] Test completed successfully");
     Ok(())

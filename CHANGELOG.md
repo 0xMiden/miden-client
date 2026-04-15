@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.14.2 (TBD)
+
+### Fixes
+
+* [FIX][web] Fixed `syncState` deterministically failing with `mmr peaks are invalid: number of one bits in leaves is N which does not equal peak length M` after importing a private note whose inclusion block pre-dates the wallet's current sync height. `get_and_store_authenticated_block` was overwriting the correct historical peaks (written by `applyStateSync`) with peaks from the caller's current `PartialMmr` forest, so subsequent reads at the same block hit the `InvalidPeaks` validation. The IndexedDB `insertBlockHeader` now uses add-if-not-exists semantics, matching the SQLite store's `INSERT OR IGNORE` in `insert_block_header_tx` ([#2037](https://github.com/0xMiden/miden-client/issues/2037)).
+- [FIX] Detect notes created and consumed on the same block that got erased from the node and mark them as consumed ([#2008](https://github.com/0xMiden/miden-client/pull/2008)).
+
+## 0.14.1 (2026-04-14)
+
+### Enhancements
+
+* Optimized `get_account_details` so it only fetches the delta of large public accounts when syncing ([#1916](https://github.com/0xMiden/miden-client/pull/1916)).
+
+### Fixes
+
+* [FIX][web] Fixed `syncState` failure ("inconsistent partial mmr: tracked leaf at position N has no value in nodes") caused by skipping authentication node collection for blocks already tracked from the MMR delta during large catch-up syncs. Authentication nodes are now always collected for note-relevant blocks regardless of prior tracking state. ([#1997](https://github.com/0xMiden/miden-client/pull/1997)).
+* [FIX][web] Fixed `transactions.send({ returnNote: true })` throwing `expected instance of NoteArray`. The JS wrapper was still building `OutputNoteArray` after the WASM binding for `withOwnOutputNotes` switched to `NoteArray` ([#2011](https://github.com/0xMiden/miden-client/issues/2011)).
+* [FIX][rust] Fixed `FilesystemKeyStore::add_key` failing on Linux when the system temp dir is on a different filesystem than the keys directory ([#2009](https://github.com/0xMiden/miden-client/pull/2009)).
+* [FIX][rust] Made source manager handling consistent when building transaction scripts. The empty fallback script is now compiled against the client's source manager instead of a fresh one, so any source information on the produced `TransactionScript` is registered with the same source manager used by the executor ([#2006](https://github.com/0xMiden/miden-client/pull/2006)).
+
 ## 0.14.0 (2026-04-07)
 
 ### Enhancements

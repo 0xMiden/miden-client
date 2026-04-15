@@ -79,21 +79,29 @@ impl KeyIndex {
     /// Saves the index to disk atomically (write to temp file, then rename).
     fn write_to_file(&self, keys_directory: &Path) -> Result<(), KeyStoreError> {
         let index_path = keys_directory.join(INDEX_FILE_NAME);
-        let temp_path = std::env::temp_dir().join(INDEX_FILE_NAME);
 
         let contents = serde_json::to_string_pretty(self).map_err(|err| {
             KeyStoreError::StorageError(format!("error serializing index: {err:?}"))
         })?;
 
-        // Write to temp file
-        let mut file = fs::File::create(&temp_path)
+        // Create the temp file in the same directory as the index so the subsequent atomic
+        // rename stays on the same filesystem.
+        let mut temp_file = tempfile::NamedTempFile::new_in(keys_directory)
             .map_err(keystore_error("error creating temp index file"))?;
-        file.write_all(contents.as_bytes())
+        temp_file
+            .write_all(contents.as_bytes())
             .map_err(keystore_error("error writing temp index file"))?;
-        file.sync_all().map_err(keystore_error("error syncing temp index file"))?;
+        temp_file
+            .as_file()
+            .sync_all()
+            .map_err(keystore_error("error syncing temp index file"))?;
 
-        // Atomically rename
-        fs::rename(&temp_path, &index_path).map_err(keystore_error("error renaming index file"))
+        // Atomically replace the index file.
+        temp_file
+            .persist(&index_path)
+            .map_err(|err| keystore_error("error renaming index file")(err.error))?;
+
+        Ok(())
     }
 
     /// Returns the account ID associated with a given public key commitment hex.

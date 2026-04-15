@@ -200,8 +200,11 @@ vi.mock("@miden-sdk/miden-sdk", () => {
     }),
     NoteArray: class NoteArray {
       notes: unknown[];
-      constructor(notes: unknown[]) {
-        this.notes = notes;
+      constructor(notes?: unknown[]) {
+        this.notes = notes ?? [];
+      }
+      push(note: unknown) {
+        this.notes.push(note);
       }
     },
     NoteAndArgs: class NoteAndArgs {
