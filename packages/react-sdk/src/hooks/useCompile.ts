@@ -53,17 +53,19 @@ export function useCompile(): UseCompileResult {
   }, [resource]);
 
   const component = useCallback(
-    (options: CompileComponentOptions) => requireResource().component(options),
+    async (options: CompileComponentOptions) =>
+      requireResource().component(options),
     [requireResource]
   );
 
   const txScript = useCallback(
-    (options: CompileTxScriptOptions) => requireResource().txScript(options),
+    async (options: CompileTxScriptOptions) =>
+      requireResource().txScript(options),
     [requireResource]
   );
 
   const noteScript = useCallback(
-    (options: CompileNoteScriptOptions) =>
+    async (options: CompileNoteScriptOptions) =>
       requireResource().noteScript(options),
     [requireResource]
   );
