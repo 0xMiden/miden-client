@@ -5,6 +5,7 @@
 ### Fixes
 
 * [FIX][web] Fixed `syncState` deterministically failing with `mmr peaks are invalid: number of one bits in leaves is N which does not equal peak length M` after importing a private note whose inclusion block pre-dates the wallet's current sync height. `get_and_store_authenticated_block` was overwriting the correct historical peaks (written by `applyStateSync`) with peaks from the caller's current `PartialMmr` forest, so subsequent reads at the same block hit the `InvalidPeaks` validation. The IndexedDB `insertBlockHeader` now uses add-if-not-exists semantics, matching the SQLite store's `INSERT OR IGNORE` in `insert_block_header_tx` ([#2037](https://github.com/0xMiden/miden-client/issues/2037)).
+* [FIX][web] Fixed WASM worker loading under webpack 5 / Next.js consumers. v0.14.1's single classic worker rewrote `import.meta.url` → `self.location.href` (needed for Safari/WKWebView cold-start performance), which webpack's asset tracer cannot follow — consumers hit a 404 on `miden_client_web.wasm` and the SDK silently fell back to a main-thread mode that hung on `sync()`. The SDK now ships BOTH variants (`web-client-methods-worker.js` classic for Safari, `web-client-methods-worker.module.js` ES module for webpack/Vite/Parcel) and `WebClient` picks at runtime via UA detection, configurable via the new `WebClient.workerMode` (`"auto"` / `"module"` / `"classic"`) static. No consumer config changes needed for auto ([#2046](https://github.com/0xMiden/miden-client/issues/2046)).
 
 ## 0.14.1 (2026-04-14)
 
