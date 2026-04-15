@@ -22,6 +22,7 @@
     "build-dev": "npm install && MIDEN_WEB_DEV=true npm run build",
     "check:wasm-types": "node ./scripts/check-bindgen-types.js",
     "check:method-classification": "node ./scripts/check-method-classification.js",
+    "check:standalone-types": "node ./scripts/check-standalone-types.js",
     "test": "yarn playwright install --with-deps && yarn playwright test",
     "test:ci": "yarn playwright install --with-deps chromium && yarn playwright test",
     "test:ci:remote_prover": "yarn playwright install --with-deps && cross-env TEST_MIDEN_PROVER_URL=localhost yarn playwright test -g 'with remote prover'",
