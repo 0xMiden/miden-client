@@ -245,6 +245,166 @@ test.describe("compile.txScript()", () => {
 });
 
 // ════════════════════════════════════════════════════════════════
+// compile.noteScript()
+// ════════════════════════════════════════════════════════════════
+
+// Minimal note script that pulls the assets off the note and receives them
+// into the consuming account. Uses the basic wallet component's procedure.
+const RECEIVE_NOTE_SCRIPT = `
+  use miden::note
+  use miden::contracts::wallets::basic
+  use miden::core::sys
+  begin
+    exec.note::get_assets drop
+    exec.basic::receive_asset
+    exec.sys::truncate_stack
+  end
+`;
+
+test.describe("compile.noteScript()", () => {
+  test("compiles a script without libraries", async ({ page }) => {
+    const result = await page.evaluate(
+      async ({ code }) => {
+        const client = await window.MidenClient.createMock();
+        const script = await client.compile.noteScript({ code });
+        return {
+          isDefined: script != null,
+          serializedLen: script?.serialize().length ?? 0,
+        };
+      },
+      { code: RECEIVE_NOTE_SCRIPT }
+    );
+
+    expect(result.isDefined).toBe(true);
+    expect(result.serializedLen).toBeGreaterThan(0);
+  });
+
+  test("compiles a script with a dynamic library", async ({ page }) => {
+    const result = await page.evaluate(
+      async ({ counterCode }) => {
+        const client = await window.MidenClient.createMock();
+        const script = await client.compile.noteScript({
+          code: `
+            use external_contract::counter_contract
+            use miden::core::sys
+            begin
+              call.counter_contract::increment_count
+              exec.sys::truncate_stack
+            end
+          `,
+          libraries: [
+            {
+              namespace: "external_contract::counter_contract",
+              code: counterCode,
+            },
+          ],
+        });
+        return { isDefined: script != null };
+      },
+      { counterCode: COUNTER_CODE }
+    );
+
+    expect(result.isDefined).toBe(true);
+  });
+
+  test("Linking enum and raw strings are interchangeable", async ({ page }) => {
+    const result = await page.evaluate(
+      async ({ counterCode }) => {
+        const client = await window.MidenClient.createMock();
+        const { Linking } = window as any;
+
+        const scriptEnum = await client.compile.noteScript({
+          code: `
+            use external_contract::counter_contract
+            use miden::core::sys
+            begin
+              call.counter_contract::increment_count
+              exec.sys::truncate_stack
+            end
+          `,
+          libraries: [
+            {
+              namespace: "external_contract::counter_contract",
+              code: counterCode,
+              linking: Linking.Dynamic,
+            },
+          ],
+        });
+
+        const scriptStr = await client.compile.noteScript({
+          code: `
+            use external_contract::counter_contract
+            use miden::core::sys
+            begin
+              call.counter_contract::increment_count
+              exec.sys::truncate_stack
+            end
+          `,
+          libraries: [
+            {
+              namespace: "external_contract::counter_contract",
+              code: counterCode,
+              linking: "dynamic",
+            },
+          ],
+        });
+
+        return {
+          enumOk: scriptEnum != null,
+          strOk: scriptStr != null,
+        };
+      },
+      { counterCode: COUNTER_CODE }
+    );
+
+    expect(result.enumOk).toBe(true);
+    expect(result.strOk).toBe(true);
+  });
+
+  test("each call uses a fresh builder — libraries from prior calls do not leak", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(
+      async ({ counterCode, plainCode }) => {
+        const client = await window.MidenClient.createMock();
+
+        // First call: link counter_contract
+        const scriptWithLib = await client.compile.noteScript({
+          code: `
+            use external_contract::counter_contract
+            use miden::core::sys
+            begin
+              call.counter_contract::increment_count
+              exec.sys::truncate_stack
+            end
+          `,
+          libraries: [
+            {
+              namespace: "external_contract::counter_contract",
+              code: counterCode,
+            },
+          ],
+        });
+
+        // Second call: no libraries — must compile independently
+        const scriptNoLib = await client.compile.noteScript({
+          code: plainCode,
+        });
+
+        return {
+          firstOk: scriptWithLib != null,
+          secondOk: scriptNoLib != null,
+        };
+      },
+      { counterCode: COUNTER_CODE, plainCode: RECEIVE_NOTE_SCRIPT }
+    );
+
+    expect(result.firstOk).toBe(true);
+    expect(result.secondOk).toBe(true);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
 // accounts.create() — contract types
 // ════════════════════════════════════════════════════════════════
 

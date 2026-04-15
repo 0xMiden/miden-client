@@ -41,9 +41,7 @@ export function useCompile(): UseCompileResult {
 
   const resource = useMemo(
     () =>
-      client && isReady
-        ? new CompilerResource(client, getWasmOrThrow)
-        : null,
+      client && isReady ? new CompilerResource(client, getWasmOrThrow) : null,
     [client, isReady]
   );
 
@@ -65,7 +63,8 @@ export function useCompile(): UseCompileResult {
   );
 
   const noteScript = useCallback(
-    (options: CompileNoteScriptOptions) => requireResource().noteScript(options),
+    (options: CompileNoteScriptOptions) =>
+      requireResource().noteScript(options),
     [requireResource]
   );
 
