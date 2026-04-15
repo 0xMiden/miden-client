@@ -29,7 +29,9 @@ tracing = { workspace = true }
 tokio = { features = ["rt", "sync", "time"], optional = true, workspace = true }
 
 [dev-dependencies]
-tokio = { features = ["macros", "rt"], workspace = true }
+miden-client = { features = ["testing"], workspace = true }
+rand         = { workspace = true }
+tokio        = { features = ["macros", "rt"], workspace = true }
 
 [lints]
 workspace = true

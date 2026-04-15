@@ -199,6 +199,7 @@ impl StateSync {
         &self,
         current_partial_mmr: &mut PartialMmr,
         input: StateSyncInput,
+        upper_bound: SyncTarget,
     ) -> Result<StateSyncUpdate, ClientError> {
         let StateSyncInput {
             accounts,
@@ -221,7 +222,7 @@ impl StateSync {
         let note_tags = Arc::new(note_tags);
         let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
         let Some(mut sync_data) = self
-            .fetch_sync_data(state_sync_update.block_num, &account_ids, &note_tags)
+            .fetch_sync_data(state_sync_update.block_num, &account_ids, &note_tags, upper_bound)
             .await?
         else {
             // No progress — already at the tip.
@@ -287,17 +288,17 @@ impl StateSync {
         current_block_num: BlockNumber,
         account_ids: &[AccountId],
         note_tags: &Arc<BTreeSet<NoteTag>>,
+        upper_bound: SyncTarget,
     ) -> Result<Option<RawStateSyncData>, ClientError> {
-        // Step 1: Fetch the MMR delta and chain tip header.
-        let chain_mmr_info = self
-            .rpc_api
-            .sync_chain_mmr(current_block_num, SyncTarget::CommittedChainTip)
-            .await?;
+        // Step 1: Fetch the MMR delta and the header at the requested upper bound.
+        // The node clamps `SyncTarget::BlockNumber(n)` to the chain tip if `n` is
+        // past it, so the response's `block_to` is always a valid block num.
+        let chain_mmr_info = self.rpc_api.sync_chain_mmr(current_block_num, upper_bound).await?;
         let chain_tip = chain_mmr_info.block_to;
 
-        // No progress — already at the tip.
+        // No progress — already at the requested upper bound.
         if chain_tip == current_block_num {
-            info!(block_num = %current_block_num, "Already at chain tip, nothing to sync.");
+            info!(block_num = %current_block_num, "Already at sync upper bound, nothing to sync.");
             return Ok(None);
         }
 
@@ -1054,7 +1055,10 @@ mod tests {
             uncommitted_transactions: vec![],
         };
 
-        let update = state_sync.sync_state(&mut partial_mmr, sync_input).await.unwrap();
+        let update = state_sync
+            .sync_state(&mut partial_mmr, sync_input, SyncTarget::CommittedChainTip)
+            .await
+            .unwrap();
 
         let updated_notes: Vec<_> = update.note_updates.updated_input_notes().collect();
 
@@ -1097,7 +1101,10 @@ mod tests {
         assert_eq!(partial_mmr.forest().num_leaves(), 1);
 
         // First sync
-        let update = state_sync.sync_state(&mut partial_mmr, empty()).await.unwrap();
+        let update = state_sync
+            .sync_state(&mut partial_mmr, empty(), SyncTarget::CommittedChainTip)
+            .await
+            .unwrap();
 
         assert_eq!(update.block_num, chain_tip_1);
         let forest_1 = partial_mmr.forest();
@@ -1108,7 +1115,10 @@ mod tests {
         mock_rpc.advance_blocks(2);
         let chain_tip_2 = mock_rpc.get_chain_tip_block_num();
 
-        let update = state_sync.sync_state(&mut partial_mmr, empty()).await.unwrap();
+        let update = state_sync
+            .sync_state(&mut partial_mmr, empty(), SyncTarget::CommittedChainTip)
+            .await
+            .unwrap();
 
         assert_eq!(update.block_num, chain_tip_2);
         let forest_2 = partial_mmr.forest();
@@ -1116,7 +1126,10 @@ mod tests {
         assert_eq!(forest_2.num_leaves(), chain_tip_2.as_u32() as usize + 1);
 
         // Third sync (no new blocks)
-        let update = state_sync.sync_state(&mut partial_mmr, empty()).await.unwrap();
+        let update = state_sync
+            .sync_state(&mut partial_mmr, empty(), SyncTarget::CommittedChainTip)
+            .await
+            .unwrap();
 
         assert_eq!(update.block_num, chain_tip_2);
         assert_eq!(partial_mmr.forest(), forest_2);
@@ -1237,7 +1250,12 @@ mod tests {
         let mut partial_mmr = PartialMmr::from_peaks(genesis_peaks);
 
         let sync_data = state_sync
-            .fetch_sync_data(BlockNumber::GENESIS, &[], &Arc::new(note_tags.clone()))
+            .fetch_sync_data(
+                BlockNumber::GENESIS,
+                &[],
+                &Arc::new(note_tags.clone()),
+                SyncTarget::CommittedChainTip,
+            )
             .await
             .unwrap()
             .expect("should have progressed past genesis");
