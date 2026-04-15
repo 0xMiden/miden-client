@@ -130,7 +130,7 @@ pub mod utils;
 
 pub mod builder;
 
-#[cfg(feature = "testing")]
+#[cfg(any(test, feature = "testing"))]
 mod test_utils;
 
 pub mod errors;
@@ -309,10 +309,7 @@ pub use miden_protocol::{
 pub use miden_remote_prover_client::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
 
-/// Provides test utilities for working with accounts and account IDs
-/// within the Miden network. This module is only available when the `testing` feature is
-/// enabled.
-#[cfg(feature = "testing")]
+#[cfg(any(test, feature = "testing"))]
 pub mod testing {
     pub use miden_protocol::testing::account_id;
     pub use miden_standards::testing::note::NoteBuilder;
