@@ -136,11 +136,14 @@ try {
 
     const script = await client.compile.noteScript({
         code: `
-            use miden::note
-            use miden::contracts::wallets::basic
+            use miden::protocol::active_note
+            use miden::core::sys
+
             begin
-                exec.note::get_assets drop
-                exec.basic::receive_asset
+                # Runs when the consuming account redeems this note.
+                # Real note scripts inspect note storage, assets, and account
+                # state using procedures from miden::protocol::active_note.
+                exec.sys::truncate_stack
             end
         `
     });

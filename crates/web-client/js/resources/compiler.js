@@ -35,21 +35,7 @@ export class CompilerResource {
     // Ensure WASM is initialized (result unused — only #inner needs it)
     await this.#getWasm();
     const builder = this.#inner.createCodeBuilder();
-    for (const lib of libraries) {
-      if (lib && typeof lib.namespace === "string") {
-        // Inline { namespace, code, linking? } — build and link automatically
-        const built = builder.buildLibrary(lib.namespace, lib.code);
-        if (lib.linking === "static") {
-          builder.linkStaticLibrary(built);
-        } else {
-          // Default: "dynamic" — matches existing tutorial behavior
-          builder.linkDynamicLibrary(built);
-        }
-      } else {
-        // Pre-built library object — link dynamically
-        builder.linkDynamicLibrary(lib);
-      }
-    }
+    linkLibraries(builder, libraries);
     return builder.compileTxScript(code);
   }
 
@@ -63,18 +49,26 @@ export class CompilerResource {
     this.#client?.assertNotTerminated();
     await this.#getWasm();
     const builder = this.#inner.createCodeBuilder();
-    for (const lib of libraries) {
-      if (lib && typeof lib.namespace === "string") {
-        const built = builder.buildLibrary(lib.namespace, lib.code);
-        if (lib.linking === "static") {
-          builder.linkStaticLibrary(built);
-        } else {
-          builder.linkDynamicLibrary(built);
-        }
-      } else {
-        builder.linkDynamicLibrary(lib);
-      }
-    }
+    linkLibraries(builder, libraries);
     return builder.compileNoteScript(code);
+  }
+}
+
+// Builds and links each library entry against `builder`. Inline
+// `{ namespace, code, linking? }` entries are built via `buildLibrary` and
+// linked according to `linking` (defaulting to dynamic, matching tutorial
+// behavior). Pre-built library objects are linked dynamically.
+function linkLibraries(builder, libraries) {
+  for (const lib of libraries) {
+    if (lib && typeof lib.namespace === "string") {
+      const built = builder.buildLibrary(lib.namespace, lib.code);
+      if (lib.linking === "static") {
+        builder.linkStaticLibrary(built);
+      } else {
+        builder.linkDynamicLibrary(built);
+      }
+    } else {
+      builder.linkDynamicLibrary(lib);
+    }
   }
 }
