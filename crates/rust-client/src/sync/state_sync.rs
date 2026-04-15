@@ -38,6 +38,7 @@ use crate::rpc::domain::account::{
     FetchedAccount,
 };
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
+use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::storage_map::StorageMapUpdate;
 use crate::rpc::domain::transaction::{
     TransactionInclusion,
@@ -400,6 +401,7 @@ impl StateSync {
                     initial_state_commitment: r.transaction_header.initial_state_commitment(),
                     nullifiers,
                     output_notes: r.output_notes,
+                    erased_output_note_ids: r.erased_output_note_ids,
                 }
             })
             .collect();
@@ -499,6 +501,30 @@ impl StateSync {
             &transactions,
         );
 
+        // Detect note consumption from transaction nullifiers.
+        //
+        // When a note is created and consumed in the same batch, its nullifier may not be
+        // available from the nullifier sync. We collect nullifiers from the transaction
+        // records to cover this case.
+        for transaction in &transactions {
+            for nullifier in &transaction.nullifiers {
+                let nullifier_update = NullifierUpdate {
+                    nullifier: *nullifier,
+                    block_num: transaction.block_num,
+                };
+
+                let external_consumer_account = state_sync_update
+                    .transaction_updates
+                    .external_nullifier_account(&nullifier_update.nullifier);
+
+                state_sync_update.note_updates.apply_nullifiers_state_transitions(
+                    &nullifier_update,
+                    state_sync_update.transaction_updates.committed_transactions(),
+                    external_consumer_account,
+                )?;
+            }
+        }
+
         // Transition tracked output notes to Committed using inclusion proofs from the
         // transaction sync response. This covers output notes regardless of whether their
         // tags were tracked in the note sync.
@@ -507,6 +533,9 @@ impl StateSync {
                 .note_updates
                 .apply_output_note_inclusion_proofs(&transaction.output_notes)?;
         }
+
+        // Detect output notes erased by same-batch note erasure.
+        Self::detect_erased_notes(state_sync_update, &transactions);
 
         Ok(())
     }
@@ -1123,6 +1152,25 @@ impl StateSync {
 
     /// Applies the changes received from the sync response to the transactions tracked by the
     /// client and updates the `transaction_updates` accordingly.
+    /// Detects output notes consumed via same-batch note erasure.
+    ///
+    /// When a note is created and consumed in the same batch, note erasure removes it from
+    /// the block body. The node reports these as erased output notes in the transaction
+    /// record (note ID only, no inclusion proof). We mark them as consumed.
+    fn detect_erased_notes(
+        state_sync_update: &mut StateSyncUpdate,
+        transactions: &[TransactionInclusion],
+    ) {
+        for tx in transactions {
+            for note_id in &tx.erased_output_note_ids {
+                // Best-effort: ignore errors for notes not tracked by this client.
+                let _ = state_sync_update
+                    .note_updates
+                    .mark_output_note_consumed_if_not_on_chain(*note_id, tx.block_num);
+            }
+        }
+    }
+
     ///
     /// The transaction updates might include:
     /// * New transactions that were committed in the block.
@@ -1326,6 +1374,7 @@ mod tests {
                     fee,
                 ),
                 output_notes: vec![],
+                erased_output_note_ids: vec![],
             }
         }
 
@@ -1376,6 +1425,7 @@ mod tests {
                     fee,
                 ),
                 output_notes: vec![],
+                erased_output_note_ids: vec![],
             };
 
             let result = super::super::compute_ordered_nullifiers(&[tx_a2, tx_b1, tx_a3, tx_a1]);
