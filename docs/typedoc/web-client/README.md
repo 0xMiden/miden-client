@@ -101,6 +101,7 @@
 - [StorageMode](type-aliases/StorageMode.md)
 - [TransactionQuery](type-aliases/TransactionQuery.md)
 - [WaitStatus](type-aliases/WaitStatus.md)
+- [WasmModule](type-aliases/WasmModule.md)
 
 ## Variables
 
