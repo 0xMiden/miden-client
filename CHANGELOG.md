@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.2 (TBD)
+
+### Features
+
+* [FEATURE][web] Added `compile.noteScript({ code, libraries? })` to `MidenClient`, filling the gap left on the resource-based surface for note-script compilation. Mirrors the existing `compile.txScript` shape. (#2044)
+* [FEATURE][web] Added `Linking` enum (`Linking.Dynamic`, `Linking.Static`) for use in `CompileTxScriptLibrary.linking`. Raw `"dynamic"` / `"static"` strings continue to work. (#2044)
+
 ## 0.14.1 (2026-04-14)
 
 ### Enhancements
