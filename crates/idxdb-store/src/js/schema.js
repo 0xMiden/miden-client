@@ -2,6 +2,8 @@ import Dexie from "dexie";
 import * as semver from "semver";
 import { logWebStoreError } from "./utils.js";
 export const CLIENT_VERSION_SETTING_KEY = "clientVersion";
+/** Mirrors `StorageSlotType::Map`, originally defined in miden-protocol. */
+export const STORAGE_SLOT_TYPE_MAP = 1;
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 // Since we can't have a pointer to a JS Object from rust, we'll
@@ -25,7 +27,10 @@ export function getDatabase(dbId) {
  */
 export async function openDatabase(network, clientVersion) {
     const db = new MidenDatabase(network);
-    await db.open(clientVersion);
+    const success = await db.open(clientVersion);
+    if (!success) {
+        throw new Error(`Failed to open IndexedDB database: ${network}`);
+    }
     databaseRegistry.set(network, db);
     return network;
 }
@@ -63,19 +68,19 @@ function indexes(...items) {
 const V1_STORES = {
     [Table.AccountCode]: indexes("root"),
     [Table.LatestAccountStorage]: indexes("[accountId+slotName]", "accountId"),
-    [Table.HistoricalAccountStorage]: indexes("[accountId+nonce+slotName]", "accountId", "[accountId+nonce]"),
+    [Table.HistoricalAccountStorage]: indexes("[accountId+replacedAtNonce+slotName]", "accountId", "[accountId+replacedAtNonce]"),
     [Table.LatestStorageMapEntries]: indexes("[accountId+slotName+key]", "accountId", "[accountId+slotName]"),
-    [Table.HistoricalStorageMapEntries]: indexes("[accountId+nonce+slotName+key]", "accountId", "[accountId+nonce]"),
-    [Table.LatestAccountAssets]: indexes("[accountId+vaultKey]", "accountId", "faucetIdPrefix"),
-    [Table.HistoricalAccountAssets]: indexes("[accountId+nonce+vaultKey]", "accountId", "[accountId+nonce]"),
+    [Table.HistoricalStorageMapEntries]: indexes("[accountId+replacedAtNonce+slotName+key]", "accountId", "[accountId+replacedAtNonce]"),
+    [Table.LatestAccountAssets]: indexes("[accountId+vaultKey]", "accountId"),
+    [Table.HistoricalAccountAssets]: indexes("[accountId+replacedAtNonce+vaultKey]", "accountId", "[accountId+replacedAtNonce]"),
     [Table.AccountAuth]: indexes("pubKeyCommitmentHex"),
     [Table.AccountKeyMapping]: indexes("[accountIdHex+pubKeyCommitmentHex]", "accountIdHex", "pubKeyCommitmentHex"),
     [Table.LatestAccountHeaders]: indexes("&id", "accountCommitment"),
-    [Table.HistoricalAccountHeaders]: indexes("&accountCommitment", "id", "[id+nonce]"),
+    [Table.HistoricalAccountHeaders]: indexes("&accountCommitment", "id", "[id+replacedAtNonce]"),
     [Table.Addresses]: indexes("address", "id"),
     [Table.Transactions]: indexes("id", "statusVariant"),
     [Table.TransactionScripts]: indexes("scriptRoot"),
-    [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant"),
+    [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant", "[consumedBlockHeight+consumedTxOrder+noteId]"),
     [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
     [Table.NotesScripts]: indexes("scriptRoot"),
     [Table.StateSync]: indexes("id"),

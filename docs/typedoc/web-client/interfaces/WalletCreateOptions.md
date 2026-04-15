@@ -22,12 +22,12 @@
 
 ### storage?
 
-> `optional` **storage**: `"public"` \| `"private"`
+> `optional` **storage**: [`StorageMode`](../type-aliases/StorageMode.md)
 
 ***
 
 ### type?
 
-> `optional` **type**: `"MutableWallet"` \| `"ImmutableWallet"`
+> `optional` **type**: [`AccountTypeValue`](../type-aliases/AccountTypeValue.md)
 
-Account type. Defaults to "MutableWallet". Use AccountType enum.
+Account type. Defaults to `AccountType.MutableWallet`.

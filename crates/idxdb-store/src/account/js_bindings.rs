@@ -1,7 +1,6 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use miden_client::Word;
 use miden_client::account::{StorageMap, StorageSlot};
 use miden_client::asset::Asset;
 use miden_client::utils::Serializable;
@@ -38,13 +37,21 @@ extern "C" {
     pub fn idxdb_get_account_code(db_id: &str, code_root: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountStorage)]
-    pub fn idxdb_get_account_storage(db_id: &str, account_id: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_storage(
+        db_id: &str,
+        account_id: String,
+        slot_names: Vec<String>,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountStorageMaps)]
     pub fn idxdb_get_account_storage_maps(db_id: &str, account_id: String) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountVaultAssets)]
-    pub fn idxdb_get_account_vault_assets(db_id: &str, account_id: String) -> js_sys::Promise;
+    pub fn idxdb_get_account_vault_assets(
+        db_id: &str,
+        account_id: String,
+        vault_keys: Vec<String>,
+    ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = getAccountAddresses)]
     pub fn idxdb_get_account_addresses(db_id: &str, account_id: String) -> js_sys::Promise;
@@ -63,7 +70,6 @@ extern "C" {
     pub fn idxdb_upsert_account_storage(
         db_id: &str,
         account_id: String,
-        nonce: String,
         storage_slots: Vec<JsStorageSlot>,
     ) -> js_sys::Promise;
 
@@ -71,7 +77,6 @@ extern "C" {
     pub fn idxdb_upsert_storage_map_entries(
         db_id: &str,
         account_id: String,
-        nonce: String,
         entries: Vec<JsStorageMapEntry>,
     ) -> js_sys::Promise;
 
@@ -79,7 +84,6 @@ extern "C" {
     pub fn idxdb_upsert_vault_assets(
         db_id: &str,
         account_id: String,
-        nonce: String,
         assets: Vec<JsVaultAsset>,
     ) -> js_sys::Promise;
 
@@ -134,7 +138,6 @@ extern "C" {
         vault_root: String,
         committed: bool,
         commitment: String,
-        account_seed: Option<Vec<u8>>,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = applyFullAccountState)]
@@ -154,6 +157,14 @@ extern "C" {
 
     #[wasm_bindgen(js_name = undoAccountStates)]
     pub fn idxdb_undo_account_states(db_id: &str, account_hashes: Vec<String>) -> js_sys::Promise;
+
+    /// Prunes historical account states for the specified account up to the given nonce.
+    #[wasm_bindgen(js_name = pruneAccountHistory)]
+    pub fn idxdb_prune_account_history(
+        db_id: &str,
+        account_id: String,
+        up_to_nonce: String,
+    ) -> js_sys::Promise;
 }
 
 // VAULT ASSET
@@ -166,9 +177,6 @@ pub struct JsVaultAsset {
     /// The vault key associated with the asset.
     #[wasm_bindgen(js_name = "vaultKey")]
     pub vault_key: String,
-    /// Asset's faucet ID prefix.
-    #[wasm_bindgen(js_name = "faucetIdPrefix")]
-    pub faucet_id_prefix: String,
     /// Word representing the asset.
     #[wasm_bindgen(js_name = "asset")]
     pub asset: String,
@@ -177,9 +185,8 @@ pub struct JsVaultAsset {
 impl JsVaultAsset {
     pub fn from_asset(asset: &Asset) -> Self {
         Self {
-            vault_key: Word::from(asset.vault_key()).to_hex(),
-            faucet_id_prefix: asset.faucet_id_prefix().to_hex(),
-            asset: Word::from(asset).to_hex(),
+            vault_key: asset.vault_key().to_string(),
+            asset: asset.to_value_word().to_hex(),
         }
     }
 }

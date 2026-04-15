@@ -22,30 +22,18 @@ const INTEGRATION_TESTS_HEADER: &str = r#"// Auto-generated integration tests
 // named test_*. Do not edit manually.
 "#;
 
-const INTEGRATION_TESTS_IMPORTS: &str = r#"use anyhow::{anyhow, Result};
-use miden_client_integration_tests::tests::config::ClientConfig;
-use miden_client::rpc::Endpoint;
-use url::Url;"#;
+const INTEGRATION_TESTS_IMPORTS: &str = r#"use anyhow::Result;
+use miden_client_integration_tests::tests::config::ClientConfig;"#;
 
 const TOKIO_TEST_WRAPPER: &str = r#"/// Auto-generated tokio test wrapper for {ORIGINAL_FUNCTION_NAME}
 #[tokio::test]
 async fn {TEST_FUNCTION_NAME}() -> Result<()> {{
-    // Use default test configuration
-    let endpoint_url = std::env::var("TEST_MIDEN_RPC_ENDPOINT")
-        .unwrap_or_else(|_| Endpoint::localhost().to_string());
-    let url = Url::parse(&endpoint_url).map_err(|_| anyhow!("Invalid RPC endpoint URL"))?;
-    let host = url
-        .host_str()
-        .ok_or_else(|| anyhow!("RPC endpoint URL is missing a host"))?
-        .to_string();
-    let port = url.port().ok_or_else(|| anyhow!("RPC endpoint URL is missing a port"))?;
-    let endpoint = Endpoint::new(url.scheme().to_string(), host, Some(port));
-    let timeout = std::env::var("TEST_TIMEOUT")
-        .unwrap_or_else(|_| "10000".to_string())
-        .parse::<u64>()
-        .map_err(|_| anyhow!("Invalid timeout value"))?;
-
-    let client_config = ClientConfig::new(endpoint, timeout);
+    // ClientConfig::default() resolves TEST_MIDEN_NETWORK, TEST_MIDEN_RPC_URL,
+    // TEST_MIDEN_PROVER_URL, TEST_MIDEN_NOTE_TRANSPORT_URL, and MIDEN_TEST_TIMEOUT.
+    // Note transport is cleared here to avoid eager gRPC connections for every test;
+    // transport tests configure their own transport via TEST_MIDEN_NOTE_TRANSPORT_URL.
+    let client_config = ClientConfig::default()
+        .with_note_transport_endpoint(None);
     {ORIGINAL_FUNCTION_NAME}(client_config).await
 }}"#;
 
@@ -334,8 +322,13 @@ fn parse_test_function_name(line: &str) -> Option<String> {
 /// # Environment Variables
 ///
 /// The generated tests respect these environment variables:
-/// - `TEST_MIDEN_RPC_ENDPOINT` - RPC endpoint URL (default: localhost)
-/// - `TEST_TIMEOUT` - Test timeout in milliseconds (default: 10000)
+/// - `TEST_MIDEN_NETWORK` - Network preset: "devnet", "testnet", "localhost", or a custom RPC
+///   endpoint (default: localhost). Sets defaults for all components.
+/// - `TEST_MIDEN_RPC_URL` - Overrides the RPC endpoint from the network preset
+/// - `TEST_MIDEN_PROVER_URL` - Overrides the prover: "devnet", "testnet", "local", or a custom URL
+///   (default: derived from network)
+/// - `TEST_MIDEN_NOTE_TRANSPORT_URL` - Used by transport tests directly (not in generated wrappers)
+/// - `MIDEN_TEST_TIMEOUT` - Test timeout in milliseconds (default: 10000)
 fn generate_integration_tests(test_cases: &[TestCaseInfo]) -> String {
     let mut result = String::new();
 

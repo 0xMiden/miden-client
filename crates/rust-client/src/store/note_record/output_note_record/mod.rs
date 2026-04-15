@@ -15,8 +15,14 @@ use miden_protocol::note::{
     Nullifier,
     PartialNote,
 };
-use miden_protocol::transaction::OutputNote;
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use miden_protocol::transaction::RawOutputNote;
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+};
 
 use super::NoteRecordError;
 
@@ -185,20 +191,17 @@ impl OutputNoteRecord {
         }
     }
 
-    /// [`OutputNote`] can always be turned into an [`OutputNoteRecord`] when they're either
-    /// [`OutputNote::Full`] or [`OutputNote::Partial`] and always fail the conversion if it's
-    /// [`OutputNote::Header`]. This also mean that `output_note.try_from()` can also be used as a
-    /// way to filter the full and partial output notes.
+    /// [`RawOutputNote`] can always be turned into an [`OutputNoteRecord`] when they're either
+    /// [`RawOutputNote::Full`] or [`RawOutputNote::Partial`].
     pub fn try_from_output_note(
-        output_note: OutputNote,
+        output_note: RawOutputNote,
         expected_height: BlockNumber,
     ) -> Result<Self, NoteRecordError> {
         match output_note {
-            OutputNote::Full(note) => Ok(Self::from_full_note(note, expected_height)),
-            OutputNote::Partial(partial_note) => Ok(Self::from_partial_note(&partial_note, expected_height)),
-            OutputNote::Header(_) => Err(NoteRecordError::ConversionError(
-                "Cannot transform a Header output note into an OutputNoteRecord: not enough information".to_string(),
-            )),
+            RawOutputNote::Full(note) => Ok(Self::from_full_note(note, expected_height)),
+            RawOutputNote::Partial(partial_note) => {
+                Ok(Self::from_partial_note(&partial_note, expected_height))
+            },
         }
     }
 }

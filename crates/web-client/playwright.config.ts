@@ -16,13 +16,13 @@ export default defineConfig({
   timeout: 240_000,
   testDir: "./test",
   /* Run tests in files in parallel */
-  fullyParallel: process.env.REMOTE_PROVER ? false : true,
+  fullyParallel: process.env.TEST_MIDEN_PROVER_URL ? false : true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: 0,
   /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 2 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
@@ -76,8 +76,8 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   // FIXME: Modularise test server constants (localhost, port)
   webServer: {
-    command: "npx http-server ./dist -p 8080",
-    url: "http://127.0.0.1:8080",
+    command: "npx http-server ./dist -a localhost -p 8080",
+    url: "http://localhost:8080",
     reuseExistingServer: true,
   },
 });

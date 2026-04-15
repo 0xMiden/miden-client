@@ -1,4 +1,5 @@
 import { getDatabase, IInputNote, IOutputNote } from "./schema.js";
+import type { Transaction } from "dexie";
 
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
@@ -128,40 +129,83 @@ export async function upsertInputNote(
   nullifier: string,
   serializedCreatedAt: string,
   stateDiscriminant: number,
-  state: Uint8Array
+  state: Uint8Array,
+  consumedBlockHeight?: number | null,
+  consumedTxOrder?: number | null,
+  consumerAccountId?: string | null,
+  tx?: Transaction
 ) {
   const db = getDatabase(dbId);
-  return db.dexie.transaction(
-    "rw",
-    db.inputNotes,
-    db.notesScripts,
-    async (tx) => {
-      try {
-        const data = {
-          noteId,
-          assets,
-          serialNumber,
-          inputs,
-          scriptRoot,
-          nullifier,
-          state,
-          stateDiscriminant,
-          serializedCreatedAt,
-        };
+  const doWork = async (t: Transaction) => {
+    try {
+      const data = {
+        noteId,
+        assets,
+        serialNumber,
+        inputs,
+        scriptRoot,
+        nullifier,
+        state,
+        stateDiscriminant,
+        serializedCreatedAt,
+        // These fields are null for non-consumed notes.
+        // Convert null -> undefined so Dexie omits them from compound indexes.
+        consumedBlockHeight: consumedBlockHeight ?? undefined,
+        consumedTxOrder: consumedTxOrder ?? undefined,
+        consumerAccountId: consumerAccountId ?? undefined,
+      };
 
-        await tx.inputNotes.put(data);
+      await t.inputNotes.put(data);
 
-        const noteScriptData = {
-          scriptRoot,
-          serializedNoteScript,
-        };
+      const noteScriptData = {
+        scriptRoot,
+        serializedNoteScript,
+      };
 
-        await tx.notesScripts.put(noteScriptData);
-      } catch (error) {
-        logWebStoreError(error, `Error inserting note: ${noteId}`);
-      }
+      await t.notesScripts.put(noteScriptData);
+    } catch (error) {
+      logWebStoreError(error, `Error inserting note: ${noteId}`);
     }
-  );
+  };
+  if (tx) return doWork(tx);
+  return db.dexie.transaction("rw", db.inputNotes, db.notesScripts, doWork);
+}
+
+// Uses the [consumedBlockHeight+consumedTxOrder+noteId] compound index for cursor-based
+// iteration, filtering by consumer account.
+export async function getInputNoteByOffset(
+  dbId: string,
+  states: Uint8Array,
+  consumerAccountId: string,
+  blockStart: number | undefined,
+  blockEnd: number | undefined,
+  offset: number
+) {
+  try {
+    const db = getDatabase(dbId);
+
+    // The compound index sorts by consumedBlockHeight, consumedTxOrder, noteId.
+    // Rows without these fields are excluded by the index.
+    const results = await db.inputNotes
+      .orderBy("[consumedBlockHeight+consumedTxOrder+noteId]")
+      .filter((n: IInputNote) => {
+        if (states.length > 0 && !states.includes(n.stateDiscriminant))
+          return false;
+        if (n.consumerAccountId !== consumerAccountId) return false;
+        if (blockStart != null && n.consumedBlockHeight! < blockStart)
+          return false;
+        if (blockEnd != null && n.consumedBlockHeight! > blockEnd) return false;
+        return true;
+      })
+      .offset(offset)
+      .limit(1)
+      .toArray();
+
+    if (results.length === 0) return [];
+    return await processInputNotes(dbId, results);
+  } catch (err) {
+    logWebStoreError(err, "Failed to get input note by offset");
+  }
 }
 
 export async function upsertOutputNote(
@@ -173,32 +217,30 @@ export async function upsertOutputNote(
   nullifier: string | undefined,
   expectedHeight: number,
   stateDiscriminant: number,
-  state: Uint8Array
+  state: Uint8Array,
+  tx?: Transaction
 ) {
   const db = getDatabase(dbId);
-  return db.dexie.transaction(
-    "rw",
-    db.outputNotes,
-    db.notesScripts,
-    async (tx) => {
-      try {
-        const data = {
-          noteId,
-          assets,
-          recipientDigest,
-          metadata,
-          nullifier: nullifier ? nullifier : undefined,
-          expectedHeight,
-          stateDiscriminant,
-          state,
-        };
+  const doWork = async (t: Transaction) => {
+    try {
+      const data = {
+        noteId,
+        assets,
+        recipientDigest,
+        metadata,
+        nullifier: nullifier ? nullifier : undefined,
+        expectedHeight,
+        stateDiscriminant,
+        state,
+      };
 
-        await tx.outputNotes.put(data);
-      } catch (error) {
-        logWebStoreError(error, `Error inserting note: ${noteId}`);
-      }
+      await t.outputNotes.put(data);
+    } catch (error) {
+      logWebStoreError(error, `Error inserting note: ${noteId}`);
     }
-  );
+  };
+  if (tx) return doWork(tx);
+  return db.dexie.transaction("rw", db.outputNotes, db.notesScripts, doWork);
 }
 
 async function processInputNotes(dbId: string, notes: IInputNote[]) {

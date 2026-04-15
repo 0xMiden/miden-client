@@ -39,7 +39,7 @@ use miden_client::store::{
     StoreError,
 };
 use miden_client::utils::Serializable;
-use miden_client::{AccountError, Word};
+use miden_client::{AccountError, Felt, Word};
 
 use super::IdxdbStore;
 use crate::account::js_bindings::idxdb_get_account_addresses;
@@ -64,6 +64,7 @@ use js_bindings::{
     idxdb_get_account_vault_assets,
     idxdb_get_foreign_account_code,
     idxdb_lock_account,
+    idxdb_prune_account_history,
     idxdb_undo_account_states,
     idxdb_upsert_foreign_account_code,
 };
@@ -184,7 +185,7 @@ impl IdxdbStore {
         let account_code = self.get_account_code(account_header.code_commitment()).await?;
 
         let account_storage = self.get_storage(account_id, AccountStorageFilter::All).await?;
-        let assets = self.get_vault_assets(account_id).await?;
+        let assets = self.get_vault_assets(account_id, vec![]).await?;
         let account_vault = AssetVault::new(&assets)?;
 
         let account = Account::new(
@@ -267,7 +268,7 @@ impl IdxdbStore {
     ) -> Result<Vec<(StorageSlotName, StorageSlotType, Word)>, StoreError> {
         let account_id_str = account_id.to_string();
 
-        let promise = idxdb_get_account_storage(self.db_id(), account_id_str);
+        let promise = idxdb_get_account_storage(self.db_id(), account_id_str, vec![]);
         let account_storage_idxdb: Vec<AccountStorageIdxdbObject> =
             await_js(promise, "failed to fetch account storage").await?;
 
@@ -298,7 +299,7 @@ impl IdxdbStore {
     ) -> Result<AccountStorage, StoreError> {
         let account_id_str = account_id.to_string();
 
-        let promise = idxdb_get_account_storage(self.db_id(), account_id_str.clone());
+        let promise = idxdb_get_account_storage(self.db_id(), account_id_str.clone(), vec![]);
         let account_storage_idxdb: Vec<AccountStorageIdxdbObject> =
             await_js(promise, "failed to fetch account storage").await?;
 
@@ -384,20 +385,48 @@ impl IdxdbStore {
     pub(super) async fn get_vault_assets(
         &self,
         account_id: AccountId,
+        vault_keys: Vec<String>,
     ) -> Result<Vec<Asset>, StoreError> {
-        let promise = idxdb_get_account_vault_assets(self.db_id(), account_id.to_string());
+        let promise =
+            idxdb_get_account_vault_assets(self.db_id(), account_id.to_string(), vault_keys);
         let vault_assets_idxdb: Vec<AccountAssetIdxdbObject> =
             await_js(promise, "failed to fetch vault assets").await?;
 
         let assets = vault_assets_idxdb
             .into_iter()
-            .map(|asset| {
-                let word = Word::try_from(&asset.asset)?;
-                Ok(Asset::try_from(word)?)
+            .map(|entry| {
+                let key_word = Word::try_from(&entry.vault_key)?;
+                let value_word = Word::try_from(&entry.asset)?;
+                Ok(Asset::from_key_value_words(key_word, value_word)?)
             })
             .collect::<Result<Vec<_>, StoreError>>()?;
 
         Ok(assets)
+    }
+
+    /// Returns a map from slot name to map root for Map-type storage slots.
+    /// When `slot_names` is non-empty, only loads the specified slots.
+    /// Only loads slot metadata — does NOT load map entries.
+    pub(crate) async fn get_storage_map_roots(
+        &self,
+        account_id: AccountId,
+        slot_names: Vec<String>,
+    ) -> Result<BTreeMap<StorageSlotName, Word>, StoreError> {
+        let promise = idxdb_get_account_storage(self.db_id(), account_id.to_string(), slot_names);
+        let slots: Vec<AccountStorageIdxdbObject> =
+            await_js(promise, "failed to fetch account storage").await?;
+
+        slots
+            .into_iter()
+            .filter(|s| StorageSlotType::try_from(s.slot_type).ok() == Some(StorageSlotType::Map))
+            .map(|s| {
+                let name = StorageSlotName::new(s.slot_name).map_err(|err| {
+                    StoreError::DatabaseError(format!("invalid storage slot name: {err}"))
+                })?;
+                let root = Word::try_from(s.slot_value.as_str())?;
+                Ok((name, root))
+            })
+            .collect()
     }
 
     pub(crate) async fn insert_account(
@@ -406,24 +435,23 @@ impl IdxdbStore {
         initial_address: Address,
     ) -> Result<(), StoreError> {
         upsert_account_code(self.db_id(), account.code()).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to insert account code: {js_error:?}",))
+            StoreError::DatabaseError(format!("failed to insert account code: {js_error:?}"))
         })?;
 
-        let nonce = account.nonce().as_int();
-        upsert_account_storage(self.db_id(), &account.id(), nonce, account.storage())
+        upsert_account_storage(self.db_id(), &account.id(), account.storage())
             .await
             .map_err(|js_error| {
-                StoreError::DatabaseError(format!("failed to insert account storage:{js_error:?}",))
+                StoreError::DatabaseError(format!("failed to insert account storage:{js_error:?}"))
             })?;
 
-        upsert_account_asset_vault(self.db_id(), &account.id(), nonce, account.vault())
+        upsert_account_asset_vault(self.db_id(), &account.id(), account.vault())
             .await
             .map_err(|js_error| {
-                StoreError::DatabaseError(format!("failed to insert account vault:{js_error:?}",))
+                StoreError::DatabaseError(format!("failed to insert account vault:{js_error:?}"))
             })?;
 
         upsert_account_record(self.db_id(), account).await.map_err(|js_error| {
-            StoreError::DatabaseError(format!("failed to insert account record: {js_error:?}",))
+            StoreError::DatabaseError(format!("failed to insert account record: {js_error:?}"))
         })?;
 
         insert_account_address(self.db_id(), &account.id(), initial_address)
@@ -435,7 +463,11 @@ impl IdxdbStore {
             })?;
 
         let mut smt_forest = self.smt_forest.write();
-        smt_forest.insert_account_state(account.vault(), account.storage())?;
+        smt_forest.insert_and_register_account_state(
+            account.id(),
+            account.vault(),
+            account.storage(),
+        )?;
 
         Ok(())
     }
@@ -444,14 +476,10 @@ impl IdxdbStore {
         &self,
         new_account_state: &Account,
     ) -> Result<(), StoreError> {
-        let account_id_str = new_account_state.id().to_string();
-        let promise = idxdb_get_account_header(self.db_id(), account_id_str);
-        let account_header_idxdb: Option<AccountRecordIdxdbObject> =
-            await_js(promise, "failed to fetch account header").await?;
-
-        if account_header_idxdb.is_none() {
-            return Err(StoreError::AccountDataNotFound(new_account_state.id()));
-        }
+        let account_id = new_account_state.id();
+        self.get_account_header(account_id)
+            .await?
+            .ok_or(StoreError::AccountDataNotFound(account_id))?;
 
         apply_full_account_state(self.db_id(), new_account_state)
             .await
@@ -478,7 +506,7 @@ impl IdxdbStore {
             .await?
             .ok_or(StoreError::AccountDataNotFound(account_id))?;
 
-        let assets = self.get_vault_assets(account_id).await?;
+        let assets = self.get_vault_assets(account_id, vec![]).await?;
         Ok(AssetVault::new(&assets)?)
     }
 
@@ -638,5 +666,18 @@ impl IdxdbStore {
         remove_account_address(self.db_id(), address).await.map_err(|js_error| {
             StoreError::DatabaseError(format!("failed to remove account address: {js_error:?}"))
         })
+    }
+
+    pub(crate) async fn prune_account_history(
+        &self,
+        account_id: AccountId,
+        up_to_nonce: Felt,
+    ) -> Result<usize, StoreError> {
+        let promise = idxdb_prune_account_history(
+            self.db_id(),
+            account_id.to_string(),
+            up_to_nonce.as_canonical_u64().to_string(),
+        );
+        await_js(promise, "failed to prune account history").await
     }
 }

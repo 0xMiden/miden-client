@@ -59,6 +59,16 @@ try {
 }
 ```
 
+## Dummy Proving
+
+When using the mock client, transaction proving is automatically handled with dummy proofs. Instead of generating real zero-knowledge proofs (which is computationally expensive), the mock client uses `LocalTransactionProver.prove_dummy()` under the hood. This means:
+
+- No prover configuration is needed — just call transaction methods as usual.
+- Transaction proving is near-instant, making tests significantly faster.
+- Dummy proofs are accepted by the mock chain but would not be valid on a real network.
+
+This applies to all transaction flows: both the simplified API (`client.transactions.mint()`, `client.transactions.send()`, etc.) and the manual `proveTransaction()` method. If no custom prover is passed and the client is a mock client, dummy proving is used automatically.
+
 ## Mock-Only Methods
 
 - `client.proveBlock()` — Advances the mock chain by one block

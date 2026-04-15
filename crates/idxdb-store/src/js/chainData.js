@@ -82,6 +82,19 @@ export async function getTrackedBlockHeaders(dbId) {
         logWebStoreError(err, "Failed to get tracked block headers");
     }
 }
+export async function getTrackedBlockHeaderNumbers(dbId) {
+    try {
+        const db = getDatabase(dbId);
+        const blockNums = await db.blockHeaders
+            .where("hasClientNotes")
+            .equals("true")
+            .primaryKeys();
+        return blockNums;
+    }
+    catch (err) {
+        logWebStoreError(err, "Failed to get tracked block header numbers");
+    }
+}
 export async function getPartialBlockchainPeaksByBlockNum(dbId, blockNum) {
     try {
         const db = getDatabase(dbId);

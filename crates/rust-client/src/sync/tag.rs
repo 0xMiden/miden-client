@@ -3,7 +3,13 @@ use alloc::vec::Vec;
 
 use miden_protocol::account::{Account, AccountId};
 use miden_protocol::note::{NoteId, NoteTag};
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+};
 use tracing::warn;
 
 use crate::Client;

@@ -839,11 +839,11 @@ import { useConsume } from '@miden-sdk/react';
 function ConsumeNotes() {
   const { consume, result, isLoading, stage, error, reset } = useConsume();
 
-  const handleConsume = async (noteIds: string[]) => {
+  const handleConsume = async (notes: string[]) => {
     try {
       const { transactionId } = await consume({
         accountId: '0xmywallet...',  // Your wallet ID
-        noteIds: noteIds,             // Array of note IDs to consume
+        notes,                        // Note IDs, InputNoteRecords, or Note objects
       });
 
       console.log('Consumed! TX:', transactionId);
@@ -948,6 +948,47 @@ function CustomTransactionButton({ accountId }: { accountId: string }) {
     <button onClick={handleRun} disabled={isLoading}>
       {isLoading ? stage : 'Run Transaction'}
     </button>
+  );
+}
+```
+
+#### `useExecuteProgram()`
+
+Execute a program (view call) against an account and read the resulting stack
+output. This runs locally and does not submit anything to the network. Useful
+for reading on-chain state like storage maps or computed values.
+
+Built-in features:
+- **Auto pre-sync** before executing (disable with `skipSync: true`)
+- **Concurrency guard** prevents double-executions while a call is in-flight
+- **Ergonomic output** converts the raw `FeltArray` to a `bigint[]` array
+
+```tsx
+import { useExecuteProgram } from '@miden-sdk/react';
+
+function ReadCountButton({ accountId, script }: { accountId: string; script: TransactionScript }) {
+  const { execute, result, isLoading, error } = useExecuteProgram();
+
+  const handleRead = async () => {
+    const { stack } = await execute({
+      accountId,
+      script,
+      // Optional:
+      // adviceInputs: myAdviceInputs,
+      // foreignAccounts: [otherAccountId],
+      // skipSync: true,
+    });
+    console.log('Stack output:', stack); // bigint[]
+  };
+
+  return (
+    <div>
+      <button onClick={handleRead} disabled={isLoading}>
+        {isLoading ? 'Executing...' : 'Read Count'}
+      </button>
+      {result && <p>Count: {result.stack[0].toString()}</p>}
+      {error && <p>Error: {error.message}</p>}
+    </div>
   );
 }
 ```
@@ -1245,7 +1286,7 @@ import { MidenFiSignerProvider } from '@miden-sdk/wallet-adapter-react';
 
 function App() {
   return (
-    <MidenFiSignerProvider network="Testnet">
+    <MidenFiSignerProvider network="testnet">
       <MidenProvider config={{ rpcUrl: 'testnet' }}>
         <YourApp />
       </MidenProvider>
@@ -1271,6 +1312,73 @@ function ConnectButton() {
     : <button onClick={connect}>Connect with {name}</button>;
 }
 ```
+
+### Multi-Signer Setup
+
+For apps that support multiple signer providers (e.g. Para + Turnkey + MidenFi), use `MultiSignerProvider` and `SignerSlot` to let users choose which signer to connect:
+
+```tsx
+import {
+  MidenProvider,
+  MultiSignerProvider,
+  SignerSlot,
+  useMultiSigner,
+} from '@miden-sdk/react';
+import { ParaSignerProvider } from '@miden-sdk/use-miden-para-react';
+import { TurnkeySignerProvider } from '@miden-sdk/miden-turnkey-react';
+import { MidenFiSignerProvider } from '@miden-sdk/miden-wallet-adapter-react';
+
+function App() {
+  return (
+    <MultiSignerProvider>
+      <ParaSignerProvider apiKey="your-api-key" environment="BETA">
+        <SignerSlot />
+      </ParaSignerProvider>
+      <TurnkeySignerProvider>
+        <SignerSlot />
+      </TurnkeySignerProvider>
+      <MidenFiSignerProvider network="testnet">
+        <SignerSlot />
+      </MidenFiSignerProvider>
+      <MidenProvider config={{ rpcUrl: 'testnet', prover: 'testnet' }}>
+        <YourApp />
+      </MidenProvider>
+    </MultiSignerProvider>
+  );
+}
+```
+
+Each `SignerSlot` captures its nearest ancestor signer provider's context and registers it with `MultiSignerProvider`. The `MidenProvider` sees whichever signer is currently active (or `null` for local keystore mode).
+
+Use `useMultiSigner()` to list available signers and switch between them:
+
+```tsx
+function SignerSelector() {
+  const multiSigner = useMultiSigner();
+
+  return (
+    <div>
+      {multiSigner?.signers.map((s) => (
+        <button key={s.name} onClick={() => multiSigner.connectSigner(s.name)}>
+          {s.name}
+        </button>
+      ))}
+      <button onClick={() => multiSigner?.disconnectSigner()}>
+        Use Local Keystore
+      </button>
+    </div>
+  );
+}
+```
+
+The `useMultiSigner()` hook returns:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `signers` | `SignerContextValue[]` | All registered signer providers |
+| `activeSigner` | `SignerContextValue \| null` | Currently active signer |
+| `connectSigner(name)` | `(name: string) => Promise<void>` | Switch to a signer by name |
+| `disconnectSigner()` | `() => Promise<void>` | Disconnect active signer (falls back to local keystore) |
 
 ### Custom Account Components
 

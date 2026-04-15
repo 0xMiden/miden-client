@@ -13,8 +13,8 @@ use miden_protocol::account::AccountId;
 use miden_protocol::account::auth::{AuthSecretKey, PublicKey, PublicKeyCommitment, Signature};
 use miden_tx::AuthenticationError;
 use miden_tx::auth::{SigningInputs, TransactionAuthenticator};
+use miden_tx::utils::serde::{Deserializable, Serializable};
 use miden_tx::utils::sync::RwLock;
-use miden_tx::utils::{Deserializable, Serializable};
 use serde::{Deserialize, Serialize};
 
 use super::{KeyStoreError, Keystore};

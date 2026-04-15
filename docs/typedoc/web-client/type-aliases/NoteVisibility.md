@@ -7,3 +7,5 @@
 # Type Alias: NoteVisibility
 
 > **NoteVisibility** = `"public"` \| `"private"`
+
+Union of valid NoteVisibility string values.

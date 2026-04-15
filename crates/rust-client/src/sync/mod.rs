@@ -29,7 +29,7 @@
 //! # use miden_client::auth::TransactionAuthenticator;
 //! # use miden_client::sync::SyncSummary;
 //! # use miden_client::{Client, ClientError};
-//! # use miden_protocol::{block::BlockHeader, Felt, Word, StarkField};
+//! # use miden_protocol::{block::BlockHeader, Felt, Word};
 //! # use miden_protocol::crypto::rand::FeltRng;
 //! # async fn run_sync<AUTH: TransactionAuthenticator + Sync + 'static>(client: &mut Client<AUTH>) -> Result<(), ClientError> {
 //! // Attempt to synchronize the client's state with the Miden network.
@@ -64,7 +64,7 @@ use miden_protocol::block::BlockNumber;
 use miden_protocol::note::NoteId;
 use miden_protocol::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
-use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
+use miden_tx::utils::serde::{Deserializable, DeserializationError, Serializable};
 use tracing::{debug, info};
 
 use crate::store::{NoteFilter, TransactionFilter};
@@ -286,7 +286,7 @@ impl SyncSummary {
 }
 
 impl Serializable for SyncSummary {
-    fn write_into<W: miden_tx::utils::ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: miden_tx::utils::serde::ByteWriter>(&self, target: &mut W) {
         self.block_num.write_into(target);
         self.new_public_notes.write_into(target);
         self.committed_notes.write_into(target);
@@ -298,7 +298,7 @@ impl Serializable for SyncSummary {
 }
 
 impl Deserializable for SyncSummary {
-    fn read_from<R: miden_tx::utils::ByteReader>(
+    fn read_from<R: miden_tx::utils::serde::ByteReader>(
         source: &mut R,
     ) -> Result<Self, DeserializationError> {
         let block_num = BlockNumber::read_from(source)?;

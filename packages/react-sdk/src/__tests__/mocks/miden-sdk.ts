@@ -244,15 +244,11 @@ export const MockFungibleAsset = class FungibleAsset {
 
 export const MockNoteAttachment = class NoteAttachment {};
 
-export const MockOutputNoteArray = class OutputNoteArray {
+export const MockNoteArray = class NoteArray {
   notes: unknown[];
   constructor(notes: unknown[]) {
     this.notes = notes;
   }
-};
-
-export const MockOutputNote = {
-  full: vi.fn((note: unknown) => ({ note })),
 };
 
 export const MockNoteAndArgs = class NoteAndArgs {
@@ -294,6 +290,35 @@ export const MockAccountId = {
   fromHex: vi.fn((hex: string) => createMockAccountId(hex)),
   fromBech32: vi.fn((bech32: string) => createMockAccountId(bech32)),
 };
+
+// Mock FeltArray
+export const createMockFeltArray = (length: number = 16) => ({
+  length: vi.fn(() => length),
+  get: vi.fn((i: number) => ({
+    asInt: vi.fn(() => BigInt(i)),
+  })),
+});
+
+// Mock AdviceInputs
+export const MockAdviceInputs = class AdviceInputs {};
+
+// Mock ForeignAccount
+export const MockForeignAccount = Object.assign(class ForeignAccount {}, {
+  public: vi.fn(
+    (_id: unknown, _storage: unknown) => new (class ForeignAccount {})()
+  ),
+});
+
+// Mock ForeignAccountArray
+export const MockForeignAccountArray = class ForeignAccountArray {
+  accounts: unknown[];
+  constructor(accounts: unknown[] = []) {
+    this.accounts = accounts;
+  }
+};
+
+// Mock AccountStorageRequirements
+export const MockAccountStorageRequirements = class AccountStorageRequirements {};
 
 // Create a mock WebClient
 export const createMockWebClient = (
@@ -350,6 +375,23 @@ export const createMockWebClient = (
     importPublicAccountFromSeed: vi.fn().mockResolvedValue(createMockAccount()),
     exportAccountFile: vi.fn().mockResolvedValue(createMockAccountFile()),
 
+    // Store operations
+    storeIdentifier: vi.fn().mockReturnValue("TestStore"),
+
+    // Note file operations
+    exportNoteFile: vi
+      .fn()
+      .mockResolvedValue({ serialize: () => new Uint8Array([1, 2, 3]) }),
+    importNoteFile: vi
+      .fn()
+      .mockResolvedValue({ toString: () => "0xnote_imported" }),
+
+    // Signer
+    setSignCb: vi.fn(),
+
+    // Execute program
+    executeProgram: vi.fn().mockResolvedValue(createMockFeltArray()),
+
     // Cleanup
     free: vi.fn(),
   };
@@ -384,6 +426,11 @@ export type MockWebClientType = {
   importAccountById: ReturnType<typeof vi.fn>;
   importPublicAccountFromSeed: ReturnType<typeof vi.fn>;
   exportAccountFile: ReturnType<typeof vi.fn>;
+  storeIdentifier: ReturnType<typeof vi.fn>;
+  exportNoteFile: ReturnType<typeof vi.fn>;
+  importNoteFile: ReturnType<typeof vi.fn>;
+  setSignCb: ReturnType<typeof vi.fn>;
+  executeProgram: ReturnType<typeof vi.fn>;
   free: ReturnType<typeof vi.fn>;
 };
 
@@ -423,8 +470,7 @@ export const createMockSdkModule = (
     NoteAssets: MockNoteAssets,
     FungibleAsset: MockFungibleAsset,
     NoteAttachment: MockNoteAttachment,
-    OutputNoteArray: MockOutputNoteArray,
-    OutputNote: MockOutputNote,
+    NoteArray: MockNoteArray,
     NoteAndArgs: MockNoteAndArgs,
     NoteAndArgsArray: MockNoteAndArgsArray,
     TransactionRequestBuilder: MockTransactionRequestBuilder,
@@ -433,6 +479,10 @@ export const createMockSdkModule = (
       uncommitted: vi.fn(() => ({})),
       ids: vi.fn((ids: unknown) => ({ ids })),
     },
+    AdviceInputs: MockAdviceInputs,
+    ForeignAccount: MockForeignAccount,
+    ForeignAccountArray: MockForeignAccountArray,
+    AccountStorageRequirements: MockAccountStorageRequirements,
     AccountFile: Object.assign(
       vi.fn().mockImplementation(() => createMockAccountFile()),
       {

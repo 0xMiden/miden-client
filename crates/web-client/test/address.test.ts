@@ -192,12 +192,15 @@ const instanceAddressRemoveThenInsert = async (page: Page) => {
     // Then we add it again
     await client.insertAccountAddress(newAccount.id(), address);
 
-    const store = await client.exportStore();
+    const store = await window.exportStore(window.storeName);
     const parsedStore = JSON.parse(store);
     const retrievedAddressRecord = parsedStore.addresses[0];
-    const retrievedAddress = window.Address.deserialize(
-      retrievedAddressRecord.address
+    // Uint8Array export is done as base64 string, so we need to decode it before deserializing
+    const addressBytes = Uint8Array.from(
+      atob(retrievedAddressRecord.address.data),
+      (c) => c.charCodeAt(0)
     );
+    const retrievedAddress = window.Address.deserialize(addressBytes);
     const retrievedId = retrievedAddressRecord.id;
 
     return {

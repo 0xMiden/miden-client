@@ -22,8 +22,11 @@ impl MerklePath {
 
     /// Computes the root given a leaf index and value.
     #[wasm_bindgen(js_name = "computeRoot")]
-    pub fn compute_root(&self, index: u64, node: &Word) -> Word {
-        self.0.compute_root(index, node.clone().into()).unwrap().into()
+    pub fn compute_root(&self, index: u64, node: &Word) -> Result<Word, JsValue> {
+        self.0
+            .compute_root(index, node.clone().into())
+            .map(Into::into)
+            .map_err(|err| JsValue::from_str(&format!("Invalid Merkle path index: {err}")))
     }
 
     /// Verifies the path against a root.

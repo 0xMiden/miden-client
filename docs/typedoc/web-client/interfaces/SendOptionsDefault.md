@@ -2,9 +2,9 @@
 
 ***
 
-[@miden-sdk/miden-sdk](../README.md) / SendOptions
+[@miden-sdk/miden-sdk](../README.md) / SendOptionsDefault
 
-# Interface: SendOptions
+# Interface: SendOptionsDefault
 
 ## Extends
 
@@ -41,6 +41,12 @@ Override default prover.
 > `optional` **reclaimAfter**: `number`
 
 Block height after which the sender can reclaim the note. This is a block number, not wall-clock time.
+
+***
+
+### returnNote?
+
+> `optional` **returnNote**: `false`
 
 ***
 

@@ -47,12 +47,12 @@ impl PublicKey {
         let native_signature: NativeSignature = signature.into();
 
         match native_signature {
-            NativeSignature::Falcon512Rpo(falcon_signature) => {
+            NativeSignature::Falcon512Poseidon2(falcon_signature) => {
                 let public_key = miden_client::crypto::rpo_falcon512::PublicKey::recover_from(
                     native_message,
                     &falcon_signature,
                 );
-                Ok(NativePublicKey::Falcon512Rpo(public_key).into())
+                Ok(NativePublicKey::Falcon512Poseidon2(public_key).into())
             },
             NativeSignature::EcdsaK256Keccak(_) => Err(JsValue::from_str(
                 "Recovering a public key from an EcdsaK256Keccak signature is not supported yet",

@@ -4,7 +4,7 @@ use miden_node_proto::generated::remote_prover::{
     worker_status_api_server,
 };
 use miden_node_utils::cors::cors_for_grpc_web_layer;
-use miden_protocol::utils::{Deserializable, Serializable};
+use miden_protocol::utils::serde::{Deserializable, Serializable};
 use miden_tx::LocalTransactionProver;
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
@@ -44,7 +44,9 @@ impl api_server::Api for TransactionProverService {
                 })?;
 
         let prover = self.prover.lock().await;
-        let proven_tx = tokio::task::block_in_place(|| prover.prove(inputs))
+        let proven_tx = prover
+            .prove(inputs)
+            .await
             .map_err(|e| tonic::Status::internal(format!("failed to prove transaction: {e}")))?;
 
         Ok(tonic::Response::new(proto::Proof { payload: proven_tx.to_bytes() }))
