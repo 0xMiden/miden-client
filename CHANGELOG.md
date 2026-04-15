@@ -2,6 +2,11 @@
 
 ## 0.14.1 (2026-04-14)
 
+### Changes
+
+* [BREAKING][type][rust,web] `Client::code_builder()` now returns `Option<CodeBuilder>` instead of `CodeBuilder`. `Client::source_manager()` now returns `Option<Arc<dyn SourceManagerSync>>` instead of `Arc<dyn SourceManagerSync>` ([#2047](https://github.com/0xMiden/miden-client/pull/2047)).
+* [BREAKING][behavior][rust,web] `ClientBuilder::build()` no longer creates a default `SourceManager`. Callers must explicitly set one via `ClientBuilder::source_manager()` before executing transactions, otherwise `ClientError::MissingSourceManager` is returned ([#2047](https://github.com/0xMiden/miden-client/pull/2047)).
+
 ### Enhancements
 
 * Optimized `get_account_details` so it only fetches the delta of large public accounts when syncing ([#1916](https://github.com/0xMiden/miden-client/pull/1916)).
@@ -12,6 +17,7 @@
 * [FIX][web] Fixed `transactions.send({ returnNote: true })` throwing `expected instance of NoteArray`. The JS wrapper was still building `OutputNoteArray` after the WASM binding for `withOwnOutputNotes` switched to `NoteArray` ([#2011](https://github.com/0xMiden/miden-client/issues/2011)).
 * [FIX][rust] Fixed `FilesystemKeyStore::add_key` failing on Linux when the system temp dir is on a different filesystem than the keys directory ([#2009](https://github.com/0xMiden/miden-client/pull/2009)).
 * [FIX][rust] Made source manager handling consistent when building transaction scripts. The empty fallback script is now compiled against the client's source manager instead of a fresh one, so any source information on the produced `TransactionScript` is registered with the same source manager used by the executor ([#2006](https://github.com/0xMiden/miden-client/pull/2006)).
+* [FIX][rust] Fixed source manager mismatch panic (`invalid source span: starting byte is out of bounds`) in tests that compiled scripts with a standalone `SourceManager` and then executed them through the client. Test helpers now use `TransactionKernel::assembler_with_source_manager()` and the client's shared source manager [#2047](https://github.com/0xMiden/miden-client/pull/2047)).
 
 ## 0.14.0 (2026-04-07)
 
