@@ -40,6 +40,10 @@ jobs:
         id: check_react_version
         run: ./scripts/check-react-sdk-version-release.sh "$GITHUB_SHA"
 
+      - name: Ensure release tag has vite-plugin version bump
+        id: check_vite_plugin_version
+        run: ./scripts/check-vite-plugin-version-release.sh "$GITHUB_SHA"
+
       - name: Install & build web-client
         if: steps.check_version.outputs.should_publish == 'true' || steps.check_react_version.outputs.should_publish == 'true'
         run: |
@@ -82,6 +86,21 @@ jobs:
           cd packages/react-sdk
           npm publish
 
+      - name: Install & build vite-plugin
+        if: steps.check_vite_plugin_version.outputs.should_publish == 'true'
+        run: |
+          cd packages/vite-plugin
+          yarn install
+          yarn build
+
+      - name: Publish vite-plugin to npm
+        if: steps.check_vite_plugin_version.outputs.should_publish == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
+        run: |
+          cd packages/vite-plugin
+          npm publish
+
       - name: Done (web-client)
         if: steps.check_version.outputs.should_publish == 'true'
         env:
@@ -93,6 +112,12 @@ jobs:
         env:
           CURRENT_VERSION: ${{ steps.check_react_version.outputs.current_version }}
         run: echo "✅ React SDK published version $CURRENT_VERSION."
+
+      - name: Done (vite-plugin)
+        if: steps.check_vite_plugin_version.outputs.should_publish == 'true'
+        env:
+          CURRENT_VERSION: ${{ steps.check_vite_plugin_version.outputs.current_version }}
+        run: echo "✅ Vite plugin published version $CURRENT_VERSION."
 
       - name: Skipped publish (web-client)
         if: steps.check_version.outputs.should_publish != 'true'
@@ -112,6 +137,17 @@ jobs:
           CURRENT_VERSION: ${{ steps.check_react_version.outputs.current_version }}
         run: |
           echo "ℹ️ React SDK publish skipped; should_publish=$SHOULD_PUBLISH"
+          if [ -n "$CURRENT_VERSION" ]; then
+            echo "Current version: $CURRENT_VERSION"
+          fi
+
+      - name: Skipped publish (vite-plugin)
+        if: steps.check_vite_plugin_version.outputs.should_publish != 'true'
+        env:
+          SHOULD_PUBLISH: ${{ steps.check_vite_plugin_version.outputs.should_publish }}
+          CURRENT_VERSION: ${{ steps.check_vite_plugin_version.outputs.current_version }}
+        run: |
+          echo "ℹ️ Vite plugin publish skipped; should_publish=$SHOULD_PUBLISH"
           if [ -n "$CURRENT_VERSION" ]; then
             echo "Current version: $CURRENT_VERSION"
           fi
