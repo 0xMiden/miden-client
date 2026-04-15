@@ -217,7 +217,7 @@ fn convert_transaction_header(
         })
         .collect::<Result<Vec<_>, RpcError>>()?;
 
-    // Build a map of note_id → inclusion_proof from the separate proofs field.
+    // Build a map of note_id to inclusion_proof from the separate proofs field.
     let mut proof_map: BTreeMap<NoteId, NoteInclusionProof> = BTreeMap::new();
     for mut proto_proof in output_note_proofs {
         let note_id: NoteId = proto_proof
@@ -233,8 +233,9 @@ fn convert_transaction_header(
     }
 
     // Join: notes with a matching proof are committed; notes without are erased.
-    let mut committed_output_notes = Vec::new();
-    let mut erased_output_note_ids = Vec::new();
+    let mut committed_output_notes = Vec::with_capacity(proof_map.len());
+    let mut erased_output_note_ids =
+        Vec::with_capacity(output_note_headers.len().saturating_sub(proof_map.len()));
 
     for header in &output_note_headers {
         let note_id = header.id();

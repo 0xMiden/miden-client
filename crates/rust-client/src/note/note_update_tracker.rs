@@ -342,12 +342,12 @@ impl NoteUpdateTracker {
         Ok(())
     }
 
-    /// Marks an output note as consumed if the node does not have it.
+    /// Marks an erased note as consumed.
     ///
     /// This handles notes that were erased due to same-batch note erasure: the note was
     /// created and consumed within the same batch, so it never appeared in the block body.
     /// The `block_num` is the block in which the creating transaction was committed.
-    pub(crate) fn mark_output_note_consumed_if_not_on_chain(
+    pub(crate) fn mark_erased_note_as_consumed(
         &mut self,
         note_id: NoteId,
         block_num: BlockNumber,
