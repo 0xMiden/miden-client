@@ -1268,8 +1268,7 @@ fn call_nonexistent_package() {
     let mut cmd = cargo_bin_cmd!("miden-client");
     cmd.args([
         "call",
-        &basic_account_id,
-        "some_procedure",
+        &format!("{basic_account_id}:some_procedure"),
         "--package",
         "nonexistent/path/package.masp",
     ]);
@@ -1290,8 +1289,7 @@ fn call_nonexistent_procedure() {
     let mut cmd = cargo_bin_cmd!("miden-client");
     cmd.args([
         "call",
-        &basic_account_id,
-        "nonexistent_procedure",
+        &format!("{basic_account_id}:nonexistent_procedure"),
         "--package",
         package_path.to_str().unwrap(),
     ]);
@@ -1376,7 +1374,14 @@ fn call_procedure_by_name() {
     let (temp_dir, account_id, masp_path) = setup_call_test_account();
 
     let mut cmd = cargo_bin_cmd!("miden-client");
-    cmd.args(["call", &account_id, "add", "3", "7", "--package", masp_path.to_str().unwrap()]);
+    cmd.args([
+        "call",
+        &format!("{account_id}:add"),
+        "3",
+        "7",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
 
     cmd.current_dir(&temp_dir).assert().success();
 }
@@ -1391,8 +1396,7 @@ fn call_procedure_by_hash() {
     let mut cmd = cargo_bin_cmd!("miden-client");
     cmd.args([
         "call",
-        &account_id,
-        &add_hash,
+        &format!("{account_id}:{add_hash}"),
         "3",
         "7",
         "--package",
@@ -1408,7 +1412,14 @@ fn call_shows_nonce_delta() {
     let (temp_dir, account_id, masp_path) = setup_call_test_account();
 
     let mut cmd = cargo_bin_cmd!("miden-client");
-    cmd.args(["call", &account_id, "add", "1", "2", "--package", masp_path.to_str().unwrap()]);
+    cmd.args([
+        "call",
+        &format!("{account_id}:add"),
+        "1",
+        "2",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
 
     let output = cmd.current_dir(&temp_dir).output().unwrap();
     assert!(
@@ -1430,8 +1441,7 @@ fn call_set_value_shows_storage_delta() {
     let mut cmd = cargo_bin_cmd!("miden-client");
     cmd.args([
         "call",
-        &account_id,
-        "set_value",
+        &format!("{account_id}:set_value"),
         "42",
         "0",
         "0",
@@ -1458,7 +1468,13 @@ fn call_rejects_wrong_arg_count() {
 
     // Too few: 1 arg for a 2-arg procedure.
     let mut too_few = cargo_bin_cmd!("miden-client");
-    too_few.args(["call", &account_id, "add", "3", "--package", masp_path.to_str().unwrap()]);
+    too_few.args([
+        "call",
+        &format!("{account_id}:add"),
+        "3",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
     let out = too_few.current_dir(&temp_dir).output().unwrap();
     assert!(!out.status.success(), "Expected failure for too-few args");
     let stderr = String::from_utf8_lossy(&out.stderr);
@@ -1471,8 +1487,7 @@ fn call_rejects_wrong_arg_count() {
     let mut too_many = cargo_bin_cmd!("miden-client");
     too_many.args([
         "call",
-        &account_id,
-        "add",
+        &format!("{account_id}:add"),
         "3",
         "7",
         "11",

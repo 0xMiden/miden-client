@@ -18,13 +18,10 @@ use crate::utils::parse_account_id;
 #[derive(Debug, Clone, Parser)]
 #[command(about = "Call a procedure on a local account and display the result and state delta")]
 pub struct CallCmd {
-    /// Account ID to execute the procedure against.
-    #[arg(value_name = "ACCOUNT_ID")]
-    account_id: String,
-
-    /// Procedure name or MAST root hash (0x-prefixed hex).
-    #[arg(value_name = "PROCEDURE")]
-    procedure: String,
+    /// Account and procedure in the form `<ACCOUNT_ID>:<PROCEDURE>`, where `PROCEDURE` is a
+    /// procedure name or MAST root hash (0x-prefixed hex).
+    #[arg(value_name = "ACCOUNT_ID:PROCEDURE")]
+    target: String,
 
     /// Positional arguments to push onto the stack before calling the procedure.
     #[arg(value_name = "args")]
@@ -46,23 +43,29 @@ impl CallCmd {
             ));
         }
 
-        let account_id = parse_account_id(&client, &self.account_id).await?;
+        let (account_str, procedure) = self.target.split_once(':').ok_or_else(|| {
+            CliError::InvalidArgument(format!(
+                "Expected `<ACCOUNT_ID>:<PROCEDURE>`, got '{}'.",
+                self.target
+            ))
+        })?;
+
+        let account_id = parse_account_id(&client, account_str).await?;
 
         let package = load_package(&self.package)?;
 
-        let (digest, param_count, result_count) = if self.procedure.starts_with("0x") {
-            let digest = Word::try_from(self.procedure.as_str()).map_err(|e| {
-                CliError::InvalidArgument(format!(
-                    "Invalid procedure hash '{}': {e}",
-                    self.procedure
-                ))
+        let (digest, param_count, result_count) = if procedure.starts_with("0x") {
+            let digest = Word::try_from(procedure).map_err(|e| {
+                CliError::InvalidArgument(format!("Invalid procedure hash '{procedure}': {e}"))
             })?;
             (digest, None, 0)
         } else {
-            let digest = resolve_procedure_digest(&package, &self.procedure)?;
-            let (param_count, result_count) = print_manifest_signature(&package, &self.procedure);
+            let digest = resolve_procedure_digest(&package, procedure)?;
+            let (param_count, result_count) = print_manifest_signature(&package, procedure);
             (digest, param_count, result_count)
         };
+
+        println!("DEBUG procedure digest: {}", digest.to_hex());
 
         let args = parse_args(&self.args)?;
 
@@ -71,7 +74,7 @@ impl CallCmd {
         {
             return Err(CliError::InvalidArgument(format!(
                 "Procedure '{}' expects {} argument(s), got {}.",
-                self.procedure,
+                procedure,
                 expected,
                 args.len()
             )));
