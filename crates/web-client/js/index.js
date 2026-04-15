@@ -6,6 +6,7 @@ import {
   releaseSyncLockWithError,
 } from "./syncLock.js";
 import { MidenClient } from "./client.js";
+import { CompilerResource } from "./resources/compiler.js";
 import {
   createP2IDNote,
   createP2IDENote,
@@ -50,6 +51,7 @@ export const Linking = Object.freeze({
 });
 
 export { MidenClient };
+export { CompilerResource };
 export { createP2IDNote, createP2IDENote, buildSwapTag };
 
 // Internal exports — used by integration tests that need direct access to the low-level WebClient proxy.

@@ -803,7 +803,26 @@ export interface CompileNoteScriptOptions {
   libraries?: CompileTxScriptLibrary[];
 }
 
-export interface CompilerResource {
+export declare class CompilerResource {
+  /**
+   * Create a standalone `CompilerResource` over a WASM `WebClient` proxy.
+   *
+   * Normally accessed as `client.compile` on a `MidenClient`; construct
+   * directly only when you need the compiler surface without the full
+   * `MidenClient` wrapper (e.g. inside a framework-specific hook).
+   *
+   * @param inner - The WASM `WebClient` (e.g. the `WasmWebClient` proxy).
+   * @param getWasm - Async accessor for the WASM module, used to reach
+   *   `AccountComponent.compile` at runtime. `getWasmOrThrow` satisfies this.
+   * @param client - Optional wrapper with `assertNotTerminated()`; used
+   *   internally by `MidenClient` and may be omitted by external callers.
+   */
+  constructor(
+    inner: WasmExports.WebClient,
+    getWasm: () => Promise<typeof WasmExports>,
+    client?: { assertNotTerminated(): void } | null
+  );
+
   /**
    * Compile MASM source into an AccountComponent.
    *

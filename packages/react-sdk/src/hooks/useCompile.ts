@@ -1,13 +1,12 @@
-import { useCallback } from "react";
-import { AccountComponent, Linking } from "@miden-sdk/miden-sdk";
+import { useCallback, useMemo } from "react";
+import { CompilerResource, getWasmOrThrow } from "@miden-sdk/miden-sdk";
 import type {
-  CodeBuilder,
+  AccountComponent,
   TransactionScript,
   NoteScript,
   CompileComponentOptions,
   CompileTxScriptOptions,
   CompileNoteScriptOptions,
-  CompileTxScriptLibrary,
 } from "@miden-sdk/miden-sdk";
 import { useMiden } from "../context/MidenProvider";
 
@@ -24,7 +23,8 @@ export interface UseCompileResult {
 
 /**
  * Hook for compiling MASM source into `AccountComponent`, `TransactionScript`,
- * or `NoteScript`. Mirrors `MidenClient.compile` from `@miden-sdk/miden-sdk`.
+ * or `NoteScript`. Wraps `CompilerResource` from `@miden-sdk/miden-sdk` so the
+ * shape is identical to `MidenClient.compile`.
  *
  * @example
  * ```tsx
@@ -39,66 +39,34 @@ export interface UseCompileResult {
 export function useCompile(): UseCompileResult {
   const { client, isReady } = useMiden();
 
-  const requireClient = useCallback(() => {
-    if (!client || !isReady) {
-      throw new Error("Miden client is not ready");
-    }
-    return client;
-  }, [client, isReady]);
-
-  const linkLibraries = useCallback(
-    (builder: CodeBuilder, libraries: CompileTxScriptLibrary[]) => {
-      for (const lib of libraries) {
-        const built = builder.buildLibrary(lib.namespace, lib.code);
-        if (lib.linking === Linking.Static) {
-          builder.linkStaticLibrary(built);
-        } else {
-          builder.linkDynamicLibrary(built);
-        }
-      }
-    },
-    []
+  const resource = useMemo(
+    () =>
+      client && isReady
+        ? new CompilerResource(client, getWasmOrThrow)
+        : null,
+    [client, isReady]
   );
 
+  const requireResource = useCallback(() => {
+    if (!resource) {
+      throw new Error("Miden client is not ready");
+    }
+    return resource;
+  }, [resource]);
+
   const component = useCallback(
-    async ({
-      code,
-      slots = [],
-      supportAllTypes = true,
-    }: CompileComponentOptions): Promise<AccountComponent> => {
-      const c = requireClient();
-      const builder = c.createCodeBuilder();
-      const compiled = builder.compileAccountComponentCode(code);
-      const comp = AccountComponent.compile(compiled, slots);
-      return supportAllTypes ? comp.withSupportsAllTypes() : comp;
-    },
-    [requireClient]
+    (options: CompileComponentOptions) => requireResource().component(options),
+    [requireResource]
   );
 
   const txScript = useCallback(
-    async ({
-      code,
-      libraries = [],
-    }: CompileTxScriptOptions): Promise<TransactionScript> => {
-      const c = requireClient();
-      const builder = c.createCodeBuilder();
-      linkLibraries(builder, libraries);
-      return builder.compileTxScript(code);
-    },
-    [requireClient, linkLibraries]
+    (options: CompileTxScriptOptions) => requireResource().txScript(options),
+    [requireResource]
   );
 
   const noteScript = useCallback(
-    async ({
-      code,
-      libraries = [],
-    }: CompileNoteScriptOptions): Promise<NoteScript> => {
-      const c = requireClient();
-      const builder = c.createCodeBuilder();
-      linkLibraries(builder, libraries);
-      return builder.compileNoteScript(code);
-    },
-    [requireClient, linkLibraries]
+    (options: CompileNoteScriptOptions) => requireResource().noteScript(options),
+    [requireResource]
   );
 
   return { component, txScript, noteScript, isReady };

@@ -3,7 +3,7 @@ export class CompilerResource {
   #getWasm;
   #client;
 
-  constructor(inner, getWasm, client) {
+  constructor(inner, getWasm, client = null) {
     this.#inner = inner;
     this.#getWasm = getWasm;
     this.#client = client;
@@ -16,7 +16,7 @@ export class CompilerResource {
    * @returns {Promise<AccountComponent>}
    */
   async component({ code, slots = [], supportAllTypes = true }) {
-    this.#client.assertNotTerminated();
+    this.#client?.assertNotTerminated();
     const wasm = await this.#getWasm();
     const builder = this.#inner.createCodeBuilder();
     const compiled = builder.compileAccountComponentCode(code);
@@ -31,7 +31,7 @@ export class CompilerResource {
    * @returns {Promise<TransactionScript>}
    */
   async txScript({ code, libraries = [] }) {
-    this.#client.assertNotTerminated();
+    this.#client?.assertNotTerminated();
     // Ensure WASM is initialized (result unused — only #inner needs it)
     await this.#getWasm();
     const builder = this.#inner.createCodeBuilder();
@@ -60,7 +60,7 @@ export class CompilerResource {
    * @returns {Promise<NoteScript>}
    */
   async noteScript({ code, libraries = [] }) {
-    this.#client.assertNotTerminated();
+    this.#client?.assertNotTerminated();
     await this.#getWasm();
     const builder = this.#inner.createCodeBuilder();
     for (const lib of libraries) {
