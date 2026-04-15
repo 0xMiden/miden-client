@@ -43,6 +43,15 @@ function isConstraintError(err) {
     const e = err;
     return e?.name === "ConstraintError" || e?.inner?.name === "ConstraintError";
 }
+export async function setBlockHasClientNotes(dbId, blockNum) {
+    try {
+        const db = getDatabase(dbId);
+        await db.blockHeaders.update(blockNum, { hasClientNotes: "true" });
+    }
+    catch (err) {
+        logWebStoreError(err);
+    }
+}
 export async function insertPartialBlockchainNodes(dbId, ids, nodes) {
     try {
         const db = getDatabase(dbId);

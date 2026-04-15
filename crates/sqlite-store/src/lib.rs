@@ -280,6 +280,13 @@ impl Store for SqliteStore {
         .await
     }
 
+    async fn set_block_has_client_notes(&self, block_num: BlockNumber) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::set_block_has_client_notes(conn, block_num)
+        })
+        .await
+    }
+
     async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError> {
         self.interact_with_connection(SqliteStore::prune_irrelevant_blocks).await
     }

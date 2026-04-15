@@ -24,6 +24,7 @@ use js_bindings::{
     idxdb_insert_block_header,
     idxdb_insert_partial_blockchain_nodes,
     idxdb_prune_irrelevant_blocks,
+    idxdb_set_block_has_client_notes,
 };
 
 mod models;
@@ -66,6 +67,15 @@ impl IdxdbStore {
         );
         await_ok(promise, "failed to insert block header").await?;
 
+        Ok(())
+    }
+
+    pub(crate) async fn set_block_has_client_notes(
+        &self,
+        block_num: BlockNumber,
+    ) -> Result<(), StoreError> {
+        let promise = idxdb_set_block_has_client_notes(self.db_id(), block_num.as_u32());
+        await_ok(promise, "failed to set block has client notes").await?;
         Ok(())
     }
 

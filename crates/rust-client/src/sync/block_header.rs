@@ -5,7 +5,6 @@ use miden_protocol::Word;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
-use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
 use crate::store::{BlockRelevance, StoreError};
@@ -54,20 +53,16 @@ impl<AUTH> Client<AUTH> {
     /// Retrieves and stores a [`BlockHeader`] by number, and stores its authentication data as
     /// well.
     ///
-    /// If the store already contains MMR data for the requested block number, the request isn't
-    /// done and the stored block header is returned.
+    /// If the store already contains the block header, the flag `has_client_notes` is set to
+    /// `true` and the stored block header is returned without fetching from the node.
     pub(crate) async fn get_and_store_authenticated_block(
         &self,
         block_num: BlockNumber,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<BlockHeader, ClientError> {
-        if current_partial_mmr.is_tracked(block_num.as_usize()) {
-            warn!("Current partial MMR already contains the requested data");
-            let (block_header, _) = self
-                .store
-                .get_block_header_by_num(block_num)
-                .await?
-                .expect("Block header should be tracked");
+        // If the block already exists in the store, just mark it as relevant and return it.
+        if let Some((block_header, _)) = self.store.get_block_header_by_num(block_num).await? {
+            self.store.set_block_has_client_notes(block_num).await?;
             return Ok(block_header);
         }
 

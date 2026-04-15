@@ -49,6 +49,9 @@ extern "C" {
         has_client_notes: bool,
     ) -> js_sys::Promise;
 
+    #[wasm_bindgen(js_name = setBlockHasClientNotes)]
+    pub fn idxdb_set_block_has_client_notes(db_id: &str, block_num: u32) -> js_sys::Promise;
+
     #[wasm_bindgen(js_name = insertPartialBlockchainNodes)]
     pub fn idxdb_insert_partial_blockchain_nodes(
         db_id: &str,

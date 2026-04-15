@@ -54,6 +54,15 @@ function isConstraintError(err: unknown): boolean {
   return e?.name === "ConstraintError" || e?.inner?.name === "ConstraintError";
 }
 
+export async function setBlockHasClientNotes(dbId: string, blockNum: number) {
+  try {
+    const db = getDatabase(dbId);
+    await db.blockHeaders.update(blockNum, { hasClientNotes: "true" });
+  } catch (err) {
+    logWebStoreError(err);
+  }
+}
+
 export async function insertPartialBlockchainNodes(
   dbId: string,
   ids: string[],

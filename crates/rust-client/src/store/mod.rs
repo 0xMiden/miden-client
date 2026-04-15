@@ -264,6 +264,25 @@ pub trait Store: Send + Sync {
         has_client_notes: bool,
     ) -> Result<(), StoreError>;
 
+    /// Marks an existing block header as having client-relevant notes.
+    ///
+    /// This only upgrades the flag from `false` to `true`; it never downgrades.
+    /// If the block header does not exist in the store, this is a no-op.
+    ///
+    /// The default implementation calls [`Store::insert_block_header`] with empty peaks,
+    /// relying on the INSERT OR IGNORE semantics to skip the insert and only upgrade the flag.
+    async fn set_block_has_client_notes(&self, block_num: BlockNumber) -> Result<(), StoreError> {
+        if let Some((header, _)) = self.get_block_header_by_num(block_num).await? {
+            self.insert_block_header(
+                &header,
+                MmrPeaks::new(Forest::empty(), vec![]).expect("empty peaks should be valid"),
+                true,
+            )
+            .await?;
+        }
+        Ok(())
+    }
+
     /// Removes block headers that do not contain any client notes and aren't the genesis or last
     /// block.
     async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError>;

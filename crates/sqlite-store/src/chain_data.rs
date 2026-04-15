@@ -60,6 +60,13 @@ impl SqliteStore {
         Ok(())
     }
 
+    pub(crate) fn set_block_has_client_notes(
+        conn: &mut Connection,
+        block_num: BlockNumber,
+    ) -> Result<(), StoreError> {
+        set_block_has_client_notes(conn, block_num.as_u64())
+    }
+
     pub(crate) fn get_block_headers(
         conn: &mut Connection,
         block_numbers: &BTreeSet<BlockNumber>,
@@ -382,6 +389,18 @@ pub(crate) fn set_block_header_has_client_notes(
         SET has_client_notes=?
         WHERE block_num=? AND has_client_notes=FALSE;";
     tx.execute(QUERY, params![has_client_notes, block_num]).into_store_error()?;
+    Ok(())
+}
+
+pub(crate) fn set_block_has_client_notes(
+    conn: &mut Connection,
+    block_num: u64,
+) -> Result<(), StoreError> {
+    const QUERY: &str = "\
+        UPDATE block_headers
+        SET has_client_notes=TRUE
+        WHERE block_num=? AND has_client_notes=FALSE;";
+    conn.execute(QUERY, params![block_num]).into_store_error()?;
     Ok(())
 }
 

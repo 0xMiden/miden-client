@@ -284,6 +284,10 @@ impl Store for IdxdbStore {
         self.get_partial_blockchain_peaks_by_block_num(block_num).await
     }
 
+    async fn set_block_has_client_notes(&self, block_num: BlockNumber) -> Result<(), StoreError> {
+        self.set_block_has_client_notes(block_num).await
+    }
+
     async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError> {
         self.prune_irrelevant_blocks().await
     }
