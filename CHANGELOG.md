@@ -4,12 +4,12 @@
 
 ### Features
 
-* [FEATURE][web] Added `compile.noteScript({ code, libraries? })` to `MidenClient`, filling the gap left on the resource-based surface for note-script compilation. Mirrors the existing `compile.txScript` shape. (#2044)
-* [FEATURE][web] Exported the `CompilerResource` class so framework wrappers (e.g. React hooks) can instantiate the compile surface over a `WasmWebClient` proxy without wrapping the full `MidenClient`. The third constructor argument is now optional. (#2044)
+* [FEATURE][web] Added `compile.noteScript({ code, libraries? })` to `MidenClient`, filling the gap left on the resource-based surface for note-script compilation. Mirrors the existing `compile.txScript` shape ([#2044](https://github.com/0xMiden/miden-client/pull/2044)).
+* [FEATURE][web] Exported the `CompilerResource` class so framework wrappers (e.g. React hooks) can instantiate the compile surface over a `WasmWebClient` proxy without wrapping the full `MidenClient`. The third constructor argument is now optional ([#2044](https://github.com/0xMiden/miden-client/pull/2044)).
 
 ### Fixes
 
-* [FIX][web] Fixed `syncState` deterministically failing with `mmr peaks are invalid: number of one bits in leaves is N which does not equal peak length M` after importing a private note whose inclusion block pre-dates the wallet's current sync height. `get_and_store_authenticated_block` was overwriting the correct historical peaks (written by `applyStateSync`) with peaks from the caller's current `PartialMmr` forest, so subsequent reads at the same block hit the `InvalidPeaks` validation. The IndexedDB `insertBlockHeader` now uses add-if-not-exists semantics, matching the SQLite store's `INSERT OR IGNORE` in `insert_block_header_tx` ([#2037](https://github.com/0xMiden/miden-client/issues/2037)).
+* [FIX][web] Fixed `syncState` deterministically failing with `mmr peaks are invalid: number of one bits in leaves is N which does not equal peak length M` after importing a private note whose inclusion block pre-dates the wallet's current sync height. `get_and_store_authenticated_block` was overwriting the correct historical peaks (written by `applyStateSync`) with peaks from the caller's current `PartialMmr` forest, so subsequent reads at the same block hit the `InvalidPeaks` validation. The IndexedDB `insertBlockHeader` now uses add-if-not-exists semantics, matching the SQLite store's `INSERT OR IGNORE` in `insert_block_header_tx` ([#2039](https://github.com/0xMiden/miden-client/pull/2039)).
 
 ## 0.14.1 (2026-04-14)
 
