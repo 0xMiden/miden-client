@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.2 (2026-04-15)
+
+### Features
+
+* [FEATURE][web] Added `useCompile()` hook for compiling MASM source into `AccountComponent`, `TransactionScript`, or `NoteScript`. Mirrors the `MidenClient.compile` resource surface (`component`, `txScript`, `noteScript`) with matching option types and the new `Linking` enum.
+
 ## 0.14.1 (2026-04-14)
 
 ### Fixes
