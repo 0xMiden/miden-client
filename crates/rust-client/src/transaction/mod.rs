@@ -35,7 +35,7 @@
 //! /// containing 100 tokens of `faucet_id`'s fungible asset.
 //! async fn create_and_submit_transaction<
 //!     R: rand::Rng,
-//!     AUTH: TransactionAuthenticator + Sync + 'static,
+//!     AUTH: TransactionAuthenticator + Send + Sync + 'static,
 //! >(
 //!     client: &mut Client<AUTH>,
 //!     sender_id: AccountId,
@@ -157,7 +157,7 @@ pub use result::TransactionResult;
 /// Transaction management methods
 impl<AUTH> Client<AUTH>
 where
-    AUTH: TransactionAuthenticator + Sync + 'static,
+    AUTH: TransactionAuthenticator + Send + Sync + 'static,
 {
     // TRANSACTION DATA RETRIEVAL
     // --------------------------------------------------------------------------------------------
@@ -206,7 +206,7 @@ where
         &mut self,
         account_id: AccountId,
         transaction_request: TransactionRequest,
-        tx_prover: Arc<dyn TransactionProver>,
+        tx_prover: Arc<dyn TransactionProver + Send + Sync>,
     ) -> Result<TransactionId, ClientError> {
         // Register any missing NTX scripts before the main transaction.
         // The registration path contains its own full execute -> prove -> submit pipeline.
@@ -365,7 +365,7 @@ where
     pub async fn prove_transaction_with(
         &mut self,
         tx_result: &TransactionResult,
-        tx_prover: Arc<dyn TransactionProver>,
+        tx_prover: Arc<dyn TransactionProver + Send + Sync>,
     ) -> Result<ProvenTransaction, ClientError> {
         info!("Proving transaction...");
 
@@ -649,7 +649,7 @@ where
         &mut self,
         account_id: AccountId,
         scripts: &[NoteScript],
-        tx_prover: Arc<dyn TransactionProver>,
+        tx_prover: Arc<dyn TransactionProver + Send + Sync>,
     ) -> Result<(), ClientError> {
         let mut missing_scripts = Vec::new();
 

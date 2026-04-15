@@ -69,7 +69,7 @@ impl<AUTH> Client<AUTH> {
 
 impl<AUTH> Client<AUTH>
 where
-    AUTH: TransactionAuthenticator + Sync + 'static,
+    AUTH: TransactionAuthenticator + Send + Sync + 'static,
 {
     /// Fetch notes for tracked note tags.
     ///

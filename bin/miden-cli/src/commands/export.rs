@@ -55,7 +55,7 @@ impl From<&ExportType> for NoteExportType {
 }
 
 impl ExportCmd {
-    pub async fn execute<AUTH: Keystore + Sync>(
+    pub async fn execute<AUTH: Keystore + Send + Sync>(
         &self,
         mut client: Client<AUTH>,
         keystore: FilesystemKeyStore,
@@ -116,7 +116,7 @@ async fn export_account<AUTH>(
 // EXPORT NOTE
 // ================================================================================================
 
-async fn export_note<AUTH: Keystore + Sync>(
+async fn export_note<AUTH: Keystore + Send + Sync>(
     client: &mut Client<AUTH>,
     note_id: &str,
     filename: Option<PathBuf>,

@@ -31,7 +31,7 @@
 //! # use miden_client::{Client, ClientError};
 //! # use miden_protocol::{block::BlockHeader, Felt, Word};
 //! # use miden_protocol::crypto::rand::FeltRng;
-//! # async fn run_sync<AUTH: TransactionAuthenticator + Sync + 'static>(client: &mut Client<AUTH>) -> Result<(), ClientError> {
+//! # async fn run_sync<AUTH: TransactionAuthenticator + Send + Sync + 'static>(client: &mut Client<AUTH>) -> Result<(), ClientError> {
 //! // Attempt to synchronize the client's state with the Miden network.
 //! // The requested data is based on the client's state: it gets updates for accounts, relevant
 //! // notes, etc. For more information on the data that gets requested, see the doc comments for
@@ -58,6 +58,7 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::max;
+use core::num::NonZeroU32;
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockNumber;
@@ -77,6 +78,10 @@ pub use tag::{NoteTagRecord, NoteTagSource};
 mod state_sync;
 pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
 
+// Re-exported for ergonomics so callers of `sync_state_to` / `get_sync_update_to`
+// don't have to import from `rpc::domain`.
+pub use crate::rpc::domain::sync::SyncTarget;
+
 mod state_sync_update;
 pub use state_sync_update::{
     AccountUpdates,
@@ -88,7 +93,7 @@ pub use state_sync_update::{
 /// Client synchronization methods.
 impl<AUTH> Client<AUTH>
 where
-    AUTH: TransactionAuthenticator + Sync + 'static,
+    AUTH: TransactionAuthenticator + Send + Sync + 'static,
 {
     // SYNC STATE
     // --------------------------------------------------------------------------------------------
@@ -117,6 +122,10 @@ where
     ///    state.
     /// 7. The MMR is updated with the new peaks and authentication nodes.
     /// 8. All updates are applied to the store to be persisted.
+    ///
+    /// For chunked sync (advancing the client a bounded number of blocks at a time), use
+    /// [`get_sync_update_by_blocks()`](Self::get_sync_update_by_blocks) followed by
+    /// [`apply_state_sync()`](Self::apply_state_sync).
     pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
         self.ensure_genesis_in_place().await?;
         self.ensure_rpc_limits_in_place().await?;
@@ -137,7 +146,9 @@ where
         let input = self.build_sync_input().await?;
 
         // Get the sync update from the network
-        let state_sync_update = state_sync.sync_state(&mut current_partial_mmr, input).await?;
+        let state_sync_update = state_sync
+            .sync_state(&mut current_partial_mmr, input, SyncTarget::CommittedChainTip)
+            .await?;
 
         let sync_summary: SyncSummary = (&state_sync_update).into();
         debug!(sync_summary = ?sync_summary, "Sync summary computed");
@@ -185,6 +196,72 @@ where
         })
     }
 
+    /// Gets the state sync update from the network without applying it.
+    ///
+    /// This method performs the same network requests as [`sync_state()`](Self::sync_state) but
+    /// returns the raw [`StateSyncUpdate`] instead of applying it to the store. This is useful
+    /// when you want to inspect or modify the update before applying it, or when implementing
+    /// custom sync logic.
+    ///
+    /// Use [`apply_state_sync()`](Self::apply_state_sync) to apply the returned update.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let update = client.get_sync_update().await?;
+    /// println!("Sync would update {} accounts", update.accounts.updated_accounts.len());
+    /// client.apply_state_sync(update).await?;
+    /// ```
+    pub async fn get_sync_update(&self) -> Result<StateSyncUpdate, ClientError> {
+        self.get_sync_update_to(SyncTarget::CommittedChainTip).await
+    }
+
+    /// Like [`get_sync_update()`](Self::get_sync_update) but only advances at most
+    /// `block_amount` blocks.
+    pub async fn get_sync_update_by_blocks(
+        &self,
+        block_amount: NonZeroU32,
+    ) -> Result<StateSyncUpdate, ClientError> {
+        let current = self.get_sync_height().await?;
+        let target = BlockNumber::from(current.as_u32().saturating_add(block_amount.get()));
+        self.get_sync_update_to(SyncTarget::BlockNumber(target)).await
+    }
+
+    /// Like [`get_sync_update()`](Self::get_sync_update) but syncs up to the given
+    /// [`SyncTarget`] instead of the chain tip.
+    pub async fn get_sync_update_to(
+        &self,
+        upper_bound: SyncTarget,
+    ) -> Result<StateSyncUpdate, ClientError> {
+        self.get_sync_update_with_screener(Arc::new(self.note_screener()), upper_bound)
+            .await
+    }
+
+    /// Like [`get_sync_update_to()`](Self::get_sync_update_to) but uses a caller-supplied
+    /// [`OnNoteReceived`] implementation to decide relevance per note.
+    ///
+    /// `OnNoteReceived` is a **filter**, not a listener. It controls what gets persisted to
+    /// the store during sync (Commit / Insert / Discard per incoming note). The returned
+    /// [`StateSyncUpdate`] — and, transitively, any events derived from it — reflects only the
+    /// notes the screener kept.
+    ///
+    /// If you want to *observe* notes without changing persistence semantics, use the default
+    /// screener and subscribe to events downstream. Implement this trait only when you need
+    /// different persistence behavior (e.g., tracking extra public notes, ignoring specific
+    /// tags, or auto-accepting private notes delivered out-of-band).
+    pub async fn get_sync_update_with_screener(
+        &self,
+        screener: Arc<dyn OnNoteReceived>,
+        upper_bound: SyncTarget,
+    ) -> Result<StateSyncUpdate, ClientError> {
+        let state_sync = StateSync::new(self.rpc_api.clone(), screener, self.tx_discard_delta);
+
+        let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
+        let input = self.build_sync_input().await?;
+
+        state_sync.sync_state(&mut current_partial_mmr, input, upper_bound).await
+    }
+
     /// Applies the state sync update to the store and prunes the irrelevant block headers.
     ///
     /// See [`crate::Store::apply_state_sync()`] for what the update implies.
@@ -214,7 +291,7 @@ where
 // ================================================================================================
 
 /// Contains stats about the sync operation.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SyncSummary {
     /// Block number up to which the client has been synced.
     pub block_num: BlockNumber,

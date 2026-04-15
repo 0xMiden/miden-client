@@ -20,6 +20,7 @@ path = "tests/integration.rs"
 [dependencies]
 # Workspace dependencies
 miden-client              = { features = ["std", "testing", "tonic"], workspace = true }
+miden-client-service      = { workspace = true }
 miden-client-sqlite-store = { workspace = true }
 
 # External dependencies

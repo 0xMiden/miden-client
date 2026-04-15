@@ -9,6 +9,7 @@
 
 ### Enhancements
 
+* Added `miden-client-service` crate that wraps `Client` to provide operation coordination (sync/transaction mutual exclusion), background sync, and async-friendly client access ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).
 * Fixed the faucet token symbol display when showing account details ([#1985](https://github.com/0xMiden/miden-client/pull/1985)).
 * [FEATURE][rust,cli,web] Added `get_network_note_status` to `NodeRpcClient` trait for querying the processing status of notes submitted to the network (pending, processed, discarded, committed), along with attempt count and error details. Exposed as `miden-client network-note-status <note_id>` CLI command and `RpcClient.getNetworkNoteStatus()` in the web client. (#TBD)
 
@@ -18,6 +19,7 @@
 
 * Made `GrpcNoteTransportClient` connection lazy, deferring it to the first RPC call instead of connecting eagerly at client initialization ([#1970](https://github.com/0xMiden/miden-client/pull/1970)).
 * Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)) ([#1737](https://github.com/0xMiden/miden-client/pull/1737), [#1809](https://github.com/0xMiden/miden-client/pull/1809)).
+* Added the `@miden-sdk/react` hooks library with a provider, hooks, and an example app for the web client ([#1711](https://github.com/0xMiden/miden-client/pull/1711)).
 * Added typed error parsing for node RPC endpoints, enabling programmatic error handling instead of string parsing ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).
 * Added `--rpc-status` flag to `miden-client info` command to display RPC node status information including node version, genesis commitment, store status, and block producer status; also added `get_status_unversioned` to `NodeRpcClient` trait ([#1742](https://github.com/0xMiden/miden-client/pull/1742)).
 * Prevent a potential unwrap panic in `insert_storage_map_nodes_for_map` ([#1750](https://github.com/0xMiden/miden-client/pull/1750)).
