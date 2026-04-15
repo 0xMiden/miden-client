@@ -238,6 +238,46 @@ function createClientProxy(instance) {
 
 class WebClient {
   /**
+   * Controls which worker variant is spawned when a WebClient is constructed.
+   *
+   * - `"auto"` (default): pick `classic` on Safari/WKWebView (where module
+   *   workers have a very slow cold start), `module` everywhere else.
+   * - `"module"`: always use the `.mjs` ES-module worker. Required for webpack
+   *   5 / Next.js consumers so the asset tracer can see the WASM URL.
+   * - `"classic"`: always use the `.js` classic-script worker. Required on
+   *   Safari/WKWebView. Set this if your consumer bundler (or your host app)
+   *   does not support module workers.
+   *
+   * Set before the first `WebClient.createClient(...)` call.
+   */
+  static workerMode = "auto";
+
+  /**
+   * Decide between the module and classic worker variants based on
+   * `WebClient.workerMode` and (when `auto`) the current user agent.
+   * @returns {boolean} true when the classic script should be used.
+   * @private
+   */
+  static _shouldUseClassicWorker() {
+    const mode = WebClient.workerMode;
+    if (mode === "module") return false;
+    if (mode === "classic") return true;
+    // auto: classic on Safari/WKWebView, module everywhere else.
+    const ua =
+      typeof navigator !== "undefined" && navigator.userAgent
+        ? navigator.userAgent
+        : "";
+    // Chromium-based browsers (Chrome, Edge, Brave, Opera, Chromium-based
+    // Android WebView) handle module workers fine.
+    if (/Chrome\/|Chromium\//.test(ua)) return false;
+    // Safari (desktop + iOS) and WKWebView-without-Chrome (e.g. Capacitor host)
+    // both have AppleWebKit but no Chrome/Chromium in the UA. Prefer classic.
+    if (/AppleWebKit/.test(ua)) return true;
+    // Firefox, jsdom, node without navigator, etc. — module worker is fine.
+    return false;
+  }
+
+  /**
    * Create a WebClient wrapper.
    *
    * @param {string | undefined} rpcUrl - RPC endpoint URL used by the client.
@@ -283,13 +323,36 @@ class WebClient {
     // Check if Web Workers are available.
     if (typeof Worker !== "undefined") {
       console.log("WebClient: Web Workers are available.");
-      // Create the worker.
-      // Classic worker (not module) — the worker is built as a self-contained
-      // async-IIFE by the rollup config, compatible with all browsers including
-      // Safari/WKWebView which is extremely slow with module workers.
-      this.worker = new Worker(
-        new URL("./workers/web-client-methods-worker.js", import.meta.url)
-      );
+      // Pick between the module and classic worker variants at runtime — see
+      // `WebClient.workerMode` below. Both branches keep the
+      // `new Worker(new URL("...", import.meta.url), ...)` form fully literal:
+      // webpack 5's new-worker detector is PURELY SYNTACTIC and only triggers
+      // a proper worker sub-compilation (with asset+chunk tracing into the
+      // Cargo glue and the sibling WASM) when it sees that exact pattern
+      // spelled inline. Hoisting either URL into a variable downgrades the
+      // detection to a plain "copy file as asset" — which in turn makes the
+      // worker's `await import("./Cargo-*.js")` 404 because webpack never
+      // emitted a chunk for it. The bit of duplication here is load-bearing.
+      //
+      // - module (`.module.js` with `{ type: "module" }`): `import.meta.url`
+      //   inside the Cargo glue is preserved so webpack/Vite can resolve the
+      //   WASM URL statically. Preferred everywhere EXCEPT Safari/WKWebView.
+      // - classic (`.js`, no options): self-contained async IIFE with
+      //   `import.meta.url` rewritten to `self.location.href`; the only form
+      //   Safari/WKWebView can cold-start in a reasonable time.
+      if (WebClient._shouldUseClassicWorker()) {
+        this.worker = new Worker(
+          new URL("./workers/web-client-methods-worker.js", import.meta.url)
+        );
+      } else {
+        this.worker = new Worker(
+          new URL(
+            "./workers/web-client-methods-worker.module.js",
+            import.meta.url
+          ),
+          { type: "module" }
+        );
+      }
 
       // Map to track pending worker requests.
       this.pendingRequests = new Map();
