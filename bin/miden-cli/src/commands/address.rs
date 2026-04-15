@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use miden_client::Client;
-use miden_client::address::{Address, AddressInterface, NetworkId, RoutingParameters};
+use miden_client::address::{Address, AddressId, AddressInterface, NetworkId, RoutingParameters};
 use miden_client::note::NoteTag;
 
 use crate::config::CliConfig;
@@ -158,7 +158,17 @@ async fn add_address<AUTH>(
 ) -> Result<(), CliError> {
     let account_id = parse_account_id(&client, &account_id).await?;
     let (_, address) =
-        Address::decode(&address_str).map_err(|e| CliError::Address(e, address_str))?;
+        Address::decode(&address_str).map_err(|e| CliError::Address(e, address_str.clone()))?;
+
+    // Validate that the address belongs to the provided account_id
+    match address.id() {
+        AddressId::AccountId(addr_account_id) if addr_account_id == account_id => {},
+        _ => {
+            return Err(CliError::Input(format!(
+                "Address {address_str} does not belong to account {account_id}"
+            )));
+        },
+    }
 
     let note_tag = NoteTag::with_account_target(account_id);
     client.add_address(address, account_id).await?;
