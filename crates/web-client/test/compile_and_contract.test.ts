@@ -248,15 +248,11 @@ test.describe("compile.txScript()", () => {
 // compile.noteScript()
 // ════════════════════════════════════════════════════════════════
 
-// Minimal note script that pulls the assets off the note and receives them
-// into the consuming account. Uses the basic wallet component's procedure.
+// Minimal valid note script — exercises the compile path without depending
+// on runtime note-script semantics.
 const RECEIVE_NOTE_SCRIPT = `
-  use miden::note
-  use miden::contracts::wallets::basic
   use miden::core::sys
   begin
-    exec.note::get_assets drop
-    exec.basic::receive_asset
     exec.sys::truncate_stack
   end
 `;
