@@ -280,7 +280,7 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn prune_irrelevant_blocks(
+    async fn untrack_and_prune_irrelevant_blocks(
         &self,
         blocks_to_untrack: &[BlockNumber],
         node_indices_to_remove: &[InOrderIndex],

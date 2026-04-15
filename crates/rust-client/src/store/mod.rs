@@ -270,7 +270,7 @@ pub trait Store: Send + Sync {
     ///    consumed).
     /// 3. Deletes block headers with `has_client_notes = false` that are not the genesis or
     ///    sync-height block.
-    async fn prune_irrelevant_blocks(
+    async fn untrack_and_prune_irrelevant_blocks(
         &self,
         blocks_to_untrack: &[BlockNumber],
         node_indices_to_remove: &[InOrderIndex],

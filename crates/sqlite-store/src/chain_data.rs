@@ -592,7 +592,7 @@ mod test {
                 .unwrap();
 
             // Prune
-            store.prune_irrelevant_blocks(&[], &[]).await.unwrap();
+            store.untrack_and_prune_irrelevant_blocks(&[], &[]).await.unwrap();
 
             // Assert blocks
             let remaining_headers: i64 = store
@@ -648,8 +648,8 @@ mod test {
         nodes.into_iter().collect()
     }
 
-    /// Tests that `prune_irrelevant_blocks` removes redundant authentication nodes for
-    /// untracked blocks while preserving nodes needed by blocks that remain tracked.
+    /// Tests that `untrack_and_prune_irrelevant_blocks` removes redundant authentication nodes
+    /// for untracked blocks while preserving nodes needed by blocks that remain tracked.
     #[tokio::test]
     async fn prune_irrelevant_blocks_removes_redundant_auth_nodes() {
         let store = create_test_store().await;
@@ -703,7 +703,7 @@ mod test {
         assert!(!removed.is_empty(), "untracking should remove at least one node");
 
         store
-            .prune_irrelevant_blocks(&[BlockNumber::from(3u32)], &removed)
+            .untrack_and_prune_irrelevant_blocks(&[BlockNumber::from(3u32)], &removed)
             .await
             .unwrap();
 

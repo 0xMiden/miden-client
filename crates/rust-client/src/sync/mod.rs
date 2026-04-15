@@ -152,7 +152,7 @@ where
             .map_err(ClientError::StoreError)?;
 
         // Prune irrelevant blocks and their MMR authentication nodes.
-        self.prune_irrelevant_blocks().await?;
+        self.untrack_and_prune_irrelevant_blocks().await?;
 
         Ok(sync_summary)
     }
@@ -194,18 +194,18 @@ where
         self.store.apply_state_sync(update).await?;
 
         // Prune irrelevant blocks and their MMR authentication nodes.
-        self.prune_irrelevant_blocks().await?;
+        self.untrack_and_prune_irrelevant_blocks().await?;
 
         Ok(())
     }
 
     /// Prunes irrelevant block data from the store.
     ///
-    /// Identifies tracked blocks whose input notes have all been consumed, untracks them
-    /// from the `PartialMmr` to determine which authentication nodes are no longer needed,
-    /// then delegates to [`Store::prune_irrelevant_blocks`] to atomically remove the stale
-    /// nodes, mark the blocks as irrelevant, and delete irrelevant block headers.
-    async fn prune_irrelevant_blocks(&self) -> Result<(), ClientError> {
+    /// Identifies tracked blocks whose input notes have all been consumed, untracks them from the
+    /// `PartialMmr` to determine which authentication nodes are no longer needed, then delegates
+    /// to [`Store::untrack_and_prune_irrelevant_blocks`] to atomically remove the stale nodes,
+    /// mark the blocks as irrelevant, and delete irrelevant block headers.
+    async fn untrack_and_prune_irrelevant_blocks(&self) -> Result<(), ClientError> {
         let tracked_blocks = self.store.get_tracked_block_header_numbers().await?;
 
         // Determine which tracked blocks no longer have unspent input notes and can be
@@ -247,7 +247,9 @@ where
 
         // Store deletes stale auth nodes, marks blocks as irrelevant, and removes irrelevant block
         // headers.
-        self.store.prune_irrelevant_blocks(&blocks_to_untrack, &nodes_to_remove).await?;
+        self.store
+            .untrack_and_prune_irrelevant_blocks(&blocks_to_untrack, &nodes_to_remove)
+            .await?;
 
         Ok(())
     }
