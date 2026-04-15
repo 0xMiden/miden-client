@@ -44,16 +44,18 @@ miden-testing   = { default-features = false, version = "0.14" }
 miden-tx        = { default-features = false, version = "0.14" }
 
 # Miden node dependencies
-miden-node-block-producer        = { branch = "igamigo-align-tx-header", git = "https://github.com/0xMiden/node.git" }
-miden-node-ntx-builder           = { branch = "igamigo-align-tx-header", git = "https://github.com/0xMiden/node.git" }
-miden-node-proto                 = { branch = "igamigo-align-tx-header", git = "https://github.com/0xMiden/node.git" }
-miden-node-proto-build           = { branch = "igamigo-align-tx-header", default-features = false, git = "https://github.com/0xMiden/node.git" }
-miden-node-rpc                   = { branch = "igamigo-align-tx-header", git = "https://github.com/0xMiden/node.git" }
-miden-node-store                 = { branch = "igamigo-align-tx-header", git = "https://github.com/0xMiden/node.git" }
-miden-node-utils                 = { branch = "igamigo-align-tx-header", git = "https://github.com/0xMiden/node.git" }
-miden-node-validator             = { branch = "igamigo-align-tx-header", git = "https://github.com/0xMiden/node.git" }
+miden-node-block-producer = { branch = "igamigo-align-tx-header", git = "https://github.com/0xMiden/node.git" }
+miden-node-ntx-builder = { branch = "igamigo-align-tx-header", git = "https://github.com/0xMiden/node.git" }
+miden-node-proto = { branch = "igamigo-align-tx-header", git = "https://github.com/0xMiden/node.git" }
+miden-node-proto-build = { branch = "igamigo-align-tx-header", default-features = false, git = "https://github.com/0xMiden/node.git" }
+miden-node-rpc = { branch = "igamigo-align-tx-header", git = "https://github.com/0xMiden/node.git" }
+miden-node-store = { branch = "igamigo-align-tx-header", git = "https://github.com/0xMiden/node.git" }
+miden-node-utils = { branch = "igamigo-align-tx-header", git = "https://github.com/0xMiden/node.git" }
+miden-node-validator = { branch = "igamigo-align-tx-header", git = "https://github.com/0xMiden/node.git" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-remote-prover-client       = { branch = "igamigo-align-tx-header", default-features = false, features = ["tx-prover"], git = "https://github.com/0xMiden/node.git" }
+miden-remote-prover-client = { branch = "igamigo-align-tx-header", default-features = false, features = [
+  "tx-prover",
+], git = "https://github.com/0xMiden/node.git" }
 
 # External dependencies
 anyhow      = { default-features = false, version = "1.0" }

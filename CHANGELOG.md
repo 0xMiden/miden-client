@@ -5,6 +5,7 @@
 ### Fixes
 
 * [FIX][web] Fixed `syncState` deterministically failing with `mmr peaks are invalid: number of one bits in leaves is N which does not equal peak length M` after importing a private note whose inclusion block pre-dates the wallet's current sync height. `get_and_store_authenticated_block` was overwriting the correct historical peaks (written by `applyStateSync`) with peaks from the caller's current `PartialMmr` forest, so subsequent reads at the same block hit the `InvalidPeaks` validation. The IndexedDB `insertBlockHeader` now uses add-if-not-exists semantics, matching the SQLite store's `INSERT OR IGNORE` in `insert_block_header_tx` ([#2037](https://github.com/0xMiden/miden-client/issues/2037)).
+- [FIX] Detect notes created and consumed on the same block that got erased from the node and mark them as consumed ([#2008](https://github.com/0xMiden/miden-client/pull/2008)).
 
 ## 0.14.1 (2026-04-14)
 
