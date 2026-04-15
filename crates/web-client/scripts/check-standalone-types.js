@@ -267,7 +267,7 @@ if (mismatches.length > 0) {
     console.error(`- ${wrapperName}: ${reason}`);
   }
   console.error(
-    "Update js/types/api-types.d.ts so the declaration matches the wasm binding (or use `ReturnType<WasmModule[\"Class\"][\"method\"]>` to source it automatically)."
+    'Update js/types/api-types.d.ts so the declaration matches the wasm binding (or use `ReturnType<WasmModule["Class"]["method"]>` to source it automatically).'
   );
   process.exit(1);
 }
