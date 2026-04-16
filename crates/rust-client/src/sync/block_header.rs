@@ -43,9 +43,16 @@ impl<AUTH> Client<AUTH> {
         Ok(())
     }
 
-    /// Fetches from the store the current view of the chain's [`PartialMmr`].
+    /// Returns the current view of the chain's [`PartialMmr`].
+    ///
+    /// If the client has a cached copy, returns a clone of it. Otherwise, rebuilds from the
+    /// store.
     pub async fn get_current_partial_mmr(&self) -> Result<PartialMmr, ClientError> {
-        self.store.get_current_partial_mmr().await.map_err(Into::into)
+        if let Some(ref mmr) = self.partial_mmr {
+            Ok(mmr.clone())
+        } else {
+            self.store.get_current_partial_mmr().await.map_err(Into::into)
+        }
     }
 
     // HELPERS

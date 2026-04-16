@@ -62,7 +62,7 @@ use core::cmp::max;
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockNumber;
-use miden_protocol::crypto::merkle::mmr::InOrderIndex;
+use miden_protocol::crypto::merkle::mmr::{InOrderIndex, PartialMmr};
 use miden_protocol::note::NoteId;
 use miden_protocol::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
@@ -135,11 +135,12 @@ where
         let note_screener = self.note_screener();
         let state_sync =
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
-        let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
         let input = self.build_sync_input().await?;
 
+        let mut partial_mmr = self.take_or_build_partial_mmr().await?;
+
         // Get the sync update from the network
-        let state_sync_update = state_sync.sync_state(&mut current_partial_mmr, input).await?;
+        let state_sync_update = state_sync.sync_state(&mut partial_mmr, input).await?;
 
         let sync_summary: SyncSummary = (&state_sync_update).into();
         debug!(sync_summary = ?sync_summary, "Sync summary computed");
@@ -152,7 +153,10 @@ where
             .map_err(ClientError::StoreError)?;
 
         // Prune irrelevant blocks and their MMR authentication nodes.
-        self.untrack_and_prune_irrelevant_blocks().await?;
+        self.untrack_and_prune_irrelevant_blocks(&mut partial_mmr).await?;
+
+        // Put the fully updated MMR back into the cache.
+        self.partial_mmr = Some(partial_mmr);
 
         Ok(sync_summary)
     }
@@ -190,22 +194,44 @@ where
     /// Applies the state sync update to the store and prunes irrelevant blocks.
     ///
     /// See [`crate::Store::apply_state_sync()`] for what the update implies.
+    ///
+    /// Note: this invalidates the in-memory [`PartialMmr`] cache because the update may contain
+    /// new blocks and authentication nodes that the cached MMR doesn't reflect. The MMR will be
+    /// rebuilt from the store on the next operation that needs it.
     pub async fn apply_state_sync(&mut self, update: StateSyncUpdate) -> Result<(), ClientError> {
+        // Invalidate the cached MMR. The store is about to receive new blocks/peaks/nodes
+        // that the cached copy doesn't have.
+        self.partial_mmr = None;
+
         self.store.apply_state_sync(update).await?;
 
-        // Prune irrelevant blocks and their MMR authentication nodes.
-        self.untrack_and_prune_irrelevant_blocks().await?;
+        // Prune irrelevant blocks (will rebuild the MMR from the now-updated store).
+        let mut partial_mmr = self.take_or_build_partial_mmr().await?;
+        self.untrack_and_prune_irrelevant_blocks(&mut partial_mmr).await?;
+        self.partial_mmr = Some(partial_mmr);
 
         Ok(())
     }
 
+    /// Returns the in-memory [`PartialMmr`] if cached, otherwise builds it from the store.
+    pub(crate) async fn take_or_build_partial_mmr(&mut self) -> Result<PartialMmr, ClientError> {
+        if let Some(mmr) = self.partial_mmr.take() {
+            Ok(mmr)
+        } else {
+            self.store.get_current_partial_mmr().await.map_err(Into::into)
+        }
+    }
+
     /// Prunes irrelevant block data from the store.
     ///
-    /// Identifies tracked blocks whose input notes have all been consumed, untracks them from the
-    /// `PartialMmr` to determine which authentication nodes are no longer needed, then delegates
+    /// Identifies tracked blocks whose input notes have all been consumed, untracks them from
+    /// `partial_mmr` to determine which authentication nodes are no longer needed, then delegates
     /// to [`Store::untrack_and_prune_irrelevant_blocks`] to atomically remove the stale nodes,
     /// mark the blocks as irrelevant, and delete irrelevant block headers.
-    async fn untrack_and_prune_irrelevant_blocks(&self) -> Result<(), ClientError> {
+    async fn untrack_and_prune_irrelevant_blocks(
+        &self,
+        partial_mmr: &mut PartialMmr,
+    ) -> Result<(), ClientError> {
         let tracked_blocks = self.store.get_tracked_block_header_numbers().await?;
         if tracked_blocks.is_empty() {
             return Ok(());
@@ -223,9 +249,8 @@ where
             return Ok(());
         }
 
-        // Rebuild the PartialMmr and untrack each block to collect the authentication node
-        // indices that are no longer needed by any remaining tracked leaf.
-        let mut partial_mmr = self.store.get_current_partial_mmr().await?;
+        // Untrack each block to collect the authentication node indices that are no longer
+        // needed by any remaining tracked leaf.
         let mut nodes_to_remove: Vec<InOrderIndex> = Vec::new();
         for &block_pos in &to_untrack {
             nodes_to_remove.extend(partial_mmr.untrack(block_pos).into_iter().map(|(idx, _)| idx));

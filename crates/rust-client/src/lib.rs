@@ -324,6 +324,7 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
+use miden_protocol::crypto::merkle::mmr::PartialMmr;
 use miden_protocol::crypto::rand::FeltRng;
 use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
@@ -370,6 +371,10 @@ pub struct Client<AUTH> {
     /// An instance of [`NoteTransportClient`] which provides a way for the client to connect to
     /// the Miden Note Transport network.
     note_transport_api: Option<Arc<dyn NoteTransportClient>>,
+    /// Cached in-memory [`PartialMmr`] representing the client's current view of the chain's MMR.
+    /// Lazily built from the store on first access and kept in sync across sync and prune
+    /// operations. If `None`, the next operation that needs the MMR will rebuild it from the store.
+    partial_mmr: Option<PartialMmr>,
 }
 
 /// Constructors.

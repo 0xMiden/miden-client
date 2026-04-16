@@ -147,7 +147,7 @@ where
     /// - If a note doesn't exist on the node.
     /// - If a note exists but is private.
     async fn import_note_records_by_id(
-        &self,
+        &mut self,
         notes: BTreeMap<NoteId, Option<InputNoteRecord>>,
     ) -> Result<BTreeMap<NoteId, Option<InputNoteRecord>>, ClientError> {
         let note_ids = notes.keys().copied().collect::<Vec<_>>();
@@ -214,7 +214,7 @@ where
     /// If the note isn't consumed and it was committed in the past relative to the client, then
     /// the MMR for the relevant block is fetched from the node and stored.
     pub(crate) async fn import_note_records_by_proof(
-        &self,
+        &mut self,
         requested_notes: Vec<(Option<InputNoteRecord>, Note, NoteInclusionProof)>,
     ) -> Result<Vec<Option<InputNoteRecord>>, ClientError> {
         // TODO: iterating twice over requested notes
@@ -240,6 +240,8 @@ where
             .rpc_api
             .get_nullifier_commit_heights(nullifier_requests, lowest_block_height)
             .await?;
+
+        let mut partial_mmr = self.take_or_build_partial_mmr().await?;
 
         for (previous_note, note, inclusion_proof) in requested_notes {
             let metadata = note.metadata().clone();
@@ -270,15 +272,10 @@ where
                     note_record.inclusion_proof_received(inclusion_proof, metadata)?;
 
                 if block_height <= current_block_num {
-                    // FIXME: We should be able to build the mmr only once (outside the for loop).
-                    // For some reason this leads to error, probably related to:
-                    // https://github.com/0xMiden/miden-client/issues/1205
                     // If the note is committed in the past we need to manually fetch the block
                     // header and MMR proof to verify the inclusion proof.
-                    let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
-
                     let block_header = self
-                        .get_and_store_authenticated_block(block_height, &mut current_partial_mmr)
+                        .get_and_store_authenticated_block(block_height, &mut partial_mmr)
                         .await?;
 
                     note_changed |= note_record.block_header_received(&block_header)?;
@@ -297,6 +294,7 @@ where
             }
         }
 
+        self.partial_mmr = Some(partial_mmr);
         Ok(note_records)
     }
 
@@ -319,6 +317,9 @@ where
         let mut committed_notes_data =
             self.check_expected_notes(lowest_request_block, note_requests).await?;
 
+        // Take the cached PartialMmr (or build from store) once, outside the loop.
+        let mut partial_mmr = self.take_or_build_partial_mmr().await?;
+
         let mut note_records = vec![];
         for (previous_note, details, after_block_num, tag) in requested_notes {
             let mut note_record = previous_note.unwrap_or({
@@ -331,14 +332,10 @@ where
 
             match committed_notes_data.remove(&note_record.id()) {
                 Some(Some((metadata, inclusion_proof))) => {
-                    // FIXME: We should be able to build the mmr only once (outside the for loop).
-                    // For some reason this leads to error, probably related to:
-                    // https://github.com/0xMiden/miden-client/issues/1205
-                    let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
                     let block_header = self
                         .get_and_store_authenticated_block(
                             inclusion_proof.location().block_num(),
-                            &mut current_partial_mmr,
+                            &mut partial_mmr,
                         )
                         .await?;
 
@@ -362,6 +359,7 @@ where
             }
         }
 
+        self.partial_mmr = Some(partial_mmr);
         Ok(note_records)
     }
 

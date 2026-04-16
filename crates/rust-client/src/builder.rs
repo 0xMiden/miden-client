@@ -481,6 +481,7 @@ where
             tx_discard_delta: self.tx_discard_delta,
             max_block_number_delta: self.max_block_number_delta,
             note_transport_api: self.note_transport_api.clone(),
+            partial_mmr: None,
         })
     }
 }
