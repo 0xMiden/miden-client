@@ -941,6 +941,15 @@ export declare class MidenClient {
   sync(options?: { timeout?: number }): Promise<SyncSummary>;
   /** Returns the current sync height. */
   getSyncHeight(): Promise<number>;
+  /**
+   * Resolves once any in-flight serialized WASM call (execute, submit,
+   * prove, apply, sync, or account creation) has settled. Use this from
+   * callers that need to perform a non-WASM-side action — e.g. clearing
+   * an in-memory auth key on wallet lock — after the kernel finishes, so
+   * its auth callback doesn't race with the key being cleared. Returns
+   * immediately if nothing is in flight.
+   */
+  waitForIdle(): Promise<void>;
   /** Returns the client-level default prover. */
   readonly defaultProver: TransactionProver | null;
   /** Terminates the underlying Web Worker. After this, all method calls throw. */

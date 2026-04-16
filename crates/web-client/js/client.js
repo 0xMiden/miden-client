@@ -197,6 +197,22 @@ export class MidenClient {
   }
 
   /**
+   * Resolves once any in-flight serialized WASM call (execute, submit,
+   * prove, apply, sync, or account creation) has settled. Use this from
+   * callers that need to perform a non-WASM-side action — e.g. clearing an
+   * in-memory auth key on wallet lock — after the kernel finishes, so its
+   * auth callback doesn't race with the key being cleared.
+   *
+   * Safe to call at any time; returns immediately if nothing is in flight.
+   *
+   * @returns {Promise<void>}
+   */
+  async waitForIdle() {
+    this.assertNotTerminated();
+    await this.#inner.waitForIdle();
+  }
+
+  /**
    * Terminates the underlying Web Worker. After this, all method calls will throw.
    */
   terminate() {
