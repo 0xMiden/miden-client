@@ -943,6 +943,14 @@ export declare class MidenClient {
    * immediately if nothing is in flight.
    */
   waitForIdle(): Promise<void>;
+  /**
+   * Returns the raw JS value that the most recent sign-callback invocation
+   * threw, or `null` if the last sign call succeeded (or no call has
+   * happened yet). Useful for recovering structured metadata (e.g. a
+   * `reason: 'locked'` property) that the kernel-level `auth::request`
+   * diagnostic would otherwise erase.
+   */
+  lastAuthError(): unknown;
   /** Returns the client-level default prover. */
   readonly defaultProver: TransactionProver | null;
   /** Terminates the underlying Web Worker. After this, all method calls throw. */
