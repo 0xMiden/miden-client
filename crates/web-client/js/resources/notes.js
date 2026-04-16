@@ -91,6 +91,26 @@ export class NotesResource {
     const address = resolveAddress(opts.to, wasm);
     await this.#inner.sendPrivateNote(note, address);
   }
+
+  /**
+   * Re-send a previously-sent private note by its ID. The note is
+   * looked up from the client's output-note store (i.e. notes this
+   * wallet sent) and re-transported to the recipient. Use this to
+   * recover from a transport failure where the on-chain transaction
+   * committed but the recipient never received the note blob.
+   *
+   * @param {object} opts
+   * @param {NoteId | string} opts.noteId - ID of the output note to resend.
+   * @param {string | Address} opts.to - Recipient address.
+   */
+  async resendPrivateById(opts) {
+    this.#client.assertNotTerminated();
+    const wasm = await this.#getWasm();
+    const noteHex = resolveNoteIdHex(opts.noteId);
+    const noteId = wasm.NoteId.fromHex(noteHex);
+    const address = resolveAddress(opts.to, wasm);
+    await this.#inner.resendPrivateNoteById(noteId, address);
+  }
 }
 
 function buildNoteFilter(query, wasm) {

@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use futures::Stream;
 use miden_protocol::address::Address;
 use miden_protocol::block::BlockNumber;
-use miden_protocol::note::{Note, NoteDetails, NoteFile, NoteHeader, NoteTag};
+use miden_protocol::note::{Note, NoteDetails, NoteFile, NoteHeader, NoteId, NoteTag};
 use miden_protocol::utils::serde::Serializable;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::serde::{
@@ -64,6 +64,55 @@ impl<AUTH> Client<AUTH> {
         api.send_note(header, details_bytes).await?;
 
         Ok(())
+    }
+
+    /// Re-send a previously-sent private note identified by its [`NoteId`].
+    ///
+    /// Looks up the note from the client's output-note store, reconstructs
+    /// its [`Note`] form, and calls [`Client::send_private_note`]. Intended
+    /// for consumers that need to recover from transport-side failures:
+    /// the on-chain transaction already committed the note's commitment,
+    /// but the blob never reached the recipient's transport. Without a
+    /// resend the recipient can never discover the note (it's private —
+    /// no on-chain details), so the sender's asset is effectively lost.
+    ///
+    /// # Errors
+    /// - [`ClientError::NoteNotFoundOnChain`] if no output note with this
+    ///   ID is tracked locally (client likely wasn't the sender).
+    /// - [`ClientError::NoteRecordConversionError`] if the stored record
+    ///   lacks the full recipient data needed to reconstruct the note
+    ///   (e.g. it was built from a `PartialNote`).
+    /// - Any [`NoteTransportError`] from the underlying transport.
+    pub async fn resend_private_note_by_id(
+        &mut self,
+        note_id: NoteId,
+        address: &Address,
+    ) -> Result<(), ClientError> {
+        use crate::store::{NoteFilter, NoteRecordError};
+
+        let record = self
+            .store
+            .get_output_notes(NoteFilter::Unique(note_id))
+            .await?
+            .pop()
+            .ok_or(ClientError::NoteNotFoundOnChain(note_id))?;
+
+        let recipient = record
+            .recipient()
+            .cloned()
+            .ok_or_else(|| {
+                ClientError::NoteRecordConversionError(
+                    NoteRecordError::ConversionError(
+                        "output note is missing recipient data; cannot reconstruct for resend"
+                            .into(),
+                    ),
+                )
+            })?;
+        let assets = record.assets().clone();
+        let metadata = record.metadata().clone();
+
+        let note = Note::new(assets, metadata, recipient);
+        self.send_private_note(note, address).await
     }
 }
 
