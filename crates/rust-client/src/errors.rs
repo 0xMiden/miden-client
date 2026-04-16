@@ -1,9 +1,11 @@
+use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
+use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::merkle::MerkleError;
 pub use miden_protocol::errors::{AccountError, AccountIdError, AssetError, NetworkIdError};
 use miden_protocol::errors::{
@@ -13,6 +15,7 @@ use miden_protocol::errors::{
     TransactionScriptError,
 };
 use miden_protocol::note::{NoteId, NoteTag};
+use miden_protocol::transaction::TransactionId;
 use miden_standards::account::interface::AccountInterfaceError;
 // RE-EXPORTS
 // ================================================================================================
@@ -165,6 +168,18 @@ pub enum ClientError {
         #[source]
         source: RpcError,
     },
+    #[error(
+        "transaction {tx_id} was submitted to the network at block {submission_height} but \
+         apply_transaction failed when writing local state. The on-chain effect is durable; the \
+         next successful sync will reconcile note states via ConsumedExternal. Do NOT retry the \
+         same transaction."
+    )]
+    ApplyTransactionAfterSubmitFailed {
+        tx_id: TransactionId,
+        submission_height: BlockNumber,
+        #[source]
+        source: Box<ClientError>,
+    },
 }
 
 // CONVERSIONS
@@ -228,6 +243,19 @@ impl From<&ClientError> for Option<ErrorHint> {
                           or provide the seed when importing.".to_string(),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
+            ClientError::ApplyTransactionAfterSubmitFailed { tx_id, submission_height, .. } => {
+                Some(ErrorHint {
+                    message: format!(
+                        "Transaction {tx_id} was submitted to the network at block \
+                         {submission_height} but the local apply step (which writes the new \
+                         note states and account commitment to the store) failed. The on-chain \
+                         effect is permanent — do NOT resubmit. Run `sync` to reconcile local \
+                         state; input notes consumed by this transaction will be detected via \
+                         their nullifiers and transitioned to ConsumedExternal automatically."
+                    ),
+                    docs_url: Some(TROUBLESHOOTING_DOC),
+                })
+            },
             _ => None,
         }
     }

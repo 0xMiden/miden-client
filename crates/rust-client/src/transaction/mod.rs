@@ -226,7 +226,34 @@ where
         let submission_height =
             self.submit_proven_transaction(proven_transaction, &tx_result).await?;
 
-        self.apply_transaction(&tx_result, submission_height).await?;
+        // From this point on, the transaction is live on the network: the
+        // sender's account state has changed and the input note
+        // nullifiers will be recorded in the nullifier SMT. If
+        // apply_transaction fails (e.g. transient IDB write error), the
+        // local state disagrees with chain until the next sync
+        // reconciles it.
+        //
+        // Try apply once more before surfacing a distinct error that
+        // tells the caller "the tx landed on chain, don't retry it."
+        // A small subset of apply failures (IDB quota spike, connection
+        // reset on the store worker) clear immediately.
+        if let Err(first_err) = self.apply_transaction(&tx_result, submission_height).await {
+            info!("apply_transaction failed once; retrying to cover transient errors");
+            if let Err(second_err) =
+                self.apply_transaction(&tx_result, submission_height).await
+            {
+                info!(
+                    "apply_transaction failed twice for submitted tx {tx_id}; surfacing \
+                     ApplyTransactionAfterSubmitFailed so the caller can rely on the next \
+                     sync to reconcile local state. First error: {first_err}"
+                );
+                return Err(ClientError::ApplyTransactionAfterSubmitFailed {
+                    tx_id,
+                    submission_height,
+                    source: Box::new(second_err),
+                });
+            }
+        }
 
         Ok(tx_id)
     }
