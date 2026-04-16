@@ -169,14 +169,6 @@ pub enum ClientError {
         source: RpcError,
     },
     #[error(
-        "input note {note_id} was already consumed on chain at block {consumed_at}; local state \
-         has been transitioned to ConsumedExternal. Retry after sync completes."
-    )]
-    InputNoteAlreadyConsumedOnChain {
-        note_id: NoteId,
-        consumed_at: BlockNumber,
-    },
-    #[error(
         "transaction {tx_id} was submitted to the network at block {submission_height} but \
          apply_transaction failed when writing local state. The on-chain effect is durable; the \
          next successful sync will reconcile note states via ConsumedExternal. Do NOT retry the \
@@ -249,16 +241,6 @@ impl From<&ClientError> for Option<ErrorHint> {
                 message: "New accounts require a seed to derive their initial state. \
                           Use `Client::new_account()` which generates the seed automatically, \
                           or provide the seed when importing.".to_string(),
-                docs_url: Some(TROUBLESHOOTING_DOC),
-            }),
-            ClientError::InputNoteAlreadyConsumedOnChain { note_id, consumed_at } => Some(ErrorHint {
-                message: format!(
-                    "Note {note_id} was already consumed on chain at block {consumed_at}. \
-                     The client's local view disagreed with the network — usually this means \
-                     a prior `apply_transaction` failed after submit succeeded, or another \
-                     client consumed the note. The local state has been transitioned to \
-                     ConsumedExternal. Retry the operation only if a newer note is available."
-                ),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
             ClientError::ApplyTransactionAfterSubmitFailed { tx_id, submission_height, .. } => {

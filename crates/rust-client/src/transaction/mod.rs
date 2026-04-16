@@ -71,7 +71,7 @@ use miden_protocol::account::{Account, AccountCode, AccountId};
 use miden_protocol::asset::NonFungibleAsset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
-use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag, Nullifier};
+use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
 use miden_protocol::transaction::AccountInputs;
 use miden_protocol::{EMPTY_WORD, Felt, Word};
 use miden_standards::account::interface::AccountInterfaceExt;
@@ -294,23 +294,6 @@ where
             }
         }
 
-        // Pre-flight nullifier check: the client's local view of a note may
-        // disagree with the chain (e.g. the client submitted a prior
-        // consume, the transaction settled on-chain, but the client's
-        // `apply_transaction` failed — so the note is on-chain consumed
-        // but still marked Committed locally). Without this check the
-        // client would run a full execute + prove + submit, only to have
-        // the node reject the transaction. Worse, retries keep failing
-        // the same way until the next sync updates the note state.
-        //
-        // Probe the nullifier SMT before executing. For any input note
-        // whose nullifier is already on chain, transition the local
-        // state to ConsumedExternal and return a distinct error so the
-        // caller can react differently than for a generic "already
-        // consumed" failure. This is a single RPC round-trip, scoped to
-        // the handful of notes being consumed.
-        self.check_input_nullifiers_on_chain(&mut stored_note_records).await?;
-
         // Only keep authenticated input notes from the store.
         stored_note_records.retain(InputNoteRecord::is_authenticated);
 
@@ -397,57 +380,6 @@ where
 
         validate_executed_transaction(&executed_transaction, &output_recipients)?;
         TransactionResult::new(executed_transaction, future_notes)
-    }
-
-    /// Probes the chain's nullifier SMT for every input note's nullifier.
-    /// If any nullifier is already on chain, transitions the local state
-    /// of that note to [`InputNoteState::ConsumedExternal`] (upserting it
-    /// into the store) and returns
-    /// [`ClientError::InputNoteAlreadyConsumedOnChain`].
-    ///
-    /// The nullifier set scan is bounded by the client's current sync
-    /// height: we only care about nullifiers created after the last sync,
-    /// because earlier consumptions would already be reflected in the
-    /// local `InputNoteState`. This makes the RPC payload small even on
-    /// long-running clients.
-    async fn check_input_nullifiers_on_chain(
-        &self,
-        stored_note_records: &mut [InputNoteRecord],
-    ) -> Result<(), ClientError> {
-        if stored_note_records.is_empty() {
-            return Ok(());
-        }
-
-        let nullifiers: BTreeSet<Nullifier> =
-            stored_note_records.iter().map(InputNoteRecord::nullifier).collect();
-
-        let sync_height = self.store.get_sync_height().await?;
-        let consumed_at =
-            self.rpc_api.get_nullifier_commit_heights(nullifiers, sync_height).await?;
-
-        for note in stored_note_records.iter_mut() {
-            let Some(Some(block_num)) = consumed_at.get(&note.nullifier()).copied() else {
-                continue;
-            };
-
-            let note_id = note.id();
-            // Transition local state to ConsumedExternal. Ignore the
-            // Result<bool> — either the transition happened (bool = true)
-            // or the note was already in a compatible state (bool =
-            // false) — both mean "don't run execute_transaction on this
-            // note."
-            let _ = note.consumed_externally(note.nullifier(), block_num, None);
-            self.store
-                .upsert_input_notes(core::slice::from_ref(note))
-                .await?;
-
-            return Err(ClientError::InputNoteAlreadyConsumedOnChain {
-                note_id,
-                consumed_at: block_num,
-            });
-        }
-
-        Ok(())
     }
 
     /// Proves the specified transaction using the prover configured for this client.
