@@ -11,29 +11,18 @@ use miden_protocol::crypto::merkle::store::MerkleStore;
 use miden_protocol::crypto::rand::FeltRng;
 use miden_protocol::errors::NoteError;
 use miden_protocol::note::{
-    Note,
-    NoteAssets,
-    NoteAttachment,
-    NoteDetails,
-    NoteId,
-    NoteMetadata,
-    NoteRecipient,
-    NoteScript,
-    NoteStorage,
-    NoteTag,
-    NoteType,
-    PartialNote,
+    Note, NoteAssets, NoteAttachment, NoteDetails, NoteId, NoteMetadata, NoteRecipient, NoteScript,
+    NoteStorage, NoteTag, NoteType, PartialNote,
 };
 use miden_protocol::transaction::TransactionScript;
 use miden_protocol::vm::AdviceMap;
 use miden_protocol::{Felt, Word};
-use miden_standards::note::{P2idNote, P2ideNote, P2ideNoteStorage, SwapNote};
+use miden_standards::note::{
+    P2idNote, P2ideNote, P2ideNoteStorage, PswapNote, PswapNoteStorage, SwapNote,
+};
 
 use super::{
-    ForeignAccount,
-    NoteArgs,
-    TransactionRequest,
-    TransactionRequestError,
+    ForeignAccount, NoteArgs, TransactionRequest, TransactionRequestError,
     TransactionScriptTemplate,
 };
 use crate::ClientRng;
@@ -425,6 +414,133 @@ impl TransactionRequestBuilder {
             .collect::<Result<_, NoteError>>()?;
 
         self.own_output_notes(registration_notes).build()
+    }
+
+    /// Consumes the builder and returns a [`TransactionRequest`] for creating a partial swap
+    /// (PSWAP) note.
+    ///
+    /// - `creator_account_id` is the account creating the swap.
+    /// - `offered_asset` is the asset being offered.
+    /// - `requested_asset` is the asset being requested in return.
+    /// - `note_type` determines the visibility of the PSWAP note itself.
+    /// - `payback_note_type` determines the visibility of the payback note that fillers emit
+    ///   back to the creator. Typically [`NoteType::Private`] (cheaper; the fill amount is
+    ///   already visible in the executing transaction).
+    /// - `note_attachment` is the optional attachment for the note.
+    pub fn build_pswap_create(
+        self,
+        creator_account_id: AccountId,
+        offered_asset: Asset,
+        requested_asset: Asset,
+        note_type: NoteType,
+        payback_note_type: NoteType,
+        note_attachment: NoteAttachment,
+        rng: &mut ClientRng,
+    ) -> Result<TransactionRequest, TransactionRequestError> {
+        let offered_fungible = match offered_asset {
+            Asset::Fungible(asset) => asset,
+            Asset::NonFungible(_) => {
+                return Err(TransactionRequestError::NoteCreationError(NoteError::other(
+                    "PSWAP notes only support fungible offered assets",
+                )));
+            },
+        };
+        let requested_fungible = match requested_asset {
+            Asset::Fungible(asset) => asset,
+            Asset::NonFungible(_) => {
+                return Err(TransactionRequestError::NoteCreationError(NoteError::other(
+                    "PSWAP notes only support fungible requested assets",
+                )));
+            },
+        };
+
+        let storage = PswapNoteStorage::builder()
+            .requested_asset(requested_fungible)
+            .creator_account_id(creator_account_id)
+            .payback_note_type(payback_note_type)
+            .build();
+
+        let pswap_note = PswapNote::builder()
+            .sender(creator_account_id)
+            .storage(storage)
+            .serial_number(rng.draw_word())
+            .note_type(note_type)
+            .offered_asset(offered_fungible)
+            .attachment(note_attachment)
+            .build()
+            .map_err(TransactionRequestError::NoteCreationError)?;
+
+        let note: Note = pswap_note.into();
+        self.own_output_notes(vec![note]).build()
+    }
+
+    /// Consumes the builder and returns a [`TransactionRequest`] for consuming (filling) a
+    /// partial swap (PSWAP) note.
+    ///
+    /// - `pswap_note` is the Pswap note being consumed.
+    /// - `consumer_account_id` is the account consuming the swap.
+    /// - `account_fill_amount` is the amount of the requested asset being provided by the consumer account.
+    /// - `note_fill_amount` is any additional amount being provided by other notes.
+    pub fn build_pswap_consume(
+        self,
+        pswap_note: &Note,
+        consumer_account_id: AccountId,
+        account_fill_amount: u64,
+        note_fill_amount: u64,
+    ) -> Result<TransactionRequest, TransactionRequestError> {
+        let pswap =
+            PswapNote::try_from(pswap_note).map_err(TransactionRequestError::NoteCreationError)?;
+
+        let requested_faucet_id = pswap.storage().requested_asset().faucet_id();
+
+        let account_fill_asset = FungibleAsset::new(requested_faucet_id, account_fill_amount)
+            .map_err(|e| NoteError::other_with_source("invalid fill amount", e))?;
+
+        let note_fill_asset = FungibleAsset::new(requested_faucet_id, note_fill_amount)
+            .map_err(|e| NoteError::other_with_source("invalid inflight amount", e))?;
+
+        let (p2id_note, remainder_pswap) = pswap
+            .execute(consumer_account_id, Some(account_fill_asset), Some(note_fill_asset))
+            .map_err(TransactionRequestError::NoteCreationError)?;
+
+        // Note args: [0, 0, inflight_amount, fill_amount]
+        let note_args = Word::from([
+            Felt::new(0),
+            Felt::new(0),
+            Felt::new(note_fill_amount),
+            Felt::new(account_fill_amount),
+        ]);
+
+        // Register output notes as expected future notes (created by the script, not the account)
+        let p2id_details = NoteDetails::from(&p2id_note);
+        let p2id_tag = p2id_note.metadata().tag();
+        let p2id_recipient = p2id_note.recipient().clone();
+
+        let mut expected_future_notes = vec![(p2id_details, p2id_tag)];
+        let mut expected_recipients = vec![p2id_recipient];
+
+        if let Some(remainder) = remainder_pswap {
+            let remainder_note: Note = remainder.into();
+            expected_future_notes
+                .push((NoteDetails::from(&remainder_note), remainder_note.metadata().tag()));
+            expected_recipients.push(remainder_note.recipient().clone());
+        }
+
+        self.input_notes(vec![(pswap_note.clone(), Some(note_args))])
+            .expected_future_notes(expected_future_notes)
+            .expected_output_recipients(expected_recipients)
+            .build()
+    }
+
+    /// Consumes the builder and returns a [`TransactionRequest`] for canceling a partial swap
+    /// (PSWAP) note.
+    ///
+    /// - `pswap_note` is the swap note to cancel. The caller must be the creator of the note.
+    pub fn build_pswap_cancel(
+        self,
+        pswap_note: Note,
+    ) -> Result<TransactionRequest, TransactionRequestError> {
+        self.input_notes(vec![(pswap_note, None)]).build()
     }
 
     // FINALIZE BUILDER

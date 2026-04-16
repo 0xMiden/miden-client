@@ -1,20 +1,18 @@
 use core::future::Future;
 use core::pin::Pin;
 use std::boxed::Box;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::env::temp_dir;
 use std::println;
 use std::sync::Arc;
 
 use miden_client::account::{Address, AddressInterface};
 use miden_client::address::RoutingParameters;
-use miden_client::assembly::CodeBuilder;
+use miden_client::assembly::{
+    Assembler, CodeBuilder, DefaultSourceManager, Module, ModuleKind, Path,
+};
 use miden_client::auth::{
-    AuthSchemeId,
-    AuthSecretKey,
-    AuthSingleSig,
-    PublicKeyCommitment,
-    RPO_FALCON_SCHEME_ID,
+    AuthSchemeId, AuthSecretKey, AuthSingleSig, PublicKeyCommitment, RPO_FALCON_SCHEME_ID,
 };
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
@@ -22,77 +20,38 @@ use miden_client::note::{BlockNumber, NoteId};
 use miden_client::rpc::{NodeRpcClient, RpcLimits};
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{
-    AccountStorageFilter,
-    InputNoteRecord,
-    InputNoteState,
-    NoteFilter,
-    OutputNoteState,
+    AccountStorageFilter, InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState,
     TransactionFilter,
 };
 use miden_client::sync::{NoteTagRecord, NoteTagSource};
 use miden_client::testing::common::{
-    ACCOUNT_ID_REGULAR,
-    MINT_AMOUNT,
-    RECALL_HEIGHT_DELTA,
-    TRANSFER_AMOUNT,
-    TestClient,
-    assert_account_has_single_asset,
-    assert_note_cannot_be_consumed_twice,
-    consume_notes,
-    create_test_store_path,
-    execute_failing_tx,
-    mint_and_consume,
-    mint_note,
-    setup_two_wallets_and_faucet,
-    setup_wallet_and_faucet,
+    ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT, TestClient,
+    assert_account_has_single_asset, assert_note_cannot_be_consumed_twice, consume_notes,
+    create_test_store_path, execute_failing_tx, mint_and_consume, mint_note,
+    setup_two_wallets_and_faucet, setup_wallet_and_faucet,
 };
 use miden_client::testing::mock::{MockClient, MockRpcApi};
 use miden_client::transaction::{
-    DiscardCause,
-    PaymentNoteDescription,
-    SwapTransactionData,
-    TransactionExecutorError,
-    TransactionRequestBuilder,
-    TransactionRequestError,
-    TransactionStatus,
+    DiscardCause, PaymentNoteDescription, SwapTransactionData, TransactionExecutorError,
+    TransactionRequestBuilder, TransactionRequestError, TransactionStatus,
 };
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_protocol::account::{
-    Account,
-    AccountBuilder,
-    AccountCode,
-    AccountComponent,
-    AccountComponentMetadata,
-    AccountHeader,
-    AccountId,
-    AccountStorageMode,
-    AccountType,
-    StorageMap,
-    StorageMapKey,
-    StorageSlot,
-    StorageSlotContent,
-    StorageSlotName,
+    Account, AccountBuilder, AccountCode, AccountComponent, AccountComponentMetadata,
+    AccountHeader, AccountId, AccountStorageMode, AccountType, StorageMap, StorageMapKey,
+    StorageSlot, StorageSlotContent, StorageSlotName,
 };
 use miden_protocol::asset::{Asset, AssetVaultKey, AssetWitness, FungibleAsset, TokenSymbol};
 use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
 use miden_protocol::note::{
-    Note,
-    NoteAssets,
-    NoteFile,
-    NoteMetadata,
-    NoteRecipient,
-    NoteStorage,
-    NoteTag,
+    Note, NoteAssets, NoteAttachment, NoteFile, NoteMetadata, NoteRecipient, NoteStorage, NoteTag,
     NoteType,
 };
 use miden_protocol::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-    ACCOUNT_ID_PRIVATE_SENDER,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-    ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
+    ACCOUNT_ID_PRIVATE_SENDER, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2, ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
     ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
@@ -651,9 +610,10 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
         state_sync_update.partial_blockchain_updates.block_headers().next().unwrap();
     assert_eq!(tip_header.block_num(), rpc_api.get_chain_tip_block_num());
 
-    // Authentication nodes must be non-empty: they include nodes produced by applying
-    // the MMR delta and adding the chain tip leaf. These nodes are needed for the
-    // tracked genesis leaf's Merkle proof path, which changes as the tree grows.
+    // Authentication nodes must be non-empty: they include nodes produced during
+    // the intermediate sync steps (blocks 1 and 4) via `extend_authentication_nodes`.
+    // These nodes are needed for the tracked genesis leaf's Merkle proof path, which
+    // changes as the tree grows.
     assert!(
         !state_sync_update
             .partial_blockchain_updates
@@ -1083,7 +1043,7 @@ async fn execute_program() {
         wallet.id(),
         tx_script,
         AdviceInputs::default(),
-        BTreeMap::new(),
+        std::collections::BTreeMap::new(),
     ))
     .await
     .unwrap();
@@ -2702,6 +2662,244 @@ async fn partial_output_note_receives_inclusion_proof_after_sync() {
 }
 
 #[tokio::test]
+async fn pswap_test() {
+    // This test verifies that:
+    // 1. Alice can create a PSWAP note offering faucet1 tokens for faucet2 tokens.
+    // 2. Bob can consume (fill) the PSWAP note by providing faucet2 tokens and receiving
+    //    faucet1 tokens in return.
+
+    let (mut client, mock_rpc_api, keystore) = create_test_client().await;
+
+    // Setup Alice's wallet and faucet1 (offered asset).
+    let (alice_wallet, faucet1) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    // Setup Bob's wallet and faucet2 (requested asset).
+    let (bob_wallet, faucet2) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    // Mint faucet1 tokens to Alice.
+    mint_and_consume(&mut client, alice_wallet.id(), faucet1.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Mint faucet2 tokens to Bob.
+    mint_and_consume(&mut client, bob_wallet.id(), faucet2.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Alice has faucet1 tokens before creating PSWAP.
+    let alice_account: Account = client
+        .get_account(alice_wallet.id())
+        .await
+        .unwrap()
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let alice_faucet1_before = alice_account.vault().get_balance(faucet1.id()).unwrap();
+    assert_eq!(alice_faucet1_before, MINT_AMOUNT, "Alice should have MINT_AMOUNT of faucet1");
+
+    // Verify Bob has faucet2 tokens before consuming PSWAP.
+    let bob_account: Account =
+        client.get_account(bob_wallet.id()).await.unwrap().unwrap().try_into().unwrap();
+    let bob_faucet2_before = bob_account.vault().get_balance(faucet2.id()).unwrap();
+    assert_eq!(bob_faucet2_before, MINT_AMOUNT, "Bob should have MINT_AMOUNT of faucet2");
+
+    // Step 1: Alice creates a PSWAP note offering faucet1 tokens for faucet2 tokens.
+    let offered_amount = 100u64;
+    let requested_amount = 50u64;
+    let offered_asset = Asset::Fungible(FungibleAsset::new(faucet1.id(), offered_amount).unwrap());
+    let requested_asset =
+        Asset::Fungible(FungibleAsset::new(faucet2.id(), requested_amount).unwrap());
+
+    let create_request = TransactionRequestBuilder::new()
+        .build_pswap_create(
+            alice_wallet.id(),
+            offered_asset,
+            requested_asset,
+            NoteType::Private,
+            NoteType::Private,
+            NoteAttachment::default(),
+            client.rng(),
+        )
+        .unwrap();
+
+    let pswap_note = create_request.expected_output_own_notes()[0].clone();
+    client.submit_new_transaction(alice_wallet.id(), create_request).await.unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Alice's faucet1 balance decreased after creating the PSWAP note.
+    let alice_account: Account = client
+        .get_account(alice_wallet.id())
+        .await
+        .unwrap()
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let alice_faucet1_after_create = alice_account.vault().get_balance(faucet1.id()).unwrap();
+    assert_eq!(
+        alice_faucet1_after_create,
+        MINT_AMOUNT - offered_amount,
+        "Alice's faucet1 balance should decrease by the offered amount"
+    );
+
+    // Step 2: Bob consumes the PSWAP note (full fill).
+    let fill_amount = requested_amount;
+    let inflight_amount = 0u64;
+
+    let consume_request = TransactionRequestBuilder::new()
+        .build_pswap_consume(&pswap_note, bob_wallet.id(), fill_amount, inflight_amount)
+        .unwrap();
+
+    client.submit_new_transaction(bob_wallet.id(), consume_request).await.unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Bob's balances after consuming the PSWAP note.
+    let bob_account: Account =
+        client.get_account(bob_wallet.id()).await.unwrap().unwrap().try_into().unwrap();
+
+    // Bob should have spent fill_amount of faucet2 tokens.
+    let bob_faucet2_after = bob_account.vault().get_balance(faucet2.id()).unwrap();
+    assert_eq!(
+        bob_faucet2_after,
+        MINT_AMOUNT - fill_amount,
+        "Bob's faucet2 balance should decrease by the fill amount"
+    );
+
+    // Bob should have received the offered faucet1 tokens (full fill = all offered tokens).
+    let bob_faucet1_after = bob_account.vault().get_balance(faucet1.id()).unwrap();
+    assert_eq!(
+        bob_faucet1_after, offered_amount,
+        "Bob should have received all offered faucet1 tokens"
+    );
+}
+
+#[tokio::test]
+async fn pswap_cancel_test() {
+    // This test verifies that:
+    // 1. Alice creates a PSWAP note (balance decreases).
+    // 2. Alice cancels the PSWAP note (balance restored).
+
+    let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
+
+    // Setup Alice's wallet and faucet1 (offered asset).
+    let (alice_wallet, faucet1) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    // Setup faucet2 (requested asset).
+    let (_bob_wallet, faucet2) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    // Mint faucet1 tokens to Alice.
+    mint_and_consume(&mut client, alice_wallet.id(), faucet1.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Alice's balance before creating the PSWAP note.
+    let alice_account: Account = client
+        .get_account(alice_wallet.id())
+        .await
+        .unwrap()
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let alice_balance_before = alice_account.vault().get_balance(faucet1.id()).unwrap();
+    assert_eq!(alice_balance_before, MINT_AMOUNT, "Alice should have MINT_AMOUNT of faucet1");
+
+    // Step 1: Alice creates a PSWAP note.
+    let offered_amount = 100u64;
+    let requested_amount = 50u64;
+    let offered_asset = Asset::Fungible(FungibleAsset::new(faucet1.id(), offered_amount).unwrap());
+    let requested_asset =
+        Asset::Fungible(FungibleAsset::new(faucet2.id(), requested_amount).unwrap());
+
+    let create_request = TransactionRequestBuilder::new()
+        .build_pswap_create(
+            alice_wallet.id(),
+            offered_asset,
+            requested_asset,
+            NoteType::Private,
+            NoteType::Private,
+            NoteAttachment::default(),
+            client.rng(),
+        )
+        .unwrap();
+
+    let pswap_note = create_request.expected_output_own_notes()[0].clone();
+    Box::pin(client.submit_new_transaction(alice_wallet.id(), create_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Alice's balance decreased after creating the PSWAP note.
+    let alice_account: Account = client
+        .get_account(alice_wallet.id())
+        .await
+        .unwrap()
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let alice_balance_after_create = alice_account.vault().get_balance(faucet1.id()).unwrap();
+    assert_eq!(
+        alice_balance_after_create,
+        MINT_AMOUNT - offered_amount,
+        "Alice's faucet1 balance should decrease by the offered amount"
+    );
+
+    // Step 2: Alice cancels the PSWAP note.
+    let cancel_request = TransactionRequestBuilder::new()
+        .build_pswap_cancel(pswap_note)
+        .unwrap();
+
+    Box::pin(client.submit_new_transaction(alice_wallet.id(), cancel_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Alice's balance is restored after canceling the PSWAP note.
+    let alice_account: Account = client
+        .get_account(alice_wallet.id())
+        .await
+        .unwrap()
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let alice_balance_after_cancel = alice_account.vault().get_balance(faucet1.id()).unwrap();
+    assert_eq!(
+        alice_balance_after_cancel, MINT_AMOUNT,
+        "Alice's balance should be fully restored after canceling the PSWAP note"
+    );
+}
+
+#[tokio::test]
 async fn empty_storage_map() {
     let (mut client, _, keystore) = create_test_client().await;
 
@@ -2900,7 +3098,8 @@ async fn storage_and_vault_proofs() {
         assert_eq!(account_vault_root, vault.root());
 
         // Check that specific asset proof matches the one in the vault
-        let vault_key = AssetVaultKey::new_fungible(faucet_account_id).unwrap();
+        let vault_key =
+            AssetVaultKey::new_fungible(faucet_account_id).expect("faucet id is fungible");
         let (asset, witness) = client
             .test_store()
             .get_account_asset(account_id, vault_key)
@@ -3764,7 +3963,8 @@ async fn storage_and_vault_proofs_ecdsa() {
         assert_eq!(account_vault_root, vault.root());
 
         // Check that specific asset proof matches the one in the vault
-        let vault_key = AssetVaultKey::new_fungible(faucet_account_id).unwrap();
+        let vault_key =
+            AssetVaultKey::new_fungible(faucet_account_id).expect("faucet id is fungible");
         let (asset, witness) = client
             .test_store()
             .get_account_asset(account_id, vault_key)
