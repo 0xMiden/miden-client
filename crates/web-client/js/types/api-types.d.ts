@@ -436,18 +436,11 @@ export interface PreviewSwapOptions {
   paybackType?: NoteVisibility;
 }
 
-export interface PreviewCustomOptions {
-  operation: "custom";
-  account: AccountRef;
-  request: TransactionRequest;
-}
-
 export type PreviewOptions =
   | PreviewSendOptions
   | PreviewMintOptions
   | PreviewConsumeOptions
-  | PreviewSwapOptions
-  | PreviewCustomOptions;
+  | PreviewSwapOptions;
 
 /** Status values reported during waitFor polling. */
 export type WaitStatus = "pending" | "submitted" | "committed";
@@ -941,6 +934,14 @@ export declare class MidenClient {
   sync(options?: { timeout?: number }): Promise<SyncSummary>;
   /** Returns the current sync height. */
   getSyncHeight(): Promise<number>;
+  /**
+   * Returns the raw JS value that the most recent sign-callback invocation
+   * threw, or `null` if the last sign call succeeded (or no call has
+   * happened yet). Useful for recovering structured metadata (e.g. a
+   * `reason: 'locked'` property) that the kernel-level `auth::request`
+   * diagnostic would otherwise erase.
+   */
+  lastAuthError(): unknown;
   /** Returns the client-level default prover. */
   readonly defaultProver: TransactionProver | null;
   /** Terminates the underlying Web Worker. After this, all method calls throw. */
