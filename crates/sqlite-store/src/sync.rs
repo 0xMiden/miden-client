@@ -91,10 +91,10 @@ impl SqliteStore {
             .expect("no binding parameters used in query")
             .map(|result| {
                 let v: i64 = result.into_store_error()?;
-                Ok(BlockNumber::from(u32::try_from(v).expect("block number is always positive")))
+                Ok(BlockNumber::from(u32::try_from(v).map_err(StoreError::InvalidInt)?))
             })
             .next()
-            .expect("state sync block number exists")
+            .ok_or_else(|| StoreError::QueryError("state sync block number not found".to_string()))?
     }
 
     pub(super) fn apply_state_sync(
