@@ -4,6 +4,7 @@ use core::fmt;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
+use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::merkle::MerkleError;
 pub use miden_protocol::errors::{AccountError, AccountIdError, AssetError, NetworkIdError};
 use miden_protocol::errors::{
@@ -165,6 +166,14 @@ pub enum ClientError {
         #[source]
         source: RpcError,
     },
+    #[error(
+        "input note {note_id} was already consumed on chain at block {consumed_at}; local state \
+         has been transitioned to ConsumedExternal. Retry after sync completes."
+    )]
+    InputNoteAlreadyConsumedOnChain {
+        note_id: NoteId,
+        consumed_at: BlockNumber,
+    },
 }
 
 // CONVERSIONS
@@ -226,6 +235,16 @@ impl From<&ClientError> for Option<ErrorHint> {
                 message: "New accounts require a seed to derive their initial state. \
                           Use `Client::new_account()` which generates the seed automatically, \
                           or provide the seed when importing.".to_string(),
+                docs_url: Some(TROUBLESHOOTING_DOC),
+            }),
+            ClientError::InputNoteAlreadyConsumedOnChain { note_id, consumed_at } => Some(ErrorHint {
+                message: format!(
+                    "Note {note_id} was already consumed on chain at block {consumed_at}. \
+                     The client's local view disagreed with the network — usually this means \
+                     a prior `apply_transaction` failed after submit succeeded, or another \
+                     client consumed the note. The local state has been transitioned to \
+                     ConsumedExternal. Retry the operation only if a newer note is available."
+                ),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
             _ => None,
