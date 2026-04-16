@@ -5,12 +5,13 @@ sidebar_position: 2.5
 
 # Compiling MASM with the Miden SDK
 
-`client.compile` exposes two methods for compiling Miden Assembly (MASM) code directly from the browser without needing a direct reference to the low-level `WasmWebClient`:
+`client.compile` exposes three methods for compiling Miden Assembly (MASM) code directly from the browser without needing a direct reference to the low-level `WasmWebClient`:
 
 | Method | Purpose |
 |--------|---------|
 | `compile.component({ code, slots })` | Compile MASM + storage slots into an `AccountComponent` for contract creation |
 | `compile.txScript({ code, libraries? })` | Compile a transaction script, optionally linking inline libraries |
+| `compile.noteScript({ code, libraries? })` | Compile a note script, optionally linking inline libraries |
 
 Each call creates a **fresh `CodeBuilder`**, so libraries linked in one call never leak into another.
 
@@ -87,6 +88,8 @@ try {
 Pass an array of `{ namespace, code, linking? }` objects. The compiler builds each library and links it automatically:
 
 ```typescript
+import { MidenClient, Linking } from "@miden-sdk/miden-sdk";
+
 try {
     const client = await MidenClient.create();
 
@@ -103,7 +106,7 @@ try {
             {
                 namespace: "external_contract::my_contract",
                 code: myContractCode,
-                // linking: "dynamic" (default) | "static"
+                linking: Linking.Dynamic, // default — may be omitted
             }
         ]
     });
@@ -116,8 +119,63 @@ try {
 
 | Value | Behaviour | When to use |
 |-------|-----------|-------------|
-| `"dynamic"` (default) | Links without copying the library code into the script | FPI — the foreign contract lives on-chain; the prover fetches its code at prove time |
-| `"static"` | Copies library code into the script | Off-chain libraries that must be self-contained |
+| `Linking.Dynamic` (default) | Links without copying the library code into the script | FPI — the foreign contract lives on-chain; the prover fetches its code at prove time |
+| `Linking.Static` | Copies library code into the script | Off-chain libraries that must be self-contained |
+
+`linking` also accepts the raw string literals `"dynamic"` / `"static"` — the `Linking` enum is a typed convenience over the same underlying values.
+
+## Compiling a Note Script
+
+Note scripts run when an account consumes a note. Compile them with `client.compile.noteScript()` — the shape mirrors `txScript()`, and the same library-linking rules apply.
+
+### Without libraries
+
+```typescript
+try {
+    const client = await MidenClient.create();
+
+    const script = await client.compile.noteScript({
+        code: `
+            use miden::protocol::active_note
+            use miden::core::sys
+
+            begin
+                # Runs when the consuming account redeems this note.
+                # Real note scripts inspect note storage, assets, and account
+                # state using procedures from miden::protocol::active_note.
+                exec.sys::truncate_stack
+            end
+        `
+    });
+
+    // script is ready to attach to a NoteRecipient / OutputNote
+} catch (error) {
+    console.error("Note script compilation failed:", error.message);
+}
+```
+
+### With inline libraries
+
+```typescript
+import { MidenClient, Linking } from "@miden-sdk/miden-sdk";
+
+try {
+    const client = await MidenClient.create();
+
+    const script = await client.compile.noteScript({
+        code: noteScriptSource,
+        libraries: [
+            {
+                namespace: "external_contract::my_contract",
+                code: myContractCode,
+                linking: Linking.Dynamic,
+            }
+        ]
+    });
+} catch (error) {
+    console.error("Note script compilation failed:", error.message);
+}
+```
 
 ## Getting a Procedure Hash (for FPI)
 

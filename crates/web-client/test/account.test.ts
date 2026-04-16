@@ -171,10 +171,6 @@ test.describe("get public account with details", () => {
   test("assets and storage with too many assets/entries are retrieved", async ({
     page,
   }) => {
-    test.skip(
-      true,
-      "Temporarily skipped: node returns Internal error for large genesis account"
-    );
     const [assetCount, balances, mapEntriesCount] = await page.evaluate(
       async () => {
         // This account is inserted into the genesis block when test node is started,
@@ -205,8 +201,8 @@ test.describe("get public account with details", () => {
       {}
     );
     expect(assetCount).toBe(1501);
-    expect(balances.every((balance) => balance === "100")).toBe(true);
-    expect(mapEntriesCount).toBe(2000);
+    expect(balances.every((balance) => balance === "75")).toBe(true);
+    expect(mapEntriesCount).toBe(199);
   });
 });
 test.describe("account public commitments", () => {

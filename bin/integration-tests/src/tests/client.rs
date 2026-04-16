@@ -14,7 +14,7 @@ use miden_client::account::{
     StorageSlot,
     StorageSlotName,
 };
-use miden_client::assembly::{CodeBuilder, DefaultSourceManager, Module, ModuleKind, Path};
+use miden_client::assembly::CodeBuilder;
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::builder::ClientBuilder;
@@ -39,7 +39,6 @@ use miden_client::transaction::{
     PaymentNoteDescription,
     ProvenTransaction,
     TransactionInputs,
-    TransactionKernel,
     TransactionProver,
     TransactionProverError,
     TransactionRequestBuilder,
@@ -1392,15 +1391,8 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     client.sync_state().await.unwrap();
 
-    let assembler = TransactionKernel::assembler();
-    let source_manager = Arc::new(DefaultSourceManager::default());
-    let module = Module::parser(ModuleKind::Library)
-        .parse_str(Path::new("custom_library::set_map_item_library"), custom_code, source_manager)
-        .unwrap();
-    let custom_lib = assembler.assemble_library([module]).unwrap();
-
     let tx_script = CodeBuilder::new()
-        .with_statically_linked_library(&custom_lib)?
+        .with_linked_module("custom_library::set_map_item_library", custom_code)?
         .compile_tx_script(
             "
         use custom_library::set_map_item_library

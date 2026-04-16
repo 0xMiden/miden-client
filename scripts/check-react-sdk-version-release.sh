@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Check if react-sdk package.json version has been bumped compared to the base branch
-# Usage: check-react-sdk-version-pr.sh <BASE_SHA>
+# Check if react-sdk package.json version has been bumped compared to the parent commit
+# Usage: check-react-sdk-version-release.sh <RELEASE_SHA>
 #
 # Outputs to $GITHUB_OUTPUT:
 #   - should_publish: true/false
-#   - previous_version: version from base commit (if should_publish=true)
-#   - current_version: version from current commit (if should_publish=true)
+#   - previous_version: version from parent commit (if should_publish=true)
+#   - current_version: version from release commit (if should_publish=true)
 
-BASE_SHA="$1"
+RELEASE_SHA="$1"
 
 write_skip_and_exit() {
   if [ -n "${GITHUB_OUTPUT:-}" ]; then
@@ -20,7 +20,14 @@ write_skip_and_exit() {
   exit 0
 }
 
-if ! git diff --name-only "$BASE_SHA"...HEAD -- packages/react-sdk/package.json | grep -q .; then
+BASE_SHA=$(git rev-parse "${RELEASE_SHA}^" 2>/dev/null || true)
+
+if [ -z "$BASE_SHA" ]; then
+  echo "Unable to determine parent commit for release tag."
+  write_skip_and_exit
+fi
+
+if ! git diff --name-only "$BASE_SHA" "$RELEASE_SHA" -- packages/react-sdk/package.json | grep -q .; then
   echo "No changes to packages/react-sdk/package.json; skipping publish."
   write_skip_and_exit
 fi
@@ -34,7 +41,7 @@ CURRENT_VERSION=$(jq -r '.version' packages/react-sdk/package.json)
 PREVIOUS_VERSION=$(jq -r '.version' /tmp/base_react_package.json)
 
 if [ "$CURRENT_VERSION" = "$PREVIOUS_VERSION" ]; then
-  echo "Version $CURRENT_VERSION matches target branch (next); skipping publish."
+  echo "Version $CURRENT_VERSION matches prior tagged commit; skipping publish."
   write_skip_and_exit
 fi
 
