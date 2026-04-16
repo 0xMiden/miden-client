@@ -67,7 +67,10 @@ impl IdxdbStore {
                         .tx_script
                         .map(|script| TransactionScript::read_from_bytes(&script))
                         .transpose()?
-                        .expect("Transaction script should be included in the row");
+                        .ok_or(StoreError::DatabaseError(
+                            "transaction script missing from store despite script_root being set"
+                                .into(),
+                        ))?;
 
                     Some(tx_script)
                 } else {
