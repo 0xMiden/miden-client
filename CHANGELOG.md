@@ -1,10 +1,12 @@
 # Changelog
 
-## 0.14.3 (2026-04-16)
+## 0.14.4 (TBA)
 
 ### Features
 
 * [FEATURE][web] Added `"custom"` operation to `preview()` so users can dry-run any pre-built `TransactionRequest`, not just send/mint/consume/swap ([#2052](https://github.com/0xMiden/miden-client/pull/2052)).
+
+## 0.14.3 (2026-04-16)
 
 ### Fixes
 
