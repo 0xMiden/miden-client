@@ -429,6 +429,12 @@ where
     pub fn authenticator(&self) -> Option<&Arc<AUTH>> {
         self.authenticator.as_ref()
     }
+
+    /// Returns the shared source manager used to retain MASM source information for assembled
+    /// programs.
+    pub fn source_manager(&self) -> Arc<dyn SourceManagerSync> {
+        self.source_manager.clone()
+    }
 }
 
 impl<AUTH> Client<AUTH> {

@@ -29,12 +29,20 @@ import type {
   AuthSecretKey,
   AccountStorageRequirements,
   TransactionScript,
+  NoteScript,
   AdviceInputs,
   FeltArray,
 } from "./crates/miden_client_web";
 
 // Import the full namespace for the MidenArrayConstructors type
 import type * as WasmExports from "./crates/miden_client_web";
+
+// Source of truth for standalone-wrapper return types. By deriving them from
+// the wasm-bindgen-generated namespace (rather than hand-writing `: Note`),
+// the declarations below cannot drift from the actual runtime behavior — the
+// exact class of bug behind #2042. Any forwarder-style wrapper should follow
+// the same pattern: `ReturnType<WasmModule["Class"]["method"]>`.
+type WasmModule = typeof import("./crates/miden_client_web");
 
 // ════════════════════════════════════════════════════════════════
 // Callback types for external keystore support
@@ -104,6 +112,18 @@ export declare const StorageMode: {
 
 /** Union of valid StorageMode string values. */
 export type StorageMode = "public" | "private" | "network";
+
+/**
+ * Library linking mode for script compilation.
+ * Use `Linking.Dynamic` or `Linking.Static` instead of raw strings.
+ */
+export declare const Linking: {
+  readonly Dynamic: "dynamic";
+  readonly Static: "static";
+};
+
+/** Union of valid Linking string values. */
+export type Linking = "dynamic" | "static";
 
 /**
  * Union of all values in the AccountType const.
@@ -777,10 +797,10 @@ export interface CompileTxScriptLibrary {
   /** MASM source code for the library. */
   code: string;
   /**
-   * `"dynamic"` (default) — procedures are linked via DYNCALL at runtime.
-   * `"static"` — procedures are inlined at compile time.
+   * `Linking.Dynamic` (default) — procedures are linked via DYNCALL at runtime.
+   * `Linking.Static` — procedures are inlined at compile time.
    */
-  linking?: "dynamic" | "static";
+  linking?: Linking;
 }
 
 export interface CompileTxScriptOptions {
@@ -790,7 +810,33 @@ export interface CompileTxScriptOptions {
   libraries?: CompileTxScriptLibrary[];
 }
 
-export interface CompilerResource {
+export interface CompileNoteScriptOptions {
+  /** MASM source code for the note script. */
+  code: string;
+  /** Component libraries to link. */
+  libraries?: CompileTxScriptLibrary[];
+}
+
+export declare class CompilerResource {
+  /**
+   * Create a standalone `CompilerResource` over a WASM `WebClient` proxy.
+   *
+   * Normally accessed as `client.compile` on a `MidenClient`; construct
+   * directly only when you need the compiler surface without the full
+   * `MidenClient` wrapper (e.g. inside a framework-specific hook).
+   *
+   * @param inner - The WASM `WebClient` (e.g. the `WasmWebClient` proxy).
+   * @param getWasm - Async accessor for the WASM module, used to reach
+   *   `AccountComponent.compile` at runtime. `getWasmOrThrow` satisfies this.
+   * @param client - Optional wrapper with `assertNotTerminated()`; used
+   *   internally by `MidenClient` and may be omitted by external callers.
+   */
+  constructor(
+    inner: WasmExports.WebClient,
+    getWasm: () => Promise<typeof WasmExports>,
+    client?: { assertNotTerminated(): void } | null
+  );
+
   /**
    * Compile MASM source into an AccountComponent.
    *
@@ -803,6 +849,12 @@ export interface CompilerResource {
    * @param options - Script source code and optional libraries to link.
    */
   txScript(options: CompileTxScriptOptions): Promise<TransactionScript>;
+  /**
+   * Compile MASM source into a NoteScript.
+   *
+   * @param options - Script source code and optional libraries to link.
+   */
+  noteScript(options: CompileNoteScriptOptions): Promise<NoteScript>;
 }
 
 export interface TagsResource {
@@ -915,13 +967,19 @@ export declare class MidenClient {
 // ════════════════════════════════════════════════════════════════
 
 /** Creates a P2ID (Pay-to-ID) note. */
-export declare function createP2IDNote(options: NoteOptions): OutputNote;
+export declare function createP2IDNote(
+  options: NoteOptions
+): ReturnType<WasmModule["Note"]["createP2IDNote"]>;
 
 /** Creates a P2IDE (Pay-to-ID with Expiration) note. */
-export declare function createP2IDENote(options: P2IDEOptions): OutputNote;
+export declare function createP2IDENote(
+  options: P2IDEOptions
+): ReturnType<WasmModule["Note"]["createP2IDENote"]>;
 
 /** Builds a swap tag for note matching. Returns a NoteTag (use `.asU32()` for the numeric value). */
-export declare function buildSwapTag(options: BuildSwapTagOptions): NoteTag;
+export declare function buildSwapTag(
+  options: BuildSwapTagOptions
+): ReturnType<WasmModule["WebClient"]["buildSwapTag"]>;
 
 /** Exports the entire contents of an IndexedDB store as a JSON string. */
 export declare function exportStore(storeName: string): Promise<string>;

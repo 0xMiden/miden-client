@@ -952,6 +952,51 @@ function CustomTransactionButton({ accountId }: { accountId: string }) {
 }
 ```
 
+#### `useCompile()`
+
+Compile MASM source into an `AccountComponent`, `TransactionScript`, or
+`NoteScript`. Mirrors `MidenClient.compile` from `@miden-sdk/miden-sdk`, so the
+shape is identical whether you're in a React app or calling the SDK directly.
+
+Returns three async methods, one per output type:
+
+| Method | Input | Output |
+|---|---|---|
+| `component(options)` | `{ code, slots?, supportAllTypes? }` | `AccountComponent` |
+| `txScript(options)`  | `{ code, libraries? }` | `TransactionScript` |
+| `noteScript(options)` | `{ code, libraries? }` | `NoteScript` |
+
+Each `libraries` entry takes `{ namespace, code, linking? }`. `linking` accepts
+the `Linking` enum (`Linking.Dynamic`, `Linking.Static`) or the raw strings
+`"dynamic"` / `"static"`. Dynamic is the default and matches the FPI pattern
+used in the tutorials.
+
+```tsx
+import { useCompile } from '@miden-sdk/react';
+import { Linking } from '@miden-sdk/miden-sdk';
+
+function ScriptBuilder({ libSource, noteSource }: { libSource: string; noteSource: string }) {
+  const { noteScript, isReady } = useCompile();
+
+  const handleBuild = async () => {
+    const script = await noteScript({
+      code: noteSource,
+      libraries: [
+        { namespace: 'my_lib::module', code: libSource, linking: Linking.Dynamic },
+      ],
+    });
+    // pass `script` to useTransaction, useExecuteProgram, or your own flow
+  };
+
+  return <button onClick={handleBuild} disabled={!isReady}>Compile</button>;
+}
+```
+
+Compile is local and synchronous in practice — the hook doesn't expose
+`isLoading` / `stage` / `error` state. Errors from the underlying compiler
+(bad MASM, unresolved imports) throw from the returned promise; handle them
+with regular `try`/`catch`.
+
 #### `useExecuteProgram()`
 
 Execute a program (view call) against an account and read the resulting stack

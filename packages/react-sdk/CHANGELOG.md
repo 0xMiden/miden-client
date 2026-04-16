@@ -1,6 +1,18 @@
 # Changelog
 
-## 0.14.0 (TBD)
+## 0.14.2 (2026-04-15)
+
+### Features
+
+* [FEATURE][web] Added `useCompile()` hook for compiling MASM source into `AccountComponent`, `TransactionScript`, or `NoteScript`. Mirrors the `MidenClient.compile` resource surface (`component`, `txScript`, `noteScript`) with matching option types and the new `Linking` enum.
+
+## 0.14.1 (2026-04-14)
+
+### Fixes
+
+* Bumped `@miden-sdk/miden-sdk` to 0.14.1 to pick up the `returnNote` fix for `transactions.send()` / `useSend` ([#2011](https://github.com/0xMiden/miden-client/issues/2011)).
+
+## 0.14.0 (2026-04-07)
 
 ### Breaking Changes
 

@@ -393,6 +393,7 @@ account.bech32id();  // "miden1qy35..."
 | `useConsume()` | `TransactionResult` | Claim notes |
 | `useSwap()` | `TransactionResult` | Atomic swap |
 | `useTransaction()` | `TransactionResult` | Custom transaction |
+| `useCompile()` | `{ component, txScript, noteScript }` | Compile MASM into `AccountComponent` / `TransactionScript` / `NoteScript` |
 
 ## Type Imports
 

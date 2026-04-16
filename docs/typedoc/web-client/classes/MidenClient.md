@@ -26,7 +26,7 @@
 
 ### compile
 
-> `readonly` **compile**: [`CompilerResource`](../interfaces/CompilerResource.md)
+> `readonly` **compile**: [`CompilerResource`](CompilerResource.md)
 
 ***
 

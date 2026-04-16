@@ -81,7 +81,7 @@ jobs:
         if: steps.check_react_version.outputs.should_publish == 'true'
         run: |
           cd packages/react-sdk
-          yarn install --frozen-lockfile
+          yarn install
           yarn build
 
       - name: Publish react-sdk to npm
