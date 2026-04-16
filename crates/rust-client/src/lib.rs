@@ -373,7 +373,8 @@ pub struct Client<AUTH> {
     note_transport_api: Option<Arc<dyn NoteTransportClient>>,
     /// Cached in-memory [`PartialMmr`] representing the client's current view of the chain's MMR.
     /// Lazily built from the store on first access and kept in sync across sync and prune
-    /// operations. If `None`, the next operation that needs the MMR will rebuild it from the store.
+    /// operations. If `None`, the next operation that needs the MMR will rebuild it from the
+    /// store.
     partial_mmr: Option<PartialMmr>,
 }
 
