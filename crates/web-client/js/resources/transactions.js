@@ -201,6 +201,11 @@ export class TransactionsResource {
         ({ accountId, request } = await this.#buildSwapRequest(opts, wasm));
         break;
       }
+      case "custom": {
+        accountId = resolveAccountRef(opts.account, wasm);
+        request = opts.request;
+        break;
+      }
       default:
         throw new Error(`Unknown preview operation: ${opts.operation}`);
     }

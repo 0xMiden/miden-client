@@ -436,11 +436,18 @@ export interface PreviewSwapOptions {
   paybackType?: NoteVisibility;
 }
 
+export interface PreviewCustomOptions {
+  operation: "custom";
+  account: AccountRef;
+  request: TransactionRequest;
+}
+
 export type PreviewOptions =
   | PreviewSendOptions
   | PreviewMintOptions
   | PreviewConsumeOptions
-  | PreviewSwapOptions;
+  | PreviewSwapOptions
+  | PreviewCustomOptions;
 
 /** Status values reported during waitFor polling. */
 export type WaitStatus = "pending" | "submitted" | "committed";
