@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.14.2 (TBD)
+## 0.14.3 (2026-04-16)
+
+### Fixes
+
+* [FIX] Detect notes created and consumed on the same block that got erased from the node and mark them as consumed ([#2008](https://github.com/0xMiden/miden-client/pull/2008)).
+
+## 0.14.2 (2026-04-15)
 
 ### Features
 

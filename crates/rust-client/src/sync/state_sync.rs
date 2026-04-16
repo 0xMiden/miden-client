@@ -400,6 +400,7 @@ impl StateSync {
                     initial_state_commitment: r.transaction_header.initial_state_commitment(),
                     nullifiers,
                     output_notes: r.output_notes,
+                    erased_output_note_ids: r.erased_output_note_ids,
                 }
             })
             .collect();
@@ -499,16 +500,37 @@ impl StateSync {
             &transactions,
         );
 
-        // Transition tracked output notes to Committed using inclusion proofs from the
-        // transaction sync response. This covers output notes regardless of whether their
-        // tags were tracked in the note sync.
+        // Process each transaction
         for transaction in &transactions {
+            // Transition tracked output notes to Committed using inclusion proofs from the
+            // transaction sync response. This covers output notes regardless of whether their
+            // tags were tracked in the note sync.
             state_sync_update
                 .note_updates
                 .apply_output_note_inclusion_proofs(&transaction.output_notes)?;
+
+            // Detect output notes erased by same-batch note erasure.
+            Self::mark_erased_notes_as_consumed(state_sync_update, transaction);
         }
 
         Ok(())
+    }
+
+    /// Marks output notes that were erased by same-batch note erasure as consumed.
+    ///
+    /// When a note is created and consumed in the same batch, note erasure removes it from
+    /// the block body. The node reports these as erased output notes in the transaction
+    /// record (note ID only, no inclusion proof). We mark them as consumed.
+    fn mark_erased_notes_as_consumed(
+        state_sync_update: &mut StateSyncUpdate,
+        transaction: &TransactionInclusion,
+    ) {
+        for note_id in &transaction.erased_output_note_ids {
+            // Best-effort: ignore errors for notes not tracked by this client.
+            let _ = state_sync_update
+                .note_updates
+                .mark_erased_note_as_consumed(*note_id, transaction.block_num);
+        }
     }
 
     /// Compares the state of tracked accounts with the updates received from the node. The method
@@ -1326,6 +1348,7 @@ mod tests {
                     fee,
                 ),
                 output_notes: vec![],
+                erased_output_note_ids: vec![],
             }
         }
 
@@ -1376,6 +1399,7 @@ mod tests {
                     fee,
                 ),
                 output_notes: vec![],
+                erased_output_note_ids: vec![],
             };
 
             let result = super::super::compute_ordered_nullifiers(&[tx_a2, tx_b1, tx_a3, tx_a1]);
@@ -1747,5 +1771,63 @@ mod tests {
                 "block {bn} with notes should be tracked in partial MMR"
             );
         }
+    }
+
+    /// Tests that erased notes are marked as consumed when a committed transaction
+    /// reports output notes that were erased by same-batch note erasure.
+    ///
+    /// This simulates same-batch note erasure: the transaction was committed, its header
+    /// says it produced a note, but the note was erased and doesn't exist on the node.
+    #[tokio::test]
+    async fn erased_notes_are_marked_as_consumed() {
+        use miden_protocol::block::BlockNumber;
+        use miden_protocol::note::{
+            NoteAssets,
+            NoteMetadata,
+            NoteRecipient,
+            NoteStorage,
+            NoteType,
+        };
+        use miden_protocol::testing::account_id::ACCOUNT_ID_SENDER;
+
+        use crate::store::{OutputNoteRecord, OutputNoteState};
+
+        // Create a public output note. It won't be in the mock chain (simulating erasure).
+        let sender_id: AccountId = ACCOUNT_ID_SENDER.try_into().unwrap();
+        let metadata = NoteMetadata::new(sender_id, NoteType::Public);
+        let script = CodeBuilder::new().compile_note_script("begin nop end").unwrap();
+        let recipient = NoteRecipient::new(
+            Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
+            script,
+            NoteStorage::new(vec![]).unwrap(),
+        );
+        let output_note = OutputNoteRecord::new(
+            recipient.digest(),
+            NoteAssets::new(vec![]).unwrap(),
+            metadata,
+            OutputNoteState::ExpectedFull { recipient },
+            BlockNumber::from(1u32),
+        );
+        let note_id = output_note.id();
+
+        // Build a NoteUpdateTracker with the output note.
+        let mut note_updates = NoteUpdateTracker::new(vec![], vec![output_note]);
+
+        // Mark the note as erased (created and consumed in the same batch).
+        let block_num = BlockNumber::from(3u32);
+        note_updates
+            .mark_erased_note_as_consumed(note_id, block_num)
+            .expect("marking erased note should succeed");
+
+        let updated = note_updates
+            .updated_output_notes()
+            .find(|n| n.id() == note_id)
+            .expect("output note should be in the update");
+
+        assert!(
+            updated.inner().is_consumed(),
+            "output note should be consumed after erasure detection, but state is: {}",
+            updated.inner().state()
+        );
     }
 }
