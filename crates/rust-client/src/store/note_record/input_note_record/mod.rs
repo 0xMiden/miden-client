@@ -135,10 +135,10 @@ impl InputNoteRecord {
 
     /// Returns the account ID that consumed this note, if available.
     ///
-    /// This is available for notes in processing or consumed-local states, where the
-    /// submission data contains the consumer account. Returns `None` for externally
-    /// consumed notes, invalid notes, or notes that haven't been submitted for
-    /// consumption.
+    /// This is available for notes in processing, consumed-local, or consumed-external
+    /// states. For externally consumed notes, the account is only known when it is tracked
+    /// by this client. Returns `None` for notes that haven't been submitted for consumption,
+    /// invalid notes, or externally consumed notes where the consuming account is unknown.
     pub fn consumer_account(&self) -> Option<AccountId> {
         match &self.state {
             InputNoteState::ProcessingAuthenticated(s) => Some(s.submission_data.consumer_account),
@@ -151,6 +151,7 @@ impl InputNoteRecord {
             InputNoteState::ConsumedUnauthenticatedLocal(s) => {
                 Some(s.submission_data.consumer_account)
             },
+            InputNoteState::ConsumedExternal(s) => s.consumer_account,
             _ => None,
         }
     }
@@ -233,8 +234,11 @@ impl InputNoteRecord {
         }
     }
 
-    /// Modifies the state of the note record to reflect that the note has been consumed by an
-    /// external transaction. Returns `true` if the state was changed.
+    /// Modifies the state of the note record to reflect that the note has been consumed by a
+    /// transaction not submitted by this client. Returns `true` if the state was changed.
+    ///
+    /// `consumer_account` is `Some` when the consuming account is tracked by this client
+    /// (derived from `sync_transactions` data). It is `None` for untracked accounts.
     ///
     /// Errors:
     /// - If the nullifier doesn't match the expected value.
@@ -242,6 +246,7 @@ impl InputNoteRecord {
         &mut self,
         nullifier: Nullifier,
         nullifier_block_height: BlockNumber,
+        consumer_account: Option<AccountId>,
     ) -> Result<bool, NoteRecordError> {
         if self.nullifier() != nullifier {
             return Err(NoteRecordError::StateTransitionError(
@@ -249,7 +254,7 @@ impl InputNoteRecord {
             ));
         }
 
-        let new_state = self.state.consumed_externally(nullifier_block_height)?;
+        let new_state = self.state.consumed_externally(nullifier_block_height, consumer_account)?;
         if let Some(new_state) = new_state {
             self.state = new_state;
             Ok(true)

@@ -340,10 +340,8 @@ impl ConsumeNotesCmd {
         }
 
         if input_notes.is_empty() {
-            return Err(CliError::Transaction(
-                "No input notes were provided and the store does not contain any notes consumable by {account_id}".into(),
-                "Input notes check failed".to_string(),
-            ));
+            println!("Did not find any consumable notes for {account_id}.");
+            return Ok(());
         }
 
         let transaction_request = TransactionRequestBuilder::new()

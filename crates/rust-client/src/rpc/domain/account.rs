@@ -578,6 +578,11 @@ impl AccountProof {
         self.state_headers.as_ref().map(|d| &d.storage_details)
     }
 
+    /// Returns the vault details, if available (public accounts only).
+    pub fn vault_details(&self) -> Option<&AccountVaultDetails> {
+        self.state_headers.as_ref().map(|d| &d.vault_details)
+    }
+
     /// Returns the storage map details for a specific slot, if available.
     pub fn find_map_details(
         &self,

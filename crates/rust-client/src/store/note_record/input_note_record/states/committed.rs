@@ -1,6 +1,7 @@
 use alloc::string::ToString;
 
 use miden_protocol::Word;
+use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::{NoteId, NoteInclusionProof, NoteMetadata};
 use miden_protocol::transaction::TransactionId;
@@ -43,10 +44,12 @@ impl NoteStateHandler for CommittedNoteState {
     fn consumed_externally(
         &self,
         nullifier_block_height: BlockNumber,
+        consumer_account: Option<AccountId>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Ok(Some(
             ConsumedExternalNoteState {
                 nullifier_block_height,
+                consumer_account,
                 consumed_tx_order: None,
             }
             .into(),

@@ -127,7 +127,7 @@ impl CodeBuilder {
         let assembler: Assembler = self.builder.clone().into();
         let native_library_build = assembler.assemble_library([module]);
         match native_library_build {
-            Ok(native_library) => Ok(native_library.into()),
+            Ok(native_library) => Ok(Arc::unwrap_or_clone(native_library).into()),
             Err(error_report) => {
                 let err_msg =
                     format_assembler_error(&error_report, "error while assembling library");
@@ -151,7 +151,7 @@ impl CodeBuilder {
             ))
         })?;
 
-        let native_code: NativeAccountComponentCode = native_library.into();
+        let native_code: NativeAccountComponentCode = Arc::unwrap_or_clone(native_library).into();
         Ok(native_code.into())
     }
 }

@@ -139,6 +139,9 @@ jobs:
       - name: Build node-builder
         if: steps.cache-node-builder.outputs.cache-hit != 'true'
         run: cargo build --release --package node-builder --locked
+      - name: Check binary existance
+        run: |
+          file -E target/release/testing-node-builder
 
   build-note-transport:
     name: Build note-transport
@@ -187,6 +190,9 @@ jobs:
       - name: Build remote-prover
         if: steps.cache-remote-prover.outputs.cache-hit != 'true'
         run: cargo build --release --package testing-remote-prover --locked
+      - name: Check binary existance
+        run: |
+          file -E target/release/testing-remote-prover
 
   integration-tests:
     name: Integration tests
@@ -310,8 +316,8 @@ jobs:
     needs: [build-web-client-dist-folder, build-node-builder]
     strategy:
       matrix:
-        shard_index: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-        shard_total: [10]
+        shard_index: [1, 2, 3, 4, 5, 6, 7]
+        shard_total: [7]
     steps:
       - uses: actions/checkout@v6
       - name: Fetch dist folder
@@ -377,7 +383,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: target/release/testing-node-builder
-          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
       - name: Restore remote-prover binary
         uses: actions/cache/restore@v4
         with:

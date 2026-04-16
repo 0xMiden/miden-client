@@ -159,6 +159,7 @@ impl ClientDataStore {
                 storage_requirements,
                 AccountStateAt::ChainTip,
                 Some(known_code),
+                None,
             )
             .await
             .map_err(|err| {

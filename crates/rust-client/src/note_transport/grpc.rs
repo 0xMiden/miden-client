@@ -1,3 +1,8 @@
+//! gRPC-based note transport client.
+//!
+//! On native targets, the connection is established lazily on the first request using a
+//! TLS-enabled `tonic` channel. On WASM, a `tonic_web_wasm_client` is created on demand.
+
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -32,56 +37,90 @@ type Service = Channel;
 #[cfg(target_arch = "wasm32")]
 type Service = tonic_web_wasm_client::Client;
 
-/// gRPC client
+/// Establishes a connection to the note transport service, returning the gRPC clients.
+#[cfg(not(target_arch = "wasm32"))]
+async fn connect_channel(
+    endpoint: &str,
+    timeout_ms: u64,
+) -> Result<(MidenNoteTransportClient<Service>, HealthClient<Service>), NoteTransportError> {
+    let endpoint = tonic::transport::Endpoint::try_from(String::from(endpoint))
+        .map_err(|e| NoteTransportError::Connection(Box::new(e)))?
+        .timeout(Duration::from_millis(timeout_ms));
+    let tls = ClientTlsConfig::new().with_native_roots();
+    let channel = endpoint
+        .tls_config(tls)
+        .map_err(|e| NoteTransportError::Connection(Box::new(e)))?
+        .connect()
+        .await
+        .map_err(|e| NoteTransportError::Connection(Box::new(e)))?;
+    Ok((MidenNoteTransportClient::new(channel.clone()), HealthClient::new(channel)))
+}
+
+/// Establishes a connection to the note transport service, returning the gRPC clients.
+///
+/// Note: `timeout_ms` is currently ignored on WASM as `tonic_web_wasm_client::Client` does not
+/// support timeout configuration.
+// TODO: refactor `connect_channel` so that WASM doesn't accept a timeout parameter.
+#[cfg(target_arch = "wasm32")]
+#[allow(clippy::unused_async)]
+async fn connect_channel(
+    endpoint: &str,
+    _timeout_ms: u64,
+) -> Result<(MidenNoteTransportClient<Service>, HealthClient<Service>), NoteTransportError> {
+    let wasm_client = tonic_web_wasm_client::Client::new(String::from(endpoint));
+    Ok((
+        MidenNoteTransportClient::new(wasm_client.clone()),
+        HealthClient::new(wasm_client),
+    ))
+}
+
+/// Inner state holding the connected gRPC clients.
+#[derive(Clone)]
+struct ConnectedClient {
+    client: MidenNoteTransportClient<Service>,
+    health_client: HealthClient<Service>,
+}
+
+/// gRPC client for the note transport network.
+///
+/// The connection is established lazily on first use.
 pub struct GrpcNoteTransportClient {
-    client: RwLock<MidenNoteTransportClient<Service>>,
-    health_client: RwLock<HealthClient<Service>>,
+    inner: RwLock<Option<ConnectedClient>>,
+    endpoint: String,
+    timeout_ms: u64,
 }
 
 impl GrpcNoteTransportClient {
-    /// gRPC client constructor
-    #[cfg(not(target_arch = "wasm32"))]
-    pub async fn connect(endpoint: String, timeout_ms: u64) -> Result<Self, NoteTransportError> {
-        let endpoint = tonic::transport::Endpoint::try_from(endpoint)
-            .map_err(|e| NoteTransportError::Connection(Box::new(e)))?
-            .timeout(Duration::from_millis(timeout_ms));
-        let tls = ClientTlsConfig::new().with_native_roots();
-        let channel = endpoint
-            .tls_config(tls)
-            .map_err(|e| NoteTransportError::Connection(Box::new(e)))?
-            .connect()
-            .await
-            .map_err(|e| NoteTransportError::Connection(Box::new(e)))?;
-        let health_client = HealthClient::new(channel.clone());
-        let client = MidenNoteTransportClient::new(channel);
-
-        Ok(Self {
-            client: RwLock::new(client),
-            health_client: RwLock::new(health_client),
-        })
-    }
-
-    /// gRPC client (WASM) constructor
-    #[cfg(target_arch = "wasm32")]
-    pub fn new(endpoint: String) -> Self {
-        let wasm_client = tonic_web_wasm_client::Client::new(endpoint);
-        let health_client = HealthClient::new(wasm_client.clone());
-        let client = MidenNoteTransportClient::new(wasm_client);
-
+    /// Creates a new [`GrpcNoteTransportClient`] without establishing a connection.
+    /// The connection will be established lazily on the first request.
+    pub fn new(endpoint: String, timeout_ms: u64) -> Self {
         Self {
-            client: RwLock::new(client),
-            health_client: RwLock::new(health_client),
+            inner: RwLock::new(None),
+            endpoint,
+            timeout_ms,
         }
     }
 
-    /// Get a lock to the main client
-    fn api(&self) -> MidenNoteTransportClient<Service> {
-        self.client.read().clone()
+    /// Ensures the client is connected and returns the connected state.
+    async fn ensure_connected(&self) -> Result<ConnectedClient, NoteTransportError> {
+        if let Some(connected) = self.inner.read().as_ref() {
+            return Ok(connected.clone());
+        }
+
+        let (client, health_client) = connect_channel(&self.endpoint, self.timeout_ms).await?;
+        let connected = ConnectedClient { client, health_client };
+        *self.inner.write() = Some(connected.clone());
+        Ok(connected)
     }
 
-    /// Get a lock to the health client
-    fn health_api(&self) -> HealthClient<Service> {
-        self.health_client.read().clone()
+    /// Get a clone of the main client, connecting if needed.
+    async fn api(&self) -> Result<MidenNoteTransportClient<Service>, NoteTransportError> {
+        Ok(self.ensure_connected().await?.client)
+    }
+
+    /// Get a clone of the health client, connecting if needed.
+    async fn health_api(&self) -> Result<HealthClient<Service>, NoteTransportError> {
+        Ok(self.ensure_connected().await?.health_client)
     }
 
     /// Pushes a note to the note transport network.
@@ -97,6 +136,7 @@ impl GrpcNoteTransportClient {
         };
 
         self.api()
+            .await?
             .send_note(Request::new(request))
             .await
             .map_err(|e| NoteTransportError::Network(format!("Send note failed: {e:?}")))?;
@@ -117,6 +157,7 @@ impl GrpcNoteTransportClient {
 
         let response = self
             .api()
+            .await?
             .fetch_notes(Request::new(request))
             .await
             .map_err(|e| NoteTransportError::Network(format!("Fetch notes failed: {e:?}")))?;
@@ -151,6 +192,7 @@ impl GrpcNoteTransportClient {
 
         let response = self
             .api()
+            .await?
             .stream_notes(request)
             .await
             .map_err(|e| NoteTransportError::Network(format!("Stream notes failed: {e:?}")))?;
@@ -168,6 +210,7 @@ impl GrpcNoteTransportClient {
 
         let response = self
             .health_api()
+            .await?
             .check(request)
             .await
             .map_err(|e| NoteTransportError::Network(format!("Health check failed: {e}")))?

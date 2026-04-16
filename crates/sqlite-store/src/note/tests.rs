@@ -33,8 +33,12 @@ use crate::tests::create_test_store;
 // HELPERS
 // ================================================================================================
 
-/// Helper to create a consumed-external input note (no consumer account).
-fn create_consumed_external_input_note(index: u32, block_height: u32) -> InputNoteRecord {
+/// Helper to create a consumed-external input note with an optional consumer account.
+fn create_consumed_external_input_note(
+    index: u32,
+    block_height: u32,
+    consumer_account: Option<AccountId>,
+) -> InputNoteRecord {
     let serial_number: Word = [Felt::new(u64::from(index) + 2000), ZERO, ZERO, ZERO].into();
     let assets = NoteAssets::new(vec![]).unwrap();
     let recipient = NoteRecipient::new(
@@ -46,6 +50,7 @@ fn create_consumed_external_input_note(index: u32, block_height: u32) -> InputNo
 
     let state = ConsumedExternalNoteState {
         nullifier_block_height: BlockNumber::from(block_height),
+        consumer_account,
         consumed_tx_order: None,
     };
 
@@ -288,6 +293,44 @@ async fn input_note_reader_filters_by_consumer_and_block_range() {
     }
 }
 
+#[tokio::test]
+async fn input_note_reader_finds_externally_consumed_notes() {
+    let store = create_test_store().await;
+    let consumer = AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
+
+    let mut tracked_note = create_consumed_external_input_note(0, 1, Some(consumer));
+    tracked_note.set_consumed_tx_order(Some(0));
+
+    let mut untracked_note = create_consumed_external_input_note(1, 2, None);
+    untracked_note.set_consumed_tx_order(Some(0));
+
+    store
+        .upsert_input_notes(&[tracked_note.clone(), untracked_note.clone()])
+        .await
+        .unwrap();
+
+    // Sanity: both notes are in the store as Consumed.
+    let in_store = store.get_input_notes(NoteFilter::Consumed).await.unwrap();
+    assert_eq!(in_store.len(), 2);
+
+    // The reader keyed by the consumer should find the tracked note but not the untracked one.
+    let store: Arc<dyn Store> = Arc::new(store);
+    let mut reader = InputNoteReader::new(store, consumer);
+
+    let mut collected = Vec::new();
+    while let Some(n) = reader.next().await.unwrap() {
+        collected.push(n);
+    }
+
+    assert_eq!(
+        collected.len(),
+        1,
+        "InputNoteReader should return externally-consumed notes when the consumer account is tracked",
+    );
+    assert_eq!(collected[0].id(), tracked_note.id());
+    assert_eq!(collected[0].consumer_account(), Some(consumer));
+}
+
 // ORDERING TESTS (INPUT NOTES)
 // ================================================================================================
 
@@ -296,9 +339,9 @@ async fn consumed_input_notes_ordered_by_block_height_then_tx_order() {
     let store = create_test_store().await;
 
     // Create consumed notes at different block heights with tx_order set.
-    let mut note_block3 = create_consumed_external_input_note(0, 3);
-    let mut note_block1 = create_consumed_external_input_note(1, 1);
-    let mut note_block2 = create_consumed_external_input_note(2, 2);
+    let mut note_block3 = create_consumed_external_input_note(0, 3, None);
+    let mut note_block1 = create_consumed_external_input_note(1, 1, None);
+    let mut note_block2 = create_consumed_external_input_note(2, 2, None);
     note_block3.set_consumed_tx_order(Some(0));
     note_block1.set_consumed_tx_order(Some(1));
     note_block2.set_consumed_tx_order(Some(0));
@@ -322,9 +365,9 @@ async fn consumed_input_notes_same_block_ordered_by_tx_order() {
     let store = create_test_store().await;
 
     // All notes consumed at the same block height, different tx_order.
-    let mut note_tx2 = create_consumed_external_input_note(10, 5);
-    let mut note_tx0 = create_consumed_external_input_note(11, 5);
-    let mut note_tx1 = create_consumed_external_input_note(12, 5);
+    let mut note_tx2 = create_consumed_external_input_note(10, 5, None);
+    let mut note_tx0 = create_consumed_external_input_note(11, 5, None);
+    let mut note_tx1 = create_consumed_external_input_note(12, 5, None);
     note_tx2.set_consumed_tx_order(Some(2));
     note_tx0.set_consumed_tx_order(Some(0));
     note_tx1.set_consumed_tx_order(Some(1));
@@ -346,8 +389,8 @@ async fn consumed_input_notes_null_tx_order_sort_last_within_block() {
     let store = create_test_store().await;
 
     // Two notes at the same block: one with tx_order, one without (external consumption).
-    let mut note_with_order = create_consumed_external_input_note(20, 5);
-    let note_without_order = create_consumed_external_input_note(21, 5);
+    let mut note_with_order = create_consumed_external_input_note(20, 5, None);
+    let note_without_order = create_consumed_external_input_note(21, 5, None);
     note_with_order.set_consumed_tx_order(Some(0));
 
     store

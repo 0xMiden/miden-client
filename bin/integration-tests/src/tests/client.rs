@@ -45,7 +45,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{ClientError, Felt, Word};
+use miden_client::{ClientError, EMPTY_WORD, Felt, Word};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use tracing::info;
 
@@ -1317,7 +1317,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .test_rpc_api()
         .get_block_header_by_number(Some(first_block_num), false)
         .await?;
-    let block = client.test_rpc_api().get_block_by_number(first_block_num).await.unwrap();
+    let block = client.test_rpc_api().get_block_by_number(first_block_num, false).await.unwrap();
 
     assert_eq!(&block_header, block.header());
 
@@ -1329,6 +1329,30 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let tx_id =
         consume_notes(&mut client, first_basic_account.id(), std::slice::from_ref(&note)).await;
     wait_for_tx(&mut client, tx_id).await?;
+
+    // Test get_account_proof retrieval (account must be deployed on-chain first)
+    let (proof_block_num, account_proof) = client
+        .test_rpc_api()
+        .get_account_proof(
+            first_basic_account.id(),
+            AccountStorageRequirements::default(),
+            AccountStateAt::ChainTip,
+            None,
+            None,
+        )
+        .await?;
+    assert!(proof_block_num >= first_block_num);
+    assert_eq!(account_proof.account_id(), first_basic_account.id());
+    assert!(account_proof.account_header().is_some());
+
+    // The witness's merkle path should resolve to the account root committed
+    // in the block header for `proof_block_num`.
+    let (proof_block_header, _) = client
+        .test_rpc_api()
+        .get_block_header_by_number(Some(proof_block_num), false)
+        .await?;
+    let computed_account_root = account_proof.account_witness().clone().into_proof().compute_root();
+    assert_eq!(computed_account_root, proof_block_header.account_root());
 
     // Define the account code for the custom library
     let custom_code = r#"
@@ -1608,7 +1632,7 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     // Request all entries (empty keys)
     let requirements_all = AccountStorageRequirements::new([(map_slot_name.clone(), [].iter())]);
     let (_, proof_all) = rpc
-        .get_account_proof(account_id, requirements_all, AccountStateAt::ChainTip, None)
+        .get_account_proof(account_id, requirements_all, AccountStateAt::ChainTip, None, None)
         .await?;
     let map_all = proof_all
         .find_map_details(&map_slot_name)
@@ -1623,7 +1647,7 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     // Request one specific key
     let requirements_one = AccountStorageRequirements::new([(map_slot_name.clone(), [&map_key_1])]);
     let (_, proof_one) = rpc
-        .get_account_proof(account_id, requirements_one, AccountStateAt::ChainTip, None)
+        .get_account_proof(account_id, requirements_one, AccountStateAt::ChainTip, None, None)
         .await?;
     let map_one = proof_one
         .find_map_details(&map_slot_name)
@@ -1639,6 +1663,96 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
         },
         other => anyhow::bail!("expected EntriesWithProofs, got {:?}", other),
     }
+
+    Ok(())
+}
+
+/// Tests that `get_account_proof` returns vault details based on the `known_vault_commitment`
+/// parameter.
+///
+/// Creates a public faucet and wallet, mints tokens so the wallet holds assets,
+/// then calls `get_account_proof` three times with different vault commitment values:
+/// - `Some(EMPTY_WORD)`: always fetches vault data (commitment never matches).
+/// - `Some(actual_root)`: commitment matches the node's state, so assets are empty.
+/// - `None`: vault data not requested, so assets are empty.
+pub async fn test_get_account_proof_returns_vault_details(
+    client_config: ClientConfig,
+) -> Result<()> {
+    let (mut client, keystore) = client_config.into_client().await?;
+    wait_for_node(&mut client).await;
+
+    let (wallet, faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Public,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    // Mint tokens so the wallet has assets in its vault
+    let tx_id = mint_and_consume(&mut client, wallet.id(), faucet.id(), NoteType::Public).await;
+    wait_for_tx(&mut client, tx_id).await?;
+
+    let rpc = client.test_rpc_api();
+
+    // Query 1: Some(EMPTY_WORD) — always fetches vault data since EMPTY_WORD never matches
+    let (_, proof) = rpc
+        .get_account_proof(
+            wallet.id(),
+            AccountStorageRequirements::default(),
+            AccountStateAt::ChainTip,
+            None,
+            Some(EMPTY_WORD),
+        )
+        .await?;
+
+    let (_, details) = proof.into_parts();
+    let details = details.context("expected account details for public account")?;
+    let vault_root = details.header.vault_root();
+
+    assert_eq!(
+        details.vault_details.assets.len(),
+        1,
+        "expected exactly 1 asset (the minted fungible token)"
+    );
+
+    // Query 2: Some(actual_root) — commitment matches, node returns empty assets
+    let (_, proof) = rpc
+        .get_account_proof(
+            wallet.id(),
+            AccountStorageRequirements::default(),
+            AccountStateAt::ChainTip,
+            None,
+            Some(vault_root),
+        )
+        .await?;
+
+    let (_, details) = proof.into_parts();
+    let details = details.context("expected account details for public account")?;
+
+    assert!(
+        details.vault_details.assets.is_empty(),
+        "expected empty assets when vault commitment matches"
+    );
+
+    // Query 3: None — vault data not requested, node returns empty assets
+    let (_, proof) = rpc
+        .get_account_proof(
+            wallet.id(),
+            AccountStorageRequirements::default(),
+            AccountStateAt::ChainTip,
+            None,
+            None,
+        )
+        .await?;
+
+    let (_, details) = proof.into_parts();
+    let details = details.context("expected account details for public account")?;
+
+    assert!(
+        details.vault_details.assets.is_empty(),
+        "expected empty assets when vault commitment is not requested"
+    );
 
     Ok(())
 }

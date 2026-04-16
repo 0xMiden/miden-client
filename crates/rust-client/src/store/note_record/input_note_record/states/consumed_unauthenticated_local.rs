@@ -1,5 +1,6 @@
 use alloc::string::ToString;
 
+use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::{NoteId, NoteInclusionProof, NoteMetadata};
 use miden_protocol::transaction::TransactionId;
@@ -34,6 +35,7 @@ impl NoteStateHandler for ConsumedUnauthenticatedLocalNoteState {
     fn consumed_externally(
         &self,
         _nullifier_block_height: BlockNumber,
+        _consumer_account: Option<AccountId>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Ok(None)
     }

@@ -234,11 +234,10 @@ type SerializedBlockData =
 fn serialize_block_updates(
     block_updates: &BlockUpdates,
 ) -> Result<SerializedBlockData, StoreError> {
-    let block_headers_len = block_updates.block_headers().len();
-    let mut block_headers_as_bytes = Vec::with_capacity(block_headers_len);
-    let mut new_mmr_peaks_as_bytes = Vec::with_capacity(block_headers_len);
-    let mut block_nums = Vec::with_capacity(block_headers_len);
-    let mut block_has_relevant_notes = Vec::with_capacity(block_headers_len);
+    let mut block_headers_as_bytes = Vec::new();
+    let mut new_mmr_peaks_as_bytes = Vec::new();
+    let mut block_nums = Vec::new();
+    let mut block_has_relevant_notes = Vec::new();
 
     for (block_header, has_client_notes, mmr_peaks) in block_updates.block_headers() {
         block_headers_as_bytes.push(block_header.to_bytes());

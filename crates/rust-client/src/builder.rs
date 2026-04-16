@@ -183,13 +183,16 @@ where
     pub fn for_testnet() -> Self {
         let endpoint = Endpoint::testnet();
         Self {
-            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(&endpoint, 10_000))),
+            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(
+                &endpoint,
+                DEFAULT_GRPC_TIMEOUT_MS,
+            ))),
             tx_prover: Some(Arc::new(RemoteTransactionProver::new(
                 TESTNET_PROVER_ENDPOINT.to_string(),
             ))),
             note_transport_config: Some(NoteTransportConfig {
                 endpoint: crate::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT.to_string(),
-                timeout_ms: NOTE_TRANSPORT_DEFAULT_TIMEOUT_MS,
+                timeout_ms: DEFAULT_GRPC_TIMEOUT_MS,
             }),
             endpoint: Some(endpoint),
             ..Self::default()
@@ -224,13 +227,16 @@ where
     pub fn for_devnet() -> Self {
         let endpoint = Endpoint::devnet();
         Self {
-            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(&endpoint, 10_000))),
+            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(
+                &endpoint,
+                DEFAULT_GRPC_TIMEOUT_MS,
+            ))),
             tx_prover: Some(Arc::new(RemoteTransactionProver::new(
                 DEVNET_PROVER_ENDPOINT.to_string(),
             ))),
             note_transport_config: Some(NoteTransportConfig {
                 endpoint: crate::note_transport::NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string(),
-                timeout_ms: NOTE_TRANSPORT_DEFAULT_TIMEOUT_MS,
+                timeout_ms: DEFAULT_GRPC_TIMEOUT_MS,
             }),
             endpoint: Some(endpoint),
             ..Self::default()
@@ -265,7 +271,10 @@ where
     pub fn for_localhost() -> Self {
         let endpoint = Endpoint::localhost();
         Self {
-            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(&endpoint, 10_000))),
+            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(
+                &endpoint,
+                DEFAULT_GRPC_TIMEOUT_MS,
+            ))),
             endpoint: Some(endpoint),
             ..Self::default()
         }
@@ -300,8 +309,10 @@ where
     #[must_use]
     #[cfg(feature = "tonic")]
     pub fn grpc_client(mut self, endpoint: &crate::rpc::Endpoint, timeout_ms: Option<u64>) -> Self {
-        self.rpc_api =
-            Some(Arc::new(crate::rpc::GrpcClient::new(endpoint, timeout_ms.unwrap_or(10_000))));
+        self.rpc_api = Some(Arc::new(crate::rpc::GrpcClient::new(
+            endpoint,
+            timeout_ms.unwrap_or(DEFAULT_GRPC_TIMEOUT_MS),
+        )));
         self
     }
 
@@ -440,21 +451,10 @@ where
         if self.note_transport_api.is_none()
             && let Some(config) = self.note_transport_config
         {
-            #[cfg(not(target_arch = "wasm32"))]
-            let transport = crate::note_transport::grpc::GrpcNoteTransportClient::connect(
+            let transport = crate::note_transport::grpc::GrpcNoteTransportClient::new(
                 config.endpoint,
                 config.timeout_ms,
-            )
-            .await
-            .map_err(|e| {
-                ClientError::ClientInitializationError(format!(
-                    "Failed to connect to note transport: {e}"
-                ))
-            })?;
-
-            #[cfg(target_arch = "wasm32")]
-            let transport =
-                crate::note_transport::grpc::GrpcNoteTransportClient::new(config.endpoint);
+            );
 
             self.note_transport_api = Some(Arc::new(transport) as Arc<dyn NoteTransportClient>);
         }

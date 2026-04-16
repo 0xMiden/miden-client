@@ -7,6 +7,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_client::block::BlockNumber;
+use miden_client::builder::DEFAULT_GRPC_TIMEOUT_MS;
 use miden_client::note::{NoteId as NativeNoteId, Nullifier};
 use miden_client::rpc::domain::account::AccountStorageRequirements as NativeAccountStorageRequirements;
 use miden_client::rpc::domain::note::FetchedNote as NativeFetchedNote;
@@ -21,6 +22,7 @@ use crate::models::account_storage_requirements::AccountStorageRequirements;
 use crate::models::block_header::BlockHeader;
 use crate::models::endpoint::Endpoint;
 use crate::models::fetched_account::FetchedAccount;
+use crate::models::network_note_status::NetworkNoteStatusInfo;
 use crate::models::note_id::NoteId;
 use crate::models::note_script::NoteScript;
 use crate::models::note_sync_info::NoteSyncInfo;
@@ -43,7 +45,7 @@ impl RpcClient {
     /// @param endpoint - Endpoint to connect to.
     #[wasm_bindgen(constructor)]
     pub fn new(endpoint: Endpoint) -> Result<RpcClient, JsValue> {
-        let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), 10_000));
+        let rpc_client = Arc::new(GrpcClient::new(&endpoint.into(), DEFAULT_GRPC_TIMEOUT_MS));
 
         Ok(RpcClient { inner: rpc_client })
     }
@@ -106,16 +108,22 @@ impl RpcClient {
     }
 
     /// Fetches a block header by number. When `block_num` is undefined, returns the latest header.
+    ///
+    /// @param `block_num` - Optional block number. When `undefined`, returns the latest header.
+    /// @param `include_mmr_proof` - When `true`, includes the MMR proof in the response. Defaults
+    ///   to `false` when `undefined`.
     #[wasm_bindgen(js_name = "getBlockHeaderByNumber")]
     pub async fn get_block_header_by_number(
         &self,
         block_num: Option<u32>,
+        include_mmr_proof: Option<bool>,
     ) -> Result<BlockHeader, JsValue> {
         let native_block_num = block_num.map(BlockNumber::from);
-        let (header, _proof) =
-            self.inner.get_block_header_by_number(native_block_num, false).await.map_err(
-                |err| js_error_with_context(err, "failed to get block header by number"),
-            )?;
+        let (header, _proof) = self
+            .inner
+            .get_block_header_by_number(native_block_num, include_mmr_proof.unwrap_or(false))
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to get block header by number"))?;
 
         Ok(header.into())
     }
@@ -153,12 +161,17 @@ impl RpcClient {
     ///   maps and keys to include. When `undefined`, no storage map data is requested.
     /// @param `block_num` - Optional block number to fetch the account state at. When `undefined`,
     ///   fetches the latest state (chain tip).
+    /// @param `known_vault_commitment` - Optional known vault commitment. When provided,
+    ///   vault data is returned only if the account's current vault root differs from this
+    ///   value. Use `Word.new([0, 0, 0, 0])` to always fetch. When `undefined`, vault data
+    ///   is not requested.
     #[wasm_bindgen(js_name = "getAccountProof")]
     pub async fn get_account_proof(
         &self,
         account_id: &AccountId,
         storage_requirements: Option<AccountStorageRequirements>,
         block_num: Option<u32>,
+        known_vault_commitment: Option<Word>,
     ) -> Result<AccountProof, JsValue> {
         let native_id: miden_client::account::AccountId = account_id.into();
 
@@ -172,7 +185,13 @@ impl RpcClient {
 
         let (block_num, proof) = self
             .inner
-            .get_account_proof(native_id, native_requirements, account_state, None)
+            .get_account_proof(
+                native_id,
+                native_requirements,
+                account_state,
+                None,
+                known_vault_commitment.map(Into::into),
+            )
             .await
             .map_err(|err| js_error_with_context(err, "failed to get account proof"))?;
 
@@ -231,6 +250,30 @@ impl RpcClient {
             .map_err(|err| js_error_with_context(err, "failed to sync notes"))?;
 
         Ok(info.into())
+    }
+
+    /// Fetches the processing status of a network note by its ID.
+    ///
+    /// Returns information about the note's current status in the network,
+    /// including whether it is pending, processed, discarded, or committed,
+    /// along with error details and attempt count.
+    ///
+    /// @param `note_id` - The ID of the note to query.
+    /// @returns Promise that resolves to a `NetworkNoteStatusInfo` object.
+    #[wasm_bindgen(js_name = "getNetworkNoteStatus")]
+    pub async fn get_network_note_status(
+        &self,
+        note_id: &NoteId,
+    ) -> Result<NetworkNoteStatusInfo, JsValue> {
+        let native_note_id: NativeNoteId = note_id.into();
+
+        let status_info = self
+            .inner
+            .get_network_note_status(native_note_id)
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to get network note status"))?;
+
+        Ok(status_info.into())
     }
 
     // TODO: This can be generalized to retrieve multiple nullifiers

@@ -107,7 +107,11 @@ pub mod component {
         singlesig_acl_library,
         singlesig_library,
     };
-    pub use miden_standards::account::faucets::{BasicFungibleFaucet, NetworkFungibleFaucet};
+    pub use miden_standards::account::faucets::{
+        BasicFungibleFaucet,
+        NetworkFungibleFaucet,
+        TokenMetadata,
+    };
     pub use miden_standards::account::mint_policies::{
         AuthControlled,
         AuthControlledInitConfig,
