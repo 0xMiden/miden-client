@@ -29,6 +29,9 @@ cargo build -p miden-client-cli --features testing
 cargo build -p miden-client-cli --no-default-features
 ```
 
+If you build from source with default features disabled, include the `dap` feature to use
+`--start-debug-adapter`.
+
 ## Quick Start
 
 ### 1. Create an account
