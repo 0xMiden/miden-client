@@ -521,6 +521,13 @@ export interface SendPrivateOptions {
   to: AccountRef;
 }
 
+export interface ResendPrivateByIdOptions {
+  /** ID of the output note to resend. Must correspond to a note this client previously sent. */
+  noteId: string | NoteId;
+  /** Recipient address. */
+  to: AccountRef;
+}
+
 export interface MockOptions {
   seed?: string | Uint8Array;
   serializedMockChain?: Uint8Array;
@@ -768,6 +775,18 @@ export interface NotesResource {
    * @param options - Options including the note and the recipient.
    */
   sendPrivate(options: SendPrivateOptions): Promise<void>;
+  /**
+   * Re-send a previously-sent private note by its ID. Looks the note up
+   * from the client's output-note store, reconstructs it, and re-
+   * transports it to the recipient. Use this to recover from a
+   * transport failure where the on-chain transaction committed but the
+   * recipient never received the note blob — without a resend they can
+   * never discover the note (it's private; no on-chain details), so the
+   * sender's asset is effectively lost.
+   *
+   * @param options - Options including the output note's ID and recipient.
+   */
+  resendPrivateById(options: ResendPrivateByIdOptions): Promise<void>;
 }
 
 // ════════════════════════════════════════════════════════════════
