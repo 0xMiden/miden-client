@@ -427,9 +427,6 @@ fn error_code_from_client_error(err: &ClientError) -> Option<&'static str> {
         ClientError::ApplyTransactionAfterSubmitFailed { .. } => {
             Some("ApplyTransactionAfterSubmitFailed")
         },
-        ClientError::InputNoteAlreadyConsumedOnChain { .. } => {
-            Some("InputNoteAlreadyConsumedOnChain")
-        },
         ClientError::AccountLocked(_) => Some("AccountLocked"),
         ClientError::NoteNotFoundOnChain(_) => Some("NoteNotFoundOnChain"),
         ClientError::RpcError(_) => Some("RpcError"),
