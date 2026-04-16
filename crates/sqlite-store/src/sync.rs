@@ -94,7 +94,9 @@ impl SqliteStore {
                 Ok(BlockNumber::from(u32::try_from(v).map_err(StoreError::InvalidInt)?))
             })
             .next()
-            .ok_or_else(|| StoreError::QueryError("state sync block number not found".to_string()))?
+            .ok_or_else(|| {
+                StoreError::QueryError("state sync block number not found".to_string())
+            })?
     }
 
     pub(super) fn apply_state_sync(
