@@ -63,6 +63,7 @@
 - [NotesResource](interfaces/NotesResource.md)
 - [P2IDEOptions](interfaces/P2IDEOptions.md)
 - [PreviewConsumeOptions](interfaces/PreviewConsumeOptions.md)
+- [PreviewCustomOptions](interfaces/PreviewCustomOptions.md)
 - [PreviewMintOptions](interfaces/PreviewMintOptions.md)
 - [PreviewSendOptions](interfaces/PreviewSendOptions.md)
 - [PreviewSwapOptions](interfaces/PreviewSwapOptions.md)
