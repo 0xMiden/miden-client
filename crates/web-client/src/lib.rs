@@ -349,10 +349,19 @@ where
     }
 
     let help = hint_from_error(&err);
+    let code = error_code_from_error(&err);
     let js_error: JsValue = JsError::new(&error_string).into();
 
     if let Some(help) = help {
         let _ = Reflect::set(&js_error, &JsValue::from_str("help"), &JsValue::from_str(&help));
+    }
+
+    // Stable, machine-readable code for consumers that need to react
+    // differently based on the specific ClientError variant. The string
+    // text is load-bearing — see `error_code_from_client_error` for the
+    // list of codes and their contract.
+    if let Some(code) = code {
+        let _ = Reflect::set(&js_error, &JsValue::from_str("errorCode"), &JsValue::from_str(code));
     }
 
     js_error
@@ -364,4 +373,33 @@ fn hint_from_error(err: &(dyn Error + 'static)) -> Option<String> {
     }
 
     err.source().and_then(hint_from_error)
+}
+
+/// Walks the error chain looking for a [`ClientError`] and returns a
+/// stable, machine-readable code for it. Used by [`js_error_with_context`]
+/// to attach an `errorCode` string to the JS Error — consumers can
+/// pattern-match on it to trigger failure-mode-specific handling
+/// (e.g. treat a submitted-but-not-applied tx as Completed rather than
+/// Failed). Codes are the variant names; the contract is that they
+/// don't change across releases.
+fn error_code_from_error(err: &(dyn Error + 'static)) -> Option<&'static str> {
+    if let Some(client_error) = err.downcast_ref::<ClientError>() {
+        return error_code_from_client_error(client_error);
+    }
+    err.source().and_then(error_code_from_error)
+}
+
+fn error_code_from_client_error(err: &ClientError) -> Option<&'static str> {
+    // Only include variants consumers are known to dispatch on. Others
+    // can be added as new callers need them — the stability contract is
+    // "code string never changes once added."
+    match err {
+        ClientError::ApplyTransactionAfterSubmitFailed { .. } => {
+            Some("ApplyTransactionAfterSubmitFailed")
+        },
+        ClientError::AccountLocked(_) => Some("AccountLocked"),
+        ClientError::NoteNotFoundOnChain(_) => Some("NoteNotFoundOnChain"),
+        ClientError::RpcError(_) => Some("RpcError"),
+        _ => None,
+    }
 }
