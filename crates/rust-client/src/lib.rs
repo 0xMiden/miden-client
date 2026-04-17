@@ -375,7 +375,26 @@ pub struct Client<AUTH> {
     /// Lazily built from the store on first access and kept in sync across sync and prune
     /// operations. If `None`, the next operation that needs the MMR will rebuild it from the
     /// store.
-    partial_mmr: Option<PartialMmr>,
+    ///
+    /// The cache carries a fingerprint of the store's latest peaks at build time. Before
+    /// returning it, that fingerprint is compared against the store to detect modifications
+    /// made outside the client (e.g. `importStore`) and force a rebuild on mismatch.
+    partial_mmr: Option<CachedPartialMmr>,
+}
+
+/// Cached [`PartialMmr`] paired with a fingerprint of the store's peaks at build time.
+///
+/// The cached `mmr` is post-add (includes the chain tip as a leaf). The store, however, holds
+/// pre-add peaks — the peaks committed by the block header at the sync height. To detect
+/// external modifications to the store, we snapshot the hash of the store's latest peaks when
+/// the cache is populated. On subsequent reads, that hash is compared against the store's
+/// current peaks hash; a mismatch means the store changed under us and the cache must be
+/// rebuilt.
+pub(crate) struct CachedPartialMmr {
+    /// Hash of the store's latest blockchain peaks at the moment this cache entry was built.
+    /// Used as a staleness fingerprint against the store's current peaks.
+    pub(crate) store_peaks_hash: Word,
+    pub(crate) mmr: PartialMmr,
 }
 
 /// Constructors.

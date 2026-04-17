@@ -70,7 +70,7 @@ use miden_tx::utils::serde::{Deserializable, DeserializationError, Serializable}
 use tracing::{debug, info};
 
 use crate::store::{NoteFilter, TransactionFilter};
-use crate::{Client, ClientError};
+use crate::{CachedPartialMmr, Client, ClientError};
 mod block_header;
 
 mod tag;
@@ -156,7 +156,7 @@ where
         self.untrack_and_prune_irrelevant_blocks(&mut partial_mmr).await?;
 
         // Put the fully updated MMR back into the cache.
-        self.partial_mmr = Some(partial_mmr);
+        self.cache_partial_mmr(partial_mmr).await?;
 
         Ok(sync_summary)
     }
@@ -208,18 +208,46 @@ where
         // Prune irrelevant blocks (will rebuild the MMR from the now-updated store).
         let mut partial_mmr = self.take_or_build_partial_mmr().await?;
         self.untrack_and_prune_irrelevant_blocks(&mut partial_mmr).await?;
-        self.partial_mmr = Some(partial_mmr);
+        self.cache_partial_mmr(partial_mmr).await?;
 
         Ok(())
     }
 
-    /// Returns the in-memory [`PartialMmr`] if cached, otherwise builds it from the store.
+    /// Returns the in-memory [`PartialMmr`] if cached and still fresh, otherwise builds it from
+    /// the store.
+    ///
+    /// Freshness is verified by comparing the hash of the store's peaks at the current sync
+    /// height against the hash captured when the cache was populated. If they differ (e.g. the
+    /// store was modified externally by `importStore`), the cache is discarded and the MMR is
+    /// rebuilt.
     pub(crate) async fn take_or_build_partial_mmr(&mut self) -> Result<PartialMmr, ClientError> {
-        if let Some(mmr) = self.partial_mmr.take() {
-            Ok(mmr)
-        } else {
-            self.store.get_current_partial_mmr().await.map_err(Into::into)
+        if let Some(cached) = self.partial_mmr.take() {
+            let sync_height = self.store.get_sync_height().await?;
+            let store_peaks_hash = self
+                .store
+                .get_partial_blockchain_peaks_by_block_num(sync_height)
+                .await?
+                .hash_peaks();
+            if store_peaks_hash == cached.store_peaks_hash {
+                return Ok(cached.mmr);
+            }
+            // Store changed under us — fall through to rebuild.
         }
+        self.store.get_current_partial_mmr().await.map_err(Into::into)
+    }
+
+    /// Caches the given [`PartialMmr`] alongside a snapshot of the store's peaks hash at the
+    /// current sync height, used later by [`Self::take_or_build_partial_mmr`] to detect
+    /// external modifications.
+    pub(crate) async fn cache_partial_mmr(&mut self, mmr: PartialMmr) -> Result<(), ClientError> {
+        let sync_height = self.store.get_sync_height().await?;
+        let store_peaks_hash = self
+            .store
+            .get_partial_blockchain_peaks_by_block_num(sync_height)
+            .await?
+            .hash_peaks();
+        self.partial_mmr = Some(CachedPartialMmr { store_peaks_hash, mmr });
+        Ok(())
     }
 
     /// Prunes irrelevant block data from the store.

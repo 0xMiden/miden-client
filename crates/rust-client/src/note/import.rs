@@ -283,7 +283,7 @@ where
                     let block_header = self
                         .get_and_store_authenticated_block(block_height, &mut partial_mmr)
                         .await?;
-                    self.partial_mmr = Some(partial_mmr);
+                    self.cache_partial_mmr(partial_mmr).await?;
 
                     note_changed |= note_record.block_header_received(&block_header)?;
                 } else {
@@ -347,7 +347,7 @@ where
                             &mut partial_mmr,
                         )
                         .await?;
-                    self.partial_mmr = Some(partial_mmr);
+                    self.cache_partial_mmr(partial_mmr).await?;
 
                     let tag = metadata.tag();
                     let note_changed =
