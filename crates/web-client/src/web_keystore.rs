@@ -56,7 +56,7 @@ struct JsCallbacks {
     /// happened yet). Consumers read this from [`WebClient::last_auth_error`]
     /// to recover structured info the thrown JS error carried (e.g. a
     /// `reason` property indicating the wallet was locked). Single-writer,
-    /// single-reader in practice: all mutating WebClient calls are serialized
+    /// single-reader in practice: all mutating `WebClient` calls are serialized
     /// through `_serializeWasmCall`, so no race.
     last_sign_error: RefCell<JsValue>,
 }

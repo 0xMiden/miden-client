@@ -112,7 +112,7 @@ pub(crate) struct SignCallback(pub(crate) Function);
 /// later inspection via [`WebClient::last_auth_error`].
 pub(crate) struct SignCallbackError {
     pub(crate) auth_err: AuthenticationError,
-    /// Raw JsValue thrown by the callback, or [`JsValue::NULL`] if the
+    /// Raw `JsValue` thrown by the callback, or [`JsValue::NULL`] if the
     /// failure didn't originate from a JS throw (e.g. result type was
     /// wrong).
     pub(crate) raw: JsValue,

@@ -119,7 +119,7 @@ impl WebClient {
     /// happened yet).
     ///
     /// Combined with the serialized-call discipline enforced at the JS
-    /// WebClient wrapper, this lets a caller that caught a failed
+    /// `WebClient` wrapper, this lets a caller that caught a failed
     /// `executeTransaction` / `submitNewTransaction` recover the original
     /// JS error the signing callback threw — preserving any structured
     /// metadata (e.g. a `reason: 'locked'` property) that the kernel-level
