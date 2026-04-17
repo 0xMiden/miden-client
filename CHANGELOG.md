@@ -4,6 +4,7 @@
 
 ### Features
 
+* [FEATURE][web] Expose `lastAuthError()` on `MidenClient` for typed sign-callback failure recovery — preserves the raw thrown value from the JS signCallback so consumers can distinguish locked/rejected/IO-error failure modes ([#2058](https://github.com/0xMiden/miden-client/pull/2058)).
 * [FEATURE][web] Added `"custom"` operation to `preview()` so users can dry-run any pre-built `TransactionRequest`, not just send/mint/consume/swap ([#2052](https://github.com/0xMiden/miden-client/pull/2052)).
 
 ## 0.14.3 (2026-04-16)
