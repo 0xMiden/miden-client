@@ -4,6 +4,7 @@
 
 ### Features
 
+* [FEATURE] Distinct `ApplyTransactionAfterSubmitFailed` error variant with one apply retry, so callers know a submitted tx landed on-chain and should not be re-submitted ([#2059](https://github.com/0xMiden/miden-client/pull/2059)).
 * [FEATURE][web] Added `"custom"` operation to `preview()` so users can dry-run any pre-built `TransactionRequest`, not just send/mint/consume/swap ([#2052](https://github.com/0xMiden/miden-client/pull/2052)).
 
 ## 0.14.3 (2026-04-16)
