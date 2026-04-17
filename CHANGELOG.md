@@ -4,6 +4,7 @@
 
 ### Features
 
+* [FEATURE] `resendPrivateNoteById()` on `NoteTransportClient` / `NotesResource` for retrying private-note P2P delivery after a post-commit transport failure ([#2061](https://github.com/0xMiden/miden-client/pull/2061)).
 * [FEATURE][web] Added `"custom"` operation to `preview()` so users can dry-run any pre-built `TransactionRequest`, not just send/mint/consume/swap ([#2052](https://github.com/0xMiden/miden-client/pull/2052)).
 
 ## 0.14.3 (2026-04-16)
