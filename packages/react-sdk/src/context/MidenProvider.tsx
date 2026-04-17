@@ -87,9 +87,8 @@ export function MidenProvider({
     }),
     [config]
   );
-  const [defaultProver, setDefaultProver] = useState<
-    ReturnType<typeof resolveTransactionProver>
-  >(null);
+  const [defaultProver, setDefaultProver] =
+    useState<ReturnType<typeof resolveTransactionProver>>(null);
 
   // Defer prover construction until WASM is ready — resolveTransactionProver
   // calls TransactionProver.newLocalProver() / newRemoteProver() which touch
