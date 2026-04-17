@@ -75,15 +75,14 @@ const P2ID_EMITTER_SCRIPT: &str = r#"
 /// note.
 ///
 /// Flow:
-/// 1. Alice (regular wallet, Public storage) creates a network-targeted note
-///    carrying a P2ID recipient digest in its storage.
-/// 2. The bank (network-storage-mode account with the counter component) is
-///    picked up by the node's NTX builder, executes the note script, and in
-///    doing so (a) increments its own counter and (b) emits a public P2ID
-///    note targeted at Bob.
-/// 3. Verifies the P2ID output note is committed on-chain by importing it
-///    by NoteId on a second client and polling for `InputNoteState::Committed`.
-///    The counter bump is checked as a secondary signal that the NTX ran.
+/// 1. Alice (regular wallet, Public storage) creates a network-targeted note carrying a P2ID
+///    recipient digest in its storage.
+/// 2. The bank (network-storage-mode account with the counter component) is picked up by the node's
+///    NTX builder, executes the note script, and in doing so (a) increments its own counter and (b)
+///    emits a public P2ID note targeted at Bob.
+/// 3. Verifies the P2ID output note is committed on-chain by importing it by NoteId on a second
+///    client and polling for `InputNoteState::Committed`. The counter bump is checked as a
+///    secondary signal that the NTX ran.
 pub async fn test_ntx_output_public_note(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.clone().into_client().await?;
     let (mut client_2, keystore_2) = ClientConfig::default()
@@ -92,13 +91,9 @@ pub async fn test_ntx_output_public_note(client_config: ClientConfig) -> Result<
         .await?;
 
     let bank = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
-    let (alice, ..) = insert_new_wallet(
-        &mut client,
-        AccountStorageMode::Public,
-        &keystore,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (alice, ..) =
+        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
+            .await?;
     let (bob, ..) = insert_new_wallet(
         &mut client_2,
         AccountStorageMode::Public,
@@ -112,8 +107,7 @@ pub async fn test_ntx_output_public_note(client_config: ClientConfig) -> Result<
     let bob_serial_num = client.rng().draw_word();
     let bob_recipient = P2idNoteStorage::new(bob.id()).into_recipient(bob_serial_num);
     let bob_recipient_digest = bob_recipient.digest();
-    let expected_output_id =
-        NoteDetails::new(NoteAssets::new(vec![])?, bob_recipient).id();
+    let expected_output_id = NoteDetails::new(NoteAssets::new(vec![])?, bob_recipient).id();
 
     let network_note = build_emitter_network_note(
         alice.id(),
@@ -150,9 +144,7 @@ pub async fn test_ntx_output_public_note(client_config: ClientConfig) -> Result<
             continue;
         }
 
-        let _ = client_2
-            .import_notes(&[NoteFile::NoteId(expected_output_id)])
-            .await;
+        let _ = client_2.import_notes(&[NoteFile::NoteId(expected_output_id)]).await;
         client_2.sync_state().await?;
         if let Some(rec) = client_2.get_input_note(expected_output_id).await? {
             if matches!(rec.state(), InputNoteState::Committed { .. }) {

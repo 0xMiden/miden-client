@@ -11,8 +11,7 @@
 
 * Fixed the faucet token symbol display when showing account details ([#1985](https://github.com/0xMiden/miden-client/pull/1985)).
 * [FEATURE][rust,cli,web] Added `get_network_note_status` to `NodeRpcClient` trait for querying the processing status of notes submitted to the network (pending, processed, discarded, committed), along with attempt count and error details. Exposed as `miden-client network-note-status <note_id>` CLI command and `RpcClient.getNetworkNoteStatus()` in the web client. (#TBD)
-* [FEATURE][rust] Re-exported `MintNote` and `MintNoteStorage` from `miden_client::note`, and `Ownable2Step` from `miden_client::account::component`, so downstream consumers can build standard MINT notes targeting network-storage fungible faucets without depending on `miden-standards` directly. (#TBD)
-* Added integration tests for network-transaction public output note creation: a custom emitter-script flow and the standard MINT note → network faucet → public P2ID flow. (#TBD)
+* Added integration tests for network-transaction public output note creation ([#2073](https://github.com/0xMiden/miden-client/pull/2073)).
 
 ## 0.14.0 (2026-04-07)
 

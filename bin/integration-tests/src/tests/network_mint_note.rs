@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, anyhow};
+use miden_client::Felt;
 use miden_client::account::component::{
     AccountComponent,
     AccountComponentMetadata,
@@ -34,7 +35,6 @@ use miden_client::testing::common::{
     wait_for_tx,
 };
 use miden_client::transaction::TransactionRequestBuilder;
-use miden_client::Felt;
 use rand::RngCore;
 
 const INCR_NONCE_AUTH_CODE: &str = "
@@ -62,20 +62,17 @@ use crate::tests::config::ClientConfig;
 /// public P2ID output note flow.
 ///
 /// Flow:
-///   1. Alice (public wallet) first emits a zero-asset public P2ID note to Bob.
-///      The node indexes the script of every committed public note, so this
-///      registers `StandardNote::P2ID.script()` in the node's NTX script
-///      registry. Without this, the node cannot materialize the P2ID output
-///      note produced by the MINT note in step 2.
-///   2. Alice owns a `NetworkFungibleFaucet` (network storage, no-auth,
-///      Ownable2Step(alice)). She builds a `StandardNote::MINT` whose
-///      `MintNoteStorage::new_public` encodes the P2ID recipient targeting
-///      Bob and whose `NoteAttachment` is a `NetworkAccountTarget` pointing
-///      at the faucet. The node's NTX builder consumes the MINT note against
-///      the faucet; `mint_and_send` emits a public P2ID note carrying the
-///      minted fungible asset to Bob.
-///   3. Bob's client imports the expected P2ID `NoteId` and polls until it
-///      reaches `InputNoteState::Committed`.
+///   1. Alice (public wallet) first emits a zero-asset public P2ID note to Bob. The node indexes
+///      the script of every committed public note, so this registers `StandardNote::P2ID.script()`
+///      in the node's NTX script registry. Without this, the node cannot materialize the P2ID
+///      output note produced by the MINT note in step 2.
+///   2. Alice owns a `NetworkFungibleFaucet` (network storage, no-auth, Ownable2Step(alice)). She
+///      builds a `StandardNote::MINT` whose `MintNoteStorage::new_public` encodes the P2ID
+///      recipient targeting Bob and whose `NoteAttachment` is a `NetworkAccountTarget` pointing at
+///      the faucet. The node's NTX builder consumes the MINT note against the faucet;
+///      `mint_and_send` emits a public P2ID note carrying the minted fungible asset to Bob.
+///   3. Bob's client imports the expected P2ID `NoteId` and polls until it reaches
+///      `InputNoteState::Committed`.
 pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.clone().into_client().await?;
     let (mut client_2, keystore_2) = ClientConfig::default()
@@ -83,13 +80,9 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
         .into_client()
         .await?;
 
-    let (alice, ..) = insert_new_wallet(
-        &mut client,
-        AccountStorageMode::Public,
-        &keystore,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (alice, ..) =
+        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
+            .await?;
     let (bob, ..) = insert_new_wallet(
         &mut client_2,
         AccountStorageMode::Public,
@@ -139,9 +132,7 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
     let deploy_script = CodeBuilder::new()
         .compile_tx_script(NOOP_TX_SCRIPT)
         .context("failed to compile faucet deploy tx script")?;
-    let deploy_tx = TransactionRequestBuilder::new()
-        .custom_script(deploy_script)
-        .build()?;
+    let deploy_tx = TransactionRequestBuilder::new().custom_script(deploy_script).build()?;
     let deploy_tx_id = client.submit_new_transaction(faucet.id(), deploy_tx).await?;
     wait_for_tx(&mut client, deploy_tx_id).await?;
 
@@ -158,9 +149,7 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
         NoteAttachment::default(),
         client.rng(),
     )?;
-    let register_tx = TransactionRequestBuilder::new()
-        .own_output_notes(vec![p2id_pre])
-        .build()?;
+    let register_tx = TransactionRequestBuilder::new().own_output_notes(vec![p2id_pre]).build()?;
     execute_tx_and_sync(&mut client, alice.id(), register_tx).await?;
 
     // STEP 2: build the standard MINT note.
@@ -191,9 +180,7 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
         client.rng(),
     )?;
 
-    let mint_tx = TransactionRequestBuilder::new()
-        .own_output_notes(vec![mint_note])
-        .build()?;
+    let mint_tx = TransactionRequestBuilder::new().own_output_notes(vec![mint_note]).build()?;
     execute_tx_and_sync(&mut client, alice.id(), mint_tx).await?;
 
     // STEP 3: wait for the node's NTX builder to consume the MINT note and
@@ -201,9 +188,7 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
     for _ in 0..15 {
         wait_for_blocks(&mut client, 1).await;
 
-        let _ = client_2
-            .import_notes(&[NoteFile::NoteId(expected_output_id)])
-            .await;
+        let _ = client_2.import_notes(&[NoteFile::NoteId(expected_output_id)]).await;
         client_2.sync_state().await?;
         if let Some(rec) = client_2.get_input_note(expected_output_id).await?
             && matches!(rec.state(), InputNoteState::Committed { .. })
