@@ -130,7 +130,7 @@ pub mod utils;
 
 pub mod builder;
 
-#[cfg(any(test, feature = "testing"))]
+#[cfg(feature = "testing")]
 mod test_utils;
 
 pub mod errors;
@@ -309,7 +309,7 @@ pub use miden_protocol::{
 pub use miden_remote_prover_client::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
 
-#[cfg(any(test, feature = "testing"))]
+#[cfg(feature = "testing")]
 pub mod testing {
     pub use miden_protocol::testing::account_id;
     pub use miden_standards::testing::note::NoteBuilder;

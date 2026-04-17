@@ -85,7 +85,6 @@ miden-protocol  = { default-features = false, features = ["testing"], workspace 
 miden-standards = { features = ["testing"], workspace = true }
 miden-testing   = { default-features = false, workspace = true }
 tokio           = { workspace = true }
-uuid            = { features = ["js", "serde", "v4"], version = "1.10" }
 web-sys         = { features = ["console"], version = "0.3" }
 
 [lints]
