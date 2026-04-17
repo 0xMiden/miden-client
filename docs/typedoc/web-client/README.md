@@ -67,6 +67,7 @@
 - [PreviewMintOptions](interfaces/PreviewMintOptions.md)
 - [PreviewSendOptions](interfaces/PreviewSendOptions.md)
 - [PreviewSwapOptions](interfaces/PreviewSwapOptions.md)
+- [ResendPrivateByIdOptions](interfaces/ResendPrivateByIdOptions.md)
 - [SendOptionsDefault](interfaces/SendOptionsDefault.md)
 - [SendOptionsReturnNote](interfaces/SendOptionsReturnNote.md)
 - [SendPrivateOptions](interfaces/SendPrivateOptions.md)

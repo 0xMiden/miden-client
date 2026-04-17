@@ -156,6 +156,32 @@ Optional filter by note status or note IDs.
 
 ***
 
+### resendPrivateById()
+
+> **resendPrivateById**(`options`): `Promise`\<`void`\>
+
+Re-send a previously-sent private note by its ID. Looks the note up
+from the client's output-note store, reconstructs it, and re-
+transports it to the recipient. Use this to recover from a
+transport failure where the on-chain transaction committed but the
+recipient never received the note blob — without a resend they can
+never discover the note (it's private; no on-chain details), so the
+sender's asset is effectively lost.
+
+#### Parameters
+
+##### options
+
+[`ResendPrivateByIdOptions`](ResendPrivateByIdOptions.md)
+
+Options including the output note's ID and recipient.
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### sendPrivate()
 
 > **sendPrivate**(`options`): `Promise`\<`void`\>

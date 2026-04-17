@@ -91,6 +91,7 @@ const WRITE_METHODS = new Set([
   "removeAccountAddress",
   "removeTag",
   "removeSetting",
+  "resendPrivateNoteById",
   "sendPrivateNote",
   "setSetting",
   "submitProvenTransaction",
