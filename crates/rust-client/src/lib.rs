@@ -309,6 +309,9 @@ pub use miden_protocol::{
 pub use miden_remote_prover_client::RemoteTransactionProver;
 pub use miden_tx::ExecutionOptions;
 
+/// Provides test utilities for working with accounts and account IDs
+/// within the Miden network. This module is only available when the `testing` feature is
+/// enabled.
 #[cfg(feature = "testing")]
 pub mod testing {
     pub use miden_protocol::testing::account_id;
