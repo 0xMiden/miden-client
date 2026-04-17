@@ -307,13 +307,10 @@ The `list` subcommand optionally takes an account ID to only show the addresses 
 miden-client address list 0x17f13f4f83a8e8100c19d2961dfda2
 ```
 
-`add` and `remove` take the account ID as a mandatory argument, and also the interface of the address, this values can be:
-- `BasicWallet`: The basic wallet interface.
-
-Note: the `Unspecified` denotes an address not bound to any interface, it's the default address for every account created.
+`add` takes a bech32-encoded address string (which embeds the account ID), and `remove` takes the account ID and address. For example:
 
 ```sh
-miden-client address add 0x17f13f4f83a8e8100c19d2961dfda2 BasicWallet 10
+miden-client address add mlcl1qple0ejnutx8zyp0cm0pme9wjfgqz0u9djq
 ```
 
 ```sh

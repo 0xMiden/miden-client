@@ -39,11 +39,9 @@ impl From<CliAddressInterface> for AddressInterface {
 pub enum AddressSubCommand {
     /// List all addresses an account can be referenced by
     List { account_id: Option<String> },
-    /// Add a new address (encoded as a bech32 string) for the given account
+    /// Add a new address (encoded as a bech32 string)
     Add {
-        /// Account to add the address to
-        account_id: String,
-        /// Address encoded as a bech32 string
+        /// Address encoded as a bech32 string (embeds the account_id)
         address: String,
     },
     /// Remove the given address
@@ -79,8 +77,8 @@ impl AddressCmd {
                 let network_id = cli_config.rpc.endpoint.0.to_network_id();
                 list_account_addresses(client, account_id, network_id).await?;
             },
-            Some(AddressSubCommand::Add { account_id, address }) => {
-                add_address(client, account_id.clone(), address.clone()).await?;
+            Some(AddressSubCommand::Add { address }) => {
+                add_address(client, address.clone()).await?;
             },
             Some(AddressSubCommand::Encode { account_id, interface, tag_len }) => {
                 let cli_config = CliConfig::load()?;
@@ -153,22 +151,20 @@ async fn list_account_addresses<AUTH>(
 
 async fn add_address<AUTH>(
     mut client: Client<AUTH>,
-    account_id: String,
     address_str: String,
 ) -> Result<(), CliError> {
-    let account_id = parse_account_id(&client, &account_id).await?;
     let (_, address) =
         Address::decode(&address_str).map_err(|e| CliError::Address(e, address_str.clone()))?;
 
-    // Validate that the address belongs to the provided account_id
-    match address.id() {
-        AddressId::AccountId(addr_account_id) if addr_account_id == account_id => {},
+    // Extract the account_id from the address
+    let account_id = match address.id() {
+        AddressId::AccountId(addr_account_id) => addr_account_id,
         _ => {
             return Err(CliError::Input(format!(
-                "Address {address_str} does not belong to account {account_id}"
+                "Address {address_str} is not an ID-based address"
             )));
         },
-    }
+    };
 
     let note_tag = NoteTag::with_account_target(account_id);
     client.add_address(address, account_id).await?;
