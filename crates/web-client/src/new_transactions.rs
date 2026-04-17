@@ -225,7 +225,9 @@ impl WebClient {
     async fn prove_transaction_impl(
         &mut self,
         transaction_result: &TransactionResult,
-        prover_arc: Option<alloc::sync::Arc<dyn miden_client::transaction::TransactionProver + Send + Sync>>,
+        prover_arc: Option<
+            alloc::sync::Arc<dyn miden_client::transaction::TransactionProver + Send + Sync>,
+        >,
     ) -> Result<ProvenTransaction, JsValue> {
         #[cfg(feature = "testing")]
         if prover_arc.is_none() && self.mock_rpc_api.is_some() {
