@@ -12,6 +12,10 @@
 * Fixed the faucet token symbol display when showing account details ([#1985](https://github.com/0xMiden/miden-client/pull/1985)).
 * [FEATURE][rust,cli,web] Added `get_network_note_status` to `NodeRpcClient` trait for querying the processing status of notes submitted to the network (pending, processed, discarded, committed), along with attempt count and error details. Exposed as `miden-client network-note-status <note_id>` CLI command and `RpcClient.getNetworkNoteStatus()` in the web client. (#TBD)
 
+### Bug Fixes
+
+* Fixed `MidenProvider` crashing on first render when a remote prover is configured by deferring prover instantiation until after WASM initialization ([#2072](https://github.com/0xMiden/miden-client/pull/2072)).
+
 ## 0.14.0 (2026-04-07)
 
 ### Enhancements
