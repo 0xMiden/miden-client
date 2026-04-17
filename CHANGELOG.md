@@ -4,6 +4,7 @@
 
 ### Features
 
+* [FEATURE][web] Serialize all mutating `WebClient` JS methods via internal `_serializeWasmCall` chain to prevent concurrent WASM access; expose `waitForIdle()` on `MidenClient` so callers can drain in-flight work before mutating non-WASM state ([#2057](https://github.com/0xMiden/miden-client/pull/2057)).
 * [FEATURE][web] Added `"custom"` operation to `preview()` so users can dry-run any pre-built `TransactionRequest`, not just send/mint/consume/swap ([#2052](https://github.com/0xMiden/miden-client/pull/2052)).
 
 ## 0.14.3 (2026-04-16)
