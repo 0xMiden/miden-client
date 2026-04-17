@@ -300,7 +300,7 @@ static COUNTER_CONTRACT_LIBRARY: LazyLock<Arc<Library>> = LazyLock::new(|| {
 });
 
 /// Returns the Basic Fungible Faucet Library.
-fn counter_contract_library() -> Arc<Library> {
+pub(crate) fn counter_contract_library() -> Arc<Library> {
     COUNTER_CONTRACT_LIBRARY.clone()
 }
 

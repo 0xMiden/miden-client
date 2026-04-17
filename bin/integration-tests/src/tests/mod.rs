@@ -3,6 +3,8 @@ pub mod config;
 pub mod custom_transaction;
 pub mod fpi;
 pub mod network_fpi;
+pub mod network_mint_note;
+pub mod network_output_note;
 pub mod network_transaction;
 pub mod onchain;
 pub mod pass_through;
