@@ -77,11 +77,10 @@ impl<AUTH> Client<AUTH> {
     /// no on-chain details), so the sender's asset is effectively lost.
     ///
     /// # Errors
-    /// - [`ClientError::NoteNotFoundOnChain`] if no output note with this
-    ///   ID is tracked locally (client likely wasn't the sender).
-    /// - [`ClientError::NoteRecordConversionError`] if the stored record
-    ///   lacks the full recipient data needed to reconstruct the note
-    ///   (e.g. it was built from a `PartialNote`).
+    /// - [`ClientError::NoteNotFoundOnChain`] if no output note with this ID is tracked locally
+    ///   (client likely wasn't the sender).
+    /// - [`ClientError::NoteRecordConversionError`] if the stored record lacks the full recipient
+    ///   data needed to reconstruct the note (e.g. it was built from a `PartialNote`).
     /// - Any [`NoteTransportError`] from the underlying transport.
     pub async fn resend_private_note_by_id(
         &mut self,
@@ -97,17 +96,11 @@ impl<AUTH> Client<AUTH> {
             .pop()
             .ok_or(ClientError::NoteNotFoundOnChain(note_id))?;
 
-        let recipient = record
-            .recipient()
-            .cloned()
-            .ok_or_else(|| {
-                ClientError::NoteRecordConversionError(
-                    NoteRecordError::ConversionError(
-                        "output note is missing recipient data; cannot reconstruct for resend"
-                            .into(),
-                    ),
-                )
-            })?;
+        let recipient = record.recipient().cloned().ok_or_else(|| {
+            ClientError::NoteRecordConversionError(NoteRecordError::ConversionError(
+                "output note is missing recipient data; cannot reconstruct for resend".into(),
+            ))
+        })?;
         let assets = record.assets().clone();
         let metadata = record.metadata().clone();
 
