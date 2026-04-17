@@ -239,9 +239,7 @@ where
         // reset on the store worker) clear immediately.
         if let Err(first_err) = self.apply_transaction(&tx_result, submission_height).await {
             info!("apply_transaction failed once; retrying to cover transient errors");
-            if let Err(second_err) =
-                self.apply_transaction(&tx_result, submission_height).await
-            {
+            if let Err(second_err) = self.apply_transaction(&tx_result, submission_height).await {
                 info!(
                     "apply_transaction failed twice for submitted tx {tx_id}; surfacing \
                      ApplyTransactionAfterSubmitFailed so the caller can rely on the next \
