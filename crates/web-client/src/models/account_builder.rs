@@ -1,5 +1,8 @@
-use miden_client::account::AccountBuilder as NativeAccountBuilder;
 use miden_client::account::component::BasicWallet;
+use miden_client::account::{
+    AccountBuilder as NativeAccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
+};
 use miden_client::auth::NoAuth;
 use wasm_bindgen::prelude::*;
 
@@ -93,8 +96,23 @@ impl AccountBuilder {
         self
     }
 
-    /// Builds the account and returns it together with the derived seed.
+    /// Builds the account (including merged storage schema commitment metadata) and returns it
+    /// together with the derived seed.
     pub fn build(self) -> Result<AccountBuilderResult, JsValue> {
+        let account = self
+            .0
+            .build_with_schema_commitment()
+            .map_err(|err| js_error_with_context(err, "Failed to build account"))?;
+        let seed = account.seed().expect("newly built account should always contain a seed");
+        Ok(AccountBuilderResult {
+            account: account.into(),
+            seed: seed.into(),
+        })
+    }
+
+    /// Builds the account without adding the schema commitment component (legacy behavior).
+    #[wasm_bindgen(js_name = "buildWithoutSchemaCommitment")]
+    pub fn build_without_schema_commitment(self) -> Result<AccountBuilderResult, JsValue> {
         let account = self
             .0
             .build()

@@ -1258,7 +1258,7 @@ fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> V
     result
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "testing"))]
 mod tests {
     use alloc::collections::BTreeSet;
     use alloc::sync::Arc;
@@ -1272,7 +1272,7 @@ mod tests {
     use miden_testing::MockChainBuilder;
 
     use super::*;
-    use crate::testing::mock::MockRpcApi;
+    use crate::test_utils::mock::MockRpcApi;
 
     /// Mock note screener that discards all notes, for minimal test setup.
     struct MockScreener;
