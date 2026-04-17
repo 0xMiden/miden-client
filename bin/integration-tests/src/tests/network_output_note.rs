@@ -146,10 +146,10 @@ pub async fn test_ntx_output_public_note(client_config: ClientConfig) -> Result<
 
         let _ = client_2.import_notes(&[NoteFile::NoteId(expected_output_id)]).await;
         client_2.sync_state().await?;
-        if let Some(rec) = client_2.get_input_note(expected_output_id).await? {
-            if matches!(rec.state(), InputNoteState::Committed { .. }) {
-                return Ok(());
-            }
+        if let Some(rec) = client_2.get_input_note(expected_output_id).await?
+            && matches!(rec.state(), InputNoteState::Committed { .. })
+        {
+            return Ok(());
         }
     }
 
