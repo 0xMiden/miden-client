@@ -62,6 +62,7 @@ export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
 const SYNC_METHODS = new Set([
   "buildSwapTag",
   "createCodeBuilder",
+  "lastAuthError",
   "newConsumeTransactionRequest",
   "newMintTransactionRequest",
   "newSendTransactionRequest",
