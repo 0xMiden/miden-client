@@ -15,6 +15,10 @@
 * [FEATURE][web] `ProverConfig` now supports fallback configuration with `primary`/`fallback` targets, `disableFallback` predicate, and `onFallback` callback. Transaction hooks automatically retry with the fallback prover on failure. ([#1861](https://github.com/0xMiden/miden-client/pull/1861))
 * [FEATURE][web] Added `useSyncControl` hook to pause and resume auto-sync intervals. ([#1861](https://github.com/0xMiden/miden-client/pull/1861))
 
+### Bug Fixes
+
+* [FIX][web] Fixed `MidenProvider` crashing on first render when a remote prover is configured by deferring prover instantiation until after WASM initialization ([#2072](https://github.com/0xMiden/miden-client/pull/2072)).
+
 ## 0.13.4 (TBD)
 
 ### Features
