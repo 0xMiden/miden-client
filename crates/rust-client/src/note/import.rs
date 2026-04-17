@@ -241,8 +241,6 @@ where
             .get_nullifier_commit_heights(nullifier_requests, lowest_block_height)
             .await?;
 
-        let mut partial_mmr = self.take_or_build_partial_mmr().await?;
-
         for (previous_note, note, inclusion_proof) in requested_notes {
             let metadata = note.metadata().clone();
             let mut note_record = previous_note.unwrap_or(InputNoteRecord::new(
@@ -274,9 +272,18 @@ where
                 if block_height <= current_block_num {
                     // If the note is committed in the past we need to manually fetch the block
                     // header and MMR proof to verify the inclusion proof.
+                    //
+                    // The MMR is built inside this branch rather than once outside the loop.
+                    // A fresh store defaults to sync_height = 0 with no genesis header, so
+                    // building the MMR via the store would fail with BlockHeaderNotFound(0).
+                    // Reaching this branch requires current_block_num >= block_height, and
+                    // real notes have block_height >= 1, so the store has synced past genesis
+                    // by this point and the build is safe.
+                    let mut partial_mmr = self.take_or_build_partial_mmr().await?;
                     let block_header = self
                         .get_and_store_authenticated_block(block_height, &mut partial_mmr)
                         .await?;
+                    self.partial_mmr = Some(partial_mmr);
 
                     note_changed |= note_record.block_header_received(&block_header)?;
                 } else {
@@ -294,7 +301,6 @@ where
             }
         }
 
-        self.partial_mmr = Some(partial_mmr);
         Ok(note_records)
     }
 
@@ -317,9 +323,6 @@ where
         let mut committed_notes_data =
             self.check_expected_notes(lowest_request_block, note_requests).await?;
 
-        // Take the cached PartialMmr (or build from store) once, outside the loop.
-        let mut partial_mmr = self.take_or_build_partial_mmr().await?;
-
         let mut note_records = vec![];
         for (previous_note, details, after_block_num, tag) in requested_notes {
             let mut note_record = previous_note.unwrap_or({
@@ -332,12 +335,19 @@ where
 
             match committed_notes_data.remove(&note_record.id()) {
                 Some(Some((metadata, inclusion_proof))) => {
+                    // The MMR is built inside this arm rather than once outside the loop.
+                    // A fresh store defaults to sync_height = 0 with no genesis header, so
+                    // building the MMR via the store would fail with BlockHeaderNotFound(0).
+                    // check_expected_notes only returns proofs for already-synced blocks, so
+                    // reaching here implies the store has synced past genesis.
+                    let mut partial_mmr = self.take_or_build_partial_mmr().await?;
                     let block_header = self
                         .get_and_store_authenticated_block(
                             inclusion_proof.location().block_num(),
                             &mut partial_mmr,
                         )
                         .await?;
+                    self.partial_mmr = Some(partial_mmr);
 
                     let tag = metadata.tag();
                     let note_changed =
@@ -359,7 +369,6 @@ where
             }
         }
 
-        self.partial_mmr = Some(partial_mmr);
         Ok(note_records)
     }
 
