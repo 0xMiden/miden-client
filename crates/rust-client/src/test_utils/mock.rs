@@ -7,6 +7,7 @@ use miden_protocol::Word;
 use miden_protocol::account::delta::AccountUpdateDetails;
 use miden_protocol::account::{AccountCode, AccountId, StorageSlot, StorageSlotContent};
 use miden_protocol::address::NetworkId;
+use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::{Forest, Mmr, MmrProof};
 use miden_protocol::crypto::merkle::smt::SmtProof;
@@ -452,6 +453,25 @@ impl NodeRpcClient for MockRpcApi {
             let mut mock_chain = self.mock_chain.write();
             mock_chain.add_pending_proven_transaction(proven_transaction.clone());
         };
+
+        let block_num = self.get_chain_tip_block_num();
+
+        Ok(block_num)
+    }
+
+    /// Simulates the submission of a proven batch to the node by adding it to the mock chain's
+    /// pending batches. The `proposed_batch` and `transaction_inputs` arguments are accepted to
+    /// match the trait signature but are unused — the mock relies on the `ProvenBatch` alone,
+    /// matching how `submit_proven_transaction` ignores its `transaction_inputs`.
+    async fn submit_proven_batch(
+        &self,
+        proven_batch: ProvenBatch,
+        _proposed_batch: ProposedBatch,
+        _transaction_inputs: Vec<TransactionInputs>,
+    ) -> Result<BlockNumber, RpcError> {
+        let mut mock_chain = self.mock_chain.write();
+        mock_chain.add_pending_batch(proven_batch);
+        drop(mock_chain);
 
         let block_num = self.get_chain_tip_block_num();
 
