@@ -2,7 +2,7 @@ import { vi, beforeEach, afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";
 
 // Mock the entire @miden-sdk/miden-sdk module before any imports
-vi.mock("@miden-sdk/miden-sdk", () => {
+vi.mock("@miden-sdk/miden-sdk/lazy", () => {
   const createMockAccountId = (id: string = "0x1234567890abcdef") => ({
     toString: vi.fn(() => id),
     toHex: vi.fn(() => id),

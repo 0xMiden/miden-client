@@ -3,13 +3,13 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { useImportStore } from "../../hooks/useImportStore";
 import { useMiden } from "../../context/MidenProvider";
 import { createMockWebClient } from "../mocks/miden-sdk";
-import { importStore as sdkImportStore } from "@miden-sdk/miden-sdk";
+import { importStore as sdkImportStore } from "@miden-sdk/miden-sdk/lazy";
 
 vi.mock("../../context/MidenProvider", () => ({
   useMiden: vi.fn(),
 }));
 
-vi.mock("@miden-sdk/miden-sdk", () => ({
+vi.mock("@miden-sdk/miden-sdk/lazy", () => ({
   importStore: vi.fn(),
 }));
 

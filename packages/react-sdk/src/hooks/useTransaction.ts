@@ -3,7 +3,7 @@ import { useMiden } from "../context/MidenProvider";
 import type {
   TransactionRequest,
   WasmWebClient as WebClient,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 import type {
   TransactionStage,
   TransactionResult,

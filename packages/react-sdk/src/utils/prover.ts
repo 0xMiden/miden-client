@@ -1,4 +1,4 @@
-import { TransactionProver } from "@miden-sdk/miden-sdk";
+import { TransactionProver } from "@miden-sdk/miden-sdk/lazy";
 import type { MidenConfig, ProverConfig, ProverTarget } from "../types";
 
 const DEFAULT_PROVER_URLS = {

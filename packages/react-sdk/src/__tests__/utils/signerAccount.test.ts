@@ -30,8 +30,8 @@ const mockCommitmentWord = {
 };
 
 // Mock the SDK module
-vi.mock("@miden-sdk/miden-sdk", async () => {
-  const actual = await vi.importActual("@miden-sdk/miden-sdk");
+vi.mock("@miden-sdk/miden-sdk/lazy", async () => {
+  const actual = await vi.importActual("@miden-sdk/miden-sdk/lazy");
   return {
     ...actual,
     AccountBuilder: vi.fn(() => mockBuilder),
@@ -55,7 +55,11 @@ vi.mock("@miden-sdk/miden-sdk", async () => {
 });
 
 // Import mocked modules for assertions
-import { AccountBuilder, AccountComponent, Word } from "@miden-sdk/miden-sdk";
+import {
+  AccountBuilder,
+  AccountComponent,
+  Word,
+} from "@miden-sdk/miden-sdk/lazy";
 
 describe("initializeSignerAccount", () => {
   let mockClient: any;

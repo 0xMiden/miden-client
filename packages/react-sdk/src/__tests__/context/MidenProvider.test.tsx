@@ -4,7 +4,7 @@ import React from "react";
 import {
   WasmWebClient as WebClient,
   TransactionProver,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 import { MidenProvider, useMiden } from "../../context/MidenProvider";
 import { useMidenStore } from "../../store/MidenStore";
 

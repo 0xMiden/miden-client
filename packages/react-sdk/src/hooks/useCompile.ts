@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { CompilerResource, getWasmOrThrow } from "@miden-sdk/miden-sdk";
+import { CompilerResource, getWasmOrThrow } from "@miden-sdk/miden-sdk/lazy";
 import type {
   AccountComponent,
   TransactionScript,
@@ -7,7 +7,7 @@ import type {
   CompileComponentOptions,
   CompileTxScriptOptions,
   CompileNoteScriptOptions,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 import { useMiden } from "../context/MidenProvider";
 
 export interface UseCompileResult {

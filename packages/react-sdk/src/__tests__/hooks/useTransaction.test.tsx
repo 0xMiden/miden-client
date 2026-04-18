@@ -3,7 +3,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { useTransaction } from "../../hooks/useTransaction";
 import { useMiden } from "../../context/MidenProvider";
 import { useMidenStore } from "../../store/MidenStore";
-import { NoteType } from "@miden-sdk/miden-sdk";
+import { NoteType } from "@miden-sdk/miden-sdk/lazy";
 import {
   createMockWebClient,
   createMockTransactionId,

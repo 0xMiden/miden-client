@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useImportNote } from "../../hooks/useImportNote";
 import { useMiden } from "../../context/MidenProvider";
-import { NoteFile } from "@miden-sdk/miden-sdk";
+import { NoteFile } from "@miden-sdk/miden-sdk/lazy";
 import { createMockWebClient } from "../mocks/miden-sdk";
 
 vi.mock("../../context/MidenProvider", () => ({

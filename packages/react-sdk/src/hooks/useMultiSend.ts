@@ -8,7 +8,7 @@ import {
   NoteType,
   NoteArray,
   TransactionRequestBuilder,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 import type {
   MultiSendOptions,
   TransactionStage,

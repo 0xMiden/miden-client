@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { TransactionFilter } from "@miden-sdk/miden-sdk";
-import type { TransactionId, TransactionRecord } from "@miden-sdk/miden-sdk";
+import { TransactionFilter } from "@miden-sdk/miden-sdk/lazy";
+import type {
+  TransactionId,
+  TransactionRecord,
+} from "@miden-sdk/miden-sdk/lazy";
 import { useMiden } from "../context/MidenProvider";
 import { useSyncStateStore } from "../store/MidenStore";
 import type {
