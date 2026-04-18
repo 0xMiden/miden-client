@@ -71,15 +71,12 @@ impl RpcError {
         }
     }
 
-    /// True when get_note_script_by_root failed because the script is absent (typed not-found or gRPC NOT_FOUND).
+    /// True when get_note_script_by_root failed because the script is absent (typed not-found or
+    /// gRPC NOT_FOUND).
     #[inline]
     pub fn is_note_script_not_found(&self) -> bool {
         match self {
-            Self::RequestError {
-                error_kind,
-                endpoint_error,
-                ..
-            } => {
+            Self::RequestError { error_kind, endpoint_error, .. } => {
                 matches!(
                     endpoint_error,
                     Some(EndpointError::GetNoteScriptByRoot(
