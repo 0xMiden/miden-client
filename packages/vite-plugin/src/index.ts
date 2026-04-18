@@ -66,7 +66,8 @@ export function midenVitePlugin(options?: MidenVitePluginOptions): Plugin {
       // root specifier; subpath imports fall through to Vite's standard ESM
       // resolution, which honors `exports`. Package-level deduplication is
       // handled separately via `resolve.dedupe` (see below).
-      const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escapeRegExp = (s: string) =>
+        s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const alias = wasmPackages.map((pkg) => {
         let replacement: string;
         try {
