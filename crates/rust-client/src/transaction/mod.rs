@@ -82,7 +82,7 @@ use super::Client;
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::domain::account::AccountStorageRequirements;
-use crate::rpc::{AccountStateAt, GrpcError, NodeRpcClient, RpcError};
+use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
@@ -661,7 +661,7 @@ where
             // Check if the node already has this script registered.
             match self.rpc_api.get_note_script_by_root(script_root).await {
                 Ok(_) => {},
-                Err(RpcError::RequestError { error_kind: GrpcError::NotFound, .. }) => {
+                Err(ref err) if err.is_note_script_not_found() => {
                     missing_scripts.push(script.clone());
                 },
                 Err(other) => {

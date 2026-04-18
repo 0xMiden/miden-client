@@ -15,6 +15,7 @@ use super::RpcEndpoint;
 
 pub mod node;
 pub use node::EndpointError;
+use node::GetNoteScriptByRootError;
 
 // RPC ERROR
 // ================================================================================================
@@ -58,6 +59,35 @@ impl RpcError {
         match self {
             Self::RequestError { endpoint_error, .. } => endpoint_error.as_ref(),
             _ => None,
+        }
+    }
+
+    /// gRPC error kind if this is a request error.
+    #[inline]
+    pub fn grpc_kind(&self) -> Option<&GrpcError> {
+        match self {
+            Self::RequestError { error_kind, .. } => Some(error_kind),
+            _ => None,
+        }
+    }
+
+    /// True when get_note_script_by_root failed because the script is absent (typed not-found or gRPC NOT_FOUND).
+    #[inline]
+    pub fn is_note_script_not_found(&self) -> bool {
+        match self {
+            Self::RequestError {
+                error_kind,
+                endpoint_error,
+                ..
+            } => {
+                matches!(
+                    endpoint_error,
+                    Some(EndpointError::GetNoteScriptByRoot(
+                        GetNoteScriptByRootError::ScriptNotFound
+                    ))
+                ) || (endpoint_error.is_none() && matches!(error_kind, GrpcError::NotFound))
+            },
+            _ => false,
         }
     }
 }
