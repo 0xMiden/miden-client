@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.3 (TBA)
+
+### Fixes
+
+* [FIX][web] Fixed `MidenProvider` crashing on first render when a non-local `prover` is configured. After the TLA removal in web-client #2010 (v0.14.2), any wasm-bindgen constructor called before `WebClient.createClient` resolved would throw `wasm.__wbindgen_malloc is undefined`. The default prover was constructed in a render-time `useMemo`, which fires before the init `useEffect`. Moved prover construction into a `useEffect` gated on `isReady` so it runs after WASM is initialized.
+
 ## 0.14.2 (2026-04-15)
 
 ### Features
