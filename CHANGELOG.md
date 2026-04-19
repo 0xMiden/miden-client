@@ -5,6 +5,7 @@
 ### Features
 
 * [FEATURE][web] Split `@miden-sdk/miden-sdk` into eager and lazy entry points. The default entry (`import from "@miden-sdk/miden-sdk"`) now awaits WASM at module top level via a small shim (`js/eager.js`) — consumers don't need `await MidenClient.ready()` / `isReady` before constructing wasm-bindgen types. The lazy entry (`import from "@miden-sdk/miden-sdk/lazy"`) preserves the previous behavior and is required for Capacitor WKWebView hosts (the custom-scheme handler hangs on TLA) and Next.js SSR. Verified empirically against the Miden Wallet's iOS E2E suite on devnet. `@miden-sdk/react` imports from `/lazy` internally and manages readiness via `isReady`.
+* [FEATURE][web] Expose `lastAuthError()` on `MidenClient` for typed sign-callback failure recovery — preserves the raw thrown value from the JS signCallback so consumers can distinguish locked/rejected/IO-error failure modes ([#2058](https://github.com/0xMiden/miden-client/pull/2058)).
 * [FEATURE][web] Added `"custom"` operation to `preview()` so users can dry-run any pre-built `TransactionRequest`, not just send/mint/consume/swap ([#2052](https://github.com/0xMiden/miden-client/pull/2052)).
 * [FEATURE][web] Exposed `BlockHeader.nativeAssetId()` so JavaScript consumers can read the native fungible-faucet account ID from a block header. The field already rides the RPC wire and is decoded into the Rust `BlockHeader`, but no WASM accessor existed, forcing wallets and dApps to hardcode the native faucet per network ([#2070](https://github.com/0xMiden/miden-client/issues/2070)).
 

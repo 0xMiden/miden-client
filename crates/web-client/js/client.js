@@ -197,6 +197,23 @@ export class MidenClient {
   }
 
   /**
+   * Returns the raw JS value that the most recent sign-callback invocation
+   * threw, or `null` if the last sign call succeeded (or no call has
+   * happened yet).
+   *
+   * Useful for recovering structured metadata (e.g. a `reason: 'locked'`
+   * property) that the kernel-level `auth::request` diagnostic would
+   * otherwise erase. Call immediately after catching a failed
+   * `transactions.submit` / `transactions.send` / `transactions.consume`.
+   *
+   * @returns {any} The raw thrown value, or `null`.
+   */
+  lastAuthError() {
+    this.assertNotTerminated();
+    return this.#inner.lastAuthError();
+  }
+
+  /**
    * Terminates the underlying Web Worker. After this, all method calls will throw.
    */
   terminate() {
