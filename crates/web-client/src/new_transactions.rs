@@ -207,12 +207,12 @@ impl WebClient {
 
     /// Generates a transaction proof using the provided prover.
     ///
-    /// Takes the prover by reference so the JS-side handle is NOT consumed.
-    /// Previous versions took `Option<TransactionProver>` by value, which
-    /// transferred ownership via wasm-bindgen on each call — invalidating
-    /// the JS object's internal WASM handle. After one use, subsequent
-    /// calls from JS would pass a dangling handle that wasm-bindgen
-    /// interpreted as `None`, silently falling back to the local prover.
+    /// Takes the prover by reference so the JS-side handle is NOT consumed
+    /// by wasm-bindgen. Taking `TransactionProver` by value would transfer
+    /// ownership on each call, invalidating the JS object's internal WASM
+    /// handle; after one use, subsequent calls from JS would pass a dangling
+    /// handle that wasm-bindgen interprets as `None`, silently falling back
+    /// to the local prover.
     #[wasm_bindgen(js_name = "proveTransactionWithProver")]
     pub async fn prove_transaction_with_prover(
         &mut self,
