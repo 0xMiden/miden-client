@@ -55,7 +55,7 @@ impl WebClient {
 
         let tx_id = transaction_result.id();
 
-        let proven_transaction = self.prove_transaction(&transaction_result, None).await?;
+        let proven_transaction = self.prove_transaction(&transaction_result).await?;
 
         let submission_height =
             self.submit_proven_transaction(&proven_transaction, &transaction_result).await?;
@@ -82,7 +82,7 @@ impl WebClient {
         let tx_id = transaction_result.id();
 
         let proven_transaction =
-            self.prove_transaction(&transaction_result, Some(prover.clone())).await?;
+            self.prove_transaction_with_prover(&transaction_result, prover).await?;
 
         let submission_height =
             self.submit_proven_transaction(&proven_transaction, &transaction_result).await?;
@@ -196,16 +196,41 @@ impl WebClient {
         }
     }
 
-    /// Generates a transaction proof using either the provided prover or the client's default
-    /// prover if none is supplied.
+    /// Generates a transaction proof using the client's default (local) prover.
     #[wasm_bindgen(js_name = "proveTransaction")]
     pub async fn prove_transaction(
         &mut self,
         transaction_result: &TransactionResult,
-        prover: Option<TransactionProver>,
+    ) -> Result<ProvenTransaction, JsValue> {
+        self.prove_transaction_impl(transaction_result, None).await
+    }
+
+    /// Generates a transaction proof using the provided prover.
+    ///
+    /// Takes the prover by reference so the JS-side handle is NOT consumed
+    /// by wasm-bindgen. Taking `TransactionProver` by value would transfer
+    /// ownership on each call, invalidating the JS object's internal WASM
+    /// handle; after one use, subsequent calls from JS would pass a dangling
+    /// handle that wasm-bindgen interprets as `None`, silently falling back
+    /// to the local prover.
+    #[wasm_bindgen(js_name = "proveTransactionWithProver")]
+    pub async fn prove_transaction_with_prover(
+        &mut self,
+        transaction_result: &TransactionResult,
+        prover: &TransactionProver,
+    ) -> Result<ProvenTransaction, JsValue> {
+        self.prove_transaction_impl(transaction_result, Some(prover.get_prover())).await
+    }
+
+    async fn prove_transaction_impl(
+        &mut self,
+        transaction_result: &TransactionResult,
+        prover_arc: Option<
+            alloc::sync::Arc<dyn miden_client::transaction::TransactionProver + Send + Sync>,
+        >,
     ) -> Result<ProvenTransaction, JsValue> {
         #[cfg(feature = "testing")]
-        if prover.is_none() && self.mock_rpc_api.is_some() {
+        if prover_arc.is_none() && self.mock_rpc_api.is_some() {
             return LocalTransactionProver::default()
                 .prove_dummy(transaction_result.native().executed_transaction().clone())
                 .map(Into::into)
@@ -213,10 +238,9 @@ impl WebClient {
         }
 
         if let Some(client) = self.get_mut_inner() {
-            let prover_arc =
-                prover.map_or_else(|| client.prover(), |custom_prover| custom_prover.get_prover());
+            let prover = prover_arc.unwrap_or_else(|| client.prover());
 
-            Box::pin(client.prove_transaction_with(transaction_result.native(), prover_arc))
+            Box::pin(client.prove_transaction_with(transaction_result.native(), prover))
                 .await
                 .map(Into::into)
                 .map_err(|err| js_error_with_context(err, "failed to prove transaction"))

@@ -169,7 +169,10 @@ export const test = base.extend<{ forEachTest: void }>({
                 )
               : window.TransactionProver.newLocalProver();
 
-            const proven = await client.proveTransaction(result, proverToUse);
+            const proven = await client.proveTransactionWithProver(
+              result,
+              proverToUse
+            );
             const submissionHeight = await client.submitProvenTransaction(
               proven,
               result

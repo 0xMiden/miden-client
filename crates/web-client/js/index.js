@@ -774,7 +774,12 @@ class WebClient {
     try {
       if (!this.worker) {
         const wasmWebClient = await this.getWasmWebClient();
-        return await wasmWebClient.proveTransaction(transactionResult, prover);
+        return prover
+          ? await wasmWebClient.proveTransactionWithProver(
+              transactionResult,
+              prover
+            )
+          : await wasmWebClient.proveTransaction(transactionResult);
       }
 
       const wasm = await getWasmOrThrow();
@@ -794,6 +799,10 @@ class WebClient {
       console.error("INDEX.JS: Error in proveTransaction:", error);
       throw error;
     }
+  }
+
+  async proveTransactionWithProver(transactionResult, prover) {
+    return this.proveTransaction(transactionResult, prover);
   }
 
   async applyTransaction(transactionResult, submissionHeight) {
