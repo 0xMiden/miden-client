@@ -3,14 +3,14 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
+use miden_client::assembly::CodeBuilder;
 use miden_client::keystore::Keystore;
-use miden_client::transaction::{AdviceInputs, TransactionRequestBuilder};
+use miden_client::transaction::{AdviceInputs, TransactionRequestBuilder, TransactionScript};
 use miden_client::vm::Package;
 use miden_client::{Client, Deserializable, Felt, Word};
 
-use crate::create_dynamic_table;
 use crate::errors::CliError;
-use crate::utils::parse_account_id;
+use crate::utils::{parse_account_id, print_executed_transaction};
 
 // CALL COMMAND
 // ================================================================================================
@@ -18,8 +18,7 @@ use crate::utils::parse_account_id;
 #[derive(Debug, Clone, Parser)]
 #[command(about = "Call a procedure on a local account and display the result and state delta")]
 pub struct CallCmd {
-    /// Account and procedure in the form `<ACCOUNT_ID>:<PROCEDURE>`, where `PROCEDURE` is a
-    /// procedure name or MAST root hash (0x-prefixed hex).
+    /// Account and procedure in the form `<ACCOUNT_ID>:<PROCEDURE>`.
     #[arg(value_name = "ACCOUNT_ID:PROCEDURE")]
     target: String,
 
@@ -51,61 +50,54 @@ impl CallCmd {
         })?;
 
         let account_id = parse_account_id(&client, account_str).await?;
+        client.try_get_account(account_id).await?;
 
         let package = load_package(&self.package)?;
 
-        let (digest, param_count, result_count) = if procedure.starts_with("0x") {
-            let digest = Word::try_from(procedure).map_err(|e| {
-                CliError::InvalidArgument(format!("Invalid procedure hash '{procedure}': {e}"))
-            })?;
-            (digest, None, 0)
-        } else {
-            let digest = resolve_procedure_digest(&package, procedure)?;
-            let (param_count, result_count) = print_manifest_signature(&package, procedure);
-            (digest, param_count, result_count)
-        };
-
-        println!("DEBUG procedure digest: {}", digest.to_hex());
+        let digest = resolve_procedure_digest(&package, procedure)?;
+        let ProcedureSignature { param_count, result_count } =
+            print_manifest_signature(&package, procedure);
 
         let args = parse_args(&self.args)?;
 
-        if let Some(expected) = param_count
-            && args.len() != expected
-        {
-            return Err(CliError::InvalidArgument(format!(
-                "Procedure '{}' expects {} argument(s), got {}.",
-                procedure,
-                expected,
-                args.len()
-            )));
+        match param_count {
+            Some(expected) if args.len() != expected => {
+                return Err(CliError::InvalidArgument(format!(
+                    "Procedure '{procedure}' expects {expected} argument(s), got {}.",
+                    args.len()
+                )));
+            },
+            None => {
+                println!(
+                    "Warning: no type info for procedure '{procedure}'. Skipping argument \
+                     count check. Passing a wrong number of arguments may cause errors or \
+                     wrong results."
+                );
+            },
+            _ => {},
         }
 
-        let library = &*package.mast;
+        // The account's code is loaded into the from the client's store in th VM runtime, so we
+        // don't need the library into the compiled script. But the assembler still needs
+        // it at compile time to resolve `call.<digest>` to a known procedure — otherwise it
+        // emits a "phantom target" warning. Dynamic linking provides that resolution without
+        // embedding the library bytes in the script.
+        let linked_builder =
+            client.code_builder().with_dynamically_linked_library(package.mast.as_ref())?;
 
-        // 1) Read-only execution to get return values
-        // When result_count is unknown (0), use args.len() to preserve values on
-        // the stack so print_output_stack can auto-detect non-zero results.
-        let read_result_count = if result_count > 0 { result_count } else { args.len() };
-        let read_script = generate_tx_script(&digest, &args, read_result_count);
-
-        let read_tx_script = client
-            .code_builder()
-            .with_statically_linked_library(library)?
-            .compile_tx_script(&read_script)?;
+        // 1) Read-only execution to get return values. If `result_count` is unknown we skip
+        // the drop sequence and let `print_output_stack` auto-detect results from the stack.
+        let read_tx_script =
+            generate_tx_script(linked_builder.clone(), &digest, &args, result_count)?;
 
         let output_stack = client
             .execute_program(account_id, read_tx_script, AdviceInputs::default(), BTreeMap::new())
             .await?;
 
-        // Print result
         print_output_stack(&output_stack, result_count);
 
-        // 2) Transaction execution to get state delta
-        let delta_script = generate_tx_script(&digest, &args, 0);
-        let delta_tx_script = client
-            .code_builder()
-            .with_statically_linked_library(library)?
-            .compile_tx_script(&delta_script)?;
+        // 2) Transaction execution to get state delta.
+        let delta_tx_script = generate_tx_script(linked_builder, &digest, &args, Some(0))?;
 
         let tx_request = TransactionRequestBuilder::new()
             .custom_script(delta_tx_script)
@@ -116,7 +108,7 @@ impl CallCmd {
 
         match client.execute_transaction(account_id, tx_request).await {
             Ok(tx_result) => {
-                print_delta(tx_result.executed_transaction());
+                print_executed_transaction(tx_result.executed_transaction())?;
             },
             Err(e) => {
                 println!("\n(Could not compute state delta: {e:?})");
@@ -137,10 +129,9 @@ fn load_package(path: &Path) -> Result<Package, CliError> {
             path.display()
         )));
     }
-    let bytes = std::fs::read(path)
-        .map_err(|e| CliError::Exec(Box::new(e), format!("Failed to read: {}", path.display())))?;
+    let bytes = std::fs::read(path)?;
     Package::read_from_bytes(&bytes).map_err(|e| {
-        CliError::Exec(Box::new(e), format!("Failed to deserialize: {}", path.display()))
+        CliError::Parse(Box::new(e), format!("Failed to deserialize package: {}", path.display()))
     })
 }
 
@@ -175,7 +166,19 @@ fn parse_args(args: &[String]) -> Result<Vec<u64>, CliError> {
         .collect()
 }
 
-fn print_manifest_signature(package: &Package, procedure_name: &str) -> (Option<usize>, usize) {
+/// Parameter and result counts from a procedure's manifest signature. `None` means the
+/// information is unavailable (procedure missing from manifest or export lacks type info).
+struct ProcedureSignature {
+    param_count: Option<usize>,
+    result_count: Option<usize>,
+}
+
+/// Prints the signature of `procedure_name` from the package manifest and returns its parameter
+/// and result counts. If the procedure is missing, prints the list of available exports.
+fn print_manifest_signature(package: &Package, procedure_name: &str) -> ProcedureSignature {
+    const UNKNOWN: ProcedureSignature =
+        ProcedureSignature { param_count: None, result_count: None };
+
     use miden_client::vm::PackageExport;
 
     let kebab_name = procedure_name.replace('_', "-");
@@ -209,10 +212,13 @@ fn print_manifest_signature(package: &Package, procedure_name: &str) -> (Option<
             let params_str = params.join(", ");
             println!("Raw Signature: {procedure_name}({params_str}){ret_str}\n");
 
-            return (Some(sig.params.len()), sig.results.len());
+            return ProcedureSignature {
+                param_count: Some(sig.params.len()),
+                result_count: Some(sig.results.len()),
+            };
         }
         println!("Raw Signature: {procedure_name}(...) [no type info]\n");
-        return (None, 0);
+        return UNKNOWN;
     }
 
     println!("(procedure '{procedure_name}' not found in manifest exports)");
@@ -223,14 +229,13 @@ fn print_manifest_signature(package: &Package, procedure_name: &str) -> (Option<
         }
     }
     println!();
-    (None, 0)
+    UNKNOWN
 }
 
-fn print_output_stack(stack: &[Felt; 16], expected_results: usize) {
-    let count = if expected_results > 0 {
-        expected_results
-    } else {
-        stack.iter().rposition(|v| v.as_canonical_u64() != 0).map_or(0, |pos| pos + 1)
+fn print_output_stack(stack: &[Felt; 16], expected_results: Option<usize>) {
+    let count = match expected_results {
+        Some(n) => n,
+        None => stack.iter().rposition(|v| v.as_canonical_u64() != 0).map_or(0, |pos| pos + 1),
     };
 
     if count == 0 {
@@ -245,80 +250,59 @@ fn print_output_stack(stack: &[Felt; 16], expected_results: usize) {
     }
 }
 
-fn generate_tx_script(digest: &Word, args: &[u64], result_count: usize) -> String {
+/// Builds a transaction script that pushes `args`, calls the procedure at `digest`, and optionally
+/// drops the pushed args from under the results. `Some(n)` keeps the top `n` values; `None` skips
+/// drops.
+fn generate_tx_script(
+    code_builder: CodeBuilder,
+    digest: &Word,
+    args: &[u64],
+    result_count: Option<usize>,
+) -> Result<TransactionScript, CliError> {
+    // MASM `movup.n` only works for n in 2..=15. The VM stack exposes only the top
+    // 16 elements; anything deeper lives in the overflow table and cannot be reached
+    // by `movup`. So we can't drop args from under more than 15 results.
+    // See miden-vm/docs/src/user_docs/assembly/instruction_reference.md (movup row)
+    // and miden-vm/docs/src/design/stack/stack_ops.md (MOVUP/MOVDN sections).
+    if let Some(n) = result_count
+        && n > 15
+    {
+        return Err(CliError::InvalidArgument(format!(
+            "Procedure returns {n} values; only up to 15 are supported."
+        )));
+    }
+
     let mut script = String::from("begin\n");
 
-    // Push args in reverse so first arg ends up on top
+    // Push args in reverse so the first arg ends up on top.
     for arg in args.iter().rev() {
         writeln!(script, "    push.{arg}").unwrap();
     }
 
     writeln!(script, "    call.{}", digest.to_hex()).unwrap();
 
-    // Drop pushed args from under the results to restore stack depth to 16
     let to_drop = args.len();
     if to_drop > 0 {
         match result_count {
-            0 => {
+            Some(0) => {
                 for _ in 0..to_drop {
                     script.push_str("    drop\n");
                 }
             },
-            1 => {
+            Some(1) => {
                 for _ in 0..to_drop {
                     script.push_str("    swap drop\n");
                 }
             },
-            n => {
+            Some(n) => {
                 for _ in 0..to_drop {
                     writeln!(script, "    movup.{n} drop").unwrap();
                 }
             },
+            None => {},
         }
     }
 
     script.push_str("end\n");
-    script
-}
-
-fn print_delta(executed_tx: &miden_client::transaction::ExecutedTransaction) {
-    let delta = executed_tx.account_delta();
-    let has_values = delta.storage().values().next().is_some();
-    let has_maps = delta.storage().maps().next().is_some();
-    if !has_values && !has_maps && delta.nonce_delta() == Felt::new(0) {
-        println!("\nState delta: no changes");
-        return;
-    }
-
-    println!("\nState delta:");
-
-    if has_values {
-        let mut table = create_dynamic_table(&["Storage Slot", "New Value"]);
-        for (slot, value) in delta.storage().values() {
-            table.add_row(vec![slot.to_string(), value.to_hex()]);
-        }
-        println!("{table}");
-    }
-
-    if has_maps {
-        let mut table = create_dynamic_table(&["Storage Slot", "Map Key", "New Value"]);
-        for (slot, map_delta) in delta.storage().maps() {
-            for (key, value) in map_delta.entries() {
-                table.add_row(vec![slot.to_string(), Word::from(*key).to_hex(), value.to_hex()]);
-            }
-        }
-        println!("{table}");
-    }
-
-    let nonce_before = executed_tx.initial_account().nonce();
-    let nonce_after = executed_tx.final_account().nonce();
-    println!("Nonce: {nonce_before} -> {nonce_after}");
-
-    let output_notes: Vec<_> = executed_tx.output_notes().iter().collect();
-    if !output_notes.is_empty() {
-        println!("\nOutput notes ({}):", output_notes.len());
-        for note in &output_notes {
-            println!("  - {}", note.id().to_hex());
-        }
-    }
+    Ok(code_builder.compile_tx_script(&script)?)
 }

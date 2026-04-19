@@ -1297,15 +1297,124 @@ fn call_nonexistent_procedure() {
     cmd.current_dir(&temp_dir).assert().failure();
 }
 
+/// Helper: builds the `call-test` package (arithmetic + storage procedures) at runtime and
+/// writes the serialized `.masp` to `out_path`.
+fn build_call_test_masp(out_path: &Path) {
+    use miden_client::account::component::{
+        AccountComponentMetadata,
+        FeltSchema,
+        StorageSchema,
+        StorageSlotSchema,
+        ValueSlotSchema,
+        WordSchema,
+    };
+    use miden_client::account::{AccountType, StorageSlotName};
+    use miden_client::assembly::{CodeBuilder, Library};
+    use miden_client::vm::{
+        Package,
+        PackageExport,
+        PackageManifest,
+        ProcedureExport,
+        QualifiedProcedureName,
+        Section,
+        SectionId,
+        TargetType,
+    };
+    use midenc_hir_type::{CallConv, FunctionType, Type};
+
+    let call_test_code = r#"
+        use miden::protocol::native_account
+        use miden::core::word
+        use miden::core::sys
+
+        const STORED_VALUE = word("miden::testing::call_test::stored_value")
+
+        pub proc add
+            add
+        end
+
+        pub proc set_value
+            push.STORED_VALUE[0..2]
+            exec.native_account::set_item
+            dropw
+            exec.sys::truncate_stack
+        end
+    "#;
+
+    let library: Library = CodeBuilder::default()
+        .compile_component_code("miden::testing::call_test", call_test_code)
+        .expect("failed to compile call-test component")
+        .into();
+
+    let slot_name =
+        StorageSlotName::new("miden::testing::call_test::stored_value").expect("valid slot name");
+
+    let word_schema = WordSchema::new_value([
+        FeltSchema::new_void(),
+        FeltSchema::new_void(),
+        FeltSchema::new_void(),
+        FeltSchema::new_void(),
+    ]);
+
+    let storage_schema = StorageSchema::new([(
+        slot_name,
+        StorageSlotSchema::Value(ValueSlotSchema::new(None, word_schema)),
+    )])
+    .expect("valid storage schema");
+
+    let metadata = AccountComponentMetadata::new("call-test", AccountType::all())
+        .with_storage_schema(storage_schema);
+
+    let signature_overrides: [(&str, FunctionType); 2] = [
+        ("add", FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt], [Type::Felt])),
+        (
+            "set_value",
+            FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt, Type::Felt, Type::Felt], []),
+        ),
+    ];
+
+    let mut exports: Vec<PackageExport> = Vec::new();
+    for module_info in library.module_infos() {
+        for (_, proc_info) in module_info.procedures() {
+            let name = QualifiedProcedureName::new(module_info.path(), proc_info.name.clone());
+            let override_sig = signature_overrides
+                .iter()
+                .find(|(n, _)| *n == proc_info.name.as_str())
+                .map(|(_, sig)| sig.clone());
+            let export = ProcedureExport {
+                path: name.into_inner(),
+                digest: proc_info.digest,
+                signature: override_sig.or_else(|| proc_info.signature.as_deref().cloned()),
+                attributes: proc_info.attributes.clone(),
+            };
+            exports.push(PackageExport::Procedure(export));
+        }
+    }
+
+    let manifest = PackageManifest::new(exports).expect("manifest validation failed");
+    let section = Section::new(SectionId::ACCOUNT_COMPONENT_METADATA, metadata.to_bytes());
+
+    let package = Package {
+        name: metadata.name().to_string().into(),
+        version: metadata.version().clone(),
+        description: Some(metadata.description().to_string()),
+        mast: Arc::new(library),
+        manifest,
+        sections: vec![section],
+        kind: TargetType::AccountComponent,
+    };
+
+    fs::write(out_path, package.to_bytes()).expect("failed to write call-test .masp");
+}
+
 /// Helper: creates an account with the `call-test.masp` package and returns (`temp_dir`,
 /// `account_id`, `masp_path`).
 fn setup_call_test_account() -> (PathBuf, String, PathBuf) {
     let temp_dir = init_cli().1;
 
-    // Copy the build-generated call-test .masp into the temp dir
-    let masp_src = PathBuf::from(env!("CALL_TEST_MASP"));
+    // Generate the call-test .masp directly in the temp dir
     let masp_dst = temp_dir.join("call_test.masp");
-    fs::copy(&masp_src, &masp_dst).unwrap();
+    build_call_test_masp(&masp_dst);
 
     // Init storage for the stored_value slot
     let init_toml = r#"
@@ -1351,23 +1460,6 @@ fn setup_call_test_account() -> (PathBuf, String, PathBuf) {
     (temp_dir, account_id, masp_dst)
 }
 
-/// Helper: resolves the MAST root hash of a procedure from a .masp package file.
-fn resolve_procedure_hash(masp_path: &Path, procedure_name: &str) -> String {
-    use miden_client::Deserializable;
-    use miden_client::vm::Package;
-
-    let bytes = fs::read(masp_path).expect("Failed to read .masp file");
-    let package = Package::read_from_bytes(&bytes).expect("Failed to deserialize package");
-
-    for module_info in package.mast.module_infos() {
-        if let Some(digest) = module_info.get_procedure_digest_by_name(procedure_name) {
-            return digest.to_hex();
-        }
-    }
-
-    panic!("Procedure '{procedure_name}' not found in package");
-}
-
 /// Tests calling a procedure by name (add) with felt arguments.
 #[test]
 fn call_procedure_by_name() {
@@ -1377,26 +1469,6 @@ fn call_procedure_by_name() {
     cmd.args([
         "call",
         &format!("{account_id}:add"),
-        "3",
-        "7",
-        "--package",
-        masp_path.to_str().unwrap(),
-    ]);
-
-    cmd.current_dir(&temp_dir).assert().success();
-}
-
-/// Tests calling a procedure by MAST root hash (0x-prefixed hex).
-#[test]
-fn call_procedure_by_hash() {
-    let (temp_dir, account_id, masp_path) = setup_call_test_account();
-
-    let add_hash = resolve_procedure_hash(&masp_path, "add");
-
-    let mut cmd = cargo_bin_cmd!("miden-client");
-    cmd.args([
-        "call",
-        &format!("{account_id}:{add_hash}"),
         "3",
         "7",
         "--package",
@@ -1429,7 +1501,10 @@ fn call_shows_nonce_delta() {
     );
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Nonce:"), "Expected nonce delta in output:\n{stdout}");
+    assert!(
+        stdout.contains("Nonce incremented by:"),
+        "Expected nonce delta in output:\n{stdout}"
+    );
 }
 
 /// Tests calling `set_value` and verifying storage delta is shown.

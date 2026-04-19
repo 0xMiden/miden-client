@@ -36,17 +36,17 @@ tracing            = { workspace = true }
 tracing-subscriber = { version = "0.3" }
 
 [build-dependencies]
-miden-client    = { features = ["std"], workspace = true }
-midenc-hir-type = "0.5"
+miden-client = { features = ["std"], workspace = true }
 
 [dev-dependencies]
-anyhow       = { workspace = true }
-assert_cmd   = { version = "2.0" }
-miden-client = { features = ["testing"], workspace = true }
-predicates   = { version = "3.0" }
-regex        = { version = "1.0" }
-serial_test  = { features = ["file_locks"], version = "3.0" }
-uuid         = { features = ["serde", "v4"], version = "1.10" }
+anyhow          = { workspace = true }
+assert_cmd      = { version = "2.0" }
+miden-client    = { features = ["testing"], workspace = true }
+midenc-hir-type = "0.5"
+predicates      = { version = "3.0" }
+regex           = { version = "1.0" }
+serial_test     = { features = ["file_locks"], version = "3.0" }
+uuid            = { features = ["serde", "v4"], version = "1.10" }
 
 [lints]
 workspace = true
