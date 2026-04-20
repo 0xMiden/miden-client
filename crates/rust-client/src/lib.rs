@@ -371,28 +371,19 @@ pub struct Client<AUTH> {
     /// An instance of [`NoteTransportClient`] which provides a way for the client to connect to
     /// the Miden Note Transport network.
     note_transport_api: Option<Arc<dyn NoteTransportClient>>,
-    /// Cached in-memory [`PartialMmr`] representing the client's current view of the chain's MMR.
-    /// Lazily built from the store on first access and kept in sync across sync and prune
-    /// operations. If `None`, the next operation that needs the MMR will rebuild it from the
-    /// store.
-    ///
-    /// The cache carries a fingerprint of the store's latest peaks at build time. Before
-    /// returning it, that fingerprint is compared against the store to detect modifications
-    /// made outside the client (e.g. `importStore`) and force a rebuild on mismatch.
+    /// Cached [`PartialMmr`] for the chain's MMR. Lazily built from the store and kept in sync
+    /// across sync/prune operations. `None` forces a rebuild on next access.
     partial_mmr: Option<CachedPartialMmr>,
 }
 
-/// Cached [`PartialMmr`] paired with a fingerprint of the store's peaks at build time.
+/// Cached [`PartialMmr`] paired with a fingerprint of the store's peaks at build time. The
+/// fingerprint is compared against the store on read to detect external modifications (e.g.
+/// `importStore`) and trigger a rebuild on mismatch.
 ///
-/// The cached `mmr` is post-add (includes the chain tip as a leaf). The store, however, holds
-/// pre-add peaks — the peaks committed by the block header at the sync height. To detect
-/// external modifications to the store, we snapshot the hash of the store's latest peaks when
-/// the cache is populated. On subsequent reads, that hash is compared against the store's
-/// current peaks hash; a mismatch means the store changed under us and the cache must be
-/// rebuilt.
+/// The cached MMR includes the sync-height block as a tracked leaf; the store persists the
+/// peaks committed by that block's header, i.e. the peaks over the chain *before* that block
+/// was added, so the two states are offset by one leaf.
 pub(crate) struct CachedPartialMmr {
-    /// Hash of the store's latest blockchain peaks at the moment this cache entry was built.
-    /// Used as a staleness fingerprint against the store's current peaks.
     pub(crate) store_peaks_hash: Word,
     pub(crate) mmr: PartialMmr,
 }

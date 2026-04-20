@@ -138,7 +138,7 @@ where
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
         let input = self.build_sync_input().await?;
 
-        let (mut partial_mmr, cached_pre_add_peaks_hash) = self.take_or_build_partial_mmr().await?;
+        let (mut partial_mmr, cached_store_peaks_hash) = self.take_or_build_partial_mmr().await?;
 
         // Get the sync update from the network
         let state_sync_update = state_sync.sync_state(&mut partial_mmr, input).await?;
@@ -147,13 +147,13 @@ where
         debug!(sync_summary = ?sync_summary, "Sync summary computed");
         info!("Applying changes to the store.");
 
-        // If the sync advanced the chain, the pre-add peaks for the new chain tip were captured
-        // into block_updates before the chain tip leaf was added. Otherwise the MMR wasn't
-        // mutated and the cached hash is still valid.
-        let new_pre_add_peaks_hash = state_sync_update
+        // If the sync advanced the chain, the peaks that the store will persist for the new
+        // chain tip were captured into block_updates before the chain tip block was added as a
+        // leaf. Otherwise the MMR wasn't mutated and the cached hash is still valid.
+        let new_store_peaks_hash = state_sync_update
             .block_updates
             .peaks_for(state_sync_update.block_num)
-            .map_or(cached_pre_add_peaks_hash, MmrPeaks::hash_peaks);
+            .map_or(cached_store_peaks_hash, MmrPeaks::hash_peaks);
 
         // Apply received and computed updates to the store
         self.store
@@ -165,7 +165,7 @@ where
         self.untrack_and_prune_irrelevant_blocks(&mut partial_mmr).await?;
 
         // Put the fully updated MMR back into the cache.
-        self.cache_partial_mmr(partial_mmr, new_pre_add_peaks_hash);
+        self.cache_partial_mmr(partial_mmr, new_store_peaks_hash);
 
         Ok(sync_summary)
     }
@@ -215,16 +215,16 @@ where
         self.store.apply_state_sync(update).await?;
 
         // Prune irrelevant blocks (will rebuild the MMR from the now-updated store).
-        let (mut partial_mmr, pre_add_peaks_hash) = self.take_or_build_partial_mmr().await?;
+        let (mut partial_mmr, store_peaks_hash) = self.take_or_build_partial_mmr().await?;
         self.untrack_and_prune_irrelevant_blocks(&mut partial_mmr).await?;
-        self.cache_partial_mmr(partial_mmr, pre_add_peaks_hash);
+        self.cache_partial_mmr(partial_mmr, store_peaks_hash);
 
         Ok(())
     }
 
     /// Returns the in-memory [`PartialMmr`] if cached and still fresh, otherwise builds it from
-    /// the store. Also returns the hash of the store's pre-add peaks at the current sync height,
-    /// which callers thread back into [`Self::cache_partial_mmr`] when writing back.
+    /// the store. Also returns the hash of the store's peaks at the current sync height, which
+    /// callers thread back into [`Self::cache_partial_mmr`] when writing back.
     ///
     /// Freshness is verified by comparing the hash of the store's peaks at the current sync
     /// height against the hash captured when the cache was populated. If they differ (e.g. the
@@ -251,12 +251,9 @@ where
         Ok((mmr, store_peaks_hash))
     }
 
-    /// Writes the given MMR and its pre-add peaks hash into the in-memory cache.
-    pub(crate) fn cache_partial_mmr(&mut self, mmr: PartialMmr, pre_add_peaks_hash: Word) {
-        self.partial_mmr = Some(CachedPartialMmr {
-            store_peaks_hash: pre_add_peaks_hash,
-            mmr,
-        });
+    /// Writes the given MMR and the current store peaks hash into the in-memory cache.
+    pub(crate) fn cache_partial_mmr(&mut self, mmr: PartialMmr, store_peaks_hash: Word) {
+        self.partial_mmr = Some(CachedPartialMmr { store_peaks_hash, mmr });
     }
 
     /// Prunes irrelevant block data from the store.

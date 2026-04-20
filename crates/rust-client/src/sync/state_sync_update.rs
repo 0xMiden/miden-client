@@ -137,7 +137,8 @@ impl BlockUpdates {
     }
 
     /// Returns the peaks stored for the given block number, if any. For the chain tip entry
-    /// these are the pre-add peaks captured before the chain tip leaf was added to the MMR.
+    /// these are the peaks committed by that block's header — i.e. the state before the block
+    /// itself was added as a leaf.
     pub fn peaks_for(&self, block_num: BlockNumber) -> Option<&MmrPeaks> {
         self.block_headers.get(&block_num).map(|(_, _, peaks)| peaks)
     }

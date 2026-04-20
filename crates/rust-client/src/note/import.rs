@@ -275,14 +275,14 @@ where
                     //
                     // Building the MMR outside the loop would fail with BlockHeaderNotFound(0)
                     // because store will be fresh, which can't happen here.
-                    let (mut partial_mmr, pre_add_peaks_hash) =
+                    let (mut partial_mmr, store_peaks_hash) =
                         self.take_or_build_partial_mmr().await?;
                     let block_header = self
                         .get_and_store_authenticated_block(block_height, &mut partial_mmr)
                         .await?;
-                    // track() doesn't advance the MMR's forest, so the pre-add peaks hash is
+                    // track() doesn't advance the MMR's forest, so the store peaks hash is
                     // unchanged from what take_or_build_partial_mmr returned.
-                    self.cache_partial_mmr(partial_mmr, pre_add_peaks_hash);
+                    self.cache_partial_mmr(partial_mmr, store_peaks_hash);
 
                     note_changed |= note_record.block_header_received(&block_header)?;
                 } else {
@@ -336,7 +336,7 @@ where
                 Some(Some((metadata, inclusion_proof))) => {
                     // Building the MMR outside the loop would fail with BlockHeaderNotFound(0)
                     // because store will be fresh, which can't happen here.
-                    let (mut partial_mmr, pre_add_peaks_hash) =
+                    let (mut partial_mmr, store_peaks_hash) =
                         self.take_or_build_partial_mmr().await?;
                     let block_header = self
                         .get_and_store_authenticated_block(
@@ -345,7 +345,7 @@ where
                         )
                         .await?;
 
-                    self.cache_partial_mmr(partial_mmr, pre_add_peaks_hash);
+                    self.cache_partial_mmr(partial_mmr, store_peaks_hash);
 
                     let tag = metadata.tag();
                     let note_changed =
