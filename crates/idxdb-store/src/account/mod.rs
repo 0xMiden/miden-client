@@ -548,10 +548,6 @@ impl IdxdbStore {
         slot_name: StorageSlotName,
         key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
-        self.get_account_header(account_id)
-            .await?
-            .ok_or(StoreError::AccountDataNotFound(account_id))?;
-
         let promise = idxdb_get_account_storage(
             self.db_id(),
             account_id.to_string(),
@@ -560,9 +556,12 @@ impl IdxdbStore {
         let slots: Vec<AccountStorageIdxdbObject> =
             await_js(promise, "failed to fetch account storage").await?;
 
-        let slot = slots.into_iter().next().ok_or_else(|| {
-            StoreError::AccountError(AccountError::other("Storage slot not found"))
-        })?;
+        let Some(slot) = slots.into_iter().next() else {
+            self.get_account_header(account_id)
+                .await?
+                .ok_or(StoreError::AccountDataNotFound(account_id))?;
+            return Err(StoreError::AccountError(AccountError::other("Storage slot not found")));
+        };
 
         let slot_type = StorageSlotType::try_from(slot.slot_type)?;
         if slot_type != StorageSlotType::Map {
