@@ -29,7 +29,7 @@ use crate::rpc::domain::note::FetchedNote;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{InputNoteRecord, InputNoteState, NoteFilter};
 use crate::sync::NoteTagRecord;
-use crate::{Client, ClientError};
+use crate::{CachedPartialMmr, Client, ClientError};
 
 /// Note importing methods.
 impl<AUTH> Client<AUTH>
@@ -279,11 +279,17 @@ where
                     // Reaching this branch requires current_block_num >= block_height, and
                     // real notes have block_height >= 1, so the store has synced past genesis
                     // by this point and the build is safe.
-                    let mut partial_mmr = self.take_or_build_partial_mmr().await?;
+                    let (mut partial_mmr, pre_add_peaks_hash) =
+                        self.take_or_build_partial_mmr().await?;
                     let block_header = self
                         .get_and_store_authenticated_block(block_height, &mut partial_mmr)
                         .await?;
-                    self.cache_partial_mmr(partial_mmr).await?;
+                    // track() doesn't advance the MMR's forest, so the pre-add peaks hash is
+                    // unchanged from what take_or_build_partial_mmr returned.
+                    self.partial_mmr = Some(CachedPartialMmr {
+                        store_peaks_hash: pre_add_peaks_hash,
+                        mmr: partial_mmr,
+                    });
 
                     note_changed |= note_record.block_header_received(&block_header)?;
                 } else {
@@ -340,14 +346,20 @@ where
                     // building the MMR via the store would fail with BlockHeaderNotFound(0).
                     // check_expected_notes only returns proofs for already-synced blocks, so
                     // reaching here implies the store has synced past genesis.
-                    let mut partial_mmr = self.take_or_build_partial_mmr().await?;
+                    let (mut partial_mmr, pre_add_peaks_hash) =
+                        self.take_or_build_partial_mmr().await?;
                     let block_header = self
                         .get_and_store_authenticated_block(
                             inclusion_proof.location().block_num(),
                             &mut partial_mmr,
                         )
                         .await?;
-                    self.cache_partial_mmr(partial_mmr).await?;
+                    // track() doesn't advance the MMR's forest, so the pre-add peaks hash is
+                    // unchanged from what take_or_build_partial_mmr returned.
+                    self.partial_mmr = Some(CachedPartialMmr {
+                        store_peaks_hash: pre_add_peaks_hash,
+                        mmr: partial_mmr,
+                    });
 
                     let tag = metadata.tag();
                     let note_changed =

@@ -136,6 +136,12 @@ impl BlockUpdates {
         self.block_headers.values()
     }
 
+    /// Returns the peaks stored for the given block number, if any. For the chain tip entry
+    /// these are the pre-add peaks captured before the chain tip leaf was added to the MMR.
+    pub fn peaks_for(&self, block_num: BlockNumber) -> Option<&MmrPeaks> {
+        self.block_headers.get(&block_num).map(|(_, _, peaks)| peaks)
+    }
+
     /// Adds authentication nodes without an associated block header.
     ///
     /// This is used when a synced block is not stored (no relevant notes and not the chain tip)
