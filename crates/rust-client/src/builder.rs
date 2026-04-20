@@ -342,9 +342,8 @@ where
 
     /// Overrides the source manager used to retain MASM source information for assembled programs.
     ///
-    /// If not set, the client uses a default
-    /// [`DefaultSourceManager`](miden_protocol::assembly::DefaultSourceManager). The same instance
-    /// is forwarded to the transaction executor and to every script compiled through the client
+    /// If not set, the client uses a default [`DefaultSourceManager`]. The same instance is
+    /// forwarded to the transaction executor and to every script compiled through the client
     /// (e.g. via [`Client::code_builder`](crate::Client::code_builder)).
     ///
     /// Set this explicitly only when scripts or modules are compiled outside the client (for
