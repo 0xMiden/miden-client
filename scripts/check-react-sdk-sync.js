@@ -48,9 +48,39 @@ const major = Number(versionMatch[1]);
 const minor = Number(versionMatch[2]);
 const patch = Number(versionMatch[3]);
 const prerelease = versionMatch[4] || "";
-const expectedRange = prerelease
+// Default range used by --fix when a range needs to be created or repaired.
+const defaultRange = prerelease
   ? `^${major}.${minor}.${patch}${prerelease}`
   : `^${major}.${minor}.0`;
+
+// A range is compatible when it is a caret range within the same
+// major.minor.prerelease as the web-client, with a patch no higher than the
+// current web-client patch. This permits tightening the lower bound past .0
+// (e.g. "^0.14.1" when web-client is 0.14.1) to exclude buggy prior patches,
+// while still rejecting ranges that cross the minor boundary.
+const parseCaretRange = (range) => {
+  const m = /^\^(\d+)\.(\d+)\.(\d+)(-.+)?$/.exec(range || "");
+  return m
+    ? {
+        major: Number(m[1]),
+        minor: Number(m[2]),
+        patch: Number(m[3]),
+        prerelease: m[4] || "",
+      }
+    : null;
+};
+
+const isCompatibleRange = (range) => {
+  const parsed = parseCaretRange(range);
+  if (!parsed) return false;
+  if (parsed.major !== major || parsed.minor !== minor) return false;
+  if (parsed.prerelease !== prerelease) return false;
+  return parsed.patch <= patch;
+};
+
+const compatibilityHint = prerelease
+  ? `^${major}.${minor}.X${prerelease} with X <= ${patch}`
+  : `^${major}.${minor}.X with X between 0 and ${patch}`;
 
 const peerDeps = reactSdkPkg.peerDependencies || {};
 const actualRange = peerDeps["@miden-sdk/miden-sdk"];
@@ -64,11 +94,9 @@ if (!actualRange) {
   errors.push(
     "Missing peerDependencies entry for @miden-sdk/miden-sdk in react-sdk."
   );
-}
-
-if (actualRange !== expectedRange) {
+} else if (!isCompatibleRange(actualRange)) {
   errors.push(
-    `React SDK peer range "${actualRange}" does not match expected "${expectedRange}" for web-client ${webClientVersion}.`
+    `React SDK peer range "${actualRange}" is not compatible with web-client ${webClientVersion}. Expected ${compatibilityHint}.`
   );
 }
 
@@ -88,25 +116,23 @@ if (!walletRange) {
   errors.push(
     "Missing dependencies entry for @miden-sdk/miden-sdk in wallet example."
   );
-}
-
-if (walletRange !== expectedRange) {
+} else if (!isCompatibleRange(walletRange)) {
   errors.push(
-    `Wallet example dependency "${walletRange}" does not match expected "${expectedRange}" for web-client ${webClientVersion}.`
+    `Wallet example dependency "${walletRange}" is not compatible with web-client ${webClientVersion}. Expected ${compatibilityHint}.`
   );
 }
 
 if (errors.length > 0) {
   if (shouldFix) {
     let updated = false;
-    if (actualRange !== expectedRange) {
-      peerDeps["@miden-sdk/miden-sdk"] = expectedRange;
+    if (!actualRange || !isCompatibleRange(actualRange)) {
+      peerDeps["@miden-sdk/miden-sdk"] = defaultRange;
       reactSdkPkg.peerDependencies = peerDeps;
       updated = true;
     }
 
-    if (walletRange !== expectedRange) {
-      walletDeps["@miden-sdk/miden-sdk"] = expectedRange;
+    if (!walletRange || !isCompatibleRange(walletRange)) {
+      walletDeps["@miden-sdk/miden-sdk"] = defaultRange;
       walletExamplePkg.dependencies = walletDeps;
       updated = true;
     }
@@ -115,7 +141,7 @@ if (errors.length > 0) {
       writeJson(reactSdkPath, reactSdkPkg);
       writeJson(walletExamplePath, walletExamplePkg);
       console.log(
-        `Updated react-sdk peer range to "${expectedRange}" and wallet dependency based on web-client ${webClientVersion}.`
+        `Updated react-sdk peer range and wallet dependency to "${defaultRange}" based on web-client ${webClientVersion}.`
       );
     }
 
@@ -129,5 +155,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-  `React SDK version/peer range and wallet dependency match web-client ${webClientVersion} (${expectedRange}).`
+  `React SDK peer range "${actualRange}" and wallet dependency "${walletRange}" are compatible with web-client ${webClientVersion}.`
 );

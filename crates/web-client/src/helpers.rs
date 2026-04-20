@@ -1,5 +1,10 @@
 use miden_client::account::component::{AccountComponent, BasicWallet};
-use miden_client::account::{Account, AccountBuilder, AccountType};
+use miden_client::account::{
+    Account,
+    AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
+    AccountType,
+};
 use miden_client::auth::{AuthSchemeId as NativeAuthScheme, AuthSecretKey, AuthSingleSig};
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
@@ -64,7 +69,7 @@ pub(crate) async fn generate_wallet(
         .storage_mode(storage_mode.into())
         .with_auth_component(auth_component)
         .with_component(BasicWallet)
-        .build()
+        .build_with_schema_commitment()
         .map_err(|err| js_error_with_context(err, "failed to create new wallet"))?;
 
     let _account_seed =

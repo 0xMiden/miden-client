@@ -17,10 +17,41 @@ export async function insertBlockHeader(
       hasClientNotes: hasClientNotes.toString(),
     };
 
-    await db.blockHeaders.put(data);
+    // Mirror SQLite's `insert_block_header_tx`: do an INSERT OR IGNORE on the
+    // row, then explicitly upgrade `has_client_notes` to true if the caller
+    // says so. Two callers hit this:
+    //   - Genesis flow — no existing row; the add succeeds.
+    //   - `get_and_store_authenticated_block` for a past block — a row
+    //     written by `applyStateSync` typically already exists. Overwriting
+    //     it would clobber the correct historical peaks (popcount ==
+    //     block_num) with peaks from the caller's current `PartialMmr`
+    //     forest (popcount == current sync height). Later reads of those
+    //     peaks trip `MmrPeaks::new`'s InvalidPeaks validation and wedge
+    //     sync for the rest of the session.
+    //
+    // The `has_client_notes` upgrade is load-bearing: `get_tracked_block_
+    // header_numbers` filters by this flag to seed `tracked_leaves`, which
+    // `get_partial_blockchain_nodes(Forest)` relies on. A private-note
+    // import at a block previously synced as irrelevant must flip the flag
+    // to true or the auth paths won't be tracked.
+    await db.blockHeaders.add(data).catch(async (err: unknown) => {
+      if (!isConstraintError(err)) throw err;
+      if (hasClientNotes) {
+        await db.blockHeaders.update(blockNum, { hasClientNotes: "true" });
+      }
+    });
   } catch (err) {
     logWebStoreError(err);
   }
+}
+
+/** Detect Dexie's primary-key collision error across sync + bulk wrappings. */
+function isConstraintError(err: unknown): boolean {
+  const e = err as
+    | { name?: string; inner?: { name?: string } }
+    | null
+    | undefined;
+  return e?.name === "ConstraintError" || e?.inner?.name === "ConstraintError";
 }
 
 export async function insertPartialBlockchainNodes(

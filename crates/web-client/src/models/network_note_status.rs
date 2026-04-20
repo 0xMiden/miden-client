@@ -17,7 +17,8 @@ pub struct NetworkNoteStatusInfo {
 
 #[js_export]
 impl NetworkNoteStatusInfo {
-    /// Returns the status as a string: "Pending", "Processed", "Discarded", or "Committed".
+    /// Returns the status as a string: `"Pending"`, `"NullifierInflight"`, `"Discarded"`, or
+    /// `"NullifierCommitted"`.
     #[js_export(getter)]
     pub fn status(&self) -> String {
         self.status.to_string()

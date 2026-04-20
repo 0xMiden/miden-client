@@ -11,8 +11,12 @@ jobs:
   check-version:
     runs-on: ubuntu-24.04
     outputs:
-      should_publish: ${{ steps.check_version.outputs.should_publish }}
-      current_version: ${{ steps.check_version.outputs.current_version }}
+      should_publish_web: ${{ steps.check_web_version.outputs.should_publish }}
+      web_version: ${{ steps.check_web_version.outputs.current_version }}
+      should_publish_react: ${{ steps.check_react_version.outputs.should_publish }}
+      react_version: ${{ steps.check_react_version.outputs.current_version }}
+      should_publish_vite: ${{ steps.check_vite_plugin_version.outputs.should_publish }}
+      vite_version: ${{ steps.check_vite_plugin_version.outputs.current_version }}
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -20,14 +24,22 @@ jobs:
           fetch-depth: 0
           ref: refs/tags/${{ github.event.release.tag_name }}
 
-      - name: Ensure release tag has version bump
-        id: check_version
+      - name: Ensure release tag has web-client version bump
+        id: check_web_version
         run: ./scripts/check-web-client-version-release.sh "$GITHUB_SHA"
+
+      - name: Ensure release tag has react-sdk version bump
+        id: check_react_version
+        run: ./scripts/check-react-sdk-version-release.sh "$GITHUB_SHA"
+
+      - name: Ensure release tag has vite-plugin version bump
+        id: check_vite_plugin_version
+        run: ./scripts/check-vite-plugin-version-release.sh "$GITHUB_SHA"
 
   # Build native Node.js binaries for each platform
   build-native-nodejs:
     needs: check-version
-    if: needs.check-version.outputs.should_publish == 'true'
+    if: needs.check-version.outputs.should_publish_web == 'true'
     strategy:
       matrix:
         include:
@@ -75,8 +87,7 @@ jobs:
     needs: [check-version, build-native-nodejs]
     if: >
       !cancelled() &&
-      needs.check-version.result == 'success' &&
-      needs.check-version.outputs.should_publish == 'true'
+      needs.check-version.result == 'success'
     runs-on: ubuntu-24.04
     steps:
       - name: Check out code
@@ -101,13 +112,13 @@ jobs:
 
       # ── Publish Node.js platform packages ──
       - name: Download native binary artifacts
-        if: needs.build-native-nodejs.result == 'success'
+        if: needs.check-version.outputs.should_publish_web == 'true' && needs.build-native-nodejs.result == 'success'
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
       - name: Sync platform package versions and publish
-        if: needs.build-native-nodejs.result == 'success'
+        if: needs.check-version.outputs.should_publish_web == 'true' && needs.build-native-nodejs.result == 'success'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
         run: |
@@ -125,13 +136,26 @@ jobs:
 
       # ── Build and publish web-client ──
       - name: Install & build web-client
+        if: needs.check-version.outputs.should_publish_web == 'true' || needs.check-version.outputs.should_publish_react == 'true'
         run: |
           cd crates/web-client
           yarn install --frozen-lockfile
           yarn build
 
+      - name: Verify WASM is optimized
+        if: needs.check-version.outputs.should_publish_web == 'true'
+        run: |
+          wasm_file=$(find crates/web-client/dist/assets -name '*.wasm' | head -1)
+          size=$(stat --format=%s "$wasm_file")
+          max_size=$((25 * 1024 * 1024))
+          echo "WASM size: $((size / 1024 / 1024))MB ($size bytes)"
+          if [ "$size" -gt "$max_size" ]; then
+            echo "::error::WASM is $((size / 1024 / 1024))MB — exceeds 25MB limit. wasm-opt likely failed silently."
+            exit 1
+          fi
+
       - name: Inject Node.js optionalDependencies before publish
-        if: needs.build-native-nodejs.result == 'success'
+        if: needs.check-version.outputs.should_publish_web == 'true' && needs.build-native-nodejs.result == 'success'
         run: |
           cd crates/web-client
           node -e "
@@ -147,15 +171,93 @@ jobs:
           "
 
       - name: Publish web-client to npm
+        if: needs.check-version.outputs.should_publish_web == 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
         run: |
           cd crates/web-client
           npm publish
 
-      - name: Done
-        run: echo "Published @miden-sdk/miden-sdk v${{ needs.check-version.outputs.current_version }} with Node.js platform binaries."
+      # ── Build and publish react-sdk ──
+      - name: Install & build react-sdk
+        if: needs.check-version.outputs.should_publish_react == 'true'
+        run: |
+          cd packages/react-sdk
+          yarn install
+          yarn build
 
-      - name: Skipped publish
-        if: failure() || cancelled()
-        run: echo "Publish failed or was cancelled."
+      - name: Publish react-sdk to npm
+        if: needs.check-version.outputs.should_publish_react == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
+        run: |
+          cd packages/react-sdk
+          npm publish
+
+      # ── Build and publish vite-plugin ──
+      - name: Install & build vite-plugin
+        if: needs.check-version.outputs.should_publish_vite == 'true'
+        run: |
+          cd packages/vite-plugin
+          yarn install
+          yarn build
+
+      - name: Publish vite-plugin to npm
+        if: needs.check-version.outputs.should_publish_vite == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_WEBCLIENT_TOKEN }}
+        run: |
+          cd packages/vite-plugin
+          npm publish
+
+      # ── Status ──
+      - name: Done (web-client)
+        if: needs.check-version.outputs.should_publish_web == 'true'
+        env:
+          CURRENT_VERSION: ${{ needs.check-version.outputs.web_version }}
+        run: echo "✅ Web-client published version $CURRENT_VERSION with Node.js platform binaries."
+
+      - name: Done (react-sdk)
+        if: needs.check-version.outputs.should_publish_react == 'true'
+        env:
+          CURRENT_VERSION: ${{ needs.check-version.outputs.react_version }}
+        run: echo "✅ React SDK published version $CURRENT_VERSION."
+
+      - name: Done (vite-plugin)
+        if: needs.check-version.outputs.should_publish_vite == 'true'
+        env:
+          CURRENT_VERSION: ${{ needs.check-version.outputs.vite_version }}
+        run: echo "✅ Vite plugin published version $CURRENT_VERSION."
+
+      - name: Skipped publish (web-client)
+        if: needs.check-version.outputs.should_publish_web != 'true'
+        env:
+          SHOULD_PUBLISH: ${{ needs.check-version.outputs.should_publish_web }}
+          CURRENT_VERSION: ${{ needs.check-version.outputs.web_version }}
+        run: |
+          echo "ℹ️ Web-client publish skipped; should_publish=$SHOULD_PUBLISH"
+          if [ -n "$CURRENT_VERSION" ]; then
+            echo "Current version: $CURRENT_VERSION"
+          fi
+
+      - name: Skipped publish (react-sdk)
+        if: needs.check-version.outputs.should_publish_react != 'true'
+        env:
+          SHOULD_PUBLISH: ${{ needs.check-version.outputs.should_publish_react }}
+          CURRENT_VERSION: ${{ needs.check-version.outputs.react_version }}
+        run: |
+          echo "ℹ️ React SDK publish skipped; should_publish=$SHOULD_PUBLISH"
+          if [ -n "$CURRENT_VERSION" ]; then
+            echo "Current version: $CURRENT_VERSION"
+          fi
+
+      - name: Skipped publish (vite-plugin)
+        if: needs.check-version.outputs.should_publish_vite != 'true'
+        env:
+          SHOULD_PUBLISH: ${{ needs.check-version.outputs.should_publish_vite }}
+          CURRENT_VERSION: ${{ needs.check-version.outputs.vite_version }}
+        run: |
+          echo "ℹ️ Vite plugin publish skipped; should_publish=$SHOULD_PUBLISH"
+          if [ -n "$CURRENT_VERSION" ]; then
+            echo "Current version: $CURRENT_VERSION"
+          fi

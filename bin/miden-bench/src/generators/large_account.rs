@@ -25,6 +25,7 @@ use miden_client::account::component::{AccountComponent, basic_wallet_library};
 use miden_client::account::{
     Account,
     AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
     AccountStorageMode,
     AccountType,
     StorageMap,
@@ -158,7 +159,7 @@ fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account,
         .with_component(wallet_component)
         .with_component(reader_component)
         .storage_mode(AccountStorageMode::Public)
-        .build()?;
+        .build_with_schema_commitment()?;
 
     Ok((account, sk))
 }

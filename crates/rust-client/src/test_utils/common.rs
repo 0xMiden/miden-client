@@ -27,7 +27,7 @@ use crate::account::component::{
     BasicFungibleFaucet,
     BasicWallet,
 };
-use crate::account::{AccountBuilder, AccountType, StorageSlot};
+use crate::account::{AccountBuilder, AccountBuilderSchemaCommitmentExt, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
 use crate::crypto::FeltRng;
 pub use crate::keystore::{FilesystemKeyStore, Keystore};
@@ -93,7 +93,7 @@ pub async fn insert_new_wallet_with_seed(
         .storage_mode(storage_mode)
         .with_auth_component(auth_component)
         .with_component(BasicWallet)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
@@ -132,7 +132,7 @@ pub async fn insert_new_fungible_faucet(
         .with_auth_component(auth_component)
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .with_component(AuthControlled::allow_all())
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
@@ -568,7 +568,7 @@ pub async fn insert_account_with_custom_component(
         ))
         .with_component(BasicWallet)
         .with_component(custom_component)
-        .build()
+        .build_with_schema_commitment()
         .map_err(ClientError::AccountError)?;
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
