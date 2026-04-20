@@ -282,21 +282,22 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
 
 // Initialize the Basic Fungible Faucet library only once.
 static COUNTER_CONTRACT_LIBRARY: LazyLock<Arc<Library>> = LazyLock::new(|| {
-    let assembler = TransactionKernel::assembler();
+    // Share a SourceManager between the parser and the assembler so spans emitted during
+    // parsing resolve in the file table the assembler uses for debug-info registration.
+    // Using separate SourceManagers causes DebugInfoSections::register_procedure_debug_info
+    // to panic in miden-debug-types::SourceFile::location when a span's byte range isn't
+    // present in the assembler's SourceManager.
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library)
         .parse_str(
             Path::new("external_contract::counter_contract"),
             COUNTER_CONTRACT,
-            source_manager,
+            source_manager.clone(),
         )
         .map_err(|err| anyhow!(err))
         .unwrap();
-    assembler
-        .clone()
-        .assemble_library([module])
-        .map_err(|err| anyhow!(err))
-        .unwrap()
+    let assembler = TransactionKernel::assembler_with_source_manager(source_manager);
+    assembler.assemble_library([module]).map_err(|err| anyhow!(err)).unwrap()
 });
 
 /// Returns the Basic Fungible Faucet Library.
