@@ -208,6 +208,25 @@ Returns true if this client uses a mock chain.
 
 ***
 
+### waitForIdle()
+
+> **waitForIdle**(): `Promise`\<`void`\>
+
+Resolves once every serialized WASM call that was in flight AT THE
+MOMENT `waitForIdle()` was called (execute, submit, prove, apply,
+sync, or account creation) has settled. Use this from callers that
+need to perform a non-WASM-side action — e.g. clearing an in-memory
+auth key on wallet lock — after the kernel finishes, so its auth
+callback doesn't race with the key being cleared. Does NOT wait for
+calls enqueued after `waitForIdle()` returns. Returns immediately if
+nothing was in flight.
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### create()
 
 > `static` **create**(`options?`): `Promise`\<`MidenClient`\>
