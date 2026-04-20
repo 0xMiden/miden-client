@@ -48,7 +48,7 @@ impl TryFrom<proto::note::NoteMetadata> for NoteMetadata {
             .ok_or_else(|| proto::note::NoteMetadata::missing_field(stringify!(sender)))?
             .try_into()?;
         let note_type =
-            NoteType::try_from(u64::try_from(value.note_type).expect("invalid note type"))?;
+            NoteType::try_from(u64::try_from(value.note_type)?)?;
         let tag = NoteTag::new(value.tag);
 
         // Deserialize attachment if present
