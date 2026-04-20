@@ -2,7 +2,7 @@ use js_export_macro::js_export;
 use miden_client::Felt as NativeFelt;
 
 use crate::models::miden_arrays::FeltArray;
-use crate::platform::{JsU64, js_u64_to_u64};
+use crate::platform::{js_u64_to_u64, u64_to_js_u64};
 
 /// Field element wrapper exposed to JavaScript.
 #[derive(Clone, Copy)]
@@ -20,7 +20,7 @@ impl Felt {
     /// Returns the integer representation of the field element.
     #[js_export(js_name = "asInt")]
     pub fn as_int(&self) -> JsU64 {
-        self.0.as_canonical_u64() as JsU64
+        u64_to_js_u64(self.0.as_canonical_u64())
     }
 
     /// Returns the string representation of the field element.

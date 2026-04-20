@@ -2,7 +2,7 @@ use js_export_macro::js_export;
 use miden_client::crypto::SparseMerklePath as NativeSparseMerklePath;
 
 use super::word::Word;
-use crate::platform::{JsU64, js_u64_to_u64};
+use crate::platform::{js_u64_to_u64, u64_to_js_u64};
 
 /// Represents a sparse Merkle path.
 #[derive(Clone)]
@@ -15,7 +15,7 @@ impl SparseMerklePath {
     #[js_export(js_name = "emptyNodesMask")]
     pub fn empty_nodes_mask(&self) -> JsU64 {
         let (mask, _siblings) = self.0.clone().into_parts();
-        mask as JsU64
+        u64_to_js_u64(mask)
     }
 
     /// Returns the sibling nodes that make up the path.

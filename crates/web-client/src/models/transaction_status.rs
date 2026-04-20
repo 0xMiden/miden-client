@@ -1,7 +1,7 @@
 use js_export_macro::js_export;
 use miden_client::transaction::{DiscardCause, TransactionStatus as NativeTransactionStatus};
 
-use crate::platform::{JsErr, JsU64, from_str_err, js_u64_to_u64};
+use crate::platform::{JsErr, from_str_err, js_u64_to_u64, u64_to_js_u64};
 
 /// Status of a transaction in the node or store.
 #[derive(Clone)]
@@ -63,7 +63,7 @@ impl TransactionStatus {
     pub fn get_commit_timestamp(&self) -> Option<JsU64> {
         match self.0 {
             NativeTransactionStatus::Committed { commit_timestamp, .. } => {
-                Some(commit_timestamp as JsU64)
+                Some(u64_to_js_u64(commit_timestamp))
             },
             _ => None,
         }

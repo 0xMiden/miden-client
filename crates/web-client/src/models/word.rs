@@ -2,7 +2,7 @@ use js_export_macro::js_export;
 use miden_client::{Felt as NativeFelt, Word as NativeWord};
 
 use super::felt::Felt;
-use crate::platform::{JsBytes, JsErr, JsU64, from_str_err, js_u64_to_u64};
+use crate::platform::{JsBytes, JsErr, from_str_err, js_u64_to_u64, u64_to_js_u64};
 use crate::utils::{deserialize_from_bytes, serialize_to_bytes};
 
 #[derive(Clone)]
@@ -16,8 +16,8 @@ impl Word {
     pub fn new(u64_vec: Vec<JsU64>) -> Word {
         assert!(u64_vec.len() == 4, "Word requires exactly 4 elements, got {}", u64_vec.len());
         let fixed_array_u64: [u64; 4] = u64_vec
-            .iter()
-            .map(|&v| js_u64_to_u64(v))
+            .into_iter()
+            .map(js_u64_to_u64)
             .collect::<Vec<u64>>()
             .try_into()
             .expect("Word requires exactly 4 elements");
@@ -33,7 +33,7 @@ impl Word {
     /// Returns the word as an array of numeric values.
     #[js_export(js_name = "toU64s")]
     pub fn to_u64s(&self) -> Vec<JsU64> {
-        self.0.iter().map(|f| NativeFelt::as_canonical_u64(f) as JsU64).collect()
+        self.0.iter().map(|f| u64_to_js_u64(NativeFelt::as_canonical_u64(f))).collect()
     }
 
     /// Creates a Word from a hex string.

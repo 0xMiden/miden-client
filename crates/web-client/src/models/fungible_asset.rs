@@ -5,7 +5,7 @@ use miden_client::asset::{Asset as NativeAsset, FungibleAsset as FungibleAssetNa
 
 use super::account_id::AccountId;
 use super::word::Word;
-use crate::platform::{JsErr, JsU64, from_str_err, js_u64_to_u64};
+use crate::platform::{JsErr, from_str_err, js_u64_to_u64, u64_to_js_u64};
 
 /// A fungible asset.
 ///
@@ -25,7 +25,7 @@ impl FungibleAsset {
 
     /// Returns the amount of fungible units.
     pub fn amount(&self) -> JsU64 {
-        self.0.amount() as JsU64
+        u64_to_js_u64(self.0.amount())
     }
 
     /// Returns the faucet account that minted this asset.

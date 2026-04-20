@@ -102,33 +102,45 @@ impl<T: Send> AsyncCell<T> {
 
 /// Platform-specific unsigned 64-bit integer type for JS interop.
 ///
-/// - Browser (`wasm_bindgen)`: `u64` maps to JavaScript `BigInt`.
-/// - Node.js (napi-rs): `f64` maps to JavaScript `number` (safe for values up to 2^53).
+/// Both platforms expose this as a JavaScript `BigInt`. See `js-export-macro` for why
+/// Node.js uses `napi::bindgen_prelude::BigInt` instead of `u64`.
 #[cfg(feature = "browser")]
 pub type JsU64 = u64;
 
 #[cfg(feature = "nodejs")]
-pub type JsU64 = f64;
+pub type JsU64 = napi::bindgen_prelude::BigInt;
 
 /// Converts a [`JsU64`] to `u64`.
-///
-/// On browser this is a no-op (`JsU64` is already `u64`).
-/// On Node.js this casts `f64` to `u64`, with a range check for values above 2^53
-/// (the maximum safe integer in JavaScript `number` type).
 #[inline]
-#[allow(clippy::unnecessary_cast)]
 pub fn js_u64_to_u64(val: JsU64) -> u64 {
+    #[cfg(feature = "browser")]
+    {
+        val
+    }
     #[cfg(feature = "nodejs")]
     {
-        const MAX_SAFE_INT: f64 = 9_007_199_254_740_992.0; // 2^53
-        if !val.is_finite() || val > MAX_SAFE_INT || val < 0.0 {
+        let (signed, value, lossless) = val.get_u64();
+        if signed || !lossless {
             panic!(
-                "u64 value {val} is outside the safe integer range (0..2^53). \
-                 Use string-based APIs for values above Number.MAX_SAFE_INTEGER."
+                "BigInt value is outside the u64 range (0..2^64); \
+                 got signed={signed}, lossless={lossless}"
             );
         }
+        value
     }
-    val as u64
+}
+
+/// Converts a `u64` to a [`JsU64`] for return to JS.
+#[inline]
+pub fn u64_to_js_u64(val: u64) -> JsU64 {
+    #[cfg(feature = "browser")]
+    {
+        val
+    }
+    #[cfg(feature = "nodejs")]
+    {
+        napi::bindgen_prelude::BigInt::from(val)
+    }
 }
 
 // FUTURE SEND WRAPPER

@@ -10,13 +10,47 @@
 //! ```
 //!
 //! When a method signature contains [`JsU64`], the macro automatically splits it
-//! into browser (`u64`) and Node.js (`f64`) variants.
+//! into browser (`u64`) and Node.js (`::napi::bindgen_prelude::BigInt`) variants.
+//! Both map to JavaScript `BigInt`, preserving full `u64` precision on both platforms.
+//!
+//! # Expansion example (JsU64 split)
+//!
+//! A method with `JsU64` in its signature:
+//!
+//! ```ignore
+//! #[js_export]
+//! impl Felt {
+//!     #[js_export(constructor)]
+//!     pub fn new(value: JsU64) -> Felt { ... }
+//! }
+//! ```
+//!
+//! expands to one impl block per platform, with `JsU64` replaced by the concrete type:
+//!
+//! ```ignore
+//! #[cfg(feature = "browser")]
+//! #[::wasm_bindgen::prelude::wasm_bindgen]
+//! impl Felt {
+//!     #[::wasm_bindgen::prelude::wasm_bindgen(constructor)]
+//!     pub fn new(value: u64) -> Felt { ... }
+//! }
+//!
+//! #[cfg(feature = "nodejs")]
+//! #[::napi_derive::napi]
+//! impl Felt {
+//!     #[::napi_derive::napi(constructor)]
+//!     pub fn new(value: ::napi::bindgen_prelude::BigInt) -> Felt { ... }
+//! }
+//! ```
+//!
+//! Methods without `JsU64` stay in a single impl block with `#[cfg_attr]` forwarding
+//! the platform-specific macro.
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::visit_mut::VisitMut;
-use syn::{Ident, ImplItem, ImplItemFn, Item, ItemEnum, ItemImpl, ItemStruct, parse_macro_input};
+use syn::{ImplItem, ImplItemFn, Item, ItemEnum, ItemImpl, ItemStruct, parse_macro_input};
 
 // ================================================================================================
 // Entry point
@@ -200,10 +234,13 @@ fn make_platform_method(
         },
     }
 
-    // Replace JsU64 in signature.
-    let replacement = match platform {
-        Platform::Browser => "u64",
-        Platform::Nodejs => "f64",
+    // Replace JsU64 in signature with the platform-specific concrete type.
+    // Browser uses `u64` (maps to BigInt via wasm_bindgen). Node.js uses napi's
+    // `BigInt` struct because napi-rs does not implement `FromNapiValue` for `u64`
+    // Both resolve to a JS `BigInt` on the JS side.
+    let replacement: syn::Path = match platform {
+        Platform::Browser => syn::parse_quote!(u64),
+        Platform::Nodejs => syn::parse_quote!(::napi::bindgen_prelude::BigInt),
     };
     let mut replacer = JsU64Replacer { replacement };
     replacer.visit_impl_item_fn_mut(&mut method);
@@ -250,7 +287,7 @@ impl VisitMut for JsU64Detector {
 // ================================================================================================
 
 struct JsU64Replacer {
-    replacement: &'static str,
+    replacement: syn::Path,
 }
 
 impl VisitMut for JsU64Replacer {
@@ -265,8 +302,7 @@ impl VisitMut for JsU64Replacer {
 
     fn visit_type_path_mut(&mut self, tp: &mut syn::TypePath) {
         if tp.path.is_ident("JsU64") {
-            let ident = Ident::new(self.replacement, tp.path.segments[0].ident.span());
-            tp.path = ident.into();
+            tp.path = self.replacement.clone();
         }
         syn::visit_mut::visit_type_path_mut(self, tp);
     }

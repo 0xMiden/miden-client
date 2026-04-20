@@ -5,8 +5,8 @@
  * SDK surfaces so the shared MidenClient wrapper works on both platforms.
  *
  * Key normalizations:
- * - BigInt -> Number (napi uses f64 for u64, browser uses BigInt)
  * - Uint8Array/Buffer -> Array (napi's Vec<u8> expects plain arrays)
+ * - BigUint64Array/BigInt64Array -> Array (napi's Vec<u64>/Vec<BigInt> expects plain arrays)
  * - null -> undefined (napi returns null for Option::None, wasm-bindgen returns undefined)
  * - camelCase -> snake_case aliases (napi uses camelCase, wasm-bindgen uses snake_case)
  * - Array type polyfills (browser has typed WASM arrays, napi accepts plain JS arrays)
@@ -16,21 +16,14 @@
 
 /**
  * Normalizes a single argument for napi compatibility.
+ *
+ * `BigInt` values are passed through untouched — napi-rs accepts JS `BigInt`
+ * for `u64` parameters (via `napi::bindgen_prelude::BigInt`), so no conversion
+ * is needed. Typed arrays of BigInts and bytes are converted to plain arrays.
  */
 export function normalizeArg(val) {
-  if (typeof val === "bigint") {
-    if (val > Number.MAX_SAFE_INTEGER || val < 0n) {
-      throw new RangeError(
-        `Value ${val} exceeds Number.MAX_SAFE_INTEGER (2^53). ` +
-          `Use string-based APIs for large values.`
-      );
-    }
-    return Number(val);
-  }
-  if (val instanceof BigUint64Array)
-    return Array.from(val, (v) => normalizeArg(v));
-  if (val instanceof BigInt64Array)
-    return Array.from(val, (v) => normalizeArg(v));
+  if (val instanceof BigUint64Array) return Array.from(val);
+  if (val instanceof BigInt64Array) return Array.from(val);
   if (val instanceof Uint8Array || Buffer.isBuffer(val)) return Array.from(val);
   return val;
 }
