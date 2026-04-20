@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
-use miden_protocol::assembly::SourceManagerSync;
+use miden_protocol::assembly::{DefaultSourceManager, SourceManagerSync};
 use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::rand::RandomCoin;
 use miden_protocol::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
@@ -340,18 +340,17 @@ where
         self
     }
 
-    /// Sets the source manager used to retain MASM source information for assembled programs.
+    /// Overrides the source manager used to retain MASM source information for assembled programs.
     ///
-    /// The same instance is forwarded to the transaction executor and to every script compiled
-    /// through the client (e.g. via [`Client::code_builder`](crate::Client::code_builder)).
-    /// This must be the only `SourceManager` used
-    /// throughout the application, any script or module compiled outside the client should
-    /// use the same `Arc` so that all source spans resolve correctly at runtime.
+    /// If not set, the client uses a default
+    /// [`DefaultSourceManager`](miden_protocol::assembly::DefaultSourceManager). The same instance
+    /// is forwarded to the transaction executor and to every script compiled through the client
+    /// (e.g. via [`Client::code_builder`](crate::Client::code_builder)).
     ///
-    /// If not set, [`Client::code_builder`](crate::Client::code_builder) and
-    /// [`Client::source_manager`](crate::Client::source_manager) will return `None`, and
-    /// operations that require a source manager (e.g. transaction execution) will return
-    /// [`ClientError::MissingSourceManager`].
+    /// Set this explicitly only when scripts or modules are compiled outside the client (for
+    /// example, using an external [`Assembler`](miden_protocol::assembly::Assembler)): pass the
+    /// same `Arc` used by that external assembler so all source spans resolve correctly at
+    /// runtime.
     #[must_use]
     pub fn source_manager(mut self, sm: Arc<dyn SourceManagerSync>) -> Self {
         self.source_manager = Some(sm);
@@ -456,6 +455,10 @@ where
         let tx_prover: Arc<dyn TransactionProver + Send + Sync> =
             self.tx_prover.unwrap_or_else(|| Arc::new(LocalTransactionProver::default()));
 
+        // Use the provided source manager, or create a default one.
+        let source_manager: Arc<dyn SourceManagerSync> =
+            self.source_manager.unwrap_or_else(|| Arc::new(DefaultSourceManager::default()));
+
         // Initialize genesis commitment in RPC client
         if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
@@ -487,7 +490,7 @@ where
             rpc_api,
             tx_prover,
             authenticator: self.authenticator,
-            source_manager: self.source_manager,
+            source_manager,
             exec_options: ExecutionOptions::new(
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use miden_client::keystore::Keystore;
 use miden_client::vm::AdviceInputs;
-use miden_client::{Client, ClientError, Felt, Word};
+use miden_client::{Client, Felt, Word};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
 use crate::errors::CliError;
@@ -85,10 +85,7 @@ impl ExecCmd {
 
         let advice_inputs = AdviceInputs::default().with_map(inputs);
 
-        let tx_script = client
-            .code_builder()
-            .ok_or(ClientError::MissingSourceManager)?
-            .compile_tx_script(&program)?;
+        let tx_script = client.code_builder().compile_tx_script(&program)?;
 
         let result = client
             .execute_program(account_id, tx_script, advice_inputs, BTreeMap::new())

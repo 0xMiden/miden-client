@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use miden_client::assembly::DefaultSourceManager;
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::RandomCoin;
 use miden_client::keystore::FilesystemKeyStore;
@@ -53,7 +52,6 @@ pub async fn create_client(
         .rng(Box::new(rng_coin))
         .sqlite_store(sqlite_path)
         .filesystem_keystore(keystore_path.to_str().expect("keystore path should be valid UTF-8"))?
-        .source_manager(Arc::new(DefaultSourceManager::default()))
         .in_debug_mode(DebugMode::Disabled)
         .tx_discard_delta(None)
         .build()

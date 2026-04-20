@@ -118,12 +118,11 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
         account_id_suffix = foreign_account_id.suffix(),
     );
 
-    let source_manager = client2.source_manager().expect("source manager not set");
     let network_note = get_network_note_with_script(
         sender_account.id(),
         target_network_account.id(),
         &network_fpi_note_script,
-        source_manager,
+        client2.source_manager(),
         &mut client2.rng(),
     )?;
 

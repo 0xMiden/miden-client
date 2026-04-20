@@ -57,7 +57,6 @@
 //! use std::sync::Arc;
 //!
 //! use miden_client::DebugMode;
-//! use miden_client::assembly::DefaultSourceManager;
 //! use miden_client::builder::ClientBuilder;
 //! use miden_client::keystore::FilesystemKeyStore;
 //! use miden_client::rpc::{Endpoint, GrpcClient};
@@ -79,7 +78,6 @@
 //!     .rpc(Arc::new(GrpcClient::new(&endpoint, 10_000)))
 //!     .store(store)
 //!     .authenticator(Arc::new(keystore))
-//!     .source_manager(Arc::new(DefaultSourceManager::default()))
 //!     .in_debug_mode(DebugMode::Disabled)
 //!     .build()
 //!     .await?;
@@ -95,7 +93,6 @@
 //! let client = ClientBuilder::for_testnet()
 //!     .store(store)
 //!     .authenticator(Arc::new(keystore))
-//!     .source_manager(Arc::new(DefaultSourceManager::default()))
 //!     .build()
 //!     .await?;
 //!
@@ -103,7 +100,6 @@
 //! let client = ClientBuilder::for_localhost()
 //!     .store(store)
 //!     .authenticator(Arc::new(keystore))
-//!     .source_manager(Arc::new(DefaultSourceManager::default()))
 //!     .build()
 //!     .await?;
 //! ```
@@ -363,7 +359,7 @@ pub struct Client<AUTH> {
     /// executor whenever a signature is requested from within the VM.
     authenticator: Option<Arc<AUTH>>,
     /// Shared source manager used to retain MASM source information for assembled programs.
-    source_manager: Option<Arc<dyn SourceManagerSync>>,
+    source_manager: Arc<dyn SourceManagerSync>,
     /// Options that control the transaction executor's runtime behaviour (e.g. debug mode).
     exec_options: ExecutionOptions,
     /// Number of blocks after which pending transactions are considered stale and discarded.
@@ -392,7 +388,6 @@ where
     ///     .rpc(rpc_client)
     ///     .store(store)
     ///     .authenticator(Arc::new(keystore))
-    ///     .source_manager(Arc::new(DefaultSourceManager::default()))
     ///     .build()
     ///     .await?;
     /// ```
@@ -412,10 +407,8 @@ where
     }
 
     /// Returns an instance of the `CodeBuilder`
-    pub fn code_builder(&self) -> Option<assembly::CodeBuilder> {
-        self.source_manager
-            .as_ref()
-            .map(|sm| assembly::CodeBuilder::with_source_manager(sm.clone()))
+    pub fn code_builder(&self) -> assembly::CodeBuilder {
+        assembly::CodeBuilder::with_source_manager(self.source_manager.clone())
     }
 
     /// Returns an instance of [`note::NoteScreener`] configured for this client.
@@ -439,7 +432,7 @@ where
 
     /// Returns the shared source manager used to retain MASM source information for assembled
     /// programs.
-    pub fn source_manager(&self) -> Option<Arc<dyn SourceManagerSync>> {
+    pub fn source_manager(&self) -> Arc<dyn SourceManagerSync> {
         self.source_manager.clone()
     }
 }

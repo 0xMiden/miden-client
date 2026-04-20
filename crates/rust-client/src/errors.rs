@@ -110,10 +110,6 @@ pub enum ClientError {
     #[error("merkle proof error")]
     MerkleError(#[from] MerkleError),
     #[error(
-        "no source manager configured; set one via ClientBuilder::source_manager() before executing transactions"
-    )]
-    MissingSourceManager,
-    #[error(
         "transaction output mismatch: expected output notes with recipient digests {0:?} were not produced by the transaction"
     )]
     MissingOutputRecipients(Vec<Word>),

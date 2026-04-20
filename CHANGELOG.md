@@ -2,14 +2,10 @@
 
 ## 0.14.1 (2026-04-14)
 
-### Changes
-
-* [BREAKING][type][rust,web] `Client::code_builder()` now returns `Option<CodeBuilder>` instead of `CodeBuilder`. `Client::source_manager()` now returns `Option<Arc<dyn SourceManagerSync>>` instead of `Arc<dyn SourceManagerSync>` ([#2047](https://github.com/0xMiden/miden-client/pull/2047)).
-* [BREAKING][behavior][rust,web] `ClientBuilder::build()` no longer creates a default `SourceManager`. Callers must explicitly set one via `ClientBuilder::source_manager()` before executing transactions, otherwise `ClientError::MissingSourceManager` is returned ([#2047](https://github.com/0xMiden/miden-client/pull/2047)).
-
 ### Enhancements
 
 * Optimized `get_account_details` so it only fetches the delta of large public accounts when syncing ([#1916](https://github.com/0xMiden/miden-client/pull/1916)).
+* Added `ClientBuilder::source_manager()` to override the `SourceManager` used by the client. When not set, the client defaults to `DefaultSourceManager`. Set this when compiling scripts outside the client with an external `Assembler`, so source spans resolve against the same manager ([#2047](https://github.com/0xMiden/miden-client/pull/2047)).
 
 ### Fixes
 

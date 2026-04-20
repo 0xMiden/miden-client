@@ -295,11 +295,9 @@ where
         let future_notes: Vec<(NoteDetails, NoteTag)> =
             transaction_request.expected_future_notes().cloned().collect();
 
-        let source_manager =
-            self.source_manager.clone().ok_or(ClientError::MissingSourceManager)?;
         let tx_script = transaction_request.build_transaction_script(
             &self.get_account_interface(account_id).await?,
-            source_manager,
+            self.source_manager.clone(),
         )?;
 
         let foreign_accounts = transaction_request.foreign_accounts().clone();
@@ -805,12 +803,11 @@ where
         &'auth self,
         data_store: &'store STORE,
     ) -> Result<TransactionExecutor<'store, 'auth, STORE, AUTH>, TransactionExecutorError> {
-        let mut executor = TransactionExecutor::new(data_store).with_options(self.exec_options)?;
+        let mut executor = TransactionExecutor::new(data_store)
+            .with_options(self.exec_options)?
+            .with_source_manager(self.source_manager.clone());
         if let Some(authenticator) = self.authenticator.as_deref() {
             executor = executor.with_authenticator(authenticator);
-        }
-        if let Some(ref source_manager) = self.source_manager {
-            executor = executor.with_source_manager(source_manager.clone());
         }
 
         Ok(executor)

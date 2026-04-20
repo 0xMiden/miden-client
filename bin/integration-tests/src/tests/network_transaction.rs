@@ -98,7 +98,7 @@ pub(crate) async fn deploy_counter_contract(
 
     client.add_account(&acc, false).await?;
 
-    let source_manager = client.source_manager().expect("source manager not set");
+    let source_manager = client.source_manager();
     let mut script_builder = CodeBuilder::with_source_manager(source_manager.clone());
     script_builder.link_dynamic_library(&counter_contract_library(source_manager))?;
     let tx_script = script_builder.compile_tx_script(INCR_SCRIPT_CODE)?;
@@ -176,7 +176,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
 
     let mut network_notes = vec![];
 
-    let source_manager = client.source_manager().expect("source manager not set");
+    let source_manager = client.source_manager();
     for _ in 0..BUMP_NOTE_NUMBER {
         let network_note = get_network_note(
             native_account.id(),
@@ -233,9 +233,12 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
             .await?
             .0;
 
-    let source_manager = client.source_manager().expect("source manager not set");
-    let network_note =
-        get_network_note(wallet.id(), network_account.id(), source_manager, &mut client.rng())?;
+    let network_note = get_network_note(
+        wallet.id(),
+        network_account.id(),
+        client.source_manager(),
+        &mut client.rng(),
+    )?;
     // Prepare both transactions
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![network_note.clone()])

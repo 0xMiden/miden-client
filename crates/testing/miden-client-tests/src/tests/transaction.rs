@@ -107,7 +107,6 @@ async fn transaction_error_reports_source_line() {
 
     let failing_script = client
         .code_builder()
-        .expect("source manager not set")
         .compile_tx_script("begin push.0 push.2 assert_eq end")
         .unwrap();
 
@@ -286,7 +285,6 @@ async fn lazy_foreign_account_loading() {
     // The procedure reads from the storage map, triggering lazy loading of map entries.
     let tx_script = client
         .code_builder()
-        .expect("source manager not set")
         .compile_tx_script(format!(
             "
             use miden::protocol::tx

@@ -384,7 +384,7 @@ async fn prune_preserves_unmodified_storage_slots() {
 
     let account_id = build_three_slot_account(&mut client, &keystore).await;
 
-    let source_manager = client.source_manager().expect("source manager not set");
+    let source_manager = client.source_manager();
     let tx_script_set_a = compile_slot_tx_script("set_a_to_10", source_manager.clone());
     let tx_script_set_b = compile_slot_tx_script("set_b_to_20", source_manager);
 

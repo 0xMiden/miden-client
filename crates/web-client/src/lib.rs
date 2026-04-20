@@ -14,7 +14,6 @@ use miden_client::store::Store;
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::testing::note_transport::MockNoteTransportApi;
 use miden_client::{Client, ClientError, DebugMode, ErrorHint, Felt};
-use miden_protocol::assembly::DefaultSourceManager;
 use models::code_builder::CodeBuilder;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -277,7 +276,6 @@ impl WebClient {
             .rng(Box::new(rng))
             .store(store)
             .authenticator(keystore)
-            .source_manager(Arc::new(DefaultSourceManager::default()))
             .in_debug_mode(if debug_mode {
                 DebugMode::Enabled
             } else {
@@ -312,10 +310,7 @@ impl WebClient {
         let Some(client) = &self.inner else {
             return Err("client was not initialized before instancing CodeBuilder".into());
         };
-        let native_builder = client
-            .code_builder()
-            .ok_or::<JsValue>("no source manager configured on the client".into())?;
-        Ok(CodeBuilder::from_source_manager(native_builder.source_manager().clone()))
+        Ok(CodeBuilder::from_source_manager(client.code_builder().source_manager().clone()))
     }
 }
 
