@@ -126,27 +126,27 @@ export const sdk = new Proxy(
   }
 ) as any;
 
-// ── BigInt → Number conversion ────────────────────────────────────────
+// ── Argument normalization ────────────────────────────────────────────
 
 /**
- * Converts BigInt values to Number. The browser SDK uses BigInt for u64 params,
- * but the Node.js napi SDK uses f64 (JavaScript number). Values up to 2^53 are
- * safe, which covers all practical token amounts.
+ * Pass-through for BigInt values — both platforms use JS `BigInt` for `u64`
+ * params. Kept as a helper so the explicit call sites remain readable.
  */
 function toNum(val: any): any {
-  return typeof val === "bigint" ? Number(val) : val;
+  return val;
 }
 
 /**
  * Normalizes arguments for napi:
- * - BigInt → Number
- * - BigUint64Array → number[]
+ * - BigUint64Array / BigInt64Array → bigint[]
  * - Uint8Array/Buffer → Array<number> (for Vec<u8> params)
+ *
+ * `BigInt` values are passed through — napi-rs accepts JS `BigInt` for `u64`
+ * parameters via `napi::bindgen_prelude::BigInt`.
  */
 function normalizeArg(val: any): any {
-  if (typeof val === "bigint") return Number(val);
-  if (val instanceof BigUint64Array) return Array.from(val, (v) => Number(v));
-  if (val instanceof BigInt64Array) return Array.from(val, (v) => Number(v));
+  if (val instanceof BigUint64Array) return Array.from(val);
+  if (val instanceof BigInt64Array) return Array.from(val);
   if (val instanceof Uint8Array || Buffer.isBuffer(val)) return Array.from(val);
   return val;
 }

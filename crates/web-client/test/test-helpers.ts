@@ -29,8 +29,8 @@ function tmpDir(): string {
 }
 
 function norm(val: any): any {
-  if (typeof val === "bigint") return Number(val);
-  if (val instanceof BigUint64Array) return Array.from(val, (v) => Number(v));
+  if (val instanceof BigUint64Array) return Array.from(val);
+  if (val instanceof BigInt64Array) return Array.from(val);
   if (val instanceof Uint8Array || Buffer.isBuffer(val)) return Array.from(val);
   return val;
 }

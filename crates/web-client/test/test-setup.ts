@@ -215,12 +215,14 @@ export function wrapNodeClient(rawClient: any, rawSdk: any): any {
 
 /**
  * Normalizes a single argument for napi:
- * - BigInt → Number, BigUint64Array → number[], Uint8Array/Buffer → number[]
+ * - BigUint64Array / BigInt64Array → bigint[], Uint8Array/Buffer → number[]
+ *
+ * `BigInt` values are passed through untouched — napi-rs accepts JS `BigInt`
+ * for `u64` parameters via `napi::bindgen_prelude::BigInt`.
  */
 function normalizeNapiArg(val: any): any {
-  if (typeof val === "bigint") return Number(val);
-  if (val instanceof BigUint64Array) return Array.from(val, (v) => Number(v));
-  if (val instanceof BigInt64Array) return Array.from(val, (v) => Number(v));
+  if (val instanceof BigUint64Array) return Array.from(val);
+  if (val instanceof BigInt64Array) return Array.from(val);
   if (val instanceof Uint8Array || Buffer.isBuffer(val)) return Array.from(val);
   return val;
 }
@@ -355,13 +357,11 @@ export function createNodeSdkWrapper(rawSdk: any): any {
     // WASM needs typed array wrappers. These make `new sdk.XArray([...])` work
     // on both platforms.
     ...makeArrayPolyfills(),
-    // u64: converts to the platform-appropriate type
-    // Node.js napi uses f64 (number), browser uses BigInt
-    u64: (val: number | bigint) =>
-      typeof val === "bigint" ? Number(val) : val,
-    // u64Array: converts an array of numbers to the platform-appropriate array type
-    // Browser uses BigUint64Array, Node.js uses number[]
-    u64Array: (vals: number[]) => vals,
+    // u64: converts to BigInt — both platforms map u64 to JS BigInt.
+    u64: (val: number | bigint) => BigInt(val),
+    // u64Array: converts an array of numbers to a BigInt array — both platforms
+    // accept bigint[] for Vec<u64> parameters.
+    u64Array: (vals: number[]) => vals.map(BigInt),
   };
 }
 
