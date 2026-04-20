@@ -15,6 +15,7 @@
 ### Bug Fixes
 
 * Fixed `MidenProvider` crashing on first render when a remote prover is configured by deferring prover instantiation until after WASM initialization ([#2072](https://github.com/0xMiden/miden-client/pull/2072)).
+* Fixed panic in `NoteMetadata` RPC conversion when protobuf `note_type` field contains a negative `i32` value, by replacing `.expect()` with proper `?` error propagation ([#2081](https://github.com/0xMiden/miden-client/pull/2081)).
 
 ## 0.14.0 (2026-04-07)
 
