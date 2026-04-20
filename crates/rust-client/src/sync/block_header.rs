@@ -48,7 +48,7 @@ impl<AUTH> Client<AUTH> {
     /// If the client has a cached copy, returns a clone of it. Otherwise, rebuilds from the
     /// store. Note that this method does not verify cache freshness against the store because
     /// it takes `&self`; callers that need to guarantee freshness should go through
-    /// [`crate::Client::take_or_build_partial_mmr`] via a `&mut self` path instead.
+    /// `Client::take_or_build_partial_mmr` via a `&mut self` path instead.
     pub async fn get_current_partial_mmr(&self) -> Result<PartialMmr, ClientError> {
         if let Some(ref cached) = self.partial_mmr {
             Ok(cached.mmr.clone())
