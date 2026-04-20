@@ -243,7 +243,9 @@ export function useSend(): UseSendResult {
         const provenTransaction = await proveWithFallback(
           (resolvedProver) =>
             runExclusiveSafe(() =>
-              client.proveTransaction(txResult, resolvedProver)
+              resolvedProver
+                ? client.proveTransactionWithProver(txResult, resolvedProver)
+                : client.proveTransaction(txResult)
             ),
           proverConfig
         );

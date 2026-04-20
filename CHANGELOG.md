@@ -5,7 +5,13 @@
 ### Features
 
 * [FEATURE][web] Serialize all async `WebClient` JS methods — both the explicit wrappers and every async call that falls through `createClientProxy` to the underlying WASM client (e.g. `getAccount`, `importAccountById`, `getAccountStorage`) — via an internal `_serializeWasmCall` chain. Prevents `"recursive use of an object detected"` panics when an unwrapped read/write races the auto-sync timer or any explicitly-wrapped method. Expose `waitForIdle()` on `MidenClient` so callers can drain in-flight work before mutating non-WASM state ([#2057](https://github.com/0xMiden/miden-client/pull/2057)).
+* [FEATURE][web] Expose `lastAuthError()` on `MidenClient` for typed sign-callback failure recovery — preserves the raw thrown value from the JS signCallback so consumers can distinguish locked/rejected/IO-error failure modes ([#2058](https://github.com/0xMiden/miden-client/pull/2058)).
 * [FEATURE][web] Added `"custom"` operation to `preview()` so users can dry-run any pre-built `TransactionRequest`, not just send/mint/consume/swap ([#2052](https://github.com/0xMiden/miden-client/pull/2052)).
+* [FEATURE][web] Exposed `BlockHeader.nativeAssetId()` so JavaScript consumers can read the native fungible-faucet account ID from a block header. The field already rides the RPC wire and is decoded into the Rust `BlockHeader`, but no WASM accessor existed, forcing wallets and dApps to hardcode the native faucet per network ([#2070](https://github.com/0xMiden/miden-client/issues/2070)).
+
+### Fixes
+
+* [FIX][web] `proveTransactionWithProver` now takes `&TransactionProver` by reference instead of consuming by value — the old signature invalidated the JS handle after one use, silently falling back to local proving on subsequent calls ([#2062](https://github.com/0xMiden/miden-client/pull/2062)).
 
 ## 0.14.3 (2026-04-16)
 

@@ -62,6 +62,7 @@ export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
 const SYNC_METHODS = new Set([
   "buildSwapTag",
   "createCodeBuilder",
+  "lastAuthError",
   "newConsumeTransactionRequest",
   "newMintTransactionRequest",
   "newSendTransactionRequest",
@@ -821,7 +822,12 @@ class WebClient {
       try {
         if (!this.worker) {
           const wasmWebClient = await this.getWasmWebClient();
-          return await wasmWebClient.proveTransaction(transactionResult, prover);
+          return prover
+            ? await wasmWebClient.proveTransactionWithProver(
+                transactionResult,
+                prover
+              )
+            : await wasmWebClient.proveTransaction(transactionResult);
         }
 
         const wasm = await getWasmOrThrow();
@@ -842,6 +848,10 @@ class WebClient {
         throw error;
       }
     });
+  }
+
+  async proveTransactionWithProver(transactionResult, prover) {
+    return this.proveTransaction(transactionResult, prover);
   }
 
   async applyTransaction(transactionResult, submissionHeight) {

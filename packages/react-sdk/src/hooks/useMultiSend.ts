@@ -152,7 +152,9 @@ export function useMultiSend(): UseMultiSendResult {
         const provenTransaction = await proveWithFallback(
           (resolvedProver) =>
             runExclusiveDirect(() =>
-              client.proveTransaction(txResult, resolvedProver)
+              resolvedProver
+                ? client.proveTransactionWithProver(txResult, resolvedProver)
+                : client.proveTransaction(txResult)
             ),
           proverConfig
         );

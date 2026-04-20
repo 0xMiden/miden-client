@@ -40,6 +40,7 @@ vi.mock("@miden-sdk/miden-sdk", () => {
       .mockResolvedValue({ toString: vi.fn(() => "0xtx") }),
     executeTransaction: vi.fn().mockResolvedValue({}),
     proveTransaction: vi.fn().mockResolvedValue({}),
+    proveTransactionWithProver: vi.fn().mockResolvedValue({}),
     submitProvenTransaction: vi.fn().mockResolvedValue(0),
     applyTransaction: vi.fn().mockResolvedValue({}),
     sendPrivateNote: vi.fn().mockResolvedValue(undefined),
