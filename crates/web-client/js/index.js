@@ -60,14 +60,25 @@ export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
 // Method classification sets — used by scripts/check-method-classification.js to ensure
 // every WASM export is explicitly categorised. Update when adding new WASM methods.
 //
-// Note on `SYNC_METHODS`: some entries (`proveBlock`, `serializeMockChain`,
-// `setDebugMode`) take `&mut self` on the Rust side. That's safe to opt out of
-// `_serializeWasmCall` because they're synchronous in JS — the event loop
-// cannot interleave another call during their execution, so the RefCell
-// borrow is always released before any other borrow can start. Do NOT move a
-// sync-in-JS method into `WRITE_METHODS` just because it takes `&mut self`;
-// wrapping it there would change its return to `Promise<T>` and break callers.
+// Note on `SYNC_METHODS`: the classifier is "synchronous in JS" — i.e.
+// `pub fn ...` in Rust, not `pub async fn ...`. Two sub-cases:
+//   1. Factory methods that return a non-Promise value (`accountReader`
+//      returns `AccountReader`; the transaction-request builders return
+//      `TransactionRequestBuilder`; `createCodeBuilder` returns a builder).
+//      Wrapping these in `_serializeWasmCall` would turn their return
+//      value into `Promise<T>` and break callers that use the result
+//      immediately (e.g. `const reader = client.accountReader(id);
+//      await reader.nonce();`).
+//   2. Sync methods that still take `&mut self` in Rust (`proveBlock`,
+//      `serializeMockChain`, `setDebugMode`). Safe to opt out because JS
+//      is single-threaded — the event loop cannot interleave another
+//      call during their synchronous execution, so the RefCell borrow
+//      is always released before any other borrow can start.
+// Do NOT move a sync-in-JS method into `WRITE_METHODS` / `READ_METHODS`
+// just because it takes `&mut self` or `&self`; wrapping changes its
+// return shape and breaks every caller.
 const SYNC_METHODS = new Set([
+  "accountReader",
   "buildSwapTag",
   "createCodeBuilder",
   "lastAuthError",
@@ -106,7 +117,6 @@ const WRITE_METHODS = new Set([
 ]);
 
 const READ_METHODS = new Set([
-  "accountReader",
   "exportAccountFile",
   "exportNoteFile",
   "exportStore",
