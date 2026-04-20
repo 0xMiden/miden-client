@@ -121,8 +121,11 @@ const READ_METHODS = new Set([
 
 const MOCK_STORE_NAME = "mock_client_db";
 
-// Suppress unused-variable warnings — these sets exist solely for the CI lint check.
-void SYNC_METHODS;
+// `SYNC_METHODS` is read by `createClientProxy` to decide whether a
+// proxy-fallback call should stay synchronous. `WRITE_METHODS` /
+// `READ_METHODS` are consulted only by the CI lint (see
+// scripts/check-method-classification.js); suppress unused-variable
+// warnings for those two.
 void WRITE_METHODS;
 void READ_METHODS;
 
@@ -224,6 +227,16 @@ export const getWasmOrThrow = async () => {
 /**
  * Create a Proxy that forwards missing properties to the underlying WASM
  * WebClient.
+ *
+ * Async proxy-fallback methods (every WASM method that borrows the
+ * WebClient's RefCell — reads included, since `&self` and `&mut self` both
+ * trip wasm-bindgen's "recursive use of an object detected" panic if
+ * another borrow is live) are routed through `_serializeWasmCall` so they
+ * queue on the same chain as the explicitly-wrapped methods.
+ *
+ * `SYNC_METHODS` opts out: they are synchronous in JS and wrapping them
+ * would change their return type to `Promise<T>`, which is a breaking
+ * change for consumers that use them as plain getters or builders.
  */
 function createClientProxy(instance) {
   return new Proxy(instance, {
@@ -234,7 +247,13 @@ function createClientProxy(instance) {
       if (target.wasmWebClient && prop in target.wasmWebClient) {
         const value = target.wasmWebClient[prop];
         if (typeof value === "function") {
-          return value.bind(target.wasmWebClient);
+          if (typeof prop === "string" && SYNC_METHODS.has(prop)) {
+            return value.bind(target.wasmWebClient);
+          }
+          return (...args) =>
+            target._serializeWasmCall(() =>
+              value.apply(target.wasmWebClient, args)
+            );
         }
         return value;
       }
