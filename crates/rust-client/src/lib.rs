@@ -376,9 +376,8 @@ pub struct Client<AUTH> {
     partial_mmr: Option<CachedPartialMmr>,
 }
 
-/// Cached [`PartialMmr`] paired with a fingerprint of the store's peaks at build time. The
-/// fingerprint is compared against the store on read to detect external modifications (e.g.
-/// `importStore`) and trigger a rebuild on mismatch.
+/// Cached [`PartialMmr`] paired with the hash of the store's peaks at the moment of caching,
+/// used as a freshness fingerprint to detect external store mutations (e.g. `importStore`).
 ///
 /// The cached MMR includes the sync-height block as a tracked leaf; the store persists the
 /// peaks committed by that block's header, i.e. the peaks over the chain *before* that block

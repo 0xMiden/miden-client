@@ -214,27 +214,21 @@ where
         Ok(())
     }
 
-    /// Returns the in-memory [`PartialMmr`] if cached and still fresh, otherwise builds it from
-    /// the store.
-    ///
-    /// Freshness is verified by comparing the hash of the store's peaks at the current sync
-    /// height against the hash captured when the cache was populated. If they differ (e.g. the
-    /// store was modified externally by `importStore`), the cache is discarded and the MMR is
-    /// rebuilt.
+    /// Returns the cached [`PartialMmr`] if its fingerprint matches the current store peaks,
+    /// otherwise rebuilds from the store.
     pub(crate) async fn take_or_build_partial_mmr(&mut self) -> Result<PartialMmr, ClientError> {
         if let Some(cached) = self.partial_mmr.take()
             && self.current_store_peaks_hash().await? == cached.store_peaks_hash
         {
             return Ok(cached.mmr);
         }
-        // Cache miss or store changed under us — fall through to rebuild.
+        // Cache miss or store changed under us -> rebuild.
 
         self.store.get_current_partial_mmr().await.map_err(Into::into)
     }
 
-    /// Writes the given MMR into the in-memory cache, capturing the current store peaks hash as
-    /// the freshness fingerprint. Must be called after any store mutations that may have changed
-    /// the peaks at the sync height, so the fingerprint reflects the post-mutation state.
+    /// Stores the MMR in the cache, capturing the current store peaks hash as fingerprint.
+    /// Must run after any store mutation that may have advanced the sync-height peaks.
     pub(crate) async fn cache_partial_mmr(&mut self, mmr: PartialMmr) -> Result<(), ClientError> {
         let store_peaks_hash = self.current_store_peaks_hash().await?;
         self.partial_mmr = Some(CachedPartialMmr { store_peaks_hash, mmr });
