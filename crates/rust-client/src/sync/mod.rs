@@ -60,7 +60,6 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::max;
 
-use miden_protocol::Word;
 use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, PartialMmr};
@@ -71,7 +70,7 @@ use miden_tx::utils::serde::{Deserializable, DeserializationError, Serializable}
 use tracing::{debug, info};
 
 use crate::store::{NoteFilter, TransactionFilter};
-use crate::{CachedPartialMmr, Client, ClientError};
+use crate::{Client, ClientError};
 mod block_header;
 
 mod tag;
@@ -82,10 +81,7 @@ pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput
 
 mod state_sync_update;
 pub use state_sync_update::{
-    AccountUpdates,
-    BlockUpdates,
-    StateSyncUpdate,
-    TransactionUpdateTracker,
+    AccountUpdates, BlockUpdates, StateSyncUpdate, TransactionUpdateTracker,
 };
 
 /// Client synchronization methods.
@@ -138,7 +134,7 @@ where
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
         let input = self.build_sync_input().await?;
 
-        let mut partial_mmr = self.take_or_build_partial_mmr().await?;
+        let mut partial_mmr = self.get_current_partial_mmr().await?;
 
         // Get the sync update from the network
         let state_sync_update = state_sync.sync_state(&mut partial_mmr, input).await?;
@@ -195,55 +191,16 @@ where
     /// Applies the state sync update to the store and prunes irrelevant blocks.
     ///
     /// See [`crate::Store::apply_state_sync()`] for what the update implies.
-    ///
-    /// Note: this invalidates the in-memory [`PartialMmr`] cache because the update may contain
-    /// new blocks and authentication nodes that the cached MMR doesn't reflect. The MMR will be
-    /// rebuilt from the store on the next operation that needs it.
     pub async fn apply_state_sync(&mut self, update: StateSyncUpdate) -> Result<(), ClientError> {
-        // Invalidate the cached MMR. The store is about to receive new blocks/peaks/nodes
-        // that the cached copy doesn't have.
-        self.partial_mmr = None;
-
         self.store.apply_state_sync(update).await?;
 
-        // Prune irrelevant blocks (will rebuild the MMR from the now-updated store).
-        let mut partial_mmr = self.take_or_build_partial_mmr().await?;
+        // Prune irrelevant blocks (will rebuild the MMR from the now-updated store, since the
+        // cached fingerprint no longer matches the store peaks).
+        let mut partial_mmr = self.get_current_partial_mmr().await?;
         self.untrack_and_prune_irrelevant_blocks(&mut partial_mmr).await?;
         self.cache_partial_mmr(partial_mmr).await?;
 
         Ok(())
-    }
-
-    /// Returns the cached [`PartialMmr`] if its fingerprint matches the current store peaks,
-    /// otherwise rebuilds from the store.
-    pub(crate) async fn take_or_build_partial_mmr(&mut self) -> Result<PartialMmr, ClientError> {
-        if let Some(cached) = self.partial_mmr.take()
-            && self.current_store_peaks_hash().await? == cached.store_peaks_hash
-        {
-            return Ok(cached.mmr);
-        }
-        // Cache miss or store changed under us -> rebuild.
-
-        self.store.get_current_partial_mmr().await.map_err(Into::into)
-    }
-
-    /// Stores the MMR in the cache, capturing the current store peaks hash as fingerprint.
-    /// Must run after any store mutation that may have advanced the sync-height peaks.
-    pub(crate) async fn cache_partial_mmr(&mut self, mmr: PartialMmr) -> Result<(), ClientError> {
-        let store_peaks_hash = self.current_store_peaks_hash().await?;
-        self.partial_mmr = Some(CachedPartialMmr { store_peaks_hash, mmr });
-        Ok(())
-    }
-
-    /// Hashes the store's peaks at the current sync height. Used as the cache freshness
-    /// fingerprint.
-    async fn current_store_peaks_hash(&self) -> Result<Word, ClientError> {
-        let sync_height = self.store.get_sync_height().await?;
-        Ok(self
-            .store
-            .get_partial_blockchain_peaks_by_block_num(sync_height)
-            .await?
-            .hash_peaks())
     }
 
     /// Prunes irrelevant block data from the store.

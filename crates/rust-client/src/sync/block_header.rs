@@ -9,7 +9,7 @@ use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
 use crate::store::{BlockRelevance, StoreError};
-use crate::{Client, ClientError};
+use crate::{CachedPartialMmr, Client, ClientError};
 
 /// Network information management methods.
 impl<AUTH> Client<AUTH> {
@@ -43,18 +43,34 @@ impl<AUTH> Client<AUTH> {
         Ok(())
     }
 
-    /// Returns the current view of the chain's [`PartialMmr`].
-    ///
-    /// If the client has a cached copy, returns a clone of it. Otherwise, rebuilds from the
-    /// store. Note that this method does not verify cache freshness against the store because
-    /// it takes `&self`; callers that need to guarantee freshness should go through
-    /// `Client::take_or_build_partial_mmr` via a `&mut self` path instead.
+    /// Returns the cached [`PartialMmr`] if its fingerprint matches the current store peaks,
+    /// otherwise rebuilds from the store.
     pub async fn get_current_partial_mmr(&self) -> Result<PartialMmr, ClientError> {
-        if let Some(ref cached) = self.partial_mmr {
-            Ok(cached.mmr.clone())
-        } else {
-            self.store.get_current_partial_mmr().await.map_err(Into::into)
+        if let Some(ref cached) = self.partial_mmr
+            && cached.store_peaks_hash == self.current_store_peaks_hash().await?
+        {
+            return Ok(cached.mmr.clone());
         }
+        self.store.get_current_partial_mmr().await.map_err(Into::into)
+    }
+
+    /// Stores the MMR in the cache, capturing the current store peaks hash as fingerprint.
+    /// Must run after any store mutation that may have advanced the sync-height peaks.
+    pub(crate) async fn cache_partial_mmr(&mut self, mmr: PartialMmr) -> Result<(), ClientError> {
+        let store_peaks_hash = self.current_store_peaks_hash().await?;
+        self.partial_mmr = Some(CachedPartialMmr { store_peaks_hash, mmr });
+        Ok(())
+    }
+
+    /// Hashes the store's peaks at the current sync height. Used as the cache freshness
+    /// fingerprint.
+    async fn current_store_peaks_hash(&self) -> Result<Word, ClientError> {
+        let sync_height = self.store.get_sync_height().await?;
+        Ok(self
+            .store
+            .get_partial_blockchain_peaks_by_block_num(sync_height)
+            .await?
+            .hash_peaks())
     }
 
     // HELPERS

@@ -14,13 +14,7 @@ use alloc::vec::Vec;
 
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{
-    Note,
-    NoteDetails,
-    NoteFile,
-    NoteId,
-    NoteInclusionProof,
-    NoteMetadata,
-    NoteTag,
+    Note, NoteDetails, NoteFile, NoteId, NoteInclusionProof, NoteMetadata, NoteTag,
 };
 use miden_tx::auth::TransactionAuthenticator;
 
@@ -275,7 +269,7 @@ where
                     //
                     // Building the MMR outside the loop would fail with BlockHeaderNotFound(0)
                     // because store will be fresh, which can't happen here.
-                    let mut partial_mmr = self.take_or_build_partial_mmr().await?;
+                    let mut partial_mmr = self.get_current_partial_mmr().await?;
                     let block_header = self
                         .get_and_store_authenticated_block(block_height, &mut partial_mmr)
                         .await?;
@@ -333,7 +327,7 @@ where
                 Some(Some((metadata, inclusion_proof))) => {
                     // Building the MMR outside the loop would fail with BlockHeaderNotFound(0)
                     // because store will be fresh, which can't happen here.
-                    let mut partial_mmr = self.take_or_build_partial_mmr().await?;
+                    let mut partial_mmr = self.get_current_partial_mmr().await?;
                     let block_header = self
                         .get_and_store_authenticated_block(
                             inclusion_proof.location().block_num(),
