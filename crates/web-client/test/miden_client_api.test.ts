@@ -254,6 +254,61 @@ test.describe("MidenClient API - Mock Chain", () => {
     expect(note?.id().toString()).toBe(noteId);
   });
 
+  // Regression test for #2011: the JS wrapper was building OutputNoteArray
+  // while the WASM binding for withOwnOutputNotes switched to NoteArray,
+  // causing `expected instance of NoteArray` at runtime.
+  test("transactions.send with returnNote returns a Note", async ({ sdk }) => {
+    const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
+    const client = await MidenClient.createMock();
+
+    const sender = await client.accounts.create();
+    const receiver = await client.accounts.create();
+    const faucet = await client.accounts.create({
+      type: "FungibleFaucet",
+      symbol: "DAG",
+      decimals: 8,
+      maxSupply: sdk.u64(10000000),
+    });
+
+    // Fund the sender: mint + consume so the wallet has a usable balance.
+    const { txId: mintTxId } = await client.transactions.mint({
+      account: faucet,
+      to: sender,
+      amount: sdk.u64(1000),
+    });
+    client.proveBlock();
+    await client.sync();
+
+    const mintRecord = (
+      await client.transactions.list({ ids: [mintTxId.toHex()] })
+    )[0];
+    const mintedNoteId = mintRecord.outputNotes().notes()[0].id().toString();
+
+    await client.transactions.consume({
+      account: sender,
+      notes: mintedNoteId,
+    });
+    client.proveBlock();
+    await client.sync();
+
+    // Send with returnNote: true — this is the path that regressed.
+    const sendResult = await client.transactions.send({
+      account: sender,
+      to: receiver,
+      token: faucet,
+      amount: sdk.u64(50),
+      type: "public",
+      returnNote: true,
+    });
+
+    expect(sendResult.txId?.toHex()).toBeDefined();
+    expect(sendResult.txId.toHex().length).toBeGreaterThan(0);
+    expect(sendResult.note != null).toBe(true);
+    expect(typeof sendResult.note?.id().toString()).toBe("string");
+    expect(sendResult.note?.id().toString().length ?? 0).toBeGreaterThan(0);
+  });
+
   test("transactions.submit with custom TransactionRequest", async ({
     sdk,
   }) => {
