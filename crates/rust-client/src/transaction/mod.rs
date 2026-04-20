@@ -226,28 +226,24 @@ where
         let submission_height =
             self.submit_proven_transaction(proven_transaction, &tx_result).await?;
 
-        // From this point on, the transaction is live on the network: the
-        // sender's account state has changed and the input note
-        // nullifiers will be recorded in the nullifier SMT. If
-        // apply_transaction fails (e.g. transient IDB write error), the
-        // local state disagrees with chain until the next sync
-        // reconciles it.
-        //
-        // Try apply once more before surfacing a distinct error that
-        // tells the caller "the tx landed on chain, don't retry it."
-        // A small subset of apply failures (IDB quota spike, connection
-        // reset on the store worker) clear immediately.
-        if let Err(first_err) = self.apply_transaction(&tx_result, submission_height).await {
-            info!("apply_transaction failed once; retrying to cover transient errors");
-            if let Err(second_err) = self.apply_transaction(&tx_result, submission_height).await {
+        // The transaction has been accepted by the node; the local store update
+        // is a separate step that can fail independently. Build the update once
+        // and retry the write once before surfacing a distinct error that
+        // carries the pending update for caller-driven recovery.
+        let tx_update = self.get_transaction_store_update(&tx_result, submission_height).await?;
+
+        if let Err(first_err) = self.apply_transaction_update(tx_update.clone()).await {
+            info!("apply_transaction_update failed once; retrying to cover transient errors");
+            if let Err(second_err) = self.apply_transaction_update(tx_update.clone()).await {
                 info!(
-                    "apply_transaction failed twice for submitted tx {tx_id}; surfacing \
-                     ApplyTransactionAfterSubmitFailed so the caller can rely on the next \
-                     sync to reconcile local state. First error: {first_err}"
+                    "apply_transaction_update failed twice for submitted tx {tx_id}; \
+                     returning ApplyTransactionAfterSubmitFailed with the pending update \
+                     attached. First error: {first_err}"
                 );
                 return Err(ClientError::ApplyTransactionAfterSubmitFailed {
                     tx_id,
                     submission_height,
+                    pending_update: Box::new(tx_update),
                     source: Box::new(second_err),
                 });
             }

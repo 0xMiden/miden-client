@@ -169,14 +169,15 @@ pub enum ClientError {
         source: RpcError,
     },
     #[error(
-        "transaction {tx_id} was submitted to the network at block {submission_height} but \
-         apply_transaction failed when writing local state. The on-chain effect is durable; the \
-         next successful sync will reconcile note states via ConsumedExternal. Do NOT retry the \
-         same transaction."
+        "transaction {tx_id} was accepted by the node at block {submission_height} but the local \
+         store update failed after a retry. The pending store update is attached and can be \
+         re-applied later via `apply_transaction_update`; resubmitting the same transaction will \
+         be rejected because the nullifiers are already consumed by the mempool-accepted copy."
     )]
     ApplyTransactionAfterSubmitFailed {
         tx_id: TransactionId,
         submission_height: BlockNumber,
+        pending_update: Box<crate::transaction::TransactionStoreUpdate>,
         #[source]
         source: Box<ClientError>,
     },
@@ -246,12 +247,12 @@ impl From<&ClientError> for Option<ErrorHint> {
             ClientError::ApplyTransactionAfterSubmitFailed { tx_id, submission_height, .. } => {
                 Some(ErrorHint {
                     message: format!(
-                        "Transaction {tx_id} was submitted to the network at block \
-                         {submission_height} but the local apply step (which writes the new \
-                         note states and account commitment to the store) failed. The on-chain \
-                         effect is permanent — do NOT resubmit. Run `sync` to reconcile local \
-                         state; input notes consumed by this transaction will be detected via \
-                         their nullifiers and transitioned to ConsumedExternal automatically."
+                        "Transaction {tx_id} was accepted by the node at block \
+                         {submission_height} but the local store update failed (twice). The \
+                         pending update is attached to this error as `pending_update`; you can \
+                         re-apply it later via `Client::apply_transaction_update`. Do NOT \
+                         resubmit the same transaction: its nullifiers are already consumed by \
+                         the mempool-accepted copy, so the node will reject the retry."
                     ),
                     docs_url: Some(TROUBLESHOOTING_DOC),
                 })
