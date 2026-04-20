@@ -9,7 +9,7 @@ const { mockGetAccountDetails, mockFromAccount } = vi.hoisted(() => ({
 }));
 
 // Override the SDK mock for this file so we can control RpcClient behavior
-vi.mock("@miden-sdk/miden-sdk", () => {
+vi.mock("@miden-sdk/miden-sdk/lazy", () => {
   const createMockAccountId = (id: string) => ({
     toString: vi.fn(() => id),
     toHex: vi.fn(() => id),

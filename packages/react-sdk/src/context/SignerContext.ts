@@ -2,7 +2,7 @@ import { createContext, useContext } from "react";
 import type {
   AccountStorageMode,
   AccountComponent,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 
 // SIGNER CONTEXT
 // ================================================================================================

@@ -205,12 +205,14 @@ const methodHandlers = {
 
     const prover = proverPayload
       ? wasm.TransactionProver.deserialize(proverPayload)
-      : undefined;
+      : null;
 
-    const proven = await wasmWebClient.proveTransaction(
-      transactionResult,
-      prover
-    );
+    const proven = prover
+      ? await wasmWebClient.proveTransactionWithProver(
+          transactionResult,
+          prover
+        )
+      : await wasmWebClient.proveTransaction(transactionResult);
     const serializedProven = proven.serialize();
     return serializedProven.buffer;
   },
@@ -263,7 +265,7 @@ const methodHandlers = {
     // Deserialize the prover from the serialized payload
     const prover = proverPayload
       ? wasm.TransactionProver.deserialize(proverPayload)
-      : undefined;
+      : null;
 
     const result = await wasmWebClient.executeTransaction(
       accountId,
@@ -272,7 +274,9 @@ const methodHandlers = {
 
     const transactionId = result.id().toHex();
 
-    const proven = await wasmWebClient.proveTransaction(result, prover);
+    const proven = prover
+      ? await wasmWebClient.proveTransactionWithProver(result, prover)
+      : await wasmWebClient.proveTransaction(result);
     const submissionHeight = await wasmWebClient.submitProvenTransaction(
       proven,
       result

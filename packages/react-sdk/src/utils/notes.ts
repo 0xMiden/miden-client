@@ -1,7 +1,7 @@
 import type {
   ConsumableNoteRecord,
   InputNoteRecord,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 import type { AssetMetadata, NoteAsset, NoteSummary } from "../types";
 import { toBech32AccountId } from "./accountBech32";
 import { formatAssetAmount } from "./amounts";
