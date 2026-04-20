@@ -165,10 +165,7 @@ where
         self.untrack_and_prune_irrelevant_blocks(&mut partial_mmr).await?;
 
         // Put the fully updated MMR back into the cache.
-        self.partial_mmr = Some(CachedPartialMmr {
-            store_peaks_hash: new_pre_add_peaks_hash,
-            mmr: partial_mmr,
-        });
+        self.cache_partial_mmr(partial_mmr, new_pre_add_peaks_hash);
 
         Ok(sync_summary)
     }
@@ -220,10 +217,7 @@ where
         // Prune irrelevant blocks (will rebuild the MMR from the now-updated store).
         let (mut partial_mmr, pre_add_peaks_hash) = self.take_or_build_partial_mmr().await?;
         self.untrack_and_prune_irrelevant_blocks(&mut partial_mmr).await?;
-        self.partial_mmr = Some(CachedPartialMmr {
-            store_peaks_hash: pre_add_peaks_hash,
-            mmr: partial_mmr,
-        });
+        self.cache_partial_mmr(partial_mmr, pre_add_peaks_hash);
 
         Ok(())
     }
@@ -255,6 +249,14 @@ where
 
         let mmr = self.store.get_current_partial_mmr().await?;
         Ok((mmr, store_peaks_hash))
+    }
+
+    /// Writes the given MMR and its pre-add peaks hash into the in-memory cache.
+    pub(crate) fn cache_partial_mmr(&mut self, mmr: PartialMmr, pre_add_peaks_hash: Word) {
+        self.partial_mmr = Some(CachedPartialMmr {
+            store_peaks_hash: pre_add_peaks_hash,
+            mmr,
+        });
     }
 
     /// Prunes irrelevant block data from the store.

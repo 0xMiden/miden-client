@@ -29,7 +29,7 @@ use crate::rpc::domain::note::FetchedNote;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{InputNoteRecord, InputNoteState, NoteFilter};
 use crate::sync::NoteTagRecord;
-use crate::{CachedPartialMmr, Client, ClientError};
+use crate::{Client, ClientError};
 
 /// Note importing methods.
 impl<AUTH> Client<AUTH>
@@ -273,12 +273,8 @@ where
                     // If the note is committed in the past we need to manually fetch the block
                     // header and MMR proof to verify the inclusion proof.
                     //
-                    // The MMR is built inside this branch rather than once outside the loop.
-                    // A fresh store defaults to sync_height = 0 with no genesis header, so
-                    // building the MMR via the store would fail with BlockHeaderNotFound(0).
-                    // Reaching this branch requires current_block_num >= block_height, and
-                    // real notes have block_height >= 1, so the store has synced past genesis
-                    // by this point and the build is safe.
+                    // Building the MMR outside the loop would fail with BlockHeaderNotFound(0)
+                    // because store will be fresh, which can't happen here.
                     let (mut partial_mmr, pre_add_peaks_hash) =
                         self.take_or_build_partial_mmr().await?;
                     let block_header = self
@@ -286,10 +282,7 @@ where
                         .await?;
                     // track() doesn't advance the MMR's forest, so the pre-add peaks hash is
                     // unchanged from what take_or_build_partial_mmr returned.
-                    self.partial_mmr = Some(CachedPartialMmr {
-                        store_peaks_hash: pre_add_peaks_hash,
-                        mmr: partial_mmr,
-                    });
+                    self.cache_partial_mmr(partial_mmr, pre_add_peaks_hash);
 
                     note_changed |= note_record.block_header_received(&block_header)?;
                 } else {
@@ -341,11 +334,8 @@ where
 
             match committed_notes_data.remove(&note_record.id()) {
                 Some(Some((metadata, inclusion_proof))) => {
-                    // The MMR is built inside this arm rather than once outside the loop.
-                    // A fresh store defaults to sync_height = 0 with no genesis header, so
-                    // building the MMR via the store would fail with BlockHeaderNotFound(0).
-                    // check_expected_notes only returns proofs for already-synced blocks, so
-                    // reaching here implies the store has synced past genesis.
+                    // Building the MMR outside the loop would fail with BlockHeaderNotFound(0)
+                    // because store will be fresh, which can't happen here.
                     let (mut partial_mmr, pre_add_peaks_hash) =
                         self.take_or_build_partial_mmr().await?;
                     let block_header = self
@@ -354,12 +344,8 @@ where
                             &mut partial_mmr,
                         )
                         .await?;
-                    // track() doesn't advance the MMR's forest, so the pre-add peaks hash is
-                    // unchanged from what take_or_build_partial_mmr returned.
-                    self.partial_mmr = Some(CachedPartialMmr {
-                        store_peaks_hash: pre_add_peaks_hash,
-                        mmr: partial_mmr,
-                    });
+
+                    self.cache_partial_mmr(partial_mmr, pre_add_peaks_hash);
 
                     let tag = metadata.tag();
                     let note_changed =
