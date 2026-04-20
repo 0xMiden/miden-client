@@ -197,6 +197,37 @@ export class MidenClient {
   }
 
   /**
+   * Resolves once every serialized WASM call that was already on the
+   * internal `_serializeWasmCall` chain when `waitForIdle()` was called
+   * (execute, submit, prove, apply, sync, or account creation) has
+   * settled. Use this from callers that need to perform a non-WASM-side
+   * action — e.g. clearing an in-memory auth key on wallet lock — after
+   * the kernel finishes, so its auth callback doesn't race with the key
+   * being cleared.
+   *
+   * Does NOT wait for calls enqueued after `waitForIdle()` returns —
+   * intentional, so a caller can drain and proceed without being blocked
+   * indefinitely by concurrent workload.
+   *
+   * Caveat for `syncState`: `syncStateWithTimeout` awaits the sync lock
+   * (`acquireSyncLock`, which uses Web Locks) BEFORE putting its WASM
+   * call onto the chain, so a `syncState` that is queued on the sync
+   * lock — but has not yet begun its WASM phase — is not visible to
+   * `waitForIdle` and will not be awaited. Other methods (`newWallet`,
+   * `executeTransaction`, etc.) route through the chain synchronously
+   * on call and are always observed.
+   *
+   * Safe to call at any time; returns immediately if nothing was in
+   * flight.
+   *
+   * @returns {Promise<void>}
+   */
+  async waitForIdle() {
+    this.assertNotTerminated();
+    await this.#inner.waitForIdle();
+  }
+
+  /**
    * Returns the raw JS value that the most recent sign-callback invocation
    * threw, or `null` if the last sign call succeeded (or no call has
    * happened yet).
