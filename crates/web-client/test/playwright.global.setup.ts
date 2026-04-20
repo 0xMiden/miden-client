@@ -276,3 +276,44 @@ export const test = base.extend<{ forEachTest: void }>({
 });
 
 export default test;
+
+// Lightweight fixture for mock-only tests that don't need an RPC connection.
+// Only loads the SDK exports and WASM module onto the page. Browser-only —
+// used by miden_client_api.test.ts and compile_and_contract.test.ts which
+// have napi-based duplicates in *.node.test.ts for Node.js coverage.
+export const mockTest = base.extend<{ forEachTest: void }>({
+  forEachTest: [
+    async ({ page }, use, testInfo) => {
+      if (testInfo.project.name === "nodejs") {
+        throw new Error("mockTest is browser-only");
+      }
+      page.on("console", (msg) => {
+        if (msg.type() === "debug") {
+          console.log(`PAGE DEBUG: ${msg.text()}`);
+        }
+      });
+
+      page.on("pageerror", (err) => {
+        console.error("PAGE ERROR:", err);
+      });
+
+      page.on("error", (err) => {
+        console.error("PUPPETEER ERROR:", err);
+      });
+
+      await page.goto("http://localhost:8080");
+
+      await page.evaluate(async () => {
+        const sdkExports = await import("./index.js");
+        for (const [key, value] of Object.entries(sdkExports)) {
+          window[key] = value;
+        }
+        const wasm = await window.getWasmOrThrow();
+        window.AuthScheme = wasm.AuthScheme;
+      });
+
+      await use();
+    },
+    { auto: true },
+  ],
+});

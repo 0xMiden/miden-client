@@ -43,9 +43,8 @@ export default defineConfig({
       testIgnore: [
         "test/node/**",
         "test/shared/**",
-        // Node.js-only tests (use napi-specific JS wrapper)
-        "test/compile_and_contract*",
-        "test/miden_client_api*",
+        // Node.js-only tests (napi-specific JS wrapper)
+        "test/*.node.test.ts",
       ],
     },
 
@@ -60,9 +59,8 @@ export default defineConfig({
       testIgnore: [
         "test/node/**",
         "test/shared/**",
-        // Node.js-only tests (use napi-specific JS wrapper)
-        "test/compile_and_contract*",
-        "test/miden_client_api*",
+        // Node.js-only tests (napi-specific JS wrapper)
+        "test/*.node.test.ts",
       ],
     },
 
@@ -81,6 +79,12 @@ export default defineConfig({
         "test/shared/**", // Old format duplicates (ported to root test/)
         "test/node/**", // Old format duplicates (ported to root test/)
         "test/remote_prover_transactions*", // Old browser format for chromium CI
+        // Browser-only variants — napi versions live in *.node.test.ts
+        "test/miden_client_api.test.ts",
+        "test/compile_and_contract.test.ts",
+        // Browser-only tests preserved from `next` that use exportStore /
+        // importStore / waitForBlocks / isolatedClient (all browser-only).
+        "test/*.browser.test.ts",
       ],
       // Skip specific browser-only tests by name.
       // Tests that request the `page` fixture must be listed here because
