@@ -521,15 +521,24 @@ class WebClient {
 
   /**
    * Returns a promise that resolves once every serialized WASM call that
-   * was in flight AT THE MOMENT `waitForIdle()` was called has settled.
-   * Use this from callers that need to perform a non-WASM-side action
-   * (e.g. clear an in-memory auth key) AFTER any in-flight execute /
-   * submit / sync has completed, so the WASM kernel's auth callback
-   * doesn't race with the key being cleared.
+   * was already on `_wasmCallChain` when `waitForIdle()` was called has
+   * settled. Use this from callers that need to perform a non-WASM-side
+   * action (e.g. clear an in-memory auth key) AFTER any in-flight
+   * execute / submit / sync has completed, so the WASM kernel's auth
+   * callback doesn't race with the key being cleared.
    *
    * Does NOT wait for calls enqueued after `waitForIdle()` returns —
    * this is intentional, so a caller can drain and then proceed without
    * being blocked indefinitely by a concurrent workload.
+   *
+   * Caveat for `syncState`: `syncStateWithTimeout` awaits
+   * `acquireSyncLock` (Web Locks) BEFORE wrapping its WASM call in
+   * `_serializeWasmCall`, so a sync that is queued on the sync lock but
+   * has not yet reached its WASM phase is not on the chain and will not
+   * be awaited. Every other serialized method (`executeTransaction`,
+   * `newWallet`, `submitNewTransaction`, `proveTransaction`,
+   * `applyTransaction`, and the proxy-fallback reads) routes through
+   * the chain synchronously on call and is always observed.
    *
    * @returns {Promise<void>}
    */
