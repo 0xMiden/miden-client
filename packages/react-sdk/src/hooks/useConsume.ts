@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
-import { NoteFilter, NoteFilterTypes, NoteId } from "@miden-sdk/miden-sdk";
-import type { Note, InputNoteRecord } from "@miden-sdk/miden-sdk";
+import { NoteFilter, NoteFilterTypes, NoteId } from "@miden-sdk/miden-sdk/lazy";
+import type { Note, InputNoteRecord } from "@miden-sdk/miden-sdk/lazy";
 import type {
   ConsumeOptions,
   TransactionStage,

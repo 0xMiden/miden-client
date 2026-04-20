@@ -1,6 +1,6 @@
 {
   "name": "@miden-sdk/react",
-  "version": "0.14.3",
+  "version": "0.14.4",
   "description": "React hooks library for Miden Web Client",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -10,6 +10,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./lazy": {
+      "types": "./dist/lazy.d.ts",
+      "import": "./dist/lazy.mjs",
+      "require": "./dist/lazy.js"
     }
   },
   "files": [
@@ -18,8 +23,8 @@
     "CLAUDE.md"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "build": "tsup",
+    "dev": "tsup --watch",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "VITE_CJS_IGNORE_WARNING=1 vitest run",
@@ -28,7 +33,7 @@
     "test:all": "VITE_CJS_IGNORE_WARNING=1 vitest run && playwright test"
   },
   "peerDependencies": {
-    "@miden-sdk/miden-sdk": "^0.14.2",
+    "@miden-sdk/miden-sdk": "^0.14.4",
     "react": ">=18.0.0"
   },
   "dependencies": {

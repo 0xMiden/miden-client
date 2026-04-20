@@ -6,7 +6,7 @@ import {
   useConsumableNotesStore,
   useSyncStateStore,
 } from "../store/MidenStore";
-import { NoteFilter } from "@miden-sdk/miden-sdk";
+import { NoteFilter } from "@miden-sdk/miden-sdk/lazy";
 import type { NotesFilter, NotesResult, NoteSummary } from "../types";
 import { getNoteSummary } from "../utils/notes";
 import { useAssetMetadata } from "./useAssetMetadata";

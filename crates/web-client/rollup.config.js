@@ -71,7 +71,7 @@ const baseCargoArgs = [
  */
 export default [
   {
-    input: ["./js/wasm.js", "./js/index.js"],
+    input: ["./js/wasm.js", "./js/index.js", "./js/eager.js"],
     output: {
       dir: `dist`,
       format: "es",

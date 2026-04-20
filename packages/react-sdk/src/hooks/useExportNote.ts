@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { NoteExportFormat } from "@miden-sdk/miden-sdk";
+import { NoteExportFormat } from "@miden-sdk/miden-sdk/lazy";
 import { useMiden } from "../context/MidenProvider";
 
 export interface UseExportNoteResult {

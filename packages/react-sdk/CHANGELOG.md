@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.14.4 (2026-04-20)
+
+### Features
+
+* [FEATURE][web] Split into eager and lazy entry points, mirroring `@miden-sdk/miden-sdk`. Default `@miden-sdk/react` imports the eager SDK variant (TLA initializes WASM on module evaluation), so dApp consumers can use the SDK synchronously outside React without awaiting readiness. The `@miden-sdk/react/lazy` subpath imports the lazy SDK variant and is required for Capacitor hosts (Miden Wallet iOS/Android), Next.js SSR, and any environment where TLA breaks module evaluation.
+
+### Changes
+
+* [CHANGE][web] All internal imports of `@miden-sdk/miden-sdk` target the `/lazy` subpath (added in web-client 0.14.4). The tsup build ships two bundles from the same source: the eager variant rewrites those imports back to the default SDK entry; the lazy variant leaves them as `/lazy`. Consumers pick an entry by their import path.
+
+### Fixes
+
+* [FIX][web] Fixed `MidenProvider` crashing on first render when a non-local `prover` is configured. After the TLA removal in web-client #2010 (v0.14.2), any wasm-bindgen constructor called before `WebClient.createClient` resolved would throw `wasm.__wbindgen_malloc is undefined`. The default prover was constructed in a render-time `useMemo`, which fires before the init `useEffect`. Moved prover construction into a `useEffect` gated on `isReady` so it runs after WASM is initialized.
+
 ## 0.14.2 (2026-04-15)
 
 ### Features
