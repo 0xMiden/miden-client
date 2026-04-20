@@ -138,8 +138,7 @@ where
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
         let input = self.build_sync_input().await?;
 
-        let (mut partial_mmr, cached_pre_add_peaks_hash) =
-            self.take_or_build_partial_mmr().await?;
+        let (mut partial_mmr, cached_pre_add_peaks_hash) = self.take_or_build_partial_mmr().await?;
 
         // Get the sync update from the network
         let state_sync_update = state_sync.sync_state(&mut partial_mmr, input).await?;
