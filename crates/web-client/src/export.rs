@@ -15,81 +15,63 @@ use crate::{WebClient, js_error_with_context};
 impl WebClient {
     #[wasm_bindgen(js_name = "exportNoteFile")]
     pub async fn export_note_file(
-        &mut self,
+        &self,
         note_id: String,
         export_format: NoteExportFormat,
     ) -> Result<NoteFile, JsValue> {
-        if let Some(client) = self.get_mut_inner() {
-            let note_id = NoteId::from_raw(Word::try_from(note_id).map_err(|err| {
-                js_error_with_context(
-                    err,
-                    "error exporting note file: failed to parse input note id",
-                )
-            })?);
+        let client = self.get_inner()?;
+        let note_id = NoteId::from_raw(Word::try_from(note_id).map_err(|err| {
+            js_error_with_context(err, "error exporting note file: failed to parse input note id")
+        })?);
 
-            let output_note = client
-                .get_output_note(note_id)
-                .await
-                .map_err(|err| {
-                    js_error_with_context(
-                        err,
-                        "error exporting note file: failed to get output notes",
-                    )
-                })?
-                .ok_or(JsValue::from_str("No output note found"))?;
+        let output_note = client
+            .get_output_note(note_id)
+            .await
+            .map_err(|err| {
+                js_error_with_context(err, "error exporting note file: failed to get output notes")
+            })?
+            .ok_or(JsValue::from_str("No output note found"))?;
 
-            let export_type = export_format.into();
+        let export_type = export_format.into();
 
-            let note_file = output_note.into_note_file(&export_type).map_err(|err| {
-                js_error_with_context(err, "failed to convert output note to note file")
-            })?;
+        let note_file = output_note.into_note_file(&export_type).map_err(|err| {
+            js_error_with_context(err, "failed to convert output note to note file")
+        })?;
 
-            Ok(note_file.into())
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
+        Ok(note_file.into())
     }
 
     #[wasm_bindgen(js_name = "exportAccountFile")]
     pub async fn export_account_file(
-        &mut self,
+        &self,
         account_id: &AccountId,
     ) -> Result<AccountFile, JsValue> {
         let keystore = self.inner_keystore()?.clone();
-        if let Some(client) = self.get_mut_inner() {
-            let account = client
-                .get_account(account_id.into())
-                .await
-                .map_err(|err| {
-                    js_error_with_context(
-                        err,
-                        &format!(
-                            "failed to get account for account id: {}",
-                            account_id.to_string()
-                        ),
-                    )
-                })?
-                .ok_or_else(|| {
-                    JsValue::from_str(&format!(
-                        "Account with ID {} not found",
-                        account_id.to_string()
-                    ))
-                })?;
+        let client = self.get_inner()?;
+        let account = client
+            .get_account(account_id.into())
+            .await
+            .map_err(|err| {
+                js_error_with_context(
+                    err,
+                    &format!("failed to get account for account id: {}", account_id.to_string()),
+                )
+            })?
+            .ok_or_else(|| {
+                JsValue::from_str(&format!("Account with ID {} not found", account_id.to_string()))
+            })?;
 
-            let key_pairs =
-                keystore.get_keys_for_account(account_id.as_native()).await.map_err(|err| {
-                    js_error_with_context(
-                        err,
-                        &format!("failed to get keys for account: {}", &account_id.to_string()),
-                    )
-                })?;
+        let key_pairs =
+            keystore.get_keys_for_account(account_id.as_native()).await.map_err(|err| {
+                js_error_with_context(
+                    err,
+                    &format!("failed to get keys for account: {}", &account_id.to_string()),
+                )
+            })?;
 
-            let account_data = NativeAccountFile::new(account, key_pairs);
+        let account_data = NativeAccountFile::new(account, key_pairs);
 
-            Ok(AccountFile::from(account_data))
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
+        Ok(AccountFile::from(account_data))
     }
 }
 

@@ -7,25 +7,19 @@ use crate::{WebClient, js_error_with_context};
 impl WebClient {
     /// Retrieves the setting value for `key`, or `None` if it hasn’t been set.
     #[wasm_bindgen(js_name = "getSetting")]
-    pub async fn get_setting(&mut self, key: String) -> Result<Option<JsValue>, JsValue> {
-        if let Some(client) = self.get_mut_inner() {
-            let result: Option<Vec<u8>> = client.get_setting(key).await.map_err(|err| {
-                js_error_with_context(err, "failed to get setting value from the store")
-            })?;
-            let deserialized_result = result
-                .map(|bytes| {
-                    to_value(&bytes).map_err(|err| {
-                        js_error_with_context(
-                            err,
-                            "failed to deserialize setting value into a JsValue",
-                        )
-                    })
+    pub async fn get_setting(&self, key: String) -> Result<Option<JsValue>, JsValue> {
+        let client = self.get_inner()?;
+        let result: Option<Vec<u8>> = client.get_setting(key).await.map_err(|err| {
+            js_error_with_context(err, "failed to get setting value from the store")
+        })?;
+        let deserialized_result = result
+            .map(|bytes| {
+                to_value(&bytes).map_err(|err| {
+                    js_error_with_context(err, "failed to deserialize setting value into a JsValue")
                 })
-                .transpose()?;
-            Ok(deserialized_result)
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
+            })
+            .transpose()?;
+        Ok(deserialized_result)
     }
 
     /// Sets a setting key-value in the store. It can then be retrieved using `get_setting`.
@@ -59,13 +53,11 @@ impl WebClient {
 
     /// Returns all the existing setting keys from the store.
     #[wasm_bindgen(js_name = "listSettingKeys")]
-    pub async fn list_setting_keys(&mut self) -> Result<Vec<String>, JsValue> {
-        if let Some(client) = self.get_mut_inner() {
-            client.list_setting_keys().await.map_err(|err| {
-                js_error_with_context(err, "failed to list setting keys in the store")
-            })
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
+    pub async fn list_setting_keys(&self) -> Result<Vec<String>, JsValue> {
+        let client = self.get_inner()?;
+        client
+            .list_setting_keys()
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to list setting keys in the store"))
     }
 }

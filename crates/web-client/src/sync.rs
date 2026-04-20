@@ -29,17 +29,14 @@ impl WebClient {
     }
 
     #[wasm_bindgen(js_name = "getSyncHeight")]
-    pub async fn get_sync_height(&mut self) -> Result<u32, JsValue> {
-        if let Some(client) = self.get_mut_inner() {
-            let sync_height = client
-                .get_sync_height()
-                .await
-                .map_err(|err| js_error_with_context(err, "failed to get sync height"))?;
+    pub async fn get_sync_height(&self) -> Result<u32, JsValue> {
+        let client = self.get_inner()?;
+        let sync_height = client
+            .get_sync_height()
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to get sync height"))?;
 
-            Ok(sync_height.as_u32())
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
+        Ok(sync_height.as_u32())
     }
 
     #[wasm_bindgen(js_name = "buildSwapTag")]

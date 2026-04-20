@@ -9,18 +9,15 @@ use crate::{WebClient, js_error_with_context};
 impl WebClient {
     #[wasm_bindgen(js_name = "getTransactions")]
     pub async fn get_transactions(
-        &mut self,
+        &self,
         transaction_filter: TransactionFilter,
     ) -> Result<Vec<TransactionRecord>, JsValue> {
-        if let Some(client) = self.get_mut_inner() {
-            let transaction_records: Vec<NativeTransactionRecord> = client
-                .get_transactions(transaction_filter.into())
-                .await
-                .map_err(|err| js_error_with_context(err, "failed to get transactions"))?;
+        let client = self.get_inner()?;
+        let transaction_records: Vec<NativeTransactionRecord> = client
+            .get_transactions(transaction_filter.into())
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to get transactions"))?;
 
-            Ok(transaction_records.into_iter().map(Into::into).collect())
-        } else {
-            Err(JsValue::from_str("Client not initialized"))
-        }
+        Ok(transaction_records.into_iter().map(Into::into).collect())
     }
 }
