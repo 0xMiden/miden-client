@@ -59,6 +59,14 @@ export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
 
 // Method classification sets — used by scripts/check-method-classification.js to ensure
 // every WASM export is explicitly categorised. Update when adding new WASM methods.
+//
+// Note on `SYNC_METHODS`: some entries (`proveBlock`, `serializeMockChain`,
+// `setDebugMode`) take `&mut self` on the Rust side. That's safe to opt out of
+// `_serializeWasmCall` because they're synchronous in JS — the event loop
+// cannot interleave another call during their execution, so the RefCell
+// borrow is always released before any other borrow can start. Do NOT move a
+// sync-in-JS method into `WRITE_METHODS` just because it takes `&mut self`;
+// wrapping it there would change its return to `Promise<T>` and break callers.
 const SYNC_METHODS = new Set([
   "buildSwapTag",
   "createCodeBuilder",

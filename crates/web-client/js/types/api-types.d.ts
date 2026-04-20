@@ -934,6 +934,7 @@ export declare class MidenClient {
   sync(options?: { timeout?: number }): Promise<SyncSummary>;
   /** Returns the current sync height. */
   getSyncHeight(): Promise<number>;
+  /**
    * Resolves once any in-flight serialized WASM call (execute, submit,
    * prove, apply, sync, or account creation) has settled. Use this from
    * callers that need to perform a non-WASM-side action — e.g. clearing

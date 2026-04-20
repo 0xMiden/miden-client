@@ -967,23 +967,32 @@ test.describe("WASM Call Serialization", () => {
   test("waitForIdle blocks until the in-flight serialized call settles", async ({
     page,
   }) => {
+    // Must use a method that goes DIRECTLY through `_serializeWasmCall`
+    // (e.g. `newWallet`) — `syncState` awaits `acquireSyncLock` BEFORE
+    // populating the chain, so the chain is still empty in the same task
+    // turn that `waitForIdle()` reads it, causing `waitForIdle` to resolve
+    // immediately regardless of the in-flight sync.
     const result = await page.evaluate(async () => {
       const client = window.client;
 
-      // Kick off a serialized call but don't await it yet.
-      let syncDone = false;
-      const syncPromise = client.syncState().finally(() => {
-        syncDone = true;
-      });
+      let walletDone = false;
+      const walletPromise = client
+        .newWallet(
+          window.AccountStorageMode.private(),
+          true,
+          window.AuthScheme.AuthRpoFalcon512
+        )
+        .finally(() => {
+          walletDone = true;
+        });
 
-      // waitForIdle must not resolve before the in-flight call completes.
       await client.waitForIdle();
-      const syncDoneWhenIdleResolved = syncDone;
-      await syncPromise;
+      const walletDoneWhenIdleResolved = walletDone;
+      await walletPromise;
 
-      return { syncDoneWhenIdleResolved };
+      return { walletDoneWhenIdleResolved };
     });
 
-    expect(result.syncDoneWhenIdleResolved).toBe(true);
+    expect(result.walletDoneWhenIdleResolved).toBe(true);
   });
 });
