@@ -230,11 +230,15 @@ where
         // is a separate step that can fail independently. Build the update once
         // and retry the write once before surfacing a distinct error that
         // carries the pending update for caller-driven recovery.
-        let tx_update = self.get_transaction_store_update(&tx_result, submission_height).await?;
+        //
+        // The update is boxed so it does not inflate the enclosing future
+        // across await points (triggers clippy::large_futures).
+        let tx_update =
+            Box::new(self.get_transaction_store_update(&tx_result, submission_height).await?);
 
-        if let Err(first_err) = self.apply_transaction_update(tx_update.clone()).await {
+        if let Err(first_err) = self.apply_transaction_update((*tx_update).clone()).await {
             info!("apply_transaction_update failed once; retrying to cover transient errors");
-            if let Err(second_err) = self.apply_transaction_update(tx_update.clone()).await {
+            if let Err(second_err) = self.apply_transaction_update((*tx_update).clone()).await {
                 info!(
                     "apply_transaction_update failed twice for submitted tx {tx_id}; \
                      returning ApplyTransactionAfterSubmitFailed with the pending update \
@@ -243,7 +247,7 @@ where
                 return Err(ClientError::ApplyTransactionAfterSubmitFailed {
                     tx_id,
                     submission_height,
-                    pending_update: Box::new(tx_update),
+                    pending_update: tx_update,
                     source: Box::new(second_err),
                 });
             }
