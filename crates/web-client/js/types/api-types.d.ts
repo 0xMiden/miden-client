@@ -943,16 +943,16 @@ export declare class MidenClient {
   terminate(): void;
 
   /** Returns the identifier of the underlying store (e.g. IndexedDB database name, file path). */
-  storeIdentifier(): string;
+  storeIdentifier(): Promise<string>;
 
   /** Advances the mock chain by one block. Only available on mock clients. */
-  proveBlock(): void;
+  proveBlock(): Promise<void>;
   /** Returns true if this client uses a mock chain. */
   usesMockChain(): boolean;
   /** Serializes the mock chain state for snapshot/restore in tests. */
-  serializeMockChain(): Uint8Array;
+  serializeMockChain(): Promise<Uint8Array>;
   /** Serializes the mock note transport node state. */
-  serializeMockNoteTransportNode(): Uint8Array;
+  serializeMockNoteTransportNode(): Promise<Uint8Array>;
 
   [Symbol.dispose](): void;
   [Symbol.asyncDispose](): Promise<void>;

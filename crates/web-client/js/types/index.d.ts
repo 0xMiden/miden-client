@@ -171,9 +171,9 @@ export declare class MockWasmWebClient extends WasmWebClient {
     logLevel?: LogLevel
   ): Promise<MockWasmWebClient>;
 
-  proveBlock(): void;
-  serializeMockChain(): Uint8Array;
-  serializeMockNoteTransportNode(): Uint8Array;
+  proveBlock(): Promise<void>;
+  serializeMockChain(): Promise<Uint8Array>;
+  serializeMockNoteTransportNode(): Promise<Uint8Array>;
 }
 
 /** Alias for MockWasmWebClient — used by test apps that import MockWebClient directly. */

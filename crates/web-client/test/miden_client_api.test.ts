@@ -302,11 +302,6 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
   mockTest(
     "transactions.submit with custom TransactionRequest",
     async ({ page }) => {
-      mockTest.skip(
-        true,
-        "browser mock chain worker serialization bug introduced by this PR: " +
-          "'failed to deserialize mock chain: unexpected EOF'. Covered in Node.js."
-      );
       const result = await page.evaluate(async () => {
         const client = await window.MidenClient.createMock();
         const wallet = await client.accounts.create();
@@ -319,7 +314,7 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
 
         // Build a custom TransactionRequest using low-level _WebClient
         const lowLevel = await window.MockWasmWebClient.createClient();
-        const mintRequest = lowLevel.newMintTransactionRequest(
+        const mintRequest = await lowLevel.newMintTransactionRequest(
           wallet.id(),
           faucet.id(),
           window.NoteType.Public,
@@ -409,11 +404,6 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
   );
 
   mockTest("exportStore and importStore round-trip", async ({ page }) => {
-    mockTest.skip(
-      true,
-      "browser mock chain worker serialization bug introduced by this PR: " +
-        "'failed to deserialize mock chain: unexpected EOF'. Covered in Node.js."
-    );
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
 
@@ -422,11 +412,13 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
       const walletId = wallet.id().toString();
 
       // Export the store
-      const storeData = await window.exportStore(client.storeIdentifier());
+      const storeData = await window.exportStore(
+        await client.storeIdentifier()
+      );
 
       // Create a new mock client and import the store
       const client2 = await window.MidenClient.createMock();
-      await window.importStore(client2.storeIdentifier(), storeData);
+      await window.importStore(await client2.storeIdentifier(), storeData);
 
       // Check the account exists in the new client
       const accounts = await client2.accounts.list();
@@ -1003,18 +995,13 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
   mockTest(
     "accounts.getOrImport works across serialized mock chain",
     async ({ page }) => {
-      mockTest.skip(
-        true,
-        "browser mock chain worker serialization bug introduced by this PR: " +
-          "'failed to deserialize mock chain: unexpected EOF'. Covered in Node.js."
-      );
       const result = await page.evaluate(async () => {
         const client = await window.MidenClient.createMock();
         const wallet = await client.accounts.create({ storage: "public" });
         const walletId = wallet.id().toString();
 
         // Serialize chain so the second client sees the same blocks
-        const chain = client.serializeMockChain();
+        const chain = await client.serializeMockChain();
 
         // Create a fresh mock client with the same chain
         const client2 = await window.MidenClient.createMock({
@@ -1035,11 +1022,6 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
   );
 
   mockTest("serializeMockChain and restore", async ({ page }) => {
-    mockTest.skip(
-      true,
-      "browser mock chain worker serialization bug introduced by this PR: " +
-        "'failed to deserialize mock chain: unexpected EOF'. Covered in Node.js."
-    );
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
 
@@ -1060,7 +1042,7 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
       await client.sync();
 
       // Serialize the mock chain
-      const serializedChain = client.serializeMockChain();
+      const serializedChain = await client.serializeMockChain();
 
       // Create a new client from the serialized chain
       const client2 = await window.MidenClient.createMock({
