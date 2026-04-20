@@ -2927,6 +2927,7 @@ dependencies = [
  "getrandom 0.3.4",
  "gloo-timers",
  "hex",
+ "miden-debug",
  "miden-node-proto-build",
  "miden-note-transport-proto-build",
  "miden-protocol",
@@ -2982,6 +2983,7 @@ dependencies = [
  "figment",
  "miden-client",
  "miden-client-sqlite-store",
+ "miden-debug",
  "miette",
  "predicates",
  "rand 0.9.2",
@@ -3161,6 +3163,77 @@ checksum = "e8bf6ebde028e79bcc61a3632d2f375a5cc64caa17d014459f75015238cb1e08"
 dependencies = [
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "miden-debug"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df04a684eeb96efabc63e2800a01945f7f6e19ffd00d3b49064e85f7e1fac444"
+dependencies = [
+ "clap",
+ "futures",
+ "glob",
+ "log",
+ "miden-assembly",
+ "miden-assembly-syntax",
+ "miden-core",
+ "miden-crypto",
+ "miden-debug-dap",
+ "miden-debug-engine",
+ "miden-debug-types",
+ "miden-mast-package",
+ "miden-processor",
+ "miden-protocol",
+ "miden-thiserror",
+ "miden-tx",
+ "num-traits",
+ "rustc-demangle",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "socket2 0.5.10",
+ "tokio",
+ "tokio-util",
+ "toml 0.8.23",
+]
+
+[[package]]
+name = "miden-debug-dap"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38cd41176322df12836bb4deecd4b619f7cf8239ed7b2c4ac1da7b2830e5199c"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "miden-debug-engine"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e03dd00bd4dab99dbfdec9fd07009811a7e3b3a988e74a28c6ccb735ac34e138"
+dependencies = [
+ "clap",
+ "glob",
+ "log",
+ "miden-assembly",
+ "miden-assembly-syntax",
+ "miden-core",
+ "miden-debug-dap",
+ "miden-debug-types",
+ "miden-mast-package",
+ "miden-processor",
+ "miden-thiserror",
+ "miden-tx",
+ "num-traits",
+ "rustc-demangle",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "socket2 0.5.10",
+ "toml 0.8.23",
 ]
 
 [[package]]
@@ -3739,6 +3812,26 @@ dependencies = [
  "rand 0.9.2",
  "rand_chacha",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "miden-thiserror"
+version = "1.0.59"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "183ff8de338956ecfde3a38573241eb7a6f3d44d73866c210e5629c07fa00253"
+dependencies = [
+ "miden-thiserror-impl",
+]
+
+[[package]]
+name = "miden-thiserror-impl"
+version = "1.0.59"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ee4176a0f2e7d29d2a8ee7e60b6deb14ce67a20e94c3e2c7275cdb8804e1862"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
 ]
 
 [[package]]
@@ -6219,6 +6312,7 @@ version = "0.8.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc1beb996b9d83529a9e75c17a1686767d148d70663143c7854d8b4a09ced362"
 dependencies = [
+ "indexmap",
  "serde",
  "serde_spanned 0.6.9",
  "toml_datetime 0.6.11",
