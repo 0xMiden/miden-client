@@ -63,7 +63,7 @@ use core::cmp::max;
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockNumber;
-use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks, PartialMmr};
+use miden_protocol::crypto::merkle::mmr::{InOrderIndex, PartialMmr};
 use miden_protocol::note::NoteId;
 use miden_protocol::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
@@ -138,7 +138,7 @@ where
             StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
         let input = self.build_sync_input().await?;
 
-        let (mut partial_mmr, cached_store_peaks_hash) = self.take_or_build_partial_mmr().await?;
+        let mut partial_mmr = self.take_or_build_partial_mmr().await?;
 
         // Get the sync update from the network
         let state_sync_update = state_sync.sync_state(&mut partial_mmr, input).await?;
@@ -146,14 +146,6 @@ where
         let sync_summary: SyncSummary = (&state_sync_update).into();
         debug!(sync_summary = ?sync_summary, "Sync summary computed");
         info!("Applying changes to the store.");
-
-        // If the sync advanced the chain, the peaks that the store will persist for the new
-        // chain tip were captured into block_updates before the chain tip block was added as a
-        // leaf. Otherwise the MMR wasn't mutated and the cached hash is still valid.
-        let new_store_peaks_hash = state_sync_update
-            .block_updates
-            .peaks_for(state_sync_update.block_num)
-            .map_or(cached_store_peaks_hash, MmrPeaks::hash_peaks);
 
         // Apply received and computed updates to the store
         self.store
@@ -165,7 +157,7 @@ where
         self.untrack_and_prune_irrelevant_blocks(&mut partial_mmr).await?;
 
         // Put the fully updated MMR back into the cache.
-        self.cache_partial_mmr(partial_mmr, new_store_peaks_hash);
+        self.cache_partial_mmr(partial_mmr).await?;
 
         Ok(sync_summary)
     }
@@ -215,45 +207,49 @@ where
         self.store.apply_state_sync(update).await?;
 
         // Prune irrelevant blocks (will rebuild the MMR from the now-updated store).
-        let (mut partial_mmr, store_peaks_hash) = self.take_or_build_partial_mmr().await?;
+        let mut partial_mmr = self.take_or_build_partial_mmr().await?;
         self.untrack_and_prune_irrelevant_blocks(&mut partial_mmr).await?;
-        self.cache_partial_mmr(partial_mmr, store_peaks_hash);
+        self.cache_partial_mmr(partial_mmr).await?;
 
         Ok(())
     }
 
     /// Returns the in-memory [`PartialMmr`] if cached and still fresh, otherwise builds it from
-    /// the store. Also returns the hash of the store's peaks at the current sync height, which
-    /// callers thread back into [`Self::cache_partial_mmr`] when writing back.
+    /// the store.
     ///
     /// Freshness is verified by comparing the hash of the store's peaks at the current sync
     /// height against the hash captured when the cache was populated. If they differ (e.g. the
     /// store was modified externally by `importStore`), the cache is discarded and the MMR is
     /// rebuilt.
-    pub(crate) async fn take_or_build_partial_mmr(
-        &mut self,
-    ) -> Result<(PartialMmr, Word), ClientError> {
-        let sync_height = self.store.get_sync_height().await?;
-        let store_peaks_hash = self
-            .store
-            .get_partial_blockchain_peaks_by_block_num(sync_height)
-            .await?
-            .hash_peaks();
-
+    pub(crate) async fn take_or_build_partial_mmr(&mut self) -> Result<PartialMmr, ClientError> {
         if let Some(cached) = self.partial_mmr.take()
-            && store_peaks_hash == cached.store_peaks_hash
+            && self.current_store_peaks_hash().await? == cached.store_peaks_hash
         {
-            return Ok((cached.mmr, store_peaks_hash));
+            return Ok(cached.mmr);
         }
         // Cache miss or store changed under us — fall through to rebuild.
 
-        let mmr = self.store.get_current_partial_mmr().await?;
-        Ok((mmr, store_peaks_hash))
+        self.store.get_current_partial_mmr().await.map_err(Into::into)
     }
 
-    /// Writes the given MMR and the current store peaks hash into the in-memory cache.
-    pub(crate) fn cache_partial_mmr(&mut self, mmr: PartialMmr, store_peaks_hash: Word) {
+    /// Writes the given MMR into the in-memory cache, capturing the current store peaks hash as
+    /// the freshness fingerprint. Must be called after any store mutations that may have changed
+    /// the peaks at the sync height, so the fingerprint reflects the post-mutation state.
+    pub(crate) async fn cache_partial_mmr(&mut self, mmr: PartialMmr) -> Result<(), ClientError> {
+        let store_peaks_hash = self.current_store_peaks_hash().await?;
         self.partial_mmr = Some(CachedPartialMmr { store_peaks_hash, mmr });
+        Ok(())
+    }
+
+    /// Hashes the store's peaks at the current sync height. Used as the cache freshness
+    /// fingerprint.
+    async fn current_store_peaks_hash(&self) -> Result<Word, ClientError> {
+        let sync_height = self.store.get_sync_height().await?;
+        Ok(self
+            .store
+            .get_partial_blockchain_peaks_by_block_num(sync_height)
+            .await?
+            .hash_peaks())
     }
 
     /// Prunes irrelevant block data from the store.
