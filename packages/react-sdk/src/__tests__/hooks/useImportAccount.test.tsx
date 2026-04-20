@@ -3,7 +3,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { useImportAccount } from "../../hooks/useImportAccount";
 import { useMiden } from "../../context/MidenProvider";
 import { useMidenStore } from "../../store/MidenStore";
-import type { AccountFile } from "@miden-sdk/miden-sdk";
+import type { AccountFile } from "@miden-sdk/miden-sdk/lazy";
 import {
   createMockAccount,
   createMockAccountFile,

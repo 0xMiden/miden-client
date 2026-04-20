@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useMiden } from "../context/MidenProvider";
-import { TransactionFilter } from "@miden-sdk/miden-sdk";
-import type { TransactionId } from "@miden-sdk/miden-sdk";
+import { TransactionFilter } from "@miden-sdk/miden-sdk/lazy";
+import type { TransactionId } from "@miden-sdk/miden-sdk/lazy";
 import type { WaitForCommitOptions } from "../types";
 
 export interface UseWaitForCommitResult {

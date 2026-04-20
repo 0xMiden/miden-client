@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { CompilerResource, getWasmOrThrow } from "@miden-sdk/miden-sdk";
+import { CompilerResource, getWasmOrThrow } from "@miden-sdk/miden-sdk/lazy";
 import { useCompile } from "../../hooks/useCompile";
 import { useMiden } from "../../context/MidenProvider";
 import { createMockWebClient } from "../mocks/miden-sdk";
@@ -9,7 +9,7 @@ vi.mock("../../context/MidenProvider", () => ({
   useMiden: vi.fn(),
 }));
 
-vi.mock("@miden-sdk/miden-sdk", () => {
+vi.mock("@miden-sdk/miden-sdk/lazy", () => {
   const instances: Array<{
     component: ReturnType<typeof vi.fn>;
     txScript: ReturnType<typeof vi.fn>;

@@ -4,7 +4,7 @@ import {
   AccountInterface,
   Address,
   NetworkId,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 import { useMidenStore } from "../store/MidenStore";
 import { parseAccountId } from "./accountParsing";
 

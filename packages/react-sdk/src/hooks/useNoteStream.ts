@@ -6,8 +6,8 @@ import {
   useSyncStateStore,
   useNoteFirstSeenStore,
 } from "../store/MidenStore";
-import { NoteFilter } from "@miden-sdk/miden-sdk";
-import type { InputNoteRecord } from "@miden-sdk/miden-sdk";
+import { NoteFilter } from "@miden-sdk/miden-sdk/lazy";
+import type { InputNoteRecord } from "@miden-sdk/miden-sdk/lazy";
 import type {
   StreamedNote,
   UseNoteStreamOptions,

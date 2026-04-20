@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { normalizeAccountId, accountIdsEqual } from "../../utils/accountId";
-import { AccountId } from "@miden-sdk/miden-sdk";
+import { AccountId } from "@miden-sdk/miden-sdk/lazy";
 
 // The global mock in setup.ts mocks @miden-sdk/miden-sdk.
 // parseAccountId (used by accountIdsEqual) calls AccountId.fromHex / fromBech32,

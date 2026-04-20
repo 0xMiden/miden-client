@@ -3,8 +3,8 @@ import {
   NoteAttachmentKind,
   NoteAttachmentScheme,
   Word,
-} from "@miden-sdk/miden-sdk";
-import type { InputNoteRecord } from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
+import type { InputNoteRecord } from "@miden-sdk/miden-sdk/lazy";
 
 export interface NoteAttachmentData {
   values: bigint[];

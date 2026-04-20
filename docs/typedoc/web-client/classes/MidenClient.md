@@ -301,3 +301,20 @@ Creates a client preconfigured for testnet (rpc, prover, note transport, autoSyn
 #### Returns
 
 `Promise`\<`MidenClient`\>
+
+***
+
+### ready()
+
+> `static` **ready**(): `Promise`\<`void`\>
+
+Resolves once the WASM module is initialized and safe to use.
+
+Idempotent and shared across callers — concurrent invocations await the
+same in-flight promise, and post-init callers resolve immediately.
+Primarily useful on the `/lazy` entry (Next.js / Capacitor) where no
+top-level await runs at import time; harmless on the eager entry.
+
+#### Returns
+
+`Promise`\<`void`\>

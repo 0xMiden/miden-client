@@ -2,7 +2,7 @@ import {
   NoteFilterTypes,
   NoteType,
   TransactionFilter,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 
 /**
  * Map a status string to the corresponding NoteFilterTypes enum value.

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import type { TransactionScript } from "@miden-sdk/miden-sdk";
+import type { TransactionScript } from "@miden-sdk/miden-sdk/lazy";
 import { useExecuteProgram } from "../../hooks/useExecuteProgram";
 import { useMiden } from "../../context/MidenProvider";
 import { useMidenStore } from "../../store/MidenStore";
