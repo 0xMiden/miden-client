@@ -1,13 +1,13 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { useMidenStore } from "../store/MidenStore";
-import { AccountFile } from "@miden-sdk/miden-sdk";
+import { AccountFile } from "@miden-sdk/miden-sdk/lazy";
 import type {
   Account,
   AccountId as AccountIdType,
   AccountFile as AccountFileType,
   WasmWebClient as WebClient,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 import type { ImportAccountOptions } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId } from "../utils/accountParsing";

@@ -1,4 +1,4 @@
-import { AuthScheme } from "@miden-sdk/miden-sdk";
+import { AuthScheme } from "@miden-sdk/miden-sdk/lazy";
 import type { AccountRef } from "../utils/accountParsing";
 import type {
   WasmWebClient as WebClient,
@@ -21,7 +21,7 @@ import type {
   Note,
   NoteVisibility,
   StorageMode,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 
 // Re-export SDK types for convenience
 export { AuthScheme };

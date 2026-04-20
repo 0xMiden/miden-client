@@ -370,6 +370,7 @@ export const createMockWebClient = (
       .fn()
       .mockResolvedValue(createMockTransactionResult()),
     proveTransaction: vi.fn().mockResolvedValue({}),
+    proveTransactionWithProver: vi.fn().mockResolvedValue({}),
     submitProvenTransaction: vi.fn().mockResolvedValue(0),
     applyTransaction: vi.fn().mockResolvedValue({}),
     sendPrivateNote: vi.fn().mockResolvedValue(undefined),
@@ -422,6 +423,7 @@ export type MockWebClientType = {
   submitNewTransactionWithProver: ReturnType<typeof vi.fn>;
   executeTransaction: ReturnType<typeof vi.fn>;
   proveTransaction: ReturnType<typeof vi.fn>;
+  proveTransactionWithProver: ReturnType<typeof vi.fn>;
   submitProvenTransaction: ReturnType<typeof vi.fn>;
   applyTransaction: ReturnType<typeof vi.fn>;
   sendPrivateNote: ReturnType<typeof vi.fn>;

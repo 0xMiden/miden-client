@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { WasmWebClient as WebClient } from "@miden-sdk/miden-sdk";
+import { WasmWebClient as WebClient } from "@miden-sdk/miden-sdk/lazy";
 import { useMidenStore } from "../store/MidenStore";
 import type { MidenConfig } from "../types";
 import { DEFAULTS } from "../types";
@@ -87,15 +87,26 @@ export function MidenProvider({
     }),
     [config]
   );
-  const defaultProver = useMemo(
-    () => resolveTransactionProver(resolvedConfig),
-    [
-      resolvedConfig.prover,
-      resolvedConfig.proverTimeoutMs,
-      resolvedConfig.proverUrls?.devnet,
-      resolvedConfig.proverUrls?.testnet,
-    ]
-  );
+  const [defaultProver, setDefaultProver] =
+    useState<ReturnType<typeof resolveTransactionProver>>(null);
+
+  // Defer prover construction until WASM is ready — resolveTransactionProver
+  // calls TransactionProver.newLocalProver() / newRemoteProver() which touch
+  // the WASM module. Running this synchronously in useMemo before the module
+  // is initialized causes a crash on first render (wasm.__wbindgen_malloc).
+  useEffect(() => {
+    if (!isReady) {
+      setDefaultProver(null);
+      return;
+    }
+    setDefaultProver(resolveTransactionProver(resolvedConfig));
+  }, [
+    isReady,
+    resolvedConfig.prover,
+    resolvedConfig.proverTimeoutMs,
+    resolvedConfig.proverUrls?.devnet,
+    resolvedConfig.proverUrls?.testnet,
+  ]);
 
   // Exposed for advanced consumers who need to serialize custom multi-step
   // operations against the client. Built-in hooks no longer use this since

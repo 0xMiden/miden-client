@@ -4,7 +4,7 @@ import {
   ForeignAccount,
   ForeignAccountArray,
   AccountStorageRequirements,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 import { useMiden } from "../context/MidenProvider";
 import type { ExecuteProgramOptions, ExecuteProgramResult } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
