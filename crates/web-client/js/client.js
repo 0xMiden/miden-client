@@ -197,13 +197,17 @@ export class MidenClient {
   }
 
   /**
-   * Resolves once any in-flight serialized WASM call (execute, submit,
-   * prove, apply, sync, or account creation) has settled. Use this from
-   * callers that need to perform a non-WASM-side action — e.g. clearing an
-   * in-memory auth key on wallet lock — after the kernel finishes, so its
-   * auth callback doesn't race with the key being cleared.
+   * Resolves once every serialized WASM call that was in flight AT THE
+   * MOMENT `waitForIdle()` was called (execute, submit, prove, apply,
+   * sync, or account creation) has settled. Use this from callers that
+   * need to perform a non-WASM-side action — e.g. clearing an in-memory
+   * auth key on wallet lock — after the kernel finishes, so its auth
+   * callback doesn't race with the key being cleared.
    *
-   * Safe to call at any time; returns immediately if nothing is in flight.
+   * Does NOT wait for calls enqueued after `waitForIdle()` returns —
+   * intentional, so a caller can drain and proceed without being blocked
+   * indefinitely by concurrent workload. Safe to call at any time; returns
+   * immediately if nothing was in flight.
    *
    * @returns {Promise<void>}
    */

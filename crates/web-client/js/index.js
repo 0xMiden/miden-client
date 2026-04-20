@@ -510,11 +510,16 @@ class WebClient {
   }
 
   /**
-   * Returns a promise that resolves when the client is idle — i.e. when no
-   * serialized WASM call is currently in flight. Use this from callers that
-   * need to perform a non-WASM-side action (e.g. clear an in-memory auth
-   * key) AFTER any in-flight execute/submit/sync has completed, so the
-   * WASM kernel's auth callback doesn't race with the key being cleared.
+   * Returns a promise that resolves once every serialized WASM call that
+   * was in flight AT THE MOMENT `waitForIdle()` was called has settled.
+   * Use this from callers that need to perform a non-WASM-side action
+   * (e.g. clear an in-memory auth key) AFTER any in-flight execute /
+   * submit / sync has completed, so the WASM kernel's auth callback
+   * doesn't race with the key being cleared.
+   *
+   * Does NOT wait for calls enqueued after `waitForIdle()` returns —
+   * this is intentional, so a caller can drain and then proceed without
+   * being blocked indefinitely by a concurrent workload.
    *
    * @returns {Promise<void>}
    */
@@ -858,6 +863,11 @@ class WebClient {
     });
   }
 
+  // Delegates to `proveTransaction`, which already routes through
+  // `_serializeWasmCall` and dispatches to the WASM `proveTransactionWithProver`
+  // binding when `prover` is present. Kept as a wrapper (rather than elided)
+  // so the method classification lint sees an explicit match for the WASM
+  // method name.
   async proveTransactionWithProver(transactionResult, prover) {
     return this.proveTransaction(transactionResult, prover);
   }

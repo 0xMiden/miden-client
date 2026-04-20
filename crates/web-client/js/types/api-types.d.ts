@@ -935,12 +935,14 @@ export declare class MidenClient {
   /** Returns the current sync height. */
   getSyncHeight(): Promise<number>;
   /**
-   * Resolves once any in-flight serialized WASM call (execute, submit,
-   * prove, apply, sync, or account creation) has settled. Use this from
-   * callers that need to perform a non-WASM-side action — e.g. clearing
-   * an in-memory auth key on wallet lock — after the kernel finishes, so
-   * its auth callback doesn't race with the key being cleared. Returns
-   * immediately if nothing is in flight.
+   * Resolves once every serialized WASM call that was in flight AT THE
+   * MOMENT `waitForIdle()` was called (execute, submit, prove, apply,
+   * sync, or account creation) has settled. Use this from callers that
+   * need to perform a non-WASM-side action — e.g. clearing an in-memory
+   * auth key on wallet lock — after the kernel finishes, so its auth
+   * callback doesn't race with the key being cleared. Does NOT wait for
+   * calls enqueued after `waitForIdle()` returns. Returns immediately if
+   * nothing was in flight.
    */
   waitForIdle(): Promise<void>;
   /**
