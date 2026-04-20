@@ -218,146 +218,122 @@ const RECEIVE_NOTE_SCRIPT = `
   end
 `;
 
+// Linking enum values (mirrors `Linking` from js/index.js). Inlined here so the
+// node sdk wrapper doesn't need to re-export the JS-only enum.
+const Linking = Object.freeze({ Dynamic: "dynamic", Static: "static" });
+
 test.describe("compile.noteScript()", () => {
-  test("compiles a script without libraries", async ({ page }) => {
-    const result = await page.evaluate(
-      async ({ code }) => {
-        const client = await window.MidenClient.createMock();
-        const script = await client.compile.noteScript({ code });
-        return {
-          isDefined: script != null,
-          serializedLen: script?.serialize().length ?? 0,
-        };
-      },
-      { code: RECEIVE_NOTE_SCRIPT }
-    );
-
-    expect(result.isDefined).toBe(true);
-    expect(result.serializedLen).toBeGreaterThan(0);
+  test("compiles a script without libraries", async ({ sdk }) => {
+    const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
+    const client = await MidenClient.createMock();
+    const script = await client.compile.noteScript({
+      code: RECEIVE_NOTE_SCRIPT,
+    });
+    expect(script).not.toBeNull();
+    expect(script.serialize().length).toBeGreaterThan(0);
   });
 
-  test("compiles a script with a dynamic library", async ({ page }) => {
-    const result = await page.evaluate(
-      async ({ counterCode }) => {
-        const client = await window.MidenClient.createMock();
-        const script = await client.compile.noteScript({
-          code: `
-            use external_contract::counter_contract
-            use miden::core::sys
-            begin
-              call.counter_contract::increment_count
-              exec.sys::truncate_stack
-            end
-          `,
-          libraries: [
-            {
-              namespace: "external_contract::counter_contract",
-              code: counterCode,
-            },
-          ],
-        });
-        return { isDefined: script != null };
-      },
-      { counterCode: COUNTER_CODE }
-    );
-
-    expect(result.isDefined).toBe(true);
+  test("compiles a script with a dynamic library", async ({ sdk }) => {
+    const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
+    const client = await MidenClient.createMock();
+    const script = await client.compile.noteScript({
+      code: `
+        use external_contract::counter_contract
+        use miden::core::sys
+        begin
+          call.counter_contract::increment_count
+          exec.sys::truncate_stack
+        end
+      `,
+      libraries: [
+        {
+          namespace: "external_contract::counter_contract",
+          code: COUNTER_CODE,
+        },
+      ],
+    });
+    expect(script).not.toBeNull();
   });
 
-  test("Linking enum and raw strings are interchangeable", async ({ page }) => {
-    const result = await page.evaluate(
-      async ({ counterCode }) => {
-        const client = await window.MidenClient.createMock();
-        const { Linking } = window as any;
+  test("Linking enum and raw strings are interchangeable", async ({ sdk }) => {
+    const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
+    const client = await MidenClient.createMock();
 
-        const scriptEnum = await client.compile.noteScript({
-          code: `
-            use external_contract::counter_contract
-            use miden::core::sys
-            begin
-              call.counter_contract::increment_count
-              exec.sys::truncate_stack
-            end
-          `,
-          libraries: [
-            {
-              namespace: "external_contract::counter_contract",
-              code: counterCode,
-              linking: Linking.Dynamic,
-            },
-          ],
-        });
+    const scriptEnum = await client.compile.noteScript({
+      code: `
+        use external_contract::counter_contract
+        use miden::core::sys
+        begin
+          call.counter_contract::increment_count
+          exec.sys::truncate_stack
+        end
+      `,
+      libraries: [
+        {
+          namespace: "external_contract::counter_contract",
+          code: COUNTER_CODE,
+          linking: Linking.Dynamic,
+        },
+      ],
+    });
 
-        const scriptStr = await client.compile.noteScript({
-          code: `
-            use external_contract::counter_contract
-            use miden::core::sys
-            begin
-              call.counter_contract::increment_count
-              exec.sys::truncate_stack
-            end
-          `,
-          libraries: [
-            {
-              namespace: "external_contract::counter_contract",
-              code: counterCode,
-              linking: "dynamic",
-            },
-          ],
-        });
+    const scriptStr = await client.compile.noteScript({
+      code: `
+        use external_contract::counter_contract
+        use miden::core::sys
+        begin
+          call.counter_contract::increment_count
+          exec.sys::truncate_stack
+        end
+      `,
+      libraries: [
+        {
+          namespace: "external_contract::counter_contract",
+          code: COUNTER_CODE,
+          linking: "dynamic",
+        },
+      ],
+    });
 
-        return {
-          enumOk: scriptEnum != null,
-          strOk: scriptStr != null,
-        };
-      },
-      { counterCode: COUNTER_CODE }
-    );
-
-    expect(result.enumOk).toBe(true);
-    expect(result.strOk).toBe(true);
+    expect(scriptEnum).not.toBeNull();
+    expect(scriptStr).not.toBeNull();
   });
 
   test("each call uses a fresh builder — libraries from prior calls do not leak", async ({
-    page,
+    sdk,
   }) => {
-    const result = await page.evaluate(
-      async ({ counterCode, plainCode }) => {
-        const client = await window.MidenClient.createMock();
+    const MidenClient = await createMidenClient(sdk);
+    test.skip(!MidenClient, "requires napi binary (Node.js only)");
+    const client = await MidenClient.createMock();
 
-        // First call: link counter_contract
-        const scriptWithLib = await client.compile.noteScript({
-          code: `
-            use external_contract::counter_contract
-            use miden::core::sys
-            begin
-              call.counter_contract::increment_count
-              exec.sys::truncate_stack
-            end
-          `,
-          libraries: [
-            {
-              namespace: "external_contract::counter_contract",
-              code: counterCode,
-            },
-          ],
-        });
+    // First call: link counter_contract
+    const scriptWithLib = await client.compile.noteScript({
+      code: `
+        use external_contract::counter_contract
+        use miden::core::sys
+        begin
+          call.counter_contract::increment_count
+          exec.sys::truncate_stack
+        end
+      `,
+      libraries: [
+        {
+          namespace: "external_contract::counter_contract",
+          code: COUNTER_CODE,
+        },
+      ],
+    });
 
-        // Second call: no libraries — must compile independently
-        const scriptNoLib = await client.compile.noteScript({
-          code: plainCode,
-        });
+    // Second call: no libraries — must compile independently
+    const scriptNoLib = await client.compile.noteScript({
+      code: RECEIVE_NOTE_SCRIPT,
+    });
 
-        return {
-          firstOk: scriptWithLib != null,
-          secondOk: scriptNoLib != null,
-        };
-      },
-      { counterCode: COUNTER_CODE, plainCode: RECEIVE_NOTE_SCRIPT }
-    );
-
-    expect(result.firstOk).toBe(true);
-    expect(result.secondOk).toBe(true);
+    expect(scriptWithLib).not.toBeNull();
+    expect(scriptNoLib).not.toBeNull();
   });
 });
 

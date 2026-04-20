@@ -478,7 +478,12 @@ function createHelpers(getClient: () => any, setClient: (c: any) => void) {
  */
 function makeArrayPolyfill(_name: string) {
   return function (items: any[]) {
-    const arr = Array.isArray(items) ? [...items] : [items];
+    const arr =
+      items === undefined || items === null
+        ? []
+        : Array.isArray(items)
+          ? [...items]
+          : [items];
     // Add WASM-style array methods that some tests use
     (arr as any).get = (i: number) => arr[i];
     (arr as any).replaceAt = (i: number, val: any) => {
@@ -493,6 +498,7 @@ const arrayPolyfills: Record<string, any> = {
   AccountArray: makeArrayPolyfill("AccountArray"),
   AccountIdArray: makeArrayPolyfill("AccountIdArray"),
   ForeignAccountArray: makeArrayPolyfill("ForeignAccountArray"),
+  NoteArray: makeArrayPolyfill("NoteArray"),
   NoteRecipientArray: makeArrayPolyfill("NoteRecipientArray"),
   OutputNoteArray: makeArrayPolyfill("OutputNoteArray"),
   StorageSlotArray: makeArrayPolyfill("StorageSlotArray"),

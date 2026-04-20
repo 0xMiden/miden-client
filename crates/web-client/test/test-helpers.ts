@@ -371,7 +371,12 @@ let _midenClientClass: any = null;
 
 function makeArrayPolyfill() {
   return function (items: any[]) {
-    const arr = Array.isArray(items) ? [...items] : [items];
+    const arr =
+      items === undefined || items === null
+        ? []
+        : Array.isArray(items)
+          ? [...items]
+          : [items];
     (arr as any).get = (i: number) => arr[i];
     (arr as any).replaceAt = (i: number, val: any) => {
       arr[i] = val;
@@ -531,6 +536,7 @@ export async function createMidenClient(sdk: any): Promise<any> {
     "AccountArray",
     "AccountIdArray",
     "ForeignAccountArray",
+    "NoteArray",
     "NoteRecipientArray",
     "OutputNoteArray",
     "StorageSlotArray",
@@ -606,6 +612,15 @@ export async function createMidenClient(sdk: any): Promise<any> {
   MidenClient._WasmWebClient = WasmWebClient;
   MidenClient._MockWasmWebClient = MockWasmWebClient;
   MidenClient._getWasmOrThrow = getWasmOrThrow;
+
+  // Install the StorageView wrapper on Account.prototype.storage() — mirrors
+  // what `ensureWasm()` does in the browser entry point. Without this,
+  // `account.storage()` on node returns raw AccountStorage instead of a
+  // StorageView, breaking dual-mode tests that expect the wrapper.
+  const { installStorageView } = await import(
+    path.join(jsDir, "storageView.js")
+  );
+  installStorageView(rawSdk);
 
   // Load standalone helpers
   try {

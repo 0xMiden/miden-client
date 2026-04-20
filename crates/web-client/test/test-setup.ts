@@ -232,7 +232,12 @@ function normalizeNapiArg(val: any): any {
 function makeArrayPolyfills(): Record<string, any> {
   // Must be a regular function (not arrow) so it can be called with `new`
   function polyfill(items: any[]) {
-    const arr = Array.isArray(items) ? [...items] : [items];
+    const arr =
+      items === undefined || items === null
+        ? []
+        : Array.isArray(items)
+          ? [...items]
+          : [items];
     (arr as any).get = (i: number) => arr[i];
     return arr;
   }
@@ -242,6 +247,7 @@ function makeArrayPolyfills(): Record<string, any> {
     "FeltArray",
     "ForeignAccountArray",
     "NoteAndArgsArray",
+    "NoteArray",
     "NoteDetailsAndTagArray",
     "NoteIdAndArgsArray",
     "NoteRecipientArray",
@@ -327,6 +333,9 @@ function patchNapiPrototypes(rawSdk: any) {
 
 export function createNodeSdkWrapper(rawSdk: any): any {
   patchNapiPrototypes(rawSdk);
+  // Expose the StorageView JS wrapper on `sdk.*` so tests can reach it via the
+  // same namespace on both platforms (browser exposes it on `window.*`).
+  const sv = require("../js/storageView.js");
 
   return {
     ...rawSdk,
@@ -338,6 +347,10 @@ export function createNodeSdkWrapper(rawSdk: any): any {
     FungibleAsset: wrapNapiClass(rawSdk.FungibleAsset),
     Word: wrapNapiClass(rawSdk.Word),
     NoteTag: wrapNapiClass(rawSdk.NoteTag),
+    // StorageView JS wrapper — browser exposes these on window via index.js.
+    StorageView: sv.StorageView,
+    StorageResult: sv.StorageResult,
+    wordToBigInt: sv.wordToBigInt,
     // Array type polyfills — napi accepts plain arrays directly, but browser
     // WASM needs typed array wrappers. These make `new sdk.XArray([...])` work
     // on both platforms.
@@ -736,6 +749,9 @@ async function setupBrowserPage(page: any, testInfo: TestInfo) {
           }
         },
 
+        createMidenMockClient: async () =>
+          await window.MidenClient.createMock(),
+
         getRpcUrl: () => window.rpcUrl,
       };
     },
@@ -788,6 +804,11 @@ async function createNodeRunHelpers(client: any, sdk: any): Promise<any> {
     parseNetworkId: (networkId: string) => h.parseNetworkId(sdk, networkId),
     createFreshMockClient: () => h.createFreshMockClient(sdk),
     createIntegrationClient: () => h.createIntegrationClient(),
+    createMidenMockClient: async () => {
+      const MidenClient = await h.createMidenClient(sdk);
+      if (!MidenClient) throw new Error("MidenClient unavailable");
+      return MidenClient.createMock();
+    },
     getRpcUrl: () => getRpcUrl(),
   };
 }

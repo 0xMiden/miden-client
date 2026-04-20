@@ -185,7 +185,12 @@ export function patchSdkPrototypes(rawSdk) {
  */
 export function makeArrayPolyfills() {
   function polyfill(items) {
-    const arr = Array.isArray(items) ? [...items] : [items];
+    const arr =
+      items === undefined || items === null
+        ? []
+        : Array.isArray(items)
+          ? [...items]
+          : [items];
     arr.get = (i) => arr[i];
     arr.replaceAt = (i, val) => {
       arr[i] = val;
@@ -199,6 +204,7 @@ export function makeArrayPolyfills() {
     "FeltArray",
     "ForeignAccountArray",
     "NoteAndArgsArray",
+    "NoteArray",
     "NoteDetailsAndTagArray",
     "NoteIdAndArgsArray",
     "NoteRecipientArray",
