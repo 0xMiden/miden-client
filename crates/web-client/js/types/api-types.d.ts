@@ -921,6 +921,15 @@ export declare class MidenClient {
   static createDevnet(options?: ClientOptions): Promise<MidenClient>;
   /** Creates a mock client for testing. */
   static createMock(options?: MockOptions): Promise<MidenClient>;
+  /**
+   * Resolves once the WASM module is initialized and safe to use.
+   *
+   * Idempotent and shared across callers — concurrent invocations await the
+   * same in-flight promise, and post-init callers resolve immediately.
+   * Primarily useful on the `/lazy` entry (Next.js / Capacitor) where no
+   * top-level await runs at import time; harmless on the eager entry.
+   */
+  static ready(): Promise<void>;
 
   readonly accounts: AccountsResource;
   readonly transactions: TransactionsResource;

@@ -141,6 +141,32 @@ export class MidenClient {
   }
 
   /**
+   * Resolves once the WASM module is initialized and safe to use.
+   *
+   * Idempotent and shared across callers: the underlying loader memoizes the
+   * in-flight promise, so concurrent `ready()` calls await the same
+   * initialization and post-init callers resolve immediately from a cached
+   * module. Safe to call from `MidenProvider`, tutorial helpers, and any
+   * other consumer simultaneously.
+   *
+   * Useful on the `/lazy` entry (e.g. Next.js / Capacitor), where no
+   * top-level await runs at import time. On the default (eager) entry this
+   * is redundant — importing the module already awaits WASM — but calling it
+   * is still harmless.
+   *
+   * @returns {Promise<void>} Resolves when WASM is initialized.
+   */
+  static async ready() {
+    const getWasm = MidenClient._getWasmOrThrow;
+    if (!getWasm) {
+      throw new Error(
+        "MidenClient not initialized. Import from the SDK package entry point."
+      );
+    }
+    await getWasm();
+  }
+
+  /**
    * Creates a mock client for testing.
    *
    * @param {MockOptions} [options] - Mock client options.
