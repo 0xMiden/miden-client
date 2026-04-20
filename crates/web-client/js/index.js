@@ -135,18 +135,17 @@ const READ_METHODS = new Set([
   "getTransactions",
   "listSettingKeys",
   "listTags",
-  "executeProgram",
 ]);
 
 const MOCK_STORE_NAME = "mock_client_db";
 
-// `SYNC_METHODS` is read by `createClientProxy` to decide whether a
-// proxy-fallback call should stay synchronous. `WRITE_METHODS` /
-// `READ_METHODS` are consulted only by the CI lint (see
+// `SYNC_METHODS` and `READ_METHODS` are read by `createClientProxy` to
+// route proxy-fallback calls: sync methods bypass the lock entirely and
+// reads go through the shared-borrow path so they can run in parallel.
+// `WRITE_METHODS` is consulted only by the CI lint (see
 // scripts/check-method-classification.js); suppress unused-variable
-// warnings for those two.
+// warnings for it.
 void WRITE_METHODS;
-void READ_METHODS;
 
 const buildTypedArraysExport = (exportObject) => {
   return Object.entries(exportObject).reduce(
@@ -247,11 +246,13 @@ export const getWasmOrThrow = async () => {
  * Create a Proxy that forwards missing properties to the underlying WASM
  * WebClient.
  *
- * Async proxy-fallback methods (every WASM method that borrows the
- * WebClient's RefCell — reads included, since `&self` and `&mut self` both
- * trip wasm-bindgen's "recursive use of an object detected" panic if
- * another borrow is live) are routed through `_serializeWasmCall` so they
- * queue on the same chain as the explicitly-wrapped methods.
+ * Async proxy-fallback methods are routed through the readers-writer lock
+ * on the enclosing `WebClient`:
+ *   - `READ_METHODS` take `&self` on the Rust side, so wasm-bindgen uses
+ *     shared borrows for them and they can run concurrently with other
+ *     reads; they go through `_serializeWasmRead`.
+ *   - Everything else takes `&mut self` and must run alone; those go
+ *     through `_serializeWasmCall`.
  *
  * `SYNC_METHODS` opts out: they are synchronous in JS and wrapping them
  * would change their return type to `Promise<T>`, which is a breaking
@@ -268,6 +269,12 @@ function createClientProxy(instance) {
         if (typeof value === "function") {
           if (typeof prop === "string" && SYNC_METHODS.has(prop)) {
             return value.bind(target.wasmWebClient);
+          }
+          if (typeof prop === "string" && READ_METHODS.has(prop)) {
+            return (...args) =>
+              target._serializeWasmRead(() =>
+                value.apply(target.wasmWebClient, args)
+              );
           }
           return (...args) =>
             target._serializeWasmCall(() =>
@@ -492,60 +499,106 @@ class WebClient {
     this.wasmWebClient = null;
     this.wasmWebClientPromise = null;
 
-    // Promise chain to serialize direct WASM calls that require exclusive
-    // (&mut self) access. Without this, concurrent calls on the same client
-    // would panic with "recursive use of an object detected" due to
-    // wasm-bindgen's internal RefCell.
-    this._wasmCallChain = Promise.resolve();
+    // Readers-writer lock state for direct WASM calls. Concurrent calls on
+    // the same client would otherwise panic with "recursive use of an object
+    // detected" (wasm-bindgen's internal RefCell): any two `&mut self` calls,
+    // or an `&mut self` call racing an `&self` call, collide on the borrow.
+    // Multiple `&self` calls (our reads) can coexist, so they run in parallel
+    // while writes still take the slot alone.
+    this._rwQueue = []; // FIFO of { type: 'read' | 'write', fn, resolve, reject }
+    this._rwRunning = 0;
+    this._rwRunningType = null; // 'read' | 'write' | null
   }
 
   /**
-   * Serialize a WASM call that requires exclusive (&mut self) access.
-   * Concurrent calls are queued and executed one at a time.
+   * Enqueue a WASM call under the readers-writer lock.
+   * @param {'read' | 'write'} type
+   * @param {() => Promise<any>} fn
+   * @returns {Promise<any>}
+   */
+  _enqueueWasmCall(type, fn) {
+    return new Promise((resolve, reject) => {
+      this._rwQueue.push({ type, fn, resolve, reject });
+      this._pumpWasmCalls();
+    });
+  }
+
+  _pumpWasmCalls() {
+    while (this._rwQueue.length > 0) {
+      const head = this._rwQueue[0];
+      const canStart =
+        this._rwRunningType === null ||
+        (this._rwRunningType === "read" && head.type === "read");
+      if (!canStart) break;
+      this._rwQueue.shift();
+      this._rwRunning++;
+      this._rwRunningType = head.type;
+      (async () => {
+        try {
+          head.resolve(await head.fn());
+        } catch (err) {
+          head.reject(err);
+        } finally {
+          this._rwRunning--;
+          if (this._rwRunning === 0) this._rwRunningType = null;
+          this._pumpWasmCalls();
+        }
+      })();
+    }
+  }
+
+  /**
+   * Serialize a WASM call that requires exclusive (`&mut self`) access.
+   * The call waits for every prior queued call (reads and writes) to finish
+   * and runs alone. New calls queued after it will wait for it to complete.
    *
    * Wraps both the direct (in-thread) path and the worker-dispatched path.
    * On the worker path this is redundant with the worker's own message queue,
-   * but harmless (the chain resolves immediately on the main thread once the
-   * worker's postMessage returns). On the direct path it is load-bearing —
-   * without it, concurrent main-thread callers would panic with
-   * "recursive use of an object detected" (wasm-bindgen's internal RefCell).
+   * but harmless. On the direct path it is load-bearing.
    *
    * @param {() => Promise<any>} fn - The async function to execute.
    * @returns {Promise<any>} The result of fn.
    */
   _serializeWasmCall(fn) {
-    const result = this._wasmCallChain.catch(() => {}).then(fn);
-    this._wasmCallChain = result.catch(() => {});
-    return result;
+    return this._enqueueWasmCall("write", fn);
   }
 
   /**
-   * Returns a promise that resolves once every serialized WASM call that
-   * was already on `_wasmCallChain` when `waitForIdle()` was called has
-   * settled. Use this from callers that need to perform a non-WASM-side
-   * action (e.g. clear an in-memory auth key) AFTER any in-flight
-   * execute / submit / sync has completed, so the WASM kernel's auth
-   * callback doesn't race with the key being cleared.
+   * Serialize a WASM call that only requires shared (`&self`) access.
+   * Concurrent reads run in parallel; a read waits for any in-flight or
+   * queued write to complete first.
    *
-   * Does NOT wait for calls enqueued after `waitForIdle()` returns —
-   * this is intentional, so a caller can drain and then proceed without
-   * being blocked indefinitely by a concurrent workload.
+   * @param {() => Promise<any>} fn - The async function to execute.
+   * @returns {Promise<any>} The result of fn.
+   */
+  _serializeWasmRead(fn) {
+    return this._enqueueWasmCall("read", fn);
+  }
+
+  /**
+   * Resolves once every WASM call queued on this client before `waitForIdle()`
+   * was called has settled. Use this from callers that need to perform a
+   * non-WASM-side action (e.g. clear an in-memory auth key) AFTER any
+   * in-flight execute / submit / sync has completed, so the WASM kernel's
+   * auth callback doesn't race with the key being cleared.
+   *
+   * Implemented by enqueuing a no-op write: it cannot run until every
+   * preceding read and write has finished, so when it runs the client is
+   * idle. Calls queued after `waitForIdle()` returns are not awaited.
    *
    * Caveat for `syncState`: `syncStateWithTimeout` awaits
-   * `acquireSyncLock` (Web Locks) BEFORE wrapping its WASM call in
-   * `_serializeWasmCall`, so a sync that is queued on the sync lock but
-   * has not yet reached its WASM phase is not on the chain and will not
-   * be awaited. Every other serialized method (`executeTransaction`,
-   * `newWallet`, `submitNewTransaction`, `proveTransaction`,
-   * `applyTransaction`, and the proxy-fallback reads) routes through
-   * the chain synchronously on call and is always observed.
+   * `acquireSyncLock` (Web Locks) BEFORE enqueueing its WASM call, so a
+   * sync that is queued on the sync lock but has not yet reached its WASM
+   * phase is not on the queue and will not be awaited. Every other
+   * serialized method (`executeTransaction`, `newWallet`,
+   * `submitNewTransaction`, `proveTransaction`, `applyTransaction`, and
+   * the proxy-fallback reads) routes through the queue synchronously on
+   * call and is always observed.
    *
    * @returns {Promise<void>}
    */
   async waitForIdle() {
-    // Chain on `_wasmCallChain`; by the time this resolves, any in-flight
-    // serialized call has settled. Catch so the chain state doesn't leak.
-    await this._wasmCallChain.catch(() => {});
+    await this._enqueueWasmCall("write", async () => {}).catch(() => {});
   }
 
   // TODO: This will soon conflict with some changes in main.
