@@ -4,6 +4,8 @@
 
 ### Changes
 
+* [BREAKING][behavior][rust,web] `Client::sync_state()` no longer returns `Err` when the Note Transport Layer fetch fails. The on-chain sync now completes and any NTL failure is surfaced through the new `SyncSummary::ntl_error: Option<String>` field (`ntlError()` in the web client). Callers that relied on the `Err` to detect NTL failures must check `ntl_error` instead. ([#1930](https://github.com/0xMiden/miden-client/issues/1930))
+* [BREAKING][type][rust,web] Added `ntl_error: Option<String>` field to `SyncSummary`. This also changes the wire format of its `Serializable`/`Deserializable` impls. ([#1930](https://github.com/0xMiden/miden-client/issues/1930))
 * [BREAKING][param][rust] `NodeRpcClient::get_block_by_number()` now takes an `include_proof: bool` parameter to control whether the block proof is included in the response. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 * [BREAKING][param][rust] `NodeRpcClient::sync_chain_mmr()` replaced `block_to: Option<BlockNumber>` with `upper_bound: SyncTarget` to match the RPC definition. Use `SyncTarget::CommittedChainTip` for previous default behavior (`None`), or `SyncTarget::BlockNumber(num)` for a specific block number. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 

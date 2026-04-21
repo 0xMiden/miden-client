@@ -55,6 +55,7 @@
 //! `committed_note_updates` and `consumed_note_updates`) to understand how the sync data is
 //! processed and applied to the local store.
 
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::max;
@@ -65,7 +66,7 @@ use miden_protocol::note::NoteId;
 use miden_protocol::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::serde::{Deserializable, DeserializationError, Serializable};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::{Client, ClientError};
@@ -124,11 +125,21 @@ where
 
         // Note Transport update
         // TODO We can run both sync_state, fetch_transport_notes futures in parallel
-        if self.is_note_transport_enabled() {
+        let ntl_error = if self.is_note_transport_enabled() {
             let cursor = self.store.get_note_transport_cursor().await?;
             let note_tags = self.store.get_unique_note_tags().await?;
-            self.fetch_transport_notes(cursor, note_tags).await?;
-        }
+            match self.fetch_transport_notes(cursor, note_tags).await {
+                Ok(()) => None,
+                Err(e) => {
+                    warn!(
+                        "Note transport fetch failed, continuing sync without private notes: {e}"
+                    );
+                    Some(e.to_string())
+                },
+            }
+        } else {
+            None
+        };
 
         // Build sync state components
         let note_screener = self.note_screener();
@@ -144,7 +155,8 @@ where
         // Get the sync update from the network
         let state_sync_update = state_sync.sync_state(&mut current_partial_mmr, input).await?;
 
-        let sync_summary: SyncSummary = (&state_sync_update).into();
+        let mut sync_summary: SyncSummary = (&state_sync_update).into();
+        sync_summary.ntl_error = ntl_error;
         debug!(sync_summary = ?sync_summary, "Sync summary computed");
         info!("Applying changes to the store.");
 
@@ -235,6 +247,9 @@ pub struct SyncSummary {
     pub locked_accounts: Vec<AccountId>,
     /// IDs of committed transactions.
     pub committed_transactions: Vec<TransactionId>,
+    /// Error message from the Note Transport Layer if its fetch failed during the sync.
+    /// `None` means NTL was either disabled or succeeded.
+    pub ntl_error: Option<String>,
 }
 
 impl SyncSummary {
@@ -255,6 +270,7 @@ impl SyncSummary {
             updated_accounts,
             locked_accounts,
             committed_transactions,
+            ntl_error: None,
         }
     }
 
@@ -267,6 +283,7 @@ impl SyncSummary {
             updated_accounts: vec![],
             locked_accounts: vec![],
             committed_transactions: vec![],
+            ntl_error: None,
         }
     }
 
@@ -287,6 +304,9 @@ impl SyncSummary {
         self.updated_accounts.append(&mut other.updated_accounts);
         self.locked_accounts.append(&mut other.locked_accounts);
         self.committed_transactions.append(&mut other.committed_transactions);
+        if self.ntl_error.is_none() {
+            self.ntl_error = other.ntl_error;
+        }
     }
 }
 
@@ -299,6 +319,7 @@ impl Serializable for SyncSummary {
         self.updated_accounts.write_into(target);
         self.locked_accounts.write_into(target);
         self.committed_transactions.write_into(target);
+        self.ntl_error.write_into(target);
     }
 }
 
@@ -313,6 +334,7 @@ impl Deserializable for SyncSummary {
         let updated_accounts = Vec::<AccountId>::read_from(source)?;
         let locked_accounts = Vec::<AccountId>::read_from(source)?;
         let committed_transactions = Vec::<TransactionId>::read_from(source)?;
+        let ntl_error = Option::<String>::read_from(source)?;
 
         Ok(Self {
             block_num,
@@ -322,6 +344,7 @@ impl Deserializable for SyncSummary {
             updated_accounts,
             locked_accounts,
             committed_transactions,
+            ntl_error,
         })
     }
 }
