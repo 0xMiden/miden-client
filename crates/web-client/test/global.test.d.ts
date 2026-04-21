@@ -61,7 +61,6 @@ import {
   TestUtils,
   TokenSymbol,
   TransactionFilter,
-  TransactionKernel,
   TransactionProver,
   TransactionRequest,
   TransactionStoreUpdate,
@@ -156,7 +155,6 @@ declare global {
     TestUtils: typeof TestUtils;
     TokenSymbol: typeof TokenSymbol;
     TransactionFilter: typeof TransactionFilter;
-    TransactionKernel: typeof TransactionKernel;
     TransactionProver: typeof TransactionProver;
     TransactionRequest: typeof TransactionRequest;
     TransactionStoreUpdate: typeof TransactionStoreUpdate;

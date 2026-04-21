@@ -1,7 +1,7 @@
 use std::sync::{Arc, LazyLock};
 use std::vec;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use miden_client::account::component::{AccountComponent, AccountComponentMetadata};
 use miden_client::account::{
     Account,
@@ -13,14 +13,7 @@ use miden_client::account::{
     StorageSlot,
     StorageSlotName,
 };
-use miden_client::assembly::{
-    CodeBuilder,
-    DefaultSourceManager,
-    Library,
-    Module,
-    ModuleKind,
-    Path,
-};
+use miden_client::assembly::{CodeBuilder, Library};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{
     NetworkAccountTarget,
@@ -41,7 +34,7 @@ use miden_client::testing::common::{
     wait_for_blocks,
     wait_for_tx,
 };
-use miden_client::transaction::{TransactionKernel, TransactionRequestBuilder};
+use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::{Felt, Word, ZERO};
 use rand::{Rng, RngCore};
 
@@ -283,21 +276,10 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
 
 // Initialize the Basic Fungible Faucet library only once.
 static COUNTER_CONTRACT_LIBRARY: LazyLock<Arc<Library>> = LazyLock::new(|| {
-    let assembler = TransactionKernel::assembler();
-    let source_manager = Arc::new(DefaultSourceManager::default());
-    let module = Module::parser(ModuleKind::Library)
-        .parse_str(
-            Path::new("external_contract::counter_contract"),
-            COUNTER_CONTRACT,
-            source_manager,
-        )
-        .map_err(|err| anyhow!(err))
-        .unwrap();
-    assembler
-        .clone()
-        .assemble_library([module])
-        .map_err(|err| anyhow!(err))
-        .unwrap()
+    let code = CodeBuilder::default()
+        .compile_component_code("external_contract::counter_contract", COUNTER_CONTRACT)
+        .expect("failed to compile counter contract library");
+    Arc::new(code.into_library())
 });
 
 /// Returns the Basic Fungible Faucet Library.
