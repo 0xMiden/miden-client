@@ -112,6 +112,7 @@ use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
 
+mod batch;
 pub mod store;
 mod transaction;
 mod transport;

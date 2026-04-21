@@ -6,6 +6,7 @@
 
 * [BREAKING][param][rust] `NodeRpcClient::get_block_by_number()` now takes an `include_proof: bool` parameter to control whether the block proof is included in the response. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 * [BREAKING][param][rust] `NodeRpcClient::sync_chain_mmr()` replaced `block_to: Option<BlockNumber>` with `upper_bound: SyncTarget` to match the RPC definition. Use `SyncTarget::CommittedChainTip` for previous default behavior (`None`), or `SyncTarget::BlockNumber(num)` for a specific block number. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
+* [BREAKING][rust] Added `submit_proven_batch` to `NodeRpcClient` trait. ([#2075](https://github.com/0xMiden/miden-client/pull/2075))
 
 ### Enhancements
 
