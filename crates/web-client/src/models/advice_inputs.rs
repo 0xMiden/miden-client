@@ -1,19 +1,19 @@
+use js_export_macro::js_export;
 use miden_client::vm::AdviceInputs as NativeAdviceInputs;
-use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;
 use super::word::Word;
 
 /// Advice inputs provided to a transaction or note script.
 #[derive(Clone, Default)]
-#[wasm_bindgen]
+#[js_export]
 pub struct AdviceInputs(NativeAdviceInputs);
 
-#[wasm_bindgen]
+#[js_export]
 impl AdviceInputs {
     /// `wasm_bindgen` requires an explicit constructor; `#[derive(Default)]` alone
     /// is not callable from JS.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new() -> AdviceInputs {
         AdviceInputs(NativeAdviceInputs::default())
     }
@@ -24,7 +24,7 @@ impl AdviceInputs {
     }
 
     /// Returns mapped values for a given key if present.
-    #[wasm_bindgen(js_name = "mappedValues")]
+    #[js_export(js_name = "mappedValues")]
     pub fn mapped_values(&self, key: &Word) -> Option<Vec<Felt>> {
         let native_key: miden_client::Word = key.into();
         self.0

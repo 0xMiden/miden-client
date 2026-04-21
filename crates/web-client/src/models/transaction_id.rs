@@ -1,10 +1,11 @@
+use js_export_macro::js_export;
 use miden_client::Word as NativeWord;
 use miden_client::transaction::TransactionId as NativeTransactionId;
-use wasm_bindgen::prelude::*;
 
 use super::felt::Felt;
 use super::word::Word;
 use crate::js_error_with_context;
+use crate::platform::JsErr;
 
 /// A unique identifier of a transaction.
 ///
@@ -15,17 +16,17 @@ use crate::js_error_with_context;
 /// - Transactions are identical if and only if they have the same ID.
 /// - Computing transaction ID can be done solely from public transaction data.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct TransactionId(NativeTransactionId);
 
-#[wasm_bindgen]
+#[js_export]
 impl TransactionId {
     /// Creates a `TransactionId` from a hex string.
     ///
     /// Fails if the provided string is not a valid hex representation of a `TransactionId`.
-    #[wasm_bindgen(js_name = "fromHex")]
-    pub fn from_hex(hex: &str) -> Result<TransactionId, JsValue> {
-        let native_word = NativeWord::try_from(hex).map_err(|err| {
+    #[js_export(js_name = "fromHex")]
+    pub fn from_hex(hex: String) -> Result<TransactionId, JsErr> {
+        let native_word = NativeWord::try_from(hex.as_str()).map_err(|err| {
             js_error_with_context(err, "error instantiating TransactionId from hex")
         })?;
         let native_tx_id = NativeTransactionId::from_raw(native_word);
@@ -33,19 +34,19 @@ impl TransactionId {
     }
 
     /// Returns the transaction ID as field elements.
-    #[wasm_bindgen(js_name = "asElements")]
+    #[js_export(js_name = "asElements")]
     pub fn as_elements(&self) -> Vec<Felt> {
         self.0.as_elements().iter().map(Into::into).collect()
     }
 
     /// Returns the transaction ID as raw bytes.
-    #[wasm_bindgen(js_name = "asBytes")]
+    #[js_export(js_name = "asBytes")]
     pub fn as_bytes(&self) -> Vec<u8> {
         self.0.as_bytes().to_vec()
     }
 
     /// Returns the hexadecimal encoding of the transaction ID.
-    #[wasm_bindgen(js_name = "toHex")]
+    #[js_export(js_name = "toHex")]
     pub fn to_hex(&self) -> String {
         self.0.to_hex()
     }
@@ -82,3 +83,5 @@ impl From<&TransactionId> for NativeTransactionId {
         id.0
     }
 }
+
+impl_napi_from_value!(TransactionId);

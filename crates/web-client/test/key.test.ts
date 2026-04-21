@@ -1,180 +1,234 @@
-import test from "./playwright.global.setup";
-import { expect } from "@playwright/test";
+// @ts-nocheck
+import { test, expect } from "./test-setup";
 
 test.describe("signature", () => {
-  [
-    ["rpoFalconWithRNG", "Falcon Scheme"],
-    ["ecdsaWithRNG", "ECDSA Scheme"],
-  ].forEach(([signatureFunction, signatureScheme]) => {
-    test(`should produce a valid signature: ${signatureScheme}`, async ({
-      page,
-    }) => {
-      const isValid = await page.evaluate(
-        ({ _signatureScheme }) => {
-          const sig = "ecdsaWithRNG";
-          const secretKey = window.AuthSecretKey[_signatureScheme]();
-          const message = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
-          const signature = secretKey.sign(message);
-          const isValid = secretKey.publicKey().verify(message, signature);
-
-          return isValid;
-        },
-        { _signatureScheme: signatureFunction }
-      );
-
-      expect(isValid).toEqual(true);
+  test("should produce a valid signature: Falcon Scheme", async ({ run }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.rpoFalconWithRNG();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const signature = secretKey.sign(message);
+      return secretKey.publicKey().verify(message, signature);
     });
+    expect(result).toEqual(true);
+  });
 
-    test(`should not verify the wrong message: ${signatureScheme}`, async ({
-      page,
-    }) => {
-      const isValid = await page.evaluate(
-        ({ _signatureScheme }) => {
-          const secretKey = window.AuthSecretKey[_signatureScheme]();
-          const message = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
-          const wrongMessage = new window.Word(
-            new BigUint64Array([5n, 6n, 7n, 8n])
-          );
-          const signature = secretKey.sign(message);
-          const isValid = secretKey.publicKey().verify(wrongMessage, signature);
-
-          return isValid;
-        },
-        { _signatureScheme: signatureFunction }
-      );
-      expect(isValid).toEqual(false);
+  test("should produce a valid signature: ECDSA Scheme", async ({ run }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.ecdsaWithRNG();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const signature = secretKey.sign(message);
+      return secretKey.publicKey().verify(message, signature);
     });
+    expect(result).toEqual(true);
+  });
 
-    test(`should not verify the signature of a different key: ${signatureScheme}`, async ({
-      page,
-    }) => {
-      const isValid = await page.evaluate(
-        ({ _signatureScheme }) => {
-          const secretKey = window.AuthSecretKey[_signatureScheme]();
-          const message = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
-          const signature = secretKey.sign(message);
-          const differentSecretKey = window.AuthSecretKey[_signatureScheme]();
-          const isValid = differentSecretKey
-            .publicKey()
-            .verify(message, signature);
-
-          return isValid;
-        },
-        { _signatureScheme: signatureFunction }
-      );
-      expect(isValid).toEqual(false);
+  test("should not verify the wrong message: Falcon Scheme", async ({
+    run,
+  }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.rpoFalconWithRNG();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const wrongMessage = new sdk.Word(sdk.u64Array([5, 6, 7, 8]));
+      const signature = secretKey.sign(message);
+      return secretKey.publicKey().verify(wrongMessage, signature);
     });
+    expect(result).toEqual(false);
+  });
 
-    test(`should be able to serialize and deserialize a signature: ${signatureScheme}`, async ({
-      page,
-    }) => {
-      const isValid = await page.evaluate(
-        ({ _signatureScheme }) => {
-          const secretKey = window.AuthSecretKey[_signatureScheme]();
-          const message = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
-          const signature = secretKey.sign(message);
-          const serializedSignature = signature.serialize();
-          const deserializedSignature =
-            window.Signature.deserialize(serializedSignature);
-
-          const isValid = secretKey
-            .publicKey()
-            .verify(message, deserializedSignature);
-
-          return isValid;
-        },
-        { _signatureScheme: signatureFunction }
-      );
-      expect(isValid).toEqual(true);
+  test("should not verify the wrong message: ECDSA Scheme", async ({ run }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.ecdsaWithRNG();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const wrongMessage = new sdk.Word(sdk.u64Array([5, 6, 7, 8]));
+      const signature = secretKey.sign(message);
+      return secretKey.publicKey().verify(wrongMessage, signature);
     });
+    expect(result).toEqual(false);
+  });
+
+  test("should not verify the signature of a different key: Falcon Scheme", async ({
+    run,
+  }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.rpoFalconWithRNG();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const signature = secretKey.sign(message);
+      const differentSecretKey = sdk.AuthSecretKey.rpoFalconWithRNG();
+      return differentSecretKey.publicKey().verify(message, signature);
+    });
+    expect(result).toEqual(false);
+  });
+
+  test("should not verify the signature of a different key: ECDSA Scheme", async ({
+    run,
+  }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.ecdsaWithRNG();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const signature = secretKey.sign(message);
+      const differentSecretKey = sdk.AuthSecretKey.ecdsaWithRNG();
+      return differentSecretKey.publicKey().verify(message, signature);
+    });
+    expect(result).toEqual(false);
+  });
+
+  test("should be able to serialize and deserialize a signature: Falcon Scheme", async ({
+    run,
+  }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.rpoFalconWithRNG();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const signature = secretKey.sign(message);
+      const serializedSignature = signature.serialize();
+      const deserializedSignature =
+        sdk.Signature.deserialize(serializedSignature);
+      return secretKey.publicKey().verify(message, deserializedSignature);
+    });
+    expect(result).toEqual(true);
+  });
+
+  test("should be able to serialize and deserialize a signature: ECDSA Scheme", async ({
+    run,
+  }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.ecdsaWithRNG();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const signature = secretKey.sign(message);
+      const serializedSignature = signature.serialize();
+      const deserializedSignature =
+        sdk.Signature.deserialize(serializedSignature);
+      return secretKey.publicKey().verify(message, deserializedSignature);
+    });
+    expect(result).toEqual(true);
   });
 });
 
 test.describe("public key", () => {
-  [
-    ["rpoFalconWithRNG", "Falcon Scheme"],
-    ["ecdsaWithRNG", "ECDSA Scheme"],
-  ].forEach(([signatureFunction, signatureScheme]) => {
-    test(`should be able to serialize and deserialize a public key: ${signatureScheme}`, async ({
-      page,
-    }) => {
-      const isValid = await page.evaluate(
-        ({ _signatureScheme }) => {
-          const secretKey = window.AuthSecretKey[_signatureScheme]();
-          const publicKey = secretKey.publicKey();
-          const serializedPublicKey = publicKey.serialize();
-          const deserializedPublicKey =
-            window.PublicKey.deserialize(serializedPublicKey);
-          const serializedDeserializedPublicKey =
-            deserializedPublicKey.serialize();
-          return (
-            serializedPublicKey.toString() ===
-            serializedDeserializedPublicKey.toString()
-          );
-        },
-        { _signatureScheme: signatureFunction }
-      );
-      expect(isValid).toEqual(true);
+  test("should be able to serialize and deserialize a public key: Falcon Scheme", async ({
+    run,
+  }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.rpoFalconWithRNG();
+      const publicKey = secretKey.publicKey();
+      const serializedPublicKey = publicKey.serialize();
+      const deserializedPublicKey =
+        sdk.PublicKey.deserialize(serializedPublicKey);
+      const serializedDeserializedPublicKey = deserializedPublicKey.serialize();
+      return {
+        original: serializedPublicKey.toString(),
+        roundtripped: serializedDeserializedPublicKey.toString(),
+      };
     });
+    expect(result.original).toEqual(result.roundtripped);
+  });
+
+  test("should be able to serialize and deserialize a public key: ECDSA Scheme", async ({
+    run,
+  }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.ecdsaWithRNG();
+      const publicKey = secretKey.publicKey();
+      const serializedPublicKey = publicKey.serialize();
+      const deserializedPublicKey =
+        sdk.PublicKey.deserialize(serializedPublicKey);
+      const serializedDeserializedPublicKey = deserializedPublicKey.serialize();
+      return {
+        original: serializedPublicKey.toString(),
+        roundtripped: serializedDeserializedPublicKey.toString(),
+      };
+    });
+    expect(result.original).toEqual(result.roundtripped);
   });
 });
 
 test.describe("signing inputs", () => {
-  [
-    ["rpoFalconWithRNG", "Falcon Scheme"],
-    ["ecdsaWithRNG", "ECDSA Scheme"],
-  ].forEach(([signatureFunction, signatureScheme]) => {
-    test(`should be able to sign and verify an arbitrary array of felts: ${signatureScheme}`, async ({
-      page,
-    }) => {
-      const { isValid, isValidOther } = await page.evaluate(
-        ({ _signatureScheme }) => {
-          const secretKey = window.AuthSecretKey[_signatureScheme]();
-          const otherSecretKey = window.AuthSecretKey[_signatureScheme]();
-          const message = Array.from(
-            { length: 128 },
-            (_, i) => new window.Felt(BigInt(i))
-          );
-          const signingInputs = window.SigningInputs.newArbitrary(message);
-          const signature = secretKey.signData(signingInputs);
-          const isValid = secretKey
-            .publicKey()
-            .verifyData(signingInputs, signature);
-          const isValidOther = otherSecretKey
-            .publicKey()
-            .verifyData(signingInputs, signature);
-
-          return { isValid, isValidOther };
-        },
-        { _signatureScheme: signatureFunction }
+  test("should be able to sign and verify an arbitrary array of felts: Falcon Scheme", async ({
+    run,
+  }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.rpoFalconWithRNG();
+      const otherSecretKey = sdk.AuthSecretKey.rpoFalconWithRNG();
+      const message = Array.from(
+        { length: 128 },
+        (_, i) => new sdk.Felt(sdk.u64(i))
       );
-      expect(isValid).toBe(true);
-      expect(isValidOther).toBe(false);
+      const signingInputs = sdk.SigningInputs.newArbitrary(message);
+      const signature = secretKey.signData(signingInputs);
+      const isValid = secretKey
+        .publicKey()
+        .verifyData(signingInputs, signature);
+      const isValidOther = otherSecretKey
+        .publicKey()
+        .verifyData(signingInputs, signature);
+      return { isValid, isValidOther };
     });
+    expect(result.isValid).toBe(true);
+    expect(result.isValidOther).toBe(false);
+  });
 
-    test(`should be able to sign and verify a blind word: ${signatureScheme}`, async ({
-      page,
-    }) => {
-      const { isValid, isValidOther } = await page.evaluate(
-        ({ _signatureScheme }) => {
-          const secretKey = window.AuthSecretKey[_signatureScheme]();
-          const otherSecretKey = window.AuthSecretKey[_signatureScheme]();
-          const message = new window.Word(new BigUint64Array([1n, 2n, 3n, 4n]));
-          const signingInputs = window.SigningInputs.newBlind(message);
-          const signature = secretKey.signData(signingInputs);
-          const isValid = secretKey
-            .publicKey()
-            .verifyData(signingInputs, signature);
-          const isValidOther = otherSecretKey
-            .publicKey()
-            .verifyData(signingInputs, signature);
-
-          return { isValid, isValidOther };
-        },
-        { _signatureScheme: signatureFunction }
+  test("should be able to sign and verify an arbitrary array of felts: ECDSA Scheme", async ({
+    run,
+  }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.ecdsaWithRNG();
+      const otherSecretKey = sdk.AuthSecretKey.ecdsaWithRNG();
+      const message = Array.from(
+        { length: 128 },
+        (_, i) => new sdk.Felt(sdk.u64(i))
       );
-      expect(isValid).toBe(true);
-      expect(isValidOther).toBe(false);
+      const signingInputs = sdk.SigningInputs.newArbitrary(message);
+      const signature = secretKey.signData(signingInputs);
+      const isValid = secretKey
+        .publicKey()
+        .verifyData(signingInputs, signature);
+      const isValidOther = otherSecretKey
+        .publicKey()
+        .verifyData(signingInputs, signature);
+      return { isValid, isValidOther };
     });
+    expect(result.isValid).toBe(true);
+    expect(result.isValidOther).toBe(false);
+  });
+
+  test("should be able to sign and verify a blind word: Falcon Scheme", async ({
+    run,
+  }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.rpoFalconWithRNG();
+      const otherSecretKey = sdk.AuthSecretKey.rpoFalconWithRNG();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const signingInputs = sdk.SigningInputs.newBlind(message);
+      const signature = secretKey.signData(signingInputs);
+      const isValid = secretKey
+        .publicKey()
+        .verifyData(signingInputs, signature);
+      const isValidOther = otherSecretKey
+        .publicKey()
+        .verifyData(signingInputs, signature);
+      return { isValid, isValidOther };
+    });
+    expect(result.isValid).toBe(true);
+    expect(result.isValidOther).toBe(false);
+  });
+
+  test("should be able to sign and verify a blind word: ECDSA Scheme", async ({
+    run,
+  }) => {
+    const result = await run(async ({ sdk }) => {
+      const secretKey = sdk.AuthSecretKey.ecdsaWithRNG();
+      const otherSecretKey = sdk.AuthSecretKey.ecdsaWithRNG();
+      const message = new sdk.Word(sdk.u64Array([1, 2, 3, 4]));
+      const signingInputs = sdk.SigningInputs.newBlind(message);
+      const signature = secretKey.signData(signingInputs);
+      const isValid = secretKey
+        .publicKey()
+        .verifyData(signingInputs, signature);
+      const isValidOther = otherSecretKey
+        .publicKey()
+        .verifyData(signingInputs, signature);
+      return { isValid, isValidOther };
+    });
+    expect(result.isValid).toBe(true);
+    expect(result.isValidOther).toBe(false);
   });
 });

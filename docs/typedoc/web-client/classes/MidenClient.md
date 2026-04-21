@@ -102,49 +102,49 @@ Returns the current sync height.
 
 ### proveBlock()
 
-> **proveBlock**(): `void`
+> **proveBlock**(): `Promise`\<`void`\>
 
 Advances the mock chain by one block. Only available on mock clients.
 
 #### Returns
 
-`void`
+`Promise`\<`void`\>
 
 ***
 
 ### serializeMockChain()
 
-> **serializeMockChain**(): `Uint8Array`
+> **serializeMockChain**(): `Promise`\<`Uint8Array`\>
 
 Serializes the mock chain state for snapshot/restore in tests.
 
 #### Returns
 
-`Uint8Array`
+`Promise`\<`Uint8Array`\>
 
 ***
 
 ### serializeMockNoteTransportNode()
 
-> **serializeMockNoteTransportNode**(): `Uint8Array`
+> **serializeMockNoteTransportNode**(): `Promise`\<`Uint8Array`\>
 
 Serializes the mock note transport node state.
 
 #### Returns
 
-`Uint8Array`
+`Promise`\<`Uint8Array`\>
 
 ***
 
 ### storeIdentifier()
 
-> **storeIdentifier**(): `string`
+> **storeIdentifier**(): `Promise`\<`string`\>
 
 Returns the identifier of the underlying store (e.g. IndexedDB database name, file path).
 
 #### Returns
 
-`string`
+`Promise`\<`string`\>
 
 ***
 
