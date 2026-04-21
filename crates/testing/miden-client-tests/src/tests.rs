@@ -191,7 +191,7 @@ async fn get_input_note() {
     let note: InputNoteRecord = original_note.clone().into();
     client
         .import_notes(&[NoteFile::NoteDetails {
-            details: note.try_into().unwrap(),
+            details: note.into(),
             tag: None,
             after_block_num: 0.into(),
         }])

@@ -40,9 +40,9 @@ impl InputNoteRecord {
         self.0.state().into()
     }
 
-    /// Returns the note details, if present.
-    pub fn details(&self) -> Option<NoteDetails> {
-        self.0.details().map(Into::into)
+    /// Returns the note details.
+    pub fn details(&self) -> NoteDetails {
+        self.0.details().into()
     }
 
     /// Returns the note metadata if available.
@@ -67,9 +67,9 @@ impl InputNoteRecord {
         self.0.consumer_transaction_id().map(ToString::to_string)
     }
 
-    /// Returns the nullifier for this note, if the record has full details.
-    pub fn nullifier(&self) -> Option<String> {
-        self.0.nullifier().map(|n| n.to_hex())
+    /// Returns the nullifier for this note.
+    pub fn nullifier(&self) -> String {
+        self.0.nullifier().to_hex()
     }
 
     /// Returns true if the record contains authentication data (proof).

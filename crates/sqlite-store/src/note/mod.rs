@@ -11,8 +11,6 @@ use miden_client::note::{
     BlockNumber,
     NoteAssets,
     NoteDetails,
-    NoteHeader,
-    NoteId,
     NoteMetadata,
     NoteRecipient,
     NoteScript,
@@ -93,7 +91,6 @@ struct SerializedInputNoteParts {
     pub script: Vec<u8>,
     pub state: Vec<u8>,
     pub created_at: u64,
-    pub note_id: String,
 }
 
 /// Represents the parts retrieved from the database to build an `OutputNoteRecord`.
@@ -353,7 +350,6 @@ fn parse_input_note_columns(
     let script: Vec<u8> = row.get(3)?;
     let state: Vec<u8> = row.get(4)?;
     let created_at: u64 = row.get(5)?;
-    let note_id: String = row.get(6)?;
 
     Ok(SerializedInputNoteParts {
         assets,
@@ -362,7 +358,6 @@ fn parse_input_note_columns(
         script,
         state,
         created_at,
-        note_id,
     })
 }
 
@@ -377,31 +372,9 @@ fn parse_input_note(
         script,
         state,
         created_at,
-        note_id,
     } = serialized_input_note_parts;
 
     let state = InputNoteState::read_from_bytes(&state)?;
-
-    // If the detail columns are empty, this is a header-only record (e.g., an erased note).
-    if assets.is_empty() {
-        let note_id = NoteId::try_from_hex(&note_id).map_err(|e| {
-            StoreError::DataDeserializationError(
-                miden_protocol::utils::serde::DeserializationError::UnknownError(format!(
-                    "failed to parse note_id for header-only input note: {e}"
-                )),
-            )
-        })?;
-        // The metadata is carried in the state (e.g., `ConsumedExternalNoteState.metadata`).
-        let metadata = state.metadata().cloned().ok_or_else(|| {
-            StoreError::DataDeserializationError(
-                miden_protocol::utils::serde::DeserializationError::UnknownError(
-                    "header-only input note record has no metadata in state".into(),
-                ),
-            )
-        })?;
-        let header = NoteHeader::new(note_id, metadata);
-        return Ok(InputNoteRecord::from_header(&header, state));
-    }
 
     let assets = NoteAssets::read_from_bytes(&assets)?;
     let serial_number = Word::read_from_bytes(&serial_number)?;
@@ -416,24 +389,18 @@ fn parse_input_note(
 /// Serialize the provided input note into database compatible types.
 fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
     let id = note.id().as_word().to_string();
-    let nullifier = note.nullifier().map(|n| n.to_hex()).unwrap_or_default();
+    let nullifier = note.nullifier().to_hex();
     let created_at = note.created_at().unwrap_or(0);
 
-    let (assets, serial_number, inputs, script, script_root) = if let Some(details) = note.details()
-    {
-        let recipient = details.recipient();
-        (
-            details.assets().to_bytes(),
-            recipient.serial_num().to_bytes(),
-            recipient.storage().to_bytes(),
-            recipient.script().to_bytes(),
-            recipient.script().root().to_hex(),
-        )
-    } else {
-        // Header-only records have no detail columns. The metadata is carried in
-        // the state itself (see `ConsumedExternalNoteState.metadata`).
-        (vec![], vec![], vec![], vec![], String::new())
-    };
+    let details = note.details();
+    let recipient = details.recipient();
+    let (assets, serial_number, inputs, script, script_root) = (
+        details.assets().to_bytes(),
+        recipient.serial_num().to_bytes(),
+        recipient.storage().to_bytes(),
+        recipient.script().to_bytes(),
+        recipient.script().root().to_hex(),
+    );
 
     let state_discriminant = note.state().discriminant();
     let state = note.state().to_bytes();

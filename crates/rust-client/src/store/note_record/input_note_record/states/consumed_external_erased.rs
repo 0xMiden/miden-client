@@ -8,12 +8,19 @@ use miden_protocol::transaction::TransactionId;
 use super::{InputNoteState, NoteStateHandler};
 use crate::store::NoteRecordError;
 
-/// Information related to notes in the [`InputNoteState::ConsumedExternal`] state.
+/// Information related to notes in the [`InputNoteState::ConsumedExternalErased`] state.
 ///
-/// A note enters this state when its nullifier appears on-chain but the consuming transaction was
-/// not submitted by this client.
+/// A record enters this state when the client learns about an erased note (created and
+/// consumed in the same batch) whose full details it never held — only the note header from
+/// the transaction. The record carries the note id and metadata directly so the consumption
+/// can be surfaced through [`crate::note::InputNoteReader`].
 #[derive(Clone, Debug, PartialEq)]
-pub struct ConsumedExternalNoteState {
+pub struct ConsumedExternalErasedNoteState {
+    /// The note id, carried in the state because the record has no
+    /// [`miden_protocol::note::NoteDetails`] to derive it from.
+    pub note_id: NoteId,
+    /// The note metadata, carried in the state for the same reason.
+    pub metadata: NoteMetadata,
     /// Block height at which the note was nullified.
     pub nullifier_block_height: BlockNumber,
     /// The account that consumed the note, if it is tracked by this client.
@@ -23,7 +30,7 @@ pub struct ConsumedExternalNoteState {
     pub consumed_tx_order: Option<u32>,
 }
 
-impl NoteStateHandler for ConsumedExternalNoteState {
+impl NoteStateHandler for ConsumedExternalErasedNoteState {
     fn inclusion_proof_received(
         &self,
         _inclusion_proof: NoteInclusionProof,
@@ -50,8 +57,8 @@ impl NoteStateHandler for ConsumedExternalNoteState {
 
     fn consumed_locally(
         &self,
-        _consumer_account: miden_protocol::account::AccountId,
-        _consumer_transaction: miden_protocol::transaction::TransactionId,
+        _consumer_account: AccountId,
+        _consumer_transaction: TransactionId,
         _current_timestamp: Option<u64>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Err(NoteRecordError::NoteNotConsumable("Note already consumed".to_string()))
@@ -68,7 +75,7 @@ impl NoteStateHandler for ConsumedExternalNoteState {
     }
 
     fn metadata(&self) -> Option<&NoteMetadata> {
-        None
+        Some(&self.metadata)
     }
 
     fn inclusion_proof(&self) -> Option<&NoteInclusionProof> {
@@ -80,22 +87,28 @@ impl NoteStateHandler for ConsumedExternalNoteState {
     }
 }
 
-impl miden_tx::utils::serde::Serializable for ConsumedExternalNoteState {
+impl miden_tx::utils::serde::Serializable for ConsumedExternalErasedNoteState {
     fn write_into<W: miden_tx::utils::serde::ByteWriter>(&self, target: &mut W) {
+        self.note_id.write_into(target);
+        self.metadata.write_into(target);
         self.nullifier_block_height.write_into(target);
         self.consumer_account.write_into(target);
         self.consumed_tx_order.write_into(target);
     }
 }
 
-impl miden_tx::utils::serde::Deserializable for ConsumedExternalNoteState {
+impl miden_tx::utils::serde::Deserializable for ConsumedExternalErasedNoteState {
     fn read_from<R: miden_tx::utils::serde::ByteReader>(
         source: &mut R,
     ) -> Result<Self, miden_tx::utils::serde::DeserializationError> {
+        let note_id = NoteId::read_from(source)?;
+        let metadata = NoteMetadata::read_from(source)?;
         let nullifier_block_height = BlockNumber::read_from(source)?;
         let consumer_account = Option::<AccountId>::read_from(source)?;
         let consumed_tx_order = Option::<u32>::read_from(source)?;
-        Ok(ConsumedExternalNoteState {
+        Ok(ConsumedExternalErasedNoteState {
+            note_id,
+            metadata,
             nullifier_block_height,
             consumer_account,
             consumed_tx_order,
@@ -103,8 +116,8 @@ impl miden_tx::utils::serde::Deserializable for ConsumedExternalNoteState {
     }
 }
 
-impl From<ConsumedExternalNoteState> for InputNoteState {
-    fn from(state: ConsumedExternalNoteState) -> Self {
-        InputNoteState::ConsumedExternal(state)
+impl From<ConsumedExternalErasedNoteState> for InputNoteState {
+    fn from(state: ConsumedExternalErasedNoteState) -> Self {
+        InputNoteState::ConsumedExternalErased(state)
     }
 }

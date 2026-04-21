@@ -58,7 +58,7 @@ Returns the transaction ID that consumed this note, if any.
 
 > **details**(): `NoteDetails`
 
-Returns the note details, if present.
+Returns the note details.
 
 #### Returns
 
@@ -152,7 +152,7 @@ Returns the note metadata if available.
 
 > **nullifier**(): `string`
 
-Returns the nullifier for this note, if the record has full details.
+Returns the nullifier for this note.
 
 #### Returns
 

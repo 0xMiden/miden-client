@@ -48,7 +48,6 @@ impl NoteStateHandler for ExpectedNoteState {
                 nullifier_block_height,
                 consumer_account,
                 consumed_tx_order: None,
-                metadata: self.metadata.clone(),
             }
             .into(),
         ))

@@ -94,8 +94,7 @@ const INPUT_NOTES_BASE_QUERY: &str = "SELECT
                 note.inputs,
                 script.serialized_note_script,
                 note.state,
-                note.created_at,
-                note.note_id
+                note.created_at
                 from input_notes AS note
                 LEFT OUTER JOIN notes_scripts AS script
                     ON note.script_root = script.script_root";
@@ -158,10 +157,11 @@ pub(super) fn note_filter_input_notes_condition(filter: &NoteFilter) -> (String,
         },
         NoteFilter::Consumed => {
             format!(
-                "(state_discriminant in ({}, {}, {}))",
+                "(state_discriminant in ({}, {}, {}, {}))",
                 InputNoteState::STATE_CONSUMED_AUTHENTICATED_LOCAL,
                 InputNoteState::STATE_CONSUMED_UNAUTHENTICATED_LOCAL,
-                InputNoteState::STATE_CONSUMED_EXTERNAL
+                InputNoteState::STATE_CONSUMED_EXTERNAL,
+                InputNoteState::STATE_CONSUMED_EXTERNAL_ERASED
             )
         },
         NoteFilter::Expected => {

@@ -207,7 +207,7 @@ async fn show_note<AUTH: Keystore + Sync>(
 
     // Identify if this is a standard note type by script root
     let script_root_word = match (&input_note_record, &output_note_record) {
-        (Some(record), _) => record.details().map(|d| d.script().root()),
+        (Some(record), _) => Some(record.details().script().root()),
         (_, Some(record)) => record.recipient().map(|r| r.script().root()),
         _ => None,
     };
@@ -229,7 +229,10 @@ async fn show_note<AUTH: Keystore + Sync>(
     println!("{table}");
 
     let inputs = match (&input_note_record, &output_note_record) {
-        (Some(record), _) => record.details().map(|details| details.storage().items().to_vec()),
+        (Some(record), _) => {
+            let details = record.details();
+            Some(details.storage().items().to_vec())
+        },
         (_, Some(record)) => {
             record.recipient().map(|recipient| recipient.storage().items().to_vec())
         },
@@ -240,7 +243,7 @@ async fn show_note<AUTH: Keystore + Sync>(
 
     let assets = input_note_record
         .clone()
-        .and_then(|record| record.assets().cloned())
+        .map(|record| record.assets().clone())
         .or(output_note_record.clone().map(|record| record.assets().clone()))
         .expect("One of the two records should be Some");
 
@@ -294,9 +297,7 @@ async fn show_note<AUTH: Keystore + Sync>(
     if with_code {
         let mut table = create_dynamic_table(&["Note Code"]);
         let code = match (&input_note_record, &output_note_record) {
-            (Some(record), _) => record
-                .details()
-                .map_or_else(|| "Code unavailable".to_string(), |d| d.script().to_pretty_string()),
+            (Some(record), _) => record.details().script().to_pretty_string(),
             (_, Some(record)) => {
                 record.state().recipient().map_or("Code unavailable".to_string(), |recipient| {
                     recipient.script().to_pretty_string()
@@ -440,21 +441,21 @@ fn note_summary(
         .expect("One of the two records should be Some");
 
     let assets_commitment_str = input_note_record
-        .and_then(|record| record.assets().map(|a| a.commitment().to_string()))
+        .map(|record| record.assets().commitment().to_string())
         .or(output_note_record.map(|record| record.assets().commitment().to_string()))
         .expect("One of the two records should be Some");
 
     let (inputs_commitment_str, serial_num, script_root_str) =
         match (input_note_record, output_note_record) {
-            (Some(record), _) if record.details().is_some() => {
-                let details = record.details().expect("checked above");
+            (Some(record), _) => {
+                let details = record.details();
                 (
                     details.storage().commitment().to_string(),
                     details.serial_num().to_string(),
                     details.script().root().to_string(),
                 )
             },
-            (_, Some(record)) if record.recipient().is_some() => {
+            (None, Some(record)) if record.recipient().is_some() => {
                 let recipient = record.recipient().expect("output record should have recipient");
                 (
                     recipient.storage().commitment().to_string(),
@@ -462,7 +463,7 @@ fn note_summary(
                     recipient.script().root().to_string(),
                 )
             },
-            (Some(_), _) | (_, Some(_)) => ("-".to_string(), "-".to_string(), "-".to_string()),
+            (None, Some(_record)) => ("-".to_string(), "-".to_string(), "-".to_string()),
             (None, None) => panic!("One of the two records should be Some"),
         };
 

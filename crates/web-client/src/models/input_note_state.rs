@@ -13,6 +13,7 @@ pub enum InputNoteState {
     ConsumedAuthenticatedLocal,
     ConsumedUnauthenticatedLocal,
     ConsumedExternal,
+    ConsumedExternalErased,
 }
 
 // CONVERSIONS
@@ -36,6 +37,7 @@ impl From<NativeNoteState> for InputNoteState {
                 InputNoteState::ConsumedUnauthenticatedLocal
             },
             NativeNoteState::ConsumedExternal(_) => InputNoteState::ConsumedExternal,
+            NativeNoteState::ConsumedExternalErased(_) => InputNoteState::ConsumedExternalErased,
         }
     }
 }
@@ -58,6 +60,7 @@ impl From<&NativeNoteState> for InputNoteState {
                 InputNoteState::ConsumedUnauthenticatedLocal
             },
             NativeNoteState::ConsumedExternal(_) => InputNoteState::ConsumedExternal,
+            NativeNoteState::ConsumedExternalErased(_) => InputNoteState::ConsumedExternalErased,
         }
     }
 }

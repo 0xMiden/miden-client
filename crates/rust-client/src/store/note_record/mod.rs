@@ -34,6 +34,7 @@ pub mod input_note_states {
     pub use super::input_note_record::{
         CommittedNoteState,
         ConsumedAuthenticatedLocalNoteState,
+        ConsumedExternalErasedNoteState,
         ConsumedExternalNoteState,
         ConsumedUnauthenticatedLocalNoteState,
         ExpectedNoteState,

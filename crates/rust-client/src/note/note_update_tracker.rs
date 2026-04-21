@@ -255,7 +255,7 @@ impl NoteUpdateTracker {
             .input_notes
             .values()
             .filter(|note| !note.inner().is_consumed())
-            .filter_map(|note| note.inner().nullifier());
+            .map(|note| note.inner().nullifier());
 
         let output_note_unspent_nullifiers = self
             .output_notes
@@ -376,25 +376,19 @@ impl NoteUpdateTracker {
         // consumption. When the output note is available, build from it; otherwise create
         // a partial record with dummy details from the header metadata.
         if !self.input_notes.contains_key(&note_id) {
-            if let Some(output_note) = self.output_notes.get(&note_id) {
-                if let Ok(note) = miden_protocol::note::Note::try_from(output_note.inner().clone())
-                {
-                    let mut input_record = InputNoteRecord::from(note);
-                    if let Some(nullifier) = input_record.nullifier() {
-                        input_record.consumed_externally(nullifier, block_num, consumer)?;
-                        input_record.set_consumed_tx_order(Some(0));
-                        self.insert_input_note(input_record, NoteUpdateType::Insert);
-                    }
-                }
+            if let Some(output_note) = self.output_notes.get(&note_id)
+                && let Ok(note) = miden_protocol::note::Note::try_from(output_note.inner().clone())
+            {
+                let mut input_record = InputNoteRecord::from(note);
+                let nullifier = input_record.nullifier();
+                input_record.consumed_externally(nullifier, block_num, consumer)?;
+                input_record.set_consumed_tx_order(Some(0));
+                self.insert_input_note(input_record, NoteUpdateType::Insert);
             } else {
                 // Note is not tracked at all — create a header-only input note record.
-                let state = crate::store::input_note_states::ConsumedExternalNoteState {
-                    nullifier_block_height: block_num,
-                    consumer_account: consumer,
-                    consumed_tx_order: Some(0),
-                    metadata: Some(note_header.metadata().clone()),
-                };
-                let input_record = InputNoteRecord::from_header(note_header, state.into());
+                let mut input_record =
+                    InputNoteRecord::from_header(note_header, block_num, consumer);
+                input_record.set_consumed_tx_order(Some(0));
                 self.insert_input_note(input_record, NoteUpdateType::Insert);
             }
         }
@@ -402,8 +396,8 @@ impl NoteUpdateTracker {
         // Also mark the corresponding input note if tracked.
         if let Some(input_note_update) = self.input_notes.get_mut(&note_id)
             && !input_note_update.inner().is_consumed()
-            && let Some(nullifier) = input_note_update.inner().nullifier()
         {
+            let nullifier = input_note_update.inner().nullifier();
             input_note_update
                 .inner_mut()
                 .consumed_externally(nullifier, block_num, consumer)?;
@@ -535,8 +529,10 @@ impl NoteUpdateTracker {
     /// Insert an input note update
     fn insert_input_note(&mut self, note: InputNoteRecord, update_type: NoteUpdateType) {
         let note_id = note.id();
-        if let Some(nullifier) = note.nullifier() {
-            self.input_notes_by_nullifier.insert(nullifier, note_id);
+        // Header-only records have a placeholder nullifier that is not a real on-chain
+        // nullifier; don't index them by nullifier to avoid collisions across records.
+        if note.has_details() {
+            self.input_notes_by_nullifier.insert(note.nullifier(), note_id);
         }
         let update = match update_type {
             NoteUpdateType::None => InputNoteUpdate::new_none(note),
