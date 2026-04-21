@@ -49,7 +49,7 @@ export function useExportStore(): UseExportStoreResult {
     setError(null);
 
     try {
-      const storeName = client.storeIdentifier();
+      const storeName = await client.storeIdentifier();
       const snapshot = await runExclusive(() => sdkExportStore(storeName));
       return snapshot;
     } catch (err) {

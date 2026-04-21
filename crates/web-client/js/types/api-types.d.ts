@@ -187,6 +187,8 @@ export interface ClientOptions {
   storeName?: string;
   /** Sync state on creation (default: false). */
   autoSync?: boolean;
+  /** Enable debug mode for transaction execution (default: false). */
+  debugMode?: boolean;
   /** External keystore callbacks. */
   keystore?: {
     getKey: GetKeyCallback;
@@ -525,12 +527,6 @@ export interface MockOptions {
   seed?: string | Uint8Array;
   serializedMockChain?: Uint8Array;
   serializedNoteTransport?: Uint8Array;
-}
-
-/** Versioned store snapshot for backup/restore. */
-export interface StoreSnapshot {
-  version: number;
-  data: unknown;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -947,16 +943,16 @@ export declare class MidenClient {
   terminate(): void;
 
   /** Returns the identifier of the underlying store (e.g. IndexedDB database name, file path). */
-  storeIdentifier(): string;
+  storeIdentifier(): Promise<string>;
 
   /** Advances the mock chain by one block. Only available on mock clients. */
-  proveBlock(): void;
+  proveBlock(): Promise<void>;
   /** Returns true if this client uses a mock chain. */
   usesMockChain(): boolean;
   /** Serializes the mock chain state for snapshot/restore in tests. */
-  serializeMockChain(): Uint8Array;
+  serializeMockChain(): Promise<Uint8Array>;
   /** Serializes the mock note transport node state. */
-  serializeMockNoteTransportNode(): Uint8Array;
+  serializeMockNoteTransportNode(): Promise<Uint8Array>;
 
   [Symbol.dispose](): void;
   [Symbol.asyncDispose](): Promise<void>;

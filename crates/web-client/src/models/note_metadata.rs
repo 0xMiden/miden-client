@@ -1,5 +1,5 @@
+use js_export_macro::js_export;
 use miden_client::note::NoteMetadata as NativeNoteMetadata;
-use wasm_bindgen::prelude::*;
 
 use super::account_id::AccountId;
 use super::note_attachment::NoteAttachment;
@@ -10,13 +10,13 @@ use super::{NoteTag, NoteType};
 /// This metadata includes the sender, note type, tag, and an optional attachment.
 /// Attachments provide additional context about how notes should be processed.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteMetadata(NativeNoteMetadata);
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteMetadata {
     /// Creates metadata for a note.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new(sender: &AccountId, note_type: NoteType, note_tag: &NoteTag) -> NoteMetadata {
         let native_note_metadata =
             NativeNoteMetadata::new(sender.into(), note_type.into()).with_tag(note_tag.into());
@@ -34,7 +34,7 @@ impl NoteMetadata {
     }
 
     /// Returns whether the note is private, encrypted, or public.
-    #[wasm_bindgen(js_name = "noteType")]
+    #[js_export(js_name = "noteType")]
     pub fn note_type(&self) -> NoteType {
         self.0.note_type().into()
     }
@@ -45,7 +45,7 @@ impl NoteMetadata {
     }
 
     /// Sets the tag for this metadata and returns the updated metadata.
-    #[wasm_bindgen(js_name = "withTag")]
+    #[js_export(js_name = "withTag")]
     pub fn with_tag(&self, tag: &NoteTag) -> NoteMetadata {
         NoteMetadata(self.clone().0.with_tag(tag.into()))
     }
@@ -55,7 +55,7 @@ impl NoteMetadata {
     /// Attachments provide additional context about how notes should be processed.
     /// For example, a `NetworkAccountTarget` attachment indicates that the note
     /// should be consumed by a specific network account.
-    #[wasm_bindgen(js_name = "withAttachment")]
+    #[js_export(js_name = "withAttachment")]
     pub fn with_attachment(&self, attachment: &NoteAttachment) -> NoteMetadata {
         let native_attachment = attachment.into();
         NoteMetadata(self.clone().0.with_attachment(native_attachment))
@@ -88,3 +88,5 @@ impl From<&NoteMetadata> for NativeNoteMetadata {
         note_metadata.0.clone()
     }
 }
+
+impl_napi_from_value!(NoteMetadata);

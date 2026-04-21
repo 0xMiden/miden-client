@@ -1,7 +1,7 @@
+use js_export_macro::js_export;
 use miden_client::vm::Program as NativeProgram;
-use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
+#[js_export]
 #[derive(Clone)]
 pub struct Program(NativeProgram);
 

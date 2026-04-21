@@ -1,49 +1,12 @@
-import { expect } from "@playwright/test";
-import test from "./playwright.global.setup";
-
-// Shared MASM code that works with the MockChain assembler
-const VALUE_SLOT_CODE = (slotName: string) => `
-  use miden::protocol::active_account
-  use miden::protocol::native_account
-  use miden::core::word
-  use miden::core::sys
-
-  const SLOT = word("${slotName}")
-
-  pub proc get_value
-    push.SLOT[0..2] exec.active_account::get_item
-    exec.sys::truncate_stack
-  end
-
-  pub proc set_value
-    push.SLOT[0..2] exec.native_account::set_item
-    exec.sys::truncate_stack
-  end
-`;
-
-const MAP_SLOT_CODE = (slotName: string) => `
-  use miden::protocol::active_account
-  use miden::core::word
-  use miden::core::sys
-
-  const MAP_SLOT = word("${slotName}")
-
-  pub proc get_map_value
-    push.MAP_SLOT[0..2] exec.active_account::get_map_item
-    exec.sys::truncate_stack
-  end
-`;
+// @ts-nocheck
+import { test, expect } from "./test-setup";
 
 // STORAGE VIEW TESTS
 // =======================================================================================================
 
 test.describe("StorageView", () => {
-  test("getItem() on a Value slot returns a StorageResult", async ({
-    page,
-  }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-
+  test("getItem() on a Value slot returns a StorageResult", async ({ run }) => {
+    const result = await run(async ({ sdk, helpers }) => {
       const SLOT_NAME = "test::counter";
       const code = `
         use miden::protocol::active_account
@@ -66,14 +29,15 @@ test.describe("StorageView", () => {
         end
       `;
 
+      const client = await helpers.createMidenMockClient();
       const component = await client.compile.component({
         code,
-        slots: [window.StorageSlot.emptyValue(SLOT_NAME)],
+        slots: [sdk.StorageSlot.emptyValue(SLOT_NAME)],
       });
 
       const seed = new Uint8Array(32);
       seed.fill(0x30);
-      const auth = window.AuthSecretKey.rpoFalconWithRNG(seed);
+      const auth = sdk.AuthSecretKey.rpoFalconWithRNG(seed);
 
       const account = await client.accounts.create({
         type: "ImmutableContract",
@@ -84,12 +48,11 @@ test.describe("StorageView", () => {
       });
 
       const storage = account.storage();
-      const slotNames = storage.getSlotNames();
       const item = storage.getItem(SLOT_NAME);
 
       return {
         hasRaw: storage.raw !== undefined,
-        slotNames,
+        slotNames: storage.getSlotNames(),
         isMap: item?.isMap,
         bigint: item?.toBigInt()?.toString(),
         hex: item?.toHex(),
@@ -116,11 +79,9 @@ test.describe("StorageView", () => {
   });
 
   test("getItem() on a StorageMap slot returns a StorageResult with entries", async ({
-    page,
+    run,
   }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-
+    const result = await run(async ({ sdk, helpers }) => {
       const SLOT_NAME = "test::balances";
       const code = `
         use miden::protocol::active_account
@@ -135,14 +96,15 @@ test.describe("StorageView", () => {
         end
       `;
 
+      const client = await helpers.createMidenMockClient();
       const component = await client.compile.component({
         code,
-        slots: [window.StorageSlot.map(SLOT_NAME, new window.StorageMap())],
+        slots: [sdk.StorageSlot.map(SLOT_NAME, new sdk.StorageMap())],
       });
 
       const seed = new Uint8Array(32);
       seed.fill(0x31);
-      const auth = window.AuthSecretKey.rpoFalconWithRNG(seed);
+      const auth = sdk.AuthSecretKey.rpoFalconWithRNG(seed);
 
       const account = await client.accounts.create({
         type: "ImmutableContract",
@@ -152,8 +114,7 @@ test.describe("StorageView", () => {
         components: [component],
       });
 
-      const storage = account.storage();
-      const item = storage.getItem(SLOT_NAME);
+      const item = account.storage().getItem(SLOT_NAME);
 
       return {
         isMap: item?.isMap,
@@ -169,10 +130,8 @@ test.describe("StorageView", () => {
     expect(result.bigint).toBe("0");
   });
 
-  test("getCommitment() returns the raw commitment hash", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = await window.MidenClient.createMock();
-
+  test("getCommitment() returns the raw commitment hash", async ({ run }) => {
+    const result = await run(async ({ sdk, helpers }) => {
       const SLOT_NAME = "test::value";
       const code = `
         use miden::protocol::active_account
@@ -187,14 +146,15 @@ test.describe("StorageView", () => {
         end
       `;
 
+      const client = await helpers.createMidenMockClient();
       const component = await client.compile.component({
         code,
-        slots: [window.StorageSlot.emptyValue(SLOT_NAME)],
+        slots: [sdk.StorageSlot.emptyValue(SLOT_NAME)],
       });
 
       const seed = new Uint8Array(32);
       seed.fill(0x32);
-      const auth = window.AuthSecretKey.rpoFalconWithRNG(seed);
+      const auth = sdk.AuthSecretKey.rpoFalconWithRNG(seed);
 
       const account = await client.accounts.create({
         type: "ImmutableContract",
@@ -211,39 +171,51 @@ test.describe("StorageView", () => {
       return {
         commitmentHex: commitment?.toHex(),
         rawHex: rawItem?.toHex(),
-        match: commitment?.toHex() === rawItem?.toHex(),
       };
     });
 
     expect(result.commitmentHex).toBeDefined();
     expect(result.rawHex).toBeDefined();
-    expect(result.match).toBe(true);
+    expect(result.commitmentHex).toBe(result.rawHex);
   });
 
   test("wordToBigInt() round-trips known felt values losslessly", async ({
-    page,
+    run,
   }) => {
-    const result = await page.evaluate(async () => {
-      // Construct Words with known first-felt values via the
-      // BigUint64Array constructor and assert wordToBigInt round-trips them.
-      const cases: bigint[] = [
+    // Node.js napi maps u64 to f64; constructing via `new Word([...])` would
+    // clamp/panic above 2^53. `Word.fromHex` lets us build full u64 felts on
+    // both platforms so this precision test runs on either backend.
+    const result = await run(async ({ sdk }) => {
+      function wordWithFirstFelt(v) {
+        const bytes = [];
+        for (let i = 0; i < 8; i++) {
+          bytes.push(
+            Number((v >> BigInt(i * 8)) & 0xffn)
+              .toString(16)
+              .padStart(2, "0")
+          );
+        }
+        const firstFeltLe = bytes.join("");
+        const zeroFeltLe = "0000000000000000";
+        return sdk.Word.fromHex(
+          "0x" + firstFeltLe + zeroFeltLe + zeroFeltLe + zeroFeltLe
+        );
+      }
+
+      const cases = [
         0n,
         1n,
         42n,
-        BigInt(Number.MAX_SAFE_INTEGER), // 2^53 - 1, last value that fits in JS number
-        BigInt(Number.MAX_SAFE_INTEGER) + 1n, // 2^53, first value that loses precision in number
-        (1n << 62n) - 1n, // large but safely below the felt modulus
+        BigInt(Number.MAX_SAFE_INTEGER), // 2^53 - 1
+        BigInt(Number.MAX_SAFE_INTEGER) + 1n, // 2^53
+        (1n << 62n) - 1n, // large but below the felt modulus
       ];
 
-      const out: { input: string; got: string; ok: boolean }[] = [];
+      const out = [];
       for (const v of cases) {
-        const word = new window.Word(new BigUint64Array([v, 0n, 0n, 0n]));
-        const got = window.wordToBigInt(word);
-        out.push({
-          input: v.toString(),
-          got: got.toString(),
-          ok: got === v,
-        });
+        const word = wordWithFirstFelt(v);
+        const got = sdk.wordToBigInt(word);
+        out.push({ input: v.toString(), got: got.toString(), ok: got === v });
       }
       return out;
     });
@@ -254,21 +226,32 @@ test.describe("StorageView", () => {
   });
 
   test("valueOf() throws RangeError for values exceeding MAX_SAFE_INTEGER", async ({
-    page,
+    run,
   }) => {
-    const result = await page.evaluate(async () => {
+    const result = await run(async ({ sdk }) => {
+      function wordWithFirstFelt(v) {
+        const bytes = [];
+        for (let i = 0; i < 8; i++) {
+          bytes.push(
+            Number((v >> BigInt(i * 8)) & 0xffn)
+              .toString(16)
+              .padStart(2, "0")
+          );
+        }
+        const firstFeltLe = bytes.join("");
+        const zeroFeltLe = "0000000000000000";
+        return sdk.Word.fromHex(
+          "0x" + firstFeltLe + zeroFeltLe + zeroFeltLe + zeroFeltLe
+        );
+      }
+
       // Build a StorageResult around a Word whose first felt is > MAX_SAFE_INTEGER.
       // We bypass StorageView since constructing a real account with a giant
       // value would be considerably more code; the wrapper class is the unit
       // under test here.
       const big = BigInt(Number.MAX_SAFE_INTEGER) + 1n; // 2^53
-      const word = new window.Word(new BigUint64Array([big, 0n, 0n, 0n]));
-      const result = new window.StorageResult(
-        word,
-        false,
-        undefined,
-        window.Word
-      );
+      const word = wordWithFirstFelt(big);
+      const result = new sdk.StorageResult(word, false, undefined, sdk.Word);
 
       // toBigInt() and toString() must remain lossless and never throw
       const bigStr = result.toBigInt().toString();
@@ -299,15 +282,26 @@ test.describe("StorageView", () => {
     expect(result.message).toContain("toBigInt");
   });
 
-  test("valueOf() returns a JS number for small values", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const word = new window.Word(new BigUint64Array([42n, 0n, 0n, 0n]));
-      const result = new window.StorageResult(
-        word,
-        false,
-        undefined,
-        window.Word
-      );
+  test("valueOf() returns a JS number for small values", async ({ run }) => {
+    const result = await run(async ({ sdk }) => {
+      function wordWithFirstFelt(v) {
+        const bytes = [];
+        for (let i = 0; i < 8; i++) {
+          bytes.push(
+            Number((v >> BigInt(i * 8)) & 0xffn)
+              .toString(16)
+              .padStart(2, "0")
+          );
+        }
+        const firstFeltLe = bytes.join("");
+        const zeroFeltLe = "0000000000000000";
+        return sdk.Word.fromHex(
+          "0x" + firstFeltLe + zeroFeltLe + zeroFeltLe + zeroFeltLe
+        );
+      }
+
+      const word = wordWithFirstFelt(42n);
+      const result = new sdk.StorageResult(word, false, undefined, sdk.Word);
       return {
         valueOf: +result,
         arithmetic: result * 2,

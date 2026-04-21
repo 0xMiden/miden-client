@@ -1,13 +1,13 @@
 use miden_client::transaction::TransactionKernel as NativeTransactionKernel;
-use wasm_bindgen::prelude::*;
+use js_export_macro::js_export;
 
 use crate::models::assembler::Assembler;
 
 /// Access to the default transaction kernel assembler.
-#[wasm_bindgen]
+#[js_export]
 pub struct TransactionKernel(NativeTransactionKernel);
 
-#[wasm_bindgen]
+#[js_export]
 impl TransactionKernel {
     /// Returns an assembler preloaded with the transaction kernel libraries.
     pub fn assembler() -> Assembler {

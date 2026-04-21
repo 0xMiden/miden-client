@@ -14,7 +14,7 @@ Field element wrapper exposed to JavaScript.
 
 > **new Felt**(`value`): `Felt`
 
-Creates a new field element from a u64 value.
+Creates a new field element.
 
 #### Parameters
 
