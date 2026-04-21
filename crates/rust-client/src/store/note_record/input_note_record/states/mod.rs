@@ -113,7 +113,7 @@ impl InputNoteState {
         }
     }
 
-    pub fn metadata(&self) -> Option<&NoteMetadata> {
+    pub(crate) fn metadata(&self) -> Option<&NoteMetadata> {
         self.inner().metadata()
     }
 

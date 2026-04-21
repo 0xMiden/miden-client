@@ -89,6 +89,7 @@ pub struct InputNoteRecord {
 }
 
 impl InputNoteRecord {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         details: NoteDetails,
         created_at: Option<u64>,
@@ -380,6 +381,7 @@ impl Deserializable for InputNoteRecord {
         let details = NoteDetails::read_from(source)?;
         let created_at = Option::<u64>::read_from(source)?;
         let state = InputNoteState::read_from(source)?;
+
         Ok(InputNoteRecord { details, created_at, state })
     }
 }
@@ -406,13 +408,14 @@ impl From<Note> for InputNoteRecord {
 impl From<InputNote> for InputNoteRecord {
     fn from(value: InputNote) -> Self {
         match value {
-            InputNote::Authenticated { note, proof } => {
-                let metadata = note.metadata().clone();
-                Self {
-                    details: note.into(),
-                    created_at: None,
-                    state: UnverifiedNoteState { metadata, inclusion_proof: proof }.into(),
+            InputNote::Authenticated { note, proof } => Self {
+                details: note.clone().into(),
+                created_at: None,
+                state: UnverifiedNoteState {
+                    metadata: note.metadata().clone(),
+                    inclusion_proof: proof,
                 }
+                .into(),
             },
             InputNote::Unauthenticated { note } => note.into(),
         }

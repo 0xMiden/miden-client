@@ -222,6 +222,7 @@ impl SqliteStore {
             Value::from(InputNoteState::STATE_CONSUMED_AUTHENTICATED_LOCAL.to_string()),
             Value::from(InputNoteState::STATE_CONSUMED_UNAUTHENTICATED_LOCAL.to_string()),
             Value::from(InputNoteState::STATE_CONSUMED_EXTERNAL.to_string()),
+            Value::from(InputNoteState::STATE_CONSUMED_EXTERNAL_ERASED.to_string()),
         ]);
         conn.prepare(QUERY)
             .into_store_error()?
@@ -374,14 +375,16 @@ fn parse_input_note(
         created_at,
     } = serialized_input_note_parts;
 
-    let state = InputNoteState::read_from_bytes(&state)?;
-
     let assets = NoteAssets::read_from_bytes(&assets)?;
+
     let serial_number = Word::read_from_bytes(&serial_number)?;
     let script = NoteScript::read_from_bytes(&script)?;
     let inputs = NoteStorage::read_from_bytes(&inputs)?;
     let recipient = NoteRecipient::new(serial_number, script, inputs);
+
     let details = NoteDetails::new(assets, recipient);
+
+    let state = InputNoteState::read_from_bytes(&state)?;
 
     Ok(InputNoteRecord::new(details, Some(created_at), state))
 }
@@ -393,14 +396,14 @@ fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
     let created_at = note.created_at().unwrap_or(0);
 
     let details = note.details();
+    let assets = details.assets().to_bytes();
     let recipient = details.recipient();
-    let (assets, serial_number, inputs, script, script_root) = (
-        details.assets().to_bytes(),
-        recipient.serial_num().to_bytes(),
-        recipient.storage().to_bytes(),
-        recipient.script().to_bytes(),
-        recipient.script().root().to_hex(),
-    );
+
+    let serial_number = recipient.serial_num().to_bytes();
+    let script = recipient.script().to_bytes();
+    let inputs = recipient.storage().to_bytes();
+
+    let script_root = recipient.script().root().to_hex();
 
     let state_discriminant = note.state().discriminant();
     let state = note.state().to_bytes();

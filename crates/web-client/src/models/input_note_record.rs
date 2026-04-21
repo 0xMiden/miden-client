@@ -40,7 +40,7 @@ impl InputNoteRecord {
         self.0.state().into()
     }
 
-    /// Returns the note details.
+    /// Returns the note details, if present.
     pub fn details(&self) -> NoteDetails {
         self.0.details().into()
     }

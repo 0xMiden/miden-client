@@ -38,7 +38,6 @@ use crate::rpc::domain::account::{
     FetchedAccount,
 };
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
-use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::storage_map::StorageMapUpdate;
 use crate::rpc::domain::transaction::{
     TransactionInclusion,
@@ -501,35 +500,16 @@ impl StateSync {
             &transactions,
         );
 
-        // Process each transaction: apply nullifier state transitions, commit output
-        // notes via inclusion proofs, and mark erased notes as consumed.
+        // Process each transaction
         for transaction in &transactions {
-            // Detect note consumption from transaction nullifiers. When a note is created
-            // and consumed in the same batch, its nullifier may not be available from the
-            // nullifier sync, so we collect them from transaction records.
-            for nullifier in &transaction.nullifiers {
-                let nullifier_update = NullifierUpdate {
-                    nullifier: *nullifier,
-                    block_num: transaction.block_num,
-                };
-
-                let external_consumer_account = state_sync_update
-                    .transaction_updates
-                    .external_nullifier_account(&nullifier_update.nullifier);
-
-                state_sync_update.note_updates.apply_nullifiers_state_transitions(
-                    &nullifier_update,
-                    state_sync_update.transaction_updates.committed_transactions(),
-                    external_consumer_account,
-                )?;
-            }
-
-            // Transition tracked output notes to Committed using inclusion proofs.
+            // Transition tracked output notes to Committed using inclusion proofs from the
+            // transaction sync response. This covers output notes regardless of whether their
+            // tags were tracked in the note sync.
             state_sync_update
                 .note_updates
                 .apply_output_note_inclusion_proofs(&transaction.output_notes)?;
 
-            // Mark erased notes (created and consumed in the same batch) as consumed.
+            // Detect output notes erased by same-batch note erasure.
             Self::mark_erased_notes_as_consumed(state_sync_update, transaction);
         }
 
@@ -1796,9 +1776,9 @@ mod tests {
         }
 
         // Verify the tracked blocks match the note blocks.
-        for bn in &note_block_nums {
+        for &bn in &note_block_nums {
             assert!(
-                partial_mmr.is_tracked((*bn).as_usize()),
+                partial_mmr.is_tracked(bn.as_usize()),
                 "block {bn} with notes should be tracked in partial MMR"
             );
         }

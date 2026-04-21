@@ -223,12 +223,16 @@ where
         let mut nullifier_requests = BTreeSet::new();
         let mut lowest_block_height: BlockNumber = u32::MAX.into();
         for (previous_note, note, inclusion_proof) in &requested_notes {
-            let nullifier = previous_note
-                .as_ref()
-                .map_or_else(|| note.nullifier(), InputNoteRecord::nullifier);
-            nullifier_requests.insert(nullifier);
-            if inclusion_proof.location().block_num() < lowest_block_height {
-                lowest_block_height = inclusion_proof.location().block_num();
+            if let Some(previous_note) = previous_note {
+                nullifier_requests.insert(previous_note.nullifier());
+                if inclusion_proof.location().block_num() < lowest_block_height {
+                    lowest_block_height = inclusion_proof.location().block_num();
+                }
+            } else {
+                nullifier_requests.insert(note.nullifier());
+                if inclusion_proof.location().block_num() < lowest_block_height {
+                    lowest_block_height = inclusion_proof.location().block_num();
+                }
             }
         }
 

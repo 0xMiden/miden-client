@@ -211,7 +211,6 @@ async function processInputNotes(dbId, notes) {
         }
         const stateBase64 = uint8ArrayToBase64(note.state);
         return {
-            noteId: note.noteId,
             assets: assetsBase64,
             serialNumber: serialNumberBase64,
             inputs: inputsBase64,

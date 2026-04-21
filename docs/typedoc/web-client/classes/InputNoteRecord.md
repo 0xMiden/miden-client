@@ -58,7 +58,7 @@ Returns the transaction ID that consumed this note, if any.
 
 > **details**(): `NoteDetails`
 
-Returns the note details.
+Returns the note details, if present.
 
 #### Returns
 

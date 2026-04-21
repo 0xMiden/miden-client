@@ -85,17 +85,16 @@ pub struct SerializedOutputNoteData {
 
 pub(crate) fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
     let note_id = note.id().to_hex().clone();
+    let note_assets = note.assets().to_bytes();
 
     let details = note.details();
+    let serial_number = details.serial_num().to_bytes();
+    let inputs = details.storage().to_bytes();
+    let nullifier = details.nullifier().to_hex();
+
     let recipient = details.recipient();
-    let (note_assets, serial_number, inputs, note_script, note_script_root, nullifier) = (
-        details.assets().to_bytes(),
-        recipient.serial_num().to_bytes(),
-        recipient.storage().to_bytes(),
-        recipient.script().to_bytes(),
-        recipient.script().root().to_hex(),
-        details.nullifier().to_hex(),
-    );
+    let note_script: Vec<u8> = recipient.script().to_bytes();
+    let note_script_root = recipient.script().root().to_hex();
 
     let state_discriminant = note.state().discriminant();
     let state = note.state().to_bytes();
@@ -213,15 +212,16 @@ pub fn parse_input_note_idxdb_object(
         created_at,
     } = note_idxdb;
 
-    let state = InputNoteState::read_from_bytes(&state)?;
-
     let assets = NoteAssets::read_from_bytes(&assets)?;
+
     let serial_number = Word::read_from_bytes(&serial_number)?;
     let script = NoteScript::read_from_bytes(&serialized_note_script)?;
     let inputs = NoteStorage::read_from_bytes(&inputs)?;
     let recipient = NoteRecipient::new(serial_number, script, inputs);
+
     let details = NoteDetails::new(assets, recipient);
 
+    let state = InputNoteState::read_from_bytes(&state)?;
     let created_at = created_at
         .parse::<u64>()
         .map_err(|_| StoreError::QueryError("Failed to parse created_at timestamp".to_string()))?;
