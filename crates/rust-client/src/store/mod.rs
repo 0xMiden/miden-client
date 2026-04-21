@@ -175,7 +175,7 @@ pub trait Store: Send + Sync {
             .get_input_notes(NoteFilter::Unspent)
             .await?
             .iter()
-            .filter_map(|input_note| input_note.nullifier())
+            .filter_map(InputNoteRecord::nullifier)
             .collect())
     }
 

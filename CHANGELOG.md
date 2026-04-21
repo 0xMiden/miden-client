@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.14.5 (2026-04-21)
+
+### Fixes
+
+* [FIX] Create a header input record for erased notes the client had not tracked as input, so their consumption surfaces through sync ([#2090](https://github.com/0xMiden/miden-client/pull/2090)).
+* [FIX] Create an input record from the output on the nullifier path when the client tracks both sender and consumer, so `InputNoteReader` finds the consumption ([#2090](https://github.com/0xMiden/miden-client/pull/2090)).
+
+
 ## 0.14.4 (2026-04-20)
 
 ### Features

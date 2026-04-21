@@ -236,7 +236,7 @@ pub fn parse_input_note_idxdb_object(
             StoreError::QueryError("header-only input note record has no metadata in state".into())
         })?;
         let header = NoteHeader::new(note_id, metadata);
-        return Ok(InputNoteRecord::from_header(header, state));
+        return Ok(InputNoteRecord::from_header(&header, state));
     }
 
     let assets = NoteAssets::read_from_bytes(&assets)?;

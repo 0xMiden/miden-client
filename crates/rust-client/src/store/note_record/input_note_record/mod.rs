@@ -80,7 +80,7 @@ impl InputNoteRecord {
     /// notes where the client doesn't have the full note data. The caller must ensure the
     /// provided `state` carries the note metadata (e.g. [`ConsumedExternalNoteState::metadata`]
     /// populated with `header.metadata()`).
-    pub fn from_header(header: NoteHeader, state: InputNoteState) -> InputNoteRecord {
+    pub fn from_header(header: &NoteHeader, state: InputNoteState) -> InputNoteRecord {
         InputNoteRecord {
             id: header.id(),
             details: None,
@@ -271,12 +271,12 @@ impl InputNoteRecord {
     ) -> Result<bool, NoteRecordError> {
         // For header-only records we skip nullifier validation since we don't have the data
         // to compute it.
-        if let Some(expected_nullifier) = self.nullifier() {
-            if expected_nullifier != nullifier {
-                return Err(NoteRecordError::StateTransitionError(
-                    "Nullifier does not match the expected value".to_string(),
-                ));
-            }
+        if let Some(expected_nullifier) = self.nullifier()
+            && expected_nullifier != nullifier
+        {
+            return Err(NoteRecordError::StateTransitionError(
+                "Nullifier does not match the expected value".to_string(),
+            ));
         }
 
         let new_state = self.state.consumed_externally(nullifier_block_height, consumer_account)?;

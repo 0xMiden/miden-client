@@ -400,7 +400,7 @@ fn parse_input_note(
             )
         })?;
         let header = NoteHeader::new(note_id, metadata);
-        return Ok(InputNoteRecord::from_header(header, state));
+        return Ok(InputNoteRecord::from_header(&header, state));
     }
 
     let assets = NoteAssets::read_from_bytes(&assets)?;

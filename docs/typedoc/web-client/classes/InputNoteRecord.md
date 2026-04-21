@@ -152,7 +152,7 @@ Returns the note metadata if available.
 
 > **nullifier**(): `string`
 
-Returns the nullifier for this note.
+Returns the nullifier for this note, if the record has full details.
 
 #### Returns
 

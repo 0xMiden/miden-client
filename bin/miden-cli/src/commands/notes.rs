@@ -296,8 +296,7 @@ async fn show_note<AUTH: Keystore + Sync>(
         let code = match (&input_note_record, &output_note_record) {
             (Some(record), _) => record
                 .details()
-                .map(|d| d.script().to_pretty_string())
-                .unwrap_or_else(|| "Code unavailable".to_string()),
+                .map_or_else(|| "Code unavailable".to_string(), |d| d.script().to_pretty_string()),
             (_, Some(record)) => {
                 record.state().recipient().map_or("Code unavailable".to_string(), |recipient| {
                     recipient.script().to_pretty_string()
