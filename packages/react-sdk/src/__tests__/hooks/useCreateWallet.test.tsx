@@ -81,7 +81,7 @@ describe("useCreateWallet", () => {
       expect(mockClient.newWallet).toHaveBeenCalledWith(
         expect.anything(), // storageMode.private()
         true, // mutable (default)
-        2, // authScheme (default: AuthRpoFalcon512)
+        2, // authScheme — default `AuthScheme.Falcon` resolves to 2 (RpoFalcon512)
         undefined // initSeed
       );
     });
@@ -105,7 +105,7 @@ describe("useCreateWallet", () => {
         await result.current.createWallet({
           storageMode: "public",
           mutable: false,
-          authScheme: 1,
+          authScheme: "ecdsa",
           initSeed,
         });
       });
@@ -113,7 +113,7 @@ describe("useCreateWallet", () => {
       expect(mockClient.newWallet).toHaveBeenCalledWith(
         expect.anything(), // storageMode.public()
         false,
-        1,
+        1, // authScheme — "ecdsa" resolves to 1 (AuthEcdsaK256Keccak)
         initSeed
       );
     });

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.14.5 (TBD)
+
+### Fixes
+
+* [FIX][web] Publicly exposed `resolveAuthScheme(scheme)` from `@miden-sdk/miden-sdk` so consumers can convert the user-friendly `AuthScheme.Falcon` / `AuthScheme.ECDSA` strings to the numeric variant expected by low-level wasm-bindgen methods (`AccountComponent.createAuthComponentFromCommitment`, `WebClient.newWallet`, `newFaucet`, `importPublicAccountFromSeed`). The helper's `wasm` parameter is now optional — public callers fall back to hardcoded discriminants (1/2) that match the Rust enum. Also merged a `type AuthScheme = "falcon" | "ecdsa"` declaration alongside the existing `const AuthScheme`, so `authScheme?: AuthScheme` now resolves to the string union in type position without breaking `AuthScheme.Falcon` in value position.
+* [FIX][react] Fixed `initializeSignerAccount` (the external-keystore init path used by `MidenFiSignerProvider`, Para, Turnkey, etc.) throwing `"invalid enum value passed"` on first connect. The code reached for `AuthScheme.AuthEcdsaK256Keccak`, which only exists on the internal wasm-bindgen `AuthScheme` enum, not on the public string-valued `AuthScheme` constant exported from `@miden-sdk/miden-sdk/lazy` — at runtime it resolved to `undefined`, and passing `undefined` to `AccountComponent.createAuthComponentFromCommitment` failed at the wasm boundary. `initializeSignerAccount` now calls `resolveAuthScheme(AuthScheme.ECDSA)`.
+* [FIX][react] `DEFAULTS.AUTH_SCHEME` was being initialized to `AuthScheme.AuthRpoFalcon512` — another nonexistent key on the public `AuthScheme`, silently resolving to `undefined`. Now set to `AuthScheme.Falcon`. The four hooks that read this default (`useCreateWallet`, `useCreateFaucet`, `useImportAccount`, `useSessionAccount`) now pipe the value through `resolveAuthScheme(...)` before handing it to the wasm-bindgen `newWallet` / `newFaucet` / `importPublicAccountFromSeed` calls. The public hook option types stay `authScheme?: AuthScheme`, which now correctly means `"falcon" | "ecdsa"`.
+
 ## 0.14.4 (2026-04-20)
 
 ### Features
