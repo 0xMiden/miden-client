@@ -21,6 +21,10 @@ pub struct ConsumedExternalNoteState {
     /// Per-account position of the consuming transaction within the account's execution chain
     /// for the block. `None` if the order has not been determined yet.
     pub consumed_tx_order: Option<u32>,
+    /// Note metadata, if known. Available when the record was created from a note header
+    /// (e.g., an erased note discovered via `sync_transactions`). `None` when the note was
+    /// previously tracked with full details and the metadata was not carried through.
+    pub metadata: Option<NoteMetadata>,
 }
 
 impl NoteStateHandler for ConsumedExternalNoteState {
@@ -68,7 +72,7 @@ impl NoteStateHandler for ConsumedExternalNoteState {
     }
 
     fn metadata(&self) -> Option<&NoteMetadata> {
-        None
+        self.metadata.as_ref()
     }
 
     fn inclusion_proof(&self) -> Option<&NoteInclusionProof> {
@@ -85,6 +89,7 @@ impl miden_tx::utils::serde::Serializable for ConsumedExternalNoteState {
         self.nullifier_block_height.write_into(target);
         self.consumer_account.write_into(target);
         self.consumed_tx_order.write_into(target);
+        self.metadata.write_into(target);
     }
 }
 
@@ -95,10 +100,12 @@ impl miden_tx::utils::serde::Deserializable for ConsumedExternalNoteState {
         let nullifier_block_height = BlockNumber::read_from(source)?;
         let consumer_account = Option::<AccountId>::read_from(source)?;
         let consumed_tx_order = Option::<u32>::read_from(source)?;
+        let metadata = Option::<NoteMetadata>::read_from(source)?;
         Ok(ConsumedExternalNoteState {
             nullifier_block_height,
             consumer_account,
             consumed_tx_order,
+            metadata,
         })
     }
 }

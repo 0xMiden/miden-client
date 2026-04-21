@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use miden_client::account::{Address, AddressInterface};
 use miden_client::address::RoutingParameters;
-use miden_client::assembly::CodeBuilder;
+use miden_client::assembly::{CodeBuilder, DefaultSourceManager};
 use miden_client::auth::{
     AuthSchemeId,
     AuthSecretKey,
@@ -80,7 +80,9 @@ use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
 use miden_protocol::note::{
     Note,
     NoteAssets,
+    NoteAttachment,
     NoteFile,
+    NoteHeader,
     NoteMetadata,
     NoteRecipient,
     NoteStorage,
@@ -93,6 +95,7 @@ use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
     ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
+    ACCOUNT_ID_REGULAR_NETWORK_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
@@ -104,7 +107,13 @@ use miden_standards::account::faucets::BasicFungibleFaucet;
 use miden_standards::account::interface::AccountInterfaceError;
 use miden_standards::account::mint_policies::AuthControlled;
 use miden_standards::account::wallets::BasicWallet;
-use miden_standards::note::{NoteConsumptionStatus, P2idNoteStorage, StandardNote};
+use miden_standards::note::{
+    NetworkAccountTarget,
+    NoteConsumptionStatus,
+    NoteExecutionHint,
+    P2idNoteStorage,
+    StandardNote,
+};
 use miden_standards::testing::mock_account::MockAccountExt;
 use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
@@ -182,7 +191,7 @@ async fn get_input_note() {
     let note: InputNoteRecord = original_note.clone().into();
     client
         .import_notes(&[NoteFile::NoteDetails {
-            details: note.into(),
+            details: note.try_into().unwrap(),
             tag: None,
             after_block_num: 0.into(),
         }])
@@ -1288,6 +1297,102 @@ async fn input_note_reader_finds_externally_consumed_notes() {
     );
     assert_eq!(collected[0].id(), p2id_note_id);
     assert_eq!(collected[0].consumer_account(), Some(consumer_id));
+}
+
+/// Scenario: a note is created and consumed within the same batch by a network account
+/// (same-batch erasure). A separate receiver client tracks the sender account but never
+/// created the note itself.
+///
+/// Expected: after sync, the receiver's `InputNoteReader` should find the note as consumed
+/// by the network account.
+#[tokio::test]
+async fn erased_note_discovered_by_receiver_client() {
+    let sender_id: AccountId = ACCOUNT_ID_PRIVATE_SENDER.try_into().unwrap();
+    let network_account_id: AccountId =
+        ACCOUNT_ID_REGULAR_NETWORK_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap();
+
+    // Build a mock chain with a sender account and a transaction.
+    let mut builder = MockChainBuilder::new();
+    let sender = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
+    let mut chain = builder.build().unwrap();
+
+    let source_manager = Arc::new(DefaultSourceManager::default());
+    let tx_script = CodeBuilder::with_source_manager(source_manager.clone())
+        .compile_tx_script("begin nop end")
+        .unwrap();
+    let tx = Box::pin(
+        chain
+            .build_tx_context(TxContextInput::Account(sender.clone()), &[], &[])
+            .unwrap()
+            .tx_script(tx_script)
+            .with_source_manager(source_manager)
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    chain.add_pending_executed_transaction(&tx).unwrap();
+    chain.prove_next_block().unwrap();
+
+    // Build the erased note: a public note with NetworkAccountTarget pointing to a network account.
+    let target = NetworkAccountTarget::new(network_account_id, NoteExecutionHint::Always).unwrap();
+    let attachment: NoteAttachment = target.into();
+    let metadata = NoteMetadata::new(sender_id, NoteType::Public).with_attachment(attachment);
+    let script = CodeBuilder::new().compile_note_script("begin nop end").unwrap();
+    let recipient = NoteRecipient::new(
+        Word::from([Felt::new(10), Felt::new(20), Felt::new(30), Felt::new(40)]),
+        script,
+        NoteStorage::new(vec![]).unwrap(),
+    );
+    let note = Note::new(NoteAssets::new(vec![]).unwrap(), metadata.clone(), recipient);
+    let note_id = note.id();
+    let note_header = NoteHeader::new(note_id, metadata);
+
+    // Create the mock RPC and mark the note as erased.
+    let mock_rpc = MockRpcApi::new(chain);
+    mock_rpc.mark_note_as_erased(note_header);
+
+    // Build the RECEIVER client — it tracks the sender account (so sync_transactions
+    // returns the sender's transactions with erased output notes) but does NOT have the
+    // note as an output note.
+    let rng = RandomCoin::new(rand::random::<[u64; 4]>().map(Felt::new).into());
+    let keystore = FilesystemKeyStore::new(temp_dir()).unwrap();
+
+    let mut receiver_client = ClientBuilder::new()
+        .rpc(Arc::new(mock_rpc))
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_discard_delta(None)
+        .build()
+        .await
+        .unwrap();
+    receiver_client.ensure_genesis_in_place().await.unwrap();
+
+    receiver_client.add_account(&sender, false).await.unwrap();
+
+    receiver_client.sync_state().await.unwrap();
+
+    let mut reader = receiver_client.input_note_reader(network_account_id);
+    let mut found = false;
+    while let Some(record) = reader.next().await.unwrap() {
+        if record.id() == note_id {
+            assert_eq!(
+                record.consumer_account(),
+                Some(network_account_id),
+                "consumer should be the network account"
+            );
+            found = true;
+            break;
+        }
+    }
+    assert!(
+        found,
+        "Receiver's NoteReader should find the erased note as consumed by the network account, \
+         even though the receiver never tracked it as an output note"
+    );
 }
 
 #[tokio::test]

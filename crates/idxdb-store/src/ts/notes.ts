@@ -266,6 +266,7 @@ async function processInputNotes(dbId: string, notes: IInputNote[]) {
       const stateBase64 = uint8ArrayToBase64(note.state);
 
       return {
+        noteId: note.noteId,
         assets: assetsBase64,
         serialNumber: serialNumberBase64,
         inputs: inputsBase64,

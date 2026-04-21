@@ -44,34 +44,49 @@ pub use states::{
 
 /// Represents a Note of which the Store can keep track and retrieve.
 ///
-/// An [`InputNoteRecord`] contains all the information of a [`NoteDetails`], in addition of
-/// specific information about the note state.
-///
-/// Once a proof is received, the [`InputNoteRecord`] can be transformed into an [`InputNote`] and
-/// used as input for transactions.
-/// It is also possible to convert [`Note`] and [`InputNote`] into [`InputNoteRecord`] (we fill the
-/// `metadata` and `inclusion_proof` fields if possible).
-///
-/// Notes can also be consumed as unauthenticated notes, where their existence is verified by
-/// the network.
+/// An [`InputNoteRecord`] always carries the note id and the note state. Full [`NoteDetails`]
+/// are optional — when present, the record can be transformed into an [`InputNote`] and used
+/// as input for transactions. Header-only records (no details) are used to track erased notes
+/// that the client discovered but never had the full data for. In that case, the metadata is
+/// carried by the state (see [`ConsumedExternalNoteState::metadata`]).
 #[derive(Clone, Debug, PartialEq)]
 pub struct InputNoteRecord {
-    /// Details of a note consisting of assets, script, inputs, and a serial number.
-    details: NoteDetails,
+    /// The note identifier. Always available.
+    id: NoteId,
+    /// Full note details (assets + recipient), if known. `None` for header-only records.
+    details: Option<NoteDetails>,
     /// The timestamp at which the note was created. If it's not known, it will be None.
     created_at: Option<u64>,
-    /// The state of the note, with specific fields for each one.
+    /// The state of the note, with specific fields for each one. Carries the note metadata.
     state: InputNoteState,
 }
 
 impl InputNoteRecord {
-    #[allow(clippy::too_many_arguments)]
+    /// Creates a new input note record with full details.
     pub fn new(
         details: NoteDetails,
         created_at: Option<u64>,
         state: InputNoteState,
     ) -> InputNoteRecord {
-        InputNoteRecord { details, created_at, state }
+        InputNoteRecord {
+            id: details.id(),
+            details: Some(details),
+            created_at,
+            state,
+        }
+    }
+
+    /// Creates a new input note record from only a note header. This is used for erased
+    /// notes where the client doesn't have the full note data. The caller must ensure the
+    /// provided `state` carries the note metadata (e.g. [`ConsumedExternalNoteState::metadata`]
+    /// populated with `header.metadata()`).
+    pub fn from_header(header: NoteHeader, state: InputNoteState) -> InputNoteRecord {
+        InputNoteRecord {
+            id: header.id(),
+            details: None,
+            created_at: None,
+            state,
+        }
     }
 
     // PUBLIC ACCESSORS
@@ -79,22 +94,22 @@ impl InputNoteRecord {
 
     /// Returns the input note ID.
     pub fn id(&self) -> NoteId {
-        self.details.id()
+        self.id
     }
 
-    /// Returns the note's recipient.
-    pub fn recipient(&self) -> Word {
-        self.details.recipient().digest()
+    /// Returns the note's recipient digest, if full details are available.
+    pub fn recipient(&self) -> Option<Word> {
+        self.details.as_ref().map(|d| d.recipient().digest())
     }
 
     /// Returns the note's commitment, if the record contains the [`NoteMetadata`].
     pub fn commitment(&self) -> Option<Word> {
-        self.metadata().map(|m| NoteHeader::new(self.id(), m.clone()).to_commitment())
+        self.metadata().map(|m| NoteHeader::new(self.id, m.clone()).to_commitment())
     }
 
-    /// Returns the note's assets.
-    pub fn assets(&self) -> &NoteAssets {
-        self.details.assets()
+    /// Returns the note's assets, if full details are available.
+    pub fn assets(&self) -> Option<&NoteAssets> {
+        self.details.as_ref().map(NoteDetails::assets)
     }
 
     /// Returns the timestamp in which the note record was created, if available.
@@ -107,14 +122,15 @@ impl InputNoteRecord {
         &self.state
     }
 
-    /// Returns the note metadata, which will be available depending on the note's current state.
+    /// Returns the note metadata, if available. Single source of truth: delegates to
+    /// [`InputNoteState::metadata`].
     pub fn metadata(&self) -> Option<&NoteMetadata> {
         self.state.metadata()
     }
 
-    /// Returns the note nullifier.
-    pub fn nullifier(&self) -> Nullifier {
-        self.details.nullifier()
+    /// Returns the note nullifier, if full details are available.
+    pub fn nullifier(&self) -> Option<Nullifier> {
+        self.details.as_ref().map(NoteDetails::nullifier)
     }
 
     /// Returns the inclusion proof for the note.
@@ -122,9 +138,14 @@ impl InputNoteRecord {
         self.state.inclusion_proof()
     }
 
-    /// Returns the note's details.
-    pub fn details(&self) -> &NoteDetails {
-        &self.details
+    /// Returns the note's full details, if available.
+    pub fn details(&self) -> Option<&NoteDetails> {
+        self.details.as_ref()
+    }
+
+    /// Returns true if this record has full note details.
+    pub fn has_details(&self) -> bool {
+        self.details.is_some()
     }
 
     /// If the note was consumed locally, it returns the corresponding transaction ID.
@@ -248,10 +269,14 @@ impl InputNoteRecord {
         nullifier_block_height: BlockNumber,
         consumer_account: Option<AccountId>,
     ) -> Result<bool, NoteRecordError> {
-        if self.nullifier() != nullifier {
-            return Err(NoteRecordError::StateTransitionError(
-                "Nullifier does not match the expected value".to_string(),
-            ));
+        // For header-only records we skip nullifier validation since we don't have the data
+        // to compute it.
+        if let Some(expected_nullifier) = self.nullifier() {
+            if expected_nullifier != nullifier {
+                return Err(NoteRecordError::StateTransitionError(
+                    "Nullifier does not match the expected value".to_string(),
+                ));
+            }
         }
 
         let new_state = self.state.consumed_externally(nullifier_block_height, consumer_account)?;
@@ -306,6 +331,7 @@ impl InputNoteRecord {
 
 impl Serializable for InputNoteRecord {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.id.write_into(target);
         self.details.write_into(target);
         self.created_at.write_into(target);
         self.state.write_into(target);
@@ -314,11 +340,12 @@ impl Serializable for InputNoteRecord {
 
 impl Deserializable for InputNoteRecord {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let details = NoteDetails::read_from(source)?;
+        let id = NoteId::read_from(source)?;
+        let details = Option::<NoteDetails>::read_from(source)?;
         let created_at = Option::<u64>::read_from(source)?;
         let state = InputNoteState::read_from(source)?;
 
-        Ok(InputNoteRecord { details, created_at, state })
+        Ok(InputNoteRecord { id, details, created_at, state })
     }
 }
 
@@ -328,8 +355,10 @@ impl Deserializable for InputNoteRecord {
 impl From<Note> for InputNoteRecord {
     fn from(value: Note) -> Self {
         let metadata = value.metadata().clone();
+        let details: NoteDetails = value.into();
         Self {
-            details: value.into(),
+            id: details.id(),
+            details: Some(details),
             created_at: None,
             state: ExpectedNoteState {
                 metadata: Some(metadata.clone()),
@@ -344,14 +373,15 @@ impl From<Note> for InputNoteRecord {
 impl From<InputNote> for InputNoteRecord {
     fn from(value: InputNote) -> Self {
         match value {
-            InputNote::Authenticated { note, proof } => Self {
-                details: note.clone().into(),
-                created_at: None,
-                state: UnverifiedNoteState {
-                    metadata: note.metadata().clone(),
-                    inclusion_proof: proof,
+            InputNote::Authenticated { note, proof } => {
+                let metadata = note.metadata().clone();
+                let details: NoteDetails = note.into();
+                Self {
+                    id: details.id(),
+                    details: Some(details),
+                    created_at: None,
+                    state: UnverifiedNoteState { metadata, inclusion_proof: proof }.into(),
                 }
-                .into(),
             },
             InputNote::Unauthenticated { note } => note.into(),
         }
@@ -362,19 +392,20 @@ impl TryInto<InputNote> for InputNoteRecord {
     type Error = NoteRecordError;
 
     fn try_into(self) -> Result<InputNote, Self::Error> {
+        let details = self.details().ok_or_else(|| {
+            NoteRecordError::ConversionError(
+                "Input Note Record does not contain full details".to_string(),
+            )
+        })?;
         match (self.metadata(), self.inclusion_proof()) {
             (Some(metadata), Some(inclusion_proof)) => Ok(InputNote::authenticated(
-                Note::new(
-                    self.details.assets().clone(),
-                    metadata.clone(),
-                    self.details.recipient().clone(),
-                ),
+                Note::new(details.assets().clone(), metadata.clone(), details.recipient().clone()),
                 inclusion_proof.clone(),
             )),
             (Some(metadata), None) => Ok(InputNote::unauthenticated(Note::new(
-                self.details.assets().clone(),
+                details.assets().clone(),
                 metadata.clone(),
-                self.details.recipient().clone(),
+                details.recipient().clone(),
             ))),
             _ => Err(NoteRecordError::ConversionError(
                 "Input Note Record does not contain metadata".to_string(),
@@ -387,12 +418,15 @@ impl TryInto<Note> for InputNoteRecord {
     type Error = NoteRecordError;
 
     fn try_into(self) -> Result<Note, Self::Error> {
+        let details = self.details().ok_or_else(|| {
+            NoteRecordError::ConversionError(
+                "Input Note Record does not contain full details".to_string(),
+            )
+        })?;
         match self.metadata().cloned() {
-            Some(metadata) => Ok(Note::new(
-                self.details.assets().clone(),
-                metadata,
-                self.details.recipient().clone(),
-            )),
+            Some(metadata) => {
+                Ok(Note::new(details.assets().clone(), metadata, details.recipient().clone()))
+            },
             None => Err(NoteRecordError::ConversionError(
                 "Input Note Record does not contain metadata".to_string(),
             )),
@@ -404,12 +438,15 @@ impl TryInto<Note> for &InputNoteRecord {
     type Error = NoteRecordError;
 
     fn try_into(self) -> Result<Note, Self::Error> {
+        let details = self.details().ok_or_else(|| {
+            NoteRecordError::ConversionError(
+                "Input Note Record does not contain full details".to_string(),
+            )
+        })?;
         match self.metadata().cloned() {
-            Some(metadata) => Ok(Note::new(
-                self.details.assets().clone(),
-                metadata,
-                self.details.recipient().clone(),
-            )),
+            Some(metadata) => {
+                Ok(Note::new(details.assets().clone(), metadata, details.recipient().clone()))
+            },
             None => Err(NoteRecordError::ConversionError(
                 "Input Note Record does not contain metadata".to_string(),
             )),
@@ -417,8 +454,14 @@ impl TryInto<Note> for &InputNoteRecord {
     }
 }
 
-impl From<InputNoteRecord> for NoteDetails {
-    fn from(value: InputNoteRecord) -> Self {
-        value.details
+impl TryFrom<InputNoteRecord> for NoteDetails {
+    type Error = NoteRecordError;
+
+    fn try_from(value: InputNoteRecord) -> Result<Self, Self::Error> {
+        value.details.ok_or_else(|| {
+            NoteRecordError::ConversionError(
+                "Input Note Record does not contain full details".to_string(),
+            )
+        })
     }
 }

@@ -223,16 +223,16 @@ where
         let mut nullifier_requests = BTreeSet::new();
         let mut lowest_block_height: BlockNumber = u32::MAX.into();
         for (previous_note, note, inclusion_proof) in &requested_notes {
-            if let Some(previous_note) = previous_note {
-                nullifier_requests.insert(previous_note.nullifier());
-                if inclusion_proof.location().block_num() < lowest_block_height {
-                    lowest_block_height = inclusion_proof.location().block_num();
-                }
+            let nullifier = if let Some(previous_note) = previous_note {
+                previous_note.nullifier()
             } else {
-                nullifier_requests.insert(note.nullifier());
-                if inclusion_proof.location().block_num() < lowest_block_height {
-                    lowest_block_height = inclusion_proof.location().block_num();
-                }
+                Some(note.nullifier())
+            };
+            if let Some(nullifier) = nullifier {
+                nullifier_requests.insert(nullifier);
+            }
+            if inclusion_proof.location().block_num() < lowest_block_height {
+                lowest_block_height = inclusion_proof.location().block_num();
             }
         }
 
@@ -254,9 +254,13 @@ where
                 .into(),
             ));
 
-            if let Some(Some(block_height)) = nullifier_commit_heights.get(&note_record.nullifier())
-            {
-                if note_record.consumed_externally(note_record.nullifier(), *block_height, None)? {
+            let consumed_block_height = note_record
+                .nullifier()
+                .and_then(|n| nullifier_commit_heights.get(&n).copied())
+                .flatten();
+            if let Some(block_height) = consumed_block_height {
+                let nullifier = note_record.nullifier().expect("nullifier must exist if consumed");
+                if note_record.consumed_externally(nullifier, block_height, None)? {
                     note_records.push(Some(note_record));
                 }
 

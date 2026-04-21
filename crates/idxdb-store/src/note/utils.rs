@@ -7,6 +7,8 @@ use miden_client::account::AccountId;
 use miden_client::note::{
     NoteAssets,
     NoteDetails,
+    NoteHeader,
+    NoteId,
     NoteMetadata,
     NoteRecipient,
     NoteScript,
@@ -85,16 +87,23 @@ pub struct SerializedOutputNoteData {
 
 pub(crate) fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
     let note_id = note.id().to_hex().clone();
-    let note_assets = note.assets().to_bytes();
 
-    let details = note.details();
-    let serial_number = details.serial_num().to_bytes();
-    let inputs = details.storage().to_bytes();
-    let nullifier = details.nullifier().to_hex();
-
-    let recipient = details.recipient();
-    let note_script: Vec<u8> = recipient.script().to_bytes();
-    let note_script_root = recipient.script().root().to_hex();
+    // Header-only records (e.g. erased notes) don't have full details — empty blobs and no
+    // script root. The metadata is carried in the state itself.
+    let (note_assets, serial_number, inputs, note_script, note_script_root, nullifier) =
+        if let Some(details) = note.details() {
+            let recipient = details.recipient();
+            (
+                details.assets().to_bytes(),
+                recipient.serial_num().to_bytes(),
+                recipient.storage().to_bytes(),
+                recipient.script().to_bytes(),
+                recipient.script().root().to_hex(),
+                details.nullifier().to_hex(),
+            )
+        } else {
+            (vec![], vec![], vec![], vec![], String::new(), String::new())
+        };
 
     let state_discriminant = note.state().discriminant();
     let state = note.state().to_bytes();
@@ -204,6 +213,7 @@ pub fn parse_input_note_idxdb_object(
 ) -> Result<InputNoteRecord, StoreError> {
     // Merge the info that comes from the input notes table and the notes script table
     let InputNoteIdxdbObject {
+        note_id,
         assets,
         serial_number,
         inputs,
@@ -211,6 +221,23 @@ pub fn parse_input_note_idxdb_object(
         state,
         created_at,
     } = note_idxdb;
+
+    let state = InputNoteState::read_from_bytes(&state)?;
+
+    // If the detail columns are empty, this is a header-only record (e.g., an erased note).
+    // The metadata is carried in the state.
+    if assets.is_empty() {
+        let note_id = NoteId::try_from_hex(&note_id).map_err(|e| {
+            StoreError::QueryError(format!(
+                "failed to parse note_id for header-only input note: {e}"
+            ))
+        })?;
+        let metadata = state.metadata().cloned().ok_or_else(|| {
+            StoreError::QueryError("header-only input note record has no metadata in state".into())
+        })?;
+        let header = NoteHeader::new(note_id, metadata);
+        return Ok(InputNoteRecord::from_header(header, state));
+    }
 
     let assets = NoteAssets::read_from_bytes(&assets)?;
 
@@ -221,7 +248,6 @@ pub fn parse_input_note_idxdb_object(
 
     let details = NoteDetails::new(assets, recipient);
 
-    let state = InputNoteState::read_from_bytes(&state)?;
     let created_at = created_at
         .parse::<u64>()
         .map_err(|_| StoreError::QueryError("Failed to parse created_at timestamp".to_string()))?;

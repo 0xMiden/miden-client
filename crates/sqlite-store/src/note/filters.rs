@@ -94,7 +94,8 @@ const INPUT_NOTES_BASE_QUERY: &str = "SELECT
                 note.inputs,
                 script.serialized_note_script,
                 note.state,
-                note.created_at
+                note.created_at,
+                note.note_id
                 from input_notes AS note
                 LEFT OUTER JOIN notes_scripts AS script
                     ON note.script_root = script.script_root";
