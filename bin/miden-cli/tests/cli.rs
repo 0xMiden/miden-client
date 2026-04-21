@@ -24,6 +24,7 @@ use miden_client::note::{
     NoteTag,
     NoteType,
 };
+use miden_client::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT;
 use miden_client::rpc::Endpoint;
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
@@ -127,6 +128,15 @@ fn silent_initialization_uses_default_values() {
     assert!(
         config_content.contains("keystore"),
         "Should use default keystore directory (relative to config file)"
+    );
+    // Verify note transport defaults to the testnet endpoint
+    assert!(
+        config_content.contains("[note_transport]"),
+        "Silent init should write a [note_transport] section"
+    );
+    assert!(
+        config_content.contains(NOTE_TRANSPORT_TESTNET_ENDPOINT),
+        "Silent init should default note transport to the testnet endpoint"
     );
     // Verify that the paths don't have the .miden prefix in the config
     // (they're relative to the config file location now)
