@@ -44,9 +44,7 @@ impl SyncSummary {
     }
 
     /// Returns the Note Transport Layer error message if its fetch failed during the sync,
-    /// or `undefined` if NTL was disabled or succeeded. The on-chain portion of the sync
-    /// completed successfully regardless of this value; use it to decide whether to disable
-    /// private-note features at the application layer.
+    /// or `undefined` if NTL was disabled or succeeded.
     #[js_export(js_name = "ntlError")]
     pub fn ntl_error(&self) -> Option<String> {
         self.0.ntl_error.clone()
