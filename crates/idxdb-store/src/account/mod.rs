@@ -27,7 +27,6 @@ use miden_client::asset::{
     AssetWitness,
     PartialVault,
     StorageMapWitness,
-    StorageSlotContent,
     StorageSlotHeader,
 };
 use miden_client::crypto::MerkleError;
@@ -549,26 +548,32 @@ impl IdxdbStore {
         slot_name: StorageSlotName,
         key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
-        // TODO: prevent fetching the full storage when we only need one map item
-        // https://github.com/0xMiden/miden-client/issues/1746
-        let storage = self
-            .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
-            .await?;
+        let promise = idxdb_get_account_storage(
+            self.db_id(),
+            account_id.to_string(),
+            vec![slot_name.as_str().to_string()],
+        );
+        let slots: Vec<AccountStorageIdxdbObject> =
+            await_js(promise, "failed to fetch account storage").await?;
 
-        match storage.get(&slot_name).map(StorageSlot::content) {
-            Some(StorageSlotContent::Map(map)) => {
-                let value = map.get(&key);
+        let Some(slot) = slots.into_iter().next() else {
+            self.get_account_header(account_id)
+                .await?
+                .ok_or(StoreError::AccountDataNotFound(account_id))?;
+            return Err(StoreError::AccountError(AccountError::other("Storage slot not found")));
+        };
 
-                let smt_forest = self.smt_forest.read();
-                let witness = smt_forest.get_storage_map_item_witness(map.root(), key)?;
-
-                Ok((value, witness))
-            },
-            Some(_) => {
-                Err(StoreError::AccountError(AccountError::other("Storage slot is not a map")))
-            },
-            None => Err(StoreError::AccountError(AccountError::other("Storage slot not found"))),
+        let slot_type = StorageSlotType::try_from(slot.slot_type)?;
+        if slot_type != StorageSlotType::Map {
+            return Err(StoreError::AccountError(AccountError::other("Storage slot is not a map")));
         }
+        let map_root = Word::try_from(slot.slot_value.as_str())?;
+
+        let smt_forest = self.smt_forest.read();
+        let witness = smt_forest.get_storage_map_item_witness(map_root, key)?;
+        let value = witness.get(key).unwrap_or(miden_client::EMPTY_WORD);
+
+        Ok((value, witness))
     }
 
     pub(crate) async fn upsert_foreign_account_code(

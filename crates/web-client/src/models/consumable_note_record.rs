@@ -1,9 +1,9 @@
+use js_export_macro::js_export;
 use miden_client::note::{
     NoteConsumability as NativeNoteConsumability,
     NoteConsumptionStatus as NativeNoteConsumptionStatus,
 };
 use miden_client::store::InputNoteRecord as NativeInputNoteRecord;
-use wasm_bindgen::prelude::*;
 
 use super::account_id::AccountId;
 use super::input_note_record::InputNoteRecord;
@@ -11,44 +11,44 @@ use super::input_note_record::InputNoteRecord;
 /// Describes if a note could be consumed under a specific conditions: target account state and
 /// block height.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteConsumptionStatus(NativeNoteConsumptionStatus);
 
-#[wasm_bindgen]
+#[js_export]
 impl NoteConsumptionStatus {
     /// Constructs a `NoteConsumptionStatus` that is consumable.
-    #[wasm_bindgen(js_name = "consumable")]
+    #[js_export(js_name = "consumable")]
     pub fn consumable() -> Self {
         Self(NativeNoteConsumptionStatus::Consumable)
     }
 
     /// Constructs a `NoteConsumptionStatus` that is consumable with authorization.
-    #[wasm_bindgen(js_name = "consumableWithAuthorization")]
+    #[js_export(js_name = "consumableWithAuthorization")]
     pub fn consumable_with_authorization() -> Self {
         Self(NativeNoteConsumptionStatus::ConsumableWithAuthorization)
     }
 
     /// Constructs a `NoteConsumptionStatus` that is consumable after a specific block height.
-    #[wasm_bindgen(js_name = "consumableAfter")]
+    #[js_export(js_name = "consumableAfter")]
     pub fn consumable_after(block_height: u32) -> Self {
         Self(NativeNoteConsumptionStatus::ConsumableAfter(block_height.into()))
     }
 
     /// Constructs a `NoteConsumptionStatus` that is never consumable.
-    #[wasm_bindgen(js_name = "neverConsumable")]
+    #[js_export(js_name = "neverConsumable")]
     pub fn never_consumable(err: String) -> Self {
         Self(NativeNoteConsumptionStatus::NeverConsumable(err.into()))
     }
 
     /// Constructs a `NoteConsumptionStatus` that is unconsumable due to conditions.
-    #[wasm_bindgen(js_name = "unconsumableConditions")]
+    #[js_export(js_name = "unconsumableConditions")]
     pub fn unconsumable_conditions() -> Self {
         Self(NativeNoteConsumptionStatus::UnconsumableConditions)
     }
 
     /// Returns the block number at which the note can be consumed.
     /// Returns None if the note is already consumable or never possible
-    #[wasm_bindgen(js_name = "consumableAfterBlock")]
+    #[js_export(js_name = "consumableAfterBlock")]
     pub fn consumable_after_block(&self) -> Option<u32> {
         match self.0 {
             NativeNoteConsumptionStatus::ConsumableAfter(block_height) => {
@@ -67,14 +67,14 @@ impl From<NativeNoteConsumptionStatus> for NoteConsumptionStatus {
 
 /// Input note record annotated with consumption conditions.
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct ConsumableNoteRecord {
     input_note_record: InputNoteRecord,
     note_consumability: Vec<NoteConsumability>,
 }
 
 #[derive(Clone)]
-#[wasm_bindgen]
+#[js_export]
 pub struct NoteConsumability {
     account_id: AccountId,
 
@@ -83,7 +83,21 @@ pub struct NoteConsumability {
     consumption_status: NoteConsumptionStatus,
 }
 
-#[wasm_bindgen]
+#[js_export]
+impl NoteConsumability {
+    /// Returns the account that can consume the note.
+    #[js_export(js_name = "accountId")]
+    pub fn account_id(&self) -> AccountId {
+        self.account_id
+    }
+
+    /// Returns the consumption status of the note.
+    #[js_export(js_name = "consumptionStatus")]
+    pub fn consumption_status(&self) -> NoteConsumptionStatus {
+        self.consumption_status.clone()
+    }
+}
+
 impl NoteConsumability {
     pub(crate) fn new(
         account_id: AccountId,
@@ -91,24 +105,12 @@ impl NoteConsumability {
     ) -> NoteConsumability {
         NoteConsumability { account_id, consumption_status }
     }
-
-    /// Returns the account that can consume the note.
-    #[wasm_bindgen(js_name = "accountId")]
-    pub fn account_id(&self) -> AccountId {
-        self.account_id
-    }
-
-    /// Returns the consumption status of the note.
-    #[wasm_bindgen(js_name = "consumptionStatus")]
-    pub fn consumption_status(&self) -> NoteConsumptionStatus {
-        self.consumption_status.clone()
-    }
 }
 
-#[wasm_bindgen]
+#[js_export]
 impl ConsumableNoteRecord {
     /// Creates a new consumable note record from an input note record and consumability metadata.
-    #[wasm_bindgen(constructor)]
+    #[js_export(constructor)]
     pub fn new(
         input_note_record: InputNoteRecord,
         note_consumability: Vec<NoteConsumability>,
@@ -117,13 +119,13 @@ impl ConsumableNoteRecord {
     }
 
     /// Returns the underlying input note record.
-    #[wasm_bindgen(js_name = "inputNoteRecord")]
+    #[js_export(js_name = "inputNoteRecord")]
     pub fn input_note_record(&self) -> InputNoteRecord {
         self.input_note_record.clone()
     }
 
     /// Returns the consumability entries.
-    #[wasm_bindgen(js_name = "noteConsumability")]
+    #[js_export(js_name = "noteConsumability")]
     pub fn note_consumability(&self) -> Vec<NoteConsumability> {
         self.note_consumability.clone()
     }
@@ -150,3 +152,5 @@ impl From<NativeNoteConsumability> for NoteConsumability {
         NoteConsumability::new(note_consumability.0.into(), note_consumability.1.into())
     }
 }
+
+impl_napi_from_value!(NoteConsumability);

@@ -198,25 +198,28 @@ try {
 
 ## Transaction Preview
 
-Preview a transaction without submitting it:
+Dry-run a transaction to inspect its effects without submitting it. Supports all operations: `send`, `mint`, `consume`, `swap`, and `custom` (any pre-built `TransactionRequest`).
 
 ```typescript
-import { MidenClient } from "@miden-sdk/miden-sdk";
+// Preview a send
+const summary = await client.transactions.preview({
+    operation: "send",
+    account: wallet,
+    to: recipient,
+    token: faucet,
+    amount: 100n
+});
 
-try {
-    const client = await MidenClient.create();
+// Preview a custom transaction request (e.g. built as in Custom Script Transactions below)
+const request = new TransactionRequestBuilder()
+    .withCustomScript(script)
+    .build();
 
-    const summary = await client.transactions.preview({
-        operation: "send",
-        account: wallet,
-        to: recipient,
-        token: faucet,
-        amount: 100n
-    });
-    console.log("Preview result:", summary);
-} catch (error) {
-    console.error("Preview failed:", error.message);
-}
+const summary = await client.transactions.preview({
+    operation: "custom",
+    account: contractAccount.id(),
+    request
+});
 ```
 
 ## Custom Script Transactions

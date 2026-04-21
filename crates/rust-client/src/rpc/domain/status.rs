@@ -40,20 +40,20 @@ pub enum NetworkNoteStatus {
     /// The note is awaiting execution or being retried after transient failures.
     Pending,
     /// The note has been consumed by a transaction that was sent to the block producer.
-    Processed,
+    NullifierInflight,
     /// The note exceeded the maximum retry count and will not be retried.
     Discarded,
     /// The note's consuming transaction has been committed on-chain.
-    Committed,
+    NullifierCommitted,
 }
 
 impl core::fmt::Display for NetworkNoteStatus {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             NetworkNoteStatus::Pending => write!(f, "Pending"),
-            NetworkNoteStatus::Processed => write!(f, "Processed"),
+            NetworkNoteStatus::NullifierInflight => write!(f, "NullifierInflight"),
             NetworkNoteStatus::Discarded => write!(f, "Discarded"),
-            NetworkNoteStatus::Committed => write!(f, "Committed"),
+            NetworkNoteStatus::NullifierCommitted => write!(f, "NullifierCommitted"),
         }
     }
 }
@@ -86,9 +86,13 @@ impl TryFrom<i32> for NetworkNoteStatus {
                 Err(RpcError::ExpectedDataMissing("NetworkNoteStatus".to_string()))
             },
             proto::rpc::NetworkNoteStatus::Pending => Ok(NetworkNoteStatus::Pending),
-            proto::rpc::NetworkNoteStatus::Processed => Ok(NetworkNoteStatus::Processed),
+            proto::rpc::NetworkNoteStatus::NullifierInflight => {
+                Ok(NetworkNoteStatus::NullifierInflight)
+            },
             proto::rpc::NetworkNoteStatus::Discarded => Ok(NetworkNoteStatus::Discarded),
-            proto::rpc::NetworkNoteStatus::Committed => Ok(NetworkNoteStatus::Committed),
+            proto::rpc::NetworkNoteStatus::NullifierCommitted => {
+                Ok(NetworkNoteStatus::NullifierCommitted)
+            },
         }
     }
 }

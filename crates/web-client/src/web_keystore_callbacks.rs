@@ -118,7 +118,7 @@ impl SignCallback {
             .dyn_ref::<Uint8Array>()
             .ok_or_else(|| AuthenticationError::other("sign callback must return a Uint8Array"))?;
 
-        let signature = Signature::deserialize(bytes).map_err(|err| {
+        let signature = Signature::deserialize(bytes.clone()).map_err(|err| {
             AuthenticationError::other(format!("Failed to sign via callback: {err:?}"))
         })?;
         Ok(signature.into())

@@ -16,6 +16,14 @@ Sync state on creation (default: false).
 
 ***
 
+### debugMode?
+
+> `optional` **debugMode**: `boolean`
+
+Enable debug mode for transaction execution (default: false).
+
+***
+
 ### keystore?
 
 > `optional` **keystore**: `object`

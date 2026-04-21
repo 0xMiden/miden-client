@@ -6,6 +6,7 @@ use miden_client::account::component::{AccountComponent, basic_wallet_library};
 use miden_client::account::{
     Account,
     AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
     AccountCode,
     AccountDelta,
     AccountHeader,
@@ -127,7 +128,7 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
             AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
-        .build()?;
+        .build_with_schema_commitment()?;
 
     let default_address = Address::new(account.id());
     store.insert_account(&account, default_address).await?;
@@ -527,7 +528,7 @@ async fn account_reader_nonce_and_status() -> anyhow::Result<()> {
             AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(dummy_component)
-        .build()?;
+        .build_with_schema_commitment()?;
 
     let default_address = Address::new(account.id());
     store.insert_account(&account, default_address).await?;
@@ -769,7 +770,7 @@ async fn prune_account_history_multiple_accounts() -> anyhow::Result<()> {
             AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(component_b)
-        .build()?;
+        .build_with_schema_commitment()?;
     let b_id = account_b.id();
     store.insert_account(&account_b, Address::new(account_b.id())).await?;
 
@@ -974,7 +975,7 @@ async fn setup_account_with_map(
             AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(component)
-        .build()?;
+        .build_with_schema_commitment()?;
 
     store.insert_account(&account, Address::new(account.id())).await?;
     Ok(account)
@@ -1360,7 +1361,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
             AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(component)
-        .build()?;
+        .build_with_schema_commitment()?;
 
     let account_id = account.id();
     store.insert_account(&account, Address::new(account_id)).await?;
@@ -1741,7 +1742,7 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
             AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(component)
-        .build()?;
+        .build_with_schema_commitment()?;
 
     let account_id = account.id();
     store.insert_account(&account, Address::new(account_id)).await?;
