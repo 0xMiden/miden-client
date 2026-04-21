@@ -6,9 +6,10 @@ slow-timeout   = { period = "3m", terminate-after = 2 }
 status-level   = "skip"
 
 # The integration tests all share a node instance, so cap concurrency to reduce
-# pressure on the node until the node-side contention issue is resolved.
+# pressure on the node until the node-side contention issue is resolved. Also
+# keeps peak memory low enough for CI runners to avoid OOM kills.
 [test-groups.integration]
-max-threads = 2
+max-threads = 1
 
 [[profile.default.overrides]]
 filter           = "package(miden-client-unit-tests)"
