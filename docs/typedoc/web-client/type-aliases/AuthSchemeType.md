@@ -4,8 +4,10 @@
 
 [@miden-sdk/miden-sdk](../README.md) / AuthSchemeType
 
-# Type Alias: AuthSchemeType
+# ~~Type Alias: AuthSchemeType~~
 
-> **AuthSchemeType** = *typeof* [`AuthScheme`](../variables/AuthScheme.md)\[keyof *typeof* [`AuthScheme`](../variables/AuthScheme.md)\]
+> **AuthSchemeType** = [`AuthScheme`](AuthScheme.md)
 
-Union of all values in the AuthScheme const.
+## Deprecated
+
+Alias for `AuthScheme` (the string union).
