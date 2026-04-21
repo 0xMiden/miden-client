@@ -1,7 +1,10 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { useMidenStore } from "../store/MidenStore";
-import { AccountStorageMode, resolveAuthScheme } from "@miden-sdk/miden-sdk/lazy";
+import {
+  AccountStorageMode,
+  resolveAuthScheme,
+} from "@miden-sdk/miden-sdk/lazy";
 import type { Account } from "@miden-sdk/miden-sdk/lazy";
 import type { CreateWalletOptions } from "../types";
 import { DEFAULTS } from "../types";

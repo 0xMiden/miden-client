@@ -62,8 +62,13 @@ export async function initializeSignerAccount(
   client: WebClient,
   config: SignerAccountConfig
 ): Promise<string> {
-  const { AccountBuilder, AccountComponent, AuthScheme, Word, resolveAuthScheme } =
-    await import("@miden-sdk/miden-sdk/lazy");
+  const {
+    AccountBuilder,
+    AccountComponent,
+    AuthScheme,
+    Word,
+    resolveAuthScheme,
+  } = await import("@miden-sdk/miden-sdk/lazy");
 
   // Sync first to get latest state
   await client.syncState();
