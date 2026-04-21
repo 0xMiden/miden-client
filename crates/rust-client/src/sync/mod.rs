@@ -130,12 +130,13 @@ where
             let note_tags = self.store.get_unique_note_tags().await?;
             match self.fetch_transport_notes(cursor, note_tags).await {
                 Ok(()) => None,
-                Err(e) => {
+                Err(ClientError::NoteTransportError(ntl_err)) => {
                     warn!(
-                        "Note transport fetch failed, continuing sync without private notes: {e}"
+                        "Note transport fetch failed, continuing sync without private notes: {ntl_err}"
                     );
-                    Some(e.to_string())
+                    Some(ntl_err.to_string())
                 },
+                Err(other) => return Err(other),
             }
         } else {
             None
