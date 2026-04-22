@@ -460,7 +460,7 @@ impl MastForestStore for ClientDataStore {
 ///
 /// `authenticated_blocks` cannot contain `forest`. For authenticating the last block we have,
 /// the kernel extends the MMR which is why it's not needed here.
-async fn build_partial_mmr_with_paths(
+pub(crate) async fn build_partial_mmr_with_paths(
     store: &alloc::sync::Arc<dyn Store>,
     forest: u32,
     authenticated_blocks: &[BlockHeader],

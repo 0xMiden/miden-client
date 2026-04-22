@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 use miden_client::account::{StorageMap, StorageSlot};
 use miden_client::asset::Asset;
 use miden_client::utils::Serializable;
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys;
 
@@ -172,7 +173,8 @@ extern "C" {
 
 /// An object that contains a serialized vault asset.
 #[wasm_bindgen(getter_with_clone, inspectable)]
-#[derive(Clone)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JsVaultAsset {
     /// The vault key associated with the asset.
     #[wasm_bindgen(js_name = "vaultKey")]
@@ -196,7 +198,8 @@ impl JsVaultAsset {
 
 /// A JavaScript representation of a storage slot in an account.
 #[wasm_bindgen(getter_with_clone, inspectable)]
-#[derive(Clone)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JsStorageSlot {
     /// The name of the storage slot.
     #[wasm_bindgen(js_name = "slotName")]
@@ -224,7 +227,8 @@ impl JsStorageSlot {
 
 /// A JavaScript representation of a storage map entry in an account.
 #[wasm_bindgen(getter_with_clone, inspectable)]
-#[derive(Clone)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JsStorageMapEntry {
     /// The slot name of the map this entry belongs to.
     #[wasm_bindgen(js_name = "slotName")]

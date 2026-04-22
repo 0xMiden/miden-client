@@ -94,6 +94,10 @@ use crate::store::{
     TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
+use crate::transaction::batch::InMemoryBatchDataStore;
+
+pub mod batch;
+pub use batch::{BatchBuilder, BatchBuilderError};
 
 mod prover;
 pub use prover::TransactionProver;
@@ -168,6 +172,39 @@ where
         filter: TransactionFilter,
     ) -> Result<Vec<TransactionRecord>, ClientError> {
         self.store.get_transactions(filter).await.map_err(Into::into)
+    }
+
+    // TRANSACTION BATCH
+    // --------------------------------------------------------------------------------------------
+
+    /// Open a new [`BatchBuilder`] for the given local `account_id`.
+    ///
+    /// Fails with [`BatchBuilderError::AccountNotTracked`] if the account is not
+    /// tracked by the client's store.
+    pub async fn new_transaction_batch(
+        &self,
+        account_id: AccountId,
+    ) -> Result<BatchBuilder<'_, AUTH>, ClientError> {
+        let account_record = self
+            .store
+            .get_account(account_id)
+            .await?
+            .ok_or(BatchBuilderError::AccountNotTracked(account_id))?;
+
+        let initial_account: Account = account_record.try_into()?;
+
+        let inner_data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
+        let data_store = InMemoryBatchDataStore::new(inner_data_store, account_id, initial_account);
+
+        Ok(BatchBuilder {
+            client: self,
+            account_id,
+            data_store,
+            proven_txs: Vec::new(),
+            transaction_inputs: Vec::new(),
+            tx_results: Vec::new(),
+            consumed_nullifiers: BTreeSet::new(),
+        })
     }
 
     // TRANSACTION
@@ -249,6 +286,30 @@ where
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionResult, ClientError> {
+        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
+        Box::pin(self.execute_transaction_with_data_store(
+            &data_store,
+            account_id,
+            transaction_request,
+        ))
+        .await
+    }
+
+    /// Executes a transaction against the provided data store rather than constructing
+    /// a fresh one internally.
+    ///
+    /// This is the shared implementation used by both the standard single-transaction flow
+    /// (`execute_transaction`) and the batch flow (`BatchBuilder::push`), which supplies its own
+    /// [`crate::transaction::batch::InMemoryBatchDataStore`]-backed store.
+    pub(crate) async fn execute_transaction_with_data_store<DS>(
+        &self,
+        data_store: &DS,
+        account_id: AccountId,
+        transaction_request: TransactionRequest,
+    ) -> Result<TransactionResult, ClientError>
+    where
+        DS: BatchExecutionDataStore + Sync,
+    {
         // Validates the transaction request before executing
         self.validate_request(account_id, &transaction_request).await?;
 
@@ -308,8 +369,7 @@ where
 
         let ignore_invalid_notes = transaction_request.ignore_invalid_input_notes();
 
-        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
-        data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
+        data_store.register_fpis(foreign_account_inputs.iter().cloned());
         for fpi_account in &foreign_account_inputs {
             data_store.mast_store().load_account_code(fpi_account.code());
         }
@@ -347,7 +407,7 @@ where
 
         // Execute the transaction and get the witness
         let executed_transaction = self
-            .build_executor(&data_store)?
+            .build_executor(data_store)?
             .execute_transaction(account_id, block_num, notes, tx_args)
             .await?;
 
@@ -357,7 +417,7 @@ where
 
     /// Proves the specified transaction using the prover configured for this client.
     pub async fn prove_transaction(
-        &mut self,
+        &self,
         tx_result: &TransactionResult,
     ) -> Result<ProvenTransaction, ClientError> {
         self.prove_transaction_with(tx_result, self.tx_prover.clone()).await
@@ -365,7 +425,7 @@ where
 
     /// Proves the specified transaction using the provided prover.
     pub async fn prove_transaction_with(
-        &mut self,
+        &self,
         tx_result: &TransactionResult,
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<ProvenTransaction, ClientError> {
@@ -614,7 +674,7 @@ where
     /// - That the account has enough balance to cover the outgoing assets.
     /// - That the client is not too far behind the chain tip.
     pub async fn validate_request(
-        &mut self,
+        &self,
         account_id: AccountId,
         transaction_request: &TransactionRequest,
     ) -> Result<(), ClientError> {
@@ -752,7 +812,7 @@ where
     /// currently have the corresponding block header data. Otherwise, we additionally need to
     /// retrieve it, this implies a state sync call which may update the client in other ways.
     async fn retrieve_foreign_account_inputs(
-        &mut self,
+        &self,
         foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
     ) -> Result<(Option<BlockNumber>, Vec<AccountInputs>), ClientError> {
         if foreign_accounts.is_empty() {
@@ -810,6 +870,52 @@ where
         executor = executor.with_source_manager(self.source_manager.clone());
 
         Ok(executor)
+    }
+}
+
+// BATCH EXECUTION DATA STORE TRAIT
+// ================================================================================================
+
+/// Extends [`DataStore`] with the MAST-forest management and foreign-account input
+/// registration that [`execute_transaction_with_data_store`] needs but are not part
+/// of the core [`DataStore`] interface.
+///
+/// Implemented for both [`ClientDataStore`] (the standard path) and
+/// [`crate::transaction::batch::InMemoryBatchDataStore`] (the batch path).
+pub(crate) trait BatchExecutionDataStore: DataStore {
+    /// Returns the MAST forest store used to load account and library code before execution.
+    fn mast_store(&self) -> Arc<miden_tx::TransactionMastStore>;
+
+    /// Registers foreign-account inputs so the executor can serve them on demand.
+    fn register_fpis(
+        &self,
+        inputs: impl IntoIterator<Item = miden_protocol::transaction::AccountInputs>,
+    );
+}
+
+impl BatchExecutionDataStore for ClientDataStore {
+    fn mast_store(&self) -> Arc<miden_tx::TransactionMastStore> {
+        ClientDataStore::mast_store(self)
+    }
+
+    fn register_fpis(
+        &self,
+        inputs: impl IntoIterator<Item = miden_protocol::transaction::AccountInputs>,
+    ) {
+        self.register_foreign_account_inputs(inputs);
+    }
+}
+
+impl BatchExecutionDataStore for crate::transaction::batch::InMemoryBatchDataStore {
+    fn mast_store(&self) -> Arc<miden_tx::TransactionMastStore> {
+        crate::transaction::batch::InMemoryBatchDataStore::mast_store(self)
+    }
+
+    fn register_fpis(
+        &self,
+        inputs: impl IntoIterator<Item = miden_protocol::transaction::AccountInputs>,
+    ) {
+        self.register_foreign_account_inputs(inputs);
     }
 }
 

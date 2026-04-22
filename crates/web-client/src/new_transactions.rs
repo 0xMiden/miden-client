@@ -33,7 +33,8 @@ use crate::models::transaction_result::TransactionResult;
 use crate::models::transaction_script::TransactionScript;
 use crate::models::transaction_store_update::TransactionStoreUpdate;
 use crate::models::transaction_summary::TransactionSummary;
-use crate::platform::{JsErr, from_str_err, js_u64_to_u64, maybe_wrap_send};
+use crate::platform::{JsBytes, JsErr, from_str_err, js_u64_to_u64, maybe_wrap_send};
+use crate::utils::deserialize_from_bytes;
 use crate::{WebClient, js_error_with_context};
 
 #[js_export]
@@ -222,6 +223,50 @@ impl WebClient {
         self.apply_transaction(&transaction_result, submission_height).await?;
 
         Ok(tx_id)
+    }
+
+    /// Executes a batch of transactions against the specified account, proves them individually
+    /// and as a batch, submits the batch to the network, and atomically applies the per-tx
+    /// updates to the local store. Returns the block number the batch was accepted into.
+    ///
+    /// All transactions must target the same local account — the `account_id` argument.
+    /// Each element of `transaction_requests` is the serialized-bytes form of a
+    /// `TransactionRequest` (obtained via `tx_request.serialize()`)
+    // TODO V2: support multi-account batches
+    #[js_export(js_name = "submitNewTransactionBatch")]
+    pub async fn submit_new_transaction_batch(
+        &self,
+        account_id: &AccountId,
+        transaction_requests: Vec<JsBytes>,
+    ) -> Result<u32, JsErr> {
+        let mut guard = self.get_mut_inner().await;
+        let client = guard.as_mut().ok_or_else(|| from_str_err("Client not initialized"))?;
+        let native_account_id: miden_client::account::AccountId = account_id.into();
+
+        // Deserialize all requests up front so we fail early on malformed input.
+        let mut native_reqs: Vec<NativeTransactionRequest> =
+            Vec::with_capacity(transaction_requests.len());
+        for bytes in &transaction_requests {
+            let req = deserialize_from_bytes::<NativeTransactionRequest>(bytes).map_err(|err| {
+                from_str_err(&format!("failed to deserialize transaction request: {err:?}"))
+            })?;
+            native_reqs.push(req);
+        }
+
+        let mut builder = Box::pin(client.new_transaction_batch(native_account_id))
+            .await
+            .map_err(|err| js_error_with_context(err, "failed to open batch builder"))?;
+
+        for native_req in native_reqs {
+            builder = Box::pin(builder.push(native_req))
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to push transaction to batch"))?;
+        }
+
+        Box::pin(builder.submit())
+            .await
+            .map(|block_number| block_number.as_u32())
+            .map_err(|err| js_error_with_context(err, "failed to submit transaction batch"))
     }
 
     /// Executes a transaction specified by the request against the specified account but does not

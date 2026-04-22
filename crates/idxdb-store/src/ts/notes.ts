@@ -165,6 +165,7 @@ export async function upsertInputNote(
       await t.notesScripts.put(noteScriptData);
     } catch (error) {
       logWebStoreError(error, `Error inserting note: ${noteId}`);
+      throw error;
     }
   };
   if (tx) return doWork(tx);
@@ -237,6 +238,7 @@ export async function upsertOutputNote(
       await t.outputNotes.put(data);
     } catch (error) {
       logWebStoreError(error, `Error inserting note: ${noteId}`);
+      throw error;
     }
   };
   if (tx) return doWork(tx);

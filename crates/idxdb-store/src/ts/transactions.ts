@@ -1,6 +1,15 @@
-import { getDatabase, ITransaction, ITransactionScript } from "./schema.js";
+import {
+  getDatabase,
+  ITransaction,
+  ITransactionScript,
+  JsStorageMapEntry,
+  JsStorageSlot,
+  JsVaultAsset,
+} from "./schema.js";
 import { logWebStoreError, mapOption, uint8ArrayToBase64 } from "./utils.js";
 import type { Transaction } from "dexie";
+import { applyFullAccountState, applyTransactionDelta } from "./accounts.js";
+import { upsertInputNote, upsertOutputNote } from "./notes.js";
 
 interface ProcessedTransaction {
   scriptRoot?: string;
@@ -134,6 +143,7 @@ export async function insertTransactionScript(
     await (tx || db).transactionScripts.put(data);
   } catch (error) {
     logWebStoreError(error, "Failed to insert transaction script");
+    throw error;
   }
 }
 
@@ -161,5 +171,215 @@ export async function upsertTransactionRecord(
     await (tx || db).transactions.put(data);
   } catch (err) {
     logWebStoreError(err, "Failed to insert proven transaction data");
+    throw err;
   }
+}
+
+// BATCH APPLY
+// ================================================================================================
+
+interface SerializedTransactionRecord {
+  id: string;
+  details: Uint8Array;
+  blockNum: number;
+  statusVariant: number;
+  status: Uint8Array;
+  scriptRoot?: Uint8Array;
+  txScript?: Uint8Array;
+}
+
+interface JsFullAccountState {
+  accountId: string;
+  nonce: string;
+  storageSlots: JsStorageSlot[];
+  storageMapEntries: JsStorageMapEntry[];
+  assets: JsVaultAsset[];
+  codeRoot: string;
+  storageRoot: string;
+  vaultRoot: string;
+  committed: boolean;
+  accountCommitment: string;
+  accountSeed: Uint8Array | undefined;
+}
+
+interface JsDeltaAccountState {
+  accountId: string;
+  nonce: string;
+  updatedSlots: JsStorageSlot[];
+  changedMapEntries: JsStorageMapEntry[];
+  changedAssets: JsVaultAsset[];
+  codeRoot: string;
+  storageRoot: string;
+  vaultRoot: string;
+  committed: boolean;
+  commitment: string;
+}
+
+type JsBatchAccountState =
+  | { kind: "full"; account: JsFullAccountState }
+  | ({ kind: "delta" } & JsDeltaAccountState);
+
+interface JsBatchNoteTag {
+  tag: Uint8Array;
+  sourceNoteId?: string;
+  sourceAccountId?: string;
+}
+
+interface SerializedInputNoteData {
+  noteId: string;
+  noteAssets: Uint8Array;
+  serialNumber: Uint8Array;
+  inputs: Uint8Array;
+  noteScriptRoot: string;
+  noteScript: Uint8Array;
+  nullifier: string;
+  createdAt: string;
+  stateDiscriminant: number;
+  state: Uint8Array;
+  consumedBlockHeight?: number;
+  consumedTxOrder?: number;
+  consumerAccountId?: string;
+}
+
+interface SerializedOutputNoteData {
+  noteId: string;
+  noteAssets: Uint8Array;
+  recipientDigest: string;
+  metadata: Uint8Array;
+  nullifier?: string;
+  expectedHeight: number;
+  stateDiscriminant: number;
+  state: Uint8Array;
+}
+
+interface JsBatchUpdatePayload {
+  transactionRecord: SerializedTransactionRecord;
+  accountState: JsBatchAccountState;
+  inputNotes: SerializedInputNoteData[];
+  outputNotes: SerializedOutputNoteData[];
+  tags: JsBatchNoteTag[];
+}
+
+/**
+ * Applies a batch of transaction updates atomically inside a single Dexie transaction.
+ *
+ * All sub-operations that internally call `db.dexie.transaction()` are auto-joined by Dexie
+ * as nested sub-transactions when run inside this parent transaction, provided the parent
+ * scope is a superset of every sub-transaction scope.
+ */
+export async function applyTransactionBatch(
+  dbId: string,
+  payloads: JsBatchUpdatePayload[]
+) {
+  const db = getDatabase(dbId);
+
+  await db.dexie.transaction(
+    "rw",
+    [
+      db.transactions,
+      db.transactionScripts,
+      db.latestAccountStorages,
+      db.historicalAccountStorages,
+      db.latestStorageMapEntries,
+      db.historicalStorageMapEntries,
+      db.latestAccountAssets,
+      db.historicalAccountAssets,
+      db.latestAccountHeaders,
+      db.historicalAccountHeaders,
+      db.inputNotes,
+      db.outputNotes,
+      db.notesScripts,
+      db.tags,
+    ],
+    async () => {
+      for (const payload of payloads) {
+        // 1. Insert the transaction record (script first, then record)
+        const rec = payload.transactionRecord;
+        if (rec.scriptRoot && rec.txScript) {
+          await insertTransactionScript(dbId, rec.scriptRoot, rec.txScript);
+        }
+        await upsertTransactionRecord(
+          dbId,
+          rec.id,
+          rec.details,
+          rec.blockNum,
+          rec.statusVariant,
+          rec.status,
+          rec.scriptRoot
+        );
+
+        // 2. Apply account state (full or delta)
+        const acct = payload.accountState;
+        if (acct.kind === "full") {
+          await applyFullAccountState(dbId, acct.account);
+        } else {
+          await applyTransactionDelta(
+            dbId,
+            acct.accountId,
+            acct.nonce,
+            acct.updatedSlots,
+            acct.changedMapEntries,
+            acct.changedAssets,
+            acct.codeRoot,
+            acct.storageRoot,
+            acct.vaultRoot,
+            acct.committed,
+            acct.commitment
+          );
+        }
+
+        // 3. Upsert input and output notes
+        for (const note of payload.inputNotes) {
+          await upsertInputNote(
+            dbId,
+            note.noteId,
+            note.noteAssets,
+            note.serialNumber,
+            note.inputs,
+            note.noteScriptRoot,
+            note.noteScript,
+            note.nullifier,
+            note.createdAt,
+            note.stateDiscriminant,
+            note.state,
+            note.consumedBlockHeight ?? null,
+            note.consumedTxOrder ?? null,
+            note.consumerAccountId ?? null
+          );
+        }
+        for (const note of payload.outputNotes) {
+          await upsertOutputNote(
+            dbId,
+            note.noteId,
+            note.noteAssets,
+            note.recipientDigest,
+            note.metadata,
+            note.nullifier,
+            note.expectedHeight,
+            note.stateDiscriminant,
+            note.state
+          );
+        }
+
+        // 4. Add note tags (deduplicated within the transaction)
+        for (const tagEntry of payload.tags) {
+          const tagArray = new Uint8Array(tagEntry.tag);
+          const tagBase64 = uint8ArrayToBase64(tagArray);
+          const sourceNoteId = tagEntry.sourceNoteId ?? "";
+          const sourceAccountId = tagEntry.sourceAccountId ?? "";
+          // Check for existing tag to avoid duplicates (mirrors the Rust add_note_tag logic)
+          const existing = await db.tags
+            .where({ tag: tagBase64, sourceNoteId, sourceAccountId })
+            .first();
+          if (!existing) {
+            await db.tags.add({
+              tag: tagBase64,
+              sourceNoteId,
+              sourceAccountId,
+            });
+          }
+        }
+      }
+    }
+  );
 }

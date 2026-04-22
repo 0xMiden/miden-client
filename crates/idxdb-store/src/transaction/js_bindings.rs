@@ -1,6 +1,4 @@
-use alloc::string::String;
-use alloc::vec::Vec;
-
+use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::js_sys;
 
@@ -31,4 +29,7 @@ extern "C" {
         status: Vec<u8>,
         scriptRoot: Option<Vec<u8>>,
     ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = applyTransactionBatch)]
+    pub fn idxdb_apply_transaction_batch(db_id: &str, payloads: JsValue) -> js_sys::Promise;
 }

@@ -46,6 +46,7 @@ miden-remote-prover-client = { default-features = false, features = ["tx-prover"
 miden-standards            = { workspace = true }
 miden-testing              = { optional = true, workspace = true }
 miden-tx                   = { workspace = true }
+miden-tx-batch-prover      = { workspace = true }
 
 # External dependencies
 anyhow       = { workspace = true }

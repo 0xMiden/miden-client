@@ -195,6 +195,13 @@ impl Store for IdxdbStore {
         self.apply_transaction(tx_update).await
     }
 
+    async fn apply_transaction_batch(
+        &self,
+        tx_updates: Vec<TransactionStoreUpdate>,
+    ) -> Result<(), StoreError> {
+        self.apply_transaction_batch_atomic(tx_updates).await
+    }
+
     // NOTES
     // --------------------------------------------------------------------------------------------
     async fn get_input_notes(

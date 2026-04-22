@@ -12,6 +12,7 @@ use miden_client::transaction::{
     TransactionStatus,
 };
 use miden_client::utils::Serializable;
+use serde::Serialize;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use super::js_bindings::{idxdb_insert_transaction_script, idxdb_upsert_transaction_record};
@@ -20,19 +21,24 @@ use crate::promise::await_ok;
 // TYPES
 // ================================================================================================
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[wasm_bindgen(getter_with_clone)]
 pub struct SerializedTransactionData {
     pub id: String,
+    #[serde(with = "serde_bytes")]
     pub details: Vec<u8>,
     #[wasm_bindgen(js_name = "scriptRoot")]
+    #[serde(with = "serde_bytes")]
     pub script_root: Option<Vec<u8>>,
     #[wasm_bindgen(js_name = "txScript")]
+    #[serde(with = "serde_bytes")]
     pub tx_script: Option<Vec<u8>>,
     #[wasm_bindgen(js_name = "blockNum")]
     pub block_num: u32,
     #[wasm_bindgen(js_name = "statusVariant")]
     pub status_variant: u8,
+    #[serde(with = "serde_bytes")]
     pub status: Vec<u8>,
 }
 

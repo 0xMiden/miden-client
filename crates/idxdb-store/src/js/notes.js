@@ -135,6 +135,7 @@ export async function upsertInputNote(dbId, noteId, assets, serialNumber, inputs
         }
         catch (error) {
             logWebStoreError(error, `Error inserting note: ${noteId}`);
+            throw error;
         }
     };
     if (tx)
@@ -190,6 +191,7 @@ export async function upsertOutputNote(dbId, noteId, assets, recipientDigest, me
         }
         catch (error) {
             logWebStoreError(error, `Error inserting note: ${noteId}`);
+            throw error;
         }
     };
     if (tx)

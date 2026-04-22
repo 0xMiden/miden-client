@@ -109,21 +109,52 @@ impl SqliteStore {
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
         tx_update: &TransactionStoreUpdate,
     ) -> Result<(), StoreError> {
+        let mut tx = conn.transaction().into_store_error()?;
+        Self::apply_transaction_in_txn(&mut tx, smt_forest, tx_update)?;
+        tx.commit().into_store_error()?;
+
+        Ok(())
+    }
+
+    /// Applies a batch of [`TransactionStoreUpdate`]s atomically. Either every update in the
+    /// slice is persisted or none are. Executes in order inside a single
+    /// [`rusqlite::Transaction`]; on any error the transaction is rolled back automatically.
+    pub fn apply_transaction_batch(
+        conn: &mut Connection,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
+        tx_updates: &[TransactionStoreUpdate],
+    ) -> Result<(), StoreError> {
+        let mut tx = conn.transaction().into_store_error()?;
+        for update in tx_updates {
+            Self::apply_transaction_in_txn(&mut tx, smt_forest, update)?;
+        }
+        tx.commit().into_store_error()?;
+        Ok(())
+    }
+
+    /// Applies a transaction's store update within the provided rusqlite transaction.
+    /// Does NOT commit — caller is responsible for commit/rollback.
+    ///
+    /// Pre-reads (fungible assets and storage map roots) are performed via the transaction so
+    /// that each call sees writes made by prior calls within the same outer transaction.
+    pub(crate) fn apply_transaction_in_txn(
+        tx: &mut Transaction<'_>,
+        smt_forest: &Arc<RwLock<AccountSmtForest>>,
+        tx_update: &TransactionStoreUpdate,
+    ) -> Result<(), StoreError> {
         let executed_transaction = tx_update.executed_transaction();
 
         let updated_fungible_assets = Self::get_account_fungible_assets_for_delta(
-            conn,
+            tx,
             executed_transaction.account_id(),
             executed_transaction.account_delta(),
         )?;
 
         let old_map_roots = Self::get_storage_map_roots_for_delta(
-            conn,
+            tx,
             executed_transaction.account_id(),
             executed_transaction.account_delta(),
         )?;
-
-        let tx = conn.transaction().into_store_error()?;
 
         // Build transaction record
         let nullifiers: Vec<Word> = executed_transaction
@@ -154,12 +185,12 @@ impl SqliteStore {
         );
 
         // Insert transaction data
-        upsert_transaction_record(&tx, &transaction_record)?;
+        upsert_transaction_record(tx, &transaction_record)?;
 
         // Account Data
         let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
         Self::apply_account_delta(
-            &tx,
+            tx,
             &mut smt_forest,
             &executed_transaction.initial_account().into(),
             executed_transaction.final_account(),
@@ -170,14 +201,12 @@ impl SqliteStore {
         drop(smt_forest);
 
         // Note Updates
-        apply_note_updates_tx(&tx, tx_update.note_updates())?;
+        apply_note_updates_tx(tx, tx_update.note_updates())?;
 
         // Note tags
         for tag_record in tx_update.new_tags() {
-            add_note_tag_tx(&tx, tag_record)?;
+            add_note_tag_tx(tx, tag_record)?;
         }
-
-        tx.commit().into_store_error()?;
 
         Ok(())
     }
