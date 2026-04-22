@@ -156,12 +156,14 @@ fn resolve_procedure_digest(package: &Package, procedure_name: &str) -> Result<W
     )))
 }
 
-fn parse_args(args: &[String]) -> Result<Vec<u64>, CliError> {
+fn parse_args(args: &[String]) -> Result<Vec<Felt>, CliError> {
     args.iter()
         .map(|arg| {
-            arg.parse::<u64>().map_err(|_| {
+            let n = arg.parse::<u64>().map_err(|_| {
                 CliError::InvalidArgument(format!("Invalid argument '{arg}'. Expected u64."))
-            })
+            })?;
+            Felt::try_from(n)
+                .map_err(|_| CliError::InvalidArgument(format!("Argument '{arg}' is too large.")))
         })
         .collect()
 }
@@ -256,7 +258,7 @@ fn print_output_stack(stack: &[Felt; 16], expected_results: Option<usize>) {
 fn generate_tx_script(
     code_builder: CodeBuilder,
     digest: &Word,
-    args: &[u64],
+    args: &[Felt],
     result_count: Option<usize>,
 ) -> Result<TransactionScript, CliError> {
     // MASM `movup.n` only works for n in 2..=15. The VM stack exposes only the top
