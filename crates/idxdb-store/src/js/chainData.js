@@ -8,10 +8,16 @@ export async function insertBlockHeader(dbId, blockNum, header, hasClientNotes) 
             header,
             hasClientNotes: hasClientNotes.toString(),
         };
-        // Mirror SQLite's `insert_block_header_tx`: INSERT OR IGNORE, then
-        // upgrade `has_client_notes` to true if the caller says so. The flag
-        // upgrade is load-bearing: `get_tracked_block_header_numbers` filters
-        // by this flag to seed `tracked_leaves`, which
+        // Mirror SQLite's `insert_block_header_tx`: INSERT OR IGNORE on the
+        // row, then explicitly upgrade `has_client_notes` to true if the caller
+        // says so. Two callers hit this:
+        //   - Genesis flow — no existing row; the add succeeds.
+        //   - `get_and_store_authenticated_block` for a past block — a row
+        //     written by `applyStateSync` typically already exists, so the add
+        //     is ignored.
+        //
+        // The `has_client_notes` upgrade is load-bearing: `get_tracked_block_
+        // header_numbers` filters by this flag to seed `tracked_leaves`, which
         // `get_partial_blockchain_nodes(Forest)` relies on. A private-note
         // import at a block previously synced as irrelevant must flip the flag
         // to true or the auth paths won't be tracked.
