@@ -24,6 +24,8 @@ pub struct StateSyncUpdate {
     pub block_num: BlockNumber,
     /// New blocks and authentication nodes.
     pub block_updates: BlockUpdates,
+    /// MMR peaks at the new sync height.
+    pub new_peaks: MmrPeaks,
     /// New and updated notes to be upserted in the store.
     pub note_updates: NoteUpdateTracker,
     /// Committed and discarded transactions after the sync.
@@ -100,45 +102,37 @@ impl From<&StateSyncUpdate> for SyncSummary {
 #[derive(Debug, Clone, Default)]
 pub struct BlockUpdates {
     /// New block headers to be stored, keyed by block number. The value contains the block
-    /// header, a flag indicating whether the block contains notes relevant to the client, and
-    /// the MMR peaks for the block.
-    block_headers: BTreeMap<BlockNumber, (BlockHeader, bool, MmrPeaks)>,
+    /// header and a flag indicating whether the block contains notes relevant to the client.
+    block_headers: BTreeMap<BlockNumber, (BlockHeader, bool)>,
     /// New authentication nodes that are meant to be stored in order to authenticate block
     /// headers.
     new_authentication_nodes: Vec<(InOrderIndex, Word)>,
 }
 
 impl BlockUpdates {
-    /// Adds or updates a block header and its corresponding data in this [`BlockUpdates`].
+    /// Adds or updates a block header in this [`BlockUpdates`].
     ///
     /// If the block header already exists (same block number), the `has_client_notes` flag is
-    /// OR-ed and the peaks are kept from the first insertion. Otherwise a new entry is added.
+    /// OR-ed. Otherwise a new entry is added.
     pub fn insert(
         &mut self,
         block_header: BlockHeader,
         has_client_notes: bool,
-        peaks: MmrPeaks,
         new_authentication_nodes: Vec<(InOrderIndex, Word)>,
     ) {
-        debug_assert_eq!(
-            peaks.forest().num_leaves(),
-            block_header.block_num().as_usize(),
-            "MMR peaks stored for a block header must use that block number as the forest",
-        );
-
         self.block_headers
             .entry(block_header.block_num())
-            .and_modify(|(_, existing_has_notes, _)| {
+            .and_modify(|(_, existing_has_notes)| {
                 *existing_has_notes |= has_client_notes;
             })
-            .or_insert((block_header, has_client_notes, peaks));
+            .or_insert((block_header, has_client_notes));
 
         self.new_authentication_nodes.extend(new_authentication_nodes);
     }
 
     /// Returns the new block headers to be stored, along with a flag indicating whether the block
-    /// contains notes that are relevant to the client and the MMR peaks for the block.
-    pub fn block_headers(&self) -> impl Iterator<Item = &(BlockHeader, bool, MmrPeaks)> {
+    /// contains notes that are relevant to the client.
+    pub fn block_headers(&self) -> impl Iterator<Item = &(BlockHeader, bool)> {
         self.block_headers.values()
     }
 

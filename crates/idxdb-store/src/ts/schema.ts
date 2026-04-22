@@ -208,12 +208,12 @@ export interface INotesScript {
 export interface IStateSync {
   id: number;
   blockNum: number;
+  partialBlockchainPeaks: Uint8Array;
 }
 
 export interface IBlockHeader {
   blockNum: number;
   header: Uint8Array;
-  partialBlockchainPeaks: Uint8Array;
   hasClientNotes: string;
 }
 
@@ -520,7 +520,11 @@ export class MidenDatabase {
 
     this.dexie.on("populate", () => {
       this.stateSync
-        .put({ id: 1, blockNum: 0 } as IStateSync)
+        .put({
+          id: 1,
+          blockNum: 0,
+          partialBlockchainPeaks: new Uint8Array(),
+        } as IStateSync)
         .catch((err: unknown) =>
           logWebStoreError(err, "Failed to populate DB")
         );

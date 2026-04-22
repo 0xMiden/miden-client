@@ -55,6 +55,25 @@ export async function getSyncHeight(dbId: string) {
   }
 }
 
+export async function getCurrentBlockchainPeaks(dbId: string) {
+  try {
+    const db = getDatabase(dbId);
+    const record = await db.stateSync.get(1);
+    if (!record) {
+      return {
+        blockNum: 0,
+        peaks: uint8ArrayToBase64(new Uint8Array()),
+      };
+    }
+    return {
+      blockNum: record.blockNum,
+      peaks: uint8ArrayToBase64(record.partialBlockchainPeaks),
+    };
+  } catch (error) {
+    logWebStoreError(error, "Error fetching current blockchain peaks");
+  }
+}
+
 export async function addNoteTag(
   dbId: string,
   tag: Uint8Array,
@@ -157,7 +176,7 @@ interface JsAccountUpdate {
 interface JsStateSyncUpdate {
   blockNum: number;
   flattenedNewBlockHeaders: FlattenedU8Vec;
-  flattenedPartialBlockChainPeaks: FlattenedU8Vec;
+  newPeaks: Uint8Array;
   newBlockNums: number[];
   blockHasRelevantNotes: Uint8Array;
   serializedNodeIds: string[];
@@ -177,7 +196,7 @@ export async function applyStateSync(
   const {
     blockNum,
     flattenedNewBlockHeaders,
-    flattenedPartialBlockChainPeaks,
+    newPeaks,
     newBlockNums,
     blockHasRelevantNotes,
     serializedNodeIds,
@@ -190,9 +209,6 @@ export async function applyStateSync(
   } = stateUpdate;
 
   const newBlockHeaders = reconstructFlattenedVec(flattenedNewBlockHeaders);
-  const partialBlockchainPeaks = reconstructFlattenedVec(
-    flattenedPartialBlockChainPeaks
-  );
 
   const tablesToAccess = [
     db.stateSync,
@@ -295,7 +311,7 @@ export async function applyStateSync(
           })
         )
       ),
-      updateSyncHeight(tx, blockNum),
+      updateSyncHeight(tx, blockNum, newPeaks),
       updatePartialBlockchainNodes(tx, serializedNodeIds, serializedNodes),
       updateCommittedNoteTags(tx, committedNoteIds),
       Promise.all(
@@ -304,7 +320,6 @@ export async function applyStateSync(
             tx,
             newBlockNums[i],
             newBlockHeader,
-            partialBlockchainPeaks[i],
             blockHasRelevantNotes[i] == 1
           );
         })
@@ -313,7 +328,11 @@ export async function applyStateSync(
   });
 }
 
-async function updateSyncHeight(tx: Transaction, blockNum: number) {
+async function updateSyncHeight(
+  tx: Transaction,
+  blockNum: number,
+  newPeaks: Uint8Array
+) {
   try {
     // Only update if moving forward to prevent race conditions
     const current = await (
@@ -324,6 +343,7 @@ async function updateSyncHeight(tx: Transaction, blockNum: number) {
         tx as Transaction & { stateSync: Dexie.Table<IStateSync, number> }
       ).stateSync.update(1, {
         blockNum: blockNum,
+        partialBlockchainPeaks: newPeaks,
       });
     }
   } catch (error) {
@@ -335,14 +355,12 @@ async function updateBlockHeader(
   tx: Transaction,
   blockNum: number,
   blockHeader: Uint8Array,
-  partialBlockchainPeaks: Uint8Array,
   hasClientNotes: boolean
 ) {
   try {
     const data = {
       blockNum: blockNum,
       header: blockHeader,
-      partialBlockchainPeaks,
       hasClientNotes: hasClientNotes.toString(),
     };
 

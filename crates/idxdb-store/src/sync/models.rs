@@ -13,6 +13,14 @@ pub struct SyncHeightIdxdbObject {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PartialBlockchainPeaksIdxdbObject {
+    pub block_num: u32,
+    #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
+    pub peaks: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NoteTagIdxdbObject {
     #[serde(deserialize_with = "base64_to_vec_u8_required", default)]
     pub tag: Vec<u8>,

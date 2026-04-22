@@ -186,7 +186,11 @@ export class MidenDatabase {
         this.settings = this.dexie.table(Table.Settings);
         this.dexie.on("populate", () => {
             this.stateSync
-                .put({ id: 1, blockNum: 0 })
+                .put({
+                id: 1,
+                blockNum: 0,
+                partialBlockchainPeaks: new Uint8Array(),
+            })
                 .catch((err) => logWebStoreError(err, "Failed to populate DB"));
         });
     }

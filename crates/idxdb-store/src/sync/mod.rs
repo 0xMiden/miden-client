@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 
 use miden_client::Word;
 use miden_client::account::{AccountId, StorageMap, StorageSlotType};
+use miden_client::crypto::{Forest, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteId, NoteTag};
 use miden_client::store::StoreError;
 use miden_client::sync::{
@@ -30,13 +31,14 @@ use js_bindings::{
     JsStateSyncUpdate,
     idxdb_add_note_tag,
     idxdb_apply_state_sync,
+    idxdb_get_current_blockchain_peaks,
     idxdb_get_note_tags,
     idxdb_get_sync_height,
     idxdb_remove_note_tag,
 };
 
 mod models;
-use models::{NoteTagIdxdbObject, SyncHeightIdxdbObject};
+use models::{NoteTagIdxdbObject, PartialBlockchainPeaksIdxdbObject, SyncHeightIdxdbObject};
 
 mod flattened_vec;
 use flattened_vec::flatten_nested_u8_vec;
@@ -77,6 +79,20 @@ impl IdxdbStore {
             await_js(promise, "failed to get sync height").await?;
 
         Ok(block_num_idxdb.block_num.into())
+    }
+
+    pub(crate) async fn get_current_blockchain_peaks(&self) -> Result<MmrPeaks, StoreError> {
+        let promise = idxdb_get_current_blockchain_peaks(self.db_id());
+        let peaks_idxdb: PartialBlockchainPeaksIdxdbObject =
+            await_js(promise, "failed to get current blockchain peaks").await?;
+
+        if peaks_idxdb.peaks.is_empty() {
+            return Ok(MmrPeaks::new(Forest::empty(), Vec::new())?);
+        }
+
+        let mmr_peaks_nodes: Vec<Word> = Vec::<Word>::read_from_bytes(&peaks_idxdb.peaks)?;
+        MmrPeaks::new(Forest::new(peaks_idxdb.block_num as usize), mmr_peaks_nodes)
+            .map_err(StoreError::MmrError)
     }
 
     pub(super) async fn add_note_tag(&self, tag: NoteTagRecord) -> Result<bool, StoreError> {
@@ -123,6 +139,7 @@ impl IdxdbStore {
         let StateSyncUpdate {
             block_num,
             block_updates,
+            new_peaks,
             note_updates,
             transaction_updates,
             account_updates,
@@ -130,12 +147,13 @@ impl IdxdbStore {
 
         let (
             block_headers_as_bytes,
-            new_mmr_peaks_as_bytes,
             block_nums,
             block_has_relevant_notes,
             serialized_node_ids,
             serialized_nodes,
         ) = serialize_block_updates(&block_updates)?;
+
+        let new_peaks_bytes = new_peaks.peaks().to_vec().to_bytes();
 
         let (serialized_input_notes, serialized_output_notes): (Vec<_>, Vec<_>) = {
             let input_notes = note_updates.updated_input_notes();
@@ -292,7 +310,7 @@ impl IdxdbStore {
             block_num: block_num.as_u32(),
             flattened_new_block_headers: flatten_nested_u8_vec(block_headers_as_bytes),
             new_block_nums: block_nums,
-            flattened_partial_blockchain_peaks: flatten_nested_u8_vec(new_mmr_peaks_as_bytes),
+            new_peaks: new_peaks_bytes,
             block_has_relevant_notes,
             serialized_node_ids,
             serialized_nodes,
@@ -322,20 +340,17 @@ impl IdxdbStore {
     }
 }
 
-type SerializedBlockData =
-    (Vec<Vec<u8>>, Vec<Vec<u8>>, Vec<u32>, Vec<u8>, Vec<String>, Vec<String>);
+type SerializedBlockData = (Vec<Vec<u8>>, Vec<u32>, Vec<u8>, Vec<String>, Vec<String>);
 
 fn serialize_block_updates(
     block_updates: &BlockUpdates,
 ) -> Result<SerializedBlockData, StoreError> {
     let mut block_headers_as_bytes = Vec::new();
-    let mut new_mmr_peaks_as_bytes = Vec::new();
     let mut block_nums = Vec::new();
     let mut block_has_relevant_notes = Vec::new();
 
-    for (block_header, has_client_notes, mmr_peaks) in block_updates.block_headers() {
+    for (block_header, has_client_notes) in block_updates.block_headers() {
         block_headers_as_bytes.push(block_header.to_bytes());
-        new_mmr_peaks_as_bytes.push(mmr_peaks.peaks().to_vec().to_bytes());
         block_nums.push(block_header.block_num().as_u32());
         block_has_relevant_notes.push(u8::from(*has_client_notes));
     }
@@ -352,7 +367,6 @@ fn serialize_block_updates(
 
     Ok((
         block_headers_as_bytes,
-        new_mmr_peaks_as_bytes,
         block_nums,
         block_has_relevant_notes,
         serialized_node_ids,

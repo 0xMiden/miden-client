@@ -241,11 +241,9 @@ impl Store for IdxdbStore {
     async fn insert_block_header(
         &self,
         block_header: &BlockHeader,
-        partial_blockchain_peaks: MmrPeaks,
         has_client_notes: bool,
     ) -> Result<(), StoreError> {
-        self.insert_block_header(block_header, partial_blockchain_peaks, has_client_notes)
-            .await
+        self.insert_block_header(block_header, has_client_notes).await
     }
 
     async fn get_block_headers(
@@ -277,11 +275,8 @@ impl Store for IdxdbStore {
         self.insert_partial_blockchain_nodes(nodes).await
     }
 
-    async fn get_partial_blockchain_peaks_by_block_num(
-        &self,
-        block_num: BlockNumber,
-    ) -> Result<MmrPeaks, StoreError> {
-        self.get_partial_blockchain_peaks_by_block_num(block_num).await
+    async fn get_current_blockchain_peaks(&self) -> Result<MmrPeaks, StoreError> {
+        self.get_current_blockchain_peaks().await
     }
 
     async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError> {

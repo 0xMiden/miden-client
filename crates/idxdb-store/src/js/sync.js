@@ -38,6 +38,25 @@ export async function getSyncHeight(dbId) {
         logWebStoreError(error, "Error fetching sync height");
     }
 }
+export async function getCurrentBlockchainPeaks(dbId) {
+    try {
+        const db = getDatabase(dbId);
+        const record = await db.stateSync.get(1);
+        if (!record) {
+            return {
+                blockNum: 0,
+                peaks: uint8ArrayToBase64(new Uint8Array()),
+            };
+        }
+        return {
+            blockNum: record.blockNum,
+            peaks: uint8ArrayToBase64(record.partialBlockchainPeaks),
+        };
+    }
+    catch (error) {
+        logWebStoreError(error, "Error fetching current blockchain peaks");
+    }
+}
 export async function addNoteTag(dbId, tag, sourceNoteId, sourceAccountId) {
     try {
         const db = getDatabase(dbId);
@@ -72,9 +91,8 @@ export async function removeNoteTag(dbId, tag, sourceNoteId, sourceAccountId) {
 }
 export async function applyStateSync(dbId, stateUpdate) {
     const db = getDatabase(dbId);
-    const { blockNum, flattenedNewBlockHeaders, flattenedPartialBlockChainPeaks, newBlockNums, blockHasRelevantNotes, serializedNodeIds, serializedNodes, committedNoteIds, serializedInputNotes, serializedOutputNotes, accountUpdates, transactionUpdates, } = stateUpdate;
+    const { blockNum, flattenedNewBlockHeaders, newPeaks, newBlockNums, blockHasRelevantNotes, serializedNodeIds, serializedNodes, committedNoteIds, serializedInputNotes, serializedOutputNotes, accountUpdates, transactionUpdates, } = stateUpdate;
     const newBlockHeaders = reconstructFlattenedVec(flattenedNewBlockHeaders);
-    const partialBlockchainPeaks = reconstructFlattenedVec(flattenedPartialBlockChainPeaks);
     const tablesToAccess = [
         db.stateSync,
         db.inputNotes,
@@ -124,22 +142,23 @@ export async function applyStateSync(dbId, stateUpdate) {
                 accountCommitment: accountUpdate.accountCommitment,
                 accountSeed: accountUpdate.accountSeed,
             }))),
-            updateSyncHeight(tx, blockNum),
+            updateSyncHeight(tx, blockNum, newPeaks),
             updatePartialBlockchainNodes(tx, serializedNodeIds, serializedNodes),
             updateCommittedNoteTags(tx, committedNoteIds),
             Promise.all(newBlockHeaders.map((newBlockHeader, i) => {
-                return updateBlockHeader(tx, newBlockNums[i], newBlockHeader, partialBlockchainPeaks[i], blockHasRelevantNotes[i] == 1);
+                return updateBlockHeader(tx, newBlockNums[i], newBlockHeader, blockHasRelevantNotes[i] == 1);
             })),
         ]);
     });
 }
-async function updateSyncHeight(tx, blockNum) {
+async function updateSyncHeight(tx, blockNum, newPeaks) {
     try {
         // Only update if moving forward to prevent race conditions
         const current = await tx.stateSync.get(1);
         if (!current || current.blockNum < blockNum) {
             await tx.stateSync.update(1, {
                 blockNum: blockNum,
+                partialBlockchainPeaks: newPeaks,
             });
         }
     }
@@ -147,12 +166,11 @@ async function updateSyncHeight(tx, blockNum) {
         logWebStoreError(error, "Failed to update sync height");
     }
 }
-async function updateBlockHeader(tx, blockNum, blockHeader, partialBlockchainPeaks, hasClientNotes) {
+async function updateBlockHeader(tx, blockNum, blockHeader, hasClientNotes) {
     try {
         const data = {
             blockNum: blockNum,
             header: blockHeader,
-            partialBlockchainPeaks,
             hasClientNotes: hasClientNotes.toString(),
         };
         const existingBlockHeader = await tx.blockHeaders.get(blockNum);

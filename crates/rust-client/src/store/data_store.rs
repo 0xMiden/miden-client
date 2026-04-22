@@ -466,9 +466,13 @@ async fn build_partial_mmr_with_paths(
     authenticated_blocks: &[BlockHeader],
 ) -> Result<PartialMmr, DataStoreError> {
     let mut partial_mmr: PartialMmr = {
-        let current_peaks = store
-            .get_partial_blockchain_peaks_by_block_num(BlockNumber::from(forest))
-            .await?;
+        let current_peaks = store.get_current_blockchain_peaks().await?;
+
+        debug_assert_eq!(
+            u32::try_from(current_peaks.forest().num_leaves()).ok(),
+            Some(forest),
+            "peaks forest must match the requested ref_block (peaks are only persisted at the current sync height)",
+        );
 
         PartialMmr::from_peaks(current_peaks)
     };

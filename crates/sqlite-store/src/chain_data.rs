@@ -21,13 +21,11 @@ use crate::{insert_sql, subst};
 struct SerializedBlockHeaderData {
     block_num: u32,
     header: Vec<u8>,
-    partial_blockchain_peaks: Vec<u8>,
     has_client_notes: bool,
 }
 struct SerializedBlockHeaderParts {
     _block_num: u64,
     header: Vec<u8>,
-    _partial_blockchain_peaks: Vec<u8>,
     has_client_notes: bool,
 }
 
@@ -44,17 +42,11 @@ impl SqliteStore {
     pub(crate) fn insert_block_header(
         conn: &mut Connection,
         block_header: &BlockHeader,
-        partial_blockchain_peaks: &MmrPeaks,
         has_client_notes: bool,
     ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
 
-        Self::insert_block_header_tx(
-            &tx,
-            block_header,
-            partial_blockchain_peaks,
-            has_client_notes,
-        )?;
+        Self::insert_block_header_tx(&tx, block_header, has_client_notes)?;
 
         tx.commit().into_store_error()?;
         Ok(())
@@ -69,7 +61,7 @@ impl SqliteStore {
             .map(|block_number| Value::Integer(i64::from(block_number.as_u32())))
             .collect::<Vec<Value>>();
 
-        const QUERY: &str = "SELECT block_num, header, partial_blockchain_peaks, has_client_notes FROM block_headers WHERE block_num IN rarray(?)";
+        const QUERY: &str = "SELECT block_num, header, has_client_notes FROM block_headers WHERE block_num IN rarray(?)";
 
         conn.prepare(QUERY)
             .into_store_error()?
@@ -86,7 +78,7 @@ impl SqliteStore {
     pub(crate) fn get_tracked_block_headers(
         conn: &mut Connection,
     ) -> Result<Vec<BlockHeader>, StoreError> {
-        const QUERY: &str = "SELECT block_num, header, partial_blockchain_peaks, has_client_notes FROM block_headers WHERE has_client_notes=true";
+        const QUERY: &str = "SELECT block_num, header, has_client_notes FROM block_headers WHERE has_client_notes=true";
         conn.prepare(QUERY)
             .into_store_error()?
             .query_map(params![], parse_block_headers_columns)
@@ -153,25 +145,24 @@ impl SqliteStore {
         }
     }
 
-    pub(crate) fn get_partial_blockchain_peaks_by_block_num(
+    pub(crate) fn get_current_blockchain_peaks(
         conn: &mut Connection,
-        block_num: BlockNumber,
     ) -> Result<MmrPeaks, StoreError> {
-        const QUERY: &str =
-            "SELECT partial_blockchain_peaks FROM block_headers WHERE block_num = ?";
+        const QUERY: &str = "SELECT block_num, partial_blockchain_peaks FROM state_sync LIMIT 1";
 
-        let partial_blockchain_peaks: Option<Vec<u8>> = conn
+        let row: Option<(u32, Vec<u8>)> = conn
             .prepare(QUERY)
             .into_store_error()?
-            .query_row(params![block_num.as_u32()], |row| row.get::<_, Vec<u8>>(0))
+            .query_row(params![], |row| Ok((row.get(0)?, row.get(1)?)))
             .optional()
             .into_store_error()?;
 
-        if let Some(partial_blockchain_peaks) = partial_blockchain_peaks {
-            return parse_partial_blockchain_peaks(block_num.as_u32(), &partial_blockchain_peaks);
+        match row {
+            Some((block_num, peaks_bytes)) if !peaks_bytes.is_empty() => {
+                parse_partial_blockchain_peaks(block_num, &peaks_bytes)
+            },
+            _ => Ok(MmrPeaks::new(Forest::empty(), vec![])?),
         }
-
-        Ok(MmrPeaks::new(Forest::empty(), vec![])?)
     }
 
     pub fn insert_partial_blockchain_nodes(
@@ -203,25 +194,13 @@ impl SqliteStore {
     pub(crate) fn insert_block_header_tx(
         tx: &Transaction<'_>,
         block_header: &BlockHeader,
-        partial_blockchain_peaks: &MmrPeaks,
         has_client_notes: bool,
     ) -> Result<(), StoreError> {
-        let partial_blockchain_peaks = partial_blockchain_peaks.peaks().to_vec();
-        let SerializedBlockHeaderData {
-            block_num,
-            header,
-            partial_blockchain_peaks,
-            has_client_notes,
-        } = serialize_block_header(block_header, &partial_blockchain_peaks, has_client_notes);
-        const QUERY: &str = insert_sql!(
-            block_headers {
-                block_num,
-                header,
-                partial_blockchain_peaks,
-                has_client_notes,
-            } | IGNORE
-        );
-        tx.execute(QUERY, params![block_num, header, partial_blockchain_peaks, has_client_notes])
+        let SerializedBlockHeaderData { block_num, header, has_client_notes } =
+            serialize_block_header(block_header, has_client_notes);
+        const QUERY: &str =
+            insert_sql!(block_headers { block_num, header, has_client_notes } | IGNORE);
+        tx.execute(QUERY, params![block_num, header, has_client_notes])
             .into_store_error()?;
 
         set_block_header_has_client_notes(tx, u64::from(block_num), has_client_notes)?;
@@ -300,17 +279,14 @@ fn parse_partial_blockchain_peaks(forest: u32, peaks_nodes: &[u8]) -> Result<Mmr
 
 fn serialize_block_header(
     block_header: &BlockHeader,
-    partial_blockchain_peaks: &[Word],
     has_client_notes: bool,
 ) -> SerializedBlockHeaderData {
     let block_num = block_header.block_num();
     let header = block_header.to_bytes();
-    let partial_blockchain_peaks = partial_blockchain_peaks.to_bytes();
 
     SerializedBlockHeaderData {
         block_num: block_num.as_u32(),
         header,
-        partial_blockchain_peaks,
         has_client_notes,
     }
 }
@@ -320,13 +296,11 @@ fn parse_block_headers_columns(
 ) -> Result<SerializedBlockHeaderParts, rusqlite::Error> {
     let block_num: u32 = row.get(0)?;
     let header: Vec<u8> = row.get(1)?;
-    let partial_blockchain_peaks: Vec<u8> = row.get(2)?;
-    let has_client_notes: bool = row.get(3)?;
+    let has_client_notes: bool = row.get(2)?;
 
     Ok(SerializedBlockHeaderParts {
         _block_num: u64::from(block_num),
         header,
-        _partial_blockchain_peaks: partial_blockchain_peaks,
         has_client_notes,
     })
 }
@@ -394,6 +368,7 @@ mod test {
     use miden_client::block::BlockHeader;
     use miden_client::crypto::{Forest, InOrderIndex, MmrPeaks};
     use miden_client::store::Store;
+    use miden_client::utils::Serializable;
     use miden_protocol::crypto::merkle::mmr::Mmr;
     use miden_protocol::transaction::TransactionKernel;
     use rusqlite::params;
@@ -412,12 +387,10 @@ mod test {
         store
             .interact_with_connection(move |conn| {
                 let tx = conn.transaction().unwrap();
-                let dummy_peaks = MmrPeaks::new(Forest::empty(), Vec::new()).unwrap();
                 (0..5).for_each(|block_num| {
                     SqliteStore::insert_block_header_tx(
                         &tx,
                         &block_headers_clone[block_num],
-                        &dummy_peaks,
                         false,
                     )
                     .unwrap();
@@ -511,15 +484,9 @@ mod test {
         store
             .interact_with_connection(move |conn| {
                 let tx = conn.transaction().unwrap();
-                for block_num in 0..TOTAL_BLOCKS {
+                for (block_num, block_header) in block_headers.iter().enumerate() {
                     let has_notes = tracked_set.contains(&block_num);
-                    SqliteStore::insert_block_header_tx(
-                        &tx,
-                        &block_headers[block_num],
-                        &peaks_by_block[block_num],
-                        has_notes,
-                    )
-                    .unwrap();
+                    SqliteStore::insert_block_header_tx(&tx, block_header, has_notes).unwrap();
                 }
 
                 SqliteStore::insert_partial_blockchain_nodes_tx(&tx, &tracked_nodes).unwrap();
@@ -542,12 +509,16 @@ mod test {
         let mut previous_remaining: Option<i64> = None;
         for height in prune_heights {
             let height_i64 = i64::try_from(height).expect("fits in i64");
+            let peaks_bytes = peaks_by_block[height].peaks().to_vec().to_bytes();
 
-            // Update sync height to simulate having synced further
+            // Update sync height (and the matching MMR peaks) to simulate having synced further
             store
                 .interact_with_connection(move |conn| {
-                    conn.execute("UPDATE state_sync SET block_num = ?", params![height_i64])
-                        .unwrap();
+                    conn.execute(
+                        "UPDATE state_sync SET block_num = ?, partial_blockchain_peaks = ?",
+                        params![height_i64, peaks_bytes],
+                    )
+                    .unwrap();
                     Ok(())
                 })
                 .await

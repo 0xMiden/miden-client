@@ -5,7 +5,6 @@ export async function insertBlockHeader(
   dbId: string,
   blockNum: number,
   header: Uint8Array,
-  partialBlockchainPeaks: Uint8Array,
   hasClientNotes: boolean
 ) {
   try {
@@ -13,24 +12,13 @@ export async function insertBlockHeader(
     const data = {
       blockNum: blockNum,
       header,
-      partialBlockchainPeaks,
       hasClientNotes: hasClientNotes.toString(),
     };
 
-    // Mirror SQLite's `insert_block_header_tx`: do an INSERT OR IGNORE on the
-    // row, then explicitly upgrade `has_client_notes` to true if the caller
-    // says so. Two callers hit this:
-    //   - Genesis flow — no existing row; the add succeeds.
-    //   - `get_and_store_authenticated_block` for a past block — a row
-    //     written by `applyStateSync` typically already exists. Overwriting
-    //     it would clobber the correct historical peaks (popcount ==
-    //     block_num) with peaks from the caller's current `PartialMmr`
-    //     forest (popcount == current sync height). Later reads of those
-    //     peaks trip `MmrPeaks::new`'s InvalidPeaks validation and wedge
-    //     sync for the rest of the session.
-    //
-    // The `has_client_notes` upgrade is load-bearing: `get_tracked_block_
-    // header_numbers` filters by this flag to seed `tracked_leaves`, which
+    // Mirror SQLite's `insert_block_header_tx`: INSERT OR IGNORE, then
+    // upgrade `has_client_notes` to true if the caller says so. The flag
+    // upgrade is load-bearing: `get_tracked_block_header_numbers` filters
+    // by this flag to seed `tracked_leaves`, which
     // `get_partial_blockchain_nodes(Forest)` relies on. A private-note
     // import at a block previously synced as irrelevant must flip the flag
     // to true or the auth paths won't be tracked.
@@ -91,14 +79,10 @@ export async function getBlockHeaders(dbId: string, blockNumbers: number[]) {
           return null;
         } else {
           const headerBase64 = uint8ArrayToBase64(result.header);
-          const partialBlockchainPeaksBase64 = uint8ArrayToBase64(
-            result.partialBlockchainPeaks
-          );
 
           return {
             blockNum: result.blockNum,
             header: headerBase64,
-            partialBlockchainPeaks: partialBlockchainPeaksBase64,
             hasClientNotes: result.hasClientNotes === "true",
           };
         }
@@ -123,14 +107,9 @@ export async function getTrackedBlockHeaders(dbId: string) {
       allMatchingRecords.map((record) => {
         const headerBase64 = uint8ArrayToBase64(record.header);
 
-        const partialBlockchainPeaksBase64 = uint8ArrayToBase64(
-          record.partialBlockchainPeaks
-        );
-
         return {
           blockNum: record.blockNum,
           header: headerBase64,
-          partialBlockchainPeaks: partialBlockchainPeaksBase64,
           hasClientNotes: record.hasClientNotes === "true",
         };
       })
@@ -152,30 +131,6 @@ export async function getTrackedBlockHeaderNumbers(dbId: string) {
     return blockNums;
   } catch (err) {
     logWebStoreError(err, "Failed to get tracked block header numbers");
-  }
-}
-
-export async function getPartialBlockchainPeaksByBlockNum(
-  dbId: string,
-  blockNum: number
-) {
-  try {
-    const db = getDatabase(dbId);
-    const blockHeader = await db.blockHeaders.get(blockNum);
-    if (blockHeader == undefined) {
-      return {
-        peaks: undefined,
-      };
-    }
-    const partialBlockchainPeaksBase64 = uint8ArrayToBase64(
-      blockHeader.partialBlockchainPeaks
-    );
-
-    return {
-      peaks: partialBlockchainPeaksBase64,
-    };
-  } catch (err) {
-    logWebStoreError(err, "Failed to get partial blockchain peaks");
   }
 }
 
