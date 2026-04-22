@@ -866,17 +866,16 @@ class WebClient {
   async syncStateWithTimeout(timeoutMs = 0) {
     // Use storeName as the database ID for lock coordination
     const dbId = this.storeName || "default";
+    const methodId = MethodName.SYNC_STATE;
 
     try {
-      // Acquire the sync lock (coordinates concurrent calls)
-      const lockHandle = await acquireSyncLock(dbId, timeoutMs);
+      const lockHandle = await acquireSyncLock(dbId, methodId, timeoutMs);
 
       if (!lockHandle.acquired) {
-        // We're coalescing - return the result from the in-progress sync
+        // Coalesced with an in-progress syncState — share its result
         return lockHandle.coalescedResult;
       }
 
-      // We acquired the lock - perform the sync
       try {
         let result;
         if (!this.worker) {
@@ -884,24 +883,100 @@ class WebClient {
           result = await wasmWebClient.syncStateImpl();
         } else {
           const wasm = await getWasmOrThrow();
-          const serializedSyncSummaryBytes = await this.callMethodWithWorker(
-            MethodName.SYNC_STATE
-          );
+          const serializedSyncSummaryBytes =
+            await this.callMethodWithWorker(methodId);
           result = wasm.SyncSummary.deserialize(
             new Uint8Array(serializedSyncSummaryBytes)
           );
         }
 
-        // Release the lock with the result
-        releaseSyncLock(dbId, result);
+        releaseSyncLock(dbId, methodId, result);
         return result;
       } catch (error) {
-        // Release the lock with the error
-        releaseSyncLockWithError(dbId, error);
+        releaseSyncLockWithError(dbId, methodId, error);
         throw error;
       }
     } catch (error) {
       console.error("INDEX.JS: Error in syncState:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Fetches private notes from the Note Transport Layer.
+   *
+   * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
+   * @returns {Promise<void>}
+   */
+  async syncNoteTransport(timeoutMs = 0) {
+    const dbId = this.storeName || "default";
+    const methodId = MethodName.SYNC_NOTE_TRANSPORT;
+
+    try {
+      const lockHandle = await acquireSyncLock(dbId, methodId, timeoutMs);
+
+      if (!lockHandle.acquired) {
+        return lockHandle.coalescedResult;
+      }
+
+      try {
+        if (!this.worker) {
+          const wasmWebClient = await this.getWasmWebClient();
+          await wasmWebClient.syncNoteTransportImpl();
+        } else {
+          await this.callMethodWithWorker(methodId);
+        }
+
+        releaseSyncLock(dbId, methodId, undefined);
+      } catch (error) {
+        releaseSyncLockWithError(dbId, methodId, error);
+        throw error;
+      }
+    } catch (error) {
+      console.error("INDEX.JS: Error in syncNoteTransport:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Runs {@link syncState} followed by {@link syncNoteTransport}, failing fast on either.
+   *
+   * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
+   * @returns {Promise<SyncSummary>}
+   */
+  async syncAll(timeoutMs = 0) {
+    const dbId = this.storeName || "default";
+    const methodId = MethodName.SYNC_ALL;
+
+    try {
+      const lockHandle = await acquireSyncLock(dbId, methodId, timeoutMs);
+
+      if (!lockHandle.acquired) {
+        return lockHandle.coalescedResult;
+      }
+
+      try {
+        let result;
+        if (!this.worker) {
+          const wasmWebClient = await this.getWasmWebClient();
+          result = await wasmWebClient.syncAllImpl();
+        } else {
+          const wasm = await getWasmOrThrow();
+          const serializedSyncSummaryBytes =
+            await this.callMethodWithWorker(methodId);
+          result = wasm.SyncSummary.deserialize(
+            new Uint8Array(serializedSyncSummaryBytes)
+          );
+        }
+
+        releaseSyncLock(dbId, methodId, result);
+        return result;
+      } catch (error) {
+        releaseSyncLockWithError(dbId, methodId, error);
+        throw error;
+      }
+    } catch (error) {
+      console.error("INDEX.JS: Error in syncAll:", error);
       throw error;
     }
   }
@@ -1001,9 +1076,10 @@ class MockWebClient extends WebClient {
    */
   async syncStateWithTimeout(timeoutMs = 0) {
     const dbId = this.storeName || "mock";
+    const methodId = MethodName.SYNC_STATE;
 
     try {
-      const lockHandle = await acquireSyncLock(dbId, timeoutMs);
+      const lockHandle = await acquireSyncLock(dbId, methodId, timeoutMs);
 
       if (!lockHandle.acquired) {
         return lockHandle.coalescedResult;
@@ -1035,10 +1111,10 @@ class MockWebClient extends WebClient {
           );
         }
 
-        releaseSyncLock(dbId, result);
+        releaseSyncLock(dbId, methodId, result);
         return result;
       } catch (error) {
-        releaseSyncLockWithError(dbId, error);
+        releaseSyncLockWithError(dbId, methodId, error);
         throw error;
       }
     } catch (error) {

@@ -168,6 +168,46 @@ Syncs the client state with the Miden node.
 
 ***
 
+### syncAll()
+
+> **syncAll**(`options?`): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+Runs [sync](#sync) followed by [syncNoteTransport](#syncnotetransport), failing fast on either.
+
+#### Parameters
+
+##### options?
+
+###### timeout?
+
+`number`
+
+#### Returns
+
+`Promise`\<[`SyncSummary`](SyncSummary.md)\>
+
+***
+
+### syncNoteTransport()
+
+> **syncNoteTransport**(`options?`): `Promise`\<`void`\>
+
+Fetches private notes from the Note Transport Layer.
+
+#### Parameters
+
+##### options?
+
+###### timeout?
+
+`number`
+
+#### Returns
+
+`Promise`\<`void`\>
+
+***
+
 ### terminate()
 
 > **terminate**(): `void`

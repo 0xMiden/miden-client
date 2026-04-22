@@ -55,7 +55,6 @@
 //! `committed_note_updates` and `consumed_note_updates`) to understand how the sync data is
 //! processed and applied to the local store.
 
-use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::max;
@@ -66,7 +65,7 @@ use miden_protocol::note::NoteId;
 use miden_protocol::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::serde::{Deserializable, DeserializationError, Serializable};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::{Client, ClientError};
@@ -100,8 +99,8 @@ where
         self.store.get_sync_height().await.map_err(Into::into)
     }
 
-    /// Syncs the client's state with the current state of the Miden network and returns a
-    /// [`SyncSummary`] corresponding to the local state update.
+    /// Syncs the client's on-chain state with the current state of the Miden network and returns
+    /// a [`SyncSummary`] corresponding to the local state update.
     ///
     /// The sync process is done in multiple steps:
     /// 1. A request is sent to the node to get the state updates. This request includes tracked
@@ -123,25 +122,6 @@ where
         self.ensure_genesis_in_place().await?;
         self.ensure_rpc_limits_in_place().await?;
 
-        // Note Transport update
-        // TODO We can run both sync_state, fetch_transport_notes futures in parallel
-        let ntl_error = if self.is_note_transport_enabled() {
-            let cursor = self.store.get_note_transport_cursor().await?;
-            let note_tags = self.store.get_unique_note_tags().await?;
-            match self.fetch_transport_notes(cursor, note_tags).await {
-                Ok(()) => None,
-                Err(ClientError::NoteTransportError(ntl_err)) => {
-                    warn!(
-                        "Note transport fetch failed, continuing sync without private notes: {ntl_err}"
-                    );
-                    Some(ntl_err.to_string())
-                },
-                Err(other) => return Err(other),
-            }
-        } else {
-            None
-        };
-
         // Build sync state components
         let note_screener = self.note_screener();
         let state_sync = StateSync::new(
@@ -156,8 +136,7 @@ where
         // Get the sync update from the network
         let state_sync_update = state_sync.sync_state(&mut current_partial_mmr, input).await?;
 
-        let mut sync_summary: SyncSummary = (&state_sync_update).into();
-        sync_summary.ntl_error = ntl_error;
+        let sync_summary: SyncSummary = (&state_sync_update).into();
         debug!(sync_summary = ?sync_summary, "Sync summary computed");
         info!("Applying changes to the store.");
 
@@ -171,6 +150,28 @@ where
         self.store.prune_irrelevant_blocks().await?;
 
         Ok(sync_summary)
+    }
+
+    /// Fetches private notes from the Note Transport Layer for the tracked note tags.
+    ///
+    /// No-op if note transport is disabled.
+    pub async fn sync_note_transport(&mut self) -> Result<(), ClientError> {
+        if !self.is_note_transport_enabled() {
+            return Ok(());
+        }
+
+        let cursor = self.store.get_note_transport_cursor().await?;
+        let note_tags = self.store.get_unique_note_tags().await?;
+        self.fetch_transport_notes(cursor, note_tags).await
+    }
+
+    /// Runs [`Client::sync_state`] followed by [`Client::sync_note_transport`], failing fast on
+    /// the first error.
+    pub async fn sync_all(&mut self) -> Result<SyncSummary, ClientError> {
+        // TODO: run in parallel.
+        let summary = self.sync_state().await?;
+        self.sync_note_transport().await?;
+        Ok(summary)
     }
 
     /// Builds a default [`StateSyncInput`] from the current client state.
@@ -248,9 +249,6 @@ pub struct SyncSummary {
     pub locked_accounts: Vec<AccountId>,
     /// IDs of committed transactions.
     pub committed_transactions: Vec<TransactionId>,
-    /// Error message from the Note Transport Layer if its fetch failed during the sync.
-    /// `None` means NTL was either disabled or succeeded.
-    pub ntl_error: Option<String>,
 }
 
 impl SyncSummary {
@@ -271,7 +269,6 @@ impl SyncSummary {
             updated_accounts,
             locked_accounts,
             committed_transactions,
-            ntl_error: None,
         }
     }
 
@@ -284,7 +281,6 @@ impl SyncSummary {
             updated_accounts: vec![],
             locked_accounts: vec![],
             committed_transactions: vec![],
-            ntl_error: None,
         }
     }
 
@@ -305,9 +301,6 @@ impl SyncSummary {
         self.updated_accounts.append(&mut other.updated_accounts);
         self.locked_accounts.append(&mut other.locked_accounts);
         self.committed_transactions.append(&mut other.committed_transactions);
-        if self.ntl_error.is_none() {
-            self.ntl_error = other.ntl_error;
-        }
     }
 }
 
@@ -320,7 +313,6 @@ impl Serializable for SyncSummary {
         self.updated_accounts.write_into(target);
         self.locked_accounts.write_into(target);
         self.committed_transactions.write_into(target);
-        self.ntl_error.write_into(target);
     }
 }
 
@@ -335,7 +327,6 @@ impl Deserializable for SyncSummary {
         let updated_accounts = Vec::<AccountId>::read_from(source)?;
         let locked_accounts = Vec::<AccountId>::read_from(source)?;
         let committed_transactions = Vec::<TransactionId>::read_from(source)?;
-        let ntl_error = Option::<String>::read_from(source)?;
 
         Ok(Self {
             block_num,
@@ -345,7 +336,6 @@ impl Deserializable for SyncSummary {
             updated_accounts,
             locked_accounts,
             committed_transactions,
-            ntl_error,
         })
     }
 }

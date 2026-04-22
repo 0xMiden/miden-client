@@ -935,6 +935,10 @@ export declare class MidenClient {
 
   /** Syncs the client state with the Miden node. */
   sync(options?: { timeout?: number }): Promise<SyncSummary>;
+  /** Fetches private notes from the Note Transport Layer. */
+  syncNoteTransport(options?: { timeout?: number }): Promise<void>;
+  /** Runs {@link sync} followed by {@link syncNoteTransport}, failing fast on either. */
+  syncAll(options?: { timeout?: number }): Promise<SyncSummary>;
   /** Returns the current sync height. */
   getSyncHeight(): Promise<number>;
   /** Returns the client-level default prover. */

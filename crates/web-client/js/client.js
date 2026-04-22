@@ -189,6 +189,30 @@ export class MidenClient {
   }
 
   /**
+   * Fetches private notes from the Note Transport Layer.
+   *
+   * @param {object} [opts] - Options.
+   * @param {number} [opts.timeout] - Timeout in milliseconds (0 = no timeout).
+   * @returns {Promise<void>}
+   */
+  async syncNoteTransport(opts) {
+    this.assertNotTerminated();
+    return await this.#inner.syncNoteTransport(opts?.timeout ?? 0);
+  }
+
+  /**
+   * Runs {@link sync} followed by {@link syncNoteTransport}, failing fast on either.
+   *
+   * @param {object} [opts] - Options.
+   * @param {number} [opts.timeout] - Timeout in milliseconds (0 = no timeout).
+   * @returns {Promise<SyncSummary>}
+   */
+  async syncAll(opts) {
+    this.assertNotTerminated();
+    return await this.#inner.syncAll(opts?.timeout ?? 0);
+  }
+
+  /**
    * Returns the current sync height.
    *
    * @returns {Promise<number>} The current sync height.

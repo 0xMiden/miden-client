@@ -164,6 +164,14 @@ const methodHandlers = {
     const serializedSyncSummary = syncSummary.serialize();
     return serializedSyncSummary.buffer;
   },
+  [MethodName.SYNC_NOTE_TRANSPORT]: async () => {
+    await wasmWebClient.syncNoteTransportImpl();
+  },
+  [MethodName.SYNC_ALL]: async () => {
+    const syncSummary = await wasmWebClient.syncAllImpl();
+    const serializedSyncSummary = syncSummary.serialize();
+    return serializedSyncSummary.buffer;
+  },
   [MethodName.APPLY_TRANSACTION]: async (args) => {
     const wasm = await getWasmOrThrow();
     const [serializedTransactionResult, submissionHeight] = args;

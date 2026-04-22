@@ -43,13 +43,6 @@ impl SyncSummary {
         self.0.committed_transactions.iter().map(Into::into).collect()
     }
 
-    /// Returns the Note Transport Layer error message if its fetch failed during the sync,
-    /// or `undefined` if NTL was disabled or succeeded.
-    #[js_export(js_name = "ntlError")]
-    pub fn ntl_error(&self) -> Option<String> {
-        self.0.ntl_error.clone()
-    }
-
     /// Serializes the sync summary into bytes.
     pub fn serialize(&self) -> JsBytes {
         serialize_to_bytes(&self.0)

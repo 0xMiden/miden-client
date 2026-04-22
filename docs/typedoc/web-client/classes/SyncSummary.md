@@ -78,19 +78,6 @@ Returns IDs of notes that were consumed.
 
 ***
 
-### ntlError()
-
-> **ntlError**(): `string`
-
-Returns the Note Transport Layer error message if its fetch failed during the sync,
-or `undefined` if NTL was disabled or succeeded.
-
-#### Returns
-
-`string`
-
-***
-
 ### serialize()
 
 > **serialize**(): `Uint8Array`

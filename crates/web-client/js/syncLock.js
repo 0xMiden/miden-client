@@ -1,14 +1,16 @@
 /**
  * Sync Lock Module
  *
- * Provides coordination for concurrent syncState() calls using the Web Locks API
- * with an in-process mutex fallback for older browsers.
+ * Coordinates concurrent sync calls using the Web Locks API with an in-process
+ * mutex fallback for older browsers.
  *
  * Behavior:
- * - Uses "coalescing": if a sync is in progress, subsequent callers wait and receive
- *   the same result
+ * - Same-method coalescing: if a sync of the same method is in progress,
+ *   subsequent callers wait and receive the same result
+ * - Different-method serialization: different methods (e.g. syncState vs
+ *   syncNoteTransport) do not coalesce; the later call waits for the earlier
+ *   to finish, then runs on its own
  * - Web Locks for cross-tab coordination (Chrome 69+, Safari 15.4+)
- * - In-process mutex fallback when Web Locks unavailable
  * - Optional timeout support
  */
 
@@ -24,15 +26,19 @@ export function hasWebLocks() {
 }
 
 /**
- * Internal state for tracking in-progress syncs and waiters per database.
+ * Per-(dbId, methodId) coalesce state. Each method tracks its own in-flight
+ * call so same-method callers share results while different-method callers
+ * serialize.
  */
 const syncStates = new Map();
 
-/**
- * Get or create sync state for a database.
- */
-function getSyncState(dbId) {
-  let state = syncStates.get(dbId);
+function coalesceKey(dbId, methodId) {
+  return `${dbId}:${methodId}`;
+}
+
+function getSyncState(dbId, methodId) {
+  const key = coalesceKey(dbId, methodId);
+  let state = syncStates.get(key);
   if (!state) {
     state = {
       inProgress: false,
@@ -42,29 +48,29 @@ function getSyncState(dbId) {
       releaseLock: null,
       syncGeneration: 0,
     };
-    syncStates.set(dbId, state);
+    syncStates.set(key, state);
   }
   return state;
 }
 
 /**
- * Acquire a sync lock for the given database.
+ * Acquire a sync lock for (dbId, methodId).
  *
- * If a sync is already in progress:
- * - Returns { acquired: false, coalescedResult } after waiting for the result
+ * If a sync of the same method is already in progress, the caller waits and
+ * receives the same result (coalescing). If a sync of a different method is
+ * in progress, the caller waits for it to release, then acquires the lock
+ * and runs its own work.
  *
- * If no sync is in progress:
- * - Returns { acquired: true } and the caller should perform the sync,
- *   then call releaseSyncLock() or releaseSyncLockWithError()
- *
- * @param {string} dbId - The database ID to lock
+ * @param {string} dbId - Database ID (scopes the lock across methods and tabs)
+ * @param {string} methodId - Method identifier (see MethodName constants)
  * @param {number} timeoutMs - Optional timeout in milliseconds (0 = no timeout)
  * @returns {Promise<{acquired: boolean, coalescedResult?: any}>}
  */
-export async function acquireSyncLock(dbId, timeoutMs = 0) {
-  const state = getSyncState(dbId);
+export async function acquireSyncLock(dbId, methodId, timeoutMs = 0) {
+  const state = getSyncState(dbId, methodId);
 
-  // If a sync is already in progress, wait for it to complete (coalescing)
+  // Same-method coalescing: a sync of this method is already running, so wait
+  // for its result instead of starting another one.
   if (state.inProgress) {
     return new Promise((resolve, reject) => {
       let timeoutId;
@@ -92,14 +98,16 @@ export async function acquireSyncLock(dbId, timeoutMs = 0) {
     });
   }
 
-  // Mark sync as in progress and increment generation
+  // Mark this method as in progress and increment generation
   state.inProgress = true;
   state.result = null;
   state.error = null;
   state.syncGeneration++;
   const currentGeneration = state.syncGeneration;
 
-  // Try to acquire Web Lock if available
+  // Try to acquire Web Lock if available. The Web Lock is keyed by `dbId`
+  // (not the method) so it serializes across methods within a tab and across
+  // tabs.
   if (hasWebLocks()) {
     const lockName = `miden-sync-${dbId}`;
 
@@ -144,7 +152,9 @@ export async function acquireSyncLock(dbId, timeoutMs = 0) {
         });
     });
   } else {
-    // Fallback: no Web Locks, just use in-process state
+    // Fallback: no Web Locks. The WASM-level mutex inside the Client already
+    // serializes across methods within a tab, so we don't need an additional
+    // in-process JS mutex — `inProgress` just gates same-method coalescing.
     return { acquired: true };
   }
 }
@@ -152,13 +162,14 @@ export async function acquireSyncLock(dbId, timeoutMs = 0) {
 /**
  * Release the sync lock with a successful result.
  *
- * This notifies all waiting callers with the result and releases the lock.
+ * Notifies all same-method waiters with the result and releases the Web Lock.
  *
- * @param {string} dbId - The database ID
- * @param {any} result - The sync result to pass to waiters
+ * @param {string} dbId - Database ID
+ * @param {string} methodId - Method identifier (must match the acquire call)
+ * @param {any} result - Sync result to pass to waiters
  */
-export function releaseSyncLock(dbId, result) {
-  const state = getSyncState(dbId);
+export function releaseSyncLock(dbId, methodId, result) {
+  const state = getSyncState(dbId, methodId);
 
   if (!state.inProgress) {
     console.warn("releaseSyncLock called but no sync was in progress");
@@ -182,13 +193,14 @@ export function releaseSyncLock(dbId, result) {
 /**
  * Release the sync lock due to an error.
  *
- * This notifies all waiting callers that the sync failed.
+ * Notifies all same-method waiters that the sync failed.
  *
- * @param {string} dbId - The database ID
- * @param {Error} error - The error to pass to waiters
+ * @param {string} dbId - Database ID
+ * @param {string} methodId - Method identifier (must match the acquire call)
+ * @param {Error} error - Error to pass to waiters
  */
-export function releaseSyncLockWithError(dbId, error) {
-  const state = getSyncState(dbId);
+export function releaseSyncLockWithError(dbId, methodId, error) {
+  const state = getSyncState(dbId, methodId);
 
   if (!state.inProgress) {
     console.warn("releaseSyncLockWithError called but no sync was in progress");
