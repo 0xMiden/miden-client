@@ -24,6 +24,7 @@ miden-client-sqlite-store = { workspace = true }
 
 # External dependencies
 anyhow             = { features = ["std"], workspace = true }
+assert_matches     = { version = "1.5.0" }
 async-trait        = { workspace = true }
 clap               = { features = ["derive", "env"], version = "4.0" }
 num_cpus           = { version = "1.0" }
