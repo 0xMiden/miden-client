@@ -207,7 +207,7 @@ where
     /// `PartialMmr` to determine which authentication nodes are no longer needed, then delegates
     /// to [`Store::untrack_and_prune_irrelevant_blocks`] to atomically remove the stale nodes,
     /// mark the blocks as irrelevant, and delete irrelevant block headers.
-    /// Any caller of this function should've cached the PartialMMR beforehand.
+    /// Any caller of this function should've cached the `PartialMmr` beforehand.
     async fn untrack_and_prune_irrelevant_blocks(&mut self) -> Result<(), ClientError> {
         let tracked_blocks = self.store.get_tracked_block_header_numbers().await?;
         if tracked_blocks.is_empty() {
