@@ -62,7 +62,7 @@ use core::cmp::max;
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockNumber;
-use miden_protocol::crypto::merkle::mmr::{InOrderIndex, PartialMmr};
+use miden_protocol::crypto::merkle::mmr::InOrderIndex;
 use miden_protocol::note::NoteId;
 use miden_protocol::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
@@ -152,11 +152,10 @@ where
             .await
             .map_err(ClientError::StoreError)?;
 
-        // Prune irrelevant blocks and their MMR authentication nodes.
-        self.untrack_and_prune_irrelevant_blocks(&mut partial_mmr).await?;
-
-        // Put the fully updated MMR back into the cache.
+        // Cache MMR so pruning can reuse in-memory MMR.
         self.cache_partial_mmr(partial_mmr).await?;
+
+        self.untrack_and_prune_irrelevant_blocks().await?;
 
         Ok(sync_summary)
     }
@@ -197,25 +196,19 @@ where
     pub async fn apply_state_sync(&mut self, update: StateSyncUpdate) -> Result<(), ClientError> {
         self.store.apply_state_sync(update).await?;
 
-        // Prune irrelevant blocks (will rebuild the MMR from the now-updated store, since the
-        // cached fingerprint no longer matches the store peaks).
-        let mut partial_mmr = self.get_current_partial_mmr().await?;
-        self.untrack_and_prune_irrelevant_blocks(&mut partial_mmr).await?;
-        self.cache_partial_mmr(partial_mmr).await?;
+        self.untrack_and_prune_irrelevant_blocks().await?;
 
         Ok(())
     }
 
     /// Prunes irrelevant block data from the store.
     ///
-    /// Identifies tracked blocks whose input notes have all been consumed, untracks them from
-    /// `partial_mmr` to determine which authentication nodes are no longer needed, then delegates
+    /// Identifies tracked blocks whose input notes have all been consumed, untracks them from the
+    /// `PartialMmr` to determine which authentication nodes are no longer needed, then delegates
     /// to [`Store::untrack_and_prune_irrelevant_blocks`] to atomically remove the stale nodes,
     /// mark the blocks as irrelevant, and delete irrelevant block headers.
-    async fn untrack_and_prune_irrelevant_blocks(
-        &self,
-        partial_mmr: &mut PartialMmr,
-    ) -> Result<(), ClientError> {
+    /// Any caller of this function should've cached the PartialMMR beforehand.
+    async fn untrack_and_prune_irrelevant_blocks(&mut self) -> Result<(), ClientError> {
         let tracked_blocks = self.store.get_tracked_block_header_numbers().await?;
         if tracked_blocks.is_empty() {
             return Ok(());
@@ -233,8 +226,8 @@ where
             return Ok(());
         }
 
-        // Untrack each block to collect the authentication node indices that are no longer
-        // needed by any remaining tracked leaf.
+        // Get PartialMMR to prune it based on untracked blocks
+        let mut partial_mmr = self.get_current_partial_mmr().await?;
         let mut nodes_to_remove: Vec<InOrderIndex> = Vec::new();
         for &block_pos in &to_untrack {
             nodes_to_remove.extend(partial_mmr.untrack(block_pos).into_iter().map(|(idx, _)| idx));
@@ -250,6 +243,8 @@ where
         self.store
             .untrack_and_prune_irrelevant_blocks(&blocks_to_untrack, &nodes_to_remove)
             .await?;
+
+        self.cache_partial_mmr(partial_mmr).await?;
 
         Ok(())
     }
