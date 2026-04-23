@@ -165,13 +165,13 @@ where
         self.fetch_transport_notes(cursor, note_tags).await
     }
 
-    /// Runs [`Client::sync_state`] followed by [`Client::sync_note_transport`], failing fast on
+    /// Runs [`Client::sync_note_transport`] followed by [`Client::sync_state`], failing fast on
     /// the first error.
     pub async fn sync_all(&mut self) -> Result<SyncSummary, ClientError> {
-        // TODO: run in parallel.
-        let summary = self.sync_state().await?;
+        // Sync NTL first so private note bodies land in the store; chain sync needs their
+        // nullifiers to detect if they've already been consumed.
         self.sync_note_transport().await?;
-        Ok(summary)
+        self.sync_state().await
     }
 
     /// Builds a default [`StateSyncInput`] from the current client state.
