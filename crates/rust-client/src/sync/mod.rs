@@ -228,7 +228,8 @@ where
     async fn untrack_and_prune_irrelevant_blocks(&self) -> Result<(), ClientError> {
         let tracked_blocks = self.store.get_tracked_block_header_numbers().await?;
         let to_untrack: Vec<usize> = if tracked_blocks.is_empty() {
-            // Do not early-return: even without blocks to untrack, old irrelevant tip headers may need pruning.
+            // Do not early-return: even without blocks to untrack, old irrelevant tip headers may
+            // need pruning.
             Vec::new()
         } else {
             // Blocks that still have at least one unspent note need to stay tracked.
