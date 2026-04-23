@@ -155,7 +155,9 @@ where
         // Cache MMR so pruning can reuse in-memory MMR.
         self.cache_partial_mmr(partial_mmr).await?;
 
-        self.untrack_and_prune_irrelevant_blocks().await?;
+        // Prune irrelevant blocks and their MMR authentication nodes according to the configured
+        // cadence.
+        self.maybe_untrack_and_prune_irrelevant_blocks().await?;
 
         Ok(sync_summary)
     }
@@ -190,13 +192,35 @@ where
         })
     }
 
-    /// Applies the state sync update to the store and prunes irrelevant blocks.
+    /// Applies the state sync update to the store and prunes irrelevant blocks according to the
+    /// configured cadence.
     ///
     /// See [`crate::Store::apply_state_sync()`] for what the update implies.
     pub async fn apply_state_sync(&mut self, update: StateSyncUpdate) -> Result<(), ClientError> {
         self.store.apply_state_sync(update).await?;
 
+        self.maybe_untrack_and_prune_irrelevant_blocks().await?;
+
+        Ok(())
+    }
+
+    /// Prunes irrelevant blocks and their MMR authentication nodes according to the configured
+    /// cadence.
+    async fn maybe_untrack_and_prune_irrelevant_blocks(&mut self) -> Result<(), ClientError> {
+        let Some(interval) = self.irrelevant_block_prune_interval else {
+            return Ok(());
+        };
+
+        let sync_height = self.store.get_sync_height().await?;
+
+        if let Some(last_prune_height) = self.last_irrelevant_block_prune_sync_height
+            && sync_height < last_prune_height + interval
+        {
+            return Ok(());
+        }
+
         self.untrack_and_prune_irrelevant_blocks().await?;
+        self.last_irrelevant_block_prune_sync_height = Some(sync_height);
 
         Ok(())
     }
