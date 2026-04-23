@@ -151,8 +151,6 @@ where
             .await
             .map_err(ClientError::StoreError)?;
 
-        // Prune irrelevant blocks and their MMR authentication nodes according to the configured
-        // cadence.
         self.maybe_untrack_and_prune_irrelevant_blocks().await?;
 
         Ok(sync_summary)

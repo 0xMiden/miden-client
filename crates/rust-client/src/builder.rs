@@ -366,12 +366,11 @@ where
 
     /// Sets the number of synced blocks between automatic irrelevant-block pruning runs.
     ///
-    /// `Some(1)` preserves the current behavior and prunes after every sync. Larger values defer
-    /// pruning until the client has advanced by at least that many sync blocks since the last
-    /// prune. `None` disables automatic pruning entirely.
+    /// Values defer pruning until the client has advanced by at least that many sync blocks since
+    /// the last prune. `None` disables automatic pruning entirely.
     #[must_use]
     pub fn irrelevant_block_prune_interval(mut self, interval: Option<u32>) -> Self {
-        self.irrelevant_block_prune_interval = interval.map(|interval| interval.max(1));
+        self.irrelevant_block_prune_interval = interval;
         self
     }
 
