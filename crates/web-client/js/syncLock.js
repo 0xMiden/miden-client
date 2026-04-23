@@ -77,7 +77,7 @@ export async function withSyncLock(dbId, methodId, fn, timeoutMs = 0) {
   let timer;
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(
-      () => reject(new Error("Sync lock acquisition timed out")),
+      () => reject(new Error("Sync timed out")),
       timeoutMs
     );
   });
