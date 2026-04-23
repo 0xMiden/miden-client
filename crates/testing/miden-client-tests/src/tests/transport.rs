@@ -48,7 +48,7 @@ async fn transport_basic() {
 
     // Sync-state / fetch notes
     // No notes before sending
-    recipient.sync_note_transport().await.unwrap();
+    recipient.sync_state().await.unwrap();
     let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 0);
 
@@ -57,17 +57,17 @@ async fn transport_basic() {
 
     // Sync-state / fetch notes
     // 1 note stored
-    recipient.sync_note_transport().await.unwrap();
+    recipient.sync_state().await.unwrap();
     let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 1);
 
     // Sync again, should be only 1 note stored
-    recipient.sync_note_transport().await.unwrap();
+    recipient.sync_state().await.unwrap();
     let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 1);
 
     // Third user shouldn't receive any note
-    observer.sync_note_transport().await.unwrap();
+    observer.sync_state().await.unwrap();
     let notes = observer.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 0);
 }
@@ -103,14 +103,14 @@ async fn transport_cursor_pagination() {
 
     // Send note A, sync → recipient receives 1 note
     sender.send_private_note(note_a.clone(), &recipient_address).await.unwrap();
-    recipient.sync_note_transport().await.unwrap();
+    recipient.sync_state().await.unwrap();
     let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 1, "should have 1 note after first sync");
     assert_eq!(notes[0].id(), note_a.id());
 
     // Send note B, sync → recipient receives note B (cursor advanced past A)
     sender.send_private_note(note_b.clone(), &recipient_address).await.unwrap();
-    recipient.sync_note_transport().await.unwrap();
+    recipient.sync_state().await.unwrap();
     let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 2, "should have 2 notes total after second sync");
 }
@@ -137,7 +137,7 @@ async fn transport_duplicate_note_handling() {
     sender.send_private_note(note, &recipient_address).await.unwrap();
 
     // First fetch
-    recipient.sync_note_transport().await.unwrap();
+    recipient.sync_state().await.unwrap();
     let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 1);
 
@@ -170,12 +170,12 @@ async fn transport_fetch_no_matching_tags() {
     sender.send_private_note(note, &recipient_address).await.unwrap();
 
     // Observer syncs — tags don't match, should get nothing
-    observer.sync_note_transport().await.unwrap();
+    observer.sync_state().await.unwrap();
     let notes = observer.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 0, "observer with non-matching tags should receive 0 notes");
 
     // Recipient syncs — tags match, should get the note
-    recipient.sync_note_transport().await.unwrap();
+    recipient.sync_state().await.unwrap();
     let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 1, "recipient with matching tags should receive 1 note");
 }
@@ -252,8 +252,8 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     // 3. Register tag 0 so chain sync sees the note's block.
     client.add_note_tag(NoteTag::new(0)).await.unwrap();
 
-    // 4. Sync to chain tip. Chain-only so we don't touch NTL yet (it's still empty).
-    client.sync_chain().await.unwrap();
+    // 4. Sync to chain tip. The NTL is empty so no transport notes are imported.
+    client.sync_state().await.unwrap();
     let sync_height = client.get_sync_height().await.unwrap();
     assert!(sync_height.as_u32() > 1, "client should have synced past block 1");
 
@@ -264,10 +264,10 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
         .write()
         .add_note(private_note.header().clone(), details_bytes);
 
-    // 6. NTL fetch imports the note. Without the lookback, after_block_num = sync_height
-    // and check_expected_notes misses the note at block 1. With the lookback window it's
-    // found and marked Committed.
-    client.sync_note_transport().await.unwrap();
+    // 6. Second sync_state: fetch_transport_notes imports the note, then chain sync runs.
+    // Without the fix, after_block_num = sync_height, scan misses the note at block 1.
+    // With the fix, lookback window catches it.
+    client.sync_state().await.unwrap();
 
     // 7. The note should be Committed after the second sync.
     let committed_notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();
