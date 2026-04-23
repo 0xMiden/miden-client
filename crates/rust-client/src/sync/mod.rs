@@ -195,7 +195,6 @@ where
     pub async fn apply_state_sync(&mut self, update: StateSyncUpdate) -> Result<(), ClientError> {
         self.store.apply_state_sync(update).await?;
 
-        
         self.maybe_untrack_and_prune_irrelevant_blocks().await?;
 
         Ok(())
