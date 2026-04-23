@@ -7,12 +7,14 @@
 * [BREAKING][api][rust,web] Split `Client::sync_state()` into on-chain-only `sync_state()`, NTL-only `sync_note_transport()`, and sequential `sync_all()`. ([#1930](https://github.com/0xMiden/miden-client/issues/1930))
 * [BREAKING][param][rust] `NodeRpcClient::get_block_by_number()` now takes an `include_proof: bool` parameter to control whether the block proof is included in the response. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 * [BREAKING][param][rust] `NodeRpcClient::sync_chain_mmr()` replaced `block_to: Option<BlockNumber>` with `upper_bound: SyncTarget` to match the RPC definition. Use `SyncTarget::CommittedChainTip` for previous default behavior (`None`), or `SyncTarget::BlockNumber(num)` for a specific block number. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
+* [BREAKING][rust] Added `submit_proven_batch` to `NodeRpcClient` trait. ([#2075](https://github.com/0xMiden/miden-client/pull/2075))
 
 ### Enhancements
 
 * Made new-account construction use merged storage schema commitment (`build_with_schema_commitment`), re-exported `AccountBuilderSchemaCommitmentExt`, added WASM `buildWithoutSchemaCommitment()`, and fixed contract `accounts.create()` to require explicit `components` ([#1996](https://github.com/0xMiden/miden-client/pull/1996)).
 * Fixed the faucet token symbol display when showing account details ([#1985](https://github.com/0xMiden/miden-client/pull/1985)).
 * [FEATURE][rust,cli,web] Added `get_network_note_status` to `NodeRpcClient` trait for querying the processing status of notes submitted to the network (pending, nullifier-inflight, discarded, nullifier-committed), along with attempt count and error details. Exposed as `miden-client network-note-status <note_id>` CLI command and `RpcClient.getNetworkNoteStatus()` in the web client. ([#1981](https://github.com/0xMiden/miden-client/pull/1981))
+* Added `miden-cli call` command for invoking account procedures directly from the CLI.
 
 ## 0.14.4 (TBA)
 

@@ -15,6 +15,7 @@ use miden_protocol::account::{
     Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot, StorageSlotType,
 };
 use miden_protocol::address::NetworkId;
+use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::account_tree::AccountWitness;
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::MerklePath;
@@ -503,6 +504,28 @@ impl NodeRpcClient for GrpcClient {
             .call_with_retry(RpcEndpoint::SubmitProvenTx, |mut rpc_api| {
                 let request = request.clone();
                 Box::pin(async move { rpc_api.submit_proven_transaction(request).await })
+            })
+            .await?;
+
+        Ok(BlockNumber::from(api_response.into_inner().block_num))
+    }
+
+    async fn submit_proven_batch(
+        &self,
+        proven_batch: ProvenBatch,
+        proposed_batch: ProposedBatch,
+        transaction_inputs: Vec<TransactionInputs>,
+    ) -> Result<BlockNumber, RpcError> {
+        let request = proto::transaction::TransactionBatch {
+            batch_proof: proven_batch.to_bytes(),
+            proposed_batch: Some(proposed_batch.to_bytes()),
+            transaction_inputs: transaction_inputs.iter().map(Serializable::to_bytes).collect(),
+        };
+
+        let api_response = self
+            .call_with_retry(RpcEndpoint::SubmitProvenBatch, |mut rpc_api| {
+                let request = request.clone();
+                Box::pin(async move { rpc_api.submit_proven_batch(request).await })
             })
             .await?;
 

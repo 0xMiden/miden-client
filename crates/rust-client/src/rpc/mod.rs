@@ -5,6 +5,7 @@
 //! to:
 //!
 //! - Submit proven transactions.
+//! - Submit proven batches.
 //! - Retrieve block headers (optionally with MMR proofs).
 //! - Sync state updates (including notes, nullifiers, and account updates).
 //! - Fetch details for specific notes and accounts.
@@ -53,6 +54,7 @@ use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
 use miden_protocol::account::{AccountCode, AccountId};
 use miden_protocol::address::NetworkId;
+use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
 use miden_protocol::crypto::merkle::smt::SmtProof;
@@ -123,6 +125,18 @@ pub trait NodeRpcClient: Send + Sync {
         &self,
         proven_transaction: ProvenTransaction,
         transaction_inputs: TransactionInputs,
+    ) -> Result<BlockNumber, RpcError>;
+
+    /// Given a Proven Batch together with the corresponding [`ProposedBatch`] and the list of
+    /// [`TransactionInputs`] (one per transaction, matching the ordering of the batch), sends
+    /// the batch to the node for inclusion in a future block using the `/SubmitProvenBatch`
+    /// RPC endpoint. All transactions in the batch must build on the current mempool state
+    /// following normal transaction submission rules.
+    async fn submit_proven_batch(
+        &self,
+        proven_batch: ProvenBatch,
+        proposed_batch: ProposedBatch,
+        transaction_inputs: Vec<TransactionInputs>,
     ) -> Result<BlockNumber, RpcError>;
 
     /// Given a block number, fetches the block header corresponding to that height from the node
@@ -481,6 +495,7 @@ pub enum RpcEndpoint {
     GetNotesById,
     SyncChainMmr,
     SubmitProvenTx,
+    SubmitProvenBatch,
     SyncNotes,
     GetNoteScriptByRoot,
     SyncStorageMaps,
@@ -503,6 +518,7 @@ impl RpcEndpoint {
             RpcEndpoint::GetNotesById => "GetNotesById",
             RpcEndpoint::SyncChainMmr => "SyncChainMmr",
             RpcEndpoint::SubmitProvenTx => "SubmitProvenTransaction",
+            RpcEndpoint::SubmitProvenBatch => "SubmitProvenBatch",
             RpcEndpoint::SyncNotes => "SyncNotes",
             RpcEndpoint::GetNoteScriptByRoot => "GetNoteScriptByRoot",
             RpcEndpoint::SyncStorageMaps => "SyncStorageMaps",
@@ -530,6 +546,7 @@ impl fmt::Display for RpcEndpoint {
             RpcEndpoint::GetNotesById => write!(f, "get_notes_by_id"),
             RpcEndpoint::SyncChainMmr => write!(f, "sync_chain_mmr"),
             RpcEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
+            RpcEndpoint::SubmitProvenBatch => write!(f, "submit_proven_batch"),
             RpcEndpoint::SyncNotes => write!(f, "sync_notes"),
             RpcEndpoint::GetNoteScriptByRoot => write!(f, "get_note_script_by_root"),
             RpcEndpoint::SyncStorageMaps => write!(f, "sync_storage_maps"),

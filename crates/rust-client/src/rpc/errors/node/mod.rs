@@ -113,6 +113,7 @@ pub fn parse_node_error(
         RpcEndpoint::SyncChainMmr
         | RpcEndpoint::Status
         | RpcEndpoint::GetLimits
-        | RpcEndpoint::GetNetworkNoteStatus => None,
+        | RpcEndpoint::GetNetworkNoteStatus
+        | RpcEndpoint::SubmitProvenBatch => None,
     }
 }
