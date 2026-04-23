@@ -253,17 +253,18 @@ impl WebClient {
             native_reqs.push(req);
         }
 
-        let mut builder = Box::pin(client.new_transaction_batch(native_account_id))
-            .await
-            .map_err(|err| js_error_with_context(err, "failed to open batch builder"))?;
+        let mut builder =
+            maybe_wrap_send(Box::pin(client.new_transaction_batch(native_account_id)))
+                .await
+                .map_err(|err| js_error_with_context(err, "failed to open batch builder"))?;
 
         for native_req in native_reqs {
-            builder = Box::pin(builder.push(native_req))
+            builder = maybe_wrap_send(Box::pin(builder.push(native_req)))
                 .await
                 .map_err(|err| js_error_with_context(err, "failed to push transaction to batch"))?;
         }
 
-        Box::pin(builder.submit())
+        maybe_wrap_send(Box::pin(builder.submit()))
             .await
             .map(|block_number| block_number.as_u32())
             .map_err(|err| js_error_with_context(err, "failed to submit transaction batch"))

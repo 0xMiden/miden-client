@@ -14,7 +14,7 @@
 * Fixed the faucet token symbol display when showing account details ([#1985](https://github.com/0xMiden/miden-client/pull/1985)).
 * [FEATURE][rust,cli,web] Added `get_network_note_status` to `NodeRpcClient` trait for querying the processing status of notes submitted to the network (pending, nullifier-inflight, discarded, nullifier-committed), along with attempt count and error details. Exposed as `miden-client network-note-status <note_id>` CLI command and `RpcClient.getNetworkNoteStatus()` in the web client. ([#1981](https://github.com/0xMiden/miden-client/pull/1981))
 * Added `miden-cli call` command for invoking account procedures directly from the CLI.
-* [FEATURE][rust] Added `BatchBuilder` for submitting multiple transactions as a single proven batch. Also adds `Store::apply_transaction_batch`([#2075](https://github.com/0xMiden/miden-client/pull/2075))
+* [FEATURE][rust,web,store] Added `BatchBuilder` for stacking multiple transactions against a single local account and submitting them as one proven batch via `SubmitProvenBatch`. Also adds `Store::apply_transaction_batch` (atomic multi-tx apply) with `SqliteStore` and `IdxdbStore` implementations. ([#2109](https://github.com/0xMiden/miden-client/pull/2109))
 
 ## 0.14.4 (TBA)
 
