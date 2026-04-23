@@ -433,6 +433,8 @@ async fn sync_state_mmr() {
     // verify that the latest block number has been updated
     assert_eq!(client.get_sync_height().await.unwrap(), rpc_api.get_chain_tip_block_num());
 
+    assert!(client.test_has_cached_partial_mmr());
+
     // verify that we inserted the latest block into the DB via the client
     let latest_block = client.get_sync_height().await.unwrap();
     assert_eq!(sync_details.block_num, latest_block);
@@ -467,6 +469,44 @@ async fn sync_state_mmr() {
     // Only block 1 remains tracked after pruning; block 4 was untracked because all its
     // notes are already consumed externally.
     assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn sync_state_mmr_without_in_memory_cache() {
+    let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
+    let mut client = builder.cache_partial_mmr_in_memory(false).build().await.unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
+
+    let notes = rpc_api
+        .get_public_available_notes()
+        .into_iter()
+        .filter_map(|n| n.note().cloned())
+        .collect::<Vec<Note>>();
+
+    for note in &notes {
+        client
+            .import_notes(&[NoteFile::NoteDetails {
+                details: note.clone().into(),
+                after_block_num: 0.into(),
+                tag: Some(note.metadata().tag()),
+            }])
+            .await
+            .unwrap();
+    }
+
+    let sync_details = client.sync_state().await.unwrap();
+    assert_eq!(sync_details.block_num, rpc_api.get_chain_tip_block_num());
+    assert!(!client.test_has_cached_partial_mmr());
+
+    let partial_mmr = client.get_current_partial_mmr().await.unwrap();
+    assert!(partial_mmr.forest().num_leaves() >= 6);
+    assert!(partial_mmr.open(1).unwrap().is_some());
+    assert!(partial_mmr.open(4).unwrap().is_none());
+    assert!(!client.test_has_cached_partial_mmr());
 }
 
 /// Tests that MMR authentication nodes are persisted even when `include_block` is false

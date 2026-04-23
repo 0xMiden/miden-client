@@ -376,6 +376,8 @@ pub struct Client<AUTH> {
     /// An instance of [`NoteTransportClient`] which provides a way for the client to connect to
     /// the Miden Note Transport network.
     note_transport_api: Option<Arc<dyn NoteTransportClient>>,
+    /// Whether the client should cache the current Partial MMR in memory.
+    cache_partial_mmr_in_memory: bool,
     /// Cached [`PartialMmr`] for the chain's MMR. Lazily built from the store and kept in sync
     /// across sync/prune operations. `None` forces a rebuild on next access.
     partial_mmr: Option<CachedPartialMmr>,
@@ -490,6 +492,11 @@ impl<AUTH> Client<AUTH> {
     #[cfg(any(test, feature = "testing"))]
     pub fn test_store(&mut self) -> &mut Arc<dyn Store> {
         &mut self.store
+    }
+
+    #[cfg(any(test, feature = "testing"))]
+    pub fn test_has_cached_partial_mmr(&self) -> bool {
+        self.partial_mmr.is_some()
     }
 }
 

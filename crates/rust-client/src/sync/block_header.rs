@@ -43,10 +43,11 @@ impl<AUTH> Client<AUTH> {
         Ok(())
     }
 
-    /// Returns the cached [`PartialMmr`] if its fingerprint matches the current store peaks,
-    /// otherwise rebuilds from the store.
+    /// Returns the cached [`PartialMmr`] if in-memory caching is enabled and its fingerprint
+    /// matches the current store peaks, otherwise rebuilds from the store.
     pub async fn get_current_partial_mmr(&self) -> Result<PartialMmr, ClientError> {
-        if let Some(ref cached) = self.partial_mmr
+        if self.cache_partial_mmr_in_memory
+            && let Some(ref cached) = self.partial_mmr
             && cached.store_peaks_hash == self.current_store_peaks_hash().await?
         {
             return Ok(cached.mmr.clone());
@@ -54,9 +55,15 @@ impl<AUTH> Client<AUTH> {
         self.store.get_current_partial_mmr().await.map_err(Into::into)
     }
 
-    /// Stores the MMR in the cache, capturing the current store peaks hash as fingerprint.
-    /// Must run after any store mutation that may have advanced the sync-height peaks.
+    /// Stores the MMR in the cache if in-memory caching is enabled, capturing the current store
+    /// peaks hash as fingerprint. Must run after any store mutation that may have advanced the
+    /// sync-height peaks.
     pub(crate) async fn cache_partial_mmr(&mut self, mmr: PartialMmr) -> Result<(), ClientError> {
+        if !self.cache_partial_mmr_in_memory {
+            self.partial_mmr = None;
+            return Ok(());
+        }
+
         let store_peaks_hash = self.current_store_peaks_hash().await?;
         self.partial_mmr = Some(CachedPartialMmr { store_peaks_hash, mmr });
         Ok(())
