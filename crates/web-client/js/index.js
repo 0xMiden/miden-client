@@ -1,10 +1,6 @@
 import loadWasm from "./wasm.js";
 import { CallbackType, MethodName, WorkerAction } from "./constants.js";
-import {
-  acquireSyncLock,
-  releaseSyncLock,
-  releaseSyncLockWithError,
-} from "./syncLock.js";
+import { withSyncLock } from "./syncLock.js";
 import { MidenClient } from "./client.js";
 import { CompilerResource } from "./resources/compiler.js";
 import {
@@ -869,33 +865,23 @@ class WebClient {
     const methodId = MethodName.SYNC_STATE;
 
     try {
-      const lockHandle = await acquireSyncLock(dbId, methodId, timeoutMs);
-
-      if (!lockHandle.acquired) {
-        // Coalesced with an in-progress syncState — share its result
-        return lockHandle.coalescedResult;
-      }
-
-      try {
-        let result;
-        if (!this.worker) {
-          const wasmWebClient = await this.getWasmWebClient();
-          result = await wasmWebClient.syncStateImpl();
-        } else {
+      return await withSyncLock(
+        dbId,
+        methodId,
+        async () => {
+          if (!this.worker) {
+            const wasmWebClient = await this.getWasmWebClient();
+            return await wasmWebClient.syncStateImpl();
+          }
           const wasm = await getWasmOrThrow();
           const serializedSyncSummaryBytes =
             await this.callMethodWithWorker(methodId);
-          result = wasm.SyncSummary.deserialize(
+          return wasm.SyncSummary.deserialize(
             new Uint8Array(serializedSyncSummaryBytes)
           );
-        }
-
-        releaseSyncLock(dbId, methodId, result);
-        return result;
-      } catch (error) {
-        releaseSyncLockWithError(dbId, methodId, error);
-        throw error;
-      }
+        },
+        timeoutMs
+      );
     } catch (error) {
       console.error("INDEX.JS: Error in syncState:", error);
       throw error;
@@ -913,25 +899,19 @@ class WebClient {
     const methodId = MethodName.SYNC_NOTE_TRANSPORT;
 
     try {
-      const lockHandle = await acquireSyncLock(dbId, methodId, timeoutMs);
-
-      if (!lockHandle.acquired) {
-        return lockHandle.coalescedResult;
-      }
-
-      try {
-        if (!this.worker) {
-          const wasmWebClient = await this.getWasmWebClient();
-          await wasmWebClient.syncNoteTransportImpl();
-        } else {
-          await this.callMethodWithWorker(methodId);
-        }
-
-        releaseSyncLock(dbId, methodId, undefined);
-      } catch (error) {
-        releaseSyncLockWithError(dbId, methodId, error);
-        throw error;
-      }
+      await withSyncLock(
+        dbId,
+        methodId,
+        async () => {
+          if (!this.worker) {
+            const wasmWebClient = await this.getWasmWebClient();
+            await wasmWebClient.syncNoteTransportImpl();
+          } else {
+            await this.callMethodWithWorker(methodId);
+          }
+        },
+        timeoutMs
+      );
     } catch (error) {
       console.error("INDEX.JS: Error in syncNoteTransport:", error);
       throw error;
@@ -949,32 +929,23 @@ class WebClient {
     const methodId = MethodName.SYNC_ALL;
 
     try {
-      const lockHandle = await acquireSyncLock(dbId, methodId, timeoutMs);
-
-      if (!lockHandle.acquired) {
-        return lockHandle.coalescedResult;
-      }
-
-      try {
-        let result;
-        if (!this.worker) {
-          const wasmWebClient = await this.getWasmWebClient();
-          result = await wasmWebClient.syncAllImpl();
-        } else {
+      return await withSyncLock(
+        dbId,
+        methodId,
+        async () => {
+          if (!this.worker) {
+            const wasmWebClient = await this.getWasmWebClient();
+            return await wasmWebClient.syncAllImpl();
+          }
           const wasm = await getWasmOrThrow();
           const serializedSyncSummaryBytes =
             await this.callMethodWithWorker(methodId);
-          result = wasm.SyncSummary.deserialize(
+          return wasm.SyncSummary.deserialize(
             new Uint8Array(serializedSyncSummaryBytes)
           );
-        }
-
-        releaseSyncLock(dbId, methodId, result);
-        return result;
-      } catch (error) {
-        releaseSyncLockWithError(dbId, methodId, error);
-        throw error;
-      }
+        },
+        timeoutMs
+      );
     } catch (error) {
       console.error("INDEX.JS: Error in syncAll:", error);
       throw error;
@@ -1079,44 +1050,34 @@ class MockWebClient extends WebClient {
     const methodId = MethodName.SYNC_STATE;
 
     try {
-      const lockHandle = await acquireSyncLock(dbId, methodId, timeoutMs);
+      return await withSyncLock(
+        dbId,
+        methodId,
+        async () => {
+          const wasmWebClient = await this.getWasmWebClient();
 
-      if (!lockHandle.acquired) {
-        return lockHandle.coalescedResult;
-      }
+          if (!this.worker) {
+            return await wasmWebClient.syncStateImpl();
+          }
 
-      try {
-        let result;
-        const wasmWebClient = await this.getWasmWebClient();
-
-        if (!this.worker) {
-          result = await wasmWebClient.syncStateImpl();
-        } else {
-          let serializedMockChain = (await wasmWebClient.serializeMockChain())
+          const serializedMockChain = (await wasmWebClient.serializeMockChain())
             .buffer;
-          let serializedMockNoteTransportNode = (
+          const serializedMockNoteTransportNode = (
             await wasmWebClient.serializeMockNoteTransportNode()
           ).buffer;
 
           const wasm = await getWasmOrThrow();
-
           const serializedSyncSummaryBytes = await this.callMethodWithWorker(
             MethodName.SYNC_STATE_MOCK,
             serializedMockChain,
             serializedMockNoteTransportNode
           );
-
-          result = wasm.SyncSummary.deserialize(
+          return wasm.SyncSummary.deserialize(
             new Uint8Array(serializedSyncSummaryBytes)
           );
-        }
-
-        releaseSyncLock(dbId, methodId, result);
-        return result;
-      } catch (error) {
-        releaseSyncLockWithError(dbId, methodId, error);
-        throw error;
-      }
+        },
+        timeoutMs
+      );
     } catch (error) {
       console.error("INDEX.JS: Error in syncState:", error);
       throw error;
