@@ -28,7 +28,7 @@ const TX_DISCARD_DELTA: u32 = 20;
 /// The default number of synced blocks between automatic irrelevant-block pruning runs.
 const IRRELEVANT_BLOCK_PRUNE_INTERVAL: u32 = 1;
 /// Whether the client should cache the current Partial MMR in memory by default.
-const CACHE_PARTIAL_MMR_IN_MEMORY: bool = true;
+const CACHE_PARTIAL_MMR_IN_MEMORY: bool = false;
 
 pub use grpc_support::*;
 
@@ -102,7 +102,7 @@ pub trait StoreFactory {
 ///   considered stale and discarded. Configure via [`tx_discard_delta()`](Self::tx_discard_delta).
 ///
 /// - **In-memory Partial MMR cache**: Reuses the current partial blockchain MMR between sync and
-///   prune operations. Enabled by default. Configure via
+///   prune operations. Disabled by default. Configure via
 ///   [`cache_partial_mmr_in_memory()`](Self::cache_partial_mmr_in_memory).
 ///
 /// - **Max block number delta**: Maximum number of blocks the client can be behind the network for
