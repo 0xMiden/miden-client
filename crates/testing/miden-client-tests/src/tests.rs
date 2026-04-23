@@ -1286,6 +1286,114 @@ async fn input_note_reader_finds_externally_consumed_notes() {
 }
 
 #[tokio::test]
+async fn irrelevant_block_pruning_respects_sync_interval() {
+    let mut builder = MockChainBuilder::new();
+    let mock_account = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
+
+    let note_first =
+        NoteBuilder::new(mock_account.id(), RandomCoin::new([0, 0, 0, 0].map(Felt::new).into()))
+            .note_type(NoteType::Public)
+            .tag(NoteTag::new(0).into())
+            .build()
+            .unwrap();
+    let note_second =
+        NoteBuilder::new(mock_account.id(), RandomCoin::new([0, 0, 0, 1].map(Felt::new).into()))
+            .note_type(NoteType::Public)
+            .tag(NoteTag::new(0).into())
+            .build()
+            .unwrap();
+
+    let spawn_note_1 = builder.add_spawn_note(std::slice::from_ref(&note_first)).unwrap();
+    let spawn_note_2 = builder.add_spawn_note(std::slice::from_ref(&note_second)).unwrap();
+
+    let mut chain = builder.build().unwrap();
+
+    // Block 1: create the first unspent note.
+    let tx = Box::pin(
+        chain
+            .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note_1])
+            .unwrap()
+            .extend_expected_output_notes(vec![RawOutputNote::Full(note_first)])
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    chain.add_pending_executed_transaction(&tx).unwrap();
+    chain.prove_next_block().unwrap();
+
+    // Blocks 2 and 3: advance the chain without changing tracked notes.
+    chain.prove_next_block().unwrap();
+    chain.prove_next_block().unwrap();
+
+    // Block 4: create the second note, which will later become irrelevant.
+    let tx = Box::pin(
+        chain
+            .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note_2])
+            .unwrap()
+            .extend_expected_output_notes(vec![RawOutputNote::Full(note_second.clone())])
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    chain.add_pending_executed_transaction(&tx).unwrap();
+    chain.prove_next_block().unwrap();
+
+    let rng = RandomCoin::new(rand::random::<[u64; 4]>().map(Felt::new).into());
+    let keystore_path = std::env::temp_dir();
+    let keystore = FilesystemKeyStore::new(keystore_path).unwrap();
+    let mock_rpc = MockRpcApi::new(chain);
+
+    let mut client = ClientBuilder::new()
+        .rpc(Arc::new(mock_rpc.clone()))
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_discard_delta(None)
+        .irrelevant_block_prune_interval(Some(2))
+        .build()
+        .await
+        .unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+    client.add_note_tag(NoteTag::new(0)).await.unwrap();
+
+    client.sync_state().await.unwrap();
+    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 2);
+
+    let tx = {
+        let tx_context = mock_rpc
+            .mock_chain
+            .write()
+            .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[note_second])
+            .unwrap()
+            .build()
+            .unwrap();
+        Box::pin(tx_context.execute()).await.unwrap()
+    };
+    mock_rpc.mock_chain.write().add_pending_executed_transaction(&tx).unwrap();
+    mock_rpc.prove_block();
+
+    client.sync_state().await.unwrap();
+    assert_eq!(
+        client.test_store().get_tracked_block_headers().await.unwrap().len(),
+        2,
+        "pruning should be deferred until the configured sync interval elapses",
+    );
+
+    mock_rpc.prove_block();
+    client.sync_state().await.unwrap();
+    assert_eq!(
+        client.test_store().get_tracked_block_headers().await.unwrap().len(),
+        1,
+        "the irrelevant block should be pruned once the sync interval is reached",
+    );
+}
+
+#[tokio::test]
 async fn p2id_transfer_failing_not_enough_balance() {
     let (mut client, mock_rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
