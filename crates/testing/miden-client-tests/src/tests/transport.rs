@@ -252,8 +252,8 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     // 3. Register tag 0 so chain sync sees the note's block.
     client.add_note_tag(NoteTag::new(0)).await.unwrap();
 
-    // 4. Sync to chain tip. The NTL is empty so no transport notes are imported.
-    client.sync_state().await.unwrap();
+    // 4. Sync to chain tip. Chain-only so we don't touch NTL yet (it's still empty).
+    client.sync_chain().await.unwrap();
     let sync_height = client.get_sync_height().await.unwrap();
     assert!(sync_height.as_u32() > 1, "client should have synced past block 1");
 

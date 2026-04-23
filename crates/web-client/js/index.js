@@ -837,7 +837,7 @@ class WebClient {
   }
 
   /**
-   * Syncs the client state with the node.
+   * Syncs the client (NTL followed by chain sync, failing fast on either).
    *
    * This method coordinates concurrent sync calls using the Web Locks API when available,
    * with an in-process mutex fallback for older browsers. If a sync is already in progress,
@@ -850,7 +850,7 @@ class WebClient {
   }
 
   /**
-   * Syncs the client state with the node with an optional timeout.
+   * Syncs the client (NTL followed by chain sync) with an optional timeout.
    *
    * This method coordinates concurrent sync calls using the Web Locks API when available,
    * with an in-process mutex fallback for older browsers. If a sync is already in progress,
@@ -919,14 +919,14 @@ class WebClient {
   }
 
   /**
-   * Runs {@link syncState} followed by {@link syncNoteTransport}, failing fast on either.
+   * Syncs on-chain state only (no NTL fetch).
    *
    * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
    * @returns {Promise<SyncSummary>}
    */
-  async syncAll(timeoutMs = 0) {
+  async syncChain(timeoutMs = 0) {
     const dbId = this.storeName || "default";
-    const methodId = MethodName.SYNC_ALL;
+    const methodId = MethodName.SYNC_CHAIN;
 
     try {
       return await withSyncLock(
@@ -935,7 +935,7 @@ class WebClient {
         async () => {
           if (!this.worker) {
             const wasmWebClient = await this.getWasmWebClient();
-            return await wasmWebClient.syncAllImpl();
+            return await wasmWebClient.syncChainImpl();
           }
           const wasm = await getWasmOrThrow();
           const serializedSyncSummaryBytes =
@@ -947,7 +947,7 @@ class WebClient {
         timeoutMs
       );
     } catch (error) {
-      console.error("INDEX.JS: Error in syncAll:", error);
+      console.error("INDEX.JS: Error in syncChain:", error);
       throw error;
     }
   }

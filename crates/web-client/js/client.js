@@ -177,7 +177,8 @@ export class MidenClient {
   }
 
   /**
-   * Syncs the client state with the Miden node.
+   * Syncs the client: fetches private notes from the Note Transport Layer, then syncs on-chain
+   * state with the Miden node. Fails fast on either.
    *
    * @param {object} [opts] - Sync options.
    * @param {number} [opts.timeout] - Timeout in milliseconds (0 = no timeout).
@@ -186,6 +187,18 @@ export class MidenClient {
   async sync(opts) {
     this.assertNotTerminated();
     return await this.#inner.syncStateWithTimeout(opts?.timeout ?? 0);
+  }
+
+  /**
+   * Syncs on-chain state only (no NTL fetch).
+   *
+   * @param {object} [opts] - Options.
+   * @param {number} [opts.timeout] - Timeout in milliseconds (0 = no timeout).
+   * @returns {Promise<SyncSummary>}
+   */
+  async syncChain(opts) {
+    this.assertNotTerminated();
+    return await this.#inner.syncChain(opts?.timeout ?? 0);
   }
 
   /**
@@ -198,18 +211,6 @@ export class MidenClient {
   async syncNoteTransport(opts) {
     this.assertNotTerminated();
     return await this.#inner.syncNoteTransport(opts?.timeout ?? 0);
-  }
-
-  /**
-   * Runs {@link sync} followed by {@link syncNoteTransport}, failing fast on either.
-   *
-   * @param {object} [opts] - Options.
-   * @param {number} [opts.timeout] - Timeout in milliseconds (0 = no timeout).
-   * @returns {Promise<SyncSummary>}
-   */
-  async syncAll(opts) {
-    this.assertNotTerminated();
-    return await this.#inner.syncAll(opts?.timeout ?? 0);
   }
 
   /**

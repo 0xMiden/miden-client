@@ -102,6 +102,10 @@ where
     /// Syncs the client's on-chain state with the current state of the Miden network and returns
     /// a [`SyncSummary`] corresponding to the local state update.
     ///
+    /// Does **not** fetch private notes from the Note Transport Layer. Use
+    /// [`Client::sync_state`] for the combined sync, or call [`Client::sync_note_transport`]
+    /// separately.
+    ///
     /// The sync process is done in multiple steps:
     /// 1. A request is sent to the node to get the state updates. This request includes tracked
     ///    account IDs and the tags of notes that might have changed or that might be of interest to
@@ -118,7 +122,7 @@ where
     ///    state.
     /// 7. The MMR is updated with the new peaks and authentication nodes.
     /// 8. All updates are applied to the store to be persisted.
-    pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
+    pub async fn sync_chain(&mut self) -> Result<SyncSummary, ClientError> {
         self.ensure_genesis_in_place().await?;
         self.ensure_rpc_limits_in_place().await?;
 
@@ -165,13 +169,14 @@ where
         self.fetch_transport_notes(cursor, note_tags).await
     }
 
-    /// Runs [`Client::sync_note_transport`] followed by [`Client::sync_state`], failing fast on
+    /// Runs [`Client::sync_note_transport`] followed by [`Client::sync_chain`], failing fast on
     /// the first error.
-    pub async fn sync_all(&mut self) -> Result<SyncSummary, ClientError> {
-        // Sync NTL first so private note bodies land in the store; chain sync needs their
-        // nullifiers to detect if they've already been consumed.
+    ///
+    /// Note: private notes delivered via NTL are imported before
+    /// the chain sync reads its input set, so their nullifiers are checked in the same call.
+    pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
         self.sync_note_transport().await?;
-        self.sync_state().await
+        self.sync_chain().await
     }
 
     /// Builds a default [`StateSyncInput`] from the current client state.

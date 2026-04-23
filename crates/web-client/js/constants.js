@@ -22,6 +22,6 @@ export const MethodName = Object.freeze({
   SUBMIT_NEW_TRANSACTION_WITH_PROVER_MOCK: "submitNewTransactionWithProverMock",
   SYNC_STATE: "syncState",
   SYNC_STATE_MOCK: "syncStateMock",
+  SYNC_CHAIN: "syncChain",
   SYNC_NOTE_TRANSPORT: "syncNoteTransport",
-  SYNC_ALL: "syncAll",
 });

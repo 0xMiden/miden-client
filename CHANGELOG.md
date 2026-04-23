@@ -4,7 +4,7 @@
 
 ### Changes
 
-* [BREAKING][api][rust,web] Split `Client::sync_state()` into on-chain-only `sync_state()`, NTL-only `sync_note_transport()`, and sequential `sync_all()`. ([#1930](https://github.com/0xMiden/miden-client/issues/1930))
+* [BREAKING][api][rust,web] Split the sync primitives: `Client::sync_state()` now runs NTL fetch followed by on-chain sync (failing fast on either) — same combined behavior as before but with fail-fast error semantics. The on-chain-only path is exposed as `Client::sync_chain()`, and NTL-only is `Client::sync_note_transport()`. JS equivalents: `MidenClient.sync()`, `syncChain()`, `syncNoteTransport()`. ([#1930](https://github.com/0xMiden/miden-client/issues/1930))
 * [BREAKING][param][rust] `NodeRpcClient::get_block_by_number()` now takes an `include_proof: bool` parameter to control whether the block proof is included in the response. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 * [BREAKING][param][rust] `NodeRpcClient::sync_chain_mmr()` replaced `block_to: Option<BlockNumber>` with `upper_bound: SyncTarget` to match the RPC definition. Use `SyncTarget::CommittedChainTip` for previous default behavior (`None`), or `SyncTarget::BlockNumber(num)` for a specific block number. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 * [BREAKING][rust] Added `submit_proven_batch` to `NodeRpcClient` trait. ([#2075](https://github.com/0xMiden/miden-client/pull/2075))

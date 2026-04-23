@@ -185,8 +185,8 @@ const allowedUnclassified = new Set([
   "createMockClient",
   // Internal impl methods called directly by sync wrappers
   "syncStateImpl",
+  "syncChainImpl",
   "syncNoteTransportImpl",
-  "syncAllImpl",
 ]);
 
 const unclassified = [...wasmMethods].filter(

@@ -152,7 +152,7 @@ Returns the identifier of the underlying store (e.g. IndexedDB database name, fi
 
 > **sync**(`options?`): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
 
-Syncs the client state with the Miden node.
+Syncs the client: fetches private notes from the Note Transport Layer, then syncs on-chain state. Fails fast on either.
 
 #### Parameters
 
@@ -168,11 +168,11 @@ Syncs the client state with the Miden node.
 
 ***
 
-### syncAll()
+### syncChain()
 
-> **syncAll**(`options?`): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
+> **syncChain**(`options?`): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
 
-Runs [sync](#sync) followed by [syncNoteTransport](#syncnotetransport), failing fast on either.
+Syncs on-chain state only (no NTL fetch).
 
 #### Parameters
 
