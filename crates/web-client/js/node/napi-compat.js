@@ -62,6 +62,8 @@ export function wrapClass(Cls) {
  *
  * - syncState() -> syncStateImpl() (no browser lock coordination needed)
  * - syncStateWithTimeout() -> syncStateImpl() (timeout not applicable)
+ * - syncNoteTransport() -> syncNoteTransportImpl() (timeout not applicable)
+ * - syncAll() -> syncAllImpl() (timeout not applicable)
  * - null -> undefined for Option<T> returns
  * - BigInt/Uint8Array args normalized
  */
@@ -73,6 +75,12 @@ export function wrapClient(rawClient, storeName) {
       }
       if (prop === "syncStateWithTimeout") {
         return (_timeoutMs) => target.syncStateImpl();
+      }
+      if (prop === "syncNoteTransport") {
+        return (_timeoutMs) => target.syncNoteTransportImpl();
+      }
+      if (prop === "syncAll") {
+        return (_timeoutMs) => target.syncAllImpl();
       }
       if (prop === "storeName") {
         return storeName || "default";
