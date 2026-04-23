@@ -1,4 +1,5 @@
 import { getDatabase } from "./schema.js";
+import { bumpPartialMmrGeneration } from "./settings.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 export async function insertBlockHeader(dbId, blockNum, header, partialBlockchainPeaks, hasClientNotes) {
     try {
@@ -10,6 +11,7 @@ export async function insertBlockHeader(dbId, blockNum, header, partialBlockchai
             hasClientNotes: hasClientNotes.toString(),
         };
         await db.blockHeaders.put(data);
+        await bumpPartialMmrGeneration(db.settings);
     }
     catch (err) {
         logWebStoreError(err);
@@ -29,6 +31,7 @@ export async function insertPartialBlockchainNodes(dbId, ids, nodes) {
             node: node,
         }));
         await db.partialBlockchainNodes.bulkPut(data);
+        await bumpPartialMmrGeneration(db.settings);
     }
     catch (err) {
         logWebStoreError(err, "Failed to insert partial blockchain nodes");
@@ -158,7 +161,7 @@ export async function pruneIrrelevantBlocks(dbId, blocksToUntrack, nodeIdsToRemo
         if (syncHeight == undefined) {
             throw Error("SyncHeight is undefined -- is the state sync table empty?");
         }
-        await db.dexie.transaction("rw", db.blockHeaders, db.partialBlockchainNodes, async () => {
+        await db.dexie.transaction("rw", db.blockHeaders, db.partialBlockchainNodes, db.settings, async () => {
             // 1. Delete stale MMR authentication nodes.
             if (numericNodeIds.length > 0) {
                 await db.partialBlockchainNodes.bulkDelete(numericNodeIds);
@@ -177,6 +180,9 @@ export async function pruneIrrelevantBlocks(dbId, blocksToUntrack, nodeIdsToRemo
                 .and((record) => record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum)
                 .toArray();
             await db.blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
+            if (numericNodeIds.length > 0 || blocksToUntrack.length > 0) {
+                await bumpPartialMmrGeneration(db.settings);
+            }
         });
     }
     catch (err) {

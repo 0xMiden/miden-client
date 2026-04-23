@@ -15,6 +15,7 @@ import {
 import { upsertInputNote, upsertOutputNote } from "./notes.js";
 
 import { applyFullAccountState } from "./accounts.js";
+import { bumpPartialMmrGeneration } from "./settings.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 import { Transaction } from "dexie";
 import Dexie from "dexie";
@@ -212,6 +213,7 @@ export async function applyStateSync(
     db.historicalStorageMapEntries,
     db.latestAccountAssets,
     db.historicalAccountAssets,
+    db.settings,
   ];
 
   return await db.dexie.transaction("rw", tablesToAccess, async (tx) => {
@@ -310,6 +312,12 @@ export async function applyStateSync(
         })
       ),
     ]);
+
+    if (newBlockHeaders.length > 0 || serializedNodeIds.length > 0) {
+      await bumpPartialMmrGeneration(
+        (tx as Transaction & { settings: Dexie.Table }).settings
+      );
+    }
   });
 }
 

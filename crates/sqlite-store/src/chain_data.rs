@@ -15,6 +15,7 @@ use rusqlite::types::Value;
 use rusqlite::{Connection, OptionalExtension, Transaction, params, params_from_iter};
 
 use super::SqliteStore;
+use crate::db_management::utils::touch_partial_mmr_generation;
 use crate::sql_error::SqlResultExt;
 use crate::{insert_sql, subst};
 
@@ -190,9 +191,15 @@ impl SqliteStore {
         tx: &Transaction<'_>,
         nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError> {
+        if nodes.is_empty() {
+            return Ok(());
+        }
+
         for (index, node) in nodes {
             insert_partial_blockchain_node(tx, *index, *node)?;
         }
+
+        touch_partial_mmr_generation(tx)?;
         Ok(())
     }
 
@@ -225,6 +232,7 @@ impl SqliteStore {
             .into_store_error()?;
 
         set_block_header_has_client_notes(tx, u64::from(block_num), has_client_notes)?;
+        touch_partial_mmr_generation(tx)?;
         Ok(())
     }
 
@@ -241,6 +249,9 @@ impl SqliteStore {
         node_indices_to_remove: &[InOrderIndex],
     ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
+
+        let partial_mmr_changed =
+            !node_indices_to_remove.is_empty() || !blocks_to_untrack.is_empty();
 
         // 1. Delete stale MMR authentication nodes.
         if !node_indices_to_remove.is_empty() {
@@ -287,6 +298,10 @@ impl SqliteStore {
                 rusqlite::params![genesis, sync_height],
             )
             .into_store_error()?;
+        }
+
+        if partial_mmr_changed {
+            touch_partial_mmr_generation(&tx)?;
         }
 
         tx.commit().into_store_error()

@@ -1,4 +1,5 @@
 import { getDatabase } from "./schema.js";
+import { bumpPartialMmrGeneration } from "./settings.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 
 export async function insertBlockHeader(
@@ -18,6 +19,7 @@ export async function insertBlockHeader(
     };
 
     await db.blockHeaders.put(data);
+    await bumpPartialMmrGeneration(db.settings);
   } catch (err) {
     logWebStoreError(err);
   }
@@ -44,6 +46,7 @@ export async function insertPartialBlockchainNodes(
     }));
 
     await db.partialBlockchainNodes.bulkPut(data);
+    await bumpPartialMmrGeneration(db.settings);
   } catch (err) {
     logWebStoreError(err, "Failed to insert partial blockchain nodes");
   }
@@ -207,6 +210,7 @@ export async function pruneIrrelevantBlocks(
       "rw",
       db.blockHeaders,
       db.partialBlockchainNodes,
+      db.settings,
       async () => {
         // 1. Delete stale MMR authentication nodes.
         if (numericNodeIds.length > 0) {
@@ -234,6 +238,10 @@ export async function pruneIrrelevantBlocks(
         await db.blockHeaders.bulkDelete(
           allMatchingRecords.map((r) => r.blockNum)
         );
+
+        if (numericNodeIds.length > 0 || blocksToUntrack.length > 0) {
+          await bumpPartialMmrGeneration(db.settings);
+        }
       }
     );
   } catch (err) {

@@ -1,7 +1,15 @@
-import { getDatabase, CLIENT_VERSION_SETTING_KEY } from "./schema.js";
+import { getDatabase, CLIENT_VERSION_SETTING_KEY, ISetting } from "./schema.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
+import Dexie from "dexie";
 
-const INTERNAL_SETTING_KEYS = new Set([CLIENT_VERSION_SETTING_KEY]);
+export const PARTIAL_MMR_GENERATION_SETTING_KEY = "partialMmrGeneration";
+
+const INTERNAL_SETTING_KEYS = new Set([
+  CLIENT_VERSION_SETTING_KEY,
+  PARTIAL_MMR_GENERATION_SETTING_KEY,
+]);
+
+const PARTIAL_MMR_GENERATION_BYTES = 8;
 
 export async function getSetting(dbId: string, key: string) {
   try {
@@ -68,4 +76,36 @@ export async function listSettingKeys(dbId: string) {
   } catch (error) {
     logWebStoreError(error, `Error listing setting keys`);
   }
+}
+
+export async function bumpPartialMmrGeneration(
+  settings: Dexie.Table<ISetting, string>
+): Promise<void> {
+  const current = await settings.get(PARTIAL_MMR_GENERATION_SETTING_KEY);
+  const next = decodePartialMmrGeneration(current?.value) + 1n;
+
+  await settings.put({
+    key: PARTIAL_MMR_GENERATION_SETTING_KEY,
+    value: encodePartialMmrGeneration(next),
+  });
+}
+
+function decodePartialMmrGeneration(value?: Uint8Array): bigint {
+  if (!value) {
+    return 0n;
+  }
+
+  if (value.length !== PARTIAL_MMR_GENERATION_BYTES) {
+    throw new Error("partial MMR generation should be 8 bytes");
+  }
+
+  const view = new DataView(value.buffer, value.byteOffset, value.byteLength);
+  return view.getBigUint64(0, true);
+}
+
+function encodePartialMmrGeneration(value: bigint): Uint8Array {
+  const bytes = new Uint8Array(PARTIAL_MMR_GENERATION_BYTES);
+  const view = new DataView(bytes.buffer);
+  view.setBigUint64(0, value, true);
+  return bytes;
 }

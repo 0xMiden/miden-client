@@ -323,6 +323,7 @@ pub mod testing {
 }
 
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::merkle::mmr::PartialMmr;
@@ -383,14 +384,14 @@ pub struct Client<AUTH> {
     partial_mmr: Option<CachedPartialMmr>,
 }
 
-/// Cached [`PartialMmr`] paired with the hash of the store's peaks at the moment of caching,
-/// used as a freshness fingerprint to detect external store mutations (e.g. `importStore`).
+/// Cached [`PartialMmr`] paired with the store-managed generation observed at the moment of
+/// caching, used as a freshness fingerprint to detect external store mutations.
 ///
 /// The cached MMR includes the sync-height block as a tracked leaf; the store persists the
 /// peaks committed by that block's header, i.e. the peaks over the chain *before* that block
 /// was added, so the two states are offset by one leaf.
 pub(crate) struct CachedPartialMmr {
-    pub(crate) store_peaks_hash: Word,
+    pub(crate) generation: Vec<u8>,
     pub(crate) mmr: PartialMmr,
 }
 

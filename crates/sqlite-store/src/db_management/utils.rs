@@ -2,7 +2,11 @@ use std::string::String;
 use std::sync::LazyLock;
 use std::vec::Vec;
 
-use miden_client::store::StoreError;
+use miden_client::store::{
+    PARTIAL_MMR_GENERATION_STORE_SETTING,
+    StoreError,
+    next_partial_mmr_generation,
+};
 use miden_protocol::crypto::hash::blake::{Blake3_256, Blake3Digest};
 use rusqlite::types::FromSql;
 use rusqlite::{Connection, OptionalExtension, Result, ToSql, Transaction, params};
@@ -176,6 +180,27 @@ pub fn list_setting_keys(conn: &Connection) -> Result<Vec<String>, StoreError> {
         .into_store_error()?
         .collect::<Result<Vec<String>, _>>()
         .into_store_error()
+}
+
+pub fn touch_partial_mmr_generation(tx: &Transaction<'_>) -> Result<(), StoreError> {
+    let current: Option<Vec<u8>> = tx
+        .query_row(
+            "SELECT value FROM settings WHERE name = $1",
+            params![PARTIAL_MMR_GENERATION_STORE_SETTING],
+            |row| row.get(0),
+        )
+        .optional()
+        .into_store_error()?;
+
+    let next = next_partial_mmr_generation(current.as_deref())?;
+
+    tx.execute(
+        insert_sql!(settings { name, value } | REPLACE),
+        params![PARTIAL_MMR_GENERATION_STORE_SETTING, next],
+    )
+    .into_store_error()?;
+
+    Ok(())
 }
 
 /// Checks if a table exists in the database.

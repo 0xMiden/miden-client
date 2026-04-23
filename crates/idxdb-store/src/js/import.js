@@ -3,6 +3,7 @@
 // should be enough + the TS compiler.
 /* eslint-disable */
 import { getDatabase } from "./schema.js";
+import { bumpPartialMmrGeneration } from "./settings.js";
 import { logWebStoreError } from "./utils.js";
 async function recursivelyTransformForImport(obj) {
     switch (obj.type) {
@@ -67,6 +68,7 @@ export async function forceImportStore(dbId, jsonStr) {
                 const transformedRecords = await Promise.all(records.map(transformForImport));
                 await table.bulkPut(transformedRecords);
             }
+            await bumpPartialMmrGeneration(db.settings);
         });
         console.log("Store imported successfully.");
     }

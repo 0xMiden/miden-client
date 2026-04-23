@@ -3,6 +3,7 @@
 // should be enough + the TS compiler.
 /* eslint-disable */
 import { getDatabase } from "./schema.js";
+import { bumpPartialMmrGeneration } from "./settings.js";
 import { logWebStoreError } from "./utils.js";
 type ImportableInput =
   | { type: "Blob"; value: { __type: "Blob"; data: string } }
@@ -97,6 +98,8 @@ export async function forceImportStore(dbId: string, jsonStr: string) {
 
         await table.bulkPut(transformedRecords);
       }
+
+      await bumpPartialMmrGeneration(db.settings);
     });
 
     console.log("Store imported successfully.");

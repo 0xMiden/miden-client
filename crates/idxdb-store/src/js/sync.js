@@ -2,6 +2,7 @@ import { getDatabase, } from "./schema.js";
 import { upsertTransactionRecord, insertTransactionScript, } from "./transactions.js";
 import { upsertInputNote, upsertOutputNote } from "./notes.js";
 import { applyFullAccountState } from "./accounts.js";
+import { bumpPartialMmrGeneration } from "./settings.js";
 import { logWebStoreError, uint8ArrayToBase64 } from "./utils.js";
 export async function getNoteTags(dbId) {
     try {
@@ -93,6 +94,7 @@ export async function applyStateSync(dbId, stateUpdate) {
         db.historicalStorageMapEntries,
         db.latestAccountAssets,
         db.historicalAccountAssets,
+        db.settings,
     ];
     return await db.dexie.transaction("rw", tablesToAccess, async (tx) => {
         await Promise.all([
@@ -131,6 +133,9 @@ export async function applyStateSync(dbId, stateUpdate) {
                 return updateBlockHeader(tx, newBlockNums[i], newBlockHeader, partialBlockchainPeaks[i], blockHasRelevantNotes[i] == 1);
             })),
         ]);
+        if (newBlockHeaders.length > 0 || serializedNodeIds.length > 0) {
+            await bumpPartialMmrGeneration(tx.settings);
+        }
     });
 }
 async function updateSyncHeight(tx, blockNum) {

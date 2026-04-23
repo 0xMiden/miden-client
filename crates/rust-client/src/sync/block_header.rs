@@ -44,11 +44,11 @@ impl<AUTH> Client<AUTH> {
     }
 
     /// Returns the cached [`PartialMmr`] if in-memory caching is enabled and its fingerprint
-    /// matches the current store peaks, otherwise rebuilds from the store.
+    /// matches the current store generation, otherwise rebuilds from the store.
     pub async fn get_current_partial_mmr(&self) -> Result<PartialMmr, ClientError> {
         if self.cache_partial_mmr_in_memory
             && let Some(ref cached) = self.partial_mmr
-            && cached.store_peaks_hash == self.current_store_peaks_hash().await?
+            && cached.generation == self.current_partial_mmr_generation().await?
         {
             return Ok(cached.mmr.clone());
         }
@@ -56,28 +56,21 @@ impl<AUTH> Client<AUTH> {
     }
 
     /// Stores the MMR in the cache if in-memory caching is enabled, capturing the current store
-    /// peaks hash as fingerprint. Must run after any store mutation that may have advanced the
-    /// sync-height peaks.
+    /// generation as fingerprint.
     pub(crate) async fn cache_partial_mmr(&mut self, mmr: PartialMmr) -> Result<(), ClientError> {
         if !self.cache_partial_mmr_in_memory {
             self.partial_mmr = None;
             return Ok(());
         }
 
-        let store_peaks_hash = self.current_store_peaks_hash().await?;
-        self.partial_mmr = Some(CachedPartialMmr { store_peaks_hash, mmr });
+        let generation = self.current_partial_mmr_generation().await?;
+        self.partial_mmr = Some(CachedPartialMmr { generation, mmr });
         Ok(())
     }
 
-    /// Hashes the store's peaks at the current sync height. Used as the cache freshness
-    /// fingerprint.
-    async fn current_store_peaks_hash(&self) -> Result<Word, ClientError> {
-        let sync_height = self.store.get_sync_height().await?;
-        Ok(self
-            .store
-            .get_partial_blockchain_peaks_by_block_num(sync_height)
-            .await?
-            .hash_peaks())
+    /// Returns the store-managed Partial MMR generation used as the cache freshness fingerprint.
+    async fn current_partial_mmr_generation(&self) -> Result<Vec<u8>, ClientError> {
+        self.store.get_partial_mmr_generation().await.map_err(Into::into)
     }
 
     // HELPERS
@@ -108,11 +101,10 @@ impl<AUTH> Client<AUTH> {
             fetch_block_header(self.rpc_api.clone(), block_num, current_partial_mmr).await?;
         let tracked_nodes = authenticated_block_nodes(&block_header, path_nodes);
 
-        // Insert header and MMR nodes
+        self.store.insert_partial_blockchain_nodes(&tracked_nodes).await?;
         self.store
             .insert_block_header(&block_header, current_partial_mmr.peaks(), true)
             .await?;
-        self.store.insert_partial_blockchain_nodes(&tracked_nodes).await?;
 
         Ok(block_header)
     }

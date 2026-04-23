@@ -53,6 +53,36 @@ use crate::rpc::{RPC_LIMITS_STORE_SETTING, RpcLimits};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
 use crate::transaction::{TransactionRecord, TransactionStatusVariant, TransactionStoreUpdate};
 
+/// Key used to store the Partial MMR cache invalidation generation.
+pub const PARTIAL_MMR_GENERATION_STORE_SETTING: &str = "partial_mmr_generation";
+
+const PARTIAL_MMR_GENERATION_BYTES: usize = 8;
+
+/// Decodes a stored Partial MMR generation counter.
+pub fn partial_mmr_generation_from_bytes(bytes: Option<&[u8]>) -> Result<u64, StoreError> {
+    let Some(bytes) = bytes else {
+        return Ok(0);
+    };
+
+    let bytes: [u8; PARTIAL_MMR_GENERATION_BYTES] = bytes.try_into().map_err(|_| {
+        StoreError::ParsingError("partial MMR generation should be 8 bytes".to_string())
+    })?;
+
+    Ok(u64::from_le_bytes(bytes))
+}
+
+/// Encodes a Partial MMR generation counter for storage.
+pub fn partial_mmr_generation_to_bytes(generation: u64) -> Vec<u8> {
+    generation.to_le_bytes().to_vec()
+}
+
+/// Returns the next stored Partial MMR generation counter.
+pub fn next_partial_mmr_generation(current: Option<&[u8]>) -> Result<Vec<u8>, StoreError> {
+    Ok(partial_mmr_generation_to_bytes(
+        partial_mmr_generation_from_bytes(current)?.wrapping_add(1),
+    ))
+}
+
 /// Contains [`ClientDataStore`] to automatically implement [`DataStore`] for anything that
 /// implements [`Store`]. This isn't public because it's an implementation detail to instantiate the
 /// executor.
@@ -394,6 +424,14 @@ pub trait Store: Send + Sync {
 
     /// Retrieves a value from the `settings` table.
     async fn get_setting(&self, key: String) -> Result<Option<Vec<u8>>, StoreError>;
+
+    /// Retrieves the Partial MMR cache invalidation generation.
+    async fn get_partial_mmr_generation(&self) -> Result<Vec<u8>, StoreError> {
+        Ok(self
+            .get_setting(PARTIAL_MMR_GENERATION_STORE_SETTING.into())
+            .await?
+            .unwrap_or_default())
+    }
 
     /// Deletes a value from the `settings` table.
     async fn remove_setting(&self, key: String) -> Result<(), StoreError>;

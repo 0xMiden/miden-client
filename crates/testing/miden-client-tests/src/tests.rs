@@ -509,6 +509,54 @@ async fn sync_state_mmr_with_in_memory_cache() {
     assert!(client.test_has_cached_partial_mmr());
 }
 
+#[tokio::test]
+async fn partial_mmr_cache_invalidates_on_same_tip_store_mutation() {
+    let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
+    let mut client = builder.cache_partial_mmr_in_memory(true).build().await.unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
+
+    let notes = rpc_api
+        .get_public_available_notes()
+        .into_iter()
+        .filter_map(|n| n.note().cloned())
+        .collect::<Vec<Note>>();
+
+    for note in &notes {
+        client
+            .import_notes(&[NoteFile::NoteDetails {
+                details: note.clone().into(),
+                after_block_num: 0.into(),
+                tag: Some(note.metadata().tag()),
+            }])
+            .await
+            .unwrap();
+    }
+
+    client.sync_state().await.unwrap();
+
+    let mut cached_partial_mmr = client.get_current_partial_mmr().await.unwrap();
+    assert!(cached_partial_mmr.open(1).unwrap().is_some());
+
+    let nodes_to_remove = cached_partial_mmr
+        .untrack(1)
+        .into_iter()
+        .map(|(idx, _)| idx)
+        .collect::<Vec<_>>();
+
+    client
+        .test_store()
+        .untrack_and_prune_irrelevant_blocks(&[BlockNumber::from(1u32)], &nodes_to_remove)
+        .await
+        .unwrap();
+
+    let refreshed_partial_mmr = client.get_current_partial_mmr().await.unwrap();
+    assert!(refreshed_partial_mmr.open(1).unwrap().is_none());
+}
+
 /// Tests that MMR authentication nodes are persisted even when `include_block` is false
 /// (i.e., a synced block has no relevant notes and is not the chain tip).
 ///
