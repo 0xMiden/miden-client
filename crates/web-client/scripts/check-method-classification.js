@@ -183,8 +183,10 @@ const allowedUnclassified = new Set([
   "createClient",
   "createClientWithExternalKeystore",
   "createMockClient",
-  // Internal impl method called directly by syncState wrappers
+  // Internal impl methods called directly by sync wrappers
   "syncStateImpl",
+  "syncNoteTransportImpl",
+  "syncAllImpl",
 ]);
 
 const unclassified = [...wasmMethods].filter(
