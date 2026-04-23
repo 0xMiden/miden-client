@@ -353,7 +353,7 @@ export class TransactionsResource {
       }
 
       try {
-        await this.#inner.syncStateWithTimeout(0);
+        await this.#inner.syncState();
       } catch {
         // Sync may fail transiently; continue polling
       }

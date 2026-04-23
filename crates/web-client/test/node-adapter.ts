@@ -194,10 +194,6 @@ function wrapClient(client: any, storeName?: string): any {
       if (prop === "syncState") {
         return (...args: any[]) => target.syncStateImpl(...args);
       }
-      // syncStateWithTimeout — just calls syncState (no browser lock coordination needed)
-      if (prop === "syncStateWithTimeout") {
-        return (_timeoutMs?: number) => target.syncStateImpl();
-      }
       // storeName — used by MidenClient for lock coordination
       if (prop === "storeName") {
         return storeName || "default";

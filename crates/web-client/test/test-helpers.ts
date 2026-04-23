@@ -420,7 +420,6 @@ function wrapClientForMidenClient(
     get(target, prop) {
       if (prop === "syncState")
         return (...args: any[]) => target.syncStateImpl(...args);
-      if (prop === "syncStateWithTimeout") return () => target.syncStateImpl();
       if (prop === "storeName") return storeName || "mock";
       if (prop === "wasmWebClient") return target;
       if (prop === "proveBlock") return async () => target.proveBlock();

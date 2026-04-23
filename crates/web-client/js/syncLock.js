@@ -53,10 +53,9 @@ function runUnderLock(dbId, fn) {
  * @param {string} dbId - Database ID
  * @param {string} methodId - Method identifier (see MethodName constants)
  * @param {() => Promise<T>} fn - Work to run under the lock
- * @param {number} timeoutMs - Optional overall timeout (0 = no timeout)
  * @returns {Promise<T>}
  */
-export async function withSyncLock(dbId, methodId, fn, timeoutMs = 0) {
+export function withSyncLock(dbId, methodId, fn) {
   const key = coalesceKey(dbId, methodId);
 
   let work = inFlight.get(key);
@@ -72,15 +71,5 @@ export async function withSyncLock(dbId, methodId, fn, timeoutMs = 0) {
       .catch(() => {});
   }
 
-  if (timeoutMs <= 0) return work;
-
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error("Sync timed out")), timeoutMs);
-  });
-  try {
-    return await Promise.race([work, timeout]);
-  } finally {
-    clearTimeout(timer);
-  }
+  return work;
 }

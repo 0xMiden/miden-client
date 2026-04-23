@@ -846,42 +846,22 @@ class WebClient {
    * @returns {Promise<SyncSummary>} The sync summary
    */
   async syncState() {
-    return this.syncStateWithTimeout(0);
-  }
-
-  /**
-   * Syncs the client (NTL followed by chain sync) with an optional timeout.
-   *
-   * This method coordinates concurrent sync calls using the Web Locks API when available,
-   * with an in-process mutex fallback for older browsers. If a sync is already in progress,
-   * subsequent callers will wait and receive the same result (coalescing behavior).
-   *
-   * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
-   * @returns {Promise<SyncSummary>} The sync summary
-   */
-  async syncStateWithTimeout(timeoutMs = 0) {
-    // Use storeName as the database ID for lock coordination
     const dbId = this.storeName || "default";
     const methodId = MethodName.SYNC_STATE;
 
     try {
-      return await withSyncLock(
-        dbId,
-        methodId,
-        async () => {
-          if (!this.worker) {
-            const wasmWebClient = await this.getWasmWebClient();
-            return await wasmWebClient.syncStateImpl();
-          }
-          const wasm = await getWasmOrThrow();
-          const serializedSyncSummaryBytes =
-            await this.callMethodWithWorker(methodId);
-          return wasm.SyncSummary.deserialize(
-            new Uint8Array(serializedSyncSummaryBytes)
-          );
-        },
-        timeoutMs
-      );
+      return await withSyncLock(dbId, methodId, async () => {
+        if (!this.worker) {
+          const wasmWebClient = await this.getWasmWebClient();
+          return await wasmWebClient.syncStateImpl();
+        }
+        const wasm = await getWasmOrThrow();
+        const serializedSyncSummaryBytes =
+          await this.callMethodWithWorker(methodId);
+        return wasm.SyncSummary.deserialize(
+          new Uint8Array(serializedSyncSummaryBytes)
+        );
+      });
     } catch (error) {
       console.error("INDEX.JS: Error in syncState:", error);
       throw error;
@@ -891,27 +871,21 @@ class WebClient {
   /**
    * Fetches private notes from the Note Transport Layer.
    *
-   * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
    * @returns {Promise<void>}
    */
-  async syncNoteTransport(timeoutMs = 0) {
+  async syncNoteTransport() {
     const dbId = this.storeName || "default";
     const methodId = MethodName.SYNC_NOTE_TRANSPORT;
 
     try {
-      await withSyncLock(
-        dbId,
-        methodId,
-        async () => {
-          if (!this.worker) {
-            const wasmWebClient = await this.getWasmWebClient();
-            await wasmWebClient.syncNoteTransportImpl();
-          } else {
-            await this.callMethodWithWorker(methodId);
-          }
-        },
-        timeoutMs
-      );
+      await withSyncLock(dbId, methodId, async () => {
+        if (!this.worker) {
+          const wasmWebClient = await this.getWasmWebClient();
+          await wasmWebClient.syncNoteTransportImpl();
+        } else {
+          await this.callMethodWithWorker(methodId);
+        }
+      });
     } catch (error) {
       console.error("INDEX.JS: Error in syncNoteTransport:", error);
       throw error;
@@ -921,31 +895,25 @@ class WebClient {
   /**
    * Syncs on-chain state only (no NTL fetch).
    *
-   * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
    * @returns {Promise<SyncSummary>}
    */
-  async syncChain(timeoutMs = 0) {
+  async syncChain() {
     const dbId = this.storeName || "default";
     const methodId = MethodName.SYNC_CHAIN;
 
     try {
-      return await withSyncLock(
-        dbId,
-        methodId,
-        async () => {
-          if (!this.worker) {
-            const wasmWebClient = await this.getWasmWebClient();
-            return await wasmWebClient.syncChainImpl();
-          }
-          const wasm = await getWasmOrThrow();
-          const serializedSyncSummaryBytes =
-            await this.callMethodWithWorker(methodId);
-          return wasm.SyncSummary.deserialize(
-            new Uint8Array(serializedSyncSummaryBytes)
-          );
-        },
-        timeoutMs
-      );
+      return await withSyncLock(dbId, methodId, async () => {
+        if (!this.worker) {
+          const wasmWebClient = await this.getWasmWebClient();
+          return await wasmWebClient.syncChainImpl();
+        }
+        const wasm = await getWasmOrThrow();
+        const serializedSyncSummaryBytes =
+          await this.callMethodWithWorker(methodId);
+        return wasm.SyncSummary.deserialize(
+          new Uint8Array(serializedSyncSummaryBytes)
+        );
+      });
     } catch (error) {
       console.error("INDEX.JS: Error in syncChain:", error);
       throw error;
@@ -1036,48 +1004,33 @@ class MockWebClient extends WebClient {
    * @returns {Promise<SyncSummary>} The sync summary
    */
   async syncState() {
-    return this.syncStateWithTimeout(0);
-  }
-
-  /**
-   * Syncs the mock client state with an optional timeout.
-   *
-   * @param {number} timeoutMs - Timeout in milliseconds (0 = no timeout)
-   * @returns {Promise<SyncSummary>} The sync summary
-   */
-  async syncStateWithTimeout(timeoutMs = 0) {
     const dbId = this.storeName || "mock";
     const methodId = MethodName.SYNC_STATE;
 
     try {
-      return await withSyncLock(
-        dbId,
-        methodId,
-        async () => {
-          const wasmWebClient = await this.getWasmWebClient();
+      return await withSyncLock(dbId, methodId, async () => {
+        const wasmWebClient = await this.getWasmWebClient();
 
-          if (!this.worker) {
-            return await wasmWebClient.syncStateImpl();
-          }
+        if (!this.worker) {
+          return await wasmWebClient.syncStateImpl();
+        }
 
-          const serializedMockChain = (await wasmWebClient.serializeMockChain())
-            .buffer;
-          const serializedMockNoteTransportNode = (
-            await wasmWebClient.serializeMockNoteTransportNode()
-          ).buffer;
+        const serializedMockChain = (await wasmWebClient.serializeMockChain())
+          .buffer;
+        const serializedMockNoteTransportNode = (
+          await wasmWebClient.serializeMockNoteTransportNode()
+        ).buffer;
 
-          const wasm = await getWasmOrThrow();
-          const serializedSyncSummaryBytes = await this.callMethodWithWorker(
-            MethodName.SYNC_STATE_MOCK,
-            serializedMockChain,
-            serializedMockNoteTransportNode
-          );
-          return wasm.SyncSummary.deserialize(
-            new Uint8Array(serializedSyncSummaryBytes)
-          );
-        },
-        timeoutMs
-      );
+        const wasm = await getWasmOrThrow();
+        const serializedSyncSummaryBytes = await this.callMethodWithWorker(
+          MethodName.SYNC_STATE_MOCK,
+          serializedMockChain,
+          serializedMockNoteTransportNode
+        );
+        return wasm.SyncSummary.deserialize(
+          new Uint8Array(serializedSyncSummaryBytes)
+        );
+      });
     } catch (error) {
       console.error("INDEX.JS: Error in syncState:", error);
       throw error;
