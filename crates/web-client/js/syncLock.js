@@ -63,9 +63,13 @@ export async function withSyncLock(dbId, methodId, fn, timeoutMs = 0) {
   if (!work) {
     work = runUnderLock(dbId, fn);
     inFlight.set(key, work);
-    work.finally(() => {
-      if (inFlight.get(key) === work) inFlight.delete(key);
-    });
+    // Swallow on the derived promise so a rejection here doesn't surface as
+    // an unhandled rejection; the caller still sees the error through `work`.
+    work
+      .finally(() => {
+        if (inFlight.get(key) === work) inFlight.delete(key);
+      })
+      .catch(() => {});
   }
 
   if (timeoutMs <= 0) return work;
