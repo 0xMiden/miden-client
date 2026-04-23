@@ -433,7 +433,7 @@ async fn sync_state_mmr() {
     // verify that the latest block number has been updated
     assert_eq!(client.get_sync_height().await.unwrap(), rpc_api.get_chain_tip_block_num());
 
-    assert!(client.test_has_cached_partial_mmr());
+    assert!(!client.test_has_cached_partial_mmr());
 
     // verify that we inserted the latest block into the DB via the client
     let latest_block = client.get_sync_height().await.unwrap();
@@ -472,9 +472,9 @@ async fn sync_state_mmr() {
 }
 
 #[tokio::test]
-async fn sync_state_mmr_without_in_memory_cache() {
+async fn sync_state_mmr_with_in_memory_cache() {
     let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
-    let mut client = builder.cache_partial_mmr_in_memory(false).build().await.unwrap();
+    let mut client = builder.cache_partial_mmr_in_memory(true).build().await.unwrap();
     client.ensure_genesis_in_place().await.unwrap();
 
     insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
@@ -500,13 +500,13 @@ async fn sync_state_mmr_without_in_memory_cache() {
 
     let sync_details = client.sync_state().await.unwrap();
     assert_eq!(sync_details.block_num, rpc_api.get_chain_tip_block_num());
-    assert!(!client.test_has_cached_partial_mmr());
+    assert!(client.test_has_cached_partial_mmr());
 
     let partial_mmr = client.get_current_partial_mmr().await.unwrap();
     assert!(partial_mmr.forest().num_leaves() >= 6);
     assert!(partial_mmr.open(1).unwrap().is_some());
     assert!(partial_mmr.open(4).unwrap().is_none());
-    assert!(!client.test_has_cached_partial_mmr());
+    assert!(client.test_has_cached_partial_mmr());
 }
 
 /// Tests that MMR authentication nodes are persisted even when `include_block` is false
