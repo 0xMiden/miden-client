@@ -287,11 +287,13 @@ impl StateSync {
         .await?;
 
         // Apply local changes: update the MMR, screen notes, and apply state transitions.
+        let tracked_accounts: BTreeSet<AccountId> = account_ids.iter().copied().collect();
         self.apply_sync_result(
             sync_data,
             &public_note_records,
             &mut state_sync_update,
             current_partial_mmr,
+            &tracked_accounts,
         )
         .await?;
 
@@ -423,6 +425,7 @@ impl StateSync {
         public_note_records: &BTreeMap<NoteId, InputNoteRecord>,
         state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
+        tracked_accounts: &BTreeSet<AccountId>,
     ) -> Result<(), ClientError> {
         let RawStateSyncData {
             mmr_delta,
@@ -510,7 +513,7 @@ impl StateSync {
                 .apply_output_note_inclusion_proofs(&transaction.output_notes)?;
 
             // Detect output notes erased by same-batch note erasure.
-            Self::mark_erased_notes_as_consumed(state_sync_update, transaction);
+            Self::mark_erased_notes_as_consumed(state_sync_update, transaction, tracked_accounts);
         }
 
         Ok(())
@@ -524,12 +527,15 @@ impl StateSync {
     fn mark_erased_notes_as_consumed(
         state_sync_update: &mut StateSyncUpdate,
         transaction: &TransactionInclusion,
+        tracked_accounts: &BTreeSet<AccountId>,
     ) {
         for note_header in &transaction.erased_output_notes {
             // Best-effort: ignore errors for notes not tracked by this client.
-            let _ = state_sync_update
-                .note_updates
-                .mark_erased_note_as_consumed(note_header, transaction.block_num);
+            let _ = state_sync_update.note_updates.mark_erased_note_as_consumed(
+                note_header,
+                transaction.block_num,
+                tracked_accounts,
+            );
         }
     }
 
@@ -1815,8 +1821,9 @@ mod tests {
 
         // Mark the note as erased (created and consumed in the same batch).
         let block_num = BlockNumber::from(3u32);
+        let tracked_accounts = BTreeSet::new();
         note_updates
-            .mark_erased_note_as_consumed(&note_header, block_num)
+            .mark_erased_note_as_consumed(&note_header, block_num, &tracked_accounts)
             .expect("marking erased note should succeed");
 
         let updated = note_updates

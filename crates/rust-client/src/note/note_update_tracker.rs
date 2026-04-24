@@ -1,4 +1,4 @@
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
@@ -352,13 +352,16 @@ impl NoteUpdateTracker {
         &mut self,
         note_header: &NoteHeader,
         block_num: BlockNumber,
+        tracked_accounts: &BTreeSet<AccountId>,
     ) -> Result<(), ClientError> {
         let note_id = note_header.id();
 
-        // Extract consumer from the note header metadata.
+        // Extract the consumer from the `NetworkAccountTarget` attachment; keep it only if
+        // the target account is tracked by this client.
         let consumer = NetworkAccountTarget::try_from(note_header.metadata().attachment())
             .ok()
-            .map(|t| t.target_id());
+            .map(|t| t.target_id())
+            .filter(|id| tracked_accounts.contains(id));
 
         if let Some(output_note) = self.get_output_note_by_id(note_id)
             && !output_note.is_consumed()
@@ -368,10 +371,9 @@ impl NoteUpdateTracker {
             output_note.nullifier_received(nullifier, block_num)?;
         }
 
-        // If no input note is tracked but the output note is (the client created the note
-        // and also tracks the consumer), build an input record from the output details so
-        // the consumption surfaces through `InputNoteReader`.
-        if !self.input_notes.contains_key(&note_id)
+        // Only create an input record when the consumer is a tracked account.
+        if consumer.is_some()
+            && !self.input_notes.contains_key(&note_id)
             && let Some(output_note) = self.output_notes.get(&note_id)
             && let Ok(note) = Note::try_from(output_note.inner().clone())
         {
