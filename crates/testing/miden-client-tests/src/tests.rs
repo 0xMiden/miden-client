@@ -1285,8 +1285,12 @@ async fn input_note_reader_finds_externally_consumed_notes() {
     assert_eq!(collected[0].consumer_account(), Some(consumer_id));
 }
 
-#[tokio::test]
-async fn irrelevant_block_pruning_respects_sync_interval() {
+/// Builds a chain with two blocks relevant to a tracked account (blocks 1 and 4) and a client
+/// synced up to block 4 with `prune_interval` configured. Returns the consuming pieces needed to
+/// make block 4 irrelevant on demand.
+async fn setup_prunable_block_scenario(
+    prune_interval: Option<u32>,
+) -> (MockClient<FilesystemKeyStore>, MockRpcApi, AccountId, Note) {
     let mut builder = MockChainBuilder::new();
     let mock_account = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
 
@@ -1308,7 +1312,7 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
 
     let mut chain = builder.build().unwrap();
 
-    // Block 1: create the first unspent note.
+    // Block 1: create the first unspent note (keeps block 1 permanently relevant).
     let tx = Box::pin(
         chain
             .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note_1])
@@ -1327,7 +1331,8 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
     chain.prove_next_block().unwrap();
     chain.prove_next_block().unwrap();
 
-    // Block 4: create the second note, which will later become irrelevant.
+    // Block 4: create the second note, which the caller will later consume to make block 4
+    // irrelevant.
     let tx = Box::pin(
         chain
             .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note_2])
@@ -1343,8 +1348,7 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
     chain.prove_next_block().unwrap();
 
     let rng = RandomCoin::new(rand::random::<[u64; 4]>().map(Felt::new).into());
-    let keystore_path = std::env::temp_dir();
-    let keystore = FilesystemKeyStore::new(keystore_path).unwrap();
+    let keystore = FilesystemKeyStore::new(std::env::temp_dir()).unwrap();
     let mock_rpc = MockRpcApi::new(chain);
 
     let mut client = ClientBuilder::new()
@@ -1354,7 +1358,7 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
         .authenticator(Arc::new(keystore))
         .in_debug_mode(DebugMode::Enabled)
         .tx_discard_delta(None)
-        .irrelevant_block_prune_interval(Some(2))
+        .irrelevant_block_prune_interval(prune_interval)
         .build()
         .await
         .unwrap();
@@ -1362,13 +1366,23 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
     client.add_note_tag(NoteTag::new(0)).await.unwrap();
 
     client.sync_state().await.unwrap();
-    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 2);
+    assert_eq!(
+        client.test_store().get_tracked_block_headers().await.unwrap().len(),
+        2,
+        "setup precondition: two relevant blocks tracked",
+    );
 
+    (client, mock_rpc, mock_account.id(), note_second)
+}
+
+/// Consumes `note` against `account_id` on the mocked chain and proves the resulting block, so the
+/// block that originally carried the note becomes irrelevant from the client's perspective.
+async fn consume_note_and_prove(mock_rpc: &MockRpcApi, account_id: AccountId, note: Note) {
     let tx = {
         let tx_context = mock_rpc
             .mock_chain
             .write()
-            .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[note_second])
+            .build_tx_context(TxContextInput::AccountId(account_id), &[], &[note])
             .unwrap()
             .build()
             .unwrap();
@@ -1376,6 +1390,14 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
     };
     mock_rpc.mock_chain.write().add_pending_executed_transaction(&tx).unwrap();
     mock_rpc.prove_block();
+}
+
+#[tokio::test]
+async fn irrelevant_block_pruning_respects_sync_interval() {
+    let (mut client, mock_rpc, account_id, note_second) =
+        setup_prunable_block_scenario(Some(2)).await;
+
+    consume_note_and_prove(&mock_rpc, account_id, note_second).await;
 
     client.sync_state().await.unwrap();
     assert_eq!(
@@ -1391,6 +1413,25 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
         1,
         "the irrelevant block should be pruned once the sync interval is reached",
     );
+}
+
+#[tokio::test]
+async fn irrelevant_block_pruning_disabled_when_interval_is_none() {
+    let (mut client, mock_rpc, account_id, note_second) =
+        setup_prunable_block_scenario(None).await;
+
+    consume_note_and_prove(&mock_rpc, account_id, note_second).await;
+
+    // With pruning disabled, both tracked blocks must remain across repeated syncs.
+    for _ in 0..5 {
+        mock_rpc.prove_block();
+        client.sync_state().await.unwrap();
+        assert_eq!(
+            client.test_store().get_tracked_block_headers().await.unwrap().len(),
+            2,
+            "no pruning should occur when the prune interval is None",
+        );
+    }
 }
 
 #[tokio::test]
