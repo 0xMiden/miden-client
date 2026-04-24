@@ -116,7 +116,7 @@ impl Deserializable for TransactionStoreUpdate {
 // TESTS
 // ================================================================================================
 
-#[cfg(all(test, feature = "testing"))]
+#[cfg(all(test))]
 mod tests {
     use alloc::boxed::Box;
 
