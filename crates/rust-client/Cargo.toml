@@ -55,22 +55,22 @@ miden-tx                   = { workspace = true }
 # External dependencies
 anyhow       = { workspace = true }
 async-trait  = { workspace = true }
-chrono       = { optional = false, version = "0.4" }
+chrono       = { workspace = true }
 futures      = { version = "0.3" }
 hex          = { workspace = true }
-prost        = { default-features = false, features = ["derive"], version = "0.14" }
+prost        = { features = ["derive"], workspace = true }
 prost-types  = { version = "0.14" }
 rand         = { workspace = true }
 serde        = { workspace = true }
-serde_json   = { version = "1.0" }
-tempfile     = { optional = true, version = "3.0" }
+serde_json   = { workspace = true }
+tempfile     = { optional = true, workspace = true }
 thiserror    = { workspace = true }
 tokio        = { features = ["time"], optional = true, workspace = true }
-tonic        = { default-features = false, features = ["codegen"], version = "0.14" }
+tonic        = { features = ["codegen"], workspace = true }
 tonic-health = { version = "0.14" }
 tonic-prost  = { version = "0.14" }
 tracing      = { workspace = true }
-uuid         = { features = ["js", "serde", "v4"], optional = true, version = "1.10" }
+uuid         = { features = ["js", "serde", "v4"], optional = true, workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 gloo-timers           = { features = ["futures"], version = "0.3" }
@@ -82,7 +82,7 @@ miden-note-transport-proto-build = { workspace = true }
 miden-protocol                   = { workspace = true }
 miden-standards                  = { workspace = true }
 miette                           = { workspace = true }
-prost                            = { default-features = false, features = ["derive"], version = "0.14" }
+prost                            = { features = ["derive"], workspace = true }
 tonic-prost-build                = { version = "0.14" }
 
 [dev-dependencies]
