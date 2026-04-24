@@ -836,11 +836,12 @@ where
         &'auth self,
         data_store: &'store STORE,
     ) -> Result<TransactionExecutor<'store, 'auth, STORE, AUTH>, TransactionExecutorError> {
-        let mut executor = TransactionExecutor::new(data_store).with_options(self.exec_options)?;
+        let mut executor = TransactionExecutor::new(data_store)
+            .with_options(self.exec_options)?
+            .with_source_manager(self.source_manager.clone());
         if let Some(authenticator) = self.authenticator.as_deref() {
             executor = executor.with_authenticator(authenticator);
         }
-        executor = executor.with_source_manager(self.source_manager.clone());
 
         Ok(executor)
     }
