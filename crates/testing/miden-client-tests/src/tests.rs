@@ -481,32 +481,18 @@ async fn sync_state_mmr_with_in_memory_cache() {
         .await
         .unwrap();
 
-    let notes = rpc_api
-        .get_public_available_notes()
-        .into_iter()
-        .filter_map(|n| n.note().cloned())
-        .collect::<Vec<Note>>();
-
-    for note in &notes {
-        client
-            .import_notes(&[NoteFile::NoteDetails {
-                details: note.clone().into(),
-                after_block_num: 0.into(),
-                tag: Some(note.metadata().tag()),
-            }])
-            .await
-            .unwrap();
-    }
-
-    let sync_details = client.sync_state().await.unwrap();
-    assert_eq!(sync_details.block_num, rpc_api.get_chain_tip_block_num());
+    // First sync populates the cache.
+    client.sync_state().await.unwrap();
     assert!(client.test_has_cached_partial_mmr());
 
-    let partial_mmr = client.get_current_partial_mmr().await.unwrap();
-    assert!(partial_mmr.forest().num_leaves() >= 6);
-    assert!(partial_mmr.open(1).unwrap().is_some());
-    assert!(partial_mmr.open(4).unwrap().is_none());
-    assert!(client.test_has_cached_partial_mmr());
+    // Advance the chain and sync again to mutate the cached MMR.
+    rpc_api.advance_blocks(2);
+    client.sync_state().await.unwrap();
+
+    // Cache must agree with the store.
+    let cached = client.get_current_partial_mmr().await.unwrap();
+    let stored = client.test_store().get_current_partial_mmr().await.unwrap();
+    assert_eq!(cached.peaks(), stored.peaks());
 }
 
 /// Tests that MMR authentication nodes are persisted even when `include_block` is false
