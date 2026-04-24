@@ -1417,8 +1417,7 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
 
 #[tokio::test]
 async fn irrelevant_block_pruning_disabled_when_interval_is_none() {
-    let (mut client, mock_rpc, account_id, note_second) =
-        setup_prunable_block_scenario(None).await;
+    let (mut client, mock_rpc, account_id, note_second) = setup_prunable_block_scenario(None).await;
 
     consume_note_and_prove(&mock_rpc, account_id, note_second).await;
 
