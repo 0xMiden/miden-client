@@ -4,3 +4,10 @@ rules:
       - publish-crates-release.yml
       - publish-web-client-next.yml
       - publish-web-client-release.yml
+  secrets-outside-env:
+    ignore:
+      - publish-crates-dry-run.yml
+      - publish-crates-release.yml
+      - publish-web-client-next.yml
+      - publish-web-client-release.yml
+      - trigger-deploy-docs.yml
