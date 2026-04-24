@@ -23,11 +23,17 @@ serde       = { features = ["derive"], workspace = true }
 # External dependencies
 base64               = { version = "0.22" }
 serde-wasm-bindgen   = { version = "0.6" }
+serde_bytes          = { version = "0.11" }
 wasm-bindgen         = { features = ["serde-serialize"], version = "0.2" }
 wasm-bindgen-futures = { version = "0.4" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { features = ["Storage", "Window", "console"], version = "0.3" }
+
+[package.metadata.cargo-machete]
+# "serde_bytes" is used only via `#[serde(with = "serde_bytes")]` string attributes,
+# which cargo-machete's static analysis cannot detect.
+ignored = ["serde_bytes"]
 
 [lints]
 workspace = true
