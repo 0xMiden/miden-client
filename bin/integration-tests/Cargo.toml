@@ -35,3 +35,7 @@ tokio              = { workspace = true }
 tracing            = { workspace = true }
 tracing-subscriber = { features = ["env-filter", "fmt", "json"], version = "0.3" }
 uuid               = { version = "1.10" }
+
+[lib]
+doctest = false
+test    = false

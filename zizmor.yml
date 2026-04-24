@@ -1,0 +1,6 @@
+rules:
+  use-trusted-publishing:
+    ignore:
+      - publish-crates-release.yml
+      - publish-web-client-next.yml
+      - publish-web-client-release.yml

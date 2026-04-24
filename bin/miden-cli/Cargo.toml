@@ -46,7 +46,6 @@ midenc-hir-type = "0.5"
 predicates      = { version = "3.0" }
 regex           = { version = "1.0" }
 serial_test     = { features = ["file_locks"], version = "3.0" }
-uuid            = { features = ["serde", "v4"], version = "1.10" }
 
 [lints]
 workspace = true
