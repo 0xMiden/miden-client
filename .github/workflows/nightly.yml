@@ -22,6 +22,8 @@ jobs:
         with:
           ref: "next"
           persist-credentials: false
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
       - name: Rustup
         run: rustup install beta && rustup default beta
       # Keep this on a released install-action commit with an explicit tool; shortcut tags can
@@ -76,6 +78,8 @@ jobs:
         with:
           ref: "next"
           persist-credentials: false
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
       # Keep this on a released install-action commit with an explicit tool; shortcut tags can
       # trip zizmor's impostor-commit audit when they are later retagged.
       - name: Install cargo-binstall
