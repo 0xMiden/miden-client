@@ -787,16 +787,16 @@ async fn list_addresses_add() -> Result<()> {
     assert!(formatted_output.contains("Unspecified"));
     assert!(!formatted_output.contains("BasicWallet"));
 
-    // Add a basic wallet address to the account
-    let mut add_address_cmd = cargo_bin_cmd!("miden-client");
-    let custom_note_tag_len = "10";
-    add_address_cmd.args([
-        "address",
-        "add",
+    // Encode a BasicWallet address with tag length 10, then add it to the account.
+    let encoded_address = encode_address_cli(
+        &temp_dir,
         &basic_account_id,
         &AddressInterface::BasicWallet.to_string(),
-        custom_note_tag_len,
-    ]);
+        Some("10"),
+    );
+
+    let mut add_address_cmd = cargo_bin_cmd!("miden-client");
+    add_address_cmd.args(["address", "add", &basic_account_id, &encoded_address]);
     let output = add_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
     assert!(output.status.success());
 
@@ -809,16 +809,16 @@ async fn list_addresses_add() -> Result<()> {
     assert_eq!(formatted_output.matches("Unspecified").count(), 1);
     assert_eq!(formatted_output.matches("BasicWallet").count(), 1);
 
-    // Add another basic wallet address to the account
-    let mut add_address_cmd = cargo_bin_cmd!("miden-client");
-    let custom_note_tag_len = "5";
-    add_address_cmd.args([
-        "address",
-        "add",
+    // Encode another BasicWallet address (different tag length → different address) and add it too.
+    let encoded_address = encode_address_cli(
+        &temp_dir,
         &basic_account_id,
         &AddressInterface::BasicWallet.to_string(),
-        custom_note_tag_len,
-    ]);
+        Some("5"),
+    );
+
+    let mut add_address_cmd = cargo_bin_cmd!("miden-client");
+    add_address_cmd.args(["address", "add", &basic_account_id, &encoded_address]);
     let output = add_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
     assert!(output.status.success());
 
@@ -830,6 +830,36 @@ async fn list_addresses_add() -> Result<()> {
     assert!(formatted_output.contains(&basic_account_id));
     assert_eq!(formatted_output.matches("Unspecified").count(), 1);
     assert_eq!(formatted_output.matches("BasicWallet").count(), 2);
+
+    Ok(())
+}
+
+/// Verifies that `address add` rejects a bech32 address whose encoded account ID does not
+/// match the `<ACCOUNT_ID>` argument.
+#[tokio::test]
+async fn address_add_rejects_mismatched_account() -> Result<()> {
+    let temp_dir = init_cli().1;
+
+    let account_a = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let account_b = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    assert_ne!(account_a, account_b, "two new wallets should have distinct ids");
+
+    sync_cli(&temp_dir);
+
+    // Encode an address that points at account A.
+    let encoded_for_a =
+        encode_address_cli(&temp_dir, &account_a, &AddressInterface::BasicWallet.to_string(), None);
+
+    // Trying to add it to account B must fail.
+    let mut add_cmd = cargo_bin_cmd!("miden-client");
+    add_cmd.args(["address", "add", &account_b, &encoded_for_a]);
+    let output = add_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(!output.status.success(), "expected add to fail on account mismatch");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("does not match the provided account ID"),
+        "unexpected stderr: {stderr}"
+    );
 
     Ok(())
 }
@@ -1161,6 +1191,29 @@ fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         .nth(1)
         .unwrap()
         .to_string()
+}
+
+/// Runs `miden-client address encode` and returns the printed bech32 address.
+fn encode_address_cli(
+    cli_path: &Path,
+    account_id: &str,
+    interface: &str,
+    tag_len: Option<&str>,
+) -> String {
+    let mut encode_cmd = cargo_bin_cmd!("miden-client");
+    let mut args = vec!["address", "encode", account_id, interface];
+    if let Some(tag_len) = tag_len {
+        args.push(tag_len);
+    }
+    encode_cmd.args(args);
+    let output = encode_cmd.current_dir(cli_path).output().unwrap();
+    assert!(
+        output.status.success(),
+        "address encode failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    String::from_utf8(output.stdout).unwrap().trim().to_string()
 }
 
 pub type TestClient = Client<FilesystemKeyStore>;
