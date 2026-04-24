@@ -4,6 +4,13 @@ export * from "./crates/miden_client_web";
 // Re-export all simplified API types
 export * from "./api-types";
 
+// Explicit re-export to shadow the wasm-bindgen `AuthScheme` enum declared
+// in `./crates/miden_client_web` with the user-facing string constant plus
+// merged string-union type from `./api-types`. Without this, `export *`
+// makes the name ambiguous and TypeScript resolves to the crates enum,
+// breaking `AuthScheme.Falcon` / `AuthScheme.ECDSA` lookups.
+export { AuthScheme, resolveAuthScheme } from "./api-types";
+
 // Import types needed for the @internal class declarations below
 import type {
   WebClient as WasmWebClientBase,

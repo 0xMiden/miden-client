@@ -87,9 +87,14 @@ vi.mock("@miden-sdk/miden-sdk/lazy", () => {
 
   return {
     AuthScheme: {
-      AuthRpoFalcon512: 2,
-      AuthEcdsaK256Keccak: 1,
+      Falcon: "falcon",
+      ECDSA: "ecdsa",
     },
+    resolveAuthScheme: vi.fn((scheme?: string) => {
+      if (scheme === "ecdsa") return 1;
+      if (scheme === "falcon" || scheme == null) return 2;
+      throw new Error(`Unknown scheme: ${scheme}`);
+    }),
     WebClient,
     WasmWebClient: WebClient,
     AccountId: {

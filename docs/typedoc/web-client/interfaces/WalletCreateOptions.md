@@ -10,7 +10,7 @@
 
 ### auth?
 
-> `optional` **auth**: [`AuthSchemeType`](../type-aliases/AuthSchemeType.md)
+> `optional` **auth**: [`AuthScheme`](../type-aliases/AuthScheme.md)
 
 ***
 

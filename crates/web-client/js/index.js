@@ -14,6 +14,8 @@ import {
   _setWasm as _setStandaloneWasm,
   _setWebClient as _setStandaloneWebClient,
 } from "./standalone.js";
+import { resolveAuthScheme } from "./utils.js";
+export { resolveAuthScheme };
 export * from "../Cargo.toml";
 
 export const AccountType = Object.freeze({

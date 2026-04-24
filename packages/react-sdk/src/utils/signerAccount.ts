@@ -62,8 +62,13 @@ export async function initializeSignerAccount(
   client: WebClient,
   config: SignerAccountConfig
 ): Promise<string> {
-  const { AccountBuilder, AccountComponent, AuthScheme, Word } =
-    await import("@miden-sdk/miden-sdk/lazy");
+  const {
+    AccountBuilder,
+    AccountComponent,
+    AuthScheme,
+    Word,
+    resolveAuthScheme,
+  } = await import("@miden-sdk/miden-sdk/lazy");
 
   // Sync first to get latest state
   await client.syncState();
@@ -94,7 +99,7 @@ export async function initializeSignerAccount(
     .withAuthComponent(
       AccountComponent.createAuthComponentFromCommitment(
         commitmentWord,
-        AuthScheme.AuthEcdsaK256Keccak
+        resolveAuthScheme(AuthScheme.ECDSA)
       )
     )
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK type mismatch between JS wrapper AccountType and WASM enum AccountType
