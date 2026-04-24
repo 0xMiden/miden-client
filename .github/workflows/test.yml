@@ -241,15 +241,9 @@ jobs:
       - name: Restore note-transport permissions
         run: chmod +x target/release/miden-note-transport-node-bin
       - name: Start test node
-        run: |
-          RUST_LOG=none target/release/testing-node-builder &
-          sleep 4
-          pgrep -f testing-node-builder || (echo "Failed to start node" && exit 1)
+        run: ./scripts/start-ci-service.sh testing-node-builder 57291 target/release/testing-node-builder
       - name: Start note transport
-        run: |
-          RUST_LOG=none target/release/miden-note-transport-node-bin &
-          sleep 4
-          pgrep -f miden-note-transport-node-bin || (echo "Failed to start note transport" && exit 1)
+        run: ./scripts/start-ci-service.sh miden-note-transport-node-bin 57292 target/release/miden-note-transport-node-bin
       - name: Run integration tests
         run: make integration-test-full
       - name: Stop test node
