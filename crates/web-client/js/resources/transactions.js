@@ -201,6 +201,11 @@ export class TransactionsResource {
         ({ accountId, request } = await this.#buildSwapRequest(opts, wasm));
         break;
       }
+      case "custom": {
+        accountId = resolveAccountRef(opts.account, wasm);
+        request = opts.request;
+        break;
+      }
       default:
         throw new Error(`Unknown preview operation: ${opts.operation}`);
     }
@@ -517,8 +522,13 @@ export class TransactionsResource {
   async #submitOrSubmitWithProver(accountId, request, perCallProver) {
     const result = await this.#inner.executeTransaction(accountId, request);
     const prover = perCallProver ?? this.#client.defaultProver;
+    // Use proveTransactionWithProver (by-reference) when a prover is
+    // provided, so the JS-side handle is NOT consumed by wasm-bindgen.
+    // Passing the prover by value would transfer ownership and invalidate
+    // the JS object after one call, causing silent fallback to local
+    // proving on reuse.
     const proven = prover
-      ? await this.#inner.proveTransaction(result, prover)
+      ? await this.#inner.proveTransactionWithProver(result, prover)
       : await this.#inner.proveTransaction(result);
     const txId = result.id();
     const height = await this.#inner.submitProvenTransaction(proven, result);

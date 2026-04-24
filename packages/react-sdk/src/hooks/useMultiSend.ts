@@ -8,7 +8,7 @@ import {
   NoteType,
   NoteArray,
   TransactionRequestBuilder,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 import type {
   MultiSendOptions,
   TransactionStage,
@@ -152,7 +152,9 @@ export function useMultiSend(): UseMultiSendResult {
         const provenTransaction = await proveWithFallback(
           (resolvedProver) =>
             runExclusiveDirect(() =>
-              client.proveTransaction(txResult, resolvedProver)
+              resolvedProver
+                ? client.proveTransactionWithProver(txResult, resolvedProver)
+                : client.proveTransaction(txResult)
             ),
           proverConfig
         );

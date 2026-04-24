@@ -292,7 +292,7 @@ fn counter_contract_library(source_manager: Arc<dyn SourceManagerSync>) -> Arc<L
         .parse_str(
             Path::new("external_contract::counter_contract"),
             COUNTER_CONTRACT,
-            source_manager,
+            source_manager.clone(),
         )
         .map_err(|err| anyhow!(err))
         .unwrap();

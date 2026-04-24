@@ -819,3 +819,180 @@ test.describe("Sync Lock Performance", () => {
     expect(result.fasterOrEqual).toBe(true);
   });
 });
+
+test.describe("WASM Call Serialization", () => {
+  // Reproduces the race reported against the React SDK v0.14 migration in
+  // the `miden-frontend-template` (Vite + React) repo. `useIncrementCounter`
+  // held an ~2–4s `runExclusive` block that overlapped the provider's
+  // `autoSyncInterval` timer (15s default). Proxy-fallback reads like
+  // `getAccount` / `getAccounts` went straight to wasm-bindgen unserialised,
+  // racing the timer-driven `syncState()` on the shared WebClient RefCell
+  // and panicking with `"recursive use of an object detected which would
+  // lead to unsafe aliasing in rust"`.
+
+  const isRecursivePanic = (msg: unknown): boolean =>
+    typeof msg === "string" && msg.includes("recursive use of an object");
+
+  test("proxy-fallback read does not panic when syncState is in flight", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      // Fire the explicitly-wrapped syncState alongside proxy-fallback reads.
+      // Without the fix, `getAccounts` / `getSyncHeight` bypass the
+      // _serializeWasmCall chain and collide with syncState on the RefCell.
+      const results = await Promise.allSettled([
+        client.syncState(),
+        client.getAccounts(),
+        client.getSyncHeight(),
+        client.getAccounts(),
+      ]);
+
+      return {
+        total: results.length,
+        fulfilled: results.filter((r) => r.status === "fulfilled").length,
+        errors: results
+          .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+          .map((r) => r.reason?.message ?? String(r.reason)),
+      };
+    });
+
+    expect(result.errors.filter(isRecursivePanic)).toEqual([]);
+    expect(result.fulfilled).toBe(result.total);
+  });
+
+  test("many concurrent proxy-fallback reads do not panic", async ({
+    page,
+  }) => {
+    // Stress test: without serialization, N concurrent reads will collide on
+    // the RefCell. With the chain, they queue cleanly.
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+      const promises = Array(10)
+        .fill(null)
+        .flatMap(() => [client.getAccounts(), client.getSyncHeight()]);
+
+      const results = await Promise.allSettled(promises);
+      return {
+        total: results.length,
+        fulfilled: results.filter((r) => r.status === "fulfilled").length,
+        errors: results
+          .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+          .map((r) => r.reason?.message ?? String(r.reason)),
+      };
+    });
+
+    expect(result.errors.filter(isRecursivePanic)).toEqual([]);
+    expect(result.fulfilled).toBe(result.total);
+  });
+
+  test("importAccountById racing syncState does not panic", async ({
+    page,
+  }) => {
+    // Mirrors the exact `useIncrementCounter.ts::loadCount` shape:
+    //   if (!(await client.getAccount(id))) await client.importAccountById(id);
+    //   await client.syncState();
+    //   await client.getAccount(id);
+    // We run these concurrently (not sequentially) to stress the race. The
+    // import may reject against the node ("account not found") — that's fine,
+    // the assertion is specifically about the recursive-use panic.
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      // Freshly created account id that the node won't have — importAccountById
+      // will exercise the WASM + network path and likely reject.
+      const wallet = await client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        window.AuthScheme.AuthRpoFalcon512
+      );
+      const id = wallet.id();
+
+      const settle = (p: Promise<unknown>) =>
+        p.then(
+          () => null,
+          (e) => (e?.message ?? String(e)) as string
+        );
+
+      const errors = await Promise.all([
+        settle(client.getAccount(id)),
+        settle(client.importAccountById(id)),
+        settle(client.syncState()),
+        settle(client.getAccount(id)),
+        settle(client.getAccountStorage(id)),
+      ]);
+
+      return { errors: errors.filter((e): e is string => e !== null) };
+    });
+
+    expect(result.errors.filter(isRecursivePanic)).toEqual([]);
+  });
+
+  test("newWallet racing proxy-fallback reads does not panic", async ({
+    page,
+  }) => {
+    // Mirrors "clicking increment right as the timer fires": an in-flight
+    // mutating call (account creation here — stands in for `executeTransaction`,
+    // which needs a real TransactionRequest to build) overlapping a
+    // proxy-fallback read and a syncState.
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      const settle = (p: Promise<unknown>) =>
+        p.then(
+          () => null,
+          (e) => (e?.message ?? String(e)) as string
+        );
+
+      const errors = await Promise.all([
+        settle(
+          client.newWallet(
+            window.AccountStorageMode.private(),
+            true,
+            window.AuthScheme.AuthRpoFalcon512
+          )
+        ),
+        settle(client.syncState()),
+        settle(client.getAccounts()),
+        settle(client.getSyncHeight()),
+      ]);
+
+      return { errors: errors.filter((e): e is string => e !== null) };
+    });
+
+    expect(result.errors.filter(isRecursivePanic)).toEqual([]);
+  });
+
+  test("waitForIdle blocks until the in-flight serialized call settles", async ({
+    page,
+  }) => {
+    // Must use a method that goes DIRECTLY through `_serializeWasmCall`
+    // (e.g. `newWallet`) — `syncState` awaits `acquireSyncLock` BEFORE
+    // populating the chain, so the chain is still empty in the same task
+    // turn that `waitForIdle()` reads it, causing `waitForIdle` to resolve
+    // immediately regardless of the in-flight sync.
+    const result = await page.evaluate(async () => {
+      const client = window.client;
+
+      let walletDone = false;
+      const walletPromise = client
+        .newWallet(
+          window.AccountStorageMode.private(),
+          true,
+          window.AuthScheme.AuthRpoFalcon512
+        )
+        .finally(() => {
+          walletDone = true;
+        });
+
+      await client.waitForIdle();
+      const walletDoneWhenIdleResolved = walletDone;
+      await walletPromise;
+
+      return { walletDoneWhenIdleResolved };
+    });
+
+    expect(result.walletDoneWhenIdleResolved).toBe(true);
+  });
+});

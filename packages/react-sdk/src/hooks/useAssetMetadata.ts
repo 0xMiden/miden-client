@@ -3,7 +3,7 @@ import {
   BasicFungibleFaucetComponent,
   Endpoint,
   RpcClient,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 import { useAssetMetadataStore, useMidenStore } from "../store/MidenStore";
 import type { AssetMetadata } from "../types";
 import { isFaucetId, parseAccountId } from "../utils/accountParsing";

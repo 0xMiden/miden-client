@@ -1,16 +1,23 @@
 {
   "name": "@miden-sdk/miden-sdk",
-  "version": "0.14.1",
+  "version": "0.14.4",
   "description": "Miden Wasm SDK",
   "collaborators": [
     "Miden"
   ],
   "type": "module",
-  "main": "./dist/index.js",
-  "browser": "./dist/index.js",
+  "main": "./dist/eager.js",
+  "browser": "./dist/eager.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/eager.js"
+    },
+    "./lazy": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "files": [
     "dist",
@@ -22,6 +29,7 @@
     "build-dev": "npm install && MIDEN_WEB_DEV=true npm run build",
     "check:wasm-types": "node ./scripts/check-bindgen-types.js",
     "check:method-classification": "node ./scripts/check-method-classification.js",
+    "check:standalone-types": "node ./scripts/check-standalone-types.js",
     "test": "yarn playwright install --with-deps && yarn playwright test",
     "test:ci": "yarn playwright install --with-deps chromium && yarn playwright test",
     "test:ci:remote_prover": "yarn playwright install --with-deps && cross-env TEST_MIDEN_PROVER_URL=localhost yarn playwright test -g 'with remote prover'",

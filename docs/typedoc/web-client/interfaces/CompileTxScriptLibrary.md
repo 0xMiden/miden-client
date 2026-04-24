@@ -18,10 +18,10 @@ MASM source code for the library.
 
 ### linking?
 
-> `optional` **linking**: `"dynamic"` \| `"static"`
+> `optional` **linking**: [`Linking`](../type-aliases/Linking.md)
 
-`"dynamic"` (default) — procedures are linked via DYNCALL at runtime.
-`"static"` — procedures are inlined at compile time.
+`Linking.Dynamic` (default) — procedures are linked via DYNCALL at runtime.
+`Linking.Static` — procedures are inlined at compile time.
 
 ***
 

@@ -119,6 +119,64 @@ function App() {
 }
 ```
 
+## Next.js & SSR
+
+The React SDK is Next.js-compatible out of the box: it ships two bundle variants built from a single source tree, and both internally import `@miden-sdk/miden-sdk/lazy` — the lazy entry point that does **not** use a top-level `await`. Nothing initializes WASM at module evaluation, so server-side rendering never hangs.
+
+- Default (`@miden-sdk/react`) — internally consumes the eager SDK. Use this in plain browser apps, Vite, CRA.
+- `@miden-sdk/react/lazy` — internally consumes the lazy SDK. Use this in Next.js (app router or pages), SSR, or inside a Capacitor iOS/Android WKWebView host (the wallet shell uses this).
+
+Both exports have identical APIs. The choice only affects which `@miden-sdk/miden-sdk` variant your bundler ends up resolving.
+
+```tsx
+// Next.js: app/providers.tsx
+"use client";
+
+import { MidenProvider } from "@miden-sdk/react/lazy";
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return <MidenProvider config={{ rpcUrl: "testnet" }}>{children}</MidenProvider>;
+}
+```
+
+`MidenProvider` gates child rendering on `isReady`, so you don't have to await anything manually in components — hooks already fire only after WASM is initialized.
+
+### Constructing wasm-bindgen types directly in Next.js
+
+Hooks accept strings for account IDs, asset IDs, and note IDs (auto-detecting hex vs. bech32) and parse them internally inside async callbacks, so **most apps never touch wasm-bindgen types directly**. If you do need to (e.g. to inspect an ID's prefix/suffix, validate a pasted string, or use a low-level API like `new Felt(…)`), import from `@miden-sdk/miden-sdk/lazy` and gate the call on `isReady`:
+
+```tsx
+import { useEffect, useState } from "react";
+import { useMiden } from "@miden-sdk/react/lazy";
+import { AccountId } from "@miden-sdk/miden-sdk/lazy";
+
+function IdInspector({ idString }: { idString: string }) {
+  const { isReady } = useMiden();
+  const [isFaucet, setIsFaucet] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!isReady) return;
+    // AccountId.fromBech32/fromHex is synchronous but touches WASM — run it
+    // only after the provider reports ready.
+    const id = idString.startsWith("miden1")
+      ? AccountId.fromBech32(idString)
+      : AccountId.fromHex(idString);
+    setIsFaucet(id.isFaucet());
+  }, [isReady, idString]);
+
+  return <span>{isFaucet === null ? "…" : isFaucet ? "faucet" : "wallet"}</span>;
+}
+```
+
+Alternatively, await `MidenClient.ready()` directly — it's idempotent and shares its in-flight promise with `MidenProvider`, so calling it from tutorial helpers or ad-hoc code has no cost:
+
+```ts
+import { MidenClient, AccountId } from "@miden-sdk/miden-sdk/lazy";
+
+await MidenClient.ready();
+const id = AccountId.fromBech32("miden1…"); // safe
+```
+
 ## Hooks Reference
 
 ### Core Hooks
@@ -951,6 +1009,51 @@ function CustomTransactionButton({ accountId }: { accountId: string }) {
   );
 }
 ```
+
+#### `useCompile()`
+
+Compile MASM source into an `AccountComponent`, `TransactionScript`, or
+`NoteScript`. Mirrors `MidenClient.compile` from `@miden-sdk/miden-sdk`, so the
+shape is identical whether you're in a React app or calling the SDK directly.
+
+Returns three async methods, one per output type:
+
+| Method | Input | Output |
+|---|---|---|
+| `component(options)` | `{ code, slots?, supportAllTypes? }` | `AccountComponent` |
+| `txScript(options)`  | `{ code, libraries? }` | `TransactionScript` |
+| `noteScript(options)` | `{ code, libraries? }` | `NoteScript` |
+
+Each `libraries` entry takes `{ namespace, code, linking? }`. `linking` accepts
+the `Linking` enum (`Linking.Dynamic`, `Linking.Static`) or the raw strings
+`"dynamic"` / `"static"`. Dynamic is the default and matches the FPI pattern
+used in the tutorials.
+
+```tsx
+import { useCompile } from '@miden-sdk/react';
+import { Linking } from '@miden-sdk/miden-sdk';
+
+function ScriptBuilder({ libSource, noteSource }: { libSource: string; noteSource: string }) {
+  const { noteScript, isReady } = useCompile();
+
+  const handleBuild = async () => {
+    const script = await noteScript({
+      code: noteSource,
+      libraries: [
+        { namespace: 'my_lib::module', code: libSource, linking: Linking.Dynamic },
+      ],
+    });
+    // pass `script` to useTransaction, useExecuteProgram, or your own flow
+  };
+
+  return <button onClick={handleBuild} disabled={!isReady}>Compile</button>;
+}
+```
+
+Compile is local and synchronous in practice — the hook doesn't expose
+`isLoading` / `stage` / `error` state. Errors from the underlying compiler
+(bad MASM, unresolved imports) throw from the returned promise; handle them
+with regular `try`/`catch`.
 
 #### `useExecuteProgram()`
 

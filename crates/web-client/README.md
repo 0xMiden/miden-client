@@ -65,6 +65,92 @@ yarn add @miden-sdk/miden-sdk@next
 
 > **Note:** The `next` version of the SDK must be used in conjunction with a locally running Miden node built from the `next` branch of the `miden-node` repository. This is necessary because the public testnet runs the stable `main` branch, which may not be compatible with the latest development features in `next`. Instructions to run a local node can be found [here](https://github.com/0xMiden/miden-node/tree/next) on the `next` branch of the `miden-node` repository. Additionally, if you plan to leverage delegated proving in your application, you may need to run a local prover (see [Remote prover instructions](https://github.com/0xMiden/miden-node/tree/next/bin/remote-prover)).
 
+## Entry Points: Eager (default) and `/lazy`
+
+The SDK ships two entry points with an identical public API. They differ only in **when** the WASM module is initialized.
+
+| Import path                    | When WASM initializes                         | When to use                                                                |
+| ------------------------------ | --------------------------------------------- | -------------------------------------------------------------------------- |
+| `@miden-sdk/miden-sdk`         | At module evaluation (top-level `await`)      | Plain browser apps, Vite, CRA, esbuild, Webpack client bundles             |
+| `@miden-sdk/miden-sdk/lazy`    | On first call to `MidenClient.ready()` or any `await`-ing SDK method | Next.js / SSR, Capacitor (iOS/Android WKWebView), framework adapters |
+
+The eager entry awaits WASM at module top level via a small shim (`js/eager.js`), so once an `import` statement resolves, any wasm-bindgen constructor (`new Felt(…)`, `AccountId.fromHex(…)`, `TransactionProver.newLocalProver()`, etc.) is safe to call synchronously on the next line. No `await MidenClient.ready()` is required.
+
+The lazy entry does not run any top-level await. This matters in two environments that hang on TLA:
+
+- **Next.js / SSR** — TLA blocks server-side module evaluation.
+- **Capacitor WKWebView hosts (Miden Wallet iOS/Android)** — the custom `capacitor://localhost` scheme handler interacts poorly with TLA in the main WebView. Verified empirically: the same TLA in a dApp WebView (vanilla HTTPS) resolves in <100ms, but hangs indefinitely in the Capacitor host.
+
+On the lazy entry, callers are responsible for awaiting initialization before calling any wasm-bindgen constructor. Every async SDK method (`client.accounts.create()`, `client.transactions.send()`, etc.) awaits internally, so you only need to gate on readiness when you're constructing wasm-bindgen types yourself.
+
+### Eager usage (default)
+
+```typescript
+// Bundlers resolve `@miden-sdk/miden-sdk` to `./dist/eager.js`.
+// The `import` statement awaits WASM; everything below is safe to call sync.
+import { MidenClient, AccountId, Felt } from "@miden-sdk/miden-sdk";
+
+const id = AccountId.fromHex("0x…"); // sync, WASM is already initialized
+const felt = new Felt(42n); // sync
+
+const client = await MidenClient.createTestnet();
+```
+
+### Lazy usage (`/lazy`)
+
+```typescript
+import { MidenClient, AccountId, Felt } from "@miden-sdk/miden-sdk/lazy";
+
+// Gate any bare wasm-bindgen constructor behind ready():
+await MidenClient.ready();
+const id = AccountId.fromHex("0x…"); // safe after ready()
+const felt = new Felt(42n);
+
+// SDK methods that are already async await internally — no ready() needed:
+const client = await MidenClient.createTestnet(); // implicitly initializes WASM
+await client.sync();
+```
+
+`MidenClient.ready()` is idempotent and safe to call from multiple places — concurrent callers share the same in-flight promise, and post-init callers resolve immediately from a cached module. `MidenProvider`, tutorial helpers, and application code can all call it without any coordination.
+
+### Next.js example
+
+```tsx
+// app/page.tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import { MidenClient } from "@miden-sdk/miden-sdk/lazy";
+
+export default function Page() {
+  const [height, setHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await MidenClient.ready(); // optional here — createTestnet awaits internally
+      const client = await MidenClient.createTestnet();
+      const syncHeight = await client.getSyncHeight();
+      if (!cancelled) setHeight(syncHeight);
+      client.terminate();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return <div>Height: {height ?? "…"}</div>;
+}
+```
+
+### Capacitor / React Native WebView
+
+Use `/lazy` from anywhere inside a Capacitor iOS/Android host (the main WKWebView). TLA hangs the custom scheme handler; the `MidenClient.ready()` gate is the replacement.
+
+### Framework adapters
+
+`@miden-sdk/react` imports from `/lazy` internally and manages readiness via `isReady`. You can still import wasm-bindgen types from either entry in your own code; see the React SDK README for the recommended pattern.
+
 ## Building and Testing the Web Client
 
 If you're interested in contributing to the web client and need to build it locally, you can do so via:

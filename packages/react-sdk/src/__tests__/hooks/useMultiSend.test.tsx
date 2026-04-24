@@ -3,7 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useMultiSend } from "../../hooks/useMultiSend";
 import { useMiden } from "../../context/MidenProvider";
 import { useMidenStore } from "../../store/MidenStore";
-import { Note, NoteType } from "@miden-sdk/miden-sdk";
+import { Note, NoteType } from "@miden-sdk/miden-sdk/lazy";
 import {
   createMockWebClient,
   createMockTransactionResult,

@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useMiden } from "../context/MidenProvider";
-import type { ConsumableNoteRecord } from "@miden-sdk/miden-sdk";
+import type { ConsumableNoteRecord } from "@miden-sdk/miden-sdk/lazy";
 import type { WaitForNotesOptions } from "../types";
 import { parseAccountId } from "../utils/accountParsing";
 import { runExclusiveDirect } from "../utils/runExclusive";

@@ -8,7 +8,7 @@ import {
   NoteType,
   NoteArray,
   TransactionRequestBuilder,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 import type { SendOptions, SendResult, TransactionStage } from "../types";
 import { DEFAULTS } from "../types";
 import { parseAccountId, parseAddress } from "../utils/accountParsing";
@@ -243,7 +243,9 @@ export function useSend(): UseSendResult {
         const provenTransaction = await proveWithFallback(
           (resolvedProver) =>
             runExclusiveSafe(() =>
-              client.proveTransaction(txResult, resolvedProver)
+              resolvedProver
+                ? client.proveTransactionWithProver(txResult, resolvedProver)
+                : client.proveTransaction(txResult)
             ),
           proverConfig
         );

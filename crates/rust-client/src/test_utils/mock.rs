@@ -205,6 +205,7 @@ impl MockRpcApi {
                     block_num: block_number,
                     transaction_header: transaction_header.clone(),
                     output_notes: vec![],
+                    erased_output_note_ids: vec![],
                 });
             }
         }

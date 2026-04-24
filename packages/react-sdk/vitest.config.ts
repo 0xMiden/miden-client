@@ -5,11 +5,17 @@ process.env.VITE_CJS_IGNORE_WARNING = "1";
 
 export default defineConfig({
   resolve: {
-    alias: {
-      "@miden-sdk/miden-sdk": fileURLToPath(
-        new URL("./src/__tests__/mocks/miden-sdk-entry.ts", import.meta.url)
-      ),
-    },
+    alias: [
+      // Match both the eager default (`@miden-sdk/miden-sdk`) and the lazy
+      // subpath (`@miden-sdk/miden-sdk/lazy`) — tests mock them identically
+      // via `vi.mock` in setup.ts.
+      {
+        find: /^@miden-sdk\/miden-sdk(\/lazy)?$/,
+        replacement: fileURLToPath(
+          new URL("./src/__tests__/mocks/miden-sdk-entry.ts", import.meta.url)
+        ),
+      },
+    ],
   },
   test: {
     environment: "jsdom",

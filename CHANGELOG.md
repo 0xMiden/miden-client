@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.14.4 (2026-04-20)
+
+### Features
+
+* [FEATURE][web] Serialize all async `WebClient` JS methods — both the explicit wrappers and every async call that falls through `createClientProxy` to the underlying WASM client (e.g. `getAccount`, `importAccountById`, `getAccountStorage`) — via an internal `_serializeWasmCall` chain. Prevents `"recursive use of an object detected"` panics when an unwrapped read/write races the auto-sync timer or any explicitly-wrapped method. Expose `waitForIdle()` on `MidenClient` so callers can drain in-flight work before mutating non-WASM state ([#2057](https://github.com/0xMiden/miden-client/pull/2057)).
+* [FEATURE][web] Split `@miden-sdk/miden-sdk` into eager and lazy entry points. The default entry (`import from "@miden-sdk/miden-sdk"`) now awaits WASM at module top level via a small shim (`js/eager.js`) — consumers don't need `await MidenClient.ready()` / `isReady` before constructing wasm-bindgen types. The lazy entry (`import from "@miden-sdk/miden-sdk/lazy"`) preserves the previous behavior and is required for Capacitor WKWebView hosts (the custom-scheme handler hangs on TLA) and Next.js SSR. Verified empirically against the Miden Wallet's iOS E2E suite on devnet. `@miden-sdk/react` imports from `/lazy` internally and manages readiness via `isReady`.
+* [FEATURE][web] Expose `lastAuthError()` on `MidenClient` for typed sign-callback failure recovery — preserves the raw thrown value from the JS signCallback so consumers can distinguish locked/rejected/IO-error failure modes ([#2058](https://github.com/0xMiden/miden-client/pull/2058)).
+* [FEATURE][web] Added `"custom"` operation to `preview()` so users can dry-run any pre-built `TransactionRequest`, not just send/mint/consume/swap ([#2052](https://github.com/0xMiden/miden-client/pull/2052)).
+* [FEATURE][web] Exposed `BlockHeader.nativeAssetId()` so JavaScript consumers can read the native fungible-faucet account ID from a block header. The field already rides the RPC wire and is decoded into the Rust `BlockHeader`, but no WASM accessor existed, forcing wallets and dApps to hardcode the native faucet per network ([#2070](https://github.com/0xMiden/miden-client/issues/2070)).
+
+### Fixes
+
+* [FIX][web] `proveTransactionWithProver` now takes `&TransactionProver` by reference instead of consuming by value — the old signature invalidated the JS handle after one use, silently falling back to local proving on subsequent calls ([#2062](https://github.com/0xMiden/miden-client/pull/2062)).
+
+## 0.14.3 (2026-04-16)
+
+### Fixes
+
+* [FIX] Detect notes created and consumed on the same block that got erased from the node and mark them as consumed ([#2008](https://github.com/0xMiden/miden-client/pull/2008)).
+
+## 0.14.2 (2026-04-15)
+
+### Features
+
+* [FEATURE][web] Added `compile.noteScript({ code, libraries? })` to `MidenClient`, filling the gap left on the resource-based surface for note-script compilation. Mirrors the existing `compile.txScript` shape ([#2044](https://github.com/0xMiden/miden-client/pull/2044)).
+* [FEATURE][web] Exported the `CompilerResource` class so framework wrappers (e.g. React hooks) can instantiate the compile surface over a `WasmWebClient` proxy without wrapping the full `MidenClient`. The third constructor argument is now optional ([#2044](https://github.com/0xMiden/miden-client/pull/2044)).
+
+### Fixes
+
+* [FIX][web] Fixed `syncState` deterministically failing with `mmr peaks are invalid: number of one bits in leaves is N which does not equal peak length M` after importing a private note whose inclusion block pre-dates the wallet's current sync height. `get_and_store_authenticated_block` was overwriting the correct historical peaks (written by `applyStateSync`) with peaks from the caller's current `PartialMmr` forest, so subsequent reads at the same block hit the `InvalidPeaks` validation. The IndexedDB `insertBlockHeader` now uses add-if-not-exists semantics, matching the SQLite store's `INSERT OR IGNORE` in `insert_block_header_tx` ([#2039](https://github.com/0xMiden/miden-client/pull/2039)).
+* [FIX][web] Fixed WASM worker loading under webpack 5 / Next.js consumers. v0.14.1's single classic worker rewrote `import.meta.url` → `self.location.href` (needed for Safari/WKWebView cold-start performance), which webpack's asset tracer cannot follow — consumers hit a 404 on `miden_client_web.wasm` and the SDK silently fell back to a main-thread mode that hung on `sync()`. The SDK now ships BOTH variants (`web-client-methods-worker.js` classic for Safari, `web-client-methods-worker.module.js` ES module for webpack/Vite/Parcel) and `WebClient` picks at runtime via UA detection, configurable via the new `WebClient.workerMode` (`"auto"` / `"module"` / `"classic"`) static. No consumer config changes needed for auto ([#2046](https://github.com/0xMiden/miden-client/issues/2046)).
+
 ## 0.14.1 (2026-04-14)
 
 ### Enhancements
@@ -18,6 +50,8 @@
 ## 0.14.0 (2026-04-07)
 
 ### Enhancements
+
+* Added DAP-backed transaction script debugging support with `--start-debug-adapter` flag on the `exec` CLI command, `execute_program_with_dap` client method, and offline bootstrap mode for node-less execution ([#1959](https://github.com/0xMiden/miden-client/pull/1959)).
 
 * Made `GrpcNoteTransportClient` connection lazy, deferring it to the first RPC call instead of connecting eagerly at client initialization ([#1970](https://github.com/0xMiden/miden-client/pull/1970)).
 * Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)) ([#1737](https://github.com/0xMiden/miden-client/pull/1737), [#1809](https://github.com/0xMiden/miden-client/pull/1809)).

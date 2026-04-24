@@ -5,7 +5,7 @@ import type {
   AccountHeader,
   InputNoteRecord,
   ConsumableNoteRecord,
-} from "@miden-sdk/miden-sdk";
+} from "@miden-sdk/miden-sdk/lazy";
 import type { SyncState, MidenConfig, AssetMetadata } from "../types";
 
 interface MidenStoreState {
