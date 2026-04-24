@@ -1,7 +1,10 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { useMidenStore } from "../store/MidenStore";
-import { AccountStorageMode } from "@miden-sdk/miden-sdk/lazy";
+import {
+  AccountStorageMode,
+  resolveAuthScheme,
+} from "@miden-sdk/miden-sdk/lazy";
 import type { Account } from "@miden-sdk/miden-sdk/lazy";
 import type { CreateFaucetOptions } from "../types";
 import { DEFAULTS } from "../types";
@@ -72,7 +75,9 @@ export function useCreateFaucet(): UseCreateFaucetResult {
           options.storageMode ?? DEFAULTS.STORAGE_MODE
         );
         const decimals = options.decimals ?? DEFAULTS.FAUCET_DECIMALS;
-        const authScheme = options.authScheme ?? DEFAULTS.AUTH_SCHEME;
+        const authScheme = resolveAuthScheme(
+          options.authScheme ?? DEFAULTS.AUTH_SCHEME
+        );
 
         const newFaucet = await runExclusiveSafe(async () => {
           const createdFaucet = await client.newFaucet(

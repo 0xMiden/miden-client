@@ -90,7 +90,7 @@ describe("useCreateFaucet", () => {
         "TEST",
         8, // decimals (default)
         1000000n,
-        2 // authScheme (default: AuthRpoFalcon512)
+        2 // authScheme — default `AuthScheme.Falcon` resolves to 2 (RpoFalcon512)
       );
     });
 
@@ -114,7 +114,7 @@ describe("useCreateFaucet", () => {
           maxSupply: 10000000000n,
           decimals: 6,
           storageMode: "public",
-          authScheme: 1,
+          authScheme: "ecdsa",
         });
       });
 
@@ -124,7 +124,7 @@ describe("useCreateFaucet", () => {
         "USDC",
         6,
         10000000000n,
-        1
+        1 // authScheme — "ecdsa" resolves to 1 (AuthEcdsaK256Keccak)
       );
     });
 

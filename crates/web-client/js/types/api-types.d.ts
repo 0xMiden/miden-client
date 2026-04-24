@@ -84,9 +84,25 @@ export declare const AuthScheme: {
 };
 
 /**
- * Union of all values in the AuthScheme const.
+ * Union of all string values in the AuthScheme const. Merges with the
+ * `AuthScheme` value so `authScheme?: AuthScheme` resolves to
+ * `"falcon" | "ecdsa"` in type position while `AuthScheme.Falcon` /
+ * `AuthScheme.ECDSA` still work in value position.
  */
-export type AuthSchemeType = (typeof AuthScheme)[keyof typeof AuthScheme];
+export type AuthScheme = (typeof AuthScheme)[keyof typeof AuthScheme];
+
+/** @deprecated Alias for `AuthScheme` (the string union). */
+export type AuthSchemeType = AuthScheme;
+
+/**
+ * Resolves an `AuthScheme` string to the numeric value expected by low-level
+ * wasm-bindgen methods such as
+ * `AccountComponent.createAuthComponentFromCommitment(commitment, scheme)`.
+ *
+ * @param scheme - `AuthScheme.Falcon` or `AuthScheme.ECDSA`. Defaults to `"falcon"`.
+ * @returns The numeric AuthScheme enum value.
+ */
+export declare function resolveAuthScheme(scheme?: AuthScheme): number;
 
 /**
  * User-friendly note visibility constants.
