@@ -3,6 +3,13 @@ use alloc::collections::BTreeMap;
 use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+};
 
 use crate::ClientError;
 use crate::rpc::RpcError;
@@ -27,7 +34,7 @@ pub enum NoteUpdateType {
 }
 
 /// Represents the possible states of an input note record in a [`NoteUpdateTracker`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct InputNoteUpdate {
     /// Input note being updated.
     note: InputNoteRecord,
@@ -92,7 +99,7 @@ impl InputNoteUpdate {
 }
 
 /// Represents the possible states of an output note record in a [`NoteUpdateTracker`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct OutputNoteUpdate {
     /// Output note being updated.
     note: OutputNoteRecord,
@@ -157,7 +164,7 @@ impl OutputNoteUpdate {
 /// This includes new notes that have been created and existing notes that have been updated. The
 /// tracker also lets state changes be applied to the contained notes, this allows for already
 /// updated notes to be further updated as new information is received.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct NoteUpdateTracker {
     /// A map of new and updated input note records to be upserted in the store.
     input_notes: BTreeMap<NoteId, InputNoteUpdate>,
@@ -509,5 +516,98 @@ impl NoteUpdateTracker {
             NoteUpdateType::Update => OutputNoteUpdate::new_update(note),
         };
         self.output_notes.insert(note_id, update);
+    }
+}
+
+// SERIALIZATION
+// ================================================================================================
+
+impl Serializable for NoteUpdateType {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        match self {
+            NoteUpdateType::None => target.write_u8(0),
+            NoteUpdateType::Insert => target.write_u8(1),
+            NoteUpdateType::Update => target.write_u8(2),
+        }
+    }
+}
+
+impl Deserializable for NoteUpdateType {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        match source.read_u8()? {
+            0 => Ok(NoteUpdateType::None),
+            1 => Ok(NoteUpdateType::Insert),
+            2 => Ok(NoteUpdateType::Update),
+            val => {
+                Err(DeserializationError::InvalidValue(format!("invalid note update type: {val}")))
+            },
+        }
+    }
+}
+
+impl Serializable for InputNoteUpdate {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.note.write_into(target);
+        self.update_type.write_into(target);
+    }
+}
+
+impl Deserializable for InputNoteUpdate {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let note = InputNoteRecord::read_from(source)?;
+        let update_type = NoteUpdateType::read_from(source)?;
+        Ok(Self { note, update_type })
+    }
+}
+
+impl Serializable for OutputNoteUpdate {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.note.write_into(target);
+        self.update_type.write_into(target);
+    }
+}
+
+impl Deserializable for OutputNoteUpdate {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let note = OutputNoteRecord::read_from(source)?;
+        let update_type = NoteUpdateType::read_from(source)?;
+        Ok(Self { note, update_type })
+    }
+}
+
+impl Serializable for NoteUpdateTracker {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        // `input_notes_by_nullifier` and `output_notes_by_nullifier` are lookup indices that can
+        // be reconstructed from `input_notes` and `output_notes`, so they are not serialized.
+        self.input_notes.write_into(target);
+        self.output_notes.write_into(target);
+        self.nullifier_order.write_into(target);
+    }
+}
+
+impl Deserializable for NoteUpdateTracker {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let input_notes = BTreeMap::<NoteId, InputNoteUpdate>::read_from(source)?;
+        let output_notes = BTreeMap::<NoteId, OutputNoteUpdate>::read_from(source)?;
+        let nullifier_order = BTreeMap::<Nullifier, u32>::read_from(source)?;
+
+        let input_notes_by_nullifier = input_notes
+            .iter()
+            .map(|(note_id, update)| (update.inner().nullifier(), *note_id))
+            .collect();
+        let output_notes_by_nullifier = output_notes
+            .iter()
+            .filter_map(|(note_id, update)| {
+                update.inner().nullifier().map(|nullifier| (nullifier, *note_id))
+            })
+            .collect();
+
+        Ok(Self {
+            input_notes,
+            output_notes,
+            input_notes_by_nullifier,
+            output_notes_by_nullifier,
+            nullifier_order,
+        })
     }
 }
