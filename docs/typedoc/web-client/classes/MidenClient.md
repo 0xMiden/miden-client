@@ -150,17 +150,9 @@ Returns the identifier of the underlying store (e.g. IndexedDB database name, fi
 
 ### sync()
 
-> **sync**(`options?`): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
+> **sync**(): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
 
 Syncs the client: fetches private notes from the Note Transport Layer, then syncs on-chain state. Fails fast on either.
-
-#### Parameters
-
-##### options?
-
-###### timeout?
-
-`number`
 
 #### Returns
 
@@ -170,17 +162,9 @@ Syncs the client: fetches private notes from the Note Transport Layer, then sync
 
 ### syncChain()
 
-> **syncChain**(`options?`): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
+> **syncChain**(): `Promise`\<[`SyncSummary`](SyncSummary.md)\>
 
 Syncs on-chain state only (no NTL fetch).
-
-#### Parameters
-
-##### options?
-
-###### timeout?
-
-`number`
 
 #### Returns
 
@@ -190,17 +174,9 @@ Syncs on-chain state only (no NTL fetch).
 
 ### syncNoteTransport()
 
-> **syncNoteTransport**(`options?`): `Promise`\<`void`\>
+> **syncNoteTransport**(): `Promise`\<`void`\>
 
 Fetches private notes from the Note Transport Layer.
-
-#### Parameters
-
-##### options?
-
-###### timeout?
-
-`number`
 
 #### Returns
 
