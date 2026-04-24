@@ -105,18 +105,31 @@ export function resolveStorageMode(mode, wasm) {
 }
 
 /**
- * Resolves an auth scheme string to a WASM AuthScheme enum value.
+ * Resolves an auth scheme string to a WASM `AuthScheme` enum numeric value.
  *
- * @param {string | undefined} scheme - "falcon" or "ecdsa". Defaults to "falcon".
- * @param {object} wasm - The WASM module.
- * @returns {number} The AuthScheme enum value.
+ * The public `AuthScheme` constant exposes SDK-friendly strings
+ * (`"falcon"` / `"ecdsa"`), but low-level wasm-bindgen methods such as
+ * `AccountComponent.createAuthComponentFromCommitment(commitment, scheme)`
+ * expect the numeric variant from the Rust `AuthScheme` enum. This helper
+ * bridges the two so callers never touch wasm-bindgen internals directly.
+ *
+ * `wasm` is optional: when provided (by internal callers who already have
+ * the module loaded), the numeric value is read from the binding itself,
+ * keeping the mapping robust if wasm-bindgen ever renumbers the enum. When
+ * omitted (public callers who don't have a handle to the WASM module), the
+ * hardcoded discriminants below are used — these are pinned to the Rust
+ * enum order by a cross-check test in `test/account_component.test.ts`.
+ *
+ * @param {"falcon" | "ecdsa" | undefined} scheme - Defaults to `"falcon"`.
+ * @param {object} [wasm] - Optional WASM module handle.
+ * @returns {number} The AuthScheme enum numeric value (1 or 2).
  */
 export function resolveAuthScheme(scheme, wasm) {
   if (scheme === "ecdsa") {
-    return wasm.AuthScheme.AuthEcdsaK256Keccak;
+    return wasm?.AuthScheme?.AuthEcdsaK256Keccak ?? 1;
   }
   if (scheme === "falcon" || scheme == null) {
-    return wasm.AuthScheme.AuthRpoFalcon512;
+    return wasm?.AuthScheme?.AuthRpoFalcon512 ?? 2;
   }
   throw new Error(
     `Unknown auth scheme: "${scheme}". Expected "falcon" or "ecdsa".`

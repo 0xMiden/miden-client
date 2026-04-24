@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { useMidenStore } from "../store/MidenStore";
-import { AccountStorageMode } from "@miden-sdk/miden-sdk/lazy";
+import {
+  AccountStorageMode,
+  resolveAuthScheme,
+} from "@miden-sdk/miden-sdk/lazy";
 import type {
   UseSessionAccountOptions,
   UseSessionAccountReturn,
@@ -60,7 +63,9 @@ export function useSessionAccount(
   // Destructure walletOptions primitives so useCallback deps are stable
   const storageMode = options.walletOptions?.storageMode ?? "public";
   const mutable = options.walletOptions?.mutable ?? DEFAULTS.WALLET_MUTABLE;
-  const authScheme = options.walletOptions?.authScheme ?? DEFAULTS.AUTH_SCHEME;
+  const authScheme = resolveAuthScheme(
+    options.walletOptions?.authScheme ?? DEFAULTS.AUTH_SCHEME
+  );
 
   // Store fund in a ref so the callback identity doesn't change when the
   // caller passes an inline function (the common case).

@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { useMidenStore } from "../store/MidenStore";
-import { AccountFile } from "@miden-sdk/miden-sdk/lazy";
+import { AccountFile, resolveAuthScheme } from "@miden-sdk/miden-sdk/lazy";
 import type {
   Account,
   AccountId as AccountIdType,
@@ -156,7 +156,9 @@ export function useImportAccount(): UseImportAccountResult {
             }
             case "seed": {
               const mutable = options.mutable ?? DEFAULTS.WALLET_MUTABLE;
-              const authScheme = options.authScheme ?? DEFAULTS.AUTH_SCHEME;
+              const authScheme = resolveAuthScheme(
+                options.authScheme ?? DEFAULTS.AUTH_SCHEME
+              );
               return await client.importPublicAccountFromSeed(
                 options.seed,
                 mutable,
