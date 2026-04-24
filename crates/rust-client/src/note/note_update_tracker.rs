@@ -2,7 +2,8 @@ use alloc::collections::BTreeMap;
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::note::{NoteHeader, NoteId, NoteInclusionProof, Nullifier};
+use miden_protocol::note::{Note, NoteHeader, NoteId, NoteInclusionProof, Nullifier};
+use miden_standards::note::NetworkAccountTarget;
 
 use crate::ClientError;
 use crate::rpc::RpcError;
@@ -355,11 +356,9 @@ impl NoteUpdateTracker {
         let note_id = note_header.id();
 
         // Extract consumer from the note header metadata.
-        let consumer = miden_standards::note::NetworkAccountTarget::try_from(
-            note_header.metadata().attachment(),
-        )
-        .ok()
-        .map(|t| t.target_id());
+        let consumer = NetworkAccountTarget::try_from(note_header.metadata().attachment())
+            .ok()
+            .map(|t| t.target_id());
 
         if let Some(output_note) = self.get_output_note_by_id(note_id)
             && !output_note.is_consumed()
@@ -374,7 +373,7 @@ impl NoteUpdateTracker {
         // the consumption surfaces through `InputNoteReader`.
         if !self.input_notes.contains_key(&note_id)
             && let Some(output_note) = self.output_notes.get(&note_id)
-            && let Ok(note) = miden_protocol::note::Note::try_from(output_note.inner().clone())
+            && let Ok(note) = Note::try_from(output_note.inner().clone())
         {
             let mut input_record = InputNoteRecord::from(note);
             let nullifier = input_record.nullifier();
@@ -420,9 +419,9 @@ impl NoteUpdateTracker {
     ///    transactions were submitted by other client instances. If a local transaction was
     ///    processing the note and it didn't get committed, the transaction should be discarded.
     ///
-    /// If the note is tracked as an output but not as an input (e.g. the client tracks both
-    /// the sender and the consumer), an new input record is created from the output details
-    /// so the consumption surfaces through `InputNoteReader`.
+    /// If the note is tracked as an output but not as an input (e.g. the client tracks both the
+    /// sender and the consumer), a new input record is created from the output details so the
+    /// consumption surfaces through `InputNoteReader`.
     pub(crate) fn apply_nullifiers_state_transitions<'a>(
         &mut self,
         nullifier_update: &NullifierUpdate,
@@ -466,7 +465,7 @@ impl NoteUpdateTracker {
             && let Some(consumer) = external_consumer_account
             && let Some(note_id) = self.output_notes_by_nullifier.get(&nullifier).copied()
             && let Some(output_note) = self.output_notes.get(&note_id)
-            && let Ok(note) = miden_protocol::note::Note::try_from(output_note.inner().clone())
+            && let Ok(note) = Note::try_from(output_note.inner().clone())
         {
             let mut input_record = InputNoteRecord::from(note);
             input_record.consumed_externally(nullifier, block_num, Some(consumer))?;
