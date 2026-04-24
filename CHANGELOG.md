@@ -8,7 +8,7 @@
 
 ### Fixes
 
-* [FIX][rust] Fixed source manager mismatch panic (`invalid source span: starting byte is out of bounds`) in tests that compiled scripts with a standalone `SourceManager` and then executed them through the client. Test helpers now use `TransactionKernel::assembler_with_source_manager()` and the client's shared source manager [#2047](https://github.com/0xMiden/miden-client/pull/2047)).
+* [FIX][rust] Fixed source manager mismatch panic (`invalid source span: starting byte is out of bounds`) in tests that compiled scripts with a standalone `SourceManager` and then executed them through the client. Test helpers now use `TransactionKernel::assembler_with_source_manager()` and the client's shared source manager ([#2047](https://github.com/0xMiden/miden-client/pull/2047)).
 
 ## 0.14.4 (2026-04-20)
 
