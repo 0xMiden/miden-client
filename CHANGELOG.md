@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.5 (2026-04-21)
+
+### Fixes
+
+* [FIX] When the client submits a network note and it is also tracking the recipient network account, now the `InputNoteReader` detects the consumed note ([#TBD](https://github.com/0xMiden/miden-client/pull/TBD)).
+
 ## 0.14.4 (2026-04-20)
 
 ### Features

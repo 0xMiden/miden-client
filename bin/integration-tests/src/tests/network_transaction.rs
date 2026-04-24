@@ -280,6 +280,69 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     Ok(())
 }
 
+/// After a network account consumes a note (potentially in the same batch it was created),
+/// the receiver's `InputNoteReader` should find it as consumed by that account. Validates
+/// the erased-notes detection flow end-to-end against a real node.
+pub async fn test_note_reader_finds_note_consumed_by_ntx(
+    client_config: ClientConfig,
+) -> Result<()> {
+    let (mut client, keystore) = client_config.into_client().await?;
+    client.sync_state().await?;
+
+    let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
+    let network_account_id = network_account.id();
+
+    let (sender_account, ..) =
+        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
+            .await?;
+
+    let network_note =
+        get_network_note(sender_account.id(), network_account_id, &mut client.rng())?;
+    let note_id = network_note.id();
+
+    let tx_request =
+        TransactionRequestBuilder::new().own_output_notes(vec![network_note]).build()?;
+    execute_tx_and_sync(&mut client, sender_account.id(), tx_request).await?;
+
+    // Wait for the network account to consume the note (check counter increment).
+    let expected_counter = Word::from([Felt::new(2), ZERO, ZERO, ZERO]);
+    for _ in 0..15 {
+        client.sync_state().await?;
+        let account_details = client
+            .test_rpc_api()
+            .get_account_details(network_account_id)
+            .await?
+            .account()
+            .cloned()
+            .with_context(|| "account details not available")?;
+
+        if account_details.storage().get_item(&COUNTER_SLOT_NAME)? == expected_counter {
+            break;
+        }
+        wait_for_blocks(&mut client, 1).await;
+    }
+
+    client.sync_state().await?;
+
+    let mut reader = client.input_note_reader(network_account_id);
+    let mut found = false;
+    while let Some(note) = reader.next().await? {
+        if note.id() == note_id {
+            assert_eq!(
+                note.consumer_account(),
+                Some(network_account_id),
+                "consumer should be the network account"
+            );
+            found = true;
+            break;
+        }
+    }
+
+    assert!(found, "NoteReader should find the note consumed by the network account");
+
+    Ok(())
+}
+
 // Initialize the Basic Fungible Faucet library only once.
 static COUNTER_CONTRACT_LIBRARY: LazyLock<Arc<Library>> = LazyLock::new(|| {
     // Share a SourceManager between the parser and the assembler so spans emitted during

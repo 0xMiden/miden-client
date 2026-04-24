@@ -400,7 +400,7 @@ impl StateSync {
                     initial_state_commitment: r.transaction_header.initial_state_commitment(),
                     nullifiers,
                     output_notes: r.output_notes,
-                    erased_output_note_ids: r.erased_output_note_ids,
+                    erased_output_notes: r.erased_output_notes,
                 }
             })
             .collect();
@@ -525,11 +525,11 @@ impl StateSync {
         state_sync_update: &mut StateSyncUpdate,
         transaction: &TransactionInclusion,
     ) {
-        for note_id in &transaction.erased_output_note_ids {
+        for note_header in &transaction.erased_output_notes {
             // Best-effort: ignore errors for notes not tracked by this client.
             let _ = state_sync_update
                 .note_updates
-                .mark_erased_note_as_consumed(*note_id, transaction.block_num);
+                .mark_erased_note_as_consumed(note_header, transaction.block_num);
         }
     }
 
@@ -1261,13 +1261,24 @@ mod tests {
 
     use async_trait::async_trait;
     use miden_protocol::assembly::DefaultSourceManager;
+    use miden_protocol::block::BlockNumber;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, PartialMmr};
-    use miden_protocol::note::{NoteTag, NoteType};
+    use miden_protocol::note::{
+        NoteAssets,
+        NoteHeader,
+        NoteMetadata,
+        NoteRecipient,
+        NoteStorage,
+        NoteTag,
+        NoteType,
+    };
+    use miden_protocol::testing::account_id::ACCOUNT_ID_SENDER;
     use miden_protocol::{Felt, Word};
     use miden_standards::code_builder::CodeBuilder;
     use miden_testing::MockChainBuilder;
 
     use super::*;
+    use crate::store::{OutputNoteRecord, OutputNoteState};
     use crate::testing::mock::MockRpcApi;
 
     /// Mock note screener that discards all notes, for minimal test setup.
@@ -1348,7 +1359,7 @@ mod tests {
                     fee,
                 ),
                 output_notes: vec![],
-                erased_output_note_ids: vec![],
+                erased_output_notes: vec![],
             }
         }
 
@@ -1399,7 +1410,7 @@ mod tests {
                     fee,
                 ),
                 output_notes: vec![],
-                erased_output_note_ids: vec![],
+                erased_output_notes: vec![],
             };
 
             let result = super::super::compute_ordered_nullifiers(&[tx_a2, tx_b1, tx_a3, tx_a1]);
@@ -1780,18 +1791,6 @@ mod tests {
     /// says it produced a note, but the note was erased and doesn't exist on the node.
     #[tokio::test]
     async fn erased_notes_are_marked_as_consumed() {
-        use miden_protocol::block::BlockNumber;
-        use miden_protocol::note::{
-            NoteAssets,
-            NoteMetadata,
-            NoteRecipient,
-            NoteStorage,
-            NoteType,
-        };
-        use miden_protocol::testing::account_id::ACCOUNT_ID_SENDER;
-
-        use crate::store::{OutputNoteRecord, OutputNoteState};
-
         // Create a public output note. It won't be in the mock chain (simulating erasure).
         let sender_id: AccountId = ACCOUNT_ID_SENDER.try_into().unwrap();
         let metadata = NoteMetadata::new(sender_id, NoteType::Public);
@@ -1804,11 +1803,12 @@ mod tests {
         let output_note = OutputNoteRecord::new(
             recipient.digest(),
             NoteAssets::new(vec![]).unwrap(),
-            metadata,
+            metadata.clone(),
             OutputNoteState::ExpectedFull { recipient },
             BlockNumber::from(1u32),
         );
         let note_id = output_note.id();
+        let note_header = NoteHeader::new(note_id, metadata);
 
         // Build a NoteUpdateTracker with the output note.
         let mut note_updates = NoteUpdateTracker::new(vec![], vec![output_note]);
@@ -1816,7 +1816,7 @@ mod tests {
         // Mark the note as erased (created and consumed in the same batch).
         let block_num = BlockNumber::from(3u32);
         note_updates
-            .mark_erased_note_as_consumed(note_id, block_num)
+            .mark_erased_note_as_consumed(&note_header, block_num)
             .expect("marking erased note should succeed");
 
         let updated = note_updates

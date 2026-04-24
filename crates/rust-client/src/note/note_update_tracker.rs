@@ -2,7 +2,7 @@ use alloc::collections::BTreeMap;
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
+use miden_protocol::note::{NoteHeader, NoteId, NoteInclusionProof, Nullifier};
 
 use crate::ClientError;
 use crate::rpc::RpcError;
@@ -349,9 +349,18 @@ impl NoteUpdateTracker {
     /// The `block_num` is the block in which the creating transaction was committed.
     pub(crate) fn mark_erased_note_as_consumed(
         &mut self,
-        note_id: NoteId,
+        note_header: &NoteHeader,
         block_num: BlockNumber,
     ) -> Result<(), ClientError> {
+        let note_id = note_header.id();
+
+        // Extract consumer from the note header metadata.
+        let consumer = miden_standards::note::NetworkAccountTarget::try_from(
+            note_header.metadata().attachment(),
+        )
+        .ok()
+        .map(|t| t.target_id());
+
         if let Some(output_note) = self.get_output_note_by_id(note_id)
             && !output_note.is_consumed()
             && !output_note.is_committed()
@@ -360,16 +369,25 @@ impl NoteUpdateTracker {
             output_note.nullifier_received(nullifier, block_num)?;
         }
 
+        // If no input note is tracked but the output note is (the client created the note
+        // and also tracks the consumer), build an input record from the output details so
+        // the consumption surfaces through `InputNoteReader`.
+        if !self.input_notes.contains_key(&note_id)
+            && let Some(output_note) = self.output_notes.get(&note_id)
+            && let Ok(note) = miden_protocol::note::Note::try_from(output_note.inner().clone())
+        {
+            let mut input_record = InputNoteRecord::from(note);
+            let nullifier = input_record.nullifier();
+            input_record.consumed_externally(nullifier, block_num, consumer)?;
+            input_record.set_consumed_tx_order(Some(0));
+            self.insert_input_note(input_record, NoteUpdateType::Insert);
+        }
+
         // Also mark the corresponding input note if tracked.
         if let Some(input_note_update) = self.input_notes.get_mut(&note_id)
             && !input_note_update.inner().is_consumed()
         {
             let nullifier = input_note_update.inner().nullifier();
-            let consumer = input_note_update.inner().metadata().and_then(|m| {
-                miden_standards::note::NetworkAccountTarget::try_from(m.attachment())
-                    .ok()
-                    .map(|t| t.target_id())
-            });
             input_note_update
                 .inner_mut()
                 .consumed_externally(nullifier, block_num, consumer)?;
@@ -401,17 +419,22 @@ impl NoteUpdateTracker {
     ///    consumption by untracked accounts as well as consumption by tracked accounts whose
     ///    transactions were submitted by other client instances. If a local transaction was
     ///    processing the note and it didn't get committed, the transaction should be discarded.
+    ///
+    /// If the note is tracked as an output but not as an input (e.g. the client tracks both
+    /// the sender and the consumer), an new input record is created from the output details
+    /// so the consumption surfaces through `InputNoteReader`.
     pub(crate) fn apply_nullifiers_state_transitions<'a>(
         &mut self,
         nullifier_update: &NullifierUpdate,
         mut committed_transactions: impl Iterator<Item = &'a TransactionRecord>,
         external_consumer_account: Option<AccountId>,
     ) -> Result<(), ClientError> {
-        let order = self.get_nullifier_order(nullifier_update.nullifier);
+        let nullifier = nullifier_update.nullifier;
+        let block_num = nullifier_update.block_num;
+        let order = self.get_nullifier_order(nullifier);
+        let input_present = self.input_notes_by_nullifier.contains_key(&nullifier);
 
-        if let Some(input_note_update) =
-            self.get_input_note_update_by_nullifier(nullifier_update.nullifier)
-        {
+        if let Some(input_note_update) = self.get_input_note_update_by_nullifier(nullifier) {
             if let Some(consumer_transaction) = committed_transactions
                 .find(|t| input_note_update.inner().consumer_transaction_id() == Some(&t.id))
             {
@@ -427,19 +450,28 @@ impl NoteUpdateTracker {
                 // The note was consumed by a transaction not submitted by this client.
                 // If the consuming account is tracked, external_consumer_account will be Some.
                 input_note_update.inner_mut().consumed_externally(
-                    nullifier_update.nullifier,
-                    nullifier_update.block_num,
+                    nullifier,
+                    block_num,
                     external_consumer_account,
                 )?;
             }
             input_note_update.inner_mut().set_consumed_tx_order(order);
         }
 
-        if let Some(output_note_record) =
-            self.get_output_note_by_nullifier(nullifier_update.nullifier)
+        if let Some(output_note_record) = self.get_output_note_by_nullifier(nullifier) {
+            output_note_record.nullifier_received(nullifier, block_num)?;
+        }
+
+        if !input_present
+            && let Some(consumer) = external_consumer_account
+            && let Some(note_id) = self.output_notes_by_nullifier.get(&nullifier).copied()
+            && let Some(output_note) = self.output_notes.get(&note_id)
+            && let Ok(note) = miden_protocol::note::Note::try_from(output_note.inner().clone())
         {
-            output_note_record
-                .nullifier_received(nullifier_update.nullifier, nullifier_update.block_num)?;
+            let mut input_record = InputNoteRecord::from(note);
+            input_record.consumed_externally(nullifier, block_num, Some(consumer))?;
+            input_record.set_consumed_tx_order(order);
+            self.insert_input_note(input_record, NoteUpdateType::Insert);
         }
 
         Ok(())
