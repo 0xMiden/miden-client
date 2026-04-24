@@ -62,7 +62,6 @@ use core::cmp::max;
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockNumber;
-use miden_protocol::crypto::merkle::mmr::InOrderIndex;
 use miden_protocol::note::NoteId;
 use miden_protocol::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
@@ -232,41 +231,50 @@ where
     /// Any caller of this function should've cached the `PartialMmr` beforehand.
     async fn untrack_and_prune_irrelevant_blocks(&mut self) -> Result<(), ClientError> {
         let tracked_blocks = self.store.get_tracked_block_header_numbers().await?;
-        if tracked_blocks.is_empty() {
-            return Ok(());
+        let to_untrack: Vec<usize> = if tracked_blocks.is_empty() {
+            // Do not early-return: even without blocks to untrack, old irrelevant tip headers may
+            // need pruning.
+            Vec::new()
+        } else {
+            // Blocks that still have at least one unspent note need to stay tracked.
+            let unspent_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
+            let live_blocks: BTreeSet<usize> = unspent_notes
+                .iter()
+                .filter_map(|n| n.inclusion_proof().map(|p| p.location().block_num().as_usize()))
+                .collect();
+
+            tracked_blocks.difference(&live_blocks).copied().collect()
+        };
+
+        let mut blocks_to_untrack = Vec::new();
+        let mut nodes_to_remove = Vec::new();
+        let mut updated_partial_mmr = None;
+
+        if !to_untrack.is_empty() {
+            // Rebuild the PartialMmr and untrack each block to collect the authentication node
+            // indices that are no longer needed by any remaining tracked leaf.
+            let mut partial_mmr = self.get_current_partial_mmr().await?;
+            for &block_pos in &to_untrack {
+                nodes_to_remove
+                    .extend(partial_mmr.untrack(block_pos).into_iter().map(|(idx, _)| idx));
+            }
+
+            blocks_to_untrack = to_untrack
+                .iter()
+                .map(|&b| BlockNumber::from(u32::try_from(b).expect("block number fits in u32")))
+                .collect();
+            updated_partial_mmr = Some(partial_mmr);
         }
-
-        // Blocks that still have at least one unspent note need to stay tracked.
-        let unspent_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
-        let live_blocks: BTreeSet<usize> = unspent_notes
-            .iter()
-            .filter_map(|n| n.inclusion_proof().map(|p| p.location().block_num().as_usize()))
-            .collect();
-
-        let to_untrack: Vec<usize> = tracked_blocks.difference(&live_blocks).copied().collect();
-        if to_untrack.is_empty() {
-            return Ok(());
-        }
-
-        // Get PartialMMR to prune it based on untracked blocks
-        let mut partial_mmr = self.get_current_partial_mmr().await?;
-        let mut nodes_to_remove: Vec<InOrderIndex> = Vec::new();
-        for &block_pos in &to_untrack {
-            nodes_to_remove.extend(partial_mmr.untrack(block_pos).into_iter().map(|(idx, _)| idx));
-        }
-
-        let blocks_to_untrack: Vec<BlockNumber> = to_untrack
-            .iter()
-            .map(|&b| BlockNumber::from(u32::try_from(b).expect("block number fits in u32")))
-            .collect();
 
         // Store deletes stale auth nodes, marks blocks as irrelevant, and removes irrelevant
-        // block headers.
+        // block headers. Old irrelevant tip headers may still need pruning.
         self.store
             .untrack_and_prune_irrelevant_blocks(&blocks_to_untrack, &nodes_to_remove)
             .await?;
 
-        self.cache_partial_mmr(partial_mmr).await?;
+        if let Some(partial_mmr) = updated_partial_mmr {
+            self.cache_partial_mmr(partial_mmr).await?;
+        }
 
         Ok(())
     }
