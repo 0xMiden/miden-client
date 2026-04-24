@@ -282,8 +282,7 @@ impl DataStore for ClientDataStore {
             .map(|(header, _has_notes)| header)
             .collect();
 
-        let partial_mmr =
-            build_partial_mmr_with_paths(&self.store, ref_block.as_u32(), &block_headers).await?;
+        let partial_mmr = build_partial_mmr_with_paths(&self.store, &block_headers).await?;
 
         let partial_blockchain =
             PartialBlockchain::new(partial_mmr, block_headers).map_err(|err| {
@@ -462,18 +461,10 @@ impl MastForestStore for ClientDataStore {
 /// the kernel extends the MMR which is why it's not needed here.
 async fn build_partial_mmr_with_paths(
     store: &alloc::sync::Arc<dyn Store>,
-    forest: u32,
     authenticated_blocks: &[BlockHeader],
 ) -> Result<PartialMmr, DataStoreError> {
     let mut partial_mmr: PartialMmr = {
         let current_peaks = store.get_current_blockchain_peaks().await?;
-
-        debug_assert_eq!(
-            u32::try_from(current_peaks.forest().num_leaves()).ok(),
-            Some(forest),
-            "peaks forest must match the requested ref_block (peaks are only persisted at the current sync height)",
-        );
-
         PartialMmr::from_peaks(current_peaks)
     };
 
