@@ -50,6 +50,7 @@ export { useImportStore } from "./hooks/useImportStore";
 export { useImportNote } from "./hooks/useImportNote";
 export { useExportNote } from "./hooks/useExportNote";
 export { useSyncControl } from "./hooks/useSyncControl";
+export { useSignBytes } from "./hooks/useSignBytes";
 
 // Types
 export type {
@@ -104,6 +105,8 @@ export type {
   SignerAccountType,
   SignerAccountConfig,
   SignerContextValue,
+  SignBytesKind,
+  IngestStateCallback,
 } from "./types";
 
 // Re-export SDK types for convenience

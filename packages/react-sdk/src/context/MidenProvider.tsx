@@ -76,6 +76,23 @@ export function MidenProvider({
     | null
   >(null);
 
+  // Ref to hold the latest ingestState so the auto-sync effect can call it
+  // without taking signerContext as a dep (which would re-create the interval
+  // on every signer-context object identity change).
+  const ingestStateRef = useRef<
+    | ((ctx: {
+        client: WebClient;
+        runExclusive: <T>(fn: () => Promise<T>) => Promise<T>;
+      }) => Promise<void>)
+    | null
+  >(null);
+
+  // Re-entry guard: ensure overlapping ingestState invocations don't queue up
+  // (possible with large note sets and short sync intervals). Auto-sync ticks
+  // that fire while a previous ingest is in flight are skipped — the next tick
+  // catches up.
+  const ingestStateInFlightRef = useRef(false);
+
   // Detect signer from context (null if no signer provider above)
   const signerContext = useSigner();
   const [signerAccountId, setSignerAccountId] = useState<string | null>(null);
@@ -167,6 +184,12 @@ export function MidenProvider({
     signCbRef.current = signerContext?.signCb ?? null;
   }, [signerContext?.signCb]);
 
+  // Keep ingestStateRef up to date so MidenProvider can invoke ingest without
+  // taking signerContext as an effect dep (mirror of the signCbRef pattern).
+  useEffect(() => {
+    ingestStateRef.current = signerContext?.ingestState ?? null;
+  }, [signerContext?.ingestState]);
+
   // Wrapped signCb that reads through the ref — this is passed to WebClient
   // so the callback can be hot-swapped without recreating the client.
   const wrappedSignCb = useCallback(
@@ -232,11 +255,22 @@ export function MidenProvider({
 
     let cancelled = false;
 
-    // Wrap the entire init in runExclusive so that if the effect re-triggers
-    // while a previous init is still running, the new init waits for the old
-    // one to finish.  This prevents concurrent WASM access (which crashes
-    // with "recursive use of an object detected").
+    // Init flow has three phases:
+    //   1. Inside runExclusive: create webClient + initial sync + load accounts.
+    //      The lock guards against concurrent WASM access if the effect
+    //      re-triggers while a previous init is still running.
+    //   2. Outside runExclusive: invoke signer.ingestState (if present) so
+    //      it can use the runExclusive helper internally without deadlocking
+    //      on the non-reentrant AsyncLock.
+    //   3. setClient — a React state setter, safe outside the lock; atomically
+    //      flips isReady true and triggers consumer hooks.
+    //
+    // Hoisting webClient/didSignerInit out of the runExclusive closure lets
+    // them survive past the lock release for phases (2) and (3).
     const initClient = async () => {
+      let webClient: WebClient | null = null;
+      let didSignerInit = false;
+
       await runExclusive(async () => {
         // Re-check cancelled after potentially waiting for the lock
         if (cancelled) return;
@@ -245,9 +279,6 @@ export function MidenProvider({
         setConfig(resolvedConfig);
 
         try {
-          let webClient: WebClient;
-          let didSignerInit = false;
-
           if (signerContext && signerIsConnected === true) {
             // External keystore mode - signer provider is present and connected
             const storeName = `MidenClientDB_${signerContext.storeName}`;
@@ -317,27 +348,52 @@ export function MidenProvider({
               // Non-fatal
             }
           }
-
-          // Set client LAST — this atomically sets isReady=true and
-          // isInitializing=false, which enables auto-sync and consumer hooks.
-          if (!cancelled) {
-            if (!signerContext) {
-              isInitializedRef.current = true;
-            }
-            setClient(webClient);
-            // Mark signer as connected if in signer mode
-            if (signerIsConnected === true) {
-              setSignerConnected(true);
-            }
-          }
         } catch (error) {
           if (!cancelled) {
             setInitError(
               error instanceof Error ? error : new Error(String(error))
             );
           }
+          // Mark failure so the post-lock phases skip and we don't half-
+          // initialize a client.
+          webClient = null;
         }
       });
+
+      if (cancelled || !webClient) return;
+
+      // Phase 2: ingestState. Runs OUTSIDE runExclusive so the implementation
+      // can use the runExclusive helper internally (one call per note import,
+      // etc.) without deadlocking on the non-reentrant AsyncLock. Still
+      // BEFORE setClient → useNotes' first fetch sees ingested notes.
+      // Errors are caught + logged + non-fatal: ingest is best-effort.
+      if (didSignerInit && signerContext?.ingestState) {
+        try {
+          await signerContext.ingestState({
+            client: webClient,
+            runExclusive,
+          });
+          if (cancelled) return;
+        } catch (err) {
+          console.warn(
+            "[MidenProvider] signer.ingestState failed during init:",
+            err
+          );
+        }
+      }
+
+      // Phase 3: setClient — atomically sets isReady=true and
+      // isInitializing=false, which enables auto-sync and consumer hooks.
+      if (!cancelled) {
+        if (!signerContext) {
+          isInitializedRef.current = true;
+        }
+        setClient(webClient);
+        // Mark signer as connected if in signer mode
+        if (signerIsConnected === true) {
+          setSignerConnected(true);
+        }
+      }
     };
 
     initClient();
@@ -376,9 +432,40 @@ export function MidenProvider({
     const interval = config.autoSyncInterval ?? DEFAULTS.AUTO_SYNC_INTERVAL;
     if (interval <= 0) return;
 
-    syncIntervalRef.current = setInterval(() => {
-      if (!useMidenStore.getState().syncPaused) {
-        sync();
+    syncIntervalRef.current = setInterval(async () => {
+      if (useMidenStore.getState().syncPaused) return;
+
+      await sync();
+
+      // After each successful auto-sync, give the connected signer a chance
+      // to backfill the local store with state the chain doesn't expose
+      // (today: private notes the wallet holds out-of-band).
+      //
+      // - Read ingestState from a ref so this effect doesn't take
+      //   signerContext as a dep (mirrors the signCbRef pattern).
+      // - NOT outer-wrapped in runExclusive: the impl uses runExclusive
+      //   internally per-operation. (sync() above also doesn't hold the
+      //   lock — see comment near `const sync` definition.)
+      // - Re-entry guard: skip if a prior ingest is still in flight.
+      // - Errors are best-effort; log + continue.
+      const ingest = ingestStateRef.current;
+      const currentClient = useMidenStore.getState().client;
+      if (
+        ingest &&
+        currentClient &&
+        !ingestStateInFlightRef.current
+      ) {
+        ingestStateInFlightRef.current = true;
+        try {
+          await ingest({ client: currentClient, runExclusive });
+        } catch (err) {
+          console.warn(
+            "[MidenProvider] signer.ingestState failed during auto-sync:",
+            err
+          );
+        } finally {
+          ingestStateInFlightRef.current = false;
+        }
       }
     }, interval);
 
@@ -388,7 +475,7 @@ export function MidenProvider({
         syncIntervalRef.current = null;
       }
     };
-  }, [isReady, client, config.autoSyncInterval, sync]);
+  }, [isReady, client, config.autoSyncInterval, sync, runExclusive]);
 
   // Cross-tab state change listener (Layer 3).
   // The WebClient auto-syncs on cross-tab changes, so the in-memory Rust

@@ -55,6 +55,8 @@ export type {
   SignerAccountType,
   SignerAccountConfig,
   SignerContextValue,
+  SignBytesKind,
+  IngestStateCallback,
 } from "../context/SignerContext";
 
 export type RpcUrlConfig =

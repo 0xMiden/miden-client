@@ -2,6 +2,7 @@ import { createContext, useContext } from "react";
 import type {
   AccountStorageMode,
   AccountComponent,
+  WebClient,
 } from "@miden-sdk/miden-sdk/lazy";
 
 // SIGNER CONTEXT
@@ -40,6 +41,30 @@ export type InsertKeyCallback = (
   pubKey: Uint8Array,
   secretKey: Uint8Array
 ) => void;
+
+/** Kind of bytes being signed — distinguishes between a Word and serialized SigningInputs. */
+export type SignBytesKind = "word" | "signingInputs";
+
+/**
+ * Backfill the SDK's local store with state the signer knows about that the
+ * chain doesn't expose (e.g., the user's private notes). Called by
+ * MidenProvider once after initialization and again after every auto-sync.
+ *
+ * Concurrency: implementations MUST scope WASM-client calls via the provided
+ * `runExclusive` helper. The MidenProvider does NOT outer-wrap this callback
+ * in runExclusive — wrapping it would block every other client operation for
+ * the ingest's full duration AND would deadlock on the non-reentrant AsyncLock
+ * during init. Use one runExclusive call per logical unit (e.g., per note).
+ *
+ * Error contract: implementations MAY throw on transient failures (network
+ * blip, permission denied, etc.). MidenProvider catches and logs as a warning;
+ * ingestion is best-effort backfill, NEVER blocking the sync itself or any
+ * other hook.
+ */
+export type IngestStateCallback = (ctx: {
+  client: WebClient;
+  runExclusive: <T>(fn: () => Promise<T>) => Promise<T>;
+}) => Promise<void>;
 
 /**
  * Account type for signer accounts.
@@ -94,6 +119,23 @@ export interface SignerContextValue {
   name: string;
   /** Whether the signer is connected and ready */
   isConnected: boolean;
+  /** Bech32 / display address of the connected account, when available synchronously. */
+  address?: string;
+  /** Public key commitment of the connected account, when available synchronously. */
+  publicKey?: Uint8Array;
+  /**
+   * Sign arbitrary bytes (a Word or serialized SigningInputs) with the
+   * connected signer's key. Optional — signers without raw-byte signing
+   * capability omit this. Consumed by `useSignBytes`.
+   */
+  signBytes?: (data: Uint8Array, kind: SignBytesKind) => Promise<Uint8Array>;
+  /**
+   * Backfill the SDK's local IndexedDB with state the signer knows about that
+   * the chain doesn't expose (today: private notes). Optional — signers
+   * without out-of-band state (Para, Turnkey) omit this. See
+   * {@link IngestStateCallback} for the full contract.
+   */
+  ingestState?: IngestStateCallback;
   /** Connect to the signer (triggers auth flow) */
   connect: () => Promise<void>;
   /** Disconnect from the signer */
