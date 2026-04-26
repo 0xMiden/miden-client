@@ -90,6 +90,8 @@ impl Serializable for TransactionStoreUpdate {
         self.executed_transaction.write_into(target);
         self.submission_height.write_into(target);
         self.future_notes.write_into(target);
+        self.note_updates.write_into(target);
+        self.new_tags.write_into(target);
     }
 }
 
@@ -98,13 +100,15 @@ impl Deserializable for TransactionStoreUpdate {
         let executed_transaction = ExecutedTransaction::read_from(source)?;
         let submission_height = BlockNumber::read_from(source)?;
         let future_notes = Vec::<(NoteDetails, NoteTag)>::read_from(source)?;
+        let note_updates = NoteUpdateTracker::read_from(source)?;
+        let new_tags = Vec::<NoteTagRecord>::read_from(source)?;
 
         Ok(Self {
             executed_transaction,
             submission_height,
             future_notes,
-            note_updates: NoteUpdateTracker::default(),
-            new_tags: Vec::new(),
+            note_updates,
+            new_tags,
         })
     }
 }
