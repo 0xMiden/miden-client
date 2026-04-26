@@ -154,3 +154,18 @@ impl TryInto<NoteTagRecord> for &InputNoteRecord {
         }
     }
 }
+
+impl Serializable for NoteTagRecord {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.tag.write_into(target);
+        self.source.write_into(target);
+    }
+}
+
+impl Deserializable for NoteTagRecord {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let tag = NoteTag::read_from(source)?;
+        let src = NoteTagSource::read_from(source)?;
+        Ok(Self { tag, source: src })
+    }
+}
