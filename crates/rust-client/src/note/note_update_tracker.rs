@@ -1,8 +1,17 @@
 use alloc::collections::BTreeMap;
+use alloc::vec::Vec;
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
+
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+};
 
 use crate::ClientError;
 use crate::rpc::RpcError;
@@ -509,5 +518,129 @@ impl NoteUpdateTracker {
             NoteUpdateType::Update => OutputNoteUpdate::new_update(note),
         };
         self.output_notes.insert(note_id, update);
+    }
+}
+
+// SERIALIZATION
+// ================================================================================================
+
+impl Serializable for NoteUpdateType {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        match self {
+            NoteUpdateType::None => target.write_u8(0),
+            NoteUpdateType::Insert => target.write_u8(1),
+            NoteUpdateType::Update => target.write_u8(2),
+        }
+    }
+}
+
+impl Deserializable for NoteUpdateType {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        match source.read_u8()? {
+            0 => Ok(NoteUpdateType::None),
+            1 => Ok(NoteUpdateType::Insert),
+            2 => Ok(NoteUpdateType::Update),
+            val => Err(DeserializationError::InvalidValue(format!(
+                "invalid NoteUpdateType discriminant: {val}"
+            ))),
+        }
+    }
+}
+
+impl Serializable for InputNoteUpdate {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.note.write_into(target);
+        self.update_type.write_into(target);
+    }
+}
+
+impl Deserializable for InputNoteUpdate {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let note = InputNoteRecord::read_from(source)?;
+        let update_type = NoteUpdateType::read_from(source)?;
+        Ok(Self { note, update_type })
+    }
+}
+
+impl Serializable for OutputNoteUpdate {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.note.write_into(target);
+        self.update_type.write_into(target);
+    }
+}
+
+impl Deserializable for OutputNoteUpdate {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let note = OutputNoteRecord::read_from(source)?;
+        let update_type = NoteUpdateType::read_from(source)?;
+        Ok(Self { note, update_type })
+    }
+}
+
+impl Serializable for NoteUpdateTracker {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        // Serialize input note updates (note record + update type).
+        let input_updates: Vec<InputNoteUpdate> =
+            self.input_notes.values().cloned().collect();
+        input_updates.write_into(target);
+
+        // Serialize output note updates (note record + update type).
+        let output_updates: Vec<OutputNoteUpdate> =
+            self.output_notes.values().cloned().collect();
+        output_updates.write_into(target);
+
+        // Serialize nullifier execution-order positions.
+        // Written as a count followed by (nullifier, position) pairs.
+        let order_count =
+            u32::try_from(self.nullifier_order.len()).expect("nullifier order count exceeds u32");
+        target.write_u32(order_count);
+        for (nullifier, position) in &self.nullifier_order {
+            nullifier.write_into(target);
+            target.write_u32(*position);
+        }
+    }
+}
+
+impl Deserializable for NoteUpdateTracker {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        // Deserialize input note updates and rebuild the nullifier index.
+        let input_updates = Vec::<InputNoteUpdate>::read_from(source)?;
+        let mut input_notes = BTreeMap::new();
+        let mut input_notes_by_nullifier = BTreeMap::new();
+        for update in input_updates {
+            let note_id = update.note.id();
+            let nullifier = update.note.nullifier();
+            input_notes_by_nullifier.insert(nullifier, note_id);
+            input_notes.insert(note_id, update);
+        }
+
+        // Deserialize output note updates and rebuild the nullifier index.
+        let output_updates = Vec::<OutputNoteUpdate>::read_from(source)?;
+        let mut output_notes = BTreeMap::new();
+        let mut output_notes_by_nullifier = BTreeMap::new();
+        for update in output_updates {
+            let note_id = update.note.id();
+            if let Some(nullifier) = update.note.nullifier() {
+                output_notes_by_nullifier.insert(nullifier, note_id);
+            }
+            output_notes.insert(note_id, update);
+        }
+
+        // Deserialize nullifier execution-order positions.
+        let order_count = source.read_u32()?;
+        let mut nullifier_order = BTreeMap::new();
+        for _ in 0..order_count {
+            let nullifier = Nullifier::read_from(source)?;
+            let position = source.read_u32()?;
+            nullifier_order.insert(nullifier, position);
+        }
+
+        Ok(Self {
+            input_notes,
+            output_notes,
+            input_notes_by_nullifier,
+            output_notes_by_nullifier,
+            nullifier_order,
+        })
     }
 }
