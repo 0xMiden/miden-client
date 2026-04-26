@@ -15,6 +15,17 @@ export interface MidenVitePluginOptions {
   rpcProxyTarget?: string | false;
   /** gRPC-web proxy path prefix. Default: "/rpc.Api" */
   rpcProxyPath?: string;
+  /**
+   * Inject `vite-plugin-node-polyfills` into the worker bundle so the SDK's
+   * worker chunk (which imports `vite-plugin-node-polyfills/shims/global`
+   * directly) resolves cleanly. Default: true. Set false if your app already
+   * configures `worker.plugins` with nodePolyfills, or if you don't want
+   * polyfills in workers at all.
+   *
+   * Requires `vite-plugin-node-polyfills` as a dev dependency in the
+   * consuming app (lazy-required at config time; missing → warning + skip).
+   */
+  injectWorkerPolyfills?: boolean;
 }
 
 /**
@@ -39,7 +50,31 @@ export function midenVitePlugin(options?: MidenVitePluginOptions): Plugin {
     crossOriginIsolation = false,
     rpcProxyTarget = "https://rpc.testnet.miden.io",
     rpcProxyPath = "/rpc.Api",
+    injectWorkerPolyfills = true,
   } = options ?? {};
+
+  // Lazy-require nodePolyfills from the consuming project so missing the dep
+  // is a warning + skip rather than a hard ESM import failure here. The SDK's
+  // worker bundle imports `vite-plugin-node-polyfills/shims/global` directly,
+  // so the worker context needs the plugin even if the host app doesn't use
+  // node polyfills elsewhere.
+  let workerPolyfillsFactory: (() => Plugin | Plugin[]) | null = null;
+  if (injectWorkerPolyfills) {
+    try {
+      const projectRequire = createRequire(`file://${process.cwd()}/`);
+      const polyfillsPkg = projectRequire("vite-plugin-node-polyfills");
+      workerPolyfillsFactory = () =>
+        polyfillsPkg.nodePolyfills({
+          globals: { Buffer: true, global: true, process: true },
+        });
+    } catch {
+      console.warn(
+        "[@miden-sdk/vite-plugin] vite-plugin-node-polyfills not found; the " +
+          "SDK worker chunk needs it to resolve `shims/global`. Install " +
+          "with: npm install -D vite-plugin-node-polyfills"
+      );
+    }
+  }
 
   const requiredDedupe = [
     "react",
@@ -99,6 +134,19 @@ export function midenVitePlugin(options?: MidenVitePluginOptions): Plugin {
         };
       }
 
+      const workerConfig: Record<string, unknown> = {
+        format: "es" as const,
+        rollupOptions: { output: { format: "es" as const } },
+      };
+      if (workerPolyfillsFactory) {
+        // `worker.plugins` must be a function (Vite calls it per worker
+        // bundle) — wrap so each worker gets a fresh plugin instance.
+        workerConfig.plugins = () => {
+          const out = workerPolyfillsFactory!();
+          return Array.isArray(out) ? out : [out];
+        };
+      }
+
       return {
         resolve: {
           alias,
@@ -111,10 +159,7 @@ export function midenVitePlugin(options?: MidenVitePluginOptions): Plugin {
         build: {
           target: "esnext",
         },
-        worker: {
-          format: "es" as const,
-          rollupOptions: { output: { format: "es" as const } },
-        },
+        worker: workerConfig,
         server: serverConfig,
         preview: previewConfig,
       };
