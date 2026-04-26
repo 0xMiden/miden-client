@@ -1,10 +1,7 @@
 import { useCallback, useState } from "react";
 import { useMiden } from "../context/MidenProvider";
 import { useMidenStore } from "../store/MidenStore";
-import {
-  AccountStorageMode,
-  resolveAuthScheme,
-} from "@miden-sdk/miden-sdk/lazy";
+import { AccountStorageMode } from "@miden-sdk/miden-sdk/lazy";
 import type { Account } from "@miden-sdk/miden-sdk/lazy";
 import type { CreateWalletOptions } from "../types";
 import { DEFAULTS } from "../types";
@@ -75,7 +72,19 @@ export function useCreateWallet(): UseCreateWalletResult {
           options.storageMode ?? DEFAULTS.STORAGE_MODE
         );
         const mutable = options.mutable ?? DEFAULTS.WALLET_MUTABLE;
-        const authScheme = resolveAuthScheme(
+        // Lazy import: resolveAuthScheme is only available in
+        // @miden-sdk/miden-sdk >=0.14.5 (HEAD as of writing). Static import
+        // would break consumers pinned to 0.14.4 even if they never call
+        // createWallet(). Throwing at call time is safe — the error is
+        // surfaced via the hook's `error` state.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sdk = (await import("@miden-sdk/miden-sdk/lazy")) as any;
+        if (typeof sdk.resolveAuthScheme !== "function") {
+          throw new Error(
+            "useCreateWallet: @miden-sdk/miden-sdk >= 0.14.5 required (resolveAuthScheme not exported by your installed version)"
+          );
+        }
+        const authScheme = sdk.resolveAuthScheme(
           options.authScheme ?? DEFAULTS.AUTH_SCHEME
         );
 
