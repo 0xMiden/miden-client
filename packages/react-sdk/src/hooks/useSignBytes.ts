@@ -34,9 +34,10 @@ export function useSignBytes(): UseSignBytesResult {
   const [isSigning, setIsSigning] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  const signerSignBytes = signer?.signBytes;
   const signBytes = useCallback(
     async (data: Uint8Array, kind: SignBytesKind): Promise<Uint8Array> => {
-      if (!signer?.signBytes) {
+      if (typeof signerSignBytes !== "function") {
         throw new Error(
           "useSignBytes: no connected signer with signBytes capability"
         );
@@ -44,7 +45,7 @@ export function useSignBytes(): UseSignBytesResult {
       setIsSigning(true);
       setError(null);
       try {
-        return await signer.signBytes(data, kind);
+        return await signerSignBytes(data, kind);
       } catch (err) {
         const e = err instanceof Error ? err : new Error(String(err));
         setError(e);
@@ -53,7 +54,10 @@ export function useSignBytes(): UseSignBytesResult {
         setIsSigning(false);
       }
     },
-    [signer]
+    // Depend on the function reference, not the whole signer object — keeps
+    // the returned signBytes referentially stable across signer re-renders
+    // when the signer's signBytes method itself hasn't changed.
+    [signerSignBytes]
   );
 
   const reset = useCallback(() => {

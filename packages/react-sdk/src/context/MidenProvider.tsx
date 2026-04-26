@@ -250,6 +250,10 @@ export function MidenProvider({
         // Also clear old client so we get a fresh one for the new identity
         setClient(null);
         setSignerAccountId(null);
+        // Reset the ingest re-entry guard — the previous identity's ingest
+        // (if still in flight against the now-stale client) shouldn't block
+        // the new identity's auto-sync from running its own ingest.
+        ingestStateInFlightRef.current = false;
       }
     }
 
@@ -283,8 +287,9 @@ export function MidenProvider({
             // External keystore mode - signer provider is present and connected
             const storeName = `MidenClientDB_${signerContext.storeName}`;
 
-            // Update the ref so wrappedSignCb uses the latest callback
-            signCbRef.current = signerContext.signCb;
+            // signCbRef is kept in sync by the dedicated useEffect at line 167.
+            // No need to assign here — the wrapped callback reads through the
+            // ref every call.
 
             webClient = await WebClient.createClientWithExternalKeystore(
               resolvedConfig.rpcUrl,
@@ -366,10 +371,17 @@ export function MidenProvider({
       // can use the runExclusive helper internally (one call per note import,
       // etc.) without deadlocking on the non-reentrant AsyncLock. Still
       // BEFORE setClient → useNotes' first fetch sees ingested notes.
-      // Errors are caught + logged + non-fatal: ingest is best-effort.
-      if (didSignerInit && signerContext?.ingestState) {
+      //
+      // Take the in-flight guard here too so that if isReady flips and an
+      // auto-sync tick fires while this init-time ingest is still running,
+      // the auto-sync invocation skips (rather than running concurrently).
+      // Read ingestState from the ref so a signer that hot-swaps its impl
+      // between effect registration and this point picks up the latest.
+      const ingestForInit = ingestStateRef.current;
+      if (didSignerInit && ingestForInit) {
+        ingestStateInFlightRef.current = true;
         try {
-          await signerContext.ingestState({
+          await ingestForInit({
             client: webClient,
             runExclusive,
           });
@@ -379,6 +391,8 @@ export function MidenProvider({
             "[MidenProvider] signer.ingestState failed during init:",
             err
           );
+        } finally {
+          ingestStateInFlightRef.current = false;
         }
       }
 
