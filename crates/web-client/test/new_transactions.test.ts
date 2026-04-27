@@ -367,7 +367,8 @@ export const customTransaction = async (
             use miden::protocol::active_note
             use miden::standards::wallets::basic->basic_wallet
             use miden::core::mem
-            begin
+            @note_script
+            pub proc main
                 # push data from the advice map into the advice stack
                 adv.push_mapval
                 # => [NOTE_ARG]
@@ -1177,6 +1178,13 @@ export const counterAccountComponent = async (
             call.counter_contract::increment_count
         end
       `;
+    const noteScriptCode = `
+        use external_contract::counter_contract
+        @note_script
+        pub proc main
+            call.counter_contract::increment_count
+        end
+      `;
     const client = window.client;
 
     // Create counter account
@@ -1230,7 +1238,7 @@ export const counterAccountComponent = async (
     );
 
     // Create transaction with network note
-    let compiledNoteScript = await builder.compileNoteScript(scriptCode);
+    let compiledNoteScript = await builder.compileNoteScript(noteScriptCode);
 
     let noteStorage = new window.NoteStorage(
       new window.MidenArrays.FeltArray([])
