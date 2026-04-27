@@ -442,11 +442,11 @@ impl StateSync {
         // one-block lag in block header MMR commitments).
         let mut new_authentication_nodes =
             current_partial_mmr.apply(mmr_delta).map_err(StoreError::MmrError)?;
-        state_sync_update.new_peaks = current_partial_mmr.peaks();
+        state_sync_update.partial_blockchain_updates.new_peaks = current_partial_mmr.peaks();
         new_authentication_nodes
             .append(&mut current_partial_mmr.add(chain_tip_header.commitment(), false));
 
-        state_sync_update.block_updates.insert(
+        state_sync_update.partial_blockchain_updates.insert(
             chain_tip_header.clone(),
             false,
             new_authentication_nodes,
@@ -486,9 +486,11 @@ impl StateSync {
                     .map(|(k, v)| (*k, *v))
                     .collect();
 
-                state_sync_update
-                    .block_updates
-                    .insert(block.block_header, true, track_auth_nodes);
+                state_sync_update.partial_blockchain_updates.insert(
+                    block.block_header,
+                    true,
+                    track_auth_nodes,
+                );
             }
         }
 

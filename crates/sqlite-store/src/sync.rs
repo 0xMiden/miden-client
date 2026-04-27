@@ -104,8 +104,7 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         let StateSyncUpdate {
             block_num,
-            block_updates,
-            new_peaks,
+            partial_blockchain_updates,
             note_updates,
             transaction_updates,
             account_updates,
@@ -114,7 +113,7 @@ impl SqliteStore {
         let tx = conn.transaction().into_store_error()?;
 
         // Update state sync block number and peaks only if moving forward.
-        let new_peaks_bytes = new_peaks.peaks().to_vec().to_bytes();
+        let new_peaks_bytes = partial_blockchain_updates.new_peaks.peaks().to_vec().to_bytes();
         const STATE_SYNC_QUERY: &str =
             "UPDATE state_sync SET block_num = ?, partial_blockchain_peaks = ? WHERE block_num < ?";
         tx.execute(
@@ -123,12 +122,15 @@ impl SqliteStore {
         )
         .into_store_error()?;
 
-        for (block_header, block_has_relevant_notes) in block_updates.block_headers() {
+        for (block_header, block_has_relevant_notes) in partial_blockchain_updates.block_headers() {
             Self::insert_block_header_tx(&tx, block_header, *block_has_relevant_notes)?;
         }
 
         // Insert new authentication nodes (inner nodes of the PartialBlockchain)
-        Self::insert_partial_blockchain_nodes_tx(&tx, block_updates.new_authentication_nodes())?;
+        Self::insert_partial_blockchain_nodes_tx(
+            &tx,
+            partial_blockchain_updates.new_authentication_nodes(),
+        )?;
 
         // Update notes
         apply_note_updates_tx(&tx, &note_updates)?;

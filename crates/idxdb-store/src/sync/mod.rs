@@ -7,9 +7,9 @@ use miden_client::crypto::{Forest, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteId, NoteTag};
 use miden_client::store::StoreError;
 use miden_client::sync::{
-    BlockUpdates,
     NoteTagRecord,
     NoteTagSource,
+    PartialBlockchainUpdates,
     PublicAccountUpdate,
     StateSyncUpdate,
 };
@@ -138,8 +138,7 @@ impl IdxdbStore {
     ) -> Result<(), StoreError> {
         let StateSyncUpdate {
             block_num,
-            block_updates,
-            new_peaks,
+            partial_blockchain_updates,
             note_updates,
             transaction_updates,
             account_updates,
@@ -151,9 +150,9 @@ impl IdxdbStore {
             block_has_relevant_notes,
             serialized_node_ids,
             serialized_nodes,
-        ) = serialize_block_updates(&block_updates)?;
+        ) = serialize_partial_blockchain_updates(&partial_blockchain_updates)?;
 
-        let new_peaks_bytes = new_peaks.peaks().to_vec().to_bytes();
+        let new_peaks_bytes = partial_blockchain_updates.new_peaks.peaks().to_vec().to_bytes();
 
         let (serialized_input_notes, serialized_output_notes): (Vec<_>, Vec<_>) = {
             let input_notes = note_updates.updated_input_notes();
@@ -342,23 +341,23 @@ impl IdxdbStore {
 
 type SerializedBlockData = (Vec<Vec<u8>>, Vec<u32>, Vec<u8>, Vec<String>, Vec<String>);
 
-fn serialize_block_updates(
-    block_updates: &BlockUpdates,
+fn serialize_partial_blockchain_updates(
+    partial_blockchain_updates: &PartialBlockchainUpdates,
 ) -> Result<SerializedBlockData, StoreError> {
     let mut block_headers_as_bytes = Vec::new();
     let mut block_nums = Vec::new();
     let mut block_has_relevant_notes = Vec::new();
 
-    for (block_header, has_client_notes) in block_updates.block_headers() {
+    for (block_header, has_client_notes) in partial_blockchain_updates.block_headers() {
         block_headers_as_bytes.push(block_header.to_bytes());
         block_nums.push(block_header.block_num().as_u32());
         block_has_relevant_notes.push(u8::from(*has_client_notes));
     }
 
-    let auth_nodes_len = block_updates.new_authentication_nodes().len();
+    let auth_nodes_len = partial_blockchain_updates.new_authentication_nodes().len();
     let mut serialized_node_ids = Vec::with_capacity(auth_nodes_len);
     let mut serialized_nodes = Vec::with_capacity(auth_nodes_len);
-    for (id, node) in block_updates.new_authentication_nodes() {
+    for (id, node) in partial_blockchain_updates.new_authentication_nodes() {
         let SerializedPartialBlockchainNodeData { id, node } =
             serialize_partial_blockchain_node(*id, *node)?;
         serialized_node_ids.push(id);
