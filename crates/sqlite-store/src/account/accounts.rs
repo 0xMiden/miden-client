@@ -78,7 +78,7 @@ impl SqliteStore {
     }
 
     pub(crate) fn get_account_header(
-        conn: &mut Connection,
+        conn: &Connection,
         account_id: AccountId,
     ) -> Result<Option<(AccountHeader, AccountStatus)>, StoreError> {
         Ok(query_latest_account_headers(conn, "id = ?", params![account_id.to_hex()])?.pop())

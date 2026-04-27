@@ -68,7 +68,7 @@ use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::serde::{Deserializable, DeserializationError, Serializable};
 use tracing::{debug, info};
 
-use crate::store::{NoteFilter, TransactionFilter};
+use crate::store::{AccountStorageFilter, NoteFilter, TransactionFilter};
 use crate::{Client, ClientError};
 mod block_header;
 
@@ -76,12 +76,19 @@ mod tag;
 pub use tag::{NoteTagRecord, NoteTagSource};
 
 mod state_sync;
-pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
+pub use state_sync::{
+    AccountSyncHint,
+    NoteUpdateAction,
+    OnNoteReceived,
+    StateSync,
+    StateSyncInput,
+};
 
 mod state_sync_update;
 pub use state_sync_update::{
     AccountUpdates,
     BlockUpdates,
+    PublicAccountDelta,
     PublicAccountUpdate,
     StateSyncUpdate,
     TransactionUpdateTracker,
@@ -133,12 +140,8 @@ where
 
         // Build sync state components
         let note_screener = self.note_screener();
-        let state_sync = StateSync::new(
-            self.rpc_api.clone(),
-            Some(self.store.clone()),
-            Arc::new(note_screener),
-            self.tx_discard_delta,
-        );
+        let state_sync =
+            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
         let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
         let input = self.build_sync_input().await?;
 
@@ -165,13 +168,28 @@ where
     /// This includes all tracked account headers, all unique note tags, all unspent input and
     /// output notes, and all uncommitted transactions.
     pub async fn build_sync_input(&self) -> Result<StateSyncInput, ClientError> {
-        let accounts = self
-            .store
-            .get_account_headers()
-            .await?
-            .into_iter()
-            .map(|(header, _status)| header)
-            .collect();
+        let mut accounts = Vec::new();
+        for (header, _status) in self.store.get_account_headers().await? {
+            // Carry the account's map slot names as a hint so `StateSync` can request all map
+            // data in a single proof call when the account changes. Falls back to the discovery
+            // path if the storage read fails.
+            let map_slot_names = match self
+                .store
+                .get_account_storage(header.id(), AccountStorageFilter::All)
+                .await
+            {
+                Ok(storage) => storage
+                    .slots()
+                    .iter()
+                    .filter(|slot| {
+                        slot.slot_type() == miden_protocol::account::StorageSlotType::Map
+                    })
+                    .map(|slot| slot.name().clone())
+                    .collect(),
+                Err(_) => Vec::new(),
+            };
+            accounts.push(AccountSyncHint { header, map_slot_names });
+        }
 
         let note_tags = self.store.get_unique_note_tags().await?;
 

@@ -1,16 +1,29 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
-use miden_protocol::Word;
-use miden_protocol::account::{AccountDelta, AccountHeader, AccountId};
+use miden_protocol::account::{
+    Account,
+    AccountDelta,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    AccountStorageDelta,
+    AccountVaultDelta,
+    StorageMapKey,
+    StorageSlotName,
+};
+use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks};
+use miden_protocol::errors::AccountDeltaError;
 use miden_protocol::note::{NoteId, Nullifier};
 use miden_protocol::transaction::TransactionId;
+use miden_protocol::{Felt, Word};
 
 use super::SyncSummary;
-use crate::account::Account;
 use crate::note::{NoteUpdateTracker, NoteUpdateType};
+use crate::rpc::domain::account_vault::AccountVaultUpdate;
+use crate::rpc::domain::storage_map::StorageMapUpdate;
 use crate::rpc::domain::transaction::TransactionInclusion;
 use crate::transaction::{DiscardCause, TransactionRecord, TransactionStatus};
 
@@ -324,22 +337,24 @@ impl TransactionUpdateTracker {
 // PUBLIC ACCOUNT UPDATE
 // ================================================================================================
 
-/// Represents an update to a single public account's state.
+/// Update to a single tracked public account.
 ///
-/// Small accounts that fit within the node's response threshold are sent as `Full` replacements.
-/// Oversized accounts (too many storage map entries or vault assets) are sent as incremental
-/// `Delta` updates to avoid reconstructing the full account in memory.
-#[derive(Debug, Clone)]
+/// `StateSync` emits one of two variants depending on whether the node could return the account's
+/// full state in a single response:
+///
+/// - [`PublicAccountUpdate::Full`] carries the new [`Account`] state directly (used when no storage
+///   map is oversized and the vault fits in the response). The store applies it by replacing the
+///   local state — no delta computation needed.
+/// - [`PublicAccountUpdate::Delta`] carries a [`PublicAccountDelta`] payload (new header plus
+///   incremental updates from `sync_storage_maps` and `sync_account_vault`, used when any part of
+///   the account is oversized). The store calls [`PublicAccountDelta::compute_account_delta`] to
+///   derive the [`AccountDelta`] to apply.
 pub enum PublicAccountUpdate {
-    /// Full account state replacement.
+    /// The account fits in a single proof response — the new full state is carried as-is.
     Full(Account),
-    /// Incremental delta applied to the locally stored state.
-    Delta {
-        /// The new account header after the delta is applied.
-        new_header: AccountHeader,
-        /// The changes relative to the current locally-stored state.
-        delta: AccountDelta,
-    },
+    /// The account is oversized in some dimension. The new state must be reconstructed by
+    /// replaying the carried incremental updates against the locally-stored state.
+    Delta(PublicAccountDelta),
 }
 
 impl PublicAccountUpdate {
@@ -347,16 +362,185 @@ impl PublicAccountUpdate {
     pub fn id(&self) -> AccountId {
         match self {
             Self::Full(account) => account.id(),
-            Self::Delta { new_header, .. } => new_header.id(),
+            Self::Delta(delta) => delta.id(),
         }
     }
+}
+
+/// Incremental delta payload for a public account update.
+///
+/// Carries the new account header plus the per-block updates fetched from the node's incremental
+/// endpoints (`sync_storage_maps` and `sync_account_vault`). The store derives the
+/// [`AccountDelta`] to apply by replaying these updates against its locally-stored account state
+/// via [`Self::compute_account_delta`].
+pub struct PublicAccountDelta {
+    /// The new account header after applying these updates.
+    new_header: AccountHeader,
+    /// First block of the synced range (the client's previous sync height).
+    block_from: BlockNumber,
+    /// Last block of the synced range (the block at which `new_header` is observed).
+    block_to: BlockNumber,
+    /// New value-slot values from the `get_account_proof` storage header. Value slots are
+    /// always small enough to fit in the response.
+    value_slot_updates: Vec<(StorageSlotName, Word)>,
+    /// Per-block storage map updates from `sync_storage_maps`.
+    storage_map_updates: Vec<StorageMapUpdate>,
+    /// Per-block vault updates from `sync_account_vault`.
+    vault_updates: Vec<AccountVaultUpdate>,
+}
+
+impl PublicAccountDelta {
+    /// Creates a new [`PublicAccountDelta`].
+    pub fn new(
+        new_header: AccountHeader,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
+        value_slot_updates: Vec<(StorageSlotName, Word)>,
+        storage_map_updates: Vec<StorageMapUpdate>,
+        vault_updates: Vec<AccountVaultUpdate>,
+    ) -> Self {
+        Self {
+            new_header,
+            block_from,
+            block_to,
+            value_slot_updates,
+            storage_map_updates,
+            vault_updates,
+        }
+    }
+
+    /// Returns the account ID this delta applies to.
+    pub fn id(&self) -> AccountId {
+        self.new_header.id()
+    }
+
+    /// Returns the new account header that this delta advances the local state to.
+    pub fn new_header(&self) -> &AccountHeader {
+        &self.new_header
+    }
+
+    /// Returns the first block of the synced range.
+    pub fn block_from(&self) -> BlockNumber {
+        self.block_from
+    }
+
+    /// Returns the last block of the synced range.
+    pub fn block_to(&self) -> BlockNumber {
+        self.block_to
+    }
+
+    /// Computes the [`AccountDelta`] implied by this payload by replaying the carried
+    /// incremental updates against the locally-stored account state.
+    pub fn compute_account_delta(
+        &self,
+        local_header: &AccountHeader,
+        local_storage: &AccountStorage,
+        local_vault: &AssetVault,
+    ) -> Result<AccountDelta, AccountDeltaError> {
+        let storage_delta = replay_storage_updates(
+            local_storage,
+            &self.value_slot_updates,
+            &self.storage_map_updates,
+        )?;
+        let vault_delta = replay_vault_updates(local_vault, &self.vault_updates)?;
+
+        let old_nonce = local_header.nonce().as_canonical_u64();
+        let new_nonce = self.new_header.nonce().as_canonical_u64();
+        let nonce_delta = Felt::new(new_nonce.saturating_sub(old_nonce));
+
+        AccountDelta::new(self.new_header.id(), storage_delta, vault_delta, nonce_delta)
+    }
+}
+
+// DELTA REPLAY HELPERS
+// ================================================================================================
+
+/// Computes a storage delta by replaying incremental updates onto the locally-stored state.
+fn replay_storage_updates(
+    local_storage: &AccountStorage,
+    value_slot_updates: &[(StorageSlotName, Word)],
+    storage_map_updates: &[StorageMapUpdate],
+) -> Result<AccountStorageDelta, AccountDeltaError> {
+    let mut storage_delta = AccountStorageDelta::new();
+
+    // Value slots: emit only the slots whose new value differs from local.
+    for (slot_name, new_value) in value_slot_updates {
+        let local_value = local_storage.get_item(slot_name).ok();
+        if local_value.as_ref() != Some(new_value) {
+            storage_delta.set_item(slot_name.clone(), *new_value)?;
+        }
+    }
+
+    // Map slots: dedup updates per (slot, key) keeping the latest value by block number.
+    let mut by_slot: BTreeMap<StorageSlotName, BTreeMap<StorageMapKey, Word>> = BTreeMap::new();
+    let mut sorted: Vec<&StorageMapUpdate> = storage_map_updates.iter().collect();
+    sorted.sort_by_key(|u| u.block_num);
+    for update in sorted {
+        by_slot
+            .entry(update.slot_name.clone())
+            .or_default()
+            .insert(update.key, update.value);
+    }
+    for (slot_name, entries) in by_slot {
+        for (key, value) in entries {
+            storage_delta.set_map_item(slot_name.clone(), key, value)?;
+        }
+    }
+
+    Ok(storage_delta)
+}
+
+/// Computes a vault delta by replaying incremental updates onto the locally-stored vault.
+fn replay_vault_updates(
+    local_vault: &AssetVault,
+    vault_updates: &[AccountVaultUpdate],
+) -> Result<AccountVaultDelta, AccountDeltaError> {
+    let mut vault_delta = AccountVaultDelta::default();
+
+    let mut final_vault: BTreeMap<AssetVaultKey, Asset> =
+        local_vault.assets().map(|asset| (asset.vault_key(), asset)).collect();
+
+    let mut sorted: Vec<&AccountVaultUpdate> = vault_updates.iter().collect();
+    sorted.sort_by_key(|u| u.block_num);
+    for update in sorted {
+        match update.asset {
+            Some(asset) => {
+                final_vault.insert(update.vault_key, asset);
+            },
+            None => {
+                final_vault.remove(&update.vault_key);
+            },
+        }
+    }
+
+    let local_assets: BTreeMap<AssetVaultKey, Asset> =
+        local_vault.assets().map(|a| (a.vault_key(), a)).collect();
+    for (key, final_asset) in &final_vault {
+        match local_assets.get(key) {
+            None => {
+                vault_delta.add_asset(*final_asset)?;
+            },
+            Some(local_asset) if local_asset != final_asset => {
+                vault_delta.remove_asset(*local_asset)?;
+                vault_delta.add_asset(*final_asset)?;
+            },
+            _ => {},
+        }
+    }
+    for (key, local_asset) in &local_assets {
+        if !final_vault.contains_key(key) {
+            vault_delta.remove_asset(*local_asset)?;
+        }
+    }
+
+    Ok(vault_delta)
 }
 
 // ACCOUNT UPDATES
 // ================================================================================================
 
 /// Contains account changes to apply to the store after a sync request.
-#[derive(Debug, Clone, Default)]
+#[derive(Default)]
 #[allow(clippy::struct_field_names)]
 pub struct AccountUpdates {
     /// Updated public accounts, either as full state replacements or incremental deltas.
