@@ -101,8 +101,8 @@ pub trait StoreFactory {
 /// - **Transaction discard delta**: Number of blocks after which pending transactions are
 ///   considered stale and discarded. Configure via [`tx_discard_delta()`](Self::tx_discard_delta).
 ///
-/// - **In-memory Partial MMR cache**: Reuses the current partial blockchain MMR between sync and
-///   prune operations. Disabled by default. Configure via
+/// - **In-memory Partial MMR cache**: Reuses the current partial blockchain MMR instead of
+///   rebuilding it from store. Disabled by default. Configure via
 ///   [`cache_partial_mmr_in_memory()`](Self::cache_partial_mmr_in_memory).
 ///
 /// - **Max block number delta**: Maximum number of blocks the client can be behind the network for

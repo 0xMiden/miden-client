@@ -387,9 +387,9 @@ pub struct Client<AUTH> {
 ///
 /// - `store_peaks_hash`: peaks at the current sync height - guards against chain/height drift.
 /// - `tracked_blocks_hash`: hash of the store's tracked block numbers - guards against drift
-///   between store-tracked and cache-tracked blocks. Required because a same-height update can
-///   mark an existing block relevant without changing peaks; pruning the cached MMR while it's
-///   missing such a block would over-delete auth nodes that the store still needs.
+///   between store-tracked and cache-tracked blocks. Required because a same-height update can mark
+///   an existing block relevant without changing peaks; pruning the cached MMR while it's missing
+///   such a block would over-delete auth nodes that the store still needs.
 ///
 /// The cached MMR includes the sync-height block as a tracked leaf; the store persists the
 /// peaks committed by that block's header, i.e. the peaks over the chain *before* that block
