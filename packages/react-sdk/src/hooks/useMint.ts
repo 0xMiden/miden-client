@@ -82,7 +82,7 @@ export function useMint(): UseMintResult {
 
         setStage("proving");
         const txResult = await runExclusiveSafe(async () => {
-          const txRequest = client.newMintTransactionRequest(
+          const txRequest = await client.newMintTransactionRequest(
             targetAccountIdObj,
             faucetIdObj,
             noteType,

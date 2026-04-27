@@ -75,12 +75,21 @@ export class AccountsResource {
     const authComponent =
       wasm.AccountComponent.createAuthComponentFromSecretKey(opts.auth);
 
+    // Schema commitment from `build()` is not a substitute for contract code; require explicit
+    // `components` so auth-only contracts are rejected at this layer.
+    const components = opts.components ?? [];
+    if (components.length === 0) {
+      throw new Error(
+        "Contract accounts require at least one non-auth procedure: pass at least one entry in `components`."
+      );
+    }
+
     let builder = new wasm.AccountBuilder(opts.seed)
       .accountType(accountTypeEnum)
       .storageMode(storageMode)
       .withAuthComponent(authComponent);
 
-    for (const component of opts.components ?? []) {
+    for (const component of components) {
       builder = builder.withComponent(component);
     }
 
@@ -122,7 +131,9 @@ export class AccountsResource {
     if (!account) {
       throw new Error(`Account not found: ${id.toString()}`);
     }
-    const keys = await this.#inner.keystore.getCommitments(id);
+    const keys = this.#inner.keystore
+      ? await this.#inner.keystore.getCommitments(id)
+      : await this.#inner.getPublicKeyCommitmentsOfAccount(id);
     return {
       account,
       vault: account.vault(),
@@ -137,7 +148,7 @@ export class AccountsResource {
     const wasm = await this.#getWasm();
     const accountId = resolveAccountRef(accountRef, wasm);
     const faucetId = resolveAccountRef(tokenRef, wasm);
-    const reader = this.#inner.accountReader(accountId);
+    const reader = await this.#inner.accountReader(accountId);
     return await reader.getBalance(faucetId);
   }
 

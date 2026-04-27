@@ -15,7 +15,13 @@ use miden_client::account::component::{
     MIDEN_PACKAGE_EXTENSION,
     StorageSlotSchema,
 };
-use miden_client::account::{Account, AccountBuilder, AccountStorageMode, AccountType};
+use miden_client::account::{
+    Account,
+    AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
+    AccountStorageMode,
+    AccountType,
+};
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig};
 use miden_client::keystore::Keystore;
 use miden_client::transaction::TransactionRequestBuilder;
@@ -443,7 +449,7 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     }
 
     let account = builder
-        .build()
+        .build_with_schema_commitment()
         .map_err(|err| CliError::Account(err, "failed to build account".into()))?;
 
     // Only add the key to the keystore if we generated a default key type (Falcon)

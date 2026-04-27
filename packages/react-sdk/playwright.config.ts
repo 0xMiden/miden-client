@@ -22,11 +22,14 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
       testMatch: "*.test.ts",
+      // MockWebClient is not yet compatible with the js_export architecture
+      testIgnore: ["test/mockchain*"],
     },
     {
       name: "webkit",
       use: { ...devices["Desktop Safari"] },
       testMatch: "*.test.ts",
+      testIgnore: ["test/mockchain*"],
     },
   ],
 

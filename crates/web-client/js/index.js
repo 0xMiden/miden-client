@@ -6,6 +6,7 @@ import {
   releaseSyncLockWithError,
 } from "./syncLock.js";
 import { MidenClient } from "./client.js";
+import { CompilerResource } from "./resources/compiler.js";
 import {
   createP2IDNote,
   createP2IDENote,
@@ -13,6 +14,12 @@ import {
   _setWasm as _setStandaloneWasm,
   _setWebClient as _setStandaloneWebClient,
 } from "./standalone.js";
+import {
+  installStorageView,
+  StorageView,
+  StorageResult,
+  wordToBigInt,
+} from "./storageView.js";
 export * from "../Cargo.toml";
 
 export const AccountType = Object.freeze({
@@ -44,11 +51,22 @@ export const StorageMode = Object.freeze({
   Network: "network",
 });
 
+export const Linking = Object.freeze({
+  Dynamic: "dynamic",
+  Static: "static",
+});
+
 export { MidenClient };
+export { CompilerResource };
 export { createP2IDNote, createP2IDENote, buildSwapTag };
+export { StorageView, StorageResult, wordToBigInt };
 
 // Internal exports — used by integration tests that need direct access to the low-level WebClient proxy.
-export { WebClient as WasmWebClient, MockWebClient as MockWasmWebClient };
+export {
+  WebClient as WasmWebClient,
+  MockWebClient as MockWasmWebClient,
+  MockWebClient,
+};
 
 // Method classification sets — used by scripts/check-method-classification.js to ensure
 // every WASM export is explicitly categorised. Update when adding new WASM methods.
@@ -68,6 +86,7 @@ const SYNC_METHODS = new Set([
 ]);
 
 const WRITE_METHODS = new Set([
+  "addAccountSecretKeyToWebStore",
   "addTag",
   "executeForSummary",
   "executeProgram",
@@ -92,6 +111,8 @@ const WRITE_METHODS = new Set([
 const READ_METHODS = new Set([
   "accountReader",
   "exportAccountFile",
+  "getAccountAuthByPubKeyCommitment",
+  "getAccountByKeyCommitment",
   "exportNoteFile",
   "exportStore",
   "getAccount",
@@ -104,6 +125,7 @@ const READ_METHODS = new Set([
   "getInputNotes",
   "getOutputNote",
   "getOutputNotes",
+  "getPublicKeyCommitmentsOfAccount",
   "getSetting",
   "getSyncHeight",
   "getTransactions",
@@ -173,6 +195,9 @@ const ensureWasm = async () => {
         }
         // Set WASM module for standalone utilities
         _setStandaloneWasm(module);
+        // Install StorageView: account.storage() now returns a developer-friendly
+        // wrapper that makes getItem() work correctly for StorageMap slots.
+        installStorageView(module);
       }
       return module;
     });
@@ -238,6 +263,46 @@ function createClientProxy(instance) {
 
 class WebClient {
   /**
+   * Controls which worker variant is spawned when a WebClient is constructed.
+   *
+   * - `"auto"` (default): pick `classic` on Safari/WKWebView (where module
+   *   workers have a very slow cold start), `module` everywhere else.
+   * - `"module"`: always use the `.mjs` ES-module worker. Required for webpack
+   *   5 / Next.js consumers so the asset tracer can see the WASM URL.
+   * - `"classic"`: always use the `.js` classic-script worker. Required on
+   *   Safari/WKWebView. Set this if your consumer bundler (or your host app)
+   *   does not support module workers.
+   *
+   * Set before the first `WebClient.createClient(...)` call.
+   */
+  static workerMode = "auto";
+
+  /**
+   * Decide between the module and classic worker variants based on
+   * `WebClient.workerMode` and (when `auto`) the current user agent.
+   * @returns {boolean} true when the classic script should be used.
+   * @private
+   */
+  static _shouldUseClassicWorker() {
+    const mode = WebClient.workerMode;
+    if (mode === "module") return false;
+    if (mode === "classic") return true;
+    // auto: classic on Safari/WKWebView, module everywhere else.
+    const ua =
+      typeof navigator !== "undefined" && navigator.userAgent
+        ? navigator.userAgent
+        : "";
+    // Chromium-based browsers (Chrome, Edge, Brave, Opera, Chromium-based
+    // Android WebView) handle module workers fine.
+    if (/Chrome\/|Chromium\//.test(ua)) return false;
+    // Safari (desktop + iOS) and WKWebView-without-Chrome (e.g. Capacitor host)
+    // both have AppleWebKit but no Chrome/Chromium in the UA. Prefer classic.
+    if (/AppleWebKit/.test(ua)) return true;
+    // Firefox, jsdom, node without navigator, etc. — module worker is fine.
+    return false;
+  }
+
+  /**
    * Create a WebClient wrapper.
    *
    * @param {string | undefined} rpcUrl - RPC endpoint URL used by the client.
@@ -283,11 +348,36 @@ class WebClient {
     // Check if Web Workers are available.
     if (typeof Worker !== "undefined") {
       console.log("WebClient: Web Workers are available.");
-      // Create the worker.
-      this.worker = new Worker(
-        new URL("./workers/web-client-methods-worker.js", import.meta.url),
-        { type: "module" }
-      );
+      // Pick between the module and classic worker variants at runtime — see
+      // `WebClient.workerMode` below. Both branches keep the
+      // `new Worker(new URL("...", import.meta.url), ...)` form fully literal:
+      // webpack 5's new-worker detector is PURELY SYNTACTIC and only triggers
+      // a proper worker sub-compilation (with asset+chunk tracing into the
+      // Cargo glue and the sibling WASM) when it sees that exact pattern
+      // spelled inline. Hoisting either URL into a variable downgrades the
+      // detection to a plain "copy file as asset" — which in turn makes the
+      // worker's `await import("./Cargo-*.js")` 404 because webpack never
+      // emitted a chunk for it. The bit of duplication here is load-bearing.
+      //
+      // - module (`.module.js` with `{ type: "module" }`): `import.meta.url`
+      //   inside the Cargo glue is preserved so webpack/Vite can resolve the
+      //   WASM URL statically. Preferred everywhere EXCEPT Safari/WKWebView.
+      // - classic (`.js`, no options): self-contained async IIFE with
+      //   `import.meta.url` rewritten to `self.location.href`; the only form
+      //   Safari/WKWebView can cold-start in a reasonable time.
+      if (WebClient._shouldUseClassicWorker()) {
+        this.worker = new Worker(
+          new URL("./workers/web-client-methods-worker.js", import.meta.url)
+        );
+      } else {
+        this.worker = new Worker(
+          new URL(
+            "./workers/web-client-methods-worker.module.js",
+            import.meta.url
+          ),
+          { type: "module" }
+        );
+      }
 
       // Map to track pending worker requests.
       this.pendingRequests = new Map();
@@ -879,9 +969,9 @@ class MockWebClient extends WebClient {
     // Wait for the underlying wasmWebClient to be initialized.
     const wasmWebClient = await instance.getWasmWebClient();
     await wasmWebClient.createMockClient(
-      seed,
-      serializedMockChain,
-      serializedMockNoteTransportNode
+      seed ?? null,
+      serializedMockChain ?? null,
+      serializedMockNoteTransportNode ?? null
     );
 
     // Wait for the worker to be ready
@@ -926,9 +1016,11 @@ class MockWebClient extends WebClient {
         if (!this.worker) {
           result = await wasmWebClient.syncStateImpl();
         } else {
-          let serializedMockChain = wasmWebClient.serializeMockChain().buffer;
-          let serializedMockNoteTransportNode =
-            wasmWebClient.serializeMockNoteTransportNode().buffer;
+          let serializedMockChain = (await wasmWebClient.serializeMockChain())
+            .buffer;
+          let serializedMockNoteTransportNode = (
+            await wasmWebClient.serializeMockNoteTransportNode()
+          ).buffer;
 
           const wasm = await getWasmOrThrow();
 
@@ -964,9 +1056,11 @@ class MockWebClient extends WebClient {
       const wasmWebClient = await this.getWasmWebClient();
       const wasm = await getWasmOrThrow();
       const serializedTransactionRequest = transactionRequest.serialize();
-      const serializedMockChain = wasmWebClient.serializeMockChain().buffer;
-      const serializedMockNoteTransportNode =
-        wasmWebClient.serializeMockNoteTransportNode().buffer;
+      const serializedMockChain = (await wasmWebClient.serializeMockChain())
+        .buffer;
+      const serializedMockNoteTransportNode = (
+        await wasmWebClient.serializeMockNoteTransportNode()
+      ).buffer;
 
       const result = await this.callMethodWithWorker(
         MethodName.SUBMIT_NEW_TRANSACTION_MOCK,
@@ -1018,9 +1112,11 @@ class MockWebClient extends WebClient {
       const wasm = await getWasmOrThrow();
       const serializedTransactionRequest = transactionRequest.serialize();
       const proverPayload = prover.serialize();
-      const serializedMockChain = wasmWebClient.serializeMockChain().buffer;
-      const serializedMockNoteTransportNode =
-        wasmWebClient.serializeMockNoteTransportNode().buffer;
+      const serializedMockChain = (await wasmWebClient.serializeMockChain())
+        .buffer;
+      const serializedMockNoteTransportNode = (
+        await wasmWebClient.serializeMockNoteTransportNode()
+      ).buffer;
 
       const result = await this.callMethodWithWorker(
         MethodName.SUBMIT_NEW_TRANSACTION_WITH_PROVER_MOCK,

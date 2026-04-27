@@ -8,14 +8,7 @@ use std::sync::Arc;
 
 use miden_client::account::{Address, AddressInterface};
 use miden_client::address::RoutingParameters;
-use miden_client::assembly::{
-    Assembler,
-    CodeBuilder,
-    DefaultSourceManager,
-    Module,
-    ModuleKind,
-    Path,
-};
+use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{
     AuthSchemeId,
     AuthSecretKey,
@@ -104,9 +97,10 @@ use miden_protocol::testing::account_id::{
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
-use miden_protocol::transaction::{RawOutputNote, TransactionKernel};
+use miden_protocol::transaction::RawOutputNote;
 use miden_protocol::vm::AdviceInputs;
 use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
+use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::faucets::BasicFungibleFaucet;
 use miden_standards::account::interface::AccountInterfaceError;
 use miden_standards::account::mint_policies::AuthControlled;
@@ -118,6 +112,7 @@ use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
 
+mod batch;
 pub mod store;
 mod transaction;
 mod transport;
@@ -125,6 +120,17 @@ mod transport;
 /// Constant that represents the number of blocks until the transaction is considered
 /// stale.
 const TX_DISCARD_DELTA: u32 = 20;
+
+/// Number of storage map entries used to create accounts that exceed the oversize threshold.
+const NUM_STORAGE_MAP_ENTRIES_LARGE_ACCOUNT: u64 = 2001;
+
+/// Number of faucets (and therefore fungible assets) used in oversized-account tests.
+const NUM_FAUCETS_LARGE_ACCOUNT: u64 = 10;
+
+/// Oversize threshold used for the mock RPC in large-account tests.
+/// Both storage map entries and vault assets must exceed this to trigger
+/// the `too_many_entries` / `too_many_assets` flags.
+const OVERSIZE_THRESHOLD: usize = 5;
 
 // TESTS
 // ================================================================================================
@@ -536,7 +542,8 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
     partial_mmr.add(genesis.commitment(), true); // track genesis
 
     // Create a StateSync that discards all notes so intermediate blocks are skipped
-    let state_sync = StateSync::new(Arc::new(rpc_api.clone()), Arc::new(DiscardAllNotes), None);
+    let state_sync =
+        StateSync::new(Arc::new(rpc_api.clone()), None, Arc::new(DiscardAllNotes), None);
 
     // Use the note tag from the prebuilt chain (tag 0) so the mock RPC returns
     // blocks step-by-step (block 1, then block 4, then the chain tip) instead of
@@ -626,7 +633,8 @@ async fn sync_state_no_redundant_get_account_calls() {
     let mut partial_mmr = PartialMmr::from_peaks(MmrPeaks::new(Forest::empty(), vec![]).unwrap());
     partial_mmr.add(genesis.commitment(), true);
 
-    let state_sync = StateSync::new(Arc::new(rpc_api.clone()), Arc::new(DiscardAllNotes), None);
+    let state_sync =
+        StateSync::new(Arc::new(rpc_api.clone()), None, Arc::new(DiscardAllNotes), None);
 
     // Use tag 0 to force multiple sync steps (notes exist in blocks 1 and 4)
     let note_tags = BTreeSet::from([NoteTag::new(0)]);
@@ -1311,8 +1319,12 @@ async fn input_note_reader_finds_externally_consumed_notes() {
     assert_eq!(collected[0].consumer_account(), Some(consumer_id));
 }
 
-#[tokio::test]
-async fn irrelevant_block_pruning_respects_sync_interval() {
+/// Builds a chain with two blocks relevant to a tracked account (blocks 1 and 4) and a client
+/// synced up to block 4 with `prune_interval` configured. Returns the consuming pieces needed to
+/// make block 4 irrelevant on demand.
+async fn setup_prunable_block_scenario(
+    prune_interval: Option<u32>,
+) -> (MockClient<FilesystemKeyStore>, MockRpcApi, AccountId, Note) {
     let mut builder = MockChainBuilder::new();
     let mock_account = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
 
@@ -1334,7 +1346,7 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
 
     let mut chain = builder.build().unwrap();
 
-    // Block 1: create the first unspent note.
+    // Block 1: create the first unspent note (keeps block 1 permanently relevant).
     let tx = Box::pin(
         chain
             .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note_1])
@@ -1353,7 +1365,8 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
     chain.prove_next_block().unwrap();
     chain.prove_next_block().unwrap();
 
-    // Block 4: create the second note, which will later become irrelevant.
+    // Block 4: create the second note, which the caller will later consume to make block 4
+    // irrelevant.
     let tx = Box::pin(
         chain
             .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note_2])
@@ -1369,8 +1382,7 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
     chain.prove_next_block().unwrap();
 
     let rng = RandomCoin::new(rand::random::<[u64; 4]>().map(Felt::new).into());
-    let keystore_path = std::env::temp_dir();
-    let keystore = FilesystemKeyStore::new(keystore_path).unwrap();
+    let keystore = FilesystemKeyStore::new(std::env::temp_dir()).unwrap();
     let mock_rpc = MockRpcApi::new(chain);
 
     let mut client = ClientBuilder::new()
@@ -1380,7 +1392,7 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
         .authenticator(Arc::new(keystore))
         .in_debug_mode(DebugMode::Enabled)
         .tx_discard_delta(None)
-        .irrelevant_block_prune_interval(Some(2))
+        .irrelevant_block_prune_interval(prune_interval)
         .build()
         .await
         .unwrap();
@@ -1388,13 +1400,23 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
     client.add_note_tag(NoteTag::new(0)).await.unwrap();
 
     client.sync_state().await.unwrap();
-    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 2);
+    assert_eq!(
+        client.test_store().get_tracked_block_headers().await.unwrap().len(),
+        2,
+        "setup precondition: two relevant blocks tracked",
+    );
 
+    (client, mock_rpc, mock_account.id(), note_second)
+}
+
+/// Consumes `note` against `account_id` on the mocked chain and proves the resulting block, so the
+/// block that originally carried the note becomes irrelevant from the client's perspective.
+async fn consume_note_and_prove(mock_rpc: &MockRpcApi, account_id: AccountId, note: Note) {
     let tx = {
         let tx_context = mock_rpc
             .mock_chain
             .write()
-            .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[note_second])
+            .build_tx_context(TxContextInput::AccountId(account_id), &[], &[note])
             .unwrap()
             .build()
             .unwrap();
@@ -1402,6 +1424,14 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
     };
     mock_rpc.mock_chain.write().add_pending_executed_transaction(&tx).unwrap();
     mock_rpc.prove_block();
+}
+
+#[tokio::test]
+async fn irrelevant_block_pruning_respects_sync_interval() {
+    let (mut client, mock_rpc, account_id, note_second) =
+        setup_prunable_block_scenario(Some(2)).await;
+
+    consume_note_and_prove(&mock_rpc, account_id, note_second).await;
 
     client.sync_state().await.unwrap();
     assert_eq!(
@@ -1417,6 +1447,24 @@ async fn irrelevant_block_pruning_respects_sync_interval() {
         1,
         "the irrelevant block should be pruned once the sync interval is reached",
     );
+}
+
+#[tokio::test]
+async fn irrelevant_block_pruning_disabled_when_interval_is_none() {
+    let (mut client, mock_rpc, account_id, note_second) = setup_prunable_block_scenario(None).await;
+
+    consume_note_and_prove(&mock_rpc, account_id, note_second).await;
+
+    // With pruning disabled, both tracked blocks must remain across repeated syncs.
+    for _ in 0..5 {
+        mock_rpc.prove_block();
+        client.sync_state().await.unwrap();
+        assert_eq!(
+            client.test_store().get_tracked_block_headers().await.unwrap().len(),
+            2,
+            "no pruning should occur when the prune interval is None",
+        );
+    }
 }
 
 #[tokio::test]
@@ -2612,7 +2660,7 @@ async fn empty_storage_map() {
         ))
         .with_component(BasicWallet)
         .with_component(component)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     let account_id = account.id();
@@ -2694,18 +2742,11 @@ async fn storage_and_vault_proofs() {
     .unwrap();
 
     // Build script that bumps the storage map item and adds a new one each time.
-    let assembler: Assembler = TransactionKernel::assembler();
-    let source_manager = Arc::new(DefaultSourceManager::default());
-    let module = Module::parser(ModuleKind::Library)
-        .parse_str(
-            Path::new("external_contract::bump_item_contract"),
-            BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
-            source_manager.clone(),
-        )
-        .unwrap();
-    let library = assembler.assemble_library([module]).unwrap();
     let tx_script = CodeBuilder::new()
-        .with_dynamically_linked_library(library)
+        .with_linked_module(
+            "external_contract::bump_item_contract",
+            BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
+        )
         .unwrap()
         .compile_tx_script(
             "use external_contract::bump_item_contract
@@ -2730,7 +2771,7 @@ async fn storage_and_vault_proofs() {
         ))
         .with_component(BasicWallet)
         .with_component(bump_item_component)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
@@ -3142,6 +3183,137 @@ async fn sync_storage_maps_pagination_from_middle() {
     assert_eq!(result.block_number, chain_tip);
 }
 
+// LARGE PUBLIC ACCOUNT SYNC TESTS
+// ================================================================================================
+
+/// Tests that syncing a public account with a large storage map works correctly.
+/// The account is synced via full-state replacement after `get_account_details`
+/// internally handles the oversized storage maps.
+#[tokio::test]
+async fn sync_large_public_account() {
+    // 1. Create a public account with a large storage map and many vault assets.
+    let map_slot = StorageSlot::with_map(
+        StorageSlotName::new("test::large_map").unwrap(),
+        StorageMap::with_entries(
+            (1..=NUM_STORAGE_MAP_ENTRIES_LARGE_ACCOUNT)
+                .map(|i| {
+                    let w = Word::from([Felt::new(i), Felt::new(0), Felt::new(0), Felt::new(0)]);
+                    (StorageMapKey::new(w), w)
+                })
+                .collect::<Vec<_>>(),
+        )
+        .unwrap(),
+    );
+
+    let mut builder = MockChainBuilder::new();
+
+    // Create faucets so we can give the account enough assets to exceed the oversize threshold.
+    let faucets: Vec<Account> = (0..NUM_FAUCETS_LARGE_ACCOUNT)
+        .map(|i| {
+            // TokenSymbol requires uppercase ASCII letters only.
+            let symbol = format!("TK{}", (b'A' + u8::try_from(i).unwrap()) as char);
+            builder
+                .add_existing_basic_faucet(miden_testing::Auth::IncrNonce, &symbol, 1_000_000, None)
+                .unwrap()
+        })
+        .collect();
+
+    let assets: Vec<Asset> = faucets
+        .iter()
+        .map(|faucet| Asset::Fungible(FungibleAsset::new(faucet.id(), 100).unwrap()))
+        .collect();
+
+    let mock_account = builder
+        .add_existing_mock_account_with_storage_and_assets(
+            miden_testing::Auth::IncrNonce,
+            [map_slot],
+            assets,
+        )
+        .unwrap();
+    let original_account = mock_account.clone();
+    let mut mock_chain = builder.build().unwrap();
+
+    // 2. Execute a transaction that increments the account's nonce.
+    // This changes the on-chain commitment so sync detects a mismatch.
+    let tx = Box::pin(
+        mock_chain
+            .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[])
+            .unwrap()
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    mock_chain.add_pending_executed_transaction(&tx).unwrap();
+    mock_chain.prove_next_block().unwrap();
+
+    // 3. Create MockRpcApi with a low oversize threshold so both the storage map
+    // and vault trigger the `too_many_entries` / `too_many_assets` flags.
+    let rpc_api = MockRpcApi::new(mock_chain).with_oversize_threshold(OVERSIZE_THRESHOLD);
+    let arc_rpc_api = Arc::new(rpc_api.clone());
+
+    // 4. Build a client and add the ORIGINAL (pre-tx) account.
+    // The pre-tx commitment differs from on-chain, which triggers sync.
+    let mut rng = rand::rng();
+    let coin_seed: [u64; 4] = rng.random();
+    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
+
+    let keystore_path = temp_dir();
+    let keystore = FilesystemKeyStore::new(keystore_path).unwrap();
+
+    let mut client = ClientBuilder::new()
+        .rpc(arc_rpc_api)
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .in_debug_mode(DebugMode::Enabled)
+        .build()
+        .await
+        .unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+    client.add_account(&original_account, false).await.unwrap();
+
+    // 5. Sync — the client detects a commitment mismatch, fetches full account state.
+    client.sync_state().await.unwrap();
+
+    // 6. Verify the synced account matches the on-chain state.
+    let synced_account: Account = client.get_account(mock_account.id()).await.unwrap().unwrap();
+    let on_chain_account =
+        rpc_api.mock_chain.read().committed_account(mock_account.id()).unwrap().clone();
+
+    assert_eq!(
+        synced_account.to_commitment(),
+        on_chain_account.to_commitment(),
+        "client should have the updated account state after sync"
+    );
+
+    // Verify the storage map entries are preserved.
+    let map_name = StorageSlotName::new("test::large_map").unwrap();
+    let map_slot = synced_account
+        .storage()
+        .slots()
+        .iter()
+        .find(|s| *s.name() == map_name)
+        .expect("large map slot should exist after sync");
+    let StorageSlotContent::Map(map) = map_slot.content() else {
+        panic!("expected map slot content");
+    };
+    assert_eq!(
+        map.entries().count(),
+        usize::try_from(NUM_STORAGE_MAP_ENTRIES_LARGE_ACCOUNT).unwrap(),
+        "all map entries should be preserved after sync"
+    );
+
+    // Verify the vault assets are preserved.
+    let synced_assets: Vec<Asset> = synced_account.vault().assets().collect();
+    assert_eq!(
+        synced_assets.len(),
+        usize::try_from(NUM_FAUCETS_LARGE_ACCOUNT).unwrap(),
+        "all vault assets should be preserved after sync"
+    );
+}
+
 // HELPERS
 // ================================================================================================
 
@@ -3278,7 +3450,7 @@ async fn insert_new_wallet(
             AuthSchemeId::Falcon512Poseidon2,
         ))
         .with_component(BasicWallet)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
@@ -3307,7 +3479,7 @@ async fn insert_new_ecdsa_wallet(
             AuthSchemeId::EcdsaK256Keccak,
         ))
         .with_component(BasicWallet)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
@@ -3341,7 +3513,7 @@ async fn insert_new_fungible_faucet(
         ))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .with_component(AuthControlled::allow_all())
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
@@ -3377,7 +3549,7 @@ async fn insert_new_ecdsa_fungible_faucet(
         ))
         .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
         .with_component(AuthControlled::allow_all())
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
@@ -3420,18 +3592,11 @@ async fn storage_and_vault_proofs_ecdsa() {
     .unwrap();
 
     // Build script that bumps the storage map item and adds a new one each time.
-    let assembler: Assembler = TransactionKernel::assembler();
-    let source_manager = Arc::new(DefaultSourceManager::default());
-    let module = Module::parser(ModuleKind::Library)
-        .parse_str(
-            Path::new("external_contract::bump_item_contract"),
-            BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
-            source_manager.clone(),
-        )
-        .unwrap();
-    let library = assembler.clone().assemble_library([module]).unwrap();
     let tx_script = CodeBuilder::new()
-        .with_dynamically_linked_library(&library)
+        .with_linked_module(
+            "external_contract::bump_item_contract",
+            BUMP_MAP_CODE.replace("{map_key}", &Word::from(MAP_KEY).to_hex()),
+        )
         .unwrap()
         .compile_tx_script(
             "use external_contract::bump_item_contract
@@ -3456,7 +3621,7 @@ async fn storage_and_vault_proofs_ecdsa() {
         ))
         .with_component(BasicWallet)
         .with_component(bump_item_component)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();

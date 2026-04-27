@@ -33,3 +33,6 @@ export {
 
 // All simplified API types
 export * from "./api-types";
+
+// Storage utilities
+export { StorageView, StorageResult, wordToBigInt } from "./index";

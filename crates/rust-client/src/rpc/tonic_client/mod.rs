@@ -15,6 +15,7 @@ use miden_protocol::account::{
     Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot, StorageSlotType,
 };
 use miden_protocol::address::NetworkId;
+use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::account_tree::AccountWitness;
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::MerklePath;
@@ -39,6 +40,7 @@ use super::{
     Endpoint, FetchedAccount, NodeRpcClient, RpcEndpoint, NoteSyncInfo, RpcError,
     RpcStatusInfo,
 };
+use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
@@ -508,6 +510,28 @@ impl NodeRpcClient for GrpcClient {
         Ok(BlockNumber::from(api_response.into_inner().block_num))
     }
 
+    async fn submit_proven_batch(
+        &self,
+        proven_batch: ProvenBatch,
+        proposed_batch: ProposedBatch,
+        transaction_inputs: Vec<TransactionInputs>,
+    ) -> Result<BlockNumber, RpcError> {
+        let request = proto::transaction::TransactionBatch {
+            batch_proof: proven_batch.to_bytes(),
+            proposed_batch: Some(proposed_batch.to_bytes()),
+            transaction_inputs: transaction_inputs.iter().map(Serializable::to_bytes).collect(),
+        };
+
+        let api_response = self
+            .call_with_retry(RpcEndpoint::SubmitProvenBatch, |mut rpc_api| {
+                let request = request.clone();
+                Box::pin(async move { rpc_api.submit_proven_batch(request).await })
+            })
+            .await?;
+
+        Ok(BlockNumber::from(api_response.into_inner().block_num))
+    }
+
     async fn get_block_header_by_number(
         &self,
         block_num: Option<BlockNumber>,
@@ -625,25 +649,27 @@ impl NodeRpcClient for GrpcClient {
         if account_id.is_private() {
             Ok(FetchedAccount::new_private(account_id, update_summary))
         } else {
-            // An account with public state has to fetch all of its state.
-            // Even more so, an account with a large state will have to do
-            // a couple of extra requests to fetch all of its data.
             let details =
                 full_account_proof.into_parts().1.ok_or(RpcError::ExpectedDataMissing(
                     "GetAccountDetails returned a public account without details".to_owned(),
                 ))?;
+
             let account_id = details.header.id();
             let nonce = details.header.nonce();
+
+            // If the vault exceeds the node's size threshold, download the full vault
+            // via the sync endpoint; otherwise use the assets from the response directly.
             let assets = if details.vault_details.too_many_assets {
                 self.fetch_full_vault(account_id, block_number).await?
             } else {
                 details.vault_details.assets
             };
 
+            // build_storage_slots handles too_many_entries maps internally via
+            // sync_storage_maps.
             let slots = self
                 .build_storage_slots(account_id, &details.storage_details, Some(block_number))
                 .await?;
-            let seed = None;
             let asset_vault = AssetVault::new(&assets).map_err(|err| {
                 RpcError::InvalidResponse(format!("api rpc returned non-valid assets: {err}"))
             })?;
@@ -653,7 +679,7 @@ impl NodeRpcClient for GrpcClient {
                 ))
             })?;
             let account =
-                Account::new(account_id, asset_vault, account_storage, details.code, nonce, seed)
+                Account::new(account_id, asset_vault, account_storage, details.code, nonce, None)
                     .map_err(|err| {
                     RpcError::InvalidResponse(format!(
                         "failed to instance an account from the rpc api response: {err}"
@@ -1078,6 +1104,21 @@ impl NodeRpcClient for GrpcClient {
 
     async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {
         GrpcClient::get_status_unversioned(self).await
+    }
+
+    async fn get_network_note_status(
+        &self,
+        note_id: NoteId,
+    ) -> Result<NetworkNoteStatusInfo, RpcError> {
+        let request = proto::note::NoteId { id: Some(note_id.into()) };
+
+        let response = self
+            .call_with_retry(RpcEndpoint::GetNetworkNoteStatus, |mut rpc_api| {
+                Box::pin(async move { rpc_api.get_network_note_status(request).await })
+            })
+            .await?;
+
+        response.into_inner().try_into()
     }
 }
 

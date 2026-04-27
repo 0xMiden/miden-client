@@ -314,7 +314,7 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
 
         // Build a custom TransactionRequest using low-level _WebClient
         const lowLevel = await window.MockWasmWebClient.createClient();
-        const mintRequest = lowLevel.newMintTransactionRequest(
+        const mintRequest = await lowLevel.newMintTransactionRequest(
           wallet.id(),
           faucet.id(),
           window.NoteType.Public,
@@ -334,6 +334,75 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
     }
   );
 
+  // Regression test for #2011: the JS wrapper was building OutputNoteArray
+  // while the WASM binding for withOwnOutputNotes switched to NoteArray,
+  // causing `expected instance of NoteArray` at runtime.
+  mockTest(
+    "transactions.send with returnNote returns a Note",
+    async ({ page }) => {
+      const result = await page.evaluate(async () => {
+        const client = await window.MidenClient.createMock();
+
+        const sender = await client.accounts.create();
+        const receiver = await client.accounts.create();
+        const faucet = await client.accounts.create({
+          type: window.AccountType.FungibleFaucet,
+          symbol: "DAG",
+          decimals: 8,
+          maxSupply: 10_000_000n,
+        });
+
+        // Fund the sender: mint + consume so the wallet has a usable balance.
+        const { txId: mintTxId } = await client.transactions.mint({
+          account: faucet,
+          to: sender,
+          amount: 1000n,
+        });
+        client.proveBlock();
+        await client.sync();
+
+        const mintRecord = (
+          await client.transactions.list({ ids: [mintTxId.toHex()] })
+        )[0];
+        const mintedNoteId = mintRecord
+          .outputNotes()
+          .notes()[0]
+          .id()
+          .toString();
+
+        await client.transactions.consume({
+          account: sender,
+          notes: mintedNoteId,
+        });
+        client.proveBlock();
+        await client.sync();
+
+        // Send with returnNote: true — this is the path that regressed.
+        const sendResult = await client.transactions.send({
+          account: sender,
+          to: receiver,
+          token: faucet,
+          amount: 50n,
+          type: "public",
+          returnNote: true,
+        });
+
+        return {
+          txId: sendResult.txId?.toHex(),
+          hasNote: sendResult.note != null,
+          noteIdIsString: typeof sendResult.note?.id().toString() === "string",
+          noteIdLength: sendResult.note?.id().toString().length ?? 0,
+        };
+      });
+
+      expect(result.txId).toBeDefined();
+      expect(result.txId.length).toBeGreaterThan(0);
+      expect(result.hasNote).toBe(true);
+      expect(result.noteIdIsString).toBe(true);
+      expect(result.noteIdLength).toBeGreaterThan(0);
+    }
+  );
+
   mockTest("exportStore and importStore round-trip", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const client = await window.MidenClient.createMock();
@@ -343,11 +412,13 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
       const walletId = wallet.id().toString();
 
       // Export the store
-      const storeData = await window.exportStore(client.storeIdentifier());
+      const storeData = await window.exportStore(
+        await client.storeIdentifier()
+      );
 
       // Create a new mock client and import the store
       const client2 = await window.MidenClient.createMock();
-      await window.importStore(client2.storeIdentifier(), storeData);
+      await window.importStore(await client2.storeIdentifier(), storeData);
 
       // Check the account exists in the new client
       const accounts = await client2.accounts.list();
@@ -930,7 +1001,7 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
         const walletId = wallet.id().toString();
 
         // Serialize chain so the second client sees the same blocks
-        const chain = client.serializeMockChain();
+        const chain = await client.serializeMockChain();
 
         // Create a fresh mock client with the same chain
         const client2 = await window.MidenClient.createMock({
@@ -971,7 +1042,7 @@ mockTest.describe("MidenClient API - Mock Chain", () => {
       await client.sync();
 
       // Serialize the mock chain
-      const serializedChain = client.serializeMockChain();
+      const serializedChain = await client.serializeMockChain();
 
       // Create a new client from the serialized chain
       const client2 = await window.MidenClient.createMock({

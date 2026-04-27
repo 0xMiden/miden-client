@@ -1,9 +1,9 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use js_export_macro::js_export;
 use miden_client::Word as NativeWord;
 use miden_client::rpc::domain::storage_map::StorageMapInfo as NativeStorageMapInfo;
-use wasm_bindgen::prelude::*;
 
 use super::word::Word;
 
@@ -12,23 +12,23 @@ use super::word::Word;
 ///
 /// Contains the list of storage map updates within the requested block range,
 /// along with the chain tip and last processed block number.
-#[wasm_bindgen(js_name = "StorageMapInfo")]
+#[js_export(js_name = "StorageMapInfo")]
 pub struct StorageMapInfo {
     chain_tip: u32,
     block_number: u32,
     updates: Vec<StorageMapUpdate>,
 }
 
-#[wasm_bindgen(js_class = "StorageMapInfo")]
+#[js_export]
 impl StorageMapInfo {
     /// Returns the current chain tip block number.
-    #[wasm_bindgen(js_name = "chainTip")]
+    #[js_export(js_name = "chainTip")]
     pub fn chain_tip(&self) -> u32 {
         self.chain_tip
     }
 
     /// Returns the block number of the last check included in this response.
-    #[wasm_bindgen(js_name = "blockNumber")]
+    #[js_export(js_name = "blockNumber")]
     pub fn block_number(&self) -> u32 {
         self.block_number
     }
@@ -45,7 +45,7 @@ impl StorageMapInfo {
 /// A single storage map update entry, containing the block number, slot name,
 /// key, and new value.
 #[derive(Clone)]
-#[wasm_bindgen(js_name = "StorageMapUpdate")]
+#[js_export(js_name = "StorageMapUpdate")]
 pub struct StorageMapUpdate {
     block_num: u32,
     slot_name: String,
@@ -53,16 +53,16 @@ pub struct StorageMapUpdate {
     value: Word,
 }
 
-#[wasm_bindgen(js_class = "StorageMapUpdate")]
+#[js_export]
 impl StorageMapUpdate {
     /// Returns the block number in which this update occurred.
-    #[wasm_bindgen(js_name = "blockNum")]
+    #[js_export(js_name = "blockNum")]
     pub fn block_num(&self) -> u32 {
         self.block_num
     }
 
     /// Returns the name of the storage slot that was updated.
-    #[wasm_bindgen(js_name = "slotName")]
+    #[js_export(js_name = "slotName")]
     pub fn slot_name(&self) -> String {
         self.slot_name.clone()
     }
