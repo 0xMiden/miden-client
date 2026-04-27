@@ -172,8 +172,8 @@ pub struct NoteUpdateTracker {
     /// Nullifiers from the same account are in execution order; ordering across different
     /// accounts is not guaranteed.
     nullifier_order: BTreeMap<Nullifier, u32>,
-    /// Account IDs tracked by this client. Used detect if the consumer of an erased note is one of
-    /// our accounts.
+    /// Account IDs tracked by this client. Used to detect if the consumer of an erased note is
+    /// tracked.
     tracked_accounts_ids: BTreeSet<AccountId>,
 }
 
