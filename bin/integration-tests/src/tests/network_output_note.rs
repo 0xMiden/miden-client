@@ -16,8 +16,8 @@ use miden_client::note::{
     NoteStorage,
     NoteTag,
     NoteType,
+    P2idNote,
     P2idNoteStorage,
-    StandardNote,
 };
 use miden_client::store::InputNoteState;
 use miden_client::testing::common::{execute_tx_and_sync, insert_new_wallet, wait_for_blocks};
@@ -109,6 +109,24 @@ pub async fn test_ntx_output_public_note(client_config: ClientConfig) -> Result<
     let bob_recipient_digest = bob_recipient.digest();
     let expected_output_id = NoteDetails::new(NoteAssets::new(vec![])?, bob_recipient).id();
 
+    // Register the P2ID note script with the node by emitting a zero-asset
+    // public P2ID note from Alice to Bob. Any committed public note has its
+    // script indexed into the node's script registry; doing this explicitly
+    // (and waiting for it to commit) before submitting the network note
+    // avoids a CI race where the NTX builder tries to materialize the public
+    // P2ID output before the script is registered. This mirrors the
+    // pre-registration step used by `test_ntx_mint_produces_public_p2id`.
+    let p2id_pre = P2idNote::create(
+        alice.id(),
+        bob.id(),
+        vec![],
+        NoteType::Public,
+        NoteAttachment::default(),
+        client.rng(),
+    )?;
+    let register_tx = TransactionRequestBuilder::new().own_output_notes(vec![p2id_pre]).build()?;
+    execute_tx_and_sync(&mut client, alice.id(), register_tx).await?;
+
     let network_note = build_emitter_network_note(
         alice.id(),
         bank.id(),
@@ -117,12 +135,8 @@ pub async fn test_ntx_output_public_note(client_config: ClientConfig) -> Result<
         client.rng(),
     )?;
 
-    // `expected_ntx_scripts` registers the P2ID script with the node's NTX
-    // script registry if it's not already there (no-op if it is).
-    let tx_request = TransactionRequestBuilder::new()
-        .own_output_notes(vec![network_note])
-        .expected_ntx_scripts(vec![StandardNote::P2ID.script()])
-        .build()?;
+    let tx_request =
+        TransactionRequestBuilder::new().own_output_notes(vec![network_note]).build()?;
 
     execute_tx_and_sync(&mut client, alice.id(), tx_request).await?;
 
