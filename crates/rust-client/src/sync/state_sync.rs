@@ -5,9 +5,19 @@ use alloc::vec::Vec;
 
 use async_trait::async_trait;
 use miden_protocol::account::{
-    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountStorage,
-    AccountStorageDelta, AccountVaultDelta, StorageMapKey, StorageSlot, StorageSlotContent,
-    StorageSlotName, StorageSlotType,
+    Account,
+    AccountCode,
+    AccountDelta,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    AccountStorageDelta,
+    AccountVaultDelta,
+    StorageMapKey,
+    StorageSlot,
+    StorageSlotContent,
+    StorageSlotName,
+    StorageSlotType,
 };
 use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey};
 use miden_protocol::block::{BlockHeader, BlockNumber};
@@ -22,12 +32,16 @@ use super::{AccountUpdates, PublicAccountUpdate, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::domain::account::{
-    AccountDetails, AccountStorageMapDetails, AccountStorageRequirements, FetchedAccount,
+    AccountDetails,
+    AccountStorageMapDetails,
+    AccountStorageRequirements,
+    FetchedAccount,
 };
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
 use crate::rpc::domain::storage_map::StorageMapUpdate;
 use crate::rpc::domain::transaction::{
-    TransactionInclusion, TransactionRecord as RpcTransactionRecord,
+    TransactionInclusion,
+    TransactionRecord as RpcTransactionRecord,
 };
 use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError};
 use crate::store::{AccountStorageFilter, InputNoteRecord, OutputNoteRecord, Store, StoreError};
@@ -224,15 +238,17 @@ impl StateSync {
             .map_err(|_| ClientError::InvalidPartialMmrForest)?
             .into();
 
+        let note_tags = Arc::new(note_tags);
+        let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
+        let tracked_accounts: BTreeSet<AccountId> = account_ids.iter().copied().collect();
+
         let mut state_sync_update = StateSyncUpdate {
             block_num,
-            note_updates: NoteUpdateTracker::new(input_notes, output_notes),
+            note_updates: NoteUpdateTracker::new(input_notes, output_notes)
+                .with_tracked_accounts(tracked_accounts),
             transaction_updates: TransactionUpdateTracker::new(uncommitted_transactions),
             ..Default::default()
         };
-
-        let note_tags = Arc::new(note_tags);
-        let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
         let Some(mut sync_data) = self
             .fetch_sync_data(state_sync_update.block_num, &account_ids, &note_tags)
             .await?
@@ -273,13 +289,11 @@ impl StateSync {
         .await?;
 
         // Apply local changes: update the MMR, screen notes, and apply state transitions.
-        let tracked_accounts: BTreeSet<AccountId> = account_ids.iter().copied().collect();
         self.apply_sync_result(
             sync_data,
             &public_note_records,
             &mut state_sync_update,
             current_partial_mmr,
-            &tracked_accounts,
         )
         .await?;
 
@@ -411,7 +425,6 @@ impl StateSync {
         public_note_records: &BTreeMap<NoteId, InputNoteRecord>,
         state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
-        tracked_accounts: &BTreeSet<AccountId>,
     ) -> Result<(), ClientError> {
         let RawStateSyncData {
             mmr_delta,
@@ -499,7 +512,7 @@ impl StateSync {
                 .apply_output_note_inclusion_proofs(&transaction.output_notes)?;
 
             // Detect output notes erased by same-batch note erasure.
-            Self::mark_erased_notes_as_consumed(state_sync_update, transaction, tracked_accounts);
+            Self::mark_erased_notes_as_consumed(state_sync_update, transaction);
         }
 
         Ok(())
@@ -513,15 +526,12 @@ impl StateSync {
     fn mark_erased_notes_as_consumed(
         state_sync_update: &mut StateSyncUpdate,
         transaction: &TransactionInclusion,
-        tracked_accounts: &BTreeSet<AccountId>,
     ) {
         for note_header in &transaction.erased_output_notes {
             // Best-effort: ignore errors for notes not tracked by this client.
-            let _ = state_sync_update.note_updates.mark_erased_note_as_consumed(
-                note_header,
-                transaction.block_num,
-                tracked_accounts,
-            );
+            let _ = state_sync_update
+                .note_updates
+                .mark_erased_note_as_consumed(note_header, transaction.block_num);
         }
     }
 
@@ -1258,11 +1268,19 @@ mod tests {
     use miden_protocol::block::BlockNumber;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, PartialMmr};
     use miden_protocol::note::{
-        Note, NoteAssets, NoteAttachment, NoteHeader, NoteMetadata, NoteRecipient, NoteStorage,
-        NoteTag, NoteType,
+        Note,
+        NoteAssets,
+        NoteAttachment,
+        NoteHeader,
+        NoteMetadata,
+        NoteRecipient,
+        NoteStorage,
+        NoteTag,
+        NoteType,
     };
     use miden_protocol::testing::account_id::{
-        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_REGULAR_NETWORK_ACCOUNT_IMMUTABLE_CODE,
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_REGULAR_NETWORK_ACCOUNT_IMMUTABLE_CODE,
         ACCOUNT_ID_SENDER,
     };
     use miden_protocol::{Felt, Word};
@@ -1311,7 +1329,8 @@ mod tests {
         use miden_protocol::{Felt, ZERO};
 
         use crate::rpc::domain::transaction::{
-            ACCOUNT_ID_NATIVE_ASSET_FAUCET, TransactionRecord as RpcTransactionRecord,
+            ACCOUNT_ID_NATIVE_ASSET_FAUCET,
+            TransactionRecord as RpcTransactionRecord,
         };
 
         fn word(n: u64) -> miden_protocol::Word {
@@ -1796,9 +1815,8 @@ mod tests {
 
         // Mark the note as erased (created and consumed in the same batch).
         let block_num = BlockNumber::from(3u32);
-        let tracked_accounts = BTreeSet::new();
         note_updates
-            .mark_erased_note_as_consumed(&note_header, block_num, &tracked_accounts)
+            .mark_erased_note_as_consumed(&note_header, block_num)
             .expect("marking erased note should succeed");
 
         let updated = note_updates
