@@ -148,7 +148,7 @@ impl SqliteStore {
     pub(crate) fn get_current_blockchain_peaks(
         conn: &mut Connection,
     ) -> Result<MmrPeaks, StoreError> {
-        const QUERY: &str = "SELECT block_num, partial_blockchain_peaks FROM state_sync LIMIT 1";
+        const QUERY: &str = "SELECT block_num, partial_blockchain_peaks FROM current_sync LIMIT 1";
 
         let row: Option<(u32, Vec<u8>)> = conn
             .prepare(QUERY)
@@ -214,7 +214,7 @@ impl SqliteStore {
         let genesis: u32 = BlockNumber::GENESIS.as_u32();
 
         let sync_block: Option<u32> = tx
-            .query_row("SELECT block_num FROM state_sync LIMIT 1", [], |r| r.get(0))
+            .query_row("SELECT block_num FROM current_sync LIMIT 1", [], |r| r.get(0))
             .optional()
             .into_store_error()?;
 
@@ -515,7 +515,7 @@ mod test {
             store
                 .interact_with_connection(move |conn| {
                     conn.execute(
-                        "UPDATE state_sync SET block_num = ?, partial_blockchain_peaks = ?",
+                        "UPDATE current_sync SET block_num = ?, partial_blockchain_peaks = ?",
                         params![height_i64, peaks_bytes],
                     )
                     .unwrap();

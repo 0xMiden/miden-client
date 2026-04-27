@@ -83,7 +83,7 @@ impl SqliteStore {
     }
 
     pub(super) fn get_sync_height(conn: &mut Connection) -> Result<BlockNumber, StoreError> {
-        const QUERY: &str = "SELECT block_num FROM state_sync";
+        const QUERY: &str = "SELECT block_num FROM current_sync";
 
         conn.prepare_cached(QUERY)
             .into_store_error()?
@@ -114,10 +114,9 @@ impl SqliteStore {
 
         // Update state sync block number and peaks only if moving forward.
         let new_peaks_bytes = partial_blockchain_updates.new_peaks.peaks().to_vec().to_bytes();
-        const STATE_SYNC_QUERY: &str =
-            "UPDATE state_sync SET block_num = ?, partial_blockchain_peaks = ? WHERE block_num < ?";
+        const CURRENT_SYNC_QUERY: &str = "UPDATE current_sync SET block_num = ?, partial_blockchain_peaks = ? WHERE block_num < ?";
         tx.execute(
-            STATE_SYNC_QUERY,
+            CURRENT_SYNC_QUERY,
             params![i64::from(block_num.as_u32()), new_peaks_bytes, i64::from(block_num.as_u32())],
         )
         .into_store_error()?;

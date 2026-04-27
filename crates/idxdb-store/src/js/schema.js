@@ -53,7 +53,7 @@ var Table;
     Table["InputNotes"] = "inputNotes";
     Table["OutputNotes"] = "outputNotes";
     Table["NotesScripts"] = "notesScripts";
-    Table["StateSync"] = "stateSync";
+    Table["CurrentSync"] = "currentSync";
     Table["BlockHeaders"] = "blockHeaders";
     Table["PartialBlockchainNodes"] = "partialBlockchainNodes";
     Table["Tags"] = "tags";
@@ -83,7 +83,7 @@ const V1_STORES = {
     [Table.InputNotes]: indexes("noteId", "nullifier", "stateDiscriminant", "[consumedBlockHeight+consumedTxOrder+noteId]"),
     [Table.OutputNotes]: indexes("noteId", "recipientDigest", "stateDiscriminant", "nullifier"),
     [Table.NotesScripts]: indexes("scriptRoot"),
-    [Table.StateSync]: indexes("id"),
+    [Table.CurrentSync]: indexes("id"),
     [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
     [Table.PartialBlockchainNodes]: indexes("id"),
     [Table.Tags]: indexes("id++", "tag", "sourceNoteId", "sourceAccountId"),
@@ -109,7 +109,7 @@ export class MidenDatabase {
     inputNotes;
     outputNotes;
     notesScripts;
-    stateSync;
+    currentSync;
     blockHeaders;
     partialBlockchainNodes;
     tags;
@@ -178,14 +178,14 @@ export class MidenDatabase {
         this.inputNotes = this.dexie.table(Table.InputNotes);
         this.outputNotes = this.dexie.table(Table.OutputNotes);
         this.notesScripts = this.dexie.table(Table.NotesScripts);
-        this.stateSync = this.dexie.table(Table.StateSync);
+        this.currentSync = this.dexie.table(Table.CurrentSync);
         this.blockHeaders = this.dexie.table(Table.BlockHeaders);
         this.partialBlockchainNodes = this.dexie.table(Table.PartialBlockchainNodes);
         this.tags = this.dexie.table(Table.Tags);
         this.foreignAccountCode = this.dexie.table(Table.ForeignAccountCode);
         this.settings = this.dexie.table(Table.Settings);
         this.dexie.on("populate", () => {
-            this.stateSync
+            this.currentSync
                 .put({
                 id: 1,
                 blockNum: 0,

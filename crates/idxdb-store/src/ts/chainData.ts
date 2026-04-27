@@ -184,10 +184,12 @@ export async function getPartialBlockchainNodesUpToInOrderIndex(
 export async function pruneIrrelevantBlocks(dbId: string) {
   try {
     const db = getDatabase(dbId);
-    const syncHeight = await db.stateSync.get(1);
+    const syncHeight = await db.currentSync.get(1);
 
     if (syncHeight == undefined) {
-      throw Error("SyncHeight is undefined -- is the state sync table empty?");
+      throw Error(
+        "SyncHeight is undefined -- is the current_sync table empty?"
+      );
     }
 
     const allMatchingRecords = await db.blockHeaders
