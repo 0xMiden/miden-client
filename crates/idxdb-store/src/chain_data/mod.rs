@@ -178,9 +178,19 @@ impl IdxdbStore {
         Ok(())
     }
 
-    pub(crate) async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError> {
-        let promise = idxdb_prune_irrelevant_blocks(self.db_id());
-        await_ok(promise, "failed to prune block header").await?;
+    pub(crate) async fn prune_irrelevant_blocks(
+        &self,
+        blocks_to_untrack: &[BlockNumber],
+        node_indices_to_remove: &[InOrderIndex],
+    ) -> Result<(), StoreError> {
+        let block_nums_vec: Vec<u32> = blocks_to_untrack.iter().map(BlockNumber::as_u32).collect();
+        let node_ids_vec: Vec<String> = node_indices_to_remove
+            .iter()
+            .map(|id| (Into::<usize>::into(*id)).to_string())
+            .collect();
+
+        let promise = idxdb_prune_irrelevant_blocks(self.db_id(), block_nums_vec, node_ids_vec);
+        await_ok(promise, "failed to prune irrelevant blocks").await?;
 
         Ok(())
     }
