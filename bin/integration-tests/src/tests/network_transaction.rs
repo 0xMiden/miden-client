@@ -89,6 +89,14 @@ const INCR_SCRIPT_CODE: &str = "
     end
 ";
 
+const INCR_NOTE_SCRIPT_CODE: &str = "
+    use external_contract::counter_contract
+    @note_script
+    pub proc main
+        call.counter_contract::increment_count
+    end
+";
+
 /// Deploys a counter contract as a network account
 pub(crate) async fn deploy_counter_contract(
     client: &mut TestClient,
@@ -309,7 +317,13 @@ fn get_network_note<T: Rng>(
     source_manager: Arc<dyn SourceManagerSync>,
     rng: &mut T,
 ) -> Result<Note> {
-    get_network_note_with_script(sender, network_account, INCR_SCRIPT_CODE, source_manager, rng)
+    get_network_note_with_script(
+        sender,
+        network_account,
+        INCR_NOTE_SCRIPT_CODE,
+        source_manager,
+        rng,
+    )
 }
 
 pub(crate) fn get_network_note_with_script<T: Rng>(
