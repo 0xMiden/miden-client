@@ -25,6 +25,8 @@ use crate::{Client, ClientError, ClientRng, ClientRngBox, DebugMode, grpc_suppor
 /// The default number of blocks after which pending transactions are considered stale and
 /// discarded.
 const TX_DISCARD_DELTA: u32 = 20;
+/// The default number of synced blocks between automatic irrelevant-block pruning runs.
+const IRRELEVANT_BLOCK_PRUNE_INTERVAL: u32 = 1;
 
 pub use grpc_support::*;
 
@@ -114,6 +116,9 @@ pub struct ClientBuilder<AUTH> {
     /// Number of blocks after which pending transactions are considered stale and discarded.
     /// If `None`, there is no limit and transactions will be kept indefinitely.
     tx_discard_delta: Option<u32>,
+    /// Number of synced blocks between automatic pruning runs for irrelevant block data.
+    /// If `None`, automatic irrelevant-block pruning is disabled.
+    irrelevant_block_prune_interval: Option<u32>,
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
@@ -137,6 +142,7 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             authenticator: None,
             in_debug_mode: DebugMode::Disabled,
             tx_discard_delta: Some(TX_DISCARD_DELTA),
+            irrelevant_block_prune_interval: Some(IRRELEVANT_BLOCK_PRUNE_INTERVAL),
             max_block_number_delta: None,
             note_transport_api: None,
             note_transport_config: None,
@@ -358,6 +364,16 @@ where
         self
     }
 
+    /// Sets the number of synced blocks between automatic irrelevant-block pruning runs.
+    ///
+    /// Values defer pruning until the client has advanced by at least that many sync blocks since
+    /// the last prune. `None` disables automatic pruning entirely.
+    #[must_use]
+    pub fn irrelevant_block_prune_interval(mut self, interval: Option<u32>) -> Self {
+        self.irrelevant_block_prune_interval = interval;
+        self
+    }
+
     /// Sets the number of blocks after which pending transactions are considered stale and
     /// discarded.
     ///
@@ -479,6 +495,8 @@ where
             )
             .expect("Default executor's options should always be valid"),
             tx_discard_delta: self.tx_discard_delta,
+            irrelevant_block_prune_interval: self.irrelevant_block_prune_interval,
+            last_irrelevant_block_prune_sync_height: None,
             max_block_number_delta: self.max_block_number_delta,
             note_transport_api: self.note_transport_api.clone(),
         })
