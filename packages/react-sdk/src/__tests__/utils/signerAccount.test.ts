@@ -29,6 +29,8 @@ const mockCommitmentWord = {
   toHex: vi.fn(() => "0xcommitment"),
 };
 
+const mockAccountFileInstance = { __mock: "AccountFile" };
+
 // Mock the SDK module
 vi.mock("@miden-sdk/miden-sdk/lazy", async () => {
   const actual = await vi.importActual("@miden-sdk/miden-sdk/lazy");
@@ -37,6 +39,13 @@ vi.mock("@miden-sdk/miden-sdk/lazy", async () => {
     AccountBuilder: vi.fn(() => mockBuilder),
     AccountComponent: {
       createAuthComponentFromCommitment: vi.fn(() => "mockAuthComponent"),
+    },
+    AccountFile: {
+      deserialize: vi.fn(() => mockAccountFileInstance),
+    },
+    AccountId: {
+      fromHex: vi.fn((hex: string) => ({ __mock: "AccountId", hex })),
+      fromBech32: vi.fn((bech: string) => ({ __mock: "AccountId", bech })),
     },
     AuthScheme: {
       Falcon: "falcon",
@@ -63,6 +72,7 @@ vi.mock("@miden-sdk/miden-sdk/lazy", async () => {
 import {
   AccountBuilder,
   AccountComponent,
+  AccountFile,
   Word,
 } from "@miden-sdk/miden-sdk/lazy";
 
@@ -75,6 +85,7 @@ describe("initializeSignerAccount", () => {
     mockClient = {
       syncState: vi.fn().mockResolvedValue({}),
       importAccountById: vi.fn().mockRejectedValue(new Error("Not found")),
+      importAccountFile: vi.fn().mockResolvedValue(undefined),
       getAccount: vi.fn().mockRejectedValue(new Error("Not found")),
       newAccount: vi.fn().mockResolvedValue(undefined),
     };
@@ -394,6 +405,115 @@ describe("initializeSignerAccount", () => {
 
       // Initial sync + sync after newAccount
       expect(mockClient.syncState).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("importAccountId fast path (public storage)", () => {
+    it("should call importAccountById and skip the build path on success", async () => {
+      mockClient.importAccountById.mockResolvedValue(undefined);
+      const config = createMockSignerAccountConfig({
+        storageMode: { toString: () => "public" } as any,
+        importAccountId: "0xexisting",
+      });
+
+      const result = await initializeSignerAccount(mockClient, config);
+
+      expect(mockClient.importAccountById).toHaveBeenCalled();
+      expect(AccountBuilder).not.toHaveBeenCalled();
+      expect(mockClient.importAccountFile).not.toHaveBeenCalled();
+      expect(result).toBe("0xexisting");
+    });
+
+    it("should treat 'already being tracked' as success", async () => {
+      mockClient.importAccountById.mockRejectedValue(
+        new Error("account is already being tracked")
+      );
+      const config = createMockSignerAccountConfig({
+        storageMode: { toString: () => "public" } as any,
+        importAccountId: "0xexisting",
+      });
+
+      const result = await initializeSignerAccount(mockClient, config);
+
+      expect(result).toBe("0xexisting");
+      expect(mockClient.importAccountFile).not.toHaveBeenCalled();
+    });
+
+    it("should fall through to AccountFile when import fails AND bytes are provided", async () => {
+      mockClient.importAccountById.mockRejectedValue(
+        new Error("account with id 0xfoo not found on the network")
+      );
+      const fileBytes = new Uint8Array([1, 2, 3]);
+      const config = createMockSignerAccountConfig({
+        storageMode: { toString: () => "public" } as any,
+        importAccountId: "0xunfunded",
+        accountFileBytes: fileBytes,
+      });
+
+      const result = await initializeSignerAccount(mockClient, config);
+
+      expect(AccountFile.deserialize).toHaveBeenCalledWith(fileBytes);
+      expect(mockClient.importAccountFile).toHaveBeenCalledWith(
+        mockAccountFileInstance
+      );
+      expect(result).toBe("0xunfunded");
+    });
+
+    it("should throw when import fails AND no AccountFile provided", async () => {
+      mockClient.importAccountById.mockRejectedValue(
+        new Error("not found on the network")
+      );
+      const config = createMockSignerAccountConfig({
+        storageMode: { toString: () => "public" } as any,
+        importAccountId: "0xunfunded",
+      });
+
+      await expect(
+        initializeSignerAccount(mockClient, config)
+      ).rejects.toThrow(/not found on the network and the signer/);
+    });
+  });
+
+  describe("importAccountId fast path (private storage)", () => {
+    it("should skip importAccountById and use AccountFile directly", async () => {
+      const fileBytes = new Uint8Array([9, 9, 9]);
+      const config = createMockSignerAccountConfig({
+        storageMode: { toString: () => "private" } as any,
+        importAccountId: "0xprivate",
+        accountFileBytes: fileBytes,
+      });
+
+      const result = await initializeSignerAccount(mockClient, config);
+
+      expect(mockClient.importAccountById).not.toHaveBeenCalled();
+      expect(AccountFile.deserialize).toHaveBeenCalledWith(fileBytes);
+      expect(mockClient.importAccountFile).toHaveBeenCalled();
+      expect(result).toBe("0xprivate");
+    });
+
+    it("should throw if private + importAccountId but no AccountFile", async () => {
+      const config = createMockSignerAccountConfig({
+        storageMode: { toString: () => "private" } as any,
+        importAccountId: "0xprivate",
+      });
+
+      await expect(
+        initializeSignerAccount(mockClient, config)
+      ).rejects.toThrow(/did not provide accountFileBytes/);
+    });
+
+    it("should treat 'already being tracked' from importAccountFile as success", async () => {
+      mockClient.importAccountFile.mockRejectedValue(
+        new Error("account is already being tracked")
+      );
+      const config = createMockSignerAccountConfig({
+        storageMode: { toString: () => "private" } as any,
+        importAccountId: "0xprivate",
+        accountFileBytes: new Uint8Array([1]),
+      });
+
+      const result = await initializeSignerAccount(mockClient, config);
+      expect(result).toBe("0xprivate");
     });
   });
 });

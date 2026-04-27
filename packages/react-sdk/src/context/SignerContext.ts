@@ -97,6 +97,20 @@ export interface SignerAccountConfig {
    * Useful for wallets that create accounts externally (e.g., via a vault).
    */
   importAccountId?: string;
+  /**
+   * Optional serialized AccountFile bytes (output of `AccountFile.serialize()`)
+   * for the account. When provided alongside `importAccountId`:
+   *   - **Public storage:** `importAccountById` is tried first (freshest chain
+   *     state). On "not found on the network" — typical for an unfunded
+   *     account that hasn't transacted yet — falls back to importing the
+   *     AccountFile so the dApp adopts the wallet's account ID without
+   *     deriving a different one locally.
+   *   - **Private storage:** chain has no state for this account; the
+   *     AccountFile path is used directly.
+   * Wallets that create accounts externally (e.g. MidenFi) should populate
+   * this so the dApp can render the user's account before its first tx.
+   */
+  accountFileBytes?: Uint8Array;
 }
 
 /**

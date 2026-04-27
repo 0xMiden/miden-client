@@ -43,16 +43,18 @@ function isPrivateStorageMode(
 /**
  * Initializes an account from signer configuration.
  *
- * This function:
- * 1. Syncs the client state
- * 2. Builds an account with the signer's public key commitment as the auth component
- * 3. Attempts to import from chain if public/network storage mode
- * 4. Creates the account locally if it doesn't exist
+ * Resolution order when `importAccountId` is set:
+ * 1. **Public storage:** `importAccountById` (freshest chain state). On
+ *    "not found on the network", fall through to step 2.
+ * 2. If `accountFileBytes` is provided, `importAccountFile` (works for
+ *    public-unfunded AND private accounts — chain doesn't carry state for
+ *    either). The wallet is responsible for serializing the AccountFile
+ *    such that its `account.id()` matches `importAccountId`.
+ * 3. Throw — neither chain nor wallet had the account.
  *
- * When `importAccountId` is set on the config, steps 2-4 are skipped entirely
- * and the account is imported from the chain by ID. This is the fast path for
- * wallets that create accounts externally (e.g., via a vault with HD key
- * derivation) and already know the on-chain account ID.
+ * When `importAccountId` is unset, falls through to the legacy build-from-
+ * publicKeyCommitment path used by signers that don't share an externally-
+ * created account ID up-front.
  *
  * @param client - The WebClient instance
  * @param config - The signer account configuration
@@ -65,6 +67,7 @@ export async function initializeSignerAccount(
   const {
     AccountBuilder,
     AccountComponent,
+    AccountFile,
     AuthScheme,
     Word,
     resolveAuthScheme,
@@ -76,16 +79,48 @@ export async function initializeSignerAccount(
   // Fast path: import existing account by ID instead of rebuilding from scratch.
   if (config.importAccountId) {
     const accountId = parseAccountId(config.importAccountId);
-    try {
-      await client.importAccountById(accountId);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!msg.includes("already being tracked")) {
-        throw e;
+    const isPrivate = isPrivateStorageMode(config.storageMode);
+
+    // Public-storage accounts: try chain first (freshest state). For private
+    // accounts, skip chain entirely — state lives off-chain so an
+    // importAccountById call can only fail or be misleading.
+    if (!isPrivate) {
+      try {
+        await client.importAccountById(accountId);
+        await client.syncState();
+        return config.importAccountId;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("already being tracked")) {
+          await client.syncState();
+          return config.importAccountId;
+        }
+        // "not found on the network" → fall through to AccountFile path
       }
     }
-    await client.syncState();
-    return config.importAccountId;
+
+    // AccountFile fallback: the wallet shipped a serialized snapshot. Works
+    // for public-unfunded (chain has nothing yet) and private (chain never
+    // has it) accounts.
+    if (config.accountFileBytes) {
+      const file = AccountFile.deserialize(config.accountFileBytes);
+      try {
+        await client.importAccountFile(file);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!msg.includes("already being tracked")) {
+          throw e;
+        }
+      }
+      await client.syncState();
+      return config.importAccountId;
+    }
+
+    throw new Error(
+      `Account ${config.importAccountId} not found on the network and the signer ` +
+        `did not provide accountFileBytes. For unfunded public accounts or private ` +
+        `accounts, the signer must populate accountConfig.accountFileBytes.`
+    );
   }
 
   // Convert Uint8Array commitment to Word (required by SDK)
