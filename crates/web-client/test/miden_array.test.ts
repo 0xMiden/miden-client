@@ -216,6 +216,147 @@ test.describe("Specific array tests (using AccountIdArray)", () => {
   });
 });
 
+test.describe("Constructor preserves input handles (regression for #2122)", () => {
+  // The wasm-bindgen-generated `pub fn new(elements: Option<Vec<T>>)`
+  // constructor takes each element by value: the Rust-side value is moved
+  // out of the caller's JS handle, leaving the JS object's `__wbg_ptr`
+  // pointing at a freed slot. Subsequent method calls on the original
+  // handle then panic deep inside WASM with the opaque
+  // `"null pointer passed to rust"` error.
+  //
+  // The fix in `js/safe-arrays.js` overrides the generated constructor
+  // with a wrapper that builds via `push(&T)` — which borrows + clones —
+  // leaving every input handle fully usable afterwards. These tests pin
+  // that contract for the four most common element types. They fail on
+  // origin/main with the null-pointer panic; they pass with the fix.
+  //
+  // The original repro from #2122 — `new Note(...) -> new NoteArray([note]) ->
+  // note.id()` — is covered by `NoteArray` below.
+
+  test("FeltArray constructor preserves Felt handles", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const felts = [10n, 20n, 30n].map((v) => new window.Felt(v));
+      // Pre-fix: this constructor moves each Felt's Rust value out of
+      // its JS handle.
+      const _array = new window.FeltArray(felts);
+      // Pre-fix: every one of these `asInt()` calls panics.
+      return felts.map((f) => f.asInt().toString());
+    });
+    expect(result).toEqual(["10", "20", "30"]);
+  });
+
+  test("AccountIdArray constructor preserves AccountId handles", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const ids = [];
+      for (let i = 0; i < 3; i++) {
+        const wallet = await window.client.newWallet(
+          window.AccountStorageMode.private(),
+          true,
+          window.AuthScheme.AuthRpoFalcon512
+        );
+        ids.push(wallet.id());
+      }
+      // Pre-fix: this constructor moves each AccountId's Rust value out.
+      const _array = new window.AccountIdArray(ids);
+      // Pre-fix: every `toString()` panics.
+      return ids.map((id) => id.toString());
+    });
+    expect(result).toHaveLength(3);
+    for (const idStr of result) {
+      expect(typeof idStr).toBe("string");
+      expect(idStr.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("AccountArray constructor preserves Account handles", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const account = await window.client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        window.AuthScheme.AuthRpoFalcon512
+      );
+      // Pre-fix: this constructor consumes the Account.
+      const _array = new window.AccountArray([account]);
+      // Pre-fix: `account.id()` reads through the dangling __wbg_ptr and
+      // panics. After the fix, the handle is still live.
+      return account.id().toString();
+    });
+    expect(typeof result).toBe("string");
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  test("NoteArray constructor preserves Note handle (the original repro)", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(async () => {
+      const sender = await window.client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        window.AuthScheme.AuthRpoFalcon512
+      );
+      const receiver = await window.client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        window.AuthScheme.AuthRpoFalcon512
+      );
+      const noteAssets = new window.NoteAssets([]);
+      const note = window.Note.createP2IDNote(
+        sender.id(),
+        receiver.id(),
+        noteAssets,
+        window.NoteType.Public,
+        new window.NoteAttachment()
+      );
+      // Pre-fix: `new NoteArray([note])` moved note's Rust value out.
+      const _array = new window.NoteArray([note]);
+      // Pre-fix: `note.id()` panics. This is the exact reproducer from
+      // #2122 — the call surfaced in the original Battleship/wallet
+      // investigation as a phantom wallet bug.
+      return note.id().toString();
+    });
+    expect(typeof result).toBe("string");
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  test("replaceAt preserves the input handle", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const wallets = [];
+      for (let i = 0; i < 3; i++) {
+        wallets.push(
+          await window.client.newWallet(
+            window.AccountStorageMode.private(),
+            true,
+            window.AuthScheme.AuthRpoFalcon512
+          )
+        );
+      }
+      const ids = wallets.map((w) => w.id());
+      const array = new window.AccountIdArray(ids);
+
+      // The new id we're going to plug in. Pre-fix, `replaceAt` took
+      // its element by value, moving the Rust value out of `replacement`'s
+      // JS handle. The Rust-side fix at miden_array.rs (`replaceAt` now
+      // takes `&T`) closes that.
+      const replacementWallet = await window.client.newWallet(
+        window.AccountStorageMode.private(),
+        true,
+        window.AuthScheme.AuthRpoFalcon512
+      );
+      const replacement = replacementWallet.id();
+      array.replaceAt(1, replacement);
+
+      // Pre-fix: this `toString()` would panic.
+      return replacement.toString();
+    });
+    expect(typeof result).toBe("string");
+    expect(result.length).toBeGreaterThan(0);
+  });
+});
+
 test.describe("Generic array tests (using each exposed array type)", () => {
   test("Instance empty arrays", async ({ page, exposedMidenArrayTypes }) => {
     for (const arrayTypeToInstance of exposedMidenArrayTypes) {
