@@ -252,7 +252,8 @@ test.describe("compile.txScript()", () => {
 // on runtime note-script semantics.
 const RECEIVE_NOTE_SCRIPT = `
   use miden::core::sys
-  begin
+  @note_script
+  pub proc main
     exec.sys::truncate_stack
   end
 `;
@@ -283,7 +284,8 @@ test.describe("compile.noteScript()", () => {
           code: `
             use external_contract::counter_contract
             use miden::core::sys
-            begin
+            @note_script
+            pub proc main
               call.counter_contract::increment_count
               exec.sys::truncate_stack
             end
@@ -313,7 +315,8 @@ test.describe("compile.noteScript()", () => {
           code: `
             use external_contract::counter_contract
             use miden::core::sys
-            begin
+            @note_script
+            pub proc main
               call.counter_contract::increment_count
               exec.sys::truncate_stack
             end
@@ -331,7 +334,8 @@ test.describe("compile.noteScript()", () => {
           code: `
             use external_contract::counter_contract
             use miden::core::sys
-            begin
+            @note_script
+            pub proc main
               call.counter_contract::increment_count
               exec.sys::truncate_stack
             end
@@ -369,7 +373,8 @@ test.describe("compile.noteScript()", () => {
           code: `
             use external_contract::counter_contract
             use miden::core::sys
-            begin
+            @note_script
+            pub proc main
               call.counter_contract::increment_count
               exec.sys::truncate_stack
             end

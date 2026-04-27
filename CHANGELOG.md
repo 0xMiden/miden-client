@@ -2,6 +2,10 @@
 
 ## 0.14.5 (2026-04-27)
 
+### Breaking Changes
+
+* [BREAKING][behavior][rust,web] `CodeBuilder::compile_note_script` now expects a library module with a single procedure annotated `@note_script` (e.g. `@note_script\npub proc main\n    ...\nend`) instead of a `begin..end` program. Inherited from `miden-standards` 0.14.5, which switched the underlying call from `assemble_program` to `assemble_library` ([#2128](https://github.com/0xMiden/miden-client/pull/2128)).
+
 ### Enhancements
 
 * Added `ClientBuilder::source_manager()` to override the `SourceManager` used by the client. When not set, the client defaults to `DefaultSourceManager`. Set this when compiling scripts outside the client with an external `Assembler`, so source spans resolve against the same manager ([#2047](https://github.com/0xMiden/miden-client/pull/2047)).
