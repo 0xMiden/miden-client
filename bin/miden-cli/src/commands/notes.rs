@@ -505,12 +505,5 @@ fn note_summary(
 /// Identifies if a note with the given script root is a standard note type.
 /// Returns the name of the standard note type if found, or `None` if not a standard note.
 fn identify_standard_note(script_root: Word) -> Option<&'static str> {
-    match script_root {
-        sr if sr == StandardNote::P2ID.script_root() => Some("P2ID"),
-        sr if sr == StandardNote::P2IDE.script_root() => Some("P2IDE"),
-        sr if sr == StandardNote::SWAP.script_root() => Some("SWAP"),
-        sr if sr == StandardNote::MINT.script_root() => Some("MINT"),
-        sr if sr == StandardNote::BURN.script_root() => Some("BURN"),
-        _ => None,
-    }
+    StandardNote::from_script_root(script_root).map(|note| note.name())
 }
