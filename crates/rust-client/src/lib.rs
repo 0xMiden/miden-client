@@ -383,14 +383,20 @@ pub struct Client<AUTH> {
     partial_mmr: Option<CachedPartialMmr>,
 }
 
-/// Cached [`PartialMmr`] paired with the hash of the store's peaks at the moment of caching,
-/// used as a freshness fingerprint to detect external store mutations (e.g. `importStore`).
+/// Cached [`PartialMmr`] with a two-part freshness fingerprint:
+///
+/// - `store_peaks_hash`: peaks at the current sync height - guards against chain/height drift.
+/// - `tracked_blocks_hash`: hash of the store's tracked block numbers - guards against drift
+///   between store-tracked and cache-tracked blocks. Required because a same-height update can
+///   mark an existing block relevant without changing peaks; pruning the cached MMR while it's
+///   missing such a block would over-delete auth nodes that the store still needs.
 ///
 /// The cached MMR includes the sync-height block as a tracked leaf; the store persists the
 /// peaks committed by that block's header, i.e. the peaks over the chain *before* that block
 /// was added, so the two states are offset by one leaf.
 pub(crate) struct CachedPartialMmr {
     pub(crate) store_peaks_hash: Word,
+    pub(crate) tracked_blocks_hash: Word,
     pub(crate) mmr: PartialMmr,
 }
 
