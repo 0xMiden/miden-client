@@ -1,8 +1,10 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
+use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::pin::Pin;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use core::task::{Context, Poll};
 
 use chrono::Utc;
@@ -142,6 +144,91 @@ impl NoteTransportClient for MockNoteTransportApi {
         cursor: NoteTransportCursor,
     ) -> Result<(Vec<NoteInfo>, NoteTransportCursor), NoteTransportError> {
         Ok(self.fetch_notes(tags, cursor))
+    }
+
+    async fn stream_notes(
+        &self,
+        _tag: NoteTag,
+        _cursor: NoteTransportCursor,
+    ) -> Result<Box<dyn NoteStream>, NoteTransportError> {
+        Ok(Box::new(DummyNoteStream {}))
+    }
+}
+
+// FAULTY NOTE TRANSPORT API
+// ================================================================================================
+
+/// Test-only [`NoteTransportClient`] decorator that injects controlled failures
+/// into `send_note` calls.
+///
+/// Reproduces the failure mode where the NTL is reachable but rejects (or
+/// silently drops) a relay attempt. With the current implementation of
+/// [`Client::send_private_note`](crate::Client::send_private_note), such a
+/// failure is unrecoverable: the chain transaction has already committed by
+/// the time the relay is attempted, so the sender's vault is debited and the
+/// note details are lost — the recipient has no way to discover the note.
+///
+/// The decorator counts attempts (`send_attempts`) and lets a test specify how
+/// many of the next `send_note` calls should fail (`fail_next`); successful
+/// calls delegate to an inner [`MockNoteTransportApi`]. `fetch_notes` and
+/// `stream_notes` always delegate to the inner mock.
+pub struct FaultyNoteTransportApi {
+    inner: MockNoteTransportApi,
+    fail_next: AtomicUsize,
+    send_attempts: AtomicUsize,
+}
+
+impl FaultyNoteTransportApi {
+    /// Create a faulty transport that fails the next `fail_next` `send_note`
+    /// calls before delegating to the inner mock.
+    pub fn new(mock_node: Arc<RwLock<MockNoteTransportNode>>, fail_next: usize) -> Self {
+        Self {
+            inner: MockNoteTransportApi::new(mock_node),
+            fail_next: AtomicUsize::new(fail_next),
+            send_attempts: AtomicUsize::new(0),
+        }
+    }
+
+    /// Reset the fail-counter to `n`; subsequent `send_note` calls fail until
+    /// the counter reaches zero.
+    pub fn fail_next_n(&self, n: usize) {
+        self.fail_next.store(n, Ordering::SeqCst);
+    }
+
+    /// Total `send_note` calls observed (success + failure).
+    pub fn send_attempts(&self) -> usize {
+        self.send_attempts.load(Ordering::SeqCst)
+    }
+}
+
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+impl NoteTransportClient for FaultyNoteTransportApi {
+    async fn send_note(
+        &self,
+        header: NoteHeader,
+        details: Vec<u8>,
+    ) -> Result<(), NoteTransportError> {
+        self.send_attempts.fetch_add(1, Ordering::SeqCst);
+        let should_fail = self
+            .fail_next
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+            .is_ok();
+        if should_fail {
+            return Err(NoteTransportError::Network(
+                "FaultyNoteTransportApi: simulated send_note failure".to_string(),
+            ));
+        }
+        self.inner.send_note(header, details);
+        Ok(())
+    }
+
+    async fn fetch_notes(
+        &self,
+        tags: &[NoteTag],
+        cursor: NoteTransportCursor,
+    ) -> Result<(Vec<NoteInfo>, NoteTransportCursor), NoteTransportError> {
+        Ok(self.inner.fetch_notes(tags, cursor))
     }
 
     async fn stream_notes(
