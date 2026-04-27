@@ -8,6 +8,10 @@
 * [BREAKING][param][rust] `NodeRpcClient::sync_chain_mmr()` replaced `block_to: Option<BlockNumber>` with `upper_bound: SyncTarget` to match the RPC definition. Use `SyncTarget::CommittedChainTip` for previous default behavior (`None`), or `SyncTarget::BlockNumber(num)` for a specific block number. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 * [BREAKING][rust] Added `submit_proven_batch` to `NodeRpcClient` trait. ([#2075](https://github.com/0xMiden/miden-client/pull/2075))
 
+### Bug Fixes
+
+* Fixed panics in `NoteMetadata` and `NoteHeader` RPC conversions when protobuf `note_type` field contains a negative `i32` value, by replacing `.expect()` with proper `?` error propagation.
+
 ### Enhancements
 
 * Made new-account construction use merged storage schema commitment (`build_with_schema_commitment`), re-exported `AccountBuilderSchemaCommitmentExt`, added WASM `buildWithoutSchemaCommitment()`, and fixed contract `accounts.create()` to require explicit `components` ([#1996](https://github.com/0xMiden/miden-client/pull/1996)).
