@@ -114,7 +114,7 @@ describe("useCompile", () => {
       const { result } = renderHook(() => useCompile());
 
       await expect(
-        result.current.noteScript({ code: "begin end" })
+        result.current.noteScript({ code: "@note_script\npub proc main\nend" })
       ).rejects.toThrow("Miden client is not ready");
     });
   });
@@ -190,7 +190,9 @@ describe("useCompile", () => {
       const { result } = renderHook(() => useCompile());
 
       await act(async () => {
-        await result.current.noteScript({ code: "begin end" });
+        await result.current.noteScript({
+          code: "@note_script\npub proc main\nend",
+        });
         await result.current.txScript({ code: "begin end" });
       });
 
