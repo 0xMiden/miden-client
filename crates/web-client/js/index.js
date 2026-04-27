@@ -18,6 +18,26 @@ import { resolveAuthScheme } from "./utils.js";
 export { resolveAuthScheme };
 export * from "../Cargo.toml";
 
+// Override the auto-generated wasm-bindgen array constructors with
+// wrappers that build via push() instead of taking Vec<T> by value.
+// Without this override, e.g. `new NoteArray([note])` silently moves the
+// underlying Rust value out of the caller's `note` handle, and any later
+// method call on `note` panics with "null pointer passed to rust".
+// See ./safe-arrays.js for the full rationale.
+export {
+  AccountArray,
+  AccountIdArray,
+  FeltArray,
+  ForeignAccountArray,
+  NoteAndArgsArray,
+  NoteArray,
+  NoteIdAndArgsArray,
+  NoteRecipientArray,
+  OutputNoteArray,
+  StorageSlotArray,
+  TransactionScriptInputPairArray,
+} from "./safe-arrays.js";
+
 export const AccountType = Object.freeze({
   // WASM-compatible numeric values — usable with AccountBuilder directly
   FungibleFaucet: 0,
