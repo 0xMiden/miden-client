@@ -2,8 +2,14 @@
 
 ## 0.14.5 (2026-04-27)
 
+### Enhancements
+
+* Added `ClientBuilder::source_manager()` to override the `SourceManager` used by the client. When not set, the client defaults to `DefaultSourceManager`. Set this when compiling scripts outside the client with an external `Assembler`, so source spans resolve against the same manager ([#2047](https://github.com/0xMiden/miden-client/pull/2047)).
+
 ### Fixes
 
+* [FIX][web] Stopped the wasm-bindgen-generated array constructors (`NoteArray`, `OutputNoteArray`, `NoteAndArgsArray`, `NoteRecipientArray`, `StorageSlotArray`, `TransactionScriptInputPairArray`, `FeltArray`, `AccountIdArray`, `AccountArray`, `ForeignAccountArray`, `NoteIdAndArgsArray`) from silently moving each input element's underlying Rust value out of the caller's JS handle. The default `pub fn new(elements: Option<Vec<T>>)` path took every element by value via wasm-bindgen's `Vec<T>` ABI: the JS handle's `__wbg_ptr` was left unchanged so the object looked fine, but any subsequent method on it panicked inside WASM with the opaque `"null pointer passed to rust"` error. The auto-generated array exports are now overridden in `js/index.js` with thin wrappers that build the same array via `push(&T)` (which already borrows + clones) so callers can keep using the originals after construction. Same pattern applied to `replaceAt` on the Rust side, which now takes `elem: &T` instead of `elem: T`. Repro: `const note = new Note(...); new NoteArray([note]); note.id();` — used to panic, now succeeds.
+* [FIX][rust] Fixed source manager mismatch panic (`invalid source span: starting byte is out of bounds`) in tests that compiled scripts with a standalone `SourceManager` and then executed them through the client. Test helpers now use `TransactionKernel::assembler_with_source_manager()` and the client's shared source manager ([#2047](https://github.com/0xMiden/miden-client/pull/2047)).
 * [FIX][react] Fixed `initializeSignerAccount` (the external-keystore init path used by `MidenFiSignerProvider`, Para, Turnkey, etc.) throwing `"invalid enum value passed"` on first connect. The code reached for `AuthScheme.AuthEcdsaK256Keccak`, which only exists on the internal wasm-bindgen `AuthScheme` enum, not on the public string-valued `AuthScheme` constant exported from `@miden-sdk/miden-sdk/lazy` — at runtime it resolved to `undefined`, and passing `undefined` to `AccountComponent.createAuthComponentFromCommitment` failed at the wasm boundary. `initializeSignerAccount` now calls `resolveAuthScheme(AuthScheme.ECDSA)`, where `resolveAuthScheme` is a newly-public helper from `@miden-sdk/miden-sdk` that converts the string constants to the numeric wasm-bindgen variant.
 * [FIX][react] `DEFAULTS.AUTH_SCHEME` was being initialized to `AuthScheme.AuthRpoFalcon512` — another nonexistent key on the public `AuthScheme`, silently resolving to `undefined`. Now set to `AuthScheme.Falcon`. The four hooks that read this default (`useCreateWallet`, `useCreateFaucet`, `useImportAccount`, `useSessionAccount`) now pipe the value through `resolveAuthScheme(...)` before handing it to the wasm-bindgen `newWallet` / `newFaucet` / `importPublicAccountFromSeed` calls. The public hook option types stay `authScheme?: AuthScheme`, which now correctly means `"falcon" | "ecdsa"`.
 * [FIX] When the client submits a network note and it is also tracking the recipient network account, now the `InputNoteReader` detects the consumed note ([#2113](https://github.com/0xMiden/miden-client/pull/2113)).
@@ -45,7 +51,6 @@
 ### Enhancements
 
 * Optimized `get_account_details` so it only fetches the delta of large public accounts when syncing ([#1916](https://github.com/0xMiden/miden-client/pull/1916)).
-* Added `ClientBuilder::source_manager()` to override the `SourceManager` used by the client. When not set, the client defaults to `DefaultSourceManager`. Set this when compiling scripts outside the client with an external `Assembler`, so source spans resolve against the same manager ([#2047](https://github.com/0xMiden/miden-client/pull/2047)).
 
 ### Fixes
 
@@ -53,7 +58,6 @@
 * [FIX][web] Fixed `transactions.send({ returnNote: true })` throwing `expected instance of NoteArray`. The JS wrapper was still building `OutputNoteArray` after the WASM binding for `withOwnOutputNotes` switched to `NoteArray` ([#2011](https://github.com/0xMiden/miden-client/issues/2011)).
 * [FIX][rust] Fixed `FilesystemKeyStore::add_key` failing on Linux when the system temp dir is on a different filesystem than the keys directory ([#2009](https://github.com/0xMiden/miden-client/pull/2009)).
 * [FIX][rust] Made source manager handling consistent when building transaction scripts. The empty fallback script is now compiled against the client's source manager instead of a fresh one, so any source information on the produced `TransactionScript` is registered with the same source manager used by the executor ([#2006](https://github.com/0xMiden/miden-client/pull/2006)).
-* [FIX][rust] Fixed source manager mismatch panic (`invalid source span: starting byte is out of bounds`) in tests that compiled scripts with a standalone `SourceManager` and then executed them through the client. Test helpers now use `TransactionKernel::assembler_with_source_manager()` and the client's shared source manager [#2047](https://github.com/0xMiden/miden-client/pull/2047)).
 
 ## 0.14.0 (2026-04-07)
 

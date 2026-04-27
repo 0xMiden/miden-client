@@ -45,14 +45,20 @@ macro_rules! declare_js_miden_arrays {
                     }
                 }
 
+                /// Replace the element at `index`. Borrows + clones the input
+                /// (mirrors `push`), so the caller's JS handle remains valid
+                /// after the call. Without this borrow, passing `elem` by
+                /// value would move the underlying Rust value out of the
+                /// caller's JS handle and any subsequent method on it would
+                /// panic with `"null pointer passed to rust"`.
                 #[wasm_bindgen(js_name = "replaceAt")]
                 pub fn replace_at(
                     &mut self,
                     index: usize,
-                    elem: $miden_type_name,
+                    elem: &$miden_type_name,
                 ) -> Result<(), wasm_bindgen::JsValue> {
                     if let Some(value_at_index) = self.__inner.get_mut(index) {
-                        *value_at_index = elem;
+                        *value_at_index = elem.clone();
                         Ok(())
                     } else {
                         let err =
