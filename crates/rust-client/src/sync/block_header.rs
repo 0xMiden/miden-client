@@ -62,7 +62,6 @@ impl<AUTH> Client<AUTH> {
     /// or the tracked block set.
     pub(crate) async fn cache_partial_mmr(&mut self, mmr: PartialMmr) -> Result<(), ClientError> {
         if !self.cache_partial_mmr_in_memory {
-            self.partial_mmr = None;
             return Ok(());
         }
 
