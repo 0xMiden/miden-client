@@ -12,7 +12,7 @@
     "@getpara/react-sdk-lite": "^2.11.0",
     "@getpara/web-sdk": "^2.11.0",
     "@miden-sdk/miden-para": "file:../../../../../miden-para",
-    "@miden-sdk/miden-sdk": "^0.14.4",
+    "@miden-sdk/miden-sdk": "file:../../../../crates/web-client",
     "@miden-sdk/miden-turnkey": "file:../../../../../miden-turnkey",
     "@miden-sdk/miden-turnkey-react": "file:../../../../../miden-turnkey/packages/use-miden-turnkey-react",
     "@miden-sdk/miden-wallet-adapter-base": "file:../../../../../miden-wallet-adapter/packages/core/base",
@@ -49,6 +49,7 @@
     "@miden-sdk/miden-para": "file:../../../../../miden-para",
     "@miden-sdk/use-miden-para-react": "file:../../../../../miden-para/packages/use-miden-para-react",
     "@miden-sdk/miden-turnkey": "file:../../../../../miden-turnkey",
-    "@miden-sdk/miden-turnkey-react": "file:../../../../../miden-turnkey/packages/use-miden-turnkey-react"
+    "@miden-sdk/miden-turnkey-react": "file:../../../../../miden-turnkey/packages/use-miden-turnkey-react",
+    "@miden-sdk/miden-sdk": "file:../../../../crates/web-client"
   }
 }

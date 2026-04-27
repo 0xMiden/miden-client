@@ -880,10 +880,8 @@
   dependencies:
     "@noble/hashes" "^2.0.1"
 
-"@miden-sdk/miden-sdk@^0.14.4":
+"@miden-sdk/miden-sdk@^0.14.4", "@miden-sdk/miden-sdk@file:../../../../crates/web-client":
   version "0.14.4"
-  resolved "https://registry.yarnpkg.com/@miden-sdk/miden-sdk/-/miden-sdk-0.14.4.tgz#be7496e6d2622b7f478768972f9896536db154cb"
-  integrity sha512-Qt+3NfGRCyHP5zcD+m9bBqQz01zuAwZRUBkls09mi+tOPVT17sFWKLglQEtKdr3gPAFHLwz2Ja4Hp4adUKfLuA==
   dependencies:
     "@rollup/plugin-typescript" "^12.3.0"
     dexie "^4.0.1"
