@@ -47,8 +47,7 @@ impl TryFrom<proto::note::NoteMetadata> for NoteMetadata {
             .sender
             .ok_or_else(|| proto::note::NoteMetadata::missing_field(stringify!(sender)))?
             .try_into()?;
-        let note_type =
-            NoteType::try_from(u64::try_from(value.note_type).expect("invalid note type"))?;
+        let note_type = NoteType::try_from(u64::try_from(value.note_type)?)?;
         let tag = NoteTag::new(value.tag);
 
         // Deserialize attachment if present
@@ -324,8 +323,7 @@ impl TryFrom<proto::note::NoteSyncRecord> for CommittedNote {
                 notes.metadata_header.sender
             )))?
             .try_into()?;
-        let note_type =
-            NoteType::try_from(u64::try_from(proto_header.note_type).expect("invalid note type"))?;
+        let note_type = NoteType::try_from(u64::try_from(proto_header.note_type)?)?;
         let tag = NoteTag::new(proto_header.tag);
         let attachment_kind = u8::try_from(proto_header.attachment_kind)
             .ok()
