@@ -24,13 +24,27 @@ use crate::transaction::{TransactionRecord, TransactionStatus};
 /// Represents the possible types of updates that can be applied to a note in a
 /// [`NoteUpdateTracker`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
 pub enum NoteUpdateType {
     /// Indicates that the note was already tracked but it was not updated.
-    None,
+    None = 0,
     /// Indicates that the note is new and should be inserted in the store.
-    Insert,
+    Insert = 1,
     /// Indicates that the note was already tracked and should be updated.
-    Update,
+    Update = 2,
+}
+
+impl TryFrom<u8> for NoteUpdateType {
+    type Error = u8;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(NoteUpdateType::None),
+            1 => Ok(NoteUpdateType::Insert),
+            2 => Ok(NoteUpdateType::Update),
+            other => Err(other),
+        }
+    }
 }
 
 /// Represents the possible states of an input note record in a [`NoteUpdateTracker`].
@@ -524,24 +538,15 @@ impl NoteUpdateTracker {
 
 impl Serializable for NoteUpdateType {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        match self {
-            NoteUpdateType::None => target.write_u8(0),
-            NoteUpdateType::Insert => target.write_u8(1),
-            NoteUpdateType::Update => target.write_u8(2),
-        }
+        target.write_u8(*self as u8);
     }
 }
 
 impl Deserializable for NoteUpdateType {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        match source.read_u8()? {
-            0 => Ok(NoteUpdateType::None),
-            1 => Ok(NoteUpdateType::Insert),
-            2 => Ok(NoteUpdateType::Update),
-            val => {
-                Err(DeserializationError::InvalidValue(format!("invalid note update type: {val}")))
-            },
-        }
+        NoteUpdateType::try_from(source.read_u8()?).map_err(|val| {
+            DeserializationError::InvalidValue(format!("invalid note update type: {val}"))
+        })
     }
 }
 

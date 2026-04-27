@@ -169,7 +169,7 @@ mod tests {
         let input_note = InputNoteRecord::from(note.clone());
         let note_updates = NoteUpdateTracker::for_transaction_updates([input_note], [], []);
 
-        let tag = miden_protocol::note::NoteTag::with_account_target(account.id());
+        let tag = NoteTag::with_account_target(account.id());
         let new_tags = vec![NoteTagRecord::with_account_source(tag, account.id())];
 
         let future_notes = vec![(Into::<NoteDetails>::into(note.clone()), tag)];
