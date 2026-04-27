@@ -1,2 +1,0 @@
-ce7368159ceabf516599045a6830c5f4a6e4adab51e29da8bff7bab939c7be0e  install.sh
-e1f6dbfcfca94f009652da4b41ab59da54d245c91518fff793a11f481ff10d8b  install.ps1
