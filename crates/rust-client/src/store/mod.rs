@@ -242,7 +242,12 @@ pub trait Store: Send + Sync {
         nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError>;
 
-    /// Returns the peaks of the chain MMR at the current sync height.
+    /// Returns the chain MMR peaks at the current sync height (peaks at `forest = block_num`,
+    /// i.e. excluding `block_num` itself as a leaf).
+    ///
+    /// The peaks' `forest().num_leaves()` equals the current sync height by construction,
+    /// so callers can derive the synced block number from the returned peaks without a
+    /// second query.
     ///
     /// Before the first sync, returns an empty [`MmrPeaks`].
     async fn get_current_blockchain_peaks(&self) -> Result<MmrPeaks, StoreError>;
@@ -510,7 +515,6 @@ pub trait Store: Send + Sync {
     /// [`Store::get_current_blockchain_peaks`] and [`Store::get_block_header_by_num`]
     async fn get_current_partial_mmr(&self) -> Result<PartialMmr, StoreError> {
         let current_block_num = self.get_sync_height().await?;
-
         let current_peaks = self.get_current_blockchain_peaks().await?;
 
         let (current_block, has_client_notes) = self

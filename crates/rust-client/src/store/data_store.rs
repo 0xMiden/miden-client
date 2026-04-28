@@ -15,7 +15,7 @@ use miden_protocol::account::{
 };
 use miden_protocol::asset::{AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::crypto::merkle::mmr::{InOrderIndex, PartialMmr};
+use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks, PartialMmr};
 use miden_protocol::crypto::merkle::{MerkleError, MerklePath};
 use miden_protocol::note::NoteScript;
 use miden_protocol::transaction::{AccountInputs, PartialBlockchain};
@@ -233,10 +233,27 @@ impl DataStore for ClientDataStore {
     async fn get_transaction_inputs(
         &self,
         account_id: AccountId,
-        mut block_refs: BTreeSet<BlockNumber>,
+        block_refs: BTreeSet<BlockNumber>,
     ) -> Result<(PartialAccount, BlockHeader, PartialBlockchain), DataStoreError> {
-        // Pop last block, used as reference (it does not need to be authenticated manually)
-        let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("block set is empty"))?;
+        let current_peaks = self.store.get_current_blockchain_peaks().await?;
+        let sync_height = BlockNumber::from(
+            u32::try_from(current_peaks.forest().num_leaves())
+                .map_err(|err| DataStoreError::other_with_source("forest exceeds u32", err))?,
+        );
+
+        // The trait contract states the highest block in `block_refs` is the transaction
+        // reference block. The peaks we persist only describe the current sync height, so
+        // honor the contract only when the caller's reference block matches it.
+        let ref_block = block_refs.last().copied().ok_or_else(|| {
+            DataStoreError::other("block_refs must contain at least the reference block")
+        })?;
+        if ref_block != sync_height {
+            return Err(DataStoreError::other(format!(
+                "transaction reference block {ref_block} does not match the current sync height \
+                 {sync_height}; the data store can only build a partial blockchain at the sync \
+                 height because peaks are not persisted for older blocks",
+            )));
+        }
 
         // Cache the reference block so lazy-loading methods can use it
         *self.ref_block.write() = Some(ref_block);
@@ -274,15 +291,21 @@ impl DataStore for ClientDataStore {
             .await?
             .ok_or(DataStoreError::BlockNotFound(ref_block))?;
 
+        // Authenticate every block in `block_refs` except `ref_block` itself; the kernel
+        // adds the ref block leaf as it extends the MMR.
+        let blocks_to_authenticate: BTreeSet<BlockNumber> =
+            block_refs.into_iter().filter(|b| *b != ref_block).collect();
+
         let block_headers: Vec<BlockHeader> = self
             .store
-            .get_block_headers(&block_refs)
+            .get_block_headers(&blocks_to_authenticate)
             .await?
             .into_iter()
             .map(|(header, _has_notes)| header)
             .collect();
 
-        let partial_mmr = build_partial_mmr_with_paths(&self.store, &block_headers).await?;
+        let partial_mmr =
+            build_partial_mmr_with_paths(&self.store, current_peaks, &block_headers).await?;
 
         let partial_blockchain =
             PartialBlockchain::new(partial_mmr, block_headers).map_err(|err| {
@@ -454,19 +477,17 @@ impl MastForestStore for ClientDataStore {
 // HELPER FUNCTIONS
 // ================================================================================================
 
-/// Builds a [`PartialMmr`] with a specified forest number and a list of blocks that should be
-/// authenticated.
+/// Builds a [`PartialMmr`] from the given peaks and a list of blocks that should be
+/// authenticated against them.
 ///
-/// `authenticated_blocks` cannot contain `forest`. For authenticating the last block we have,
-/// the kernel extends the MMR which is why it's not needed here.
+/// `authenticated_blocks` must not contain the block whose forest matches `peaks`. For that
+/// block the kernel extends the MMR itself, so an authentication path is not needed.
 async fn build_partial_mmr_with_paths(
     store: &alloc::sync::Arc<dyn Store>,
+    peaks: MmrPeaks,
     authenticated_blocks: &[BlockHeader],
 ) -> Result<PartialMmr, DataStoreError> {
-    let mut partial_mmr: PartialMmr = {
-        let current_peaks = store.get_current_blockchain_peaks().await?;
-        PartialMmr::from_peaks(current_peaks)
-    };
+    let mut partial_mmr: PartialMmr = PartialMmr::from_peaks(peaks);
 
     let block_nums: Vec<BlockNumber> =
         authenticated_blocks.iter().map(BlockHeader::block_num).collect();

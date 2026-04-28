@@ -83,7 +83,7 @@ impl SqliteStore {
     }
 
     pub(super) fn get_sync_height(conn: &mut Connection) -> Result<BlockNumber, StoreError> {
-        const QUERY: &str = "SELECT block_num FROM sync_checkpoint";
+        const QUERY: &str = "SELECT block_num FROM blockchain_checkpoint";
 
         conn.prepare_cached(QUERY)
             .into_store_error()?
@@ -112,11 +112,11 @@ impl SqliteStore {
 
         let tx = conn.transaction().into_store_error()?;
 
-        // Update state sync block number and peaks only if moving forward.
+        // Update blockchain checkpoint (block number and peaks) only if moving forward.
         let new_peaks_bytes = partial_blockchain_updates.new_peaks.peaks().to_vec().to_bytes();
-        const SYNC_CHECKPOINT_QUERY: &str = "UPDATE sync_checkpoint SET block_num = ?, partial_blockchain_peaks = ? WHERE block_num < ?";
+        const BLOCKCHAIN_CHECKPOINT_QUERY: &str = "UPDATE blockchain_checkpoint SET block_num = ?, partial_blockchain_peaks = ? WHERE block_num < ?";
         tx.execute(
-            SYNC_CHECKPOINT_QUERY,
+            BLOCKCHAIN_CHECKPOINT_QUERY,
             params![i64::from(block_num.as_u32()), new_peaks_bytes, i64::from(block_num.as_u32())],
         )
         .into_store_error()?;
