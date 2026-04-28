@@ -157,7 +157,7 @@ In this directory you can place the packages used to create the account componen
 
 For more information on miden packages, see:
 - [The mast-package crate](https://github.com/0xMiden/miden-vm/blob/next/crates/mast-package/README.md)
-- [The Miden package's status article on the Miden compiler](https://0xmiden.github.io/compiler/appendix/known-limitations.html#packaging)
+- [The Miden package's status article on the Miden compiler](https://docs.miden.xyz/core-concepts/compiler/)
 
 ### Block Delta
 
