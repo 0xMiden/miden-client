@@ -4,7 +4,7 @@
 
 ### Fixes
 
-* [FIX][rust] Fixed `BlockUpdates::insert` panicking on `debug_assertions=true` builds during `sync_state` when the chain-tip block is also a note-relevant block. Moved the assertion into the `or_insert_with` closure so it only fires when peaks are actually being stored ([#TBD](https://github.com/0xMiden/miden-client/pull/TBD)).
+* [FIX][rust] Fixed `BlockUpdates::insert` panicking on `debug_assertions=true` builds during `sync_state` when the chain-tip block is also a note-relevant block. Moved the assertion into the `or_insert_with` closure so it only fires when peaks are actually being stored ([#2137](https://github.com/0xMiden/miden-client/pull/2137)).
 
 ## 0.14.5 (2026-04-27)
 
