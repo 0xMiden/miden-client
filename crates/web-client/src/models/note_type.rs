@@ -7,11 +7,17 @@ use miden_client::note::NoteType as NativeNoteType;
 #[repr(u8)]
 pub enum NoteType {
     /// Notes with this type have only their hash published to the network.
-    Private = NativeNoteType::Private as u8,
+    Private = 0b10,
 
     /// Notes with this type are fully shared with the network.
-    Public = NativeNoteType::Public as u8,
+    Public = 0b01,
 }
+
+// Compile-time check to keep enum values aligned.
+const _: () = {
+    assert!(NativeNoteType::Private as u8 == NoteType::Private as u8);
+    assert!(NativeNoteType::Public as u8 == NoteType::Public as u8);
+};
 
 impl From<NativeNoteType> for NoteType {
     fn from(value: NativeNoteType) -> Self {
