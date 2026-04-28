@@ -233,27 +233,12 @@ impl DataStore for ClientDataStore {
     async fn get_transaction_inputs(
         &self,
         account_id: AccountId,
-        block_refs: BTreeSet<BlockNumber>,
+        mut block_refs: BTreeSet<BlockNumber>,
     ) -> Result<(PartialAccount, BlockHeader, PartialBlockchain), DataStoreError> {
         let current_peaks = self.store.get_current_blockchain_peaks().await?;
-        let sync_height = BlockNumber::from(
-            u32::try_from(current_peaks.forest().num_leaves())
-                .map_err(|err| DataStoreError::other_with_source("forest exceeds u32", err))?,
-        );
 
-        // The trait contract states the highest block in `block_refs` is the transaction
-        // reference block. The peaks we persist only describe the current sync height, so
-        // honor the contract only when the caller's reference block matches it.
-        let ref_block = block_refs.last().copied().ok_or_else(|| {
-            DataStoreError::other("block_refs must contain at least the reference block")
-        })?;
-        if ref_block != sync_height {
-            return Err(DataStoreError::other(format!(
-                "transaction reference block {ref_block} does not match the current sync height \
-                 {sync_height}; the data store can only build a partial blockchain at the sync \
-                 height because peaks are not persisted for older blocks",
-            )));
-        }
+        // Pop last block, used as reference (it does not need to be authenticated manually)
+        let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("block set is empty"))?;
 
         // Cache the reference block so lazy-loading methods can use it
         *self.ref_block.write() = Some(ref_block);
@@ -291,14 +276,9 @@ impl DataStore for ClientDataStore {
             .await?
             .ok_or(DataStoreError::BlockNotFound(ref_block))?;
 
-        // Authenticate every block in `block_refs` except `ref_block` itself; the kernel
-        // adds the ref block leaf as it extends the MMR.
-        let blocks_to_authenticate: BTreeSet<BlockNumber> =
-            block_refs.into_iter().filter(|b| *b != ref_block).collect();
-
         let block_headers: Vec<BlockHeader> = self
             .store
-            .get_block_headers(&blocks_to_authenticate)
+            .get_block_headers(&block_refs)
             .await?
             .into_iter()
             .map(|(header, _has_notes)| header)
