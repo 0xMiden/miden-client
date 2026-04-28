@@ -101,6 +101,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
     // FAILURE ATTEMPT
     let transaction_request = TransactionRequestBuilder::new()
         .input_notes(note_args_map.clone())
+        .trusted_input_note_script_roots([note.script().root()])
         .custom_script(tx_script.clone())
         .script_arg(Word::empty())
         .extend_advice_map(advice_map.clone())
@@ -117,6 +118,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
     // SUCCESS EXECUTION
     let transaction_request = TransactionRequestBuilder::new()
         .input_notes(note_args_map)
+        .trusted_input_note_script_roots([note.script().root()])
         .custom_script(tx_script)
         .script_arg([Felt::new(4), Felt::new(3), Felt::new(2), Felt::new(1)].into())
         .extend_advice_map(advice_map)
@@ -187,6 +189,7 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
     // these exact arguments
     let note_args_commitment = Poseidon2::hash_elements(&NOTE_ARGS);
 
+    let trusted_script_root = note.script().root();
     let note_args_map = vec![(note, Some(note_args_commitment))];
     let mut advice_map = AdviceMap::default();
     advice_map.insert(note_args_commitment, NOTE_ARGS.to_vec());
@@ -231,6 +234,7 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
 
     let transaction_request = TransactionRequestBuilder::new()
         .input_notes(note_args_map)
+        .trusted_input_note_script_roots([trusted_script_root])
         .custom_script(tx_script)
         .extend_advice_map(advice_map)
         .extend_merkle_store(merkle_store.inner_nodes())

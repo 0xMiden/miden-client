@@ -6,12 +6,14 @@ use miden_client::account::AccountId;
 use miden_client::keystore::Keystore;
 use miden_client::note::{
     BlockNumber,
+    Note,
     NoteType as MidenNoteType,
     SwapNote,
     get_input_note_with_id_prefix,
 };
 use miden_client::store::NoteRecordError;
 use miden_client::transaction::{
+    NoteArgs,
     PaymentNoteDescription,
     RawOutputNote,
     SwapTransactionData,
@@ -293,6 +295,12 @@ pub struct ConsumeNotesCmd {
     /// Flag to delegate proving to the remote prover specified in the config file.
     #[arg(long, default_value_t = false)]
     delegate_proving: bool,
+
+    /// Trust the script roots of the input notes that are not recognized standard scripts. By
+    /// default, the client only executes notes whose scripts match a known standard. Pass this
+    /// flag after independently verifying the note scripts you are about to run.
+    #[arg(long, default_value_t = false)]
+    allow_unlisted_note_scripts: bool,
 }
 
 impl ConsumeNotesCmd {
@@ -302,7 +310,7 @@ impl ConsumeNotesCmd {
     ) -> Result<(), CliError> {
         let force = self.force;
 
-        let mut input_notes = Vec::new();
+        let mut input_notes: Vec<(Note, Option<NoteArgs>)> = Vec::new();
 
         for note_id in &self.list_of_notes {
             let note_record = get_input_note_with_id_prefix(&client, note_id)
@@ -341,15 +349,18 @@ impl ConsumeNotesCmd {
             return Ok(());
         }
 
-        let transaction_request = TransactionRequestBuilder::new()
-            .input_notes(input_notes)
-            .build()
-            .map_err(|err| {
-                CliError::Transaction(
-                    err.into(),
-                    "Failed to build consume notes transaction".to_string(),
-                )
-            })?;
+        let mut builder = TransactionRequestBuilder::new();
+        if self.allow_unlisted_note_scripts {
+            let trusted_roots: Vec<_> =
+                input_notes.iter().map(|(note, _)| note.script().root()).collect();
+            builder = builder.trusted_input_note_script_roots(trusted_roots);
+        }
+        let transaction_request = builder.input_notes(input_notes).build().map_err(|err| {
+            CliError::Transaction(
+                err.into(),
+                "Failed to build consume notes transaction".to_string(),
+            )
+        })?;
 
         execute_transaction(
             &mut client,

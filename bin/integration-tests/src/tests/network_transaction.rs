@@ -239,6 +239,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     client.apply_transaction(&bump_result, current_height).await?;
 
     let tx_request = TransactionRequestBuilder::new()
+        .trusted_input_note_script_roots([network_note.script().root()])
         .input_notes(vec![(network_note, None)])
         .build()?;
 
