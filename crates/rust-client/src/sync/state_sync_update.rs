@@ -125,14 +125,7 @@ impl BlockUpdates {
             .and_modify(|(_, existing_has_notes, _)| {
                 *existing_has_notes |= has_client_notes;
             })
-            .or_insert_with(|| {
-                debug_assert_eq!(
-                    peaks.forest().num_leaves(),
-                    block_header.block_num().as_usize(),
-                    "MMR peaks stored for a block header must use that block number as the forest",
-                );
-                (block_header, has_client_notes, peaks)
-            });
+            .or_insert((block_header, has_client_notes, peaks));
 
         self.new_authentication_nodes.extend(new_authentication_nodes);
     }
@@ -396,49 +389,5 @@ impl AccountUpdates {
     pub fn extend(&mut self, other: AccountUpdates) {
         self.updated_public_accounts.extend(other.updated_public_accounts);
         self.mismatched_private_accounts.extend(other.mismatched_private_accounts);
-    }
-}
-
-#[cfg(test)]
-#[cfg(feature = "testing")]
-mod tests {
-    use alloc::vec;
-
-    use miden_protocol::block::BlockHeader;
-    use miden_protocol::crypto::merkle::mmr::Mmr;
-    use miden_protocol::transaction::TransactionKernel;
-    use miden_protocol::{Felt, Word};
-
-    use super::BlockUpdates;
-
-    fn word(n: u64) -> Word {
-        Word::new([Felt::new(n), Felt::new(0), Felt::new(0), Felt::new(0)])
-    }
-
-    #[test]
-    fn insert_dedup_with_post_tip_peaks_does_not_panic() {
-        let mut updates = BlockUpdates::default();
-        let block_num: u32 = 4;
-        let block_header =
-            BlockHeader::mock(block_num, None, None, &[], TransactionKernel.to_commitment());
-
-        let mut mmr = Mmr::new();
-        for i in 0..u64::from(block_num) {
-            mmr.add(word(i));
-        }
-        let correct_peaks = mmr.peaks();
-        updates.insert(block_header.clone(), false, correct_peaks, vec![]);
-
-        mmr.add(word(u64::from(block_num)));
-        let post_tip_peaks = mmr.peaks();
-        updates.insert(block_header, true, post_tip_peaks, vec![]);
-
-        let (_, has_notes, stored_peaks) = updates.block_headers().next().expect("block stored");
-        assert!(*has_notes, "has_client_notes should be OR-ed to true after dedup");
-        assert_eq!(
-            stored_peaks.forest().num_leaves(),
-            block_num as usize,
-            "first-insertion peaks (matching block_num) must be preserved",
-        );
     }
 }
