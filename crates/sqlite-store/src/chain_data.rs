@@ -638,8 +638,8 @@ mod test {
         // Track blocks 3 and 10; we will untrack 3 later.
         let tracked: BTreeSet<usize> = [3, 10].into();
         let auth_nodes = collect_auth_nodes(&mmr, &headers, &tracked);
-        let peaks_by_block: Vec<MmrPeaks> =
-            (0..TOTAL_BLOCKS).map(|n| mmr.peaks_at(Forest::new(n)).unwrap()).collect();
+        let tip_peaks_bytes =
+            mmr.peaks_at(Forest::new(TOTAL_BLOCKS - 1)).unwrap().peaks().to_vec().to_bytes();
 
         // Persist everything.
         let headers_clone = headers.clone();
@@ -650,15 +650,14 @@ mod test {
                     SqliteStore::insert_block_header_tx(
                         &tx,
                         &headers_clone[i],
-                        &peaks_by_block[i],
                         tracked.contains(&i),
                     )
                     .unwrap();
                 }
                 SqliteStore::insert_partial_blockchain_nodes_tx(&tx, &auth_nodes).unwrap();
                 tx.execute(
-                    "UPDATE state_sync SET block_num = ?",
-                    params![i64::try_from(TOTAL_BLOCKS - 1).unwrap()],
+                    "UPDATE current_sync SET block_num = ?, partial_blockchain_peaks = ?",
+                    params![i64::try_from(TOTAL_BLOCKS - 1).unwrap(), tip_peaks_bytes],
                 )
                 .unwrap();
                 tx.commit().unwrap();
