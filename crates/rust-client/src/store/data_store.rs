@@ -430,14 +430,6 @@ impl DataStore for ClientDataStore {
                     DataStoreError::other_with_source("failed to fetch note script via RPC", err)
                 })?;
 
-            // Verify the RPC returned the script we asked for.
-            let fetched_root = note_script.root();
-            if fetched_root != script_root {
-                return Err(DataStoreError::other(format!(
-                    "RPC returned note script with root {fetched_root} for requested root {script_root}",
-                )));
-            }
-
             // Persist for future lookups.
             if let Err(err) = store.upsert_note_scripts(core::slice::from_ref(&note_script)).await {
                 tracing::warn!(
