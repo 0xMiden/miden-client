@@ -64,7 +64,7 @@ enum Table {
   InputNotes = "inputNotes",
   OutputNotes = "outputNotes",
   NotesScripts = "notesScripts",
-  CurrentSync = "currentSync",
+  SyncCheckpoint = "syncCheckpoint",
   BlockHeaders = "blockHeaders",
   PartialBlockchainNodes = "partialBlockchainNodes",
   Tags = "tags",
@@ -205,7 +205,7 @@ export interface INotesScript {
   serializedNoteScript: Uint8Array;
 }
 
-export interface ICurrentSync {
+export interface ISyncCheckpoint {
   id: number;
   blockNum: number;
   partialBlockchainPeaks: Uint8Array;
@@ -314,7 +314,7 @@ const V1_STORES: Record<string, string> = {
     "nullifier"
   ),
   [Table.NotesScripts]: indexes("scriptRoot"),
-  [Table.CurrentSync]: indexes("id"),
+  [Table.SyncCheckpoint]: indexes("id"),
   [Table.BlockHeaders]: indexes("blockNum", "hasClientNotes"),
   [Table.PartialBlockchainNodes]: indexes("id"),
   [Table.Tags]: indexes("id++", "tag", "sourceNoteId", "sourceAccountId"),
@@ -345,7 +345,7 @@ declare module "dexie" {
     accountAuths: Table<IAccountAuth, string>;
     accountKeyMappings: Table<IAccountKeyMapping, string>;
     addresses: Table<IAddress, string>;
-    currentSync: Table<ICurrentSync, number>;
+    syncCheckpoint: Table<ISyncCheckpoint, number>;
     blockHeaders: Table<IBlockHeader, number>;
     partialBlockchainNodes: Table<IPartialBlockchainNode, number>;
     foreignAccountCode: Table<IForeignAccountCode, string>;
@@ -371,7 +371,7 @@ export type MidenDexie = Dexie & {
   inputNotes: Dexie.Table<IInputNote, string>;
   outputNotes: Dexie.Table<IOutputNote, string>;
   notesScripts: Dexie.Table<INotesScript, string>;
-  currentSync: Dexie.Table<ICurrentSync, number>;
+  syncCheckpoint: Dexie.Table<ISyncCheckpoint, number>;
   blockHeaders: Dexie.Table<IBlockHeader, number>;
   partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, number>;
   tags: Dexie.Table<ITag, number>;
@@ -398,7 +398,7 @@ export class MidenDatabase {
   inputNotes: Dexie.Table<IInputNote, string>;
   outputNotes: Dexie.Table<IOutputNote, string>;
   notesScripts: Dexie.Table<INotesScript, string>;
-  currentSync: Dexie.Table<ICurrentSync, number>;
+  syncCheckpoint: Dexie.Table<ISyncCheckpoint, number>;
   blockHeaders: Dexie.Table<IBlockHeader, number>;
   partialBlockchainNodes: Dexie.Table<IPartialBlockchainNode, number>;
   tags: Dexie.Table<ITag, number>;
@@ -504,8 +504,8 @@ export class MidenDatabase {
     this.notesScripts = this.dexie.table<INotesScript, string>(
       Table.NotesScripts
     );
-    this.currentSync = this.dexie.table<ICurrentSync, number>(
-      Table.CurrentSync
+    this.syncCheckpoint = this.dexie.table<ISyncCheckpoint, number>(
+      Table.SyncCheckpoint
     );
     this.blockHeaders = this.dexie.table<IBlockHeader, number>(
       Table.BlockHeaders
@@ -521,12 +521,12 @@ export class MidenDatabase {
     this.settings = this.dexie.table<ISetting, string>(Table.Settings);
 
     this.dexie.on("populate", () => {
-      this.currentSync
+      this.syncCheckpoint
         .put({
           id: 1,
           blockNum: 0,
           partialBlockchainPeaks: new Uint8Array(),
-        } as ICurrentSync)
+        } as ISyncCheckpoint)
         .catch((err: unknown) =>
           logWebStoreError(err, "Failed to populate DB")
         );

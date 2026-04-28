@@ -198,9 +198,9 @@ CREATE TABLE notes_scripts (
     PRIMARY KEY (script_root)
 );
 
--- ── Current sync & tags ──────────────────────────────────────────────────
+-- ── Sync checkpoint & tags ───────────────────────────────────────────────
 
-CREATE TABLE current_sync (
+CREATE TABLE sync_checkpoint (
     block_num UNSIGNED BIG INT NOT NULL,    -- the block number of the most recent state sync
     partial_blockchain_peaks BLOB NOT NULL, -- serialized MMR peaks at the current sync height
     PRIMARY KEY (block_num)
@@ -211,11 +211,11 @@ CREATE TABLE tags (
     source BLOB NOT NULL   -- the serialized tag source
 );
 
--- insert initial row into current_sync table
-INSERT OR IGNORE INTO current_sync (block_num, partial_blockchain_peaks)
+-- insert initial row into sync_checkpoint table
+INSERT OR IGNORE INTO sync_checkpoint (block_num, partial_blockchain_peaks)
 SELECT 0, X''
 WHERE (
-    SELECT COUNT(*) FROM current_sync
+    SELECT COUNT(*) FROM sync_checkpoint
 ) = 0;
 
 -- ── Block headers & partial blockchain ───────────────────────────────────

@@ -23,7 +23,7 @@ export async function getNoteTags(dbId) {
 export async function getSyncHeight(dbId) {
     try {
         const db = getDatabase(dbId);
-        const record = await db.currentSync.get(1);
+        const record = await db.syncCheckpoint.get(1);
         if (record) {
             let data = {
                 blockNum: record.blockNum,
@@ -41,7 +41,7 @@ export async function getSyncHeight(dbId) {
 export async function getCurrentBlockchainPeaks(dbId) {
     try {
         const db = getDatabase(dbId);
-        const record = await db.currentSync.get(1);
+        const record = await db.syncCheckpoint.get(1);
         if (!record) {
             return {
                 blockNum: 0,
@@ -94,7 +94,7 @@ export async function applyStateSync(dbId, stateUpdate) {
     const { blockNum, flattenedNewBlockHeaders, newPeaks, newBlockNums, blockHasRelevantNotes, serializedNodeIds, serializedNodes, committedNoteIds, serializedInputNotes, serializedOutputNotes, accountUpdates, transactionUpdates, } = stateUpdate;
     const newBlockHeaders = reconstructFlattenedVec(flattenedNewBlockHeaders);
     const tablesToAccess = [
-        db.currentSync,
+        db.syncCheckpoint,
         db.inputNotes,
         db.outputNotes,
         db.notesScripts,
@@ -154,9 +154,9 @@ export async function applyStateSync(dbId, stateUpdate) {
 async function updateSyncHeight(tx, blockNum, newPeaks) {
     try {
         // Only update if moving forward to prevent race conditions
-        const current = await tx.currentSync.get(1);
+        const current = await tx.syncCheckpoint.get(1);
         if (!current || current.blockNum < blockNum) {
-            await tx.currentSync.update(1, {
+            await tx.syncCheckpoint.update(1, {
                 blockNum: blockNum,
                 partialBlockchainPeaks: newPeaks,
             });

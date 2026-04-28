@@ -4,7 +4,7 @@ import {
   JsStorageSlot,
   JsStorageMapEntry,
   IBlockHeader,
-  ICurrentSync,
+  ISyncCheckpoint,
 } from "./schema.js";
 
 import {
@@ -41,7 +41,7 @@ export async function getNoteTags(dbId: string) {
 export async function getSyncHeight(dbId: string) {
   try {
     const db = getDatabase(dbId);
-    const record = await db.currentSync.get(1);
+    const record = await db.syncCheckpoint.get(1);
     if (record) {
       let data = {
         blockNum: record.blockNum,
@@ -58,7 +58,7 @@ export async function getSyncHeight(dbId: string) {
 export async function getCurrentBlockchainPeaks(dbId: string) {
   try {
     const db = getDatabase(dbId);
-    const record = await db.currentSync.get(1);
+    const record = await db.syncCheckpoint.get(1);
     if (!record) {
       return {
         blockNum: 0,
@@ -211,7 +211,7 @@ export async function applyStateSync(
   const newBlockHeaders = reconstructFlattenedVec(flattenedNewBlockHeaders);
 
   const tablesToAccess = [
-    db.currentSync,
+    db.syncCheckpoint,
     db.inputNotes,
     db.outputNotes,
     db.notesScripts,
@@ -336,12 +336,16 @@ async function updateSyncHeight(
   try {
     // Only update if moving forward to prevent race conditions
     const current = await (
-      tx as Transaction & { currentSync: Dexie.Table<ICurrentSync, number> }
-    ).currentSync.get(1);
+      tx as Transaction & {
+        syncCheckpoint: Dexie.Table<ISyncCheckpoint, number>;
+      }
+    ).syncCheckpoint.get(1);
     if (!current || current.blockNum < blockNum) {
       await (
-        tx as Transaction & { currentSync: Dexie.Table<ICurrentSync, number> }
-      ).currentSync.update(1, {
+        tx as Transaction & {
+          syncCheckpoint: Dexie.Table<ISyncCheckpoint, number>;
+        }
+      ).syncCheckpoint.update(1, {
         blockNum: blockNum,
         partialBlockchainPeaks: newPeaks,
       });

@@ -148,7 +148,8 @@ impl SqliteStore {
     pub(crate) fn get_current_blockchain_peaks(
         conn: &mut Connection,
     ) -> Result<MmrPeaks, StoreError> {
-        const QUERY: &str = "SELECT block_num, partial_blockchain_peaks FROM current_sync LIMIT 1";
+        const QUERY: &str =
+            "SELECT block_num, partial_blockchain_peaks FROM sync_checkpoint LIMIT 1";
 
         let row: Option<(u32, Vec<u8>)> = conn
             .prepare(QUERY)
@@ -253,7 +254,7 @@ impl SqliteStore {
         let genesis: u32 = BlockNumber::GENESIS.as_u32();
 
         let sync_block: Option<u32> = tx
-            .query_row("SELECT block_num FROM current_sync LIMIT 1", [], |r| r.get(0))
+            .query_row("SELECT block_num FROM sync_checkpoint LIMIT 1", [], |r| r.get(0))
             .optional()
             .into_store_error()?;
 
@@ -553,7 +554,7 @@ mod test {
             store
                 .interact_with_connection(move |conn| {
                     conn.execute(
-                        "UPDATE current_sync SET block_num = ?, partial_blockchain_peaks = ?",
+                        "UPDATE sync_checkpoint SET block_num = ?, partial_blockchain_peaks = ?",
                         params![height_i64, peaks_bytes],
                     )
                     .unwrap();
@@ -651,7 +652,7 @@ mod test {
                 }
                 SqliteStore::insert_partial_blockchain_nodes_tx(&tx, &auth_nodes).unwrap();
                 tx.execute(
-                    "UPDATE current_sync SET block_num = ?, partial_blockchain_peaks = ?",
+                    "UPDATE sync_checkpoint SET block_num = ?, partial_blockchain_peaks = ?",
                     params![i64::try_from(TOTAL_BLOCKS - 1).unwrap(), tip_peaks_bytes],
                 )
                 .unwrap();
