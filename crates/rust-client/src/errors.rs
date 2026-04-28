@@ -27,7 +27,7 @@ use crate::note::NoteScreenerError;
 use crate::note_transport::NoteTransportError;
 use crate::rpc::RpcError;
 use crate::store::{NoteRecordError, StoreError};
-use crate::transaction::TransactionRequestError;
+use crate::transaction::{NoteScriptTrustPolicy, TransactionRequestError};
 
 // ACTIONABLE HINTS
 // ================================================================================================
@@ -164,6 +164,13 @@ pub enum ClientError {
         script_root: Word,
         #[source]
         source: RpcError,
+    },
+    #[error(
+        "note script {script_root} is not allowed by this transaction's note-script trust policy"
+    )]
+    UntrustedNoteScript {
+        script_root: Word,
+        policy: NoteScriptTrustPolicy,
     },
 }
 

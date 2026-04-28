@@ -2963,8 +2963,9 @@ async fn consume_note_with_custom_script() {
     let stored_script = client.test_store().get_note_script(note_script.root()).await.unwrap();
     assert_eq!(stored_script.root().to_hex(), note_script.root().to_hex());
 
-    // Consume note
+    // Consume note (the script is custom, so the consumer must explicitly trust its root).
     let transaction_request = TransactionRequestBuilder::new()
+        .trusted_input_note_script_roots([note_script.root()])
         .build_consume_notes(vec![custom_note.clone()])
         .unwrap();
 
@@ -2975,6 +2976,68 @@ async fn consume_note_with_custom_script() {
 
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
+}
+
+/// A custom note script that is already in the local store must still be rejected when the active
+/// trust policy does not allow it. Importing a script locally must NOT bypass the per-request
+/// trust check.
+#[tokio::test]
+async fn consume_note_with_custom_script_default_policy_rejects_local_hit() {
+    let (mut client, mock_rpc_api, keystore) = create_test_client().await;
+
+    let (sender_account, receiver_account, faucet_account) = setup_two_wallets_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    let sender_id = sender_account.id();
+    let receiver_id = receiver_account.id();
+    let faucet_id = faucet_account.id();
+
+    mint_and_consume(&mut client, sender_id, faucet_id, NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    let note_script = client.code_builder().compile_note_script("begin nop end").unwrap();
+
+    let note_storage = NoteStorage::new(vec![]).unwrap();
+    let serial_num = client.rng().draw_word();
+    let note_metadata = NoteMetadata::new(sender_id, NoteType::Private)
+        .with_tag(NoteTag::with_account_target(receiver_id));
+    let note_assets = NoteAssets::new(vec![]).unwrap();
+    let note_recipient = NoteRecipient::new(serial_num, note_script.clone(), note_storage);
+    let custom_note = Note::new(note_assets, note_metadata, note_recipient);
+
+    let create_request = TransactionRequestBuilder::new()
+        .own_output_notes(vec![custom_note.clone()])
+        .build()
+        .unwrap();
+    let _ = Box::pin(client.submit_new_transaction(sender_id, create_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // The script is now in the local store.
+    let stored_script = client.test_store().get_note_script(note_script.root()).await.unwrap();
+    assert_eq!(stored_script.root(), note_script.root());
+
+    // Consume without trusting the root: must fail with `UntrustedNoteScript`, even though the
+    // script is locally available.
+    let consume_request = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![custom_note.clone()])
+        .unwrap();
+
+    match Box::pin(client.submit_new_transaction(receiver_id, consume_request)).await {
+        Err(ClientError::UntrustedNoteScript { script_root, .. }) => {
+            assert_eq!(script_root, note_script.root());
+        },
+        other => panic!("expected UntrustedNoteScript, got {other:?}"),
+    }
 }
 
 #[tokio::test]

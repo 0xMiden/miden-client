@@ -7,6 +7,8 @@
 * [BREAKING][param][rust] `NodeRpcClient::get_block_by_number()` now takes an `include_proof: bool` parameter to control whether the block proof is included in the response. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 * [BREAKING][param][rust] `NodeRpcClient::sync_chain_mmr()` replaced `block_to: Option<BlockNumber>` with `upper_bound: SyncTarget` to match the RPC definition. Use `SyncTarget::CommittedChainTip` for previous default behavior (`None`), or `SyncTarget::BlockNumber(num)` for a specific block number. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 * [BREAKING][rust] Added `submit_proven_batch` to `NodeRpcClient` trait. ([#2075](https://github.com/0xMiden/miden-client/pull/2075))
+* [BREAKING][rust] `TransactionRequest` now defaults to `NoteScriptTrustPolicy::StandardScriptsOnly` for input-note scripts. Transactions consuming notes with non-standard scripts must explicitly opt in via `TransactionRequestBuilder::trusted_input_note_script_roots(...)` or `::allow_unlisted_note_scripts_after_user_approval()`. Previously, missing non-standard input-note scripts could be silently fetched from the node and executed.
+* [BREAKING][rust] `TransactionRequest` binary serialization format changed: a new `note_script_trust_policy` field is appended. Persisted/cached requests from previous versions will fail to deserialize.
 
 ### Enhancements
 

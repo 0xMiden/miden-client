@@ -114,6 +114,7 @@ mod request;
 pub use request::{
     ForeignAccount,
     NoteArgs,
+    NoteScriptTrustPolicy,
     PaymentNoteDescription,
     SwapTransactionData,
     TransactionRequest,
@@ -208,6 +209,9 @@ where
         transaction_request: TransactionRequest,
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<TransactionId, ClientError> {
+        // Check before NTX registration, which can submit a separate transaction.
+        check_input_note_script_trust(&transaction_request)?;
+
         // Register any missing NTX scripts before the main transaction.
         // The registration path contains its own full execute -> prove -> submit pipeline.
         if !transaction_request.expected_ntx_scripts().is_empty() {
@@ -251,6 +255,9 @@ where
     ) -> Result<TransactionResult, ClientError> {
         // Validates the transaction request before executing
         self.validate_request(account_id, &transaction_request).await?;
+
+        // Also check direct execution callers.
+        check_input_note_script_trust(&transaction_request)?;
 
         // Retrieve all input notes from the store.
         let mut stored_note_records = self
@@ -815,6 +822,20 @@ where
 
 // HELPERS
 // ================================================================================================
+
+/// Rejects the first input note whose script root is not allowed by the request policy.
+fn check_input_note_script_trust(
+    transaction_request: &TransactionRequest,
+) -> Result<(), ClientError> {
+    let policy = transaction_request.note_script_trust_policy();
+    for note in transaction_request.input_notes() {
+        let script_root = note.script().root();
+        if !policy.allows(script_root) {
+            return Err(ClientError::UntrustedNoteScript { script_root, policy: policy.clone() });
+        }
+    }
+    Ok(())
+}
 
 /// Helper to get the account outgoing assets.
 ///
