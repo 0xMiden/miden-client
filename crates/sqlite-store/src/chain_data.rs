@@ -646,13 +646,8 @@ mod test {
         store
             .interact_with_connection(move |conn| {
                 let tx = conn.transaction().unwrap();
-                for i in 0..TOTAL_BLOCKS {
-                    SqliteStore::insert_block_header_tx(
-                        &tx,
-                        &headers_clone[i],
-                        tracked.contains(&i),
-                    )
-                    .unwrap();
+                for (i, header) in headers_clone.iter().enumerate().take(TOTAL_BLOCKS) {
+                    SqliteStore::insert_block_header_tx(&tx, header, tracked.contains(&i)).unwrap();
                 }
                 SqliteStore::insert_partial_blockchain_nodes_tx(&tx, &auth_nodes).unwrap();
                 tx.execute(
