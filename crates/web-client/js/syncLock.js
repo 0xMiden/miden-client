@@ -26,10 +26,27 @@ export function hasWebLocks() {
 // Coalesce map keyed by `${dbId}:${methodId}` -> in-flight promise.
 const inFlight = new Map();
 
+/**
+ * Build the coalesce-map key for an in-flight sync of `(dbId, methodId)`.
+ *
+ * @param {string} dbId
+ * @param {string} methodId
+ * @returns {string}
+ */
 function coalesceKey(dbId, methodId) {
   return `${dbId}:${methodId}`;
 }
 
+/**
+ * Run `fn` while holding the per-db Web Lock. When Web Locks are unavailable,
+ * runs `fn` directly and relies on the WASM-level mutex (`get_mut_inner`) to
+ * serialize across methods within the tab.
+ *
+ * @param {string} dbId
+ * @param {() => Promise<T>} fn
+ * @returns {Promise<T>}
+ * @template T
+ */
 function runUnderLock(dbId, fn) {
   if (!hasWebLocks()) {
     // No Web Locks: rely on the WASM-level mutex (get_mut_inner) to serialize
