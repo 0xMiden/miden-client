@@ -6,9 +6,8 @@ use clap::Parser;
 use miden_client::assembly::CodeBuilder;
 use miden_client::keystore::Keystore;
 use miden_client::transaction::{AdviceInputs, TransactionRequestBuilder, TransactionScript};
-use miden_client::vm::Package;
+use miden_client::vm::{Package, PackageExport};
 use miden_client::{Client, Deserializable, Felt, Word};
-use miden_client::vm::PackageExport;
 
 use crate::errors::CliError;
 use crate::utils::{parse_account_id, print_executed_program_stack, print_executed_transaction};
