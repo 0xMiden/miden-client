@@ -5,6 +5,7 @@
 //! to:
 //!
 //! - Submit proven transactions.
+//! - Submit proven batches.
 //! - Retrieve block headers (optionally with MMR proofs).
 //! - Sync state updates (including notes, nullifiers, and account updates).
 //! - Fetch details for specific notes and accounts.
@@ -51,13 +52,16 @@ use domain::note::{FetchedNote, NoteSyncInfo, SyncNotesResult};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
-use miden_protocol::account::{Account, AccountCode, AccountHeader, AccountId};
+use miden_protocol::account::{AccountCode, AccountId};
 use miden_protocol::address::NetworkId;
+use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
 use miden_protocol::crypto::merkle::smt::SmtProof;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
+
+use crate::rpc::domain::storage_map::StorageMapInfo;
 
 /// Contains domain types related to RPC requests and responses, as well as utility functions
 /// for dealing with them.
@@ -84,7 +88,6 @@ pub use tonic_client::GrpcClient;
 
 use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::rpc::domain::account_vault::AccountVaultInfo;
-use crate::rpc::domain::storage_map::StorageMapInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
 use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
@@ -122,6 +125,18 @@ pub trait NodeRpcClient: Send + Sync {
         &self,
         proven_transaction: ProvenTransaction,
         transaction_inputs: TransactionInputs,
+    ) -> Result<BlockNumber, RpcError>;
+
+    /// Given a Proven Batch together with the corresponding [`ProposedBatch`] and the list of
+    /// [`TransactionInputs`] (one per transaction, matching the ordering of the batch), sends
+    /// the batch to the node for inclusion in a future block using the `/SubmitProvenBatch`
+    /// RPC endpoint. All transactions in the batch must build on the current mempool state
+    /// following normal transaction submission rules.
+    async fn submit_proven_batch(
+        &self,
+        proven_batch: ProvenBatch,
+        proposed_batch: ProposedBatch,
+        transaction_inputs: Vec<TransactionInputs>,
     ) -> Result<BlockNumber, RpcError>;
 
     /// Given a block number, fetches the block header corresponding to that height from the node
@@ -365,34 +380,6 @@ pub trait NodeRpcClient: Send + Sync {
         Ok(public_notes)
     }
 
-    /// Fetches the public accounts that have been updated since the last known state of the
-    /// accounts.
-    ///
-    /// The `local_accounts` parameter is a list of account headers that the client has
-    /// stored locally and that it wants to check for updates. If an account is private or didn't
-    /// change, it is ignored and will not be included in the returned list.
-    /// The default implementation of this method uses [`NodeRpcClient::get_account_details`].
-    async fn get_updated_public_accounts(
-        &self,
-        local_accounts: &[&AccountHeader],
-    ) -> Result<Vec<Account>, RpcError> {
-        let mut public_accounts = vec![];
-
-        for local_account in local_accounts {
-            let response = self.get_account_details(local_account.id()).await?;
-
-            if let FetchedAccount::Public(account, _) = response {
-                let account = *account;
-                // We should only return an account if it's newer, otherwise we ignore it
-                if account.nonce().as_canonical_u64() > local_account.nonce().as_canonical_u64() {
-                    public_accounts.push(account);
-                }
-            }
-        }
-
-        Ok(public_accounts)
-    }
-
     /// Given a block number, fetches the block header corresponding to that height from the node
     /// along with the MMR proof.
     ///
@@ -508,6 +495,7 @@ pub enum RpcEndpoint {
     GetNotesById,
     SyncChainMmr,
     SubmitProvenTx,
+    SubmitProvenBatch,
     SyncNotes,
     GetNoteScriptByRoot,
     SyncStorageMaps,
@@ -530,6 +518,7 @@ impl RpcEndpoint {
             RpcEndpoint::GetNotesById => "GetNotesById",
             RpcEndpoint::SyncChainMmr => "SyncChainMmr",
             RpcEndpoint::SubmitProvenTx => "SubmitProvenTransaction",
+            RpcEndpoint::SubmitProvenBatch => "SubmitProvenBatch",
             RpcEndpoint::SyncNotes => "SyncNotes",
             RpcEndpoint::GetNoteScriptByRoot => "GetNoteScriptByRoot",
             RpcEndpoint::SyncStorageMaps => "SyncStorageMaps",
@@ -557,6 +546,7 @@ impl fmt::Display for RpcEndpoint {
             RpcEndpoint::GetNotesById => write!(f, "get_notes_by_id"),
             RpcEndpoint::SyncChainMmr => write!(f, "sync_chain_mmr"),
             RpcEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
+            RpcEndpoint::SubmitProvenBatch => write!(f, "submit_proven_batch"),
             RpcEndpoint::SyncNotes => write!(f, "sync_notes"),
             RpcEndpoint::GetNoteScriptByRoot => write!(f, "get_note_script_by_root"),
             RpcEndpoint::SyncStorageMaps => write!(f, "sync_storage_maps"),

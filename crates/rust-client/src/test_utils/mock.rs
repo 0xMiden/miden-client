@@ -7,6 +7,7 @@ use miden_protocol::Word;
 use miden_protocol::account::delta::AccountUpdateDetails;
 use miden_protocol::account::{AccountCode, AccountId, StorageSlot, StorageSlotContent};
 use miden_protocol::address::NetworkId;
+use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::{Forest, Mmr, MmrProof};
 use miden_protocol::crypto::merkle::smt::SmtProof;
@@ -59,6 +60,7 @@ pub type MockClient<AUTH> = Client<AUTH>;
 pub struct MockRpcApi {
     account_commitment_updates: Arc<RwLock<BTreeMap<BlockNumber, BTreeMap<AccountId, Word>>>>,
     pub mock_chain: Arc<RwLock<MockChain>>,
+    oversize_threshold: usize,
 }
 
 impl Default for MockRpcApi {
@@ -76,7 +78,17 @@ impl MockRpcApi {
         Self {
             account_commitment_updates: Arc::new(RwLock::new(build_account_updates(&mock_chain))),
             mock_chain: Arc::new(RwLock::new(mock_chain)),
+            oversize_threshold: 1000,
         }
+    }
+
+    /// Sets the oversize threshold for `get_account_proof`. Any storage map with more
+    /// entries than this threshold, or a vault with more assets, will have the
+    /// `too_many_entries` / `too_many_assets` flags set in the response.
+    #[must_use]
+    pub fn with_oversize_threshold(mut self, threshold: usize) -> Self {
+        self.oversize_threshold = threshold;
+        self
     }
 
     /// Returns the current MMR of the blockchain.
@@ -195,6 +207,7 @@ impl MockRpcApi {
                     block_num: block_number,
                     transaction_header: transaction_header.clone(),
                     output_notes: vec![],
+                    erased_output_note_ids: vec![],
                 });
             }
         }
@@ -446,7 +459,27 @@ impl NodeRpcClient for MockRpcApi {
         Ok(block_num)
     }
 
+    /// Simulates the submission of a proven batch to the node by adding it to the mock chain's
+    /// pending batches. The `proposed_batch` and `transaction_inputs` arguments are accepted to
+    /// match the trait signature but are unused — the mock relies on the `ProvenBatch` alone,
+    /// matching how `submit_proven_transaction` ignores its `transaction_inputs`.
+    async fn submit_proven_batch(
+        &self,
+        proven_batch: ProvenBatch,
+        _proposed_batch: ProposedBatch,
+        _transaction_inputs: Vec<TransactionInputs>,
+    ) -> Result<BlockNumber, RpcError> {
+        let mut mock_chain = self.mock_chain.write();
+        mock_chain.add_pending_batch(proven_batch);
+        drop(mock_chain);
+
+        let block_num = self.get_chain_tip_block_num();
+
+        Ok(block_num)
+    }
+
     /// Returns the node's tracked account details for the specified account ID.
+    /// Always returns the full account for public accounts.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         let summary =
             self.account_commitment_updates
@@ -505,7 +538,9 @@ impl NodeRpcClient for MockRpcApi {
                         .map(|(key, value)| StorageMapEntry { key: *key, value: *value })
                         .collect();
 
-                    let too_many_entries = entries.len() > 1000;
+                    // NOTE: The mock returns all entries even when too_many_entries is set.
+                    // In production, the node would return partial data for oversized maps.
+                    let too_many_entries = entries.len() > self.oversize_threshold;
                     let account_storage_map_detail = AccountStorageMapDetails {
                         slot_name: slot_name.clone(),
                         too_many_entries,
@@ -528,7 +563,7 @@ impl NodeRpcClient for MockRpcApi {
                 assets.push(asset);
             }
             let vault_details = AccountVaultDetails {
-                too_many_assets: assets.len() > 1000,
+                too_many_assets: assets.len() > self.oversize_threshold,
                 assets,
             };
 

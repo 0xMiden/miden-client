@@ -324,6 +324,7 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
+use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::rand::FeltRng;
 use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
@@ -364,6 +365,10 @@ pub struct Client<AUTH> {
     exec_options: ExecutionOptions,
     /// Number of blocks after which pending transactions are considered stale and discarded.
     tx_discard_delta: Option<u32>,
+    /// Number of synced blocks between automatic irrelevant-block pruning runs.
+    irrelevant_block_prune_interval: Option<u32>,
+    /// Sync height at which the last automatic irrelevant-block prune completed.
+    last_irrelevant_block_prune_sync_height: Option<BlockNumber>,
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
@@ -428,6 +433,12 @@ where
 
     pub fn authenticator(&self) -> Option<&Arc<AUTH>> {
         self.authenticator.as_ref()
+    }
+
+    /// Returns the shared source manager used to retain MASM source information for assembled
+    /// programs.
+    pub fn source_manager(&self) -> Arc<dyn SourceManagerSync> {
+        self.source_manager.clone()
     }
 }
 

@@ -8,7 +8,7 @@ use anyhow::Result;
 use assert_cmd::Command;
 use assert_cmd::cargo::cargo_bin_cmd;
 use miden_client::account::{AccountId, AccountStorageMode};
-use miden_client::address::AddressInterface;
+use miden_client::address::{Address, NetworkId};
 use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::{FeltRng, RandomCoin};
@@ -787,16 +787,12 @@ async fn list_addresses_add() -> Result<()> {
     assert!(formatted_output.contains("Unspecified"));
     assert!(!formatted_output.contains("BasicWallet"));
 
-    // Add a basic wallet address to the account
+    // Encode a BasicWallet address with tag length 10, then add it to the account.
+    let encoded_address =
+        encode_address_cli(&temp_dir, &basic_account_id, "basic-wallet", Some("10"));
+
     let mut add_address_cmd = cargo_bin_cmd!("miden-client");
-    let custom_note_tag_len = "10";
-    add_address_cmd.args([
-        "address",
-        "add",
-        &basic_account_id,
-        &AddressInterface::BasicWallet.to_string(),
-        custom_note_tag_len,
-    ]);
+    add_address_cmd.args(["address", "add", &basic_account_id, &encoded_address]);
     let output = add_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
     assert!(output.status.success());
 
@@ -809,16 +805,12 @@ async fn list_addresses_add() -> Result<()> {
     assert_eq!(formatted_output.matches("Unspecified").count(), 1);
     assert_eq!(formatted_output.matches("BasicWallet").count(), 1);
 
-    // Add another basic wallet address to the account
+    // Encode another BasicWallet address (different tag length → different address) and add it too.
+    let encoded_address =
+        encode_address_cli(&temp_dir, &basic_account_id, "basic-wallet", Some("5"));
+
     let mut add_address_cmd = cargo_bin_cmd!("miden-client");
-    let custom_note_tag_len = "5";
-    add_address_cmd.args([
-        "address",
-        "add",
-        &basic_account_id,
-        &AddressInterface::BasicWallet.to_string(),
-        custom_note_tag_len,
-    ]);
+    add_address_cmd.args(["address", "add", &basic_account_id, &encoded_address]);
     let output = add_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
     assert!(output.status.success());
 
@@ -830,6 +822,66 @@ async fn list_addresses_add() -> Result<()> {
     assert!(formatted_output.contains(&basic_account_id));
     assert_eq!(formatted_output.matches("Unspecified").count(), 1);
     assert_eq!(formatted_output.matches("BasicWallet").count(), 2);
+
+    Ok(())
+}
+
+/// Verifies that `address add` rejects a bech32 address whose encoded account ID does not
+/// match the `<ACCOUNT_ID>` argument.
+#[tokio::test]
+async fn address_add_rejects_mismatched_account() -> Result<()> {
+    let temp_dir = init_cli().1;
+
+    let account_a = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let account_b = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    assert_ne!(account_a, account_b, "two new wallets should have distinct ids");
+
+    sync_cli(&temp_dir);
+
+    // Encode an address that points at account A.
+    let encoded_for_a = encode_address_cli(&temp_dir, &account_a, "basic-wallet", None);
+
+    // Trying to add it to account B must fail.
+    let mut add_cmd = cargo_bin_cmd!("miden-client");
+    add_cmd.args(["address", "add", &account_b, &encoded_for_a]);
+    let output = add_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(!output.status.success(), "expected add to fail on account mismatch");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("does not match the provided account ID"),
+        "unexpected stderr: {stderr}"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn address_add_rejects_mismatched_network() -> Result<()> {
+    let temp_dir = init_cli().1;
+
+    let account = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    sync_cli(&temp_dir);
+
+    // Encode a valid address against the CLI's configured network, then re-encode it under a
+    // different `NetworkId` so the HRP no longer matches.
+    let encoded_local = encode_address_cli(&temp_dir, &account, "basic-wallet", None);
+    let (cli_network_id, address) = Address::decode(&encoded_local)?;
+    let other_network_id = if cli_network_id == NetworkId::Mainnet {
+        NetworkId::Testnet
+    } else {
+        NetworkId::Mainnet
+    };
+    let encoded_other = address.encode(other_network_id);
+
+    let mut add_cmd = cargo_bin_cmd!("miden-client");
+    add_cmd.args(["address", "add", &account, &encoded_other]);
+    let output = add_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(!output.status.success(), "expected add to fail on network mismatch");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("does not match configured network"),
+        "unexpected stderr: {stderr}"
+    );
 
     Ok(())
 }
@@ -1163,6 +1215,29 @@ fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         .to_string()
 }
 
+/// Runs `miden-client address encode` and returns the printed bech32 address.
+fn encode_address_cli(
+    cli_path: &Path,
+    account_id: &str,
+    interface: &str,
+    tag_len: Option<&str>,
+) -> String {
+    let mut encode_cmd = cargo_bin_cmd!("miden-client");
+    let mut args = vec!["address", "encode", account_id, interface];
+    if let Some(tag_len) = tag_len {
+        args.push(tag_len);
+    }
+    encode_cmd.args(args);
+    let output = encode_cmd.current_dir(cli_path).output().unwrap();
+    assert!(
+        output.status.success(),
+        "address encode failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    String::from_utf8(output.stdout).unwrap().trim().to_string()
+}
+
 pub type TestClient = Client<FilesystemKeyStore>;
 
 /// Creates a new [`Client`] with a given store. Also returns the keystore associated with it.
@@ -1244,6 +1319,338 @@ fn exec_parse() {
     ]);
 
     failure_cmd.current_dir(&temp_dir).assert().failure();
+}
+
+// CALL COMMAND TESTS
+// ================================================================================================
+
+/// Tests that the `call` command fails when no arguments are provided.
+#[test]
+fn call_empty_command() {
+    let temp_dir = init_cli().1;
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(cmd.args(["call"]).current_dir(&temp_dir));
+}
+
+/// Tests that the `call` command fails when the package file does not exist.
+#[test]
+fn call_nonexistent_package() {
+    let temp_dir = init_cli().1;
+
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &format!("{basic_account_id}:some_procedure"),
+        "--package",
+        "nonexistent/path/package.masp",
+    ]);
+
+    cmd.current_dir(&temp_dir).assert().failure();
+}
+
+/// Tests that the `call` command fails when the procedure name is not found in the package.
+#[test]
+fn call_nonexistent_procedure() {
+    let temp_dir = init_cli().1;
+
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let package_path = temp_dir.join(MIDEN_DIR).join("packages/basic-wallet.masp");
+
+    sync_cli(&temp_dir);
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &format!("{basic_account_id}:nonexistent_procedure"),
+        "--package",
+        package_path.to_str().unwrap(),
+    ]);
+
+    cmd.current_dir(&temp_dir).assert().failure();
+}
+
+/// Helper: builds the `call-test` package (arithmetic + storage procedures) at runtime and
+/// writes the serialized `.masp` to `out_path`.
+fn build_call_test_masp(out_path: &Path) {
+    use miden_client::account::component::{
+        AccountComponentMetadata,
+        FeltSchema,
+        StorageSchema,
+        StorageSlotSchema,
+        ValueSlotSchema,
+        WordSchema,
+    };
+    use miden_client::account::{AccountType, StorageSlotName};
+    use miden_client::assembly::{CodeBuilder, Library};
+    use miden_client::vm::{
+        Package,
+        PackageExport,
+        PackageManifest,
+        ProcedureExport,
+        QualifiedProcedureName,
+        Section,
+        SectionId,
+        TargetType,
+    };
+    use midenc_hir_type::{CallConv, FunctionType, Type};
+
+    let call_test_code = r#"
+        use miden::protocol::native_account
+        use miden::core::word
+        use miden::core::sys
+
+        const STORED_VALUE = word("miden::testing::call_test::stored_value")
+
+        pub proc add
+            add
+        end
+
+        pub proc set_value
+            push.STORED_VALUE[0..2]
+            exec.native_account::set_item
+            dropw
+            exec.sys::truncate_stack
+        end
+    "#;
+
+    let library: Library = CodeBuilder::default()
+        .compile_component_code("miden::testing::call_test", call_test_code)
+        .expect("failed to compile call-test component")
+        .into();
+
+    let slot_name =
+        StorageSlotName::new("miden::testing::call_test::stored_value").expect("valid slot name");
+
+    let word_schema = WordSchema::new_value([
+        FeltSchema::new_void(),
+        FeltSchema::new_void(),
+        FeltSchema::new_void(),
+        FeltSchema::new_void(),
+    ]);
+
+    let storage_schema = StorageSchema::new([(
+        slot_name,
+        StorageSlotSchema::Value(ValueSlotSchema::new(None, word_schema)),
+    )])
+    .expect("valid storage schema");
+
+    let metadata = AccountComponentMetadata::new("call-test", AccountType::all())
+        .with_storage_schema(storage_schema);
+
+    let signature_overrides: [(&str, FunctionType); 2] = [
+        ("add", FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt], [Type::Felt])),
+        (
+            "set_value",
+            FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt, Type::Felt, Type::Felt], []),
+        ),
+    ];
+
+    let mut exports: Vec<PackageExport> = Vec::new();
+    for module_info in library.module_infos() {
+        for (_, proc_info) in module_info.procedures() {
+            let name = QualifiedProcedureName::new(module_info.path(), proc_info.name.clone());
+            let override_sig = signature_overrides
+                .iter()
+                .find(|(n, _)| *n == proc_info.name.as_str())
+                .map(|(_, sig)| sig.clone());
+            let export = ProcedureExport {
+                path: name.into_inner(),
+                digest: proc_info.digest,
+                signature: override_sig.or_else(|| proc_info.signature.as_deref().cloned()),
+                attributes: proc_info.attributes.clone(),
+            };
+            exports.push(PackageExport::Procedure(export));
+        }
+    }
+
+    let manifest = PackageManifest::new(exports).expect("manifest validation failed");
+    let section = Section::new(SectionId::ACCOUNT_COMPONENT_METADATA, metadata.to_bytes());
+
+    let package = Package {
+        name: metadata.name().to_string().into(),
+        version: metadata.version().clone(),
+        description: Some(metadata.description().to_string()),
+        mast: Arc::new(library),
+        manifest,
+        sections: vec![section],
+        kind: TargetType::AccountComponent,
+    };
+
+    fs::write(out_path, package.to_bytes()).expect("failed to write call-test .masp");
+}
+
+/// Helper: creates an account with the `call-test.masp` package and returns (`temp_dir`,
+/// `account_id`, `masp_path`).
+fn setup_call_test_account() -> (PathBuf, String, PathBuf) {
+    let temp_dir = init_cli().1;
+
+    // Generate the call-test .masp directly in the temp dir
+    let masp_dst = temp_dir.join("call_test.masp");
+    build_call_test_masp(&masp_dst);
+
+    // Init storage for the stored_value slot
+    let init_toml = r#"
+"miden::testing::call_test::stored_value" = "0x0000000000000000000000000000000000000000000000000000000000000000"
+"#;
+    let init_path = temp_dir.join("call_test_init.toml");
+    fs::write(&init_path, init_toml).unwrap();
+
+    // Create account with the custom package
+    let mut create_cmd = cargo_bin_cmd!("miden-client");
+    create_cmd.args([
+        "new-account",
+        "--account-type",
+        "regular-account-immutable-code",
+        "-s",
+        "public",
+        "-p",
+        "auth/no-auth",
+        "-p",
+        masp_dst.to_str().unwrap(),
+        "-i",
+        init_path.to_str().unwrap(),
+    ]);
+
+    let output = create_cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "Failed to create account: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Parse account ID from output: "...account -s <ID>"
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let account_id = stdout
+        .split_whitespace()
+        .skip_while(|&w| w != "-s")
+        .nth(1)
+        .expect("Could not parse account ID from new-account output")
+        .to_string();
+
+    sync_cli(&temp_dir);
+
+    (temp_dir, account_id, masp_dst)
+}
+
+/// Tests calling a procedure by name (add) with felt arguments.
+#[test]
+fn call_procedure_by_name() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &format!("{account_id}:add"),
+        "3",
+        "7",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
+
+    cmd.current_dir(&temp_dir).assert().success();
+}
+
+/// Tests that transaction execution produces a nonce change in the state delta.
+#[test]
+fn call_shows_nonce_delta() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &format!("{account_id}:add"),
+        "1",
+        "2",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
+
+    let output = cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "Call failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Nonce incremented by:"),
+        "Expected nonce delta in output:\n{stdout}"
+    );
+}
+
+/// Tests calling `set_value` and verifying storage delta is shown.
+#[test]
+fn call_set_value_shows_storage_delta() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    // set_value expects [VALUE (4 felts)] on the stack
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &format!("{account_id}:set_value"),
+        "42",
+        "0",
+        "0",
+        "0",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
+
+    let output = cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "Call failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Storage Slot"), "Expected storage delta in output:\n{stdout}");
+}
+
+/// Tests that calling a `add` with the wrong number of arguments fails
+#[test]
+fn call_rejects_wrong_arg_count() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    // Too few: 1 arg for a 2-arg procedure.
+    let mut too_few = cargo_bin_cmd!("miden-client");
+    too_few.args([
+        "call",
+        &format!("{account_id}:add"),
+        "3",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
+    let out = too_few.current_dir(&temp_dir).output().unwrap();
+    assert!(!out.status.success(), "Expected failure for too-few args");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("expects 2 argument") && stderr.contains("got 1"),
+        "Unexpected stderr:\n{stderr}"
+    );
+
+    // Too many: 3 args for a 2-arg procedure.
+    let mut too_many = cargo_bin_cmd!("miden-client");
+    too_many.args([
+        "call",
+        &format!("{account_id}:add"),
+        "3",
+        "7",
+        "11",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
+    let out = too_many.current_dir(&temp_dir).output().unwrap();
+    assert!(!out.status.success(), "Expected failure for too-many args");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("expects 2 argument") && stderr.contains("got 3"),
+        "Unexpected stderr:\n{stderr}"
+    );
 }
 
 // AUTH COMPONENT TESTS
