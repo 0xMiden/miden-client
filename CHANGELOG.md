@@ -11,7 +11,7 @@
 
 ### Enhancements
 
-* [FEATURE][rust] Added `Client::sync_chain()` (on-chain sync only) and `Client::sync_note_transport()` (Note Transport Layer fetch only) for callers needing finer-grained control over sync. `Client::sync_state()` is now a thin wrapper that calls both in order. ([#2091](https://github.com/0xMiden/miden-client/pull/2091))
+* [FEATURE][rust] Added `Client::sync_chain()` (on-chain sync only) and `Client::sync_note_transport()` (Note Transport Layer fetch only) for callers needing finer-grained control over sync. ([#2091](https://github.com/0xMiden/miden-client/pull/2091))
 * [FEATURE][rust] Added `GrpcClient::with_bearer_auth(token)` to attach an `authorization: Bearer <token>` header to every outbound gRPC call, for use behind authenticating gateways. Tokens are validated at connection time and preserved across `set_genesis_commitment` updates ([#2101](https://github.com/0xMiden/miden-client/pull/2101)).
 * Made new-account construction use merged storage schema commitment (`build_with_schema_commitment`), re-exported `AccountBuilderSchemaCommitmentExt`, added WASM `buildWithoutSchemaCommitment()`, and fixed contract `accounts.create()` to require explicit `components` ([#1996](https://github.com/0xMiden/miden-client/pull/1996)).
 * Fixed the faucet token symbol display when showing account details ([#1985](https://github.com/0xMiden/miden-client/pull/1985)).
