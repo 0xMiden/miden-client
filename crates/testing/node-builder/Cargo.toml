@@ -29,12 +29,16 @@ miden-standards           = { workspace = true }
 # External dependencies
 anyhow      = { workspace = true }
 rand        = { workspace = true }
-rand_chacha = { version = "0.9" }
+rand_chacha = { workspace = true }
 tokio       = { features = ["signal"], workspace = true }
 url         = { features = ["serde"], version = "2.5" }
 
 [dev-dependencies]
-tempfile = "3.0"
+tempfile = { workspace = true }
 
 [lints]
 workspace = true
+
+[lib]
+doctest = false
+test    = false
