@@ -351,9 +351,7 @@ impl ConsumeNotesCmd {
 
         let mut builder = TransactionRequestBuilder::new();
         if self.allow_unlisted_note_scripts {
-            let trusted_roots: Vec<_> =
-                input_notes.iter().map(|(note, _)| note.script().root()).collect();
-            builder = builder.trusted_input_note_script_roots(trusted_roots);
+            builder = builder.allow_unlisted_note_scripts();
         }
         let transaction_request = builder.input_notes(input_notes).build().map_err(|err| {
             CliError::Transaction(

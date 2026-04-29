@@ -27,7 +27,7 @@ pub enum NoteScriptTrustPolicy {
     /// Only allow scripts that match a known [`StandardNote`] (P2ID, P2IDE, SWAP, MINT, BURN).
     ///
     /// This is the default and rejects any custom or unknown script the executor encounters,
-    /// even if its bytes are already in the local store.
+    /// even if it is already in the local store.
     #[default]
     StandardScriptsOnly,
     /// Allow scripts whose root is in the provided set, in addition to standard scripts. Use this
@@ -36,9 +36,7 @@ pub enum NoteScriptTrustPolicy {
     /// Allow any script root. Equivalent to disabling the trust gate entirely.
     ///
     /// Intended for clients that surface unknown scripts to the user behind their own approval
-    /// flow before submitting the transaction. The SDK does not enforce or record any such
-    /// approval; selecting this variant simply opts the request out of root-based gating, and the
-    /// integrator is responsible for whatever review process they implement.
+    /// flow before submitting the transaction.
     AllowUnlistedAfterApproval,
 }
 

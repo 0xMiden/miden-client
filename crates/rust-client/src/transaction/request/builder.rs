@@ -306,7 +306,7 @@ impl TransactionRequestBuilder {
     ///
     /// Use this only after the caller has approved the unlisted scripts through their own flow.
     #[must_use]
-    pub fn allow_unlisted_note_scripts_after_user_approval(mut self) -> Self {
+    pub fn allow_unlisted_note_scripts(mut self) -> Self {
         self.note_script_trust_policy = NoteScriptTrustPolicy::AllowUnlistedAfterApproval;
         self
     }
