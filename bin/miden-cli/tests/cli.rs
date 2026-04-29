@@ -8,7 +8,7 @@ use anyhow::Result;
 use assert_cmd::Command;
 use assert_cmd::cargo::cargo_bin_cmd;
 use miden_client::account::{AccountId, AccountStorageMode};
-use miden_client::address::AddressInterface;
+use miden_client::address::{Address, AddressInterface, NetworkId};
 use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::{FeltRng, RandomCoin};
@@ -858,6 +858,38 @@ async fn address_add_rejects_mismatched_account() -> Result<()> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("does not match the provided account ID"),
+        "unexpected stderr: {stderr}"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn address_add_rejects_mismatched_network() -> Result<()> {
+    let temp_dir = init_cli().1;
+
+    let account = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    sync_cli(&temp_dir);
+
+    // Encode a valid address against the CLI's configured network, then re-encode it under a
+    // different `NetworkId` so the HRP no longer matches.
+    let encoded_local =
+        encode_address_cli(&temp_dir, &account, &AddressInterface::BasicWallet.to_string(), None);
+    let (cli_network_id, address) = Address::decode(&encoded_local)?;
+    let other_network_id = if cli_network_id == NetworkId::Mainnet {
+        NetworkId::Testnet
+    } else {
+        NetworkId::Mainnet
+    };
+    let encoded_other = address.encode(other_network_id);
+
+    let mut add_cmd = cargo_bin_cmd!("miden-client");
+    add_cmd.args(["address", "add", &account, &encoded_other]);
+    let output = add_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(!output.status.success(), "expected add to fail on network mismatch");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("does not match configured network"),
         "unexpected stderr: {stderr}"
     );
 

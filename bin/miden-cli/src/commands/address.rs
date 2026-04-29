@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use miden_client::Client;
+use miden_client::account::AccountId;
 use miden_client::address::{Address, AddressId, AddressInterface, NetworkId, RoutingParameters};
 
 use crate::config::CliConfig;
@@ -76,25 +77,23 @@ pub struct AddressCmd {
 
 impl AddressCmd {
     pub async fn execute<AUTH>(&self, client: Client<AUTH>) -> Result<(), CliError> {
+        let cli_config = CliConfig::load()?;
+        let network_id = cli_config.rpc.endpoint.0.to_network_id();
         match &self.command {
             Some(AddressSubCommand::List { account_id: Some(account_id) }) => {
-                let cli_config = CliConfig::load()?;
-                let network_id = cli_config.rpc.endpoint.0.to_network_id();
                 list_account_addresses(client, account_id, network_id).await?;
             },
             Some(AddressSubCommand::Add { account_id, address }) => {
-                add_address(client, account_id.clone(), address.clone()).await?;
+                add_address(client, account_id.clone(), address.clone(), network_id).await?;
             },
             Some(AddressSubCommand::Remove { account_id, address }) => {
-                remove_address(client, account_id.clone(), address.clone()).await?;
+                remove_address(client, account_id.clone(), address.clone(), network_id).await?;
             },
             Some(AddressSubCommand::Encode { account_id, interface, tag_len }) => {
-                encode_address(client, account_id, interface.clone(), *tag_len).await?;
+                encode_address(client, account_id, interface.clone(), *tag_len, network_id).await?;
             },
             _ => {
                 // List all addresses as default
-                let cli_config = CliConfig::load()?;
-                let network_id = cli_config.rpc.endpoint.0.to_network_id();
                 list_all_addresses(client, network_id).await?;
             },
         }
@@ -156,33 +155,10 @@ async fn add_address<AUTH>(
     mut client: Client<AUTH>,
     account_id: String,
     address: String,
+    network_id: NetworkId,
 ) -> Result<(), CliError> {
     let account_id = parse_account_id(&client, &account_id).await?;
-    let (decoded_network_id, address) =
-        Address::decode(&address).map_err(|e| CliError::Address(e, address))?;
-
-    // The address must encode the same account ID the user is adding it to.
-    let AddressId::AccountId(address_account_id) = address.id() else {
-        return Err(CliError::Input(
-            "Address is not account-ID-based; only account-ID addresses can be tracked".to_string(),
-        ));
-    };
-    if address_account_id != account_id {
-        return Err(CliError::Input(format!(
-            "Address encodes account ID `{}` which does not match the provided account ID `{}`",
-            address_account_id.to_hex(),
-            account_id.to_hex(),
-        )));
-    }
-
-    // The address' network must match the one the CLI is configured against.
-    let cli_config = CliConfig::load()?;
-    let config_network_id = cli_config.rpc.endpoint.0.to_network_id();
-    if decoded_network_id != config_network_id {
-        return Err(CliError::Input(format!(
-            "Address network `{decoded_network_id}` does not match configured network `{config_network_id}`",
-        )));
-    }
+    let address = decode_account_address(&address, account_id, &network_id)?;
 
     let note_tag = address.to_note_tag();
     client.add_address(address, account_id).await?;
@@ -195,9 +171,10 @@ async fn remove_address<AUTH>(
     mut client: Client<AUTH>,
     account_id: String,
     address: String,
+    network_id: NetworkId,
 ) -> Result<(), CliError> {
     let account_id = parse_account_id(&client, &account_id).await?;
-    let (_, address) = Address::decode(&address).map_err(|e| CliError::Address(e, address))?;
+    let address = decode_account_address(&address, account_id, &network_id)?;
     let note_tag = address.to_note_tag();
 
     println!("removing address - Account Id {account_id} - Note tag: {note_tag}");
@@ -211,6 +188,7 @@ async fn encode_address<AUTH>(
     account_id: &str,
     interface: CliAddressInterface,
     tag_len: Option<u8>,
+    network_id: NetworkId,
 ) -> Result<(), CliError> {
     let account_id = parse_account_id(&client, account_id).await?;
     let interface = interface.into();
@@ -222,8 +200,37 @@ async fn encode_address<AUTH>(
     };
     let address = Address::new(account_id).with_routing_parameters(routing_params);
 
-    let cli_config = CliConfig::load()?;
-    let network_id = cli_config.rpc.endpoint.0.to_network_id();
     println!("{}", address.encode(network_id));
     Ok(())
+}
+
+/// Decodes a bech32 address and verifies it encodes the expected account ID and network.
+fn decode_account_address(
+    encoded: &str,
+    expected_account_id: AccountId,
+    expected_network_id: &NetworkId,
+) -> Result<Address, CliError> {
+    let (decoded_network_id, address) =
+        Address::decode(encoded).map_err(|e| CliError::Address(e, encoded.to_string()))?;
+
+    let AddressId::AccountId(address_account_id) = address.id() else {
+        return Err(CliError::Input(
+            "Address is not account-ID-based; only account-ID addresses can be tracked".to_string(),
+        ));
+    };
+    if address_account_id != expected_account_id {
+        return Err(CliError::Input(format!(
+            "Address encodes account ID `{}` which does not match the provided account ID `{}`",
+            address_account_id.to_hex(),
+            expected_account_id.to_hex(),
+        )));
+    }
+
+    if &decoded_network_id != expected_network_id {
+        return Err(CliError::Input(format!(
+            "Address network `{decoded_network_id}` does not match configured network `{expected_network_id}`",
+        )));
+    }
+
+    Ok(address)
 }
