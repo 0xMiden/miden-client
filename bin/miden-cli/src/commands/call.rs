@@ -8,9 +8,10 @@ use miden_client::keystore::Keystore;
 use miden_client::transaction::{AdviceInputs, TransactionRequestBuilder, TransactionScript};
 use miden_client::vm::Package;
 use miden_client::{Client, Deserializable, Felt, Word};
+use miden_client::vm::PackageExport;
 
 use crate::errors::CliError;
-use crate::utils::{parse_account_id, print_executed_transaction};
+use crate::utils::{parse_account_id, print_executed_program_stack, print_executed_transaction};
 
 // CALL COMMAND
 // ================================================================================================
@@ -94,7 +95,7 @@ impl CallCmd {
             .execute_program(account_id, read_tx_script, AdviceInputs::default(), BTreeMap::new())
             .await?;
 
-        print_output_stack(&output_stack, result_count);
+        print_executed_program_stack(&output_stack, result_count);
 
         // 2) Transaction execution to get state delta.
         let delta_tx_script = generate_tx_script(linked_builder, &digest, &args, Some(0))?;
@@ -111,7 +112,7 @@ impl CallCmd {
                 print_executed_transaction(tx_result.executed_transaction())?;
             },
             Err(e) => {
-                println!("\n(Could not compute state delta: {e:?})");
+                println!("\n(Could not compute state delta: {e})");
             },
         }
 
@@ -181,8 +182,6 @@ fn print_manifest_signature(package: &Package, procedure_name: &str) -> Procedur
     const UNKNOWN: ProcedureSignature =
         ProcedureSignature { param_count: None, result_count: None };
 
-    use miden_client::vm::PackageExport;
-
     let kebab_name = procedure_name.replace('_', "-");
     let quoted_kebab = format!("\"{kebab_name}\"");
     let quoted_name = format!("\"{procedure_name}\"");
@@ -232,24 +231,6 @@ fn print_manifest_signature(package: &Package, procedure_name: &str) -> Procedur
     }
     println!();
     UNKNOWN
-}
-
-fn print_output_stack(stack: &[Felt; 16], expected_results: Option<usize>) {
-    let count = match expected_results {
-        Some(n) => n,
-        None => stack.iter().rposition(|v| v.as_canonical_u64() != 0).map_or(0, |pos| pos + 1),
-    };
-
-    if count == 0 {
-        println!("\nResult: 0");
-    } else if count == 1 {
-        println!("\nResult: {}", stack[0]);
-    } else {
-        println!("\nResult ({count} values):");
-        for (i, val) in stack.iter().enumerate().take(count) {
-            println!("  [{i}]: {val}");
-        }
-    }
 }
 
 /// Builds a transaction script that pushes `args`, calls the procedure at `digest`, and optionally

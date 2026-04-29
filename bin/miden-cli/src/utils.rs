@@ -2,7 +2,7 @@ use miden_client::account::AccountId;
 use miden_client::address::{Address, AddressId};
 use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
 use miden_client::transaction::{ExecutedTransaction, InputNote};
-use miden_client::{Client, Word};
+use miden_client::{Client, Felt, Word};
 
 use super::{CLIENT_CONFIG_FILE_NAME, create_dynamic_table, get_account_with_id_prefix};
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
@@ -196,4 +196,40 @@ pub fn print_executed_transaction(executed_tx: &ExecutedTransaction) -> Result<(
     println!("Nonce incremented by: {}.", delta.nonce_delta());
 
     Ok(())
+}
+
+/// Prints the output stack from `execute_program`.
+///
+/// If `expected_results` is `Some(n)`, prints the top `n` values. If `None`, prints up to the
+/// last non-zero value so trailing zero-padding is hidden.
+pub fn print_executed_program_stack(stack: &[Felt; 16], expected_results: Option<usize>) {
+    let count = match expected_results {
+        Some(n) => n,
+        None => stack.iter().rposition(|v| v.as_canonical_u64() != 0).map_or(0, |pos| pos + 1),
+    };
+
+    if count == 0 {
+        println!("\nResult: 0");
+    } else if count == 1 {
+        println!("\nResult: {}", stack[0]);
+    } else {
+        println!("\nResult ({count} values):");
+        for (i, val) in stack.iter().enumerate().take(count) {
+            println!("  [{i}]: {val}");
+        }
+    }
+}
+
+/// Prints the output stack as four 4-felt words with their hex encoding.
+pub fn print_executed_program_stack_hex_words(stack: &[Felt; 16]) {
+    println!("Output stack:");
+    for word_idx in (0..16).step_by(4) {
+        let word_idx_end = word_idx + 3;
+        let prefix = if word_idx == 12 { "└──" } else { "├──" };
+        let word = [stack[word_idx], stack[word_idx + 1], stack[word_idx + 2], stack[word_idx + 3]];
+        println!(
+            "{prefix} {word_idx:2} - {word_idx_end:2}: {word:?} ({})",
+            Word::from(word).to_hex()
+        );
+    }
 }
