@@ -25,13 +25,17 @@ miden-client-sqlite-store = { workspace = true }
 # External dependencies
 anyhow             = { features = ["std"], workspace = true }
 async-trait        = { workspace = true }
-clap               = { features = ["derive", "env"], version = "4.0" }
+clap               = { features = ["derive", "env"], workspace = true }
 num_cpus           = { version = "1.0" }
 rand               = { workspace = true }
-regex              = { version = "1.0" }
-serde              = { features = ["derive"], version = "1.0" }
-serde_json         = { version = "1.0" }
+regex              = { workspace = true }
+serde              = { workspace = true }
+serde_json         = { workspace = true }
 tokio              = { workspace = true }
 tracing            = { workspace = true }
-tracing-subscriber = { features = ["env-filter", "fmt", "json"], version = "0.3" }
-uuid               = { version = "1.10" }
+tracing-subscriber = { features = ["env-filter", "fmt", "json"], workspace = true }
+uuid               = { workspace = true }
+
+[lib]
+doctest = false
+test    = false
