@@ -278,9 +278,19 @@ pub trait Store: Send + Sync {
         has_client_notes: bool,
     ) -> Result<(), StoreError>;
 
-    /// Removes block headers that do not contain any client notes and aren't the genesis or last
-    /// block.
-    async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError>;
+    /// Prunes irrelevant block data from the store.
+    ///
+    /// This performs three operations atomically:
+    /// 1. Deletes MMR authentication nodes at the given `node_indices`.
+    /// 2. Sets `has_client_notes = false` for `blocks_to_untrack` (blocks whose notes have all been
+    ///    consumed).
+    /// 3. Deletes block headers with `has_client_notes = false` that are not the genesis or
+    ///    sync-height block.
+    async fn untrack_and_prune_irrelevant_blocks(
+        &self,
+        blocks_to_untrack: &[BlockNumber],
+        node_indices_to_remove: &[InOrderIndex],
+    ) -> Result<(), StoreError>;
 
     /// Prunes historical account states for the specified account up to the given nonce.
     ///

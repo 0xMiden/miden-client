@@ -84,15 +84,6 @@ You can find more information about other `make` commands in the [Makefile](Make
 ### Versioning
 We use [semver](https://semver.org/) naming convention.
 
-### React SDK version sync
-When you bump the web-client version (especially major/minor), keep the React SDK version and peer range in sync. From the repo root, run:
-
-```
-yarn check:sync:react-sdk --fix
-```
-
-Run without `--fix` to check only. This syncs `packages/react-sdk/package.json` to the current web-client version.
-
 ## Pre-PR checklist
 
 > [!TIP]
@@ -105,8 +96,6 @@ Run without `--fix` to check only. This syncs `packages/react-sdk/package.json` 
 - Documentation/comments updated for all changes according to our documentation convention.
 - Lints: Rustfmt, Clippy, Rustdoc, Typos and TOML-formatting linting passing.
   - As mentioned above, `make lint` can be used for checking there.
-- If the PR includes changes to the web client, the documentation needs to be up to date. You can automatically generate them by running `make typedoc`.
-
 ### Changelog
 
 If a PR introduces anything a downstream user might notice - a new feature, a behaviour change, a bug-fix, a deprecation, or a breaking API change - add a bullet to [CHANGELOG.md](./CHANGELOG.md) under the last existing heading (corresponds to the unreleased version when working on the `next` branch). The convention is to write a past-tense summary (e.g. "* [BREAKING] Renamed foo() to bar() in `Client` {#PR number link}"). Internal refactors or smaller tweaks that don’t affect public behaviour can be left out.
@@ -114,8 +103,6 @@ If a PR introduces anything a downstream user might notice - a new feature, a be
 ### Docs
 
 The documentation in the `docs/external` folder is built using Docusaurus and is automatically absorbed into the main [miden-docs](https://github.com/0xMiden/miden-docs) repository for the main documentation website. Changes to the `next` branch trigger an automated deployment workflow. The docs folder requires npm packages to be installed before building.
-
-The documentation inside of the `docs/typedoc` folder is auto generated using `typedoc` and is not integrated into the main Miden docs.
 
 ## Write bug reports with detail, background, and sample code
 
