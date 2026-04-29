@@ -320,11 +320,12 @@ View and manage addresses.
 
 #### Action Subcommands
 
-| Subcommand                       | Description                                                                            |
-| -------------------------------- | ---------------------------------------------------------------------------------------|
-| `list <ID>`                      | List all addresses or only for the specified account ID (default command)              |
-| `add <ID> <INTERFACE> <TAG_LEN>` | Bind an address for an interface for the specified account ID with optional tag length |
-| `remove <ID> <ADDRESS>`          | Remove an address for the specified account ID                                         |
+| Subcommand                          | Description                                                                                      |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------|
+| `list <ID>`                         | List all addresses or only for the specified account ID (default command)                        |
+| `add <ID> <ADDRESS>`                | Track a bech32-encoded address on the specified account ID                                       |
+| `remove <ID> <ADDRESS>`             | Remove a bech32-encoded address from the specified account ID                                    |
+| `encode <ID> <INTERFACE> <TAG_LEN>` | Produce a bech32 address from the account ID, interface, and optional tag length                 |
 
 The `list` subcommand optionally takes an account ID to only show the addresses of that account, if it is not provided, it will show all addresses of all accounts.
 
@@ -332,13 +333,19 @@ The `list` subcommand optionally takes an account ID to only show the addresses 
 miden-client address list 0x17f13f4f83a8e8100c19d2961dfda2
 ```
 
-`add` and `remove` take the account ID as a mandatory argument, and also the interface of the address, this values can be:
-- `BasicWallet`: The basic wallet interface.
+`add` and `remove` take the account ID and a bech32-encoded address as arguments. `add` validates that the bech32 address encodes the same account ID and that its network matches the CLI's configured network.
 
-Note: the `Unspecified` denotes an address not bound to any interface, it's the default address for every account created.
+Use `encode` to produce a bech32 address from its fields — this output is what `add` expects. The interface can be:
+- `basic-wallet`: The basic wallet interface.
+
+Note: `Unspecified` (shown by `address list`) denotes an address not bound to any interface, it's the default address for every account created.
 
 ```sh
-miden-client address add 0x17f13f4f83a8e8100c19d2961dfda2 BasicWallet 10
+# Produce a bech32 address for the given account, interface, and tag length
+miden-client address encode 0x17f13f4f83a8e8100c19d2961dfda2 basic-wallet 10
+
+# Track that address on the account
+miden-client address add 0x17f13f4f83a8e8100c19d2961dfda2 mlcl1qple0ejnutx8zyp0cm0pme9wjfgqz0u9djq_qruqqypuyph
 ```
 
 ```sh

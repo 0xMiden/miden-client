@@ -457,23 +457,22 @@ async fn sync_state_mmr() {
     let partial_mmr = client.test_store().get_current_partial_mmr().await.unwrap();
     assert!(partial_mmr.forest().num_leaves() >= 6);
     assert!(partial_mmr.open(0).unwrap().is_none());
+    // Block 1 holds the only unspent public note, so its leaf stays tracked.
     assert!(partial_mmr.open(1).unwrap().is_some());
     assert!(partial_mmr.open(2).unwrap().is_none());
     assert!(partial_mmr.open(3).unwrap().is_none());
-    assert!(partial_mmr.open(4).unwrap().is_some());
+    // Block 4's notes are all consumed externally, so pruning untracks its leaf.
+    assert!(partial_mmr.open(4).unwrap().is_none());
     assert!(partial_mmr.open(5).unwrap().is_none());
 
-    // // Ensure the proofs are valid
+    // Ensure the proof for the remaining tracked leaf is valid
     let mmr_proof = partial_mmr.open(1).unwrap().unwrap();
     let (block_1, _) = rpc_api.get_block_header_by_number(Some(1.into()), false).await.unwrap();
     partial_mmr.peaks().verify(block_1.commitment(), mmr_proof).unwrap();
 
-    let mmr_proof = partial_mmr.open(4).unwrap().unwrap();
-    let (block_4, _) = rpc_api.get_block_header_by_number(Some(4.into()), false).await.unwrap();
-    partial_mmr.peaks().verify(block_4.commitment(), mmr_proof).unwrap();
-
-    // the blocks for both notes should be stored as they are relevant for the client's accounts
-    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 2);
+    // Only block 1 remains tracked after pruning; block 4 was untracked because all its
+    // notes are already consumed externally.
+    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 1);
 }
 
 /// Tests that MMR authentication nodes are persisted even when `include_block` is false
@@ -543,18 +542,22 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
     // Blocks 1 and 4 had matching note tags but the screener discarded them,
     // so `include_block` was false for those steps.
     assert_eq!(
-        state_sync_update.block_updates.block_headers().count(),
+        state_sync_update.partial_blockchain_updates.block_headers().count(),
         1,
         "expected only the chain tip block header to be stored"
     );
-    let (tip_header, ..) = state_sync_update.block_updates.block_headers().next().unwrap();
+    let (tip_header, ..) =
+        state_sync_update.partial_blockchain_updates.block_headers().next().unwrap();
     assert_eq!(tip_header.block_num(), rpc_api.get_chain_tip_block_num());
 
     // Authentication nodes must be non-empty: they include nodes produced by applying
     // the MMR delta and adding the chain tip leaf. These nodes are needed for the
     // tracked genesis leaf's Merkle proof path, which changes as the tree grows.
     assert!(
-        !state_sync_update.block_updates.new_authentication_nodes().is_empty(),
+        !state_sync_update
+            .partial_blockchain_updates
+            .new_authentication_nodes()
+            .is_empty(),
         "expected authentication nodes from intermediate (skipped) blocks to be persisted"
     );
 }
@@ -658,7 +661,9 @@ async fn sync_state_tags() {
 
     // as we are syncing with tags, the response should contain blocks for both notes
     assert_eq!(client.get_input_notes(NoteFilter::All).await.unwrap().len(), 2);
-    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 2);
+    // Only the public note is unspent; the private note is consumed externally, so its
+    // block is pruned immediately after sync.
+    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 1);
 }
 
 #[tokio::test]
@@ -1290,6 +1295,154 @@ async fn input_note_reader_finds_externally_consumed_notes() {
     );
     assert_eq!(collected[0].id(), p2id_note_id);
     assert_eq!(collected[0].consumer_account(), Some(consumer_id));
+}
+
+/// Builds a chain with two blocks relevant to a tracked account (blocks 1 and 4) and a client
+/// synced up to block 4 with `prune_interval` configured. Returns the consuming pieces needed to
+/// make block 4 irrelevant on demand.
+async fn setup_prunable_block_scenario(
+    prune_interval: Option<u32>,
+) -> (MockClient<FilesystemKeyStore>, MockRpcApi, AccountId, Note) {
+    let mut builder = MockChainBuilder::new();
+    let mock_account = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
+
+    let note_first =
+        NoteBuilder::new(mock_account.id(), RandomCoin::new([0, 0, 0, 0].map(Felt::new).into()))
+            .note_type(NoteType::Public)
+            .tag(NoteTag::new(0).into())
+            .build()
+            .unwrap();
+    let note_second =
+        NoteBuilder::new(mock_account.id(), RandomCoin::new([0, 0, 0, 1].map(Felt::new).into()))
+            .note_type(NoteType::Public)
+            .tag(NoteTag::new(0).into())
+            .build()
+            .unwrap();
+
+    let spawn_note_1 = builder.add_spawn_note(std::slice::from_ref(&note_first)).unwrap();
+    let spawn_note_2 = builder.add_spawn_note(std::slice::from_ref(&note_second)).unwrap();
+
+    let mut chain = builder.build().unwrap();
+
+    // Block 1: create the first unspent note (keeps block 1 permanently relevant).
+    let tx = Box::pin(
+        chain
+            .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note_1])
+            .unwrap()
+            .extend_expected_output_notes(vec![RawOutputNote::Full(note_first)])
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    chain.add_pending_executed_transaction(&tx).unwrap();
+    chain.prove_next_block().unwrap();
+
+    // Blocks 2 and 3: advance the chain without changing tracked notes.
+    chain.prove_next_block().unwrap();
+    chain.prove_next_block().unwrap();
+
+    // Block 4: create the second note, which the caller will later consume to make block 4
+    // irrelevant.
+    let tx = Box::pin(
+        chain
+            .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note_2])
+            .unwrap()
+            .extend_expected_output_notes(vec![RawOutputNote::Full(note_second.clone())])
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    chain.add_pending_executed_transaction(&tx).unwrap();
+    chain.prove_next_block().unwrap();
+
+    let rng = RandomCoin::new(rand::random::<[u64; 4]>().map(Felt::new).into());
+    let keystore = FilesystemKeyStore::new(std::env::temp_dir()).unwrap();
+    let mock_rpc = MockRpcApi::new(chain);
+
+    let mut client = ClientBuilder::new()
+        .rpc(Arc::new(mock_rpc.clone()))
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_discard_delta(None)
+        .irrelevant_block_prune_interval(prune_interval)
+        .build()
+        .await
+        .unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+    client.add_note_tag(NoteTag::new(0)).await.unwrap();
+
+    client.sync_state().await.unwrap();
+    assert_eq!(
+        client.test_store().get_tracked_block_headers().await.unwrap().len(),
+        2,
+        "setup precondition: two relevant blocks tracked",
+    );
+
+    (client, mock_rpc, mock_account.id(), note_second)
+}
+
+/// Consumes `note` against `account_id` on the mocked chain and proves the resulting block, so the
+/// block that originally carried the note becomes irrelevant from the client's perspective.
+async fn consume_note_and_prove(mock_rpc: &MockRpcApi, account_id: AccountId, note: Note) {
+    let tx = {
+        let tx_context = mock_rpc
+            .mock_chain
+            .write()
+            .build_tx_context(TxContextInput::AccountId(account_id), &[], &[note])
+            .unwrap()
+            .build()
+            .unwrap();
+        Box::pin(tx_context.execute()).await.unwrap()
+    };
+    mock_rpc.mock_chain.write().add_pending_executed_transaction(&tx).unwrap();
+    mock_rpc.prove_block();
+}
+
+#[tokio::test]
+async fn irrelevant_block_pruning_respects_sync_interval() {
+    let (mut client, mock_rpc, account_id, note_second) =
+        setup_prunable_block_scenario(Some(2)).await;
+
+    consume_note_and_prove(&mock_rpc, account_id, note_second).await;
+
+    client.sync_state().await.unwrap();
+    assert_eq!(
+        client.test_store().get_tracked_block_headers().await.unwrap().len(),
+        2,
+        "pruning should be deferred until the configured sync interval elapses",
+    );
+
+    mock_rpc.prove_block();
+    client.sync_state().await.unwrap();
+    assert_eq!(
+        client.test_store().get_tracked_block_headers().await.unwrap().len(),
+        1,
+        "the irrelevant block should be pruned once the sync interval is reached",
+    );
+}
+
+#[tokio::test]
+async fn irrelevant_block_pruning_disabled_when_interval_is_none() {
+    let (mut client, mock_rpc, account_id, note_second) = setup_prunable_block_scenario(None).await;
+
+    consume_note_and_prove(&mock_rpc, account_id, note_second).await;
+
+    // With pruning disabled, both tracked blocks must remain across repeated syncs.
+    for _ in 0..5 {
+        mock_rpc.prove_block();
+        client.sync_state().await.unwrap();
+        assert_eq!(
+            client.test_store().get_tracked_block_headers().await.unwrap().len(),
+            2,
+            "no pruning should occur when the prune interval is None",
+        );
+    }
 }
 
 #[tokio::test]

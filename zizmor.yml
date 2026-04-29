@@ -1,0 +1,9 @@
+rules:
+  use-trusted-publishing:
+    ignore:
+      - publish-crates-release.yml
+  secrets-outside-env:
+    ignore:
+      - publish-crates-dry-run.yml
+      - publish-crates-release.yml
+      - trigger-deploy-docs.yml
