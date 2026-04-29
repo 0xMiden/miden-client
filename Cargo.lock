@@ -2924,6 +2924,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "futures",
+ "getrandom 0.3.4",
  "gloo-timers",
  "hex",
  "miden-node-proto-build",
