@@ -8,7 +8,7 @@ use anyhow::Result;
 use assert_cmd::Command;
 use assert_cmd::cargo::cargo_bin_cmd;
 use miden_client::account::{AccountId, AccountStorageMode};
-use miden_client::address::{Address, AddressInterface, NetworkId};
+use miden_client::address::{Address, NetworkId};
 use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::{FeltRng, RandomCoin};
@@ -788,12 +788,8 @@ async fn list_addresses_add() -> Result<()> {
     assert!(!formatted_output.contains("BasicWallet"));
 
     // Encode a BasicWallet address with tag length 10, then add it to the account.
-    let encoded_address = encode_address_cli(
-        &temp_dir,
-        &basic_account_id,
-        &AddressInterface::BasicWallet.to_string(),
-        Some("10"),
-    );
+    let encoded_address =
+        encode_address_cli(&temp_dir, &basic_account_id, "basic-wallet", Some("10"));
 
     let mut add_address_cmd = cargo_bin_cmd!("miden-client");
     add_address_cmd.args(["address", "add", &basic_account_id, &encoded_address]);
@@ -810,12 +806,8 @@ async fn list_addresses_add() -> Result<()> {
     assert_eq!(formatted_output.matches("BasicWallet").count(), 1);
 
     // Encode another BasicWallet address (different tag length → different address) and add it too.
-    let encoded_address = encode_address_cli(
-        &temp_dir,
-        &basic_account_id,
-        &AddressInterface::BasicWallet.to_string(),
-        Some("5"),
-    );
+    let encoded_address =
+        encode_address_cli(&temp_dir, &basic_account_id, "basic-wallet", Some("5"));
 
     let mut add_address_cmd = cargo_bin_cmd!("miden-client");
     add_address_cmd.args(["address", "add", &basic_account_id, &encoded_address]);
@@ -847,8 +839,7 @@ async fn address_add_rejects_mismatched_account() -> Result<()> {
     sync_cli(&temp_dir);
 
     // Encode an address that points at account A.
-    let encoded_for_a =
-        encode_address_cli(&temp_dir, &account_a, &AddressInterface::BasicWallet.to_string(), None);
+    let encoded_for_a = encode_address_cli(&temp_dir, &account_a, "basic-wallet", None);
 
     // Trying to add it to account B must fail.
     let mut add_cmd = cargo_bin_cmd!("miden-client");
@@ -873,8 +864,7 @@ async fn address_add_rejects_mismatched_network() -> Result<()> {
 
     // Encode a valid address against the CLI's configured network, then re-encode it under a
     // different `NetworkId` so the HRP no longer matches.
-    let encoded_local =
-        encode_address_cli(&temp_dir, &account, &AddressInterface::BasicWallet.to_string(), None);
+    let encoded_local = encode_address_cli(&temp_dir, &account, "basic-wallet", None);
     let (cli_network_id, address) = Address::decode(&encoded_local)?;
     let other_network_id = if cli_network_id == NetworkId::Mainnet {
         NetworkId::Testnet
