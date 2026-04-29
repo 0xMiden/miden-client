@@ -945,6 +945,13 @@ impl NodeRpcClient for GrpcClient {
                 .ok_or(RpcError::ExpectedDataMissing("GetNoteScriptByRoot.script".to_string()))?,
         )?;
 
+        let fetched_root = note_script.root();
+        if fetched_root != root {
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned note script with root {fetched_root} for requested root {root}",
+            )));
+        }
+
         Ok(note_script)
     }
 
