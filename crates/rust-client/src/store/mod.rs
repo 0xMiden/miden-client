@@ -514,8 +514,10 @@ pub trait Store: Send + Sync {
     /// The default implementation is based on [`Store::get_partial_blockchain_nodes`],
     /// [`Store::get_current_blockchain_peaks`] and [`Store::get_block_header_by_num`]
     async fn get_current_partial_mmr(&self) -> Result<PartialMmr, StoreError> {
-        let current_block_num = self.get_sync_height().await?;
         let current_peaks = self.get_current_blockchain_peaks().await?;
+        let current_block_num = u32::try_from(current_peaks.num_leaves())
+            .map_err(|err| StoreError::ParsingError(err.to_string()))?
+            .into();
 
         let (current_block, has_client_notes) = self
             .get_block_header_by_num(current_block_num)

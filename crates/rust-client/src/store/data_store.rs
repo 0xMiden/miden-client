@@ -284,6 +284,9 @@ impl DataStore for ClientDataStore {
             .map(|(header, _has_notes)| header)
             .collect();
 
+        // TODO: the client stores only the peaks of the MMR at the current sync height, so we are
+        // not actually following the block_ref here. If the block_ref != current_sync_height, this
+        // would return an invalid partial blockchain.
         let partial_mmr =
             build_partial_mmr_with_paths(&self.store, current_peaks, &block_headers).await?;
 
