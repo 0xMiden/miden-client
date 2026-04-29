@@ -356,12 +356,12 @@ impl StateSync {
             .sync_notes_with_details(current_block_num, Some(chain_tip), note_tags.as_ref())
             .await?;
 
-        // Validate every returned note block falls in (current_block_num, chain_tip].
+        // Validate every returned note block falls in [current_block_num, chain_tip].
         for block in &sync_notes_result.blocks {
             let block_num = block.block_header.block_num();
-            if block_num <= current_block_num || block_num > chain_tip {
+            if block_num < current_block_num || block_num > chain_tip {
                 return Err(ClientError::ChainValidationError(format!(
-                    "sync_notes returned block {block_num} outside requested range ({current_block_num}, {chain_tip}]"
+                    "sync_notes returned block {block_num} outside requested range [{current_block_num}, {chain_tip}]"
                 )));
             }
         }
