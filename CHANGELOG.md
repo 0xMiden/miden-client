@@ -4,7 +4,6 @@
 
 ### Changes
 
-* [BREAKING][api][rust,web] Split `sync_state()` into `sync_state()` (combined NTL + chain, fail-fast), `sync_chain()`, and `sync_note_transport()`. Matching JS: `MidenClient.sync()`, `syncChain()`, `syncNoteTransport()`. Dropped the web `timeout` option (and `syncStateWithTimeout`) since it never cancelled the underlying sync. ([#2091](https://github.com/0xMiden/miden-client/pull/2091))
 * [BREAKING][param][rust] `NodeRpcClient::get_block_by_number()` now takes an `include_proof: bool` parameter to control whether the block proof is included in the response. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 * [BREAKING][param][rust] `NodeRpcClient::sync_chain_mmr()` replaced `block_to: Option<BlockNumber>` with `upper_bound: SyncTarget` to match the RPC definition. Use `SyncTarget::CommittedChainTip` for previous default behavior (`None`), or `SyncTarget::BlockNumber(num)` for a specific block number. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 * [BREAKING][rust] Added `submit_proven_batch` to `NodeRpcClient` trait. ([#2075](https://github.com/0xMiden/miden-client/pull/2075))
@@ -12,6 +11,7 @@
 
 ### Enhancements
 
+* [FEATURE][rust] Added `Client::sync_chain()` (on-chain sync only) and `Client::sync_note_transport()` (Note Transport Layer fetch only) for callers needing finer-grained control over sync. `Client::sync_state()` is now a thin wrapper that calls both in order. ([#2091](https://github.com/0xMiden/miden-client/pull/2091))
 * [FEATURE][rust] Added `GrpcClient::with_bearer_auth(token)` to attach an `authorization: Bearer <token>` header to every outbound gRPC call, for use behind authenticating gateways. Tokens are validated at connection time and preserved across `set_genesis_commitment` updates ([#2101](https://github.com/0xMiden/miden-client/pull/2101)).
 * Made new-account construction use merged storage schema commitment (`build_with_schema_commitment`), re-exported `AccountBuilderSchemaCommitmentExt`, added WASM `buildWithoutSchemaCommitment()`, and fixed contract `accounts.create()` to require explicit `components` ([#1996](https://github.com/0xMiden/miden-client/pull/1996)).
 * Fixed the faucet token symbol display when showing account details ([#1985](https://github.com/0xMiden/miden-client/pull/1985)).
