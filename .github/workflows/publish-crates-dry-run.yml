@@ -14,9 +14,10 @@ jobs:
       CARGO_TERM_COLOR: always
     steps:
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Cleanup large tools for build space
         uses: ./.github/actions/cleanup-runner
