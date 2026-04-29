@@ -242,27 +242,26 @@ pub trait Store: Send + Sync {
         nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError>;
 
-    /// Returns peaks information from the blockchain by a specific block number.
+    /// Returns the chain MMR peaks at the current sync height (peaks at `forest = block_num`,
+    /// i.e. excluding `block_num` itself as a leaf).
     ///
-    /// If there is no partial blockchain info stored for the provided block returns an empty
-    /// [`MmrPeaks`].
-    async fn get_partial_blockchain_peaks_by_block_num(
-        &self,
-        block_num: BlockNumber,
-    ) -> Result<MmrPeaks, StoreError>;
+    /// The peaks' `forest().num_leaves()` equals the current sync height by construction,
+    /// so callers can derive the synced block number from the returned peaks without a
+    /// second query.
+    ///
+    /// Before the first sync, returns an empty [`MmrPeaks`].
+    async fn get_current_blockchain_peaks(&self) -> Result<MmrPeaks, StoreError>;
 
-    /// Inserts a block header into the store, alongside peaks information at the block's height.
+    /// Inserts a block header into the store.
     ///
     /// Insert-if-not-exists with a one-way flag upgrade: on conflict with an existing row,
-    /// `header` and `partial_blockchain_peaks` are preserved (peaks are per-block and must
-    /// stay consistent with that block's forest), and `has_client_notes` is only upgraded
-    /// from `false` to `true`; never downgraded.
+    /// `header` is preserved and `has_client_notes` is only upgraded from `false` to `true`;
+    /// never downgraded.
     // TODO: this method's name only tells half the story. The insert is conditional and
     // the flag has its own upgrade rule. Revisit the name in a follow-up.
     async fn insert_block_header(
         &self,
         block_header: &BlockHeader,
-        partial_blockchain_peaks: MmrPeaks,
         has_client_notes: bool,
     ) -> Result<(), StoreError>;
 
@@ -513,12 +512,12 @@ pub trait Store: Send + Sync {
     /// known leaves thus far.
     ///
     /// The default implementation is based on [`Store::get_partial_blockchain_nodes`],
-    /// [`Store::get_partial_blockchain_peaks_by_block_num`] and [`Store::get_block_header_by_num`]
+    /// [`Store::get_current_blockchain_peaks`] and [`Store::get_block_header_by_num`]
     async fn get_current_partial_mmr(&self) -> Result<PartialMmr, StoreError> {
-        let current_block_num = self.get_sync_height().await?;
-
-        let current_peaks =
-            self.get_partial_blockchain_peaks_by_block_num(current_block_num).await?;
+        let current_peaks = self.get_current_blockchain_peaks().await?;
+        let current_block_num = u32::try_from(current_peaks.num_leaves())
+            .map_err(|err| StoreError::ParsingError(err.to_string()))?
+            .into();
 
         let (current_block, has_client_notes) = self
             .get_block_header_by_num(current_block_num)

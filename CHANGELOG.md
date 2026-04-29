@@ -15,7 +15,8 @@
 * Made new-account construction use merged storage schema commitment (`build_with_schema_commitment`), re-exported `AccountBuilderSchemaCommitmentExt`, added WASM `buildWithoutSchemaCommitment()`, and fixed contract `accounts.create()` to require explicit `components` ([#1996](https://github.com/0xMiden/miden-client/pull/1996)).
 * Fixed the faucet token symbol display when showing account details ([#1985](https://github.com/0xMiden/miden-client/pull/1985)).
 * [FEATURE][rust,cli,web] Added `get_network_note_status` to `NodeRpcClient` trait for querying the processing status of notes submitted to the network (pending, nullifier-inflight, discarded, nullifier-committed), along with attempt count and error details. Exposed as `miden-client network-note-status <note_id>` CLI command and `RpcClient.getNetworkNoteStatus()` in the web client. ([#1981](https://github.com/0xMiden/miden-client/pull/1981))
-* Added `miden-cli call` command for invoking account procedures directly from the CLI.
+* Remove MMR peaks from the blocks table and store them alongside the sync height in a new `blockchain_checkpoint` table ([#2100](https://github.com/0xMiden/miden-client/pull/2100)).
+* Added `miden-cli call` command for invoking account procedures directly from the CLI ([#1943](https://github.com/0xMiden/miden-client/pull/1943)).
 * Made `TransactionStoreUpdate` serialization lossless ([#2112](https://github.com/0xMiden/miden-client/pull/2112)).
 * [FEATURE][cli] Added `address encode <ACCOUNT_ID> <INTERFACE> [TAG_LEN]` subcommand that prints the bech32 encoding of an address built from the given fields (useful for producing the input to `address add`). ([#2115](https://github.com/0xMiden/miden-client/pull/2115))
 
