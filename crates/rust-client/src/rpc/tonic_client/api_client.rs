@@ -62,7 +62,8 @@ pub(crate) mod api_client_wrapper {
             bearer_token: Option<String>,
         ) -> Result<ApiClient, RpcError> {
             let wasm_client = WasmClient::new(endpoint);
-            let interceptor = MetadataInterceptor::default().with_bearer_token(bearer_token.as_deref())?;
+            let interceptor =
+                MetadataInterceptor::default().with_bearer_token(bearer_token.as_deref())?;
             let client = ProtoClient::with_interceptor(wasm_client.clone(), interceptor);
             Ok(ApiClient { client, wasm_client, bearer_token })
         }
