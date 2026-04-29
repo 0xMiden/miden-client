@@ -1,5 +1,4 @@
-use std::str::FromStr;
-
+use clap::ValueEnum;
 use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::address::{Address, AddressId, AddressInterface, NetworkId, RoutingParameters};
@@ -9,22 +8,13 @@ use crate::errors::CliError;
 use crate::utils::parse_account_id;
 use crate::{Parser, Subcommand, create_dynamic_table};
 
-#[derive(Debug, Clone)]
+/// Mirrors [`AddressInterface`], enabling parsing for CLI commands.
+///
+/// An interface specifies the set of procedures an account exposes, which determines
+/// which notes it is able to receive and consume.
+#[derive(Debug, Clone, ValueEnum)]
 pub enum CliAddressInterface {
     BasicWallet,
-}
-
-impl FromStr for CliAddressInterface {
-    type Err = String;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value {
-            "BasicWallet" => Ok(CliAddressInterface::BasicWallet),
-            other => Err(format!(
-                "Invalid interface: {other}. Valid values are: BasicWallet, Unspecified",
-            )),
-        }
-    }
 }
 
 impl From<CliAddressInterface> for AddressInterface {
@@ -61,7 +51,8 @@ pub enum AddressSubCommand {
     Encode {
         /// Account that the address points to
         account_id: String,
-        /// Interface the address exposes
+        /// Interface the address exposes.
+        #[arg(value_enum)]
         interface: CliAddressInterface,
         /// Optional tag length
         tag_len: Option<u8>,
