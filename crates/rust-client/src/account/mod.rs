@@ -280,20 +280,14 @@ impl<AUTH> Client<AUTH> {
     /// - If the account is not found on the network.
     /// - If the account is private.
     /// - There was an error sending the request to the network.
-    pub async fn follow_account_by_id(
-        &mut self,
-        account_id: AccountId,
-    ) -> Result<(), ClientError> {
+    pub async fn follow_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
         let account = self.fetch_public_account(account_id).await?;
         self.add_account_with_watch_only(&account, true, true).await
     }
 
     /// Fetches a public [`Account`] from the network, returning a typed error when the account
     /// doesn't exist on chain or is private.
-    async fn fetch_public_account(
-        &self,
-        account_id: AccountId,
-    ) -> Result<Account, ClientError> {
+    async fn fetch_public_account(&self, account_id: AccountId) -> Result<Account, ClientError> {
         let fetched_account =
             self.rpc_api.get_account_details(account_id).await.map_err(|err| {
                 match err.endpoint_error() {

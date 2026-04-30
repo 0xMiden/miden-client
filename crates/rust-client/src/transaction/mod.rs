@@ -249,6 +249,17 @@ where
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionResult, ClientError> {
+        // Error fast if the account is watch-only. Otherwise the failure would surface during
+        // transaction execution.
+        let account_record = self
+            .store
+            .get_account(account_id)
+            .await?
+            .ok_or(ClientError::AccountDataNotFound(account_id))?;
+        if account_record.is_watch_only() {
+            return Err(ClientError::AccountIsWatchOnly(account_id));
+        }
+
         // Validates the transaction request before executing
         self.validate_request(account_id, &transaction_request).await?;
 
@@ -327,13 +338,7 @@ where
             self.store.get_sync_height().await?
         };
 
-        // Load account code into MAST forest store
         // TODO: Refactor this to get account code only?
-        let account_record = self
-            .store
-            .get_account(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))?;
         let account: Account = account_record.try_into()?;
         data_store.mast_store().load_account_code(account.code());
 

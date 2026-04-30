@@ -427,8 +427,8 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
 /// Watch-only follow flow:
 ///   - `client_1` owns the wallet and faucet, executes transactions.
 ///   - `client_2` follows the wallet via `follow_account_by_id` (no note tag).
-///   - After `client_1` mints + consumes a note, `client_2` should observe the new account
-///     state (commitment, nonce) but not have the targeted note locally, and a placeholder
+///   - After `client_1` mints + consumes a note, `client_2` should observe the new account state
+///     (commitment, nonce) but not have the targeted note locally, and a placeholder
 ///     `ConsumedExternal` record should track the consumption.
 pub async fn test_follow_account_by_id(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
@@ -478,7 +478,9 @@ pub async fn test_follow_account_by_id(client_config: ClientConfig) -> Result<()
 
     let tags = client_2.test_store().get_note_tags().await?;
     assert!(
-        !tags.iter().any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
+        !tags
+            .iter()
+            .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
         "watch-only account must not register a per-account note tag",
     );
 
@@ -488,8 +490,7 @@ pub async fn test_follow_account_by_id(client_config: ClientConfig) -> Result<()
     //   - a ConsumedExternal placeholder for the consumed note's nullifier should appear.
     let (tx_id, note) = mint_note(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
     wait_for_tx(&mut client_1, tx_id).await?;
-    let consume_tx_id =
-        consume_notes(&mut client_1, wallet_id, std::slice::from_ref(&note)).await;
+    let consume_tx_id = consume_notes(&mut client_1, wallet_id, std::slice::from_ref(&note)).await;
     wait_for_tx(&mut client_1, consume_tx_id).await?;
 
     client_2.sync_state().await?;
@@ -505,8 +506,7 @@ pub async fn test_follow_account_by_id(client_config: ClientConfig) -> Result<()
         "watched account state should have advanced",
     );
 
-    let watched_input_notes =
-        client_2.test_store().get_input_notes(NoteFilter::All).await?;
+    let watched_input_notes = client_2.test_store().get_input_notes(NoteFilter::All).await?;
     assert!(
         watched_input_notes.iter().all(|n| n.id() != note.id()),
         "watch-only client must not have synced the targeted note (no note tag)",

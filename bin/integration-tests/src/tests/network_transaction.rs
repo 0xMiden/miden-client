@@ -370,7 +370,8 @@ pub async fn test_follow_network_account(client_config: ClientConfig) -> Result<
         "watch-only network account must not register a per-account note tag",
     );
 
-    let initial_watched_commitment = client_2.account_reader(network_account_id).commitment().await?;
+    let initial_watched_commitment =
+        client_2.account_reader(network_account_id).commitment().await?;
 
     // client_1 emits BUMP_NOTE_NUMBER network notes targeted at the counter; the node will
     // consume them in subsequent blocks and bump the counter to 1 + BUMP_NOTE_NUMBER.
@@ -407,7 +408,10 @@ pub async fn test_follow_network_account(client_config: ClientConfig) -> Result<
             break;
         }
     }
-    assert!(observed, "client_2 should observe the network account state advance via sync_state");
+    assert!(
+        observed,
+        "client_2 should observe the network account state advance via sync_state"
+    );
 
     let source_commitment = client_1.account_reader(network_account_id).commitment().await?;
     let watched_commitment = client_2.account_reader(network_account_id).commitment().await?;

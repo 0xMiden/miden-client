@@ -3680,3 +3680,53 @@ async fn storage_and_vault_proofs_ecdsa() {
         assert_eq!(proof, map.open(&StorageMapKey::new(MAP_KEY.into())));
     }
 }
+
+#[tokio::test]
+async fn execute_transaction_fails_for_watch_only_account() {
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+    // Build a faucet locally and insert it directly as watch-only via the store. Bypasses the
+    // public `add_account`/`follow_account_by_id` paths so we don't need a mock RPC round-trip.
+    let key_pair = AuthSecretKey::new_falcon512_poseidon2();
+    let auth_component =
+        AuthSingleSig::new(key_pair.public_key().to_commitment(), AuthSchemeId::Falcon512Poseidon2);
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let symbol = TokenSymbol::new("WTCH").unwrap();
+    let max_supply = Felt::new(9_999_999_u64);
+    let faucet = AccountBuilder::new(init_seed)
+        .account_type(AccountType::FungibleFaucet)
+        .storage_mode(AccountStorageMode::Public)
+        .with_auth_component(auth_component)
+        .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
+        .with_component(AuthControlled::allow_all())
+        .build_with_schema_commitment()
+        .unwrap();
+    let faucet_id = faucet.id();
+    let address = Address::new(faucet_id);
+
+    client
+        .test_store()
+        .insert_account(&faucet, address, true)
+        .await
+        .expect("watch-only account should insert via the store");
+
+    let target_account_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(
+            FungibleAsset::new(faucet_id, 1u64).unwrap(),
+            target_account_id,
+            miden_protocol::note::NoteType::Private,
+            client.rng(),
+        )
+        .unwrap();
+
+    let result = Box::pin(client.execute_transaction(faucet_id, tx_request)).await;
+
+    match result {
+        Err(ClientError::AccountIsWatchOnly(id)) => assert_eq!(id, faucet_id),
+        other => panic!("expected AccountIsWatchOnly, got {other:?}"),
+    }
+}
