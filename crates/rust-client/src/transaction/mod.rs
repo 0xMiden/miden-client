@@ -178,10 +178,6 @@ where
     ///
     /// Uses the client's default prover (configured via
     /// [`crate::builder::ClientBuilder::prover`]).
-    ///
-    /// If the transaction utilizes foreign account data, there is a chance that the client
-    /// doesn't have the required block header in the local database. In these scenarios, a sync to
-    /// the chain tip is performed, and the required block header is retrieved.
     pub async fn submit_new_transaction(
         &mut self,
         account_id: AccountId,
@@ -198,10 +194,6 @@ where
     ///
     /// This is useful for falling back to a different prover (e.g., local) when the default
     /// prover (e.g., remote) fails with a [`ClientError::TransactionProvingError`].
-    ///
-    /// If the transaction utilizes foreign account data, there is a chance that the client
-    /// doesn't have the required block header in the local database. In these scenarios, a sync to
-    /// the chain tip is performed, and the required block header is retrieved.
     pub async fn submit_new_transaction_with_prover(
         &mut self,
         account_id: AccountId,
@@ -233,10 +225,6 @@ where
 
     /// Creates and executes a transaction specified by the request against the specified account,
     /// but doesn't change the local database.
-    ///
-    /// If the transaction utilizes foreign account data, there is a chance that the client doesn't
-    /// have the required block header in the local database. In these scenarios, a sync to
-    /// the chain tip is performed, and the required block header is retrieved.
     ///
     /// # Errors
     ///
@@ -747,10 +735,6 @@ where
     /// For any [`ForeignAccount::Public`] in `foreign_accounts`, these pieces of data are retrieved
     /// from the network. For any [`ForeignAccount::Private`] account, inner data is used and only
     /// a proof of the account's existence on the network is fetched.
-    ///
-    /// Account data is retrieved for the node's current chain tip, so we need to check whether we
-    /// currently have the corresponding block header data. Otherwise, we additionally need to
-    /// retrieve it, this implies a state sync call which may update the client in other ways.
     async fn retrieve_foreign_account_inputs(
         &mut self,
         foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
