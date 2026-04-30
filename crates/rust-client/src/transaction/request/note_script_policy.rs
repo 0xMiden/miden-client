@@ -1,4 +1,4 @@
-//! Trust policy applied to note scripts during transaction execution.
+//! Trust policy applied to input-note scripts when executing a user transaction request.
 //!
 //! See [`NoteScriptTrustPolicy`] for the available variants and their semantics.
 
@@ -15,13 +15,21 @@ use miden_tx::utils::serde::{
     Serializable,
 };
 
-/// Per-request trust policy controlling which note scripts the transaction executor is allowed to
-/// run.
+/// Per-request trust policy controlling which input-note scripts may be included in a
+/// user-authorized transaction.
 ///
-/// The policy is checked at the start of every transaction execution by validating each input
-/// note's script root before any execution-time work happens. Trust is therefore an *execution*
-/// decision rather than a *fetch* decision: a script previously imported into the local store
+/// The policy is checked at the start of [`Client::submit_new_transaction`] and
+/// [`Client::execute_transaction`] by validating each input note's script root before
+/// executing the requested transaction. A script previously imported into the local store
 /// does not bypass the policy.
+///
+/// This gate applies to user-authorized transaction execution only. Speculative
+/// consumability probes, such as [`crate::note::NoteScreener`] during sync or
+/// `consume-notes` auto-discovery, may execute scripts but discard their effects and are
+/// outside this policy.
+///
+/// [`Client::submit_new_transaction`]: crate::Client::submit_new_transaction
+/// [`Client::execute_transaction`]: crate::Client::execute_transaction
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum NoteScriptTrustPolicy {
     /// Only allow scripts that match a known [`StandardNote`] (P2ID, P2IDE, SWAP, MINT, BURN).
@@ -41,7 +49,8 @@ pub enum NoteScriptTrustPolicy {
 }
 
 impl NoteScriptTrustPolicy {
-    /// Returns whether the policy permits the executor to run a script with the given root.
+    /// Returns whether the policy permits a user transaction to include an input note with the
+    /// given script root.
     pub fn allows(&self, root: Word) -> bool {
         match self {
             Self::StandardScriptsOnly => is_standard_script(root),
