@@ -22,7 +22,7 @@ use miden_protocol::account::{
 use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
-use miden_protocol::note::{Note, NoteId, NoteTag, NoteType, Nullifier};
+use miden_protocol::note::{Note, NoteId, NoteInclusionProof, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::InputNoteCommitment;
 use miden_protocol::{EMPTY_WORD, Felt, Word};
 use tracing::info;
@@ -503,6 +503,7 @@ impl StateSync {
         );
 
         // Process each transaction
+        let mut unknown_output_notes: BTreeMap<NoteId, NoteInclusionProof> = BTreeMap::new();
         for transaction in &transactions {
             // Transition tracked output notes to Committed using inclusion proofs from the
             // transaction sync response. This covers output notes regardless of whether their
@@ -514,20 +515,62 @@ impl StateSync {
             // Detect output notes erased by same-batch note erasure.
             Self::mark_erased_notes_as_consumed(state_sync_update, transaction);
 
-            // TODO(follow-accounts): the placeholder built below carries dummy P2ID note
-            // details — its `NoteId`/recipient digest don't match the on-chain note. Replace
-            // this with a real partial-note record once the `input_notes`/`output_notes`
-            // schema supports header-only / nullifier-only entries.
+            // Collect output notes that the client didn't know about. Typical for watch-only
+            // accounts: their per-account note tag isn't registered, so `sync_notes` never
+            // returned the notes they create. We resolve their full data with a follow-up
+            // `get_notes_by_id` call below.
             //
-            // For nullifiers consumed by this transaction whose notes weren't synced locally
-            // (watch-only flow: no per-account note tag, so `sync_notes` never returned them),
-            // insert a placeholder `InputNoteRecord` so the consumption is at least surfaced.
-            for nullifier in &transaction.nullifiers {
-                state_sync_update.note_updates.track_external_consumption_placeholder(
-                    *nullifier,
-                    transaction.block_num,
-                    transaction.account_id,
-                );
+            // Note: input notes consumed by these transactions (the nullifiers above) are
+            // not surfaced as `InputNoteRecord`s here — for *authenticated* commitments the
+            // node only sends the nullifier (no `NoteId` to resolve), and we don't bother
+            // with the *unauthenticated* edge case (creation and consumption in the same
+            // batch) for consistency. Watch-only accounts therefore see their on-chain state
+            // advance and the output notes they emit, but not the notes they consume.
+            //
+            // TODO(follow-accounts): once the schema supports header-only output notes (just
+            // `note_id + metadata + inclusion_proof`), drop this round-trip and persist the
+            // record directly from the `CommittedNote` without a second RPC.
+            for committed in &transaction.output_notes {
+                let note_id = *committed.note_id();
+                if !state_sync_update.note_updates.contains_note(&note_id) {
+                    unknown_output_notes
+                        .entry(note_id)
+                        .or_insert_with(|| committed.inclusion_proof().clone());
+                }
+            }
+        }
+
+        if !unknown_output_notes.is_empty() {
+            self.fetch_and_track_unknown_output_notes(state_sync_update, unknown_output_notes)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    /// Resolves the full data of output notes observed during sync that the client wasn't
+    /// previously tracking, and inserts them as `CommittedFull` `OutputNoteRecord`s.
+    ///
+    /// Notes returned by the node as private (`FetchedNote::Private`) are silently skipped —
+    /// the node doesn't expose their details, so we cannot persist a usable record.
+    async fn fetch_and_track_unknown_output_notes(
+        &self,
+        state_sync_update: &mut StateSyncUpdate,
+        unknown_output_notes: BTreeMap<NoteId, NoteInclusionProof>,
+    ) -> Result<(), ClientError> {
+        let ids: Vec<NoteId> = unknown_output_notes.keys().copied().collect();
+
+        let fetched = self.rpc_api.get_notes_by_id(&ids).await?;
+
+        for note in fetched {
+            if let crate::rpc::domain::note::FetchedNote::Public(note, _) = note {
+                let id = note.id();
+                let Some(inclusion_proof) = unknown_output_notes.get(&id).cloned() else {
+                    continue;
+                };
+                state_sync_update
+                    .note_updates
+                    .track_new_committed_output_note(note, inclusion_proof);
             }
         }
 

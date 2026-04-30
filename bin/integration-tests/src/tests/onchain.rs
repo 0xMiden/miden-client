@@ -427,9 +427,10 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
 /// Watch-only follow flow:
 ///   - `client_1` owns the wallet and faucet, executes transactions.
 ///   - `client_2` follows the wallet via `follow_account_by_id` (no note tag).
-///   - After `client_1` mints + consumes a note, `client_2` should observe the new account state
-///     (commitment, nonce) but not have the targeted note locally, and a placeholder
-///     `ConsumedExternal` record should track the consumption.
+///   - After `client_1` mints+consumes (filling the wallet) and the wallet emits a P2ID note,
+///     `client_2` should observe (a) the new account commitment, (b) no input note for the
+///     mint targeted at the wallet (no note tag), and (c) the wallet's *output* P2ID note
+///     fully resolved as `OutputNoteRecord` (via the post-sync `get_notes_by_id` round-trip).
 pub async fn test_follow_account_by_id(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
     let (mut client_2, _keystore_2) = ClientConfig::default()
@@ -452,10 +453,18 @@ pub async fn test_follow_account_by_id(client_config: ClientConfig) -> Result<()
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
+    let (recipient_wallet, _) = insert_new_wallet(
+        &mut client_1,
+        AccountStorageMode::Public,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
     let wallet_id = wallet.id();
+    let recipient_wallet_id = recipient_wallet.id();
     let faucet_id = faucet_account.id();
 
-    // Bring the wallet to a non-zero state on chain so client_2 can pick it up via follow.
+    // Fill the wallet with an asset so it can later emit a P2ID note.
     let tx_id = mint_and_consume(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
     wait_for_tx(&mut client_1, tx_id).await?;
 
@@ -484,14 +493,29 @@ pub async fn test_follow_account_by_id(client_config: ClientConfig) -> Result<()
         "watch-only account must not register a per-account note tag",
     );
 
-    // client_1 mints + consumes another note. From client_2's perspective:
-    //   - sync_state should observe the new account commitment / nonce.
-    //   - the targeted note must NOT land in client_2's input notes (no tag was registered).
-    //   - a ConsumedExternal placeholder for the consumed note's nullifier should appear.
-    let (tx_id, note) = mint_note(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
+    // client_1 mints another note targeted at the wallet (which the watch-only client must
+    // NOT see, because no note tag was registered).
+    let (tx_id, mint_note) = mint_note(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
     wait_for_tx(&mut client_1, tx_id).await?;
-    let consume_tx_id = consume_notes(&mut client_1, wallet_id, std::slice::from_ref(&note)).await;
+    let consume_tx_id =
+        consume_notes(&mut client_1, wallet_id, std::slice::from_ref(&mint_note)).await;
     wait_for_tx(&mut client_1, consume_tx_id).await?;
+
+    // The wallet emits a P2ID note targeted at recipient_wallet. This output note should be
+    // picked up by client_2 via the post-sync get_notes_by_id round-trip.
+    let p2id_asset = FungibleAsset::new(faucet_id, 1u64)?;
+    let p2id_request = TransactionRequestBuilder::new().build_pay_to_id(
+        PaymentNoteDescription::new(vec![p2id_asset.into()], wallet_id, recipient_wallet_id),
+        NoteType::Public,
+        client_1.rng(),
+    )?;
+    let emitted_note = p2id_request
+        .expected_output_own_notes()
+        .pop()
+        .with_context(|| "P2ID request should describe an expected output note")?
+        .clone();
+    let p2id_tx_id = client_1.submit_new_transaction(wallet_id, p2id_request).await?;
+    wait_for_tx(&mut client_1, p2id_tx_id).await?;
 
     client_2.sync_state().await?;
 
@@ -506,23 +530,25 @@ pub async fn test_follow_account_by_id(client_config: ClientConfig) -> Result<()
         "watched account state should have advanced",
     );
 
+    // Mint output note (targeted at the wallet) must NOT have been synced as an input note.
     let watched_input_notes = client_2.test_store().get_input_notes(NoteFilter::All).await?;
     assert!(
-        watched_input_notes.iter().all(|n| n.id() != note.id()),
-        "watch-only client must not have synced the targeted note (no note tag)",
+        watched_input_notes.iter().all(|n| n.id() != mint_note.id()),
+        "watch-only client must not have synced notes targeted at the wallet (no note tag)",
     );
 
-    let placeholders_for_wallet = watched_input_notes
+    // The P2ID note emitted by the wallet should land as an OutputNoteRecord in client_2's
+    // store, with its full data resolved by get_notes_by_id.
+    let watched_output_notes = client_2.test_store().get_output_notes(NoteFilter::All).await?;
+    let observed_p2id = watched_output_notes
         .iter()
-        .filter_map(|n| match n.state() {
-            InputNoteState::ConsumedExternal(state) => Some(state),
-            _ => None,
-        })
-        .filter(|state| state.consumer_account == Some(wallet_id))
-        .count();
+        .find(|n| n.id() == emitted_note.id())
+        .with_context(|| {
+            format!("P2ID output note {} should be tracked in client_2", emitted_note.id())
+        })?;
     assert!(
-        placeholders_for_wallet >= 1,
-        "client_2 should have at least one ConsumedExternal placeholder for the wallet's consumption",
+        observed_p2id.is_committed(),
+        "P2ID output note should be in a committed state in client_2",
     );
 
     Ok(())

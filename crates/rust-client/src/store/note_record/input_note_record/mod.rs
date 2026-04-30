@@ -74,34 +74,6 @@ impl InputNoteRecord {
         InputNoteRecord { details, created_at, state }
     }
 
-    /// Builds a placeholder record for a nullifier observed during sync that doesn't match any
-    /// locally tracked note (typical of watch-only accounts: their consumed notes were never
-    /// synced because the per-account note tag is not registered).
-    ///
-    /// The record carries dummy P2ID note details — the recipient is built from the consuming
-    /// account ID and the nullifier's word is reused as the serial number so each placeholder is
-    /// unique. The resulting `NoteId` and recipient digest **do not** match the real on-chain
-    /// note: this is purely a stand-in until the schema can persist header-only / nullifier-only
-    /// records (see TODO(follow-accounts) in `state_sync.rs`).
-    pub fn placeholder_for_external_consumption(
-        nullifier: Nullifier,
-        block_num: BlockNumber,
-        consumer_account: AccountId,
-    ) -> InputNoteRecord {
-        use miden_standards::note::P2idNoteStorage;
-
-        let recipient =
-            P2idNoteStorage::new(consumer_account).into_recipient((*nullifier.as_word()).into());
-        let details = NoteDetails::new(NoteAssets::default(), recipient);
-        let state = states::ConsumedExternalNoteState {
-            nullifier_block_height: block_num,
-            consumer_account: Some(consumer_account),
-            consumed_tx_order: None,
-        }
-        .into();
-        InputNoteRecord { details, created_at: None, state }
-    }
-
     // PUBLIC ACCESSORS
     // ================================================================================================
 
