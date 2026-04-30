@@ -428,9 +428,9 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
 ///   - `client_1` owns the wallet and faucet, executes transactions.
 ///   - `client_2` follows the wallet via `follow_account_by_id` (no note tag).
 ///   - After `client_1` mints+consumes (filling the wallet) and the wallet emits a P2ID note,
-///     `client_2` should observe (a) the new account commitment, (b) no input note for the
-///     mint targeted at the wallet (no note tag), and (c) the wallet's *output* P2ID note
-///     fully resolved as `OutputNoteRecord` (via the post-sync `get_notes_by_id` round-trip).
+///     `client_2` should observe (a) the new account commitment, (b) no input note for the mint
+///     targeted at the wallet (no note tag), and (c) the wallet's *output* P2ID note fully resolved
+///     as `OutputNoteRecord` (via the post-sync `get_notes_by_id` round-trip).
 pub async fn test_follow_account_by_id(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
     let (mut client_2, _keystore_2) = ClientConfig::default()

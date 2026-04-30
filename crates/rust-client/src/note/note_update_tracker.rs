@@ -383,8 +383,7 @@ impl NoteUpdateTracker {
         let (assets, recipient) = NoteDetails::from(note).into_parts();
         let recipient_digest = recipient.digest();
         let state = OutputNoteState::CommittedFull { recipient, inclusion_proof };
-        let record =
-            OutputNoteRecord::new(recipient_digest, assets, metadata, state, block_num);
+        let record = OutputNoteRecord::new(recipient_digest, assets, metadata, state, block_num);
         self.insert_output_note(record, NoteUpdateType::Insert);
     }
 
