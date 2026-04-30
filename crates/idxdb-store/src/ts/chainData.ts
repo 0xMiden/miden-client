@@ -220,25 +220,53 @@ export async function getPartialBlockchainNodesUpToInOrderIndex(
   }
 }
 
-export async function pruneIrrelevantBlocks(dbId: string) {
+export async function pruneIrrelevantBlocks(
+  dbId: string,
+  blocksToUntrack: number[],
+  nodeIdsToRemove: string[]
+) {
   try {
     const db = getDatabase(dbId);
-    const syncHeight = await db.stateSync.get(1);
+    const numericNodeIds = nodeIdsToRemove.map(Number);
 
+    const syncHeight = await db.stateSync.get(1);
     if (syncHeight == undefined) {
       throw Error("SyncHeight is undefined -- is the state sync table empty?");
     }
 
-    const allMatchingRecords = await db.blockHeaders
-      .where("hasClientNotes")
-      .equals("false")
-      .and(
-        (record) =>
-          record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum
-      )
-      .toArray();
+    await db.dexie.transaction(
+      "rw",
+      db.blockHeaders,
+      db.partialBlockchainNodes,
+      async () => {
+        // 1. Delete stale MMR authentication nodes.
+        if (numericNodeIds.length > 0) {
+          await db.partialBlockchainNodes.bulkDelete(numericNodeIds);
+        }
 
-    await db.blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
+        // 2. Mark untracked blocks as irrelevant.
+        if (blocksToUntrack.length > 0) {
+          await db.blockHeaders
+            .where("blockNum")
+            .anyOf(blocksToUntrack)
+            .modify({ hasClientNotes: "false" });
+        }
+
+        // 3. Delete irrelevant block headers.
+        const allMatchingRecords = await db.blockHeaders
+          .where("hasClientNotes")
+          .equals("false")
+          .and(
+            (record) =>
+              record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum
+          )
+          .toArray();
+
+        await db.blockHeaders.bulkDelete(
+          allMatchingRecords.map((r) => r.blockNum)
+        );
+      }
+    );
   } catch (err) {
     logWebStoreError(err, "Failed to prune irrelevant blocks");
   }
