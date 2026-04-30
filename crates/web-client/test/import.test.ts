@@ -1,172 +1,286 @@
-import test from "./playwright.global.setup";
-import { Page, expect } from "@playwright/test";
-import {
-  createNewFaucet,
-  createNewWallet,
-  fundAccountFromFaucet,
-  getAccount,
-  getAccountBalance,
-  StorageMode,
-} from "./webClientTestUtils";
-
-const importWalletFromSeed = async (
-  page: Page,
-  walletSeed: Uint8Array,
-  mutable: boolean,
-  authSchemeId: number
-) => {
-  return await page.evaluate(
-    async ({ _walletSeed, mutable, authSchemeId }) => {
-      const client = window.client;
-      await client.syncState();
-      const account = await client.importPublicAccountFromSeed(
-        _walletSeed,
-        mutable,
-        authSchemeId
-      );
-      return {
-        accountId: account.id().toString(),
-        accountCommitment: account.to_commitment().toHex(),
-      };
-    },
-    {
-      _walletSeed: walletSeed,
-      mutable,
-      authSchemeId,
-    }
-  );
-};
-
-// Creates a new WebClient with a fresh IndexedDB store, simulating a clean
-// start. This ensures both the store and the RPC client cache are empty.
-const createFreshClient = async (page: Page) => {
-  await page.evaluate(async () => {
-    const freshStoreName = `test_fresh_${crypto.randomUUID().slice(0, 8)}`;
-    const client = await window.WasmWebClient.createClient(
-      window.rpcUrl,
-      undefined,
-      undefined,
-      freshStoreName
-    );
-    window.client = client;
-  });
-};
-
-const importAccountById = async (page: Page, accountId: string) => {
-  return await page.evaluate(async (id) => {
-    const client = window.client;
-    const _accountId = window.AccountId.fromHex(id);
-    await client.importAccountById(_accountId);
-    const account = await client.getAccount(_accountId);
-    return {
-      accountId: account?.id().toString(),
-      accountCommitment: account?.to_commitment().toHex(),
-    };
-  }, accountId);
-};
+// @ts-nocheck
+import { test, expect } from "./test-setup";
 
 test.describe("import from seed", () => {
-  test("should import same public account from seed", async ({ page }) => {
-    const walletSeed = new Uint8Array(32);
-    crypto.getRandomValues(walletSeed);
+  test("should import same public account from seed", async ({ run }) => {
+    test.slow();
+    const result = await run(async ({ sdk, helpers }) => {
+      const integration = await helpers.createIntegrationClient();
+      if (!integration) return { skip: true };
+      const { client: intClient } = integration;
 
-    const mutable = false;
-    const storageMode = StorageMode.PUBLIC;
-    const authSchemeId = 2;
+      const walletSeed = new Uint8Array(32);
+      crypto.getRandomValues(walletSeed);
 
-    const initialWallet = await createNewWallet(page, {
-      storageMode,
-      mutable,
-      authSchemeId,
-      walletSeed,
+      const mutable = false;
+
+      const initialWallet = await intClient.newWallet(
+        sdk.AccountStorageMode.public(),
+        mutable,
+        sdk.AuthScheme.AuthRpoFalcon512,
+        walletSeed
+      );
+      const initialWalletId = initialWallet.id();
+
+      const faucet = await intClient.newFaucet(
+        sdk.AccountStorageMode.public(),
+        false,
+        "DAG",
+        8,
+        sdk.u64(10000000),
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const faucetId = faucet.id();
+
+      // Mint
+      await intClient.syncState();
+      const mintRequest = await intClient.newMintTransactionRequest(
+        initialWalletId,
+        faucetId,
+        sdk.NoteType.Private,
+        sdk.u64(1000)
+      );
+      let execResult = await intClient.executeTransaction(
+        faucetId,
+        mintRequest
+      );
+      let prover = sdk.TransactionProver.newLocalProver();
+      let proven = await intClient.proveTransaction(execResult, prover);
+      let height = await intClient.submitProvenTransaction(proven, execResult);
+      let execUpdate = await intClient.applyTransaction(execResult, height);
+      let txId = execUpdate.executedTransaction().id().toHex();
+      const createdNoteId = execUpdate
+        .createdNotes()
+        .notes()[0]
+        .id()
+        .toString();
+
+      // Wait for mint tx
+      let timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(txId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      // Consume
+      await intClient.syncState();
+      const inputNoteRecord = await intClient.getInputNote(createdNoteId);
+      const note = inputNoteRecord.toNote();
+      const consumeRequest = intClient.newConsumeTransactionRequest([note]);
+      execResult = await intClient.executeTransaction(
+        initialWalletId,
+        consumeRequest
+      );
+      prover = sdk.TransactionProver.newLocalProver();
+      proven = await intClient.proveTransaction(execResult, prover);
+      height = await intClient.submitProvenTransaction(proven, execResult);
+      execUpdate = await intClient.applyTransaction(execResult, height);
+      txId = execUpdate.executedTransaction().id().toHex();
+
+      // Wait for consume tx
+      timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(txId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      const initialAccount = await intClient.getAccount(initialWalletId);
+      const initialBalance = initialAccount
+        .vault()
+        .getBalance(faucetId)
+        .toString();
+      const initialCommitment = initialAccount.to_commitment().toHex();
+
+      // Create a fresh client (separate store) and import the wallet from seed
+      const integration2 = await helpers.createIntegrationClient();
+      if (!integration2) return { skip: true };
+      const { client: freshClient } = integration2;
+
+      await freshClient.syncState();
+      const restoredAccount = await freshClient.importPublicAccountFromSeed(
+        walletSeed,
+        mutable,
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+
+      const restoredAccountId = restoredAccount.id().toString();
+
+      const restoredAccountObj = await freshClient.getAccount(
+        sdk.AccountId.fromHex(restoredAccountId)
+      );
+      const restoredAccountCommitment = restoredAccountObj
+        .to_commitment()
+        .toHex();
+
+      const restoredBalance = restoredAccountObj
+        .vault()
+        .getBalance(sdk.AccountId.fromHex(faucetId.toString()));
+
+      return {
+        skip: false,
+        initialWalletIdStr: initialWalletId.toString(),
+        restoredAccountId,
+        initialBalance,
+        restoredBalance: restoredBalance.toString(),
+        initialCommitment,
+        restoredAccountCommitment,
+      };
     });
-
-    const faucet = await createNewFaucet(page);
-
-    const result = await fundAccountFromFaucet(
-      page,
-      initialWallet.id,
-      faucet.id
-    );
-    const initialBalance = result.targetAccountBalance;
-
-    const { commitment: initialCommitment } = await getAccount(
-      page,
-      initialWallet.id
-    );
-
-    // Deleting the account
-    await createFreshClient(page);
-
-    const { accountId: restoredAccountId } = await importWalletFromSeed(
-      page,
-      walletSeed,
-      mutable,
-      authSchemeId
-    );
-
-    expect(restoredAccountId).toEqual(initialWallet.id);
-
-    const { commitment: restoredAccountCommitment } = await getAccount(
-      page,
-      initialWallet.id
-    );
-
-    const restoredBalance = await getAccountBalance(
-      page,
-      initialWallet.id,
-      faucet.id
-    );
-
-    expect(restoredBalance!.toString()).toEqual(initialBalance);
-    expect(restoredAccountCommitment).toEqual(initialCommitment);
+    if (result.skip) {
+      test.skip(true, "requires running node");
+      return;
+    }
+    expect(result.restoredAccountId).toEqual(result.initialWalletIdStr);
+    expect(result.restoredBalance).toEqual(result.initialBalance);
+    expect(result.restoredAccountCommitment).toEqual(result.initialCommitment);
   });
 });
 
 test.describe("import public account by id", () => {
-  test("should import public account from id", async ({ page }) => {
-    const walletSeed = new Uint8Array(32);
-    crypto.getRandomValues(walletSeed);
+  test("should import public account from id", async ({ run }) => {
+    test.slow();
+    const result = await run(async ({ sdk, helpers }) => {
+      const integration = await helpers.createIntegrationClient();
+      if (!integration) return { skip: true };
+      const { client: intClient } = integration;
 
-    const mutable = false;
-    const storageMode = StorageMode.PUBLIC;
-    const authSchemeId = 2;
+      const walletSeed = new Uint8Array(32);
+      crypto.getRandomValues(walletSeed);
 
-    const initialWallet = await createNewWallet(page, {
-      storageMode,
-      mutable,
-      authSchemeId,
-      walletSeed,
+      const mutable = false;
+
+      const initialWallet = await intClient.newWallet(
+        sdk.AccountStorageMode.public(),
+        mutable,
+        sdk.AuthScheme.AuthRpoFalcon512,
+        walletSeed
+      );
+      const initialWalletId = initialWallet.id();
+
+      const faucet = await intClient.newFaucet(
+        sdk.AccountStorageMode.public(),
+        false,
+        "DAG",
+        8,
+        sdk.u64(10000000),
+        sdk.AuthScheme.AuthRpoFalcon512
+      );
+      const faucetId = faucet.id();
+
+      // Mint
+      await intClient.syncState();
+      const mintRequest = await intClient.newMintTransactionRequest(
+        initialWalletId,
+        faucetId,
+        sdk.NoteType.Private,
+        sdk.u64(1000)
+      );
+      let execResult = await intClient.executeTransaction(
+        faucetId,
+        mintRequest
+      );
+      let prover = sdk.TransactionProver.newLocalProver();
+      let proven = await intClient.proveTransaction(execResult, prover);
+      let height = await intClient.submitProvenTransaction(proven, execResult);
+      let execUpdate = await intClient.applyTransaction(execResult, height);
+      let txId = execUpdate.executedTransaction().id().toHex();
+      const createdNoteId = execUpdate
+        .createdNotes()
+        .notes()[0]
+        .id()
+        .toString();
+
+      // Wait for mint tx
+      let timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(txId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      // Consume
+      await intClient.syncState();
+      const inputNoteRecord = await intClient.getInputNote(createdNoteId);
+      const note = inputNoteRecord.toNote();
+      const consumeRequest = intClient.newConsumeTransactionRequest([note]);
+      execResult = await intClient.executeTransaction(
+        initialWalletId,
+        consumeRequest
+      );
+      prover = sdk.TransactionProver.newLocalProver();
+      proven = await intClient.proveTransaction(execResult, prover);
+      height = await intClient.submitProvenTransaction(proven, execResult);
+      execUpdate = await intClient.applyTransaction(execResult, height);
+      txId = execUpdate.executedTransaction().id().toHex();
+
+      // Wait for consume tx
+      timeWaited = 0;
+      while (timeWaited < 10000) {
+        await intClient.syncState();
+        const uncommitted = await intClient.getTransactions(
+          sdk.TransactionFilter.uncommitted()
+        );
+        const ids = uncommitted.map((tx) => tx.id().toHex());
+        if (!ids.includes(txId)) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        timeWaited += 1000;
+      }
+
+      const initialAccount = await intClient.getAccount(initialWalletId);
+      const initialBalance = initialAccount
+        .vault()
+        .getBalance(faucetId)
+        .toString();
+      const initialCommitment = initialAccount.to_commitment().toHex();
+
+      // Create a fresh client (separate store) and import by account ID
+      const integration2 = await helpers.createIntegrationClient();
+      if (!integration2) return { skip: true };
+      const { client: freshClient } = integration2;
+
+      const accountIdObj = sdk.AccountId.fromHex(initialWalletId.toString());
+      await freshClient.importAccountById(accountIdObj);
+      const restoredAccount = await freshClient.getAccount(accountIdObj);
+
+      const restoredAccountId = restoredAccount.id().toString();
+      const restoredAccountCommitment = restoredAccount.to_commitment().toHex();
+      const restoredBalance = restoredAccount
+        .vault()
+        .getBalance(sdk.AccountId.fromHex(faucetId.toString()));
+
+      return {
+        skip: false,
+        initialWalletIdStr: initialWalletId.toString(),
+        restoredAccountId,
+        initialBalance,
+        restoredBalance: restoredBalance.toString(),
+        initialCommitment,
+        restoredAccountCommitment,
+      };
     });
-
-    const faucet = await createNewFaucet(page);
-
-    const { targetAccountBalance: initialBalance } =
-      await fundAccountFromFaucet(page, initialWallet.id, faucet.id);
-    const { commitment: initialCommitment } = await getAccount(
-      page,
-      initialWallet.id
-    );
-
-    await createFreshClient(page);
-
-    const { accountId: restoredAccountId } = await importAccountById(
-      page,
-      initialWallet.id
-    );
-    expect(restoredAccountId).toEqual(initialWallet.id);
-
-    const { commitment: restoredAccountCommitment } = await getAccount(
-      page,
-      initialWallet.id
-    );
-    const restoredBalance = await getAccountBalance(
-      page,
-      initialWallet.id,
-      faucet.id
-    );
-
-    expect(restoredBalance!.toString()).toEqual(initialBalance);
-    expect(restoredAccountCommitment).toEqual(initialCommitment);
+    if (result.skip) {
+      test.skip(true, "requires running node");
+      return;
+    }
+    expect(result.restoredAccountId).toEqual(result.initialWalletIdStr);
+    expect(result.restoredBalance).toEqual(result.initialBalance);
+    expect(result.restoredAccountCommitment).toEqual(result.initialCommitment);
   });
 });

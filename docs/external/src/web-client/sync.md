@@ -51,8 +51,9 @@ import { MidenClient } from "@miden-sdk/miden-sdk";
 // Client syncs automatically before returning
 const client = await MidenClient.create({ autoSync: true });
 
-// Or use createTestnet() which defaults to autoSync: true
+// Or use a network-specific factory (defaults to autoSync: true)
 const testnetClient = await MidenClient.createTestnet();
+const devnetClient = await MidenClient.createDevnet();
 ```
 
 ## Get Current Sync Height

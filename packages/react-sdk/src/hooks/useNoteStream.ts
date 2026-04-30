@@ -14,7 +14,6 @@ import type {
   UseNoteStreamReturn,
   NoteAsset,
 } from "../types";
-import { runExclusiveDirect } from "../utils/runExclusive";
 import { readNoteAttachment } from "../utils/noteAttachment";
 import { normalizeAccountId } from "../utils/accountId";
 import { toBech32AccountId } from "../utils/accountBech32";
@@ -49,8 +48,7 @@ import { getNoteFilterType } from "../utils/noteFilters";
 export function useNoteStream(
   options: UseNoteStreamOptions = {}
 ): UseNoteStreamReturn {
-  const { client, isReady, runExclusive } = useMiden();
-  const runExclusiveSafe = runExclusive ?? runExclusiveDirect;
+  const { client, isReady } = useMiden();
 
   const allNotes = useNotesStore();
   const noteFirstSeen = useNoteFirstSeenStore();
@@ -96,16 +94,14 @@ export function useNoteStream(
     try {
       const filterType = getNoteFilterType(status);
       const filter = new NoteFilter(filterType);
-      const fetched = await runExclusiveSafe(() =>
-        client.getInputNotes(filter)
-      );
+      const fetched = await client.getInputNotes(filter);
       setNotesIfChanged(fetched);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
     } finally {
       setIsLoading(false);
     }
-  }, [client, isReady, runExclusiveSafe, status, setNotesIfChanged]);
+  }, [client, isReady, status, setNotesIfChanged]);
 
   // Fetch on mount and after each sync
   useEffect(() => {

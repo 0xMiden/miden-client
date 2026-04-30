@@ -16,13 +16,13 @@ export default defineConfig({
   timeout: 240_000,
   testDir: "./test",
   /* Run tests in files in parallel */
-  fullyParallel: process.env.REMOTE_PROVER ? false : true,
+  fullyParallel: process.env.TEST_MIDEN_PROVER_URL ? false : true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: 0,
   /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 2 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
@@ -40,6 +40,12 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
       testMatch: "*.test.ts",
+      testIgnore: [
+        "test/node/**",
+        "test/shared/**",
+        // Node.js-only tests (napi-specific JS wrapper)
+        "test/*.node.test.ts",
+      ],
     },
 
     // {
@@ -50,6 +56,42 @@ export default defineConfig({
     {
       name: "webkit",
       use: { ...devices["Desktop Safari"] },
+      testIgnore: [
+        "test/node/**",
+        "test/shared/**",
+        // Node.js-only tests (napi-specific JS wrapper)
+        "test/*.node.test.ts",
+      ],
+    },
+
+    {
+      name: "nodejs",
+      testDir: "./test",
+      testMatch: "**/*.test.ts",
+      // Skip browser-only and WASM-specific tests
+      testIgnore: [
+        "test/store_isolation*",
+        "test/sync_lock*",
+        "test/import_export*",
+        "test/remote_keystore*",
+        "test/package*", // TestUtils (createMockSerialized*) is browser-only
+        "test/miden_array*", // WASM array .length() method not available in Node.js
+        "test/shared/**", // Old format duplicates (ported to root test/)
+        "test/node/**", // Old format duplicates (ported to root test/)
+        "test/remote_prover_transactions*", // Old browser format for chromium CI
+        // Browser-only variants — napi versions live in *.node.test.ts
+        "test/miden_client_api.test.ts",
+        "test/compile_and_contract.test.ts",
+        // Browser-only tests preserved from `next` that use exportStore /
+        // importStore / waitForBlocks / isolatedClient (all browser-only).
+        "test/*.browser.test.ts",
+      ],
+      // Skip specific browser-only tests by name.
+      // Tests that request the `page` fixture must be listed here because
+      // Playwright launches the browser for the fixture BEFORE test.skip()
+      // in the test body can run.
+      grepInvert:
+        /exportStore|importStore|reads updated state after a mutating|accounts\.insert stores a pre-built/,
     },
 
     /* Test against mobile viewports. */
@@ -75,9 +117,15 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   // FIXME: Modularise test server constants (localhost, port)
-  webServer: {
-    command: "npx http-server ./dist -p 8080",
-    url: "http://127.0.0.1:8080",
-    reuseExistingServer: true,
-  },
+  // Skip webServer when running only Node.js tests (no browser/dist needed)
+  ...(process.env.SKIP_WEB_SERVER
+    ? {}
+    : {
+        webServer: {
+          command: "npx http-server ./dist -a localhost -p 8080",
+          url: "http://localhost:8080",
+          reuseExistingServer: true,
+        },
+      }),
 });
+// CI trigger

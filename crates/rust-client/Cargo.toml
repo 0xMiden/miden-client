@@ -28,6 +28,8 @@ default = ["std"]
 std = [
   "dep:argon2",
   "dep:chacha20poly1305",
+  "dep:tempfile",
+  "dep:tokio",
   "dep:zeroize",
   "miden-protocol/std",
   "miden-remote-prover-client/std",
@@ -42,7 +44,6 @@ tonic = []
 
 [dependencies]
 # Miden dependencies
-miden-mast-package         = { default-features = false, version = "0.20" }
 miden-protocol             = { workspace = true }
 miden-remote-prover-client = { default-features = false, features = ["tx-prover"], workspace = true }
 miden-standards            = { workspace = true }
@@ -62,7 +63,9 @@ prost-types      = { version = "0.14" }
 rand             = { workspace = true }
 serde            = { workspace = true }
 serde_json       = { version = "1.0" }
+tempfile         = { optional = true, version = "3.0" }
 thiserror        = { workspace = true }
+tokio            = { features = ["time"], optional = true, workspace = true }
 tonic            = { default-features = false, features = ["codegen"], version = "0.14" }
 tonic-health     = { version = "0.14" }
 tonic-prost      = { version = "0.14" }
@@ -72,6 +75,7 @@ zeroize          = { optional = true, version = "1.8" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom             = { features = ["wasm_js"], version = "0.3" }
+gloo-timers           = { features = ["futures"], version = "0.3" }
 tonic-web-wasm-client = { default-features = false, version = "0.9" }
 web-sys               = { features = ["Storage", "Window", "console"], version = "0.3" }
 

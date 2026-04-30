@@ -9,11 +9,39 @@ export async function insertBlockHeader(dbId, blockNum, header, partialBlockchai
             partialBlockchainPeaks,
             hasClientNotes: hasClientNotes.toString(),
         };
-        await db.blockHeaders.put(data);
+        // Mirror SQLite's `insert_block_header_tx`: do an INSERT OR IGNORE on the
+        // row, then explicitly upgrade `has_client_notes` to true if the caller
+        // says so. Two callers hit this:
+        //   - Genesis flow — no existing row; the add succeeds.
+        //   - `get_and_store_authenticated_block` for a past block — a row
+        //     written by `applyStateSync` typically already exists. Overwriting
+        //     it would clobber the correct historical peaks (popcount ==
+        //     block_num) with peaks from the caller's current `PartialMmr`
+        //     forest (popcount == current sync height). Later reads of those
+        //     peaks trip `MmrPeaks::new`'s InvalidPeaks validation and wedge
+        //     sync for the rest of the session.
+        //
+        // The `has_client_notes` upgrade is load-bearing: `get_tracked_block_
+        // header_numbers` filters by this flag to seed `tracked_leaves`, which
+        // `get_partial_blockchain_nodes(Forest)` relies on. A private-note
+        // import at a block previously synced as irrelevant must flip the flag
+        // to true or the auth paths won't be tracked.
+        await db.blockHeaders.add(data).catch(async (err) => {
+            if (!isConstraintError(err))
+                throw err;
+            if (hasClientNotes) {
+                await db.blockHeaders.update(blockNum, { hasClientNotes: "true" });
+            }
+        });
     }
     catch (err) {
         logWebStoreError(err);
     }
+}
+/** Detect Dexie's primary-key collision error across sync + bulk wrappings. */
+function isConstraintError(err) {
+    const e = err;
+    return e?.name === "ConstraintError" || e?.inner?.name === "ConstraintError";
 }
 export async function insertPartialBlockchainNodes(dbId, ids, nodes) {
     try {
@@ -82,6 +110,19 @@ export async function getTrackedBlockHeaders(dbId) {
         logWebStoreError(err, "Failed to get tracked block headers");
     }
 }
+export async function getTrackedBlockHeaderNumbers(dbId) {
+    try {
+        const db = getDatabase(dbId);
+        const blockNums = await db.blockHeaders
+            .where("hasClientNotes")
+            .equals("true")
+            .primaryKeys();
+        return blockNums;
+    }
+    catch (err) {
+        logWebStoreError(err, "Failed to get tracked block header numbers");
+    }
+}
 export async function getPartialBlockchainPeaksByBlockNum(dbId, blockNum) {
     try {
         const db = getDatabase(dbId);
@@ -137,19 +178,34 @@ export async function getPartialBlockchainNodesUpToInOrderIndex(dbId, maxInOrder
         logWebStoreError(err, "Failed to get partial blockchain nodes up to index");
     }
 }
-export async function pruneIrrelevantBlocks(dbId) {
+export async function pruneIrrelevantBlocks(dbId, blocksToUntrack, nodeIdsToRemove) {
     try {
         const db = getDatabase(dbId);
+        const numericNodeIds = nodeIdsToRemove.map(Number);
         const syncHeight = await db.stateSync.get(1);
         if (syncHeight == undefined) {
             throw Error("SyncHeight is undefined -- is the state sync table empty?");
         }
-        const allMatchingRecords = await db.blockHeaders
-            .where("hasClientNotes")
-            .equals("false")
-            .and((record) => record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum)
-            .toArray();
-        await db.blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
+        await db.dexie.transaction("rw", db.blockHeaders, db.partialBlockchainNodes, async () => {
+            // 1. Delete stale MMR authentication nodes.
+            if (numericNodeIds.length > 0) {
+                await db.partialBlockchainNodes.bulkDelete(numericNodeIds);
+            }
+            // 2. Mark untracked blocks as irrelevant.
+            if (blocksToUntrack.length > 0) {
+                await db.blockHeaders
+                    .where("blockNum")
+                    .anyOf(blocksToUntrack)
+                    .modify({ hasClientNotes: "false" });
+            }
+            // 3. Delete irrelevant block headers.
+            const allMatchingRecords = await db.blockHeaders
+                .where("hasClientNotes")
+                .equals("false")
+                .and((record) => record.blockNum !== 0 && record.blockNum !== syncHeight.blockNum)
+                .toArray();
+            await db.blockHeaders.bulkDelete(allMatchingRecords.map((r) => r.blockNum));
+        });
     }
     catch (err) {
         logWebStoreError(err, "Failed to prune irrelevant blocks");

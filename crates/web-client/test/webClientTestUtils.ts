@@ -46,7 +46,7 @@ export const mintTransaction = async (
       const targetAccountId = window.AccountId.fromHex(_targetAccountId);
       const faucetAccountId = window.AccountId.fromHex(_faucetAccountId);
 
-      const mintTransactionRequest = client.newMintTransactionRequest(
+      const mintTransactionRequest = await client.newMintTransactionRequest(
         targetAccountId,
         faucetAccountId,
         _publicNote ? window.NoteType.Public : window.NoteType.Private,
@@ -116,7 +116,7 @@ export const mintPublicTransaction = async (
       const targetAccountId = window.AccountId.fromHex(_targetAccountId);
       const faucetAccountId = window.AccountId.fromHex(_faucetAccountId);
 
-      const mintTransactionRequest = client.newMintTransactionRequest(
+      const mintTransactionRequest = await client.newMintTransactionRequest(
         targetAccountId,
         faucetAccountId,
         window.NoteType.Public,
@@ -205,7 +205,7 @@ export const sendTransaction = async (
       const targetAccountId = window.AccountId.fromHex(_targetAccountId);
       const faucetAccountId = window.AccountId.fromHex(_faucetAccountId);
 
-      let mintTransactionRequest = client.newMintTransactionRequest(
+      let mintTransactionRequest = await client.newMintTransactionRequest(
         senderAccountId,
         faucetAccountId,
         window.NoteType.Private,
@@ -248,7 +248,7 @@ export const sendTransaction = async (
           prover
         );
 
-      let sendTransactionRequest = client.newSendTransactionRequest(
+      let sendTransactionRequest = await client.newSendTransactionRequest(
         senderAccountId,
         targetAccountId,
         faucetAccountId,
@@ -351,7 +351,7 @@ export const swapTransaction = async (
 
       // Swap transaction
 
-      let swapTransactionRequest = client.newSwapTransactionRequest(
+      let swapTransactionRequest = await client.newSwapTransactionRequest(
         accountAId,
         assetAFaucetId,
         _assetAAmount,
@@ -933,13 +933,8 @@ export const syncState = async (testingPage: Page) => {
 };
 export const clearStore = async (page: Page) => {
   await page.evaluate(async () => {
-    // Open a connection to the list of databases
-    const databases = await indexedDB.databases();
-    for (const db of databases) {
-      // Delete each database by name
-      if (db.name) {
-        indexedDB.deleteDatabase(db.name);
-      }
+    if (window.storeName) {
+      indexedDB.deleteDatabase(window.storeName);
     }
   });
 };
@@ -996,14 +991,15 @@ export const getInputNotes = async (testingPage: Page) => {
 
 export const setupMintedNote = async (
   page: Page,
-  publicNote: boolean = false
+  publicNote: boolean = false,
+  withRemoteProver: boolean = false
 ) => {
   const { accountId, faucetId } = await setupWalletAndFaucet(page);
   const { createdNoteId } = await mintTransaction(
     page,
     accountId,
     faucetId,
-    undefined,
+    withRemoteProver,
     undefined,
     publicNote
   );

@@ -16,6 +16,14 @@ Sync state on creation (default: false).
 
 ***
 
+### debugMode?
+
+> `optional` **debugMode**: `boolean`
+
+Enable debug mode for transaction execution (default: false).
+
+***
+
 ### keystore?
 
 > `optional` **keystore**: `object`
@@ -42,9 +50,12 @@ signing to happen outside of WASM (e.g., in a remote HSM).
 
 ### noteTransportUrl?
 
-> `optional` **noteTransportUrl**: `string`
+> `optional` **noteTransportUrl**: `"testnet"` \| `"devnet"` \| `string` & `object`
 
-Note transport URL (optional).
+Note transport endpoint. Accepts shorthands or a raw URL:
+- `"testnet"` — Miden testnet transport (`https://transport.miden.io`)
+- `"devnet"` — Miden devnet transport (`https://transport.devnet.miden.io`)
+- any other string — treated as a raw note transport endpoint URL
 
 ***
 
@@ -65,17 +76,26 @@ Mutually exclusive with `keystore` — if both are provided, `keystore` takes pr
 
 ### proverUrl?
 
-> `optional` **proverUrl**: `string`
+> `optional` **proverUrl**: `"testnet"` \| `"devnet"` \| `"local"` \| `string` & `object`
 
-Auto-creates a remote prover from this URL.
+Prover to use for transactions. Accepts shorthands or a raw URL:
+- `"local"` — local (in-browser) prover
+- `"devnet"` — Miden devnet remote prover
+- `"testnet"` — Miden testnet remote prover
+- any other string — treated as a raw remote prover URL
 
 ***
 
 ### rpcUrl?
 
-> `optional` **rpcUrl**: `string`
+> `optional` **rpcUrl**: `"testnet"` \| `"devnet"` \| `"localhost"` \| `"local"` \| `string` & `object`
 
-RPC endpoint URL. Defaults to testnet RPC.
+RPC endpoint. Accepts shorthands or a raw URL:
+- `"testnet"` — Miden testnet RPC (`https://rpc.testnet.miden.io`)
+- `"devnet"` — Miden devnet RPC (`https://rpc.devnet.miden.io`)
+- `"localhost"` / `"local"` — local node (`http://localhost:57291`)
+- any other string — treated as a raw RPC endpoint URL
+Defaults to the SDK testnet RPC if omitted.
 
 ***
 

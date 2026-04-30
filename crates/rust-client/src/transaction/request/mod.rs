@@ -3,10 +3,12 @@
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
+use miden_protocol::assembly::SourceManagerSync;
 use miden_protocol::asset::{Asset, NonFungibleAsset};
 use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::store::MerkleStore;
@@ -18,20 +20,35 @@ use miden_protocol::errors::{
     TransactionInputError,
     TransactionScriptError,
 };
-use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteTag, PartialNote};
+use miden_protocol::note::{
+    Note,
+    NoteDetails,
+    NoteId,
+    NoteRecipient,
+    NoteScript,
+    NoteTag,
+    PartialNote,
+};
 use miden_protocol::transaction::{InputNote, InputNotes, TransactionArgs, TransactionScript};
 use miden_protocol::vm::AdviceMap;
 use miden_standards::account::interface::{AccountInterface, AccountInterfaceError};
 use miden_standards::code_builder::CodeBuilder;
 use miden_standards::errors::CodeBuilderError;
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+};
 use thiserror::Error;
 
 mod builder;
 pub use builder::{PaymentNoteDescription, SwapTransactionData, TransactionRequestBuilder};
 
 mod foreign;
-pub use foreign::{ForeignAccount, account_proof_into_inputs};
+pub use foreign::ForeignAccount;
+pub(crate) use foreign::account_proof_into_inputs;
 
 use crate::store::InputNoteRecord;
 
@@ -84,10 +101,10 @@ pub struct TransactionRequest {
     advice_map: AdviceMap,
     /// Initial state of the `MerkleStore` that provides data during runtime.
     merkle_store: MerkleStore,
-    /// Foreign account data requirements. At execution time, account data will be retrieved from
-    /// the network, and injected as advice inputs. Additionally, the account's code will be
-    /// added to the executor and prover.
-    foreign_accounts: BTreeSet<ForeignAccount>,
+    /// Foreign account data requirements keyed by account ID. At execution time, account data
+    /// will be retrieved from the network, and injected as advice inputs. Additionally, the
+    /// account's code will be added to the executor and prover.
+    foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
     /// The number of blocks in relation to the transaction's reference block after which the
     /// transaction will expire. If `None`, the transaction will not expire.
     expiration_delta: Option<u16>,
@@ -101,6 +118,10 @@ pub struct TransactionRequest {
     /// Optional [`Word`] that will be pushed to the stack for the authentication procedure
     /// during transaction execution.
     auth_arg: Option<Word>,
+    /// Note scripts that the node's NTX builder will need in its script registry.
+    ///
+    /// See [`TransactionRequestBuilder::expected_ntx_scripts`] for details.
+    expected_ntx_scripts: Vec<NoteScript>,
 }
 
 impl TransactionRequest {
@@ -118,7 +139,7 @@ impl TransactionRequest {
     }
 
     /// Returns the assets held by the transaction's input notes.
-    pub fn incoming_assets(&self) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {
+    pub fn incoming_assets(&self) -> (BTreeMap<AccountId, u64>, Vec<NonFungibleAsset>) {
         collect_assets(self.input_notes.iter().flat_map(|note| note.assets().iter()))
     }
 
@@ -185,8 +206,8 @@ impl TransactionRequest {
         &self.merkle_store
     }
 
-    /// Returns the IDs of the required foreign accounts for the transaction request.
-    pub fn foreign_accounts(&self) -> &BTreeSet<ForeignAccount> {
+    /// Returns the required foreign accounts keyed by account ID.
+    pub fn foreign_accounts(&self) -> &BTreeMap<AccountId, ForeignAccount> {
         &self.foreign_accounts
     }
 
@@ -203,6 +224,11 @@ impl TransactionRequest {
     /// Returns the auth argument for the transaction request.
     pub fn auth_arg(&self) -> &Option<Word> {
         &self.auth_arg
+    }
+
+    /// Returns the expected NTX scripts that the node's NTX builder will need in its registry.
+    pub fn expected_ntx_scripts(&self) -> &[NoteScript] {
+        &self.expected_ntx_scripts
     }
 
     /// Builds the [`InputNotes`] needed for the transaction execution.
@@ -290,17 +316,28 @@ impl TransactionRequest {
 
     /// Builds the transaction script based on the account capabilities and the transaction request.
     /// The debug mode enables the script debug logs.
+    ///
+    /// The provided `source_manager` is used when compiling scripts owned by the request (currently
+    /// the empty fallback script) so that any source information attached to the produced
+    /// [`TransactionScript`] is registered in the same source manager used by the executor. Scripts
+    /// supplied by the caller via [`TransactionScriptTemplate::CustomScript`] are expected to have
+    /// already been compiled against the client's source manager (e.g. via
+    /// [`Client::code_builder`](crate::Client::code_builder)).
     pub(crate) fn build_transaction_script(
         &self,
         account_interface: &AccountInterface,
+        source_manager: Arc<dyn SourceManagerSync>,
     ) -> Result<TransactionScript, TransactionRequestError> {
         match &self.script_template {
             Some(TransactionScriptTemplate::CustomScript(script)) => Ok(script.clone()),
             Some(TransactionScriptTemplate::SendNotes(notes)) => {
+                // TODO: We could pass `SourceManager` to this call, but it needs to be supported
+                // in the protocol struct (however, this should also not fail to build often)
                 Ok(account_interface.build_send_notes_script(notes, self.expiration_delta)?)
             },
             None => {
-                let empty_script = CodeBuilder::new().compile_tx_script("begin nop end")?;
+                let empty_script = CodeBuilder::with_source_manager(source_manager)
+                    .compile_tx_script("begin nop end")?;
 
                 Ok(empty_script)
             },
@@ -330,11 +367,13 @@ impl Serializable for TransactionRequest {
         self.expected_future_notes.write_into(target);
         self.advice_map.write_into(target);
         self.merkle_store.write_into(target);
-        self.foreign_accounts.write_into(target);
+        let foreign_accounts: Vec<_> = self.foreign_accounts.values().cloned().collect();
+        foreign_accounts.write_into(target);
         self.expiration_delta.write_into(target);
         target.write_u8(u8::from(self.ignore_invalid_input_notes));
         self.script_arg.write_into(target);
         self.auth_arg.write_into(target);
+        self.expected_ntx_scripts.write_into(target);
     }
 }
 
@@ -365,11 +404,15 @@ impl Deserializable for TransactionRequest {
 
         let advice_map = AdviceMap::read_from(source)?;
         let merkle_store = MerkleStore::read_from(source)?;
-        let foreign_accounts = BTreeSet::<ForeignAccount>::read_from(source)?;
+        let mut foreign_accounts = BTreeMap::new();
+        for foreign_account in Vec::<ForeignAccount>::read_from(source)? {
+            foreign_accounts.entry(foreign_account.account_id()).or_insert(foreign_account);
+        }
         let expiration_delta = Option::<u16>::read_from(source)?;
         let ignore_invalid_input_notes = source.read_u8()? == 1;
         let script_arg = Option::<Word>::read_from(source)?;
         let auth_arg = Option::<Word>::read_from(source)?;
+        let expected_ntx_scripts = Vec::<NoteScript>::read_from(source)?;
 
         Ok(TransactionRequest {
             input_notes,
@@ -384,6 +427,7 @@ impl Deserializable for TransactionRequest {
             ignore_invalid_input_notes,
             script_arg,
             auth_arg,
+            expected_ntx_scripts,
         })
     }
 }
@@ -394,9 +438,9 @@ impl Deserializable for TransactionRequest {
 /// Accumulates fungible totals and collectable non-fungible assets from an iterator of assets.
 pub(crate) fn collect_assets<'a>(
     assets: impl Iterator<Item = &'a Asset>,
-) -> (BTreeMap<AccountId, u64>, BTreeSet<NonFungibleAsset>) {
+) -> (BTreeMap<AccountId, u64>, Vec<NonFungibleAsset>) {
     let mut fungible_balance_map = BTreeMap::new();
-    let mut non_fungible_set = BTreeSet::new();
+    let mut non_fungible_set = Vec::new();
 
     assets.for_each(|asset| match asset {
         Asset::Fungible(fungible) => {
@@ -406,7 +450,9 @@ pub(crate) fn collect_assets<'a>(
                 .or_insert(fungible.amount());
         },
         Asset::NonFungible(non_fungible) => {
-            non_fungible_set.insert(*non_fungible);
+            if !non_fungible_set.contains(non_fungible) {
+                non_fungible_set.push(*non_fungible);
+            }
         },
     });
 
@@ -445,8 +491,6 @@ pub enum TransactionRequestError {
     InputNoteNotAuthenticated(NoteId),
     #[error("note {0} has already been consumed")]
     InputNoteAlreadyConsumed(NoteId),
-    #[error("internal error: own notes must contain full note data, not just a header")]
-    InvalidNoteVariant,
     #[error("sender account {0} is not tracked by this client or does not exist")]
     InvalidSenderAccount(AccountId),
     #[error("invalid transaction script")]
@@ -496,19 +540,18 @@ mod tests {
         StorageSlotName,
     };
     use miden_protocol::asset::FungibleAsset;
-    use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
+    use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
     use miden_protocol::note::{NoteAttachment, NoteTag, NoteType};
     use miden_protocol::testing::account_id::{
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
         ACCOUNT_ID_SENDER,
     };
-    use miden_protocol::transaction::OutputNote;
     use miden_protocol::{EMPTY_WORD, Felt, Word};
     use miden_standards::account::auth::AuthSingleSig;
     use miden_standards::note::P2idNote;
     use miden_standards::testing::account_component::MockAccountComponent;
-    use miden_tx::utils::{Deserializable, Serializable};
+    use miden_tx::utils::serde::{Deserializable, Serializable};
 
     use super::{TransactionRequest, TransactionRequestBuilder};
     use crate::rpc::domain::account::AccountStorageRequirements;
@@ -517,8 +560,11 @@ mod tests {
     #[test]
     fn transaction_request_serialization() {
         assert_transaction_request_serialization_with(|| {
-            AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthScheme::Falcon512Rpo)
-                .into()
+            AuthSingleSig::new(
+                PublicKeyCommitment::from(EMPTY_WORD),
+                AuthScheme::Falcon512Poseidon2,
+            )
+            .into()
         });
     }
 
@@ -538,7 +584,7 @@ mod tests {
         let target_id =
             AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
         let faucet_id = AccountId::try_from(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET).unwrap();
-        let mut rng = RpoRandomCoin::new(Word::default());
+        let mut rng = RandomCoin::new(Word::default());
 
         let mut notes = vec![];
         for i in 0..6 {
@@ -587,12 +633,10 @@ mod tests {
                 .unwrap(),
                 ForeignAccount::private(&account).unwrap(),
             ])
-            .own_output_notes(vec![
-                OutputNote::Full(notes.pop().unwrap()),
-                OutputNote::Partial(notes.pop().unwrap().into()),
-            ])
+            .own_output_notes(vec![notes.pop().unwrap(), notes.pop().unwrap()])
             .script_arg(rng.draw_word())
             .auth_arg(rng.draw_word())
+            .expected_ntx_scripts(vec![notes.first().unwrap().recipient().script().clone()])
             .build()
             .unwrap();
 

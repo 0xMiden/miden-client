@@ -48,6 +48,7 @@ import {
   Package,
   ProcedureThreshold,
   PublicKey,
+  Poseidon2,
   Rpo256,
   RpcClient,
   Signature,
@@ -60,7 +61,6 @@ import {
   TestUtils,
   TokenSymbol,
   TransactionFilter,
-  TransactionKernel,
   TransactionProver,
   TransactionRequest,
   TransactionStoreUpdate,
@@ -143,6 +143,7 @@ declare global {
     Package: typeof Package;
     ProcedureThreshold: typeof ProcedureThreshold;
     PublicKey: typeof PublicKey;
+    Poseidon2: typeof Poseidon2;
     Rpo256: typeof Rpo256;
     Signature: typeof Signature;
     SigningInputs: typeof SigningInputs;
@@ -154,7 +155,6 @@ declare global {
     TestUtils: typeof TestUtils;
     TokenSymbol: typeof TokenSymbol;
     TransactionFilter: typeof TransactionFilter;
-    TransactionKernel: typeof TransactionKernel;
     TransactionProver: typeof TransactionProver;
     TransactionRequest: typeof TransactionRequest;
     TransactionStoreUpdate: typeof TransactionStoreUpdate;

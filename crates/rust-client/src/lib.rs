@@ -135,7 +135,7 @@ mod test_utils;
 
 pub mod errors;
 
-pub use miden_protocol::utils::{Deserializable, Serializable, SliceReader};
+pub use miden_protocol::utils::serde::{Deserializable, Serializable, SliceReader};
 
 // RE-EXPORTS
 // ================================================================================================
@@ -212,7 +212,7 @@ pub mod auth {
 
     pub use crate::account::component::AuthScheme;
 
-    pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::Falcon512Rpo;
+    pub const RPO_FALCON_SCHEME_ID: AuthSchemeId = AuthSchemeId::Falcon512Poseidon2;
     pub const ECDSA_K256_KECCAK_SCHEME_ID: AuthSchemeId = AuthSchemeId::EcdsaK256Keccak;
 }
 
@@ -226,9 +226,14 @@ pub mod block {
 /// the `miden_standards` crate.
 pub mod crypto {
     pub mod rpo_falcon512 {
-        pub use miden_protocol::crypto::dsa::falcon512_rpo::{PublicKey, SecretKey, Signature};
+        pub use miden_protocol::crypto::dsa::falcon512_poseidon2::{
+            PublicKey,
+            SecretKey,
+            Signature,
+        };
     }
-    pub use miden_protocol::crypto::hash::blake::{Blake3_160, Blake3Digest};
+    pub use miden_protocol::crypto::hash::blake::Blake3Digest;
+    pub use miden_protocol::crypto::hash::poseidon2::Poseidon2;
     pub use miden_protocol::crypto::hash::rpo::Rpo256;
     pub use miden_protocol::crypto::merkle::mmr::{
         Forest,
@@ -255,7 +260,7 @@ pub mod crypto {
         NodeIndex,
         SparseMerklePath,
     };
-    pub use miden_protocol::crypto::rand::{FeltRng, RpoRandomCoin};
+    pub use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
 }
 
 /// Provides types for working with addresses within the Miden network.
@@ -272,20 +277,19 @@ pub mod address {
 
 /// Provides types for working with the virtual machine within the Miden network.
 pub mod vm {
-    // TODO: Remove this re-export once miden-protocol exposes PackageKind/ProcedureExport.
-    pub use miden_mast_package::{PackageKind, ProcedureExport};
     pub use miden_protocol::vm::{
         AdviceInputs,
         AdviceMap,
         AttributeSet,
-        MastArtifact,
         Package,
         PackageExport,
         PackageManifest,
+        ProcedureExport,
         Program,
         QualifiedProcedureName,
         Section,
         SectionId,
+        TargetType,
     };
 }
 
@@ -299,7 +303,6 @@ pub use miden_protocol::{
     MIN_TX_EXECUTION_CYCLES,
     ONE,
     PrettyPrint,
-    StarkField,
     Word,
     ZERO,
 };
@@ -321,6 +324,7 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
+use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::rand::FeltRng;
 use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
@@ -361,6 +365,10 @@ pub struct Client<AUTH> {
     exec_options: ExecutionOptions,
     /// Number of blocks after which pending transactions are considered stale and discarded.
     tx_discard_delta: Option<u32>,
+    /// Number of synced blocks between automatic irrelevant-block pruning runs.
+    irrelevant_block_prune_interval: Option<u32>,
+    /// Sync height at which the last automatic irrelevant-block prune completed.
+    last_irrelevant_block_prune_sync_height: Option<BlockNumber>,
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
@@ -409,11 +417,8 @@ where
     }
 
     /// Returns an instance of [`note::NoteScreener`] configured for this client.
-    pub fn note_screener(&self) -> note::NoteScreener<AUTH>
-    where
-        AUTH: Sync,
-    {
-        note::NoteScreener::new(self.store.clone(), self.authenticator.clone())
+    pub fn note_screener(&self) -> note::NoteScreener {
+        note::NoteScreener::new(self.store.clone(), self.rpc_api.clone())
     }
 
     /// Returns a reference to the client's random number generator. This can be used to generate
@@ -425,9 +430,25 @@ where
     pub fn prover(&self) -> Arc<dyn TransactionProver + Send + Sync> {
         self.tx_prover.clone()
     }
+
+    pub fn authenticator(&self) -> Option<&Arc<AUTH>> {
+        self.authenticator.as_ref()
+    }
+
+    /// Returns the shared source manager used to retain MASM source information for assembled
+    /// programs.
+    pub fn source_manager(&self) -> Arc<dyn SourceManagerSync> {
+        self.source_manager.clone()
+    }
 }
 
 impl<AUTH> Client<AUTH> {
+    /// Returns the identifier of the underlying store (e.g. `IndexedDB` database name, `SQLite`
+    /// file path).
+    pub fn store_identifier(&self) -> &str {
+        self.store.identifier()
+    }
+
     // LIMITS
     // --------------------------------------------------------------------------------------------
 

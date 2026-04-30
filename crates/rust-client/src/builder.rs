@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 
 use miden_protocol::assembly::{DefaultSourceManager, SourceManagerSync};
 use miden_protocol::block::BlockNumber;
-use miden_protocol::crypto::rand::RpoRandomCoin;
+use miden_protocol::crypto::rand::RandomCoin;
 use miden_protocol::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use miden_tx::{ExecutionOptions, LocalTransactionProver};
 use rand::Rng;
@@ -25,6 +25,8 @@ use crate::{Client, ClientError, ClientRng, ClientRngBox, DebugMode, grpc_suppor
 /// The default number of blocks after which pending transactions are considered stale and
 /// discarded.
 const TX_DISCARD_DELTA: u32 = 20;
+/// The default number of synced blocks between automatic irrelevant-block pruning runs.
+const IRRELEVANT_BLOCK_PRUNE_INTERVAL: u32 = 1;
 
 pub use grpc_support::*;
 
@@ -114,6 +116,9 @@ pub struct ClientBuilder<AUTH> {
     /// Number of blocks after which pending transactions are considered stale and discarded.
     /// If `None`, there is no limit and transactions will be kept indefinitely.
     tx_discard_delta: Option<u32>,
+    /// Number of synced blocks between automatic pruning runs for irrelevant block data.
+    /// If `None`, automatic irrelevant-block pruning is disabled.
+    irrelevant_block_prune_interval: Option<u32>,
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
@@ -137,6 +142,7 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             authenticator: None,
             in_debug_mode: DebugMode::Disabled,
             tx_discard_delta: Some(TX_DISCARD_DELTA),
+            irrelevant_block_prune_interval: Some(IRRELEVANT_BLOCK_PRUNE_INTERVAL),
             max_block_number_delta: None,
             note_transport_api: None,
             note_transport_config: None,
@@ -158,9 +164,10 @@ where
     /// Creates a `ClientBuilder` pre-configured for Miden testnet.
     ///
     /// This automatically configures:
-    /// - **RPC**: `https://rpc.testnet.miden.io`
-    /// - **Prover**: Remote prover at `https://tx-prover.testnet.miden.io`
-    /// - **Note transport**: `https://transport.miden.io`
+    /// - **RPC**: [`Endpoint::testnet()`]
+    /// - **Prover**: Remote prover at [`TESTNET_PROVER_ENDPOINT`]
+    /// - **Note transport**:
+    ///   [`NOTE_TRANSPORT_TESTNET_ENDPOINT`](crate::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT)
     ///
     /// You still need to provide:
     /// - A store (via `.store()`)
@@ -182,13 +189,16 @@ where
     pub fn for_testnet() -> Self {
         let endpoint = Endpoint::testnet();
         Self {
-            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(&endpoint, 10_000))),
+            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(
+                &endpoint,
+                DEFAULT_GRPC_TIMEOUT_MS,
+            ))),
             tx_prover: Some(Arc::new(RemoteTransactionProver::new(
                 TESTNET_PROVER_ENDPOINT.to_string(),
             ))),
             note_transport_config: Some(NoteTransportConfig {
-                endpoint: crate::note_transport::NOTE_TRANSPORT_DEFAULT_ENDPOINT.to_string(),
-                timeout_ms: NOTE_TRANSPORT_DEFAULT_TIMEOUT_MS,
+                endpoint: crate::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT.to_string(),
+                timeout_ms: DEFAULT_GRPC_TIMEOUT_MS,
             }),
             endpoint: Some(endpoint),
             ..Self::default()
@@ -198,10 +208,10 @@ where
     /// Creates a `ClientBuilder` pre-configured for Miden devnet.
     ///
     /// This automatically configures:
-    /// - **RPC**: `https://rpc.devnet.miden.io`
-    /// - **Prover**: Remote prover at `https://tx-prover.devnet.miden.io`
-    ///
-    /// Note transport is not configured by default for devnet.
+    /// - **RPC**: [`Endpoint::devnet()`]
+    /// - **Prover**: Remote prover at [`DEVNET_PROVER_ENDPOINT`]
+    /// - **Note transport**:
+    ///   [`NOTE_TRANSPORT_DEVNET_ENDPOINT`](crate::note_transport::NOTE_TRANSPORT_DEVNET_ENDPOINT)
     ///
     /// You still need to provide:
     /// - A store (via `.store()`)
@@ -223,10 +233,17 @@ where
     pub fn for_devnet() -> Self {
         let endpoint = Endpoint::devnet();
         Self {
-            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(&endpoint, 10_000))),
+            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(
+                &endpoint,
+                DEFAULT_GRPC_TIMEOUT_MS,
+            ))),
             tx_prover: Some(Arc::new(RemoteTransactionProver::new(
                 DEVNET_PROVER_ENDPOINT.to_string(),
             ))),
+            note_transport_config: Some(NoteTransportConfig {
+                endpoint: crate::note_transport::NOTE_TRANSPORT_DEVNET_ENDPOINT.to_string(),
+                timeout_ms: DEFAULT_GRPC_TIMEOUT_MS,
+            }),
             endpoint: Some(endpoint),
             ..Self::default()
         }
@@ -260,7 +277,10 @@ where
     pub fn for_localhost() -> Self {
         let endpoint = Endpoint::localhost();
         Self {
-            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(&endpoint, 10_000))),
+            rpc_api: Some(Arc::new(crate::rpc::GrpcClient::new(
+                &endpoint,
+                DEFAULT_GRPC_TIMEOUT_MS,
+            ))),
             endpoint: Some(endpoint),
             ..Self::default()
         }
@@ -295,8 +315,10 @@ where
     #[must_use]
     #[cfg(feature = "tonic")]
     pub fn grpc_client(mut self, endpoint: &crate::rpc::Endpoint, timeout_ms: Option<u64>) -> Self {
-        self.rpc_api =
-            Some(Arc::new(crate::rpc::GrpcClient::new(endpoint, timeout_ms.unwrap_or(10_000))));
+        self.rpc_api = Some(Arc::new(crate::rpc::GrpcClient::new(
+            endpoint,
+            timeout_ms.unwrap_or(DEFAULT_GRPC_TIMEOUT_MS),
+        )));
         self
     }
 
@@ -339,6 +361,16 @@ where
     #[must_use]
     pub fn tx_discard_delta(mut self, delta: Option<u32>) -> Self {
         self.tx_discard_delta = delta;
+        self
+    }
+
+    /// Sets the number of synced blocks between automatic irrelevant-block pruning runs.
+    ///
+    /// Values defer pruning until the client has advanced by at least that many sync blocks since
+    /// the last prune. `None` disables automatic pruning entirely.
+    #[must_use]
+    pub fn irrelevant_block_prune_interval(mut self, interval: Option<u32>) -> Self {
+        self.irrelevant_block_prune_interval = interval;
         self
     }
 
@@ -412,7 +444,7 @@ where
         } else {
             let mut seed_rng = rand::rng();
             let coin_seed: [u64; 4] = seed_rng.random();
-            Box::new(RpoRandomCoin::new(coin_seed.map(Felt::new).into()))
+            Box::new(RandomCoin::new(coin_seed.map(Felt::new).into()))
         };
 
         // Set default prover if not provided
@@ -435,21 +467,10 @@ where
         if self.note_transport_api.is_none()
             && let Some(config) = self.note_transport_config
         {
-            #[cfg(not(target_arch = "wasm32"))]
-            let transport = crate::note_transport::grpc::GrpcNoteTransportClient::connect(
+            let transport = crate::note_transport::grpc::GrpcNoteTransportClient::new(
                 config.endpoint,
                 config.timeout_ms,
-            )
-            .await
-            .map_err(|e| {
-                ClientError::ClientInitializationError(format!(
-                    "Failed to connect to note transport: {e}"
-                ))
-            })?;
-
-            #[cfg(target_arch = "wasm32")]
-            let transport =
-                crate::note_transport::grpc::GrpcNoteTransportClient::new(config.endpoint);
+            );
 
             self.note_transport_api = Some(Arc::new(transport) as Arc<dyn NoteTransportClient>);
         }
@@ -468,11 +489,14 @@ where
             exec_options: ExecutionOptions::new(
                 Some(MAX_TX_EXECUTION_CYCLES),
                 MIN_TX_EXECUTION_CYCLES,
+                ExecutionOptions::DEFAULT_CORE_TRACE_FRAGMENT_SIZE,
                 false,
                 self.in_debug_mode.into(),
             )
             .expect("Default executor's options should always be valid"),
             tx_discard_delta: self.tx_discard_delta,
+            irrelevant_block_prune_interval: self.irrelevant_block_prune_interval,
+            last_irrelevant_block_prune_sync_height: None,
             max_block_number_delta: self.max_block_number_delta,
             note_transport_api: self.note_transport_api.clone(),
         })

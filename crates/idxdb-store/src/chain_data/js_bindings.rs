@@ -16,6 +16,9 @@ extern "C" {
     #[wasm_bindgen(js_name = getTrackedBlockHeaders)]
     pub fn idxdb_get_tracked_block_headers(db_id: &str) -> js_sys::Promise;
 
+    #[wasm_bindgen(js_name = getTrackedBlockHeaderNumbers)]
+    pub fn idxdb_get_tracked_block_header_numbers(db_id: &str) -> js_sys::Promise;
+
     #[wasm_bindgen(js_name = getPartialBlockchainNodesAll)]
     pub fn idxdb_get_partial_blockchain_nodes_all(db_id: &str) -> js_sys::Promise;
 
@@ -57,5 +60,9 @@ extern "C" {
     // ================================================================================================
 
     #[wasm_bindgen(js_name = pruneIrrelevantBlocks)]
-    pub fn idxdb_prune_irrelevant_blocks(db_id: &str) -> js_sys::Promise;
+    pub fn idxdb_prune_irrelevant_blocks(
+        db_id: &str,
+        blocks_to_untrack: Vec<u32>,
+        node_ids_to_remove: Vec<String>,
+    ) -> js_sys::Promise;
 }

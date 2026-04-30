@@ -6,8 +6,7 @@ import {
   NoteAssets,
   NoteAttachment,
   NoteType,
-  OutputNote,
-  OutputNoteArray,
+  NoteArray,
   TransactionRequestBuilder,
 } from "@miden-sdk/miden-sdk";
 import type { SendOptions, SendResult, TransactionStage } from "../types";
@@ -18,6 +17,8 @@ import { createNoteAttachment } from "../utils/noteAttachment";
 import { MidenError } from "../utils/errors";
 import { getNoteType, waitForTransactionCommit } from "../utils/noteFilters";
 import type { ClientWithTransactions } from "../utils/noteFilters";
+import { proveWithFallback } from "../utils/prover";
+import { useMidenStore } from "../store/MidenStore";
 
 export interface UseSendResult {
   /** Send tokens from one account to another */
@@ -165,10 +166,12 @@ export function useSend(): UseSendResult {
               new NoteAttachment()
             );
 
+            // NoteArray constructor consumes its elements; use push(&note)
+            // to keep `p2idNote` valid so the caller can use the returned Note.
+            const ownOutputs = new NoteArray();
+            ownOutputs.push(p2idNote);
             const txRequest = new TransactionRequestBuilder()
-              .withOwnOutputNotes(
-                new OutputNoteArray([OutputNote.full(p2idNote)])
-              )
+              .withOwnOutputNotes(ownOutputs)
               .build();
 
             const execFromId = parseAccountId(options.from);
@@ -215,10 +218,10 @@ export function useSend(): UseSendResult {
               attachment
             );
             txRequest = new TransactionRequestBuilder()
-              .withOwnOutputNotes(new OutputNoteArray([OutputNote.full(note)]))
+              .withOwnOutputNotes(new NoteArray([note]))
               .build();
           } else {
-            txRequest = client.newSendTransactionRequest(
+            txRequest = await client.newSendTransactionRequest(
               fromAccountId,
               toAccountId,
               assetIdObj,
@@ -236,8 +239,13 @@ export function useSend(): UseSendResult {
         });
 
         setStage("proving");
-        const provenTransaction = await runExclusiveSafe(() =>
-          client.proveTransaction(txResult, prover ?? undefined)
+        const proverConfig = useMidenStore.getState().config;
+        const provenTransaction = await proveWithFallback(
+          (resolvedProver) =>
+            runExclusiveSafe(() =>
+              client.proveTransaction(txResult, resolvedProver)
+            ),
+          proverConfig
         );
 
         setStage("submitting");

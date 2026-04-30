@@ -29,7 +29,7 @@
 //! # use miden_client::auth::TransactionAuthenticator;
 //! # use miden_client::sync::SyncSummary;
 //! # use miden_client::{Client, ClientError};
-//! # use miden_protocol::{block::BlockHeader, Felt, Word, StarkField};
+//! # use miden_protocol::{block::BlockHeader, Felt, Word};
 //! # use miden_protocol::crypto::rand::FeltRng;
 //! # async fn run_sync<AUTH: TransactionAuthenticator + Sync + 'static>(client: &mut Client<AUTH>) -> Result<(), ClientError> {
 //! // Attempt to synchronize the client's state with the Miden network.
@@ -55,6 +55,7 @@
 //! `committed_note_updates` and `consumed_note_updates`) to understand how the sync data is
 //! processed and applied to the local store.
 
+use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::max;
@@ -64,7 +65,7 @@ use miden_protocol::block::BlockNumber;
 use miden_protocol::note::NoteId;
 use miden_protocol::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
-use miden_tx::utils::{Deserializable, DeserializationError, Serializable};
+use miden_tx::utils::serde::{Deserializable, DeserializationError, Serializable};
 use tracing::{debug, info};
 
 use crate::store::{NoteFilter, TransactionFilter};
@@ -81,6 +82,7 @@ mod state_sync_update;
 pub use state_sync_update::{
     AccountUpdates,
     BlockUpdates,
+    PublicAccountUpdate,
     StateSyncUpdate,
     TransactionUpdateTracker,
 };
@@ -131,8 +133,12 @@ where
 
         // Build sync state components
         let note_screener = self.note_screener();
-        let state_sync =
-            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
+        let state_sync = StateSync::new(
+            self.rpc_api.clone(),
+            Some(self.store.clone()),
+            Arc::new(note_screener),
+            self.tx_discard_delta,
+        );
         let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
         let input = self.build_sync_input().await?;
 
@@ -149,8 +155,7 @@ where
             .await
             .map_err(ClientError::StoreError)?;
 
-        // Remove irrelevant block headers
-        self.store.prune_irrelevant_blocks().await?;
+        self.maybe_untrack_and_prune_irrelevant_blocks().await?;
 
         Ok(sync_summary)
     }
@@ -165,7 +170,7 @@ where
             .get_account_headers()
             .await?
             .into_iter()
-            .map(|(acc_header, _)| acc_header)
+            .map(|(header, _status)| header)
             .collect();
 
         let note_tags = self.store.get_unique_note_tags().await?;
@@ -185,14 +190,86 @@ where
         })
     }
 
-    /// Applies the state sync update to the store and prunes the irrelevant block headers.
+    /// Applies the state sync update to the store and prunes irrelevant blocks according to the
+    /// configured cadence.
     ///
     /// See [`crate::Store::apply_state_sync()`] for what the update implies.
     pub async fn apply_state_sync(&mut self, update: StateSyncUpdate) -> Result<(), ClientError> {
         self.store.apply_state_sync(update).await?;
 
-        // Remove irrelevant block headers
-        self.store.prune_irrelevant_blocks().await?;
+        self.maybe_untrack_and_prune_irrelevant_blocks().await?;
+
+        Ok(())
+    }
+
+    /// Prunes irrelevant blocks and their MMR authentication nodes according to the configured
+    /// cadence.
+    async fn maybe_untrack_and_prune_irrelevant_blocks(&mut self) -> Result<(), ClientError> {
+        let Some(interval) = self.irrelevant_block_prune_interval else {
+            return Ok(());
+        };
+
+        let sync_height = self.store.get_sync_height().await?;
+
+        // Check if we've exceeded the prune interval, early return if we haven't.
+        if let Some(last_prune_height) = self.last_irrelevant_block_prune_sync_height
+            && sync_height < last_prune_height + interval
+        {
+            return Ok(());
+        }
+
+        self.untrack_and_prune_irrelevant_blocks().await?;
+        self.last_irrelevant_block_prune_sync_height = Some(sync_height);
+
+        Ok(())
+    }
+
+    /// Prunes irrelevant block data from the store.
+    ///
+    /// Identifies tracked blocks whose input notes have all been consumed, untracks them from the
+    /// `PartialMmr` to determine which authentication nodes are no longer needed, then delegates
+    /// to [`Store::untrack_and_prune_irrelevant_blocks`] to atomically remove the stale nodes,
+    /// mark the blocks as irrelevant, and delete irrelevant block headers.
+    async fn untrack_and_prune_irrelevant_blocks(&self) -> Result<(), ClientError> {
+        let tracked_blocks = self.store.get_tracked_block_header_numbers().await?;
+        let to_untrack: Vec<usize> = if tracked_blocks.is_empty() {
+            // Do not early-return: even without blocks to untrack, old irrelevant tip headers may
+            // need pruning.
+            Vec::new()
+        } else {
+            // Blocks that still have at least one unspent note need to stay tracked.
+            let unspent_notes = self.store.get_input_notes(NoteFilter::Unspent).await?;
+            let live_blocks: BTreeSet<usize> = unspent_notes
+                .iter()
+                .filter_map(|n| n.inclusion_proof().map(|p| p.location().block_num().as_usize()))
+                .collect();
+
+            tracked_blocks.difference(&live_blocks).copied().collect()
+        };
+
+        let mut blocks_to_untrack = Vec::new();
+        let mut nodes_to_remove = Vec::new();
+
+        if !to_untrack.is_empty() {
+            // Rebuild the PartialMmr and untrack each block to collect the authentication node
+            // indices that are no longer needed by any remaining tracked leaf.
+            let mut partial_mmr = self.store.get_current_partial_mmr().await?;
+            for &block_pos in &to_untrack {
+                nodes_to_remove
+                    .extend(partial_mmr.untrack(block_pos).into_iter().map(|(idx, _)| idx));
+            }
+
+            blocks_to_untrack = to_untrack
+                .iter()
+                .map(|&b| BlockNumber::from(u32::try_from(b).expect("block number fits in u32")))
+                .collect();
+        }
+
+        // Store deletes stale auth nodes, marks blocks as irrelevant, and removes irrelevant
+        // block headers. Old irrelevant tip headers may still need pruning.
+        self.store
+            .untrack_and_prune_irrelevant_blocks(&blocks_to_untrack, &nodes_to_remove)
+            .await?;
 
         Ok(())
     }
@@ -286,7 +363,7 @@ impl SyncSummary {
 }
 
 impl Serializable for SyncSummary {
-    fn write_into<W: miden_tx::utils::ByteWriter>(&self, target: &mut W) {
+    fn write_into<W: miden_tx::utils::serde::ByteWriter>(&self, target: &mut W) {
         self.block_num.write_into(target);
         self.new_public_notes.write_into(target);
         self.committed_notes.write_into(target);
@@ -298,7 +375,7 @@ impl Serializable for SyncSummary {
 }
 
 impl Deserializable for SyncSummary {
-    fn read_from<R: miden_tx::utils::ByteReader>(
+    fn read_from<R: miden_tx::utils::serde::ByteReader>(
         source: &mut R,
     ) -> Result<Self, DeserializationError> {
         let block_num = BlockNumber::read_from(source)?;

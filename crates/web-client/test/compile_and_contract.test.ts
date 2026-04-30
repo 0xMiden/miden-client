@@ -245,6 +245,162 @@ test.describe("compile.txScript()", () => {
 });
 
 // ════════════════════════════════════════════════════════════════
+// compile.noteScript()
+// ════════════════════════════════════════════════════════════════
+
+// Minimal valid note script — exercises the compile path without depending
+// on runtime note-script semantics.
+const RECEIVE_NOTE_SCRIPT = `
+  use miden::core::sys
+  begin
+    exec.sys::truncate_stack
+  end
+`;
+
+test.describe("compile.noteScript()", () => {
+  test("compiles a script without libraries", async ({ page }) => {
+    const result = await page.evaluate(
+      async ({ code }) => {
+        const client = await window.MidenClient.createMock();
+        const script = await client.compile.noteScript({ code });
+        return {
+          isDefined: script != null,
+          serializedLen: script?.serialize().length ?? 0,
+        };
+      },
+      { code: RECEIVE_NOTE_SCRIPT }
+    );
+
+    expect(result.isDefined).toBe(true);
+    expect(result.serializedLen).toBeGreaterThan(0);
+  });
+
+  test("compiles a script with a dynamic library", async ({ page }) => {
+    const result = await page.evaluate(
+      async ({ counterCode }) => {
+        const client = await window.MidenClient.createMock();
+        const script = await client.compile.noteScript({
+          code: `
+            use external_contract::counter_contract
+            use miden::core::sys
+            begin
+              call.counter_contract::increment_count
+              exec.sys::truncate_stack
+            end
+          `,
+          libraries: [
+            {
+              namespace: "external_contract::counter_contract",
+              code: counterCode,
+            },
+          ],
+        });
+        return { isDefined: script != null };
+      },
+      { counterCode: COUNTER_CODE }
+    );
+
+    expect(result.isDefined).toBe(true);
+  });
+
+  test("Linking enum and raw strings are interchangeable", async ({ page }) => {
+    const result = await page.evaluate(
+      async ({ counterCode }) => {
+        const client = await window.MidenClient.createMock();
+        const { Linking } = window as any;
+
+        const scriptEnum = await client.compile.noteScript({
+          code: `
+            use external_contract::counter_contract
+            use miden::core::sys
+            begin
+              call.counter_contract::increment_count
+              exec.sys::truncate_stack
+            end
+          `,
+          libraries: [
+            {
+              namespace: "external_contract::counter_contract",
+              code: counterCode,
+              linking: Linking.Dynamic,
+            },
+          ],
+        });
+
+        const scriptStr = await client.compile.noteScript({
+          code: `
+            use external_contract::counter_contract
+            use miden::core::sys
+            begin
+              call.counter_contract::increment_count
+              exec.sys::truncate_stack
+            end
+          `,
+          libraries: [
+            {
+              namespace: "external_contract::counter_contract",
+              code: counterCode,
+              linking: "dynamic",
+            },
+          ],
+        });
+
+        return {
+          enumOk: scriptEnum != null,
+          strOk: scriptStr != null,
+        };
+      },
+      { counterCode: COUNTER_CODE }
+    );
+
+    expect(result.enumOk).toBe(true);
+    expect(result.strOk).toBe(true);
+  });
+
+  test("each call uses a fresh builder — libraries from prior calls do not leak", async ({
+    page,
+  }) => {
+    const result = await page.evaluate(
+      async ({ counterCode, plainCode }) => {
+        const client = await window.MidenClient.createMock();
+
+        // First call: link counter_contract
+        const scriptWithLib = await client.compile.noteScript({
+          code: `
+            use external_contract::counter_contract
+            use miden::core::sys
+            begin
+              call.counter_contract::increment_count
+              exec.sys::truncate_stack
+            end
+          `,
+          libraries: [
+            {
+              namespace: "external_contract::counter_contract",
+              code: counterCode,
+            },
+          ],
+        });
+
+        // Second call: no libraries — must compile independently
+        const scriptNoLib = await client.compile.noteScript({
+          code: plainCode,
+        });
+
+        return {
+          firstOk: scriptWithLib != null,
+          secondOk: scriptNoLib != null,
+        };
+      },
+      { counterCode: COUNTER_CODE, plainCode: RECEIVE_NOTE_SCRIPT }
+    );
+
+    expect(result.firstOk).toBe(true);
+    expect(result.secondOk).toBe(true);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
 // accounts.create() — contract types
 // ════════════════════════════════════════════════════════════════
 
@@ -487,7 +643,7 @@ test.describe("transactions.execute()", () => {
         });
 
         // Execute the transaction
-        const txId = await client.transactions.execute({
+        const { txId } = await client.transactions.execute({
           account: account.id(),
           script,
         });
@@ -549,11 +705,10 @@ test.describe("transactions.execute()", () => {
         const updated = await client.accounts.get(account.id());
         const countWord = updated?.storage().getItem(slotName);
 
-        // The counter word is stored little-endian; extract the value from the last 8 hex chars
-        const countHex = countWord?.toHex() ?? "";
-        const countValue = Number(
-          BigInt("0x" + countHex.slice(-16).match(/../g).reverse().join(""))
-        );
+        // The counter is stored in the first felt of the word
+        const countValue = countWord
+          ? Number(countWord.toFelts()[0].asInt())
+          : 0;
 
         return { countValue };
       },
@@ -610,7 +765,7 @@ test.describe("transactions.execute()", () => {
         });
 
         // The key assertion: passing { id: foreignContract.id() } works
-        const txId = await client.transactions.execute({
+        const { txId } = await client.transactions.execute({
           account: wallet.id(),
           script,
           foreignAccounts: [{ id: foreignContract.id() }],
@@ -664,7 +819,7 @@ test.describe("transactions.execute()", () => {
         });
 
         // Pass the AccountId directly (not wrapped in { id })
-        const txId = await client.transactions.execute({
+        const { txId } = await client.transactions.execute({
           account: wallet.id(),
           script,
           foreignAccounts: [foreignContract.id()],
@@ -677,5 +832,85 @@ test.describe("transactions.execute()", () => {
 
     expect(result.txHex).toBeDefined();
     expect(result.txHex.length).toBeGreaterThan(0);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// transactions.executeProgram()
+// ════════════════════════════════════════════════════════════════
+
+test.describe("transactions.executeProgram()", () => {
+  test("reads updated state after a mutating transaction", async ({ page }) => {
+    const result = await page.evaluate(
+      async ({ code, slotName }) => {
+        const client = await window.MidenClient.createMock();
+
+        const component = await client.compile.component({
+          code,
+          slots: [window.StorageSlot.emptyValue(slotName)],
+        });
+
+        const seed = new Uint8Array(32);
+        seed.fill(0x60);
+        const auth = window.AuthSecretKey.rpoFalconWithRNG(seed);
+
+        const account = await client.accounts.create({
+          type: "ImmutableContract",
+          storage: "public",
+          seed,
+          auth,
+          components: [component],
+        });
+
+        client.proveBlock();
+        await client.sync();
+
+        // Increment the counter
+        const incrScript = await client.compile.txScript({
+          code: `
+            use external_contract::counter_contract
+            begin
+              call.counter_contract::increment_count
+            end
+          `,
+          libraries: [
+            { namespace: "external_contract::counter_contract", code },
+          ],
+        });
+
+        await client.transactions.execute({
+          account: account.id(),
+          script: incrScript,
+        });
+
+        client.proveBlock();
+        await client.sync();
+
+        // Now read the count via executeProgram — should be 1
+        const readScript = await client.compile.txScript({
+          code: `
+            use external_contract::counter_contract
+            begin
+              call.counter_contract::get_count
+            end
+          `,
+          libraries: [
+            { namespace: "external_contract::counter_contract", code },
+          ],
+        });
+
+        const feltArray = await client.transactions.executeProgram({
+          account: account.id(),
+          script: readScript,
+        });
+
+        const count = feltArray.get(0).asInt();
+
+        return { count: count.toString() };
+      },
+      { code: COUNTER_CODE, slotName: COUNTER_SLOT_NAME }
+    );
+
+    expect(result.count).toBe("1");
   });
 });

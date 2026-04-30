@@ -26,7 +26,7 @@
 
 ### compile
 
-> `readonly` **compile**: [`CompilerResource`](../interfaces/CompilerResource.md)
+> `readonly` **compile**: [`CompilerResource`](CompilerResource.md)
 
 ***
 
@@ -35,6 +35,12 @@
 > `readonly` **defaultProver**: [`TransactionProver`](TransactionProver.md)
 
 Returns the client-level default prover.
+
+***
+
+### keystore
+
+> `readonly` **keystore**: [`KeystoreResource`](../interfaces/KeystoreResource.md)
 
 ***
 
@@ -82,18 +88,6 @@ Returns the client-level default prover.
 
 ***
 
-### exportStore()
-
-> **exportStore**(): `Promise`\<[`StoreSnapshot`](../interfaces/StoreSnapshot.md)\>
-
-Exports the client store as a versioned snapshot.
-
-#### Returns
-
-`Promise`\<[`StoreSnapshot`](../interfaces/StoreSnapshot.md)\>
-
-***
-
 ### getSyncHeight()
 
 > **getSyncHeight**(): `Promise`\<`number`\>
@@ -106,17 +100,11 @@ Returns the current sync height.
 
 ***
 
-### importStore()
+### proveBlock()
 
-> **importStore**(`snapshot`): `Promise`\<`void`\>
+> **proveBlock**(): `Promise`\<`void`\>
 
-Imports a previously exported store snapshot.
-
-#### Parameters
-
-##### snapshot
-
-[`StoreSnapshot`](../interfaces/StoreSnapshot.md)
+Advances the mock chain by one block. Only available on mock clients.
 
 #### Returns
 
@@ -124,39 +112,39 @@ Imports a previously exported store snapshot.
 
 ***
 
-### proveBlock()
-
-> **proveBlock**(): `void`
-
-Advances the mock chain by one block. Only available on mock clients.
-
-#### Returns
-
-`void`
-
-***
-
 ### serializeMockChain()
 
-> **serializeMockChain**(): `Uint8Array`
+> **serializeMockChain**(): `Promise`\<`Uint8Array`\>
 
 Serializes the mock chain state for snapshot/restore in tests.
 
 #### Returns
 
-`Uint8Array`
+`Promise`\<`Uint8Array`\>
 
 ***
 
 ### serializeMockNoteTransportNode()
 
-> **serializeMockNoteTransportNode**(): `Uint8Array`
+> **serializeMockNoteTransportNode**(): `Promise`\<`Uint8Array`\>
 
 Serializes the mock note transport node state.
 
 #### Returns
 
-`Uint8Array`
+`Promise`\<`Uint8Array`\>
+
+***
+
+### storeIdentifier()
+
+> **storeIdentifier**(): `Promise`\<`string`\>
+
+Returns the identifier of the underlying store (e.g. IndexedDB database name, file path).
+
+#### Returns
+
+`Promise`\<`string`\>
 
 ***
 
@@ -222,6 +210,24 @@ Creates and initializes a new MidenClient.
 
 ***
 
+### createDevnet()
+
+> `static` **createDevnet**(`options?`): `Promise`\<`MidenClient`\>
+
+Creates a client preconfigured for devnet (rpc, prover, note transport, autoSync).
+
+#### Parameters
+
+##### options?
+
+[`ClientOptions`](../interfaces/ClientOptions.md)
+
+#### Returns
+
+`Promise`\<`MidenClient`\>
+
+***
+
 ### createMock()
 
 > `static` **createMock**(`options?`): `Promise`\<`MidenClient`\>
@@ -244,7 +250,7 @@ Creates a mock client for testing.
 
 > `static` **createTestnet**(`options?`): `Promise`\<`MidenClient`\>
 
-Creates a client preconfigured for testnet use. Defaults to autoSync: true.
+Creates a client preconfigured for testnet (rpc, prover, note transport, autoSync).
 
 #### Parameters
 

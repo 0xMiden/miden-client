@@ -12,7 +12,7 @@
 //!
 //! ```rust
 //! # use miden_client::{
-//! #   account::{Account, AccountBuilder, AccountType, component::BasicWallet},
+//! #   account::{Account, AccountBuilder, AccountBuilderSchemaCommitmentExt, AccountType, component::BasicWallet},
 //! #   crypto::FeltRng
 //! # };
 //! # use miden_protocol::account::AccountStorageMode;
@@ -24,7 +24,7 @@
 //!     .account_type(AccountType::RegularAccountImmutableCode)
 //!     .storage_mode(AccountStorageMode::Private)
 //!     .with_component(BasicWallet)
-//!     .build()?;
+//!     .build_with_schema_commitment()?;
 //!
 //! // Add the account to the client. The account already embeds its seed information.
 //! client.add_account(&account, false).await?;
@@ -36,6 +36,7 @@
 
 use alloc::vec::Vec;
 
+use miden_protocol::Felt;
 use miden_protocol::account::auth::PublicKey;
 pub use miden_protocol::account::{
     Account,
@@ -70,6 +71,7 @@ use miden_protocol::note::NoteTag;
 
 mod account_reader;
 pub use account_reader::AccountReader;
+pub use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::auth::AuthSingleSig;
 // RE-EXPORTS
 // ================================================================================================
@@ -77,7 +79,6 @@ pub use miden_standards::account::interface::AccountInterfaceExt;
 use miden_standards::account::wallets::BasicWallet;
 
 use super::Client;
-use crate::auth::AuthSchemeId;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::rpc::node::{EndpointError, GetAccountError};
@@ -89,9 +90,14 @@ pub mod component {
 
     pub use miden_protocol::account::auth::*;
     pub use miden_protocol::account::component::{
+        FeltSchema,
         InitStorageData,
+        SchemaType,
+        StorageSchema,
         StorageSlotSchema,
         StorageValueName,
+        ValueSlotSchema,
+        WordSchema,
     };
     pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
     pub use miden_standards::account::auth::*;
@@ -103,9 +109,18 @@ pub mod component {
         no_auth_library,
         singlesig_acl_library,
         singlesig_library,
-        storage_schema_library,
     };
-    pub use miden_standards::account::faucets::{BasicFungibleFaucet, NetworkFungibleFaucet};
+    pub use miden_standards::account::faucets::{
+        BasicFungibleFaucet,
+        NetworkFungibleFaucet,
+        TokenMetadata,
+    };
+    pub use miden_standards::account::mint_policies::{
+        AuthControlled,
+        AuthControlledInitConfig,
+        OwnerControlled,
+        OwnerControlledInitConfig,
+    };
     pub use miden_standards::account::wallets::BasicWallet;
 }
 
@@ -116,7 +131,10 @@ pub mod component {
 ///
 /// - **Account creation:** Use the [`AccountBuilder`] to construct new accounts, specifying account
 ///   type, storage mode (public/private), and attaching necessary components (e.g., basic wallet or
-///   fungible faucet). After creation, they can be added to the client.
+///   fungible faucet). Prefer [`AccountBuilderSchemaCommitmentExt::build_with_schema_commitment`]
+///   so the account includes merged storage schema commitment metadata; use plain
+///   [`AccountBuilder::build`] only when you need to opt out. After creation, accounts can be added
+///   to the client.
 ///
 /// - **Account tracking:** Accounts added via the client are persisted to the local store, where
 ///   their state (including nonce, balance, and metadata) is updated upon every synchronization
@@ -189,7 +207,7 @@ impl<AUTH> Client<AUTH> {
                     return Err(ClientError::AccountAlreadyTracked(account.id()));
                 }
 
-                if tracked_account.nonce().as_int() > account.nonce().as_int() {
+                if tracked_account.nonce().as_canonical_u64() > account.nonce().as_canonical_u64() {
                     // If the new account is older than the one being tracked, return an error
                     return Err(ClientError::AccountNonceTooLow);
                 }
@@ -387,6 +405,21 @@ impl<AUTH> Client<AUTH> {
     pub fn account_reader(&self, account_id: AccountId) -> AccountReader {
         AccountReader::new(self.store.clone(), account_id)
     }
+
+    /// Prunes historical account states for the specified account up to the given nonce.
+    ///
+    /// Deletes all historical entries with `replaced_at_nonce <= up_to_nonce` and any
+    /// orphaned account code.
+    ///
+    /// Returns the total number of rows deleted, including historical entries and orphaned
+    /// account code.
+    pub async fn prune_account_history(
+        &self,
+        account_id: AccountId,
+        up_to_nonce: Felt,
+    ) -> Result<usize, ClientError> {
+        Ok(self.store.prune_account_history(account_id, up_to_nonce).await?)
+    }
 }
 
 // UTILITY FUNCTIONS
@@ -421,29 +454,53 @@ pub fn build_wallet_id(
     };
 
     let auth_scheme = public_key.auth_scheme();
-    let auth_component = match auth_scheme {
-        AuthSchemeId::Falcon512Rpo => {
-            let auth_component: AccountComponent =
-                AuthSingleSig::new(public_key.to_commitment(), AuthSchemeId::Falcon512Rpo).into();
-            auth_component
-        },
-        AuthSchemeId::EcdsaK256Keccak => {
-            let auth_component: AccountComponent =
-                AuthSingleSig::new(public_key.to_commitment(), AuthSchemeId::EcdsaK256Keccak)
-                    .into();
-            auth_component
-        },
-        auth_scheme => {
-            return Err(ClientError::UnsupportedAuthSchemeId(auth_scheme.as_u8()));
-        },
-    };
+    let auth_component: AccountComponent =
+        AuthSingleSig::new(public_key.to_commitment(), auth_scheme).into();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(account_type)
         .storage_mode(storage_mode)
         .with_auth_component(auth_component)
         .with_component(BasicWallet)
-        .build()?;
+        .build_with_schema_commitment()?;
 
     Ok(account.id())
+}
+
+#[cfg(test)]
+mod schema_commitment_tests {
+    use miden_protocol::EMPTY_WORD;
+    use miden_protocol::account::AccountStorageMode;
+    use miden_protocol::account::auth::AuthSecretKey;
+    use miden_standards::account::metadata::AccountSchemaCommitment;
+
+    use super::{
+        AccountBuilder,
+        AccountBuilderSchemaCommitmentExt,
+        AccountType,
+        AuthSingleSig,
+        BasicWallet,
+    };
+    use crate::auth::AuthSchemeId;
+
+    #[test]
+    fn wallet_build_includes_schema_commitment_metadata_slot() {
+        let key = AuthSecretKey::new_falcon512_poseidon2();
+        let account = AccountBuilder::new([2u8; 32])
+            .account_type(AccountType::RegularAccountImmutableCode)
+            .storage_mode(AccountStorageMode::Private)
+            .with_auth_component(AuthSingleSig::new(
+                key.public_key().to_commitment(),
+                AuthSchemeId::Falcon512Poseidon2,
+            ))
+            .with_component(BasicWallet)
+            .build_with_schema_commitment()
+            .expect("build_with_schema_commitment");
+
+        let commitment = account
+            .storage()
+            .get_item(AccountSchemaCommitment::schema_commitment_slot())
+            .expect("schema commitment slot");
+        assert_ne!(commitment, EMPTY_WORD);
+    }
 }

@@ -302,9 +302,9 @@ async fn benchmark_tx_full(
             let tx_request = build_chunk_tx_request(&client, chunk, slot_infos)?;
 
             // Measure full transaction time (execute + prove + submit)
-            let (_, duration) = measure_time_async(|| async {
+            let (_, duration) = Box::pin(measure_time_async(|| async {
                 client.submit_new_transaction(account_id, tx_request).await
-            })
+            }))
             .await;
 
             total_duration += duration;

@@ -16,6 +16,12 @@ export default tseslint.config(
     rules: { "prefer-const": "off" },
   },
   {
-    ignores: ["js/**", "**/node_modules/**", "**/*.mjs", "**/*.test.ts"],
+    ignores: [
+      "js/**",
+      "**/node_modules/**",
+      "**/*.mjs",
+      "**/*.test.ts",
+      "**/test-utils.ts",
+    ],
   }
 );

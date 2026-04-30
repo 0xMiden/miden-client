@@ -6,7 +6,7 @@
 
 # Type Alias: TransactionQuery
 
-> **TransactionQuery** = \{ `status`: `"uncommitted"`; \} \| \{ `ids`: `string`[]; \} \| \{ `expiredBefore`: `number`; \}
+> **TransactionQuery** = \{ `status`: `"uncommitted"`; \} \| \{ `ids`: (`string` \| [`TransactionId`](../classes/TransactionId.md))[]; \} \| \{ `expiredBefore`: `number`; \}
 
 Discriminated union for transaction queries.
 Mirrors the underlying WASM TransactionFilter enum.

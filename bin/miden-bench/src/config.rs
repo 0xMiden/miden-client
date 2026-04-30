@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use miden_client::builder::ClientBuilder;
-use miden_client::crypto::RpoRandomCoin;
+use miden_client::crypto::RandomCoin;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::{Client, DebugMode, Felt};
@@ -45,7 +45,7 @@ pub async fn create_client(
 
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
-    let rng_coin = RpoRandomCoin::new(coin_seed.map(Felt::new).into());
+    let rng_coin = RandomCoin::new(coin_seed.map(Felt::new).into());
 
     let client = ClientBuilder::new()
         .rpc(Arc::new(GrpcClient::new(endpoint, 30_000)))

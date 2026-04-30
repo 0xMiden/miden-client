@@ -13,7 +13,6 @@ export {
   AccountId,
   AccountStorage,
   AssetVault,
-  ConsumableNoteRecord,
   Felt,
   InputNoteRecord,
   Note,
@@ -21,7 +20,7 @@ export {
   NoteFile,
   NoteId,
   NoteTag,
-  OutputNote,
+  RawOutputNote,
   OutputNoteRecord,
   SyncSummary,
   TransactionId,
@@ -34,3 +33,6 @@ export {
 
 // All simplified API types
 export * from "./api-types";
+
+// Storage utilities
+export { StorageView, StorageResult, wordToBigInt } from "./index";

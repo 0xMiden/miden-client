@@ -1,13 +1,18 @@
 use miden_client::account::component::{AccountComponent, BasicWallet};
-use miden_client::account::{Account, AccountBuilder, AccountType};
+use miden_client::account::{
+    Account,
+    AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
+    AccountType,
+};
 use miden_client::auth::{AuthSchemeId as NativeAuthScheme, AuthSecretKey, AuthSingleSig};
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
-use wasm_bindgen::JsValue;
 
 use crate::js_error_with_context;
 use crate::models::account_storage_mode::AccountStorageMode;
 use crate::models::auth::AuthScheme;
+use crate::platform::{JsErr, from_str_err};
 
 // HELPERS
 // ================================================================================================
@@ -23,43 +28,33 @@ pub(crate) async fn generate_wallet(
     mutable: bool,
     seed: Option<Vec<u8>>,
     auth_scheme: AuthScheme,
-) -> Result<(Account, AuthSecretKey), JsValue> {
+) -> Result<(Account, AuthSecretKey), JsErr> {
     let mut rng = match seed {
         Some(seed_bytes) => {
             // Attempt to convert the seed slice into a 32-byte array.
             let seed_array: [u8; 32] = seed_bytes
                 .try_into()
-                .map_err(|_| JsValue::from_str("Seed must be exactly 32 bytes"))?;
+                .map_err(|_| from_str_err("Seed must be exactly 32 bytes"))?;
             StdRng::from_seed(seed_array)
         },
         None => StdRng::from_os_rng(),
     };
 
     let native_scheme: NativeAuthScheme = auth_scheme.try_into()?;
-    let (key_pair, auth_component) = match native_scheme {
-        NativeAuthScheme::Falcon512Rpo => {
-            let key_pair = AuthSecretKey::new_falcon512_rpo_with_rng(&mut rng);
-            let auth_component: AccountComponent = AuthSingleSig::new(
-                key_pair.public_key().to_commitment(),
-                NativeAuthScheme::Falcon512Rpo,
-            )
-            .into();
-            (key_pair, auth_component)
+    let key_pair = match native_scheme {
+        NativeAuthScheme::Falcon512Poseidon2 => {
+            AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut rng)
         },
         NativeAuthScheme::EcdsaK256Keccak => {
-            let key_pair = AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng);
-            let auth_component: AccountComponent = AuthSingleSig::new(
-                key_pair.public_key().to_commitment(),
-                NativeAuthScheme::EcdsaK256Keccak,
-            )
-            .into();
-            (key_pair, auth_component)
+            AuthSecretKey::new_ecdsa_k256_keccak_with_rng(&mut rng)
         },
         _ => {
             let message = format!("unsupported auth scheme: {native_scheme:?}");
-            return Err(JsValue::from_str(&message));
+            return Err(from_str_err(&message));
         },
     };
+    let auth_component: AccountComponent =
+        AuthSingleSig::new(key_pair.public_key().to_commitment(), native_scheme).into();
 
     let account_type = if mutable {
         AccountType::RegularAccountUpdatableCode
@@ -74,7 +69,7 @@ pub(crate) async fn generate_wallet(
         .storage_mode(storage_mode.into())
         .with_auth_component(auth_component)
         .with_component(BasicWallet)
-        .build()
+        .build_with_schema_commitment()
         .map_err(|err| js_error_with_context(err, "failed to create new wallet"))?;
 
     let _account_seed =

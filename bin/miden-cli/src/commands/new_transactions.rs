@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use clap::{Parser, ValueEnum};
 use miden_client::account::AccountId;
-use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
 use miden_client::keystore::Keystore;
 use miden_client::note::{
     BlockNumber,
@@ -13,10 +12,8 @@ use miden_client::note::{
 };
 use miden_client::store::NoteRecordError;
 use miden_client::transaction::{
-    ExecutedTransaction,
-    InputNote,
-    OutputNote,
     PaymentNoteDescription,
+    RawOutputNote,
     SwapTransactionData,
     TransactionRequest,
     TransactionRequestBuilder,
@@ -25,13 +22,13 @@ use miden_client::{Client, RemoteTransactionProver};
 use tracing::info;
 
 use crate::config::CliConfig;
-use crate::create_dynamic_table;
 use crate::errors::CliError;
 use crate::utils::{
     SHARED_TOKEN_DOCUMENTATION,
     get_input_acc_id_by_prefix_or_default,
     load_faucet_details_map,
     parse_account_id,
+    print_executed_transaction,
 };
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -340,10 +337,8 @@ impl ConsumeNotesCmd {
         }
 
         if input_notes.is_empty() {
-            return Err(CliError::Transaction(
-                "No input notes were provided and the store does not contain any notes consumable by {account_id}".into(),
-                "Input notes check failed".to_string(),
-            ));
+            println!("Did not find any consumable notes for {account_id}.");
+            return Ok(());
         }
 
         let transaction_request = TransactionRequestBuilder::new()
@@ -383,7 +378,7 @@ async fn execute_transaction<AUTH: Keystore + Sync + 'static>(
     let executed_transaction = transaction_result.executed_transaction().clone();
 
     // Show delta and ask for confirmation
-    print_transaction_details(&executed_transaction)?;
+    print_executed_transaction(&executed_transaction)?;
     if !force {
         println!(
             "\nContinue with proving and submission? Changes will be irreversible once the proof is finalized on the network (y/N)"
@@ -401,7 +396,7 @@ async fn execute_transaction<AUTH: Keystore + Sync + 'static>(
     let output_notes = executed_transaction
         .output_notes()
         .iter()
-        .map(OutputNote::id)
+        .map(RawOutputNote::id)
         .collect::<Vec<_>>();
 
     println!("Proving transaction...");
@@ -443,98 +438,6 @@ async fn execute_transaction<AUTH: Keystore + Sync + 'static>(
             println!("\t- {note_id}");
         }
     }
-
-    Ok(())
-}
-
-fn print_transaction_details(executed_tx: &ExecutedTransaction) -> Result<(), CliError> {
-    println!("The transaction will have the following effects:\n");
-
-    // INPUT NOTES
-    let input_note_ids = executed_tx.input_notes().iter().map(InputNote::id).collect::<Vec<_>>();
-    if input_note_ids.is_empty() {
-        println!("No notes will be consumed.");
-    } else {
-        println!("The following notes will be consumed:");
-        for input_note_id in input_note_ids {
-            println!("\t- {}", input_note_id.to_hex());
-        }
-    }
-    println!();
-
-    // OUTPUT NOTES
-    let output_note_count = executed_tx.output_notes().iter().count();
-    if output_note_count == 0 {
-        println!("No notes will be created as a result of this transaction.");
-    } else {
-        println!("{output_note_count} notes will be created as a result of this transaction.");
-    }
-    println!();
-
-    // ACCOUNT CHANGES
-    println!("The account with ID {} will be modified as follows:", executed_tx.account_id());
-
-    let account_delta = executed_tx.account_delta();
-
-    let has_storage_changes = !account_delta.storage().is_empty();
-    if has_storage_changes {
-        let mut table = create_dynamic_table(&["Storage Slot", "Effect"]);
-
-        for (updated_item_slot, new_value) in account_delta.storage().values() {
-            table.add_row(vec![
-                updated_item_slot.to_string(),
-                format!("Updated ({})", new_value.to_hex()),
-            ]);
-        }
-
-        println!("Storage changes:");
-        println!("{table}");
-    } else {
-        println!("Account Storage will not be changed.");
-    }
-
-    if account_delta.vault().is_empty() {
-        println!("Account Vault will not be changed.");
-    } else {
-        let faucet_details_map = load_faucet_details_map()?;
-        let mut table = create_dynamic_table(&["Asset Type", "Faucet ID", "Amount"]);
-
-        for (faucet_id, amount) in account_delta.vault().fungible().iter() {
-            let asset =
-                FungibleAsset::new(*faucet_id, amount.unsigned_abs()).map_err(CliError::Asset)?;
-            let (faucet_fmt, amount_fmt) = faucet_details_map.format_fungible_asset(&asset)?;
-
-            if amount.is_positive() {
-                table.add_row(vec!["Fungible Asset", &faucet_fmt, &format!("+{amount_fmt}")]);
-            } else {
-                table.add_row(vec!["Fungible Asset", &faucet_fmt, &format!("-{amount_fmt}")]);
-            }
-        }
-
-        for (asset, action) in account_delta.vault().non_fungible().iter() {
-            match action {
-                NonFungibleDeltaAction::Add => {
-                    table.add_row(vec![
-                        "Non Fungible Asset",
-                        &asset.faucet_id_prefix().to_hex(),
-                        "1",
-                    ]);
-                },
-                NonFungibleDeltaAction::Remove => {
-                    table.add_row(vec![
-                        "Non Fungible Asset",
-                        &asset.faucet_id_prefix().to_hex(),
-                        "-1",
-                    ]);
-                },
-            }
-        }
-
-        println!("Vault changes:");
-        println!("{table}");
-    }
-
-    println!("Nonce incremented by: {}.", account_delta.nonce_delta());
 
     Ok(())
 }
