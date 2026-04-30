@@ -16,7 +16,6 @@ use miden_client::note::{
     NoteStorage,
     NoteTag,
     NoteType,
-    P2idNote,
     P2idNoteStorage,
 };
 use miden_client::store::InputNoteState;
@@ -31,13 +30,22 @@ use crate::tests::network_transaction::{
     deploy_counter_contract,
 };
 
+// Layout of the network note's storage as consumed by `P2ID_EMITTER_SCRIPT`:
+//   [ 0.. 4) SERIAL_NUM       (4 felts) — for the output P2ID note
+//   [ 4.. 8) SCRIPT_ROOT      (4 felts) — root of the P2ID note script
+//   [ 8..10) P2ID storage     (2 felts) — target account suffix, prefix
+//   [10]     note_type        (Public)
+//   [11]     tag              (NoteTag::with_account_target(target))
+const EMITTER_NOTE_NUM_STORAGE_ITEMS: u32 = 12;
+
 const P2ID_EMITTER_SCRIPT: &str = r#"
     use miden::protocol::active_note
+    use miden::protocol::note
     use miden::protocol::output_note
     use miden::core::sys
     use external_contract::counter_contract
 
-    const ERR_STORAGE_LEN="expected 6 note storage items"
+    const ERR_STORAGE_LEN="expected 12 note storage items"
 
     begin
         # drop note arguments
@@ -49,19 +57,33 @@ const P2ID_EMITTER_SCRIPT: &str = r#"
         # load note storage into memory starting at address 0
         push.0 exec.active_note::get_storage
         # => [num_storage_items, storage_ptr]
-        eq.6 assert.err=ERR_STORAGE_LEN
+        eq.12 assert.err=ERR_STORAGE_LEN
         drop
         # => []
 
-        # load RECIPIENT (addresses 0..3), then note_type (4) and tag (5) on top
+        # Build the recipient via the canonical helper. This is the same path
+        # used by `MINT.masm` for public output notes: it computes the recipient
+        # digest AND populates the advice map with the entries the kernel's
+        # `note::before_created` event handler reads when materializing the
+        # public output note (recipient_digest -> [sn_script_hash, storage_commitment],
+        # sn_script_hash, sn_hash, storage_commitment -> storage items).
+        # Without this, the kernel can only see the recipient digest and aborts
+        # the NTX with `PublicNoteMissingDetails`.
+        padw mem_loadw_le.4
+        # => [SCRIPT_ROOT]
         padw mem_loadw_le.0
+        # => [SERIAL_NUM, SCRIPT_ROOT]
+        push.2 push.8
+        # => [storage_ptr=8, num_storage_items=2, SERIAL_NUM, SCRIPT_ROOT]
+
+        exec.note::build_recipient
         # => [RECIPIENT]
-        mem_load.4
+
+        mem_load.10
         # => [note_type, RECIPIENT]
-        mem_load.5
+        mem_load.11
         # => [tag, note_type, RECIPIENT]
 
-        # emit the public P2ID output note
         exec.output_note::create
         # => [note_idx]
         drop
@@ -75,8 +97,8 @@ const P2ID_EMITTER_SCRIPT: &str = r#"
 /// note.
 ///
 /// Flow:
-/// 1. Alice (regular wallet, Public storage) creates a network-targeted note carrying a P2ID
-///    recipient digest in its storage.
+/// 1. Alice (regular wallet, Public storage) creates a network-targeted note carrying the
+///    components of a P2ID recipient (serial num, script root, P2ID storage) in its storage.
 /// 2. The bank (network-storage-mode account with the counter component) is picked up by the node's
 ///    NTX builder, executes the note script, and in doing so (a) increments its own counter and (b)
 ///    emits a public P2ID note targeted at Bob.
@@ -102,38 +124,14 @@ pub async fn test_ntx_output_public_note(client_config: ClientConfig) -> Result<
     )
     .await?;
 
-    // Precompute Bob's P2ID recipient so the same `digest()` used to populate the
-    // network note's storage also determines the expected output NoteId.
+    // Precompute Bob's P2ID recipient. The same components used to populate
+    // the network note's storage determine the expected output NoteId.
     let bob_serial_num = client.rng().draw_word();
     let bob_recipient = P2idNoteStorage::new(bob.id()).into_recipient(bob_serial_num);
-    let bob_recipient_digest = bob_recipient.digest();
-    let expected_output_id = NoteDetails::new(NoteAssets::new(vec![])?, bob_recipient).id();
+    let expected_output_id = NoteDetails::new(NoteAssets::new(vec![])?, bob_recipient.clone()).id();
 
-    // Register the P2ID note script with the node by emitting a zero-asset
-    // public P2ID note from Alice to Bob. Any committed public note has its
-    // script indexed into the node's script registry; doing this explicitly
-    // (and waiting for it to commit) before submitting the network note
-    // avoids a CI race where the NTX builder tries to materialize the public
-    // P2ID output before the script is registered. This mirrors the
-    // pre-registration step used by `test_ntx_mint_produces_public_p2id`.
-    let p2id_pre = P2idNote::create(
-        alice.id(),
-        bob.id(),
-        vec![],
-        NoteType::Public,
-        NoteAttachment::default(),
-        client.rng(),
-    )?;
-    let register_tx = TransactionRequestBuilder::new().own_output_notes(vec![p2id_pre]).build()?;
-    execute_tx_and_sync(&mut client, alice.id(), register_tx).await?;
-
-    let network_note = build_emitter_network_note(
-        alice.id(),
-        bank.id(),
-        bob.id(),
-        bob_recipient_digest,
-        client.rng(),
-    )?;
+    let network_note =
+        build_emitter_network_note(alice.id(), bank.id(), bob.id(), &bob_recipient, client.rng())?;
 
     let tx_request =
         TransactionRequestBuilder::new().own_output_notes(vec![network_note]).build()?;
@@ -177,14 +175,15 @@ pub async fn test_ntx_output_public_note(client_config: ClientConfig) -> Result<
 
 /// Network-targeted note whose script emits a public P2ID note.
 ///
-/// Mirrors `network_transaction::get_network_note_with_script` but stuffs the
-/// P2ID recipient digest + note_type + tag into the note storage so the MASM
-/// can pass them to `output_note::create`.
+/// Stuffs the components of the output P2ID's recipient (serial num, script
+/// root, P2ID storage) plus the output's note_type and tag into the network
+/// note's own storage so the MASM can pass them to `note::build_recipient`
+/// and `output_note::create`.
 fn build_emitter_network_note(
     sender: AccountId,
     network_account: AccountId,
     target: AccountId,
-    recipient_digest: Word,
+    output_recipient: &NoteRecipient,
     rng: &mut ClientRng,
 ) -> Result<Note> {
     let target_ntx = NetworkAccountTarget::new(network_account, NoteExecutionHint::Always)?;
@@ -197,17 +196,19 @@ fn build_emitter_network_note(
         .with_dynamically_linked_library(counter_contract_library())?
         .compile_note_script(P2ID_EMITTER_SCRIPT)?;
 
-    // Storage consumed by `P2ID_EMITTER_SCRIPT`:
-    //   [0..4] RECIPIENT, [4] note_type, [5] tag
-    let storage = NoteStorage::new(vec![
-        recipient_digest[0],
-        recipient_digest[1],
-        recipient_digest[2],
-        recipient_digest[3],
-        NoteType::Public.into(),
-        NoteTag::with_account_target(target).into(),
-    ])?;
+    let serial_num = output_recipient.serial_num();
+    let script_root = output_recipient.script().root();
+    let output_storage_items = output_recipient.storage().items();
 
+    let mut storage_values: Vec<Felt> = Vec::with_capacity(EMITTER_NOTE_NUM_STORAGE_ITEMS as usize);
+    storage_values.extend_from_slice(serial_num.as_elements());
+    storage_values.extend_from_slice(script_root.as_elements());
+    storage_values.extend_from_slice(output_storage_items);
+    storage_values.push(NoteType::Public.into());
+    storage_values.push(NoteTag::with_account_target(target).into());
+    debug_assert_eq!(storage_values.len(), EMITTER_NOTE_NUM_STORAGE_ITEMS as usize);
+
+    let storage = NoteStorage::new(storage_values)?;
     let recipient = NoteRecipient::new(rng.draw_word(), script, storage);
 
     Ok(Note::new(NoteAssets::new(vec![])?, metadata, recipient))
