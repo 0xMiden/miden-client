@@ -1,15 +1,25 @@
 use std::sync::Arc;
 
+use miden_client::account::AccountStorageMode;
+use miden_client::asset::{Asset, FungibleAsset};
+use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::NoteUpdateTracker;
+use miden_client::note::{NoteType, NoteUpdateTracker};
 use miden_client::rpc::NodeRpcClient;
 use miden_client::store::{StoreError, TransactionFilter};
-use miden_client::testing::common::create_test_store_path;
+use miden_client::testing::common::{
+    MINT_AMOUNT,
+    create_test_store_path,
+    mint_and_consume,
+    mint_note,
+    setup_two_wallets_and_faucet,
+};
 use miden_client::testing::mock::MockRpcApi;
 use miden_client::transaction::{
     BatchBuilderError,
     LocalTransactionProver,
+    PaymentNoteDescription,
     TransactionRequestBuilder,
     TransactionStoreUpdate,
 };
@@ -238,6 +248,88 @@ async fn apply_transaction_batch_rolls_back_on_mid_batch_failure() {
         a_commitment_before,
         "account A state must be unchanged after atomic rollback"
     );
+}
+
+/// Regression test for B1: `BatchBuilder::push` must validate each transaction
+/// against the in-batch (stacked) account state, not the persisted pre-batch state.
+///
+/// Setup: A starts with `MINT_AMOUNT` (consumed, also puts A on-chain). A second
+/// mint note also worth `MINT_AMOUNT` is left UNCONSUMED.
+///
+/// - Push 1 consumes the second note → in-batch balance becomes `2 * MINT_AMOUNT`.
+/// - Push 2 sends `MINT_AMOUNT + 1` to B → invalid against pre-batch (`MINT_AMOUNT`)
+///   but valid against in-batch (`2 * MINT_AMOUNT`).
+///
+/// Currently `validate_request` reads from `client.store` (persistent), so push 2
+/// is expected to fail with `AssetError::FungibleAssetAmountNotSufficient { minuend:
+/// MINT_AMOUNT, subtrahend: MINT_AMOUNT + 1 }` even though the executor would
+/// accept the tx. After the fix, validation reads through the supplied data store
+/// and the batch submits cleanly.
+#[tokio::test]
+async fn batch_builder_push_succeeds_when_balance_depends_on_prior_push() {
+    let (mut client, rpc_api, authenticator) = Box::pin(create_test_client()).await;
+
+    let (first_regular_account, second_regular_account, faucet_account_header) =
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
+
+    let from_account_id = first_regular_account.id();
+    let to_account_id = second_regular_account.id();
+    let faucet_account_id = faucet_account_header.id();
+
+    // Pre-batch: give A `MINT_AMOUNT` (also gets A on-chain so its first
+    // batch-tx delta is partial, not full-state).
+    mint_and_consume(&mut client, from_account_id, faucet_account_id, NoteType::Private).await;
+    rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Mint a second note worth `MINT_AMOUNT` for A — left UNCONSUMED, so push 1 can claim it.
+    let (_mint_tx_id, second_note) =
+        mint_note(&mut client, from_account_id, faucet_account_id, NoteType::Private).await;
+    rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Push 1 consumes the second note → in-batch balance = 2 * MINT_AMOUNT.
+    let push1 = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![second_note])
+        .unwrap();
+
+    // Push 2 sends MINT_AMOUNT + 1 → exceeds pre-batch balance (MINT_AMOUNT)
+    // but valid against in-batch balance (2 * MINT_AMOUNT).
+    let oversend = FungibleAsset::new(faucet_account_id, MINT_AMOUNT + 1).unwrap();
+    let push2 = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentNoteDescription::new(
+                vec![Asset::Fungible(oversend)],
+                from_account_id,
+                to_account_id,
+            ),
+            NoteType::Private,
+            client.rng(),
+        )
+        .unwrap();
+
+    let block_num = Box::pin(async {
+        client
+            .new_transaction_batch(from_account_id)
+            .await?
+            .push(push1)
+            .await?
+            .push(push2)
+            .await?
+            .submit()
+            .await
+    })
+    .await
+    .expect("post-fix: submit should succeed because validation must use in-batch state");
+
+    assert!(block_num.as_u32() > 0);
 }
 
 /// Verify that submitting an empty batch (no pushes) returns `BatchBuilderError::Empty`.
