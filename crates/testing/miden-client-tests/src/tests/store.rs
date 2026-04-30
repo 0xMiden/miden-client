@@ -331,7 +331,7 @@ async fn build_three_slot_account(
     keystore.add_key(&key_pair, account_id).await.unwrap();
     client
         .test_store()
-        .insert_account(&account, Address::new(account_id))
+        .insert_account(&account, Address::new(account_id), false)
         .await
         .unwrap();
 

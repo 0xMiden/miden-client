@@ -336,8 +336,9 @@ pub trait Store: Send + Sync {
     ) -> Result<Option<AccountCode>, StoreError>;
 
     /// Inserts an [`Account`] to the store.
-    /// Receives an [`Address`] as the initial address to associate with the account. This address
-    /// will be tracked for incoming notes and its derived note tag will be monitored.
+    /// Receives an [`Address`] as the initial address to associate with the account. When the
+    /// account is **not** in watch-only mode, the address's derived note tag is also tracked so
+    /// that incoming notes are picked up by sync.
     ///
     /// # Errors
     ///
@@ -346,6 +347,7 @@ pub trait Store: Send + Sync {
         &self,
         account: &Account,
         initial_address: Address,
+        watch_only: bool,
     ) -> Result<(), StoreError>;
 
     /// Upserts the account code for a foreign account. This value will be used as a cache of known

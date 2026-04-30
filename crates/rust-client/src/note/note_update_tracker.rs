@@ -299,6 +299,33 @@ impl NoteUpdateTracker {
         }
     }
 
+    /// Records a placeholder `InputNoteRecord` for a nullifier consumed by a tracked account
+    /// whose note isn't synced locally (watch-only accounts).
+    ///
+    /// No-op if a tracked input or output note already matches the nullifier — in that case the
+    /// regular consumption path will mark it consumed. Otherwise a `ConsumedExternal` placeholder
+    /// is inserted with dummy P2ID details (see
+    /// [`InputNoteRecord::placeholder_for_external_consumption`]).
+    pub(crate) fn track_external_consumption_placeholder(
+        &mut self,
+        nullifier: Nullifier,
+        block_num: BlockNumber,
+        consumer_account: AccountId,
+    ) {
+        if self.input_notes_by_nullifier.contains_key(&nullifier)
+            || self.output_notes_by_nullifier.contains_key(&nullifier)
+        {
+            return;
+        }
+
+        let record = InputNoteRecord::placeholder_for_external_consumption(
+            nullifier,
+            block_num,
+            consumer_account,
+        );
+        self.insert_input_note(record, NoteUpdateType::Insert);
+    }
+
     // UPDATE METHODS
     // --------------------------------------------------------------------------------------------
 

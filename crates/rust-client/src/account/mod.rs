@@ -166,6 +166,22 @@ impl<AUTH> Client<AUTH> {
         account: &Account,
         overwrite: bool,
     ) -> Result<(), ClientError> {
+        self.add_account_with_watch_only(account, overwrite, false).await
+    }
+
+    /// Same as [`Self::add_account`] but allows specifying whether the account should be tracked
+    /// in watch-only mode.
+    ///
+    /// In watch-only mode, the account is added without registering its derived note tag, so
+    /// notes targeted at it will not be synced. The account's on-chain state (commitment,
+    /// nonce, storage) is still updated by `sync_state`. This is the path used by
+    /// [`Self::follow_account_by_id`].
+    async fn add_account_with_watch_only(
+        &mut self,
+        account: &Account,
+        overwrite: bool,
+        watch_only: bool,
+    ) -> Result<(), ClientError> {
         if account.is_new() {
             if account.seed().is_none() {
                 return Err(ClientError::AddNewAccountWithoutSeed);
@@ -185,19 +201,24 @@ impl<AUTH> Client<AUTH> {
             None => {
                 // Check limits since it's a non-tracked account
                 self.check_account_limit().await?;
-                self.check_note_tag_limit().await?;
+                if !watch_only {
+                    self.check_note_tag_limit().await?;
+                }
 
                 let default_address = Address::new(account.id());
 
                 // If the account is not being tracked, insert it into the store regardless of the
-                // `overwrite` flag
-                let default_address_note_tag = default_address.to_note_tag();
-                let note_tag_record =
-                    NoteTagRecord::with_account_source(default_address_note_tag, account.id());
-                self.store.add_note_tag(note_tag_record).await?;
+                // `overwrite` flag. Watch-only accounts skip the per-account note tag so that
+                // sync doesn't pull notes targeted at them.
+                if !watch_only {
+                    let default_address_note_tag = default_address.to_note_tag();
+                    let note_tag_record =
+                        NoteTagRecord::with_account_source(default_address_note_tag, account.id());
+                    self.store.add_note_tag(note_tag_record).await?;
+                }
 
                 self.store
-                    .insert_account(account, default_address)
+                    .insert_account(account, default_address, watch_only)
                     .await
                     .map_err(ClientError::StoreError)
             },
@@ -233,11 +254,46 @@ impl<AUTH> Client<AUTH> {
     /// and be tracked by the network, it will be fetched by its ID. If the account was already
     /// being tracked by the client, it's state will be overwritten.
     ///
+    /// To import an account in watch-only mode (state-tracking only, no note sync), use
+    /// [`Self::follow_account_by_id`] instead.
+    ///
     /// # Errors
     /// - If the account is not found on the network.
     /// - If the account is private.
     /// - There was an error sending the request to the network.
     pub async fn import_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
+        let account = self.fetch_public_account(account_id).await?;
+        self.add_account_with_watch_only(&account, true, false).await
+    }
+
+    /// Starts following an on-chain account in watch-only mode.
+    ///
+    /// Like [`Self::import_account_by_id`], the account is fetched from the network by its ID.
+    /// Unlike `import_account_by_id`, the account is added without registering its derived note
+    /// tag: `sync_state` will keep the account's commitment, nonce and storage up to date but
+    /// will **not** pull notes targeted at it.
+    ///
+    /// If the account is already being tracked, its state is overwritten and it becomes
+    /// watch-only.
+    ///
+    /// # Errors
+    /// - If the account is not found on the network.
+    /// - If the account is private.
+    /// - There was an error sending the request to the network.
+    pub async fn follow_account_by_id(
+        &mut self,
+        account_id: AccountId,
+    ) -> Result<(), ClientError> {
+        let account = self.fetch_public_account(account_id).await?;
+        self.add_account_with_watch_only(&account, true, true).await
+    }
+
+    /// Fetches a public [`Account`] from the network, returning a typed error when the account
+    /// doesn't exist on chain or is private.
+    async fn fetch_public_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Account, ClientError> {
         let fetched_account =
             self.rpc_api.get_account_details(account_id).await.map_err(|err| {
                 match err.endpoint_error() {
@@ -248,14 +304,10 @@ impl<AUTH> Client<AUTH> {
                 }
             })?;
 
-        let account = match fetched_account {
-            FetchedAccount::Private(..) => {
-                return Err(ClientError::AccountIsPrivate(account_id));
-            },
-            FetchedAccount::Public(account, ..) => *account,
-        };
-
-        self.add_account(&account, true).await
+        match fetched_account {
+            FetchedAccount::Private(..) => Err(ClientError::AccountIsPrivate(account_id)),
+            FetchedAccount::Public(account, ..) => Ok(*account),
+        }
     }
 
     /// Adds an [`Address`] to the associated [`AccountId`], alongside its derived [`NoteTag`].

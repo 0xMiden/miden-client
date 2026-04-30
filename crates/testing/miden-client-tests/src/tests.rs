@@ -2756,7 +2756,7 @@ async fn storage_and_vault_proofs() {
 
     client
         .test_store()
-        .insert_account(&account, Address::new(account.id()))
+        .insert_account(&account, Address::new(account.id()), false)
         .await
         .unwrap();
 

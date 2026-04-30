@@ -6,6 +6,7 @@ use miden_client::keystore::Keystore;
 use miden_client::note::{NoteAttachment, NoteAttachmentScheme, NoteFile, NoteType, P2idNote};
 use miden_client::rpc::{AcceptHeaderError, RpcError};
 use miden_client::store::{InputNoteState, NoteFilter};
+use miden_client::sync::NoteTagSource;
 use miden_client::testing::common::*;
 use miden_client::transaction::{
     InputNote,
@@ -420,6 +421,110 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
         MINT_AMOUNT * 2,
     )
     .await;
+    Ok(())
+}
+
+/// Watch-only follow flow:
+///   - `client_1` owns the wallet and faucet, executes transactions.
+///   - `client_2` follows the wallet via `follow_account_by_id` (no note tag).
+///   - After `client_1` mints + consumes a note, `client_2` should observe the new account
+///     state (commitment, nonce) but not have the targeted note locally, and a placeholder
+///     `ConsumedExternal` record should track the consumption.
+pub async fn test_follow_account_by_id(client_config: ClientConfig) -> Result<()> {
+    let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
+    let (mut client_2, _keystore_2) = ClientConfig::default()
+        .with_rpc_endpoint(client_config.rpc_endpoint())
+        .into_client()
+        .await?;
+    wait_for_node(&mut client_1).await;
+
+    let (faucet_account, _) = insert_new_fungible_faucet(
+        &mut client_1,
+        AccountStorageMode::Public,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+    let (wallet, _) = insert_new_wallet(
+        &mut client_1,
+        AccountStorageMode::Public,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+    let wallet_id = wallet.id();
+    let faucet_id = faucet_account.id();
+
+    // Bring the wallet to a non-zero state on chain so client_2 can pick it up via follow.
+    let tx_id = mint_and_consume(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
+    wait_for_tx(&mut client_1, tx_id).await?;
+
+    // client_2 starts following the wallet in watch-only mode.
+    client_2.follow_account_by_id(wallet_id).await?;
+
+    let initial_source_commitment = client_1.account_reader(wallet_id).commitment().await?;
+    let initial_watched_commitment = client_2.account_reader(wallet_id).commitment().await?;
+    assert_eq!(
+        initial_watched_commitment, initial_source_commitment,
+        "watched account commitment should match source after follow",
+    );
+
+    let watched_record = client_2
+        .test_store()
+        .get_account(wallet_id)
+        .await?
+        .context("watched account should be tracked in client_2's store")?;
+    assert!(watched_record.is_watch_only(), "followed account must be watch-only");
+
+    let tags = client_2.test_store().get_note_tags().await?;
+    assert!(
+        !tags.iter().any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
+        "watch-only account must not register a per-account note tag",
+    );
+
+    // client_1 mints + consumes another note. From client_2's perspective:
+    //   - sync_state should observe the new account commitment / nonce.
+    //   - the targeted note must NOT land in client_2's input notes (no tag was registered).
+    //   - a ConsumedExternal placeholder for the consumed note's nullifier should appear.
+    let (tx_id, note) = mint_note(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
+    wait_for_tx(&mut client_1, tx_id).await?;
+    let consume_tx_id =
+        consume_notes(&mut client_1, wallet_id, std::slice::from_ref(&note)).await;
+    wait_for_tx(&mut client_1, consume_tx_id).await?;
+
+    client_2.sync_state().await?;
+
+    let updated_source_commitment = client_1.account_reader(wallet_id).commitment().await?;
+    let updated_watched_commitment = client_2.account_reader(wallet_id).commitment().await?;
+    assert_eq!(
+        updated_watched_commitment, updated_source_commitment,
+        "watched commitment should track source after sync",
+    );
+    assert_ne!(
+        updated_watched_commitment, initial_watched_commitment,
+        "watched account state should have advanced",
+    );
+
+    let watched_input_notes =
+        client_2.test_store().get_input_notes(NoteFilter::All).await?;
+    assert!(
+        watched_input_notes.iter().all(|n| n.id() != note.id()),
+        "watch-only client must not have synced the targeted note (no note tag)",
+    );
+
+    let placeholders_for_wallet = watched_input_notes
+        .iter()
+        .filter_map(|n| match n.state() {
+            InputNoteState::ConsumedExternal(state) => Some(state),
+            _ => None,
+        })
+        .filter(|state| state.consumer_account == Some(wallet_id))
+        .count();
+    assert!(
+        placeholders_for_wallet >= 1,
+        "client_2 should have at least one ConsumedExternal placeholder for the wallet's consumption",
+    );
+
     Ok(())
 }
 

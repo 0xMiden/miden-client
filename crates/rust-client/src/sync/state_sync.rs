@@ -513,6 +513,22 @@ impl StateSync {
 
             // Detect output notes erased by same-batch note erasure.
             Self::mark_erased_notes_as_consumed(state_sync_update, transaction);
+
+            // TODO(follow-accounts): the placeholder built below carries dummy P2ID note
+            // details — its `NoteId`/recipient digest don't match the on-chain note. Replace
+            // this with a real partial-note record once the `input_notes`/`output_notes`
+            // schema supports header-only / nullifier-only entries.
+            //
+            // For nullifiers consumed by this transaction whose notes weren't synced locally
+            // (watch-only flow: no per-account note tag, so `sync_notes` never returned them),
+            // insert a placeholder `InputNoteRecord` so the consumption is at least surfaced.
+            for nullifier in &transaction.nullifiers {
+                state_sync_update.note_updates.track_external_consumption_placeholder(
+                    *nullifier,
+                    transaction.block_num,
+                    transaction.account_id,
+                );
+            }
         }
 
         Ok(())

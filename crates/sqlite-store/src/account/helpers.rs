@@ -29,12 +29,15 @@ pub(crate) struct SerializedHeaderData {
     pub code_commitment: String,
     pub account_seed: Option<Vec<u8>>,
     pub locked: bool,
+    pub watch_only: bool,
 }
 
 /// Parse an account header from the provided serialized data.
+///
+/// Returns the parsed header, its status, and the `watch_only` flag.
 pub(crate) fn parse_accounts(
     serialized_account_parts: SerializedHeaderData,
-) -> Result<(AccountHeader, AccountStatus), StoreError> {
+) -> Result<(AccountHeader, AccountStatus, bool), StoreError> {
     let SerializedHeaderData {
         id,
         nonce,
@@ -43,6 +46,7 @@ pub(crate) fn parse_accounts(
         code_commitment,
         account_seed,
         locked,
+        watch_only,
     } = serialized_account_parts;
     let account_seed = account_seed.map(|seed| Word::read_from_bytes(&seed[..])).transpose()?;
 
@@ -61,6 +65,7 @@ pub(crate) fn parse_accounts(
             Word::try_from(&code_commitment)?,
         ),
         status,
+        watch_only,
     ))
 }
 
@@ -68,7 +73,7 @@ pub(crate) fn query_latest_account_headers(
     conn: &Connection,
     where_clause: &str,
     params: impl Params,
-) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
+) -> Result<Vec<(AccountHeader, AccountStatus, bool)>, StoreError> {
     query_account_headers_from_table(conn, "latest_account_headers", where_clause, params)
 }
 
@@ -76,7 +81,7 @@ pub(crate) fn query_historical_account_headers(
     conn: &Connection,
     where_clause: &str,
     params: impl Params,
-) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
+) -> Result<Vec<(AccountHeader, AccountStatus, bool)>, StoreError> {
     query_account_headers_from_table(conn, "historical_account_headers", where_clause, params)
 }
 
@@ -85,9 +90,9 @@ fn query_account_headers_from_table(
     table: &str,
     where_clause: &str,
     params: impl Params,
-) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
+) -> Result<Vec<(AccountHeader, AccountStatus, bool)>, StoreError> {
     let query = format!(
-        "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked \
+        "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked, watch_only \
          FROM {table} WHERE {where_clause}"
     );
     conn.prepare(&query)
@@ -100,6 +105,7 @@ fn query_account_headers_from_table(
             let code_commitment: String = row.get(4)?;
             let account_seed: Option<Vec<u8>> = row.get(5)?;
             let locked: bool = row.get(6)?;
+            let watch_only: bool = row.get(7)?;
 
             Ok(SerializedHeaderData {
                 id,
@@ -109,11 +115,29 @@ fn query_account_headers_from_table(
                 code_commitment,
                 account_seed,
                 locked,
+                watch_only,
             })
         })
         .into_store_error()?
         .map(|result| parse_accounts(result.into_store_error()?))
-        .collect::<Result<Vec<(AccountHeader, AccountStatus)>, StoreError>>()
+        .collect::<Result<Vec<(AccountHeader, AccountStatus, bool)>, StoreError>>()
+}
+
+/// Reads the `watch_only` flag for the given account from `latest_account_headers`.
+/// Returns `false` if the account is not yet tracked.
+pub(crate) fn query_watch_only_flag(
+    conn: &Connection,
+    account_id: AccountId,
+) -> Result<bool, StoreError> {
+    use rusqlite::OptionalExtension;
+    conn.query_row(
+        "SELECT watch_only FROM latest_account_headers WHERE id = ?",
+        params![account_id.to_hex()],
+        |row| row.get::<_, bool>(0),
+    )
+    .optional()
+    .into_store_error()
+    .map(|opt| opt.unwrap_or(false))
 }
 
 // TODO: this function will probably be refactored to receive more complex where clauses and
