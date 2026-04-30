@@ -46,8 +46,12 @@ jobs:
         run: make build
 
   install:
-    name: Install binaries
-    runs-on: warp-ubuntu-latest-x64-8x
+    name: Install ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [install, install-bench, install-tests]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -62,9 +66,5 @@ jobs:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: false
-      - name: make - install
-        run: make install
-      - name: make - install-bench
-        run: make install-bench
-      - name: make - install-tests
-        run: make install-tests
+      - name: make - ${{ matrix.target }}
+        run: make ${{ matrix.target }}
