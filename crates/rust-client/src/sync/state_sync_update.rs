@@ -2,7 +2,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
-use miden_protocol::account::AccountId;
+use miden_protocol::account::{AccountDelta, AccountHeader, AccountId};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks};
 use miden_protocol::note::{NoteId, Nullifier};
@@ -22,8 +22,8 @@ use crate::transaction::{DiscardCause, TransactionRecord, TransactionStatus};
 pub struct StateSyncUpdate {
     /// The block number of the last block that was synced.
     pub block_num: BlockNumber,
-    /// New blocks and authentication nodes.
-    pub block_updates: BlockUpdates,
+    /// New blocks, authentication nodes and MMR peaks.
+    pub partial_blockchain_updates: PartialBlockchainUpdates,
     /// New and updated notes to be upserted in the store.
     pub note_updates: NoteUpdateTracker,
     /// Committed and discarded transactions after the sync.
@@ -83,7 +83,7 @@ impl From<&StateSyncUpdate> for SyncSummary {
                 .account_updates
                 .updated_public_accounts()
                 .iter()
-                .map(Account::id)
+                .map(PublicAccountUpdate::id)
                 .collect(),
             value
                 .account_updates
@@ -96,60 +96,45 @@ impl From<&StateSyncUpdate> for SyncSummary {
     }
 }
 
-/// Contains all the block information that needs to be added in the client's store after a sync.
+/// Contains all the partial blockchain information that needs to be added in the client's store
+/// after a sync: block headers, authentication nodes and the MMR peaks at the new sync height.
 #[derive(Debug, Clone, Default)]
-pub struct BlockUpdates {
-    /// New block headers to be stored, along with a flag indicating whether the block contains
-    /// notes that are relevant to the client and the MMR peaks for the block.
-    block_headers: Vec<(BlockHeader, bool, MmrPeaks)>,
+pub struct PartialBlockchainUpdates {
+    /// New block headers to be stored, keyed by block number. The value contains the block
+    /// header and a flag indicating whether the block contains notes relevant to the client.
+    block_headers: BTreeMap<BlockNumber, (BlockHeader, bool)>,
     /// New authentication nodes that are meant to be stored in order to authenticate block
     /// headers.
     new_authentication_nodes: Vec<(InOrderIndex, Word)>,
+    /// MMR peaks at the new sync height.
+    pub new_peaks: MmrPeaks,
 }
 
-impl BlockUpdates {
-    /// Creates a new instance of [`BlockUpdates`].
-    pub fn new(
-        block_headers: Vec<(BlockHeader, bool, MmrPeaks)>,
-        new_authentication_nodes: Vec<(InOrderIndex, Word)>,
-    ) -> Self {
-        Self { block_headers, new_authentication_nodes }
-    }
-
-    /// Adds a new block header and its corresponding data to this [`BlockUpdates`].
+impl PartialBlockchainUpdates {
+    /// Adds or updates a block header in this [`PartialBlockchainUpdates`].
     ///
-    /// # Parameters
-    /// - `block_header`: The block header to add.
-    /// - `has_client_notes`: Whether this block contains input notes that the client could use.
-    /// - `peaks`: The MMR peaks after including `block_header`.
-    /// - `new_authentication_nodes`: Authentication (MMR) nodes produced while adding
-    ///   `block_header` to the client's MMR.
+    /// If the block header already exists (same block number), the `has_client_notes` flag is
+    /// OR-ed. Otherwise a new entry is added.
     pub fn insert(
         &mut self,
         block_header: BlockHeader,
         has_client_notes: bool,
-        peaks: MmrPeaks,
         new_authentication_nodes: Vec<(InOrderIndex, Word)>,
     ) {
-        self.block_headers.push((block_header, has_client_notes, peaks));
+        self.block_headers
+            .entry(block_header.block_num())
+            .and_modify(|(_, existing_has_notes)| {
+                *existing_has_notes |= has_client_notes;
+            })
+            .or_insert((block_header, has_client_notes));
 
-        self.new_authentication_nodes.reserve(new_authentication_nodes.len());
         self.new_authentication_nodes.extend(new_authentication_nodes);
     }
 
     /// Returns the new block headers to be stored, along with a flag indicating whether the block
-    /// contains notes that are relevant to the client and the MMR peaks for the block.
-    pub fn block_headers(&self) -> &[(BlockHeader, bool, MmrPeaks)] {
-        &self.block_headers
-    }
-
-    /// Adds authentication nodes without an associated block header.
-    ///
-    /// This is used when a synced block is not stored (no relevant notes and not the chain tip)
-    /// but the MMR authentication nodes it produced must still be persisted so that the on-disk
-    /// state stays consistent with the in-memory `PartialMmr`.
-    pub fn extend_authentication_nodes(&mut self, nodes: Vec<(InOrderIndex, Word)>) {
-        self.new_authentication_nodes.extend(nodes);
+    /// contains notes that are relevant to the client.
+    pub fn block_headers(&self) -> impl Iterator<Item = &(BlockHeader, bool)> {
+        self.block_headers.values()
     }
 
     /// Returns the new authentication nodes that are meant to be stored in order to authenticate
@@ -162,7 +147,10 @@ impl BlockUpdates {
 /// Contains transaction changes to apply to the store.
 #[derive(Default)]
 pub struct TransactionUpdateTracker {
+    /// Transactions that were committed in the block.
     transactions: BTreeMap<TransactionId, TransactionRecord>,
+    /// Nullifier-to-account mappings from external transactions by tracked accounts.
+    external_nullifier_accounts: BTreeMap<Nullifier, AccountId>,
 }
 
 impl TransactionUpdateTracker {
@@ -171,7 +159,10 @@ impl TransactionUpdateTracker {
         let transactions =
             transactions.into_iter().map(|tx| (tx.id, tx)).collect::<BTreeMap<_, _>>();
 
-        Self { transactions }
+        Self {
+            transactions,
+            external_nullifier_accounts: BTreeMap::new(),
+        }
     }
 
     /// Returns a reference to committed transactions.
@@ -202,6 +193,12 @@ impl TransactionUpdateTracker {
             .map(|tx| tx.id)
     }
 
+    /// Returns the account ID that consumed the given nullifier in an external transaction, if
+    /// available.
+    pub fn external_nullifier_account(&self, nullifier: &Nullifier) -> Option<AccountId> {
+        self.external_nullifier_accounts.get(nullifier).copied()
+    }
+
     /// Applies the necessary state transitions to the [`TransactionUpdateTracker`] when a
     /// transaction is included in a block.
     pub fn apply_transaction_inclusion(
@@ -223,6 +220,15 @@ impl TransactionUpdateTracker {
                 && tx.details.init_account_state == transaction_inclusion.initial_state_commitment
         }) {
             transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
+            return;
+        }
+
+        // No local transaction matched. This is an external transaction by a tracked account.
+        // Record the nullifier→account mappings so we can attribute note consumption to tracked
+        // accounts during nullifier processing.
+        for nullifier in &transaction_inclusion.nullifiers {
+            self.external_nullifier_accounts
+                .insert(*nullifier, transaction_inclusion.account_id);
         }
     }
 
@@ -301,14 +307,46 @@ impl TransactionUpdateTracker {
     }
 }
 
+// PUBLIC ACCOUNT UPDATE
+// ================================================================================================
+
+/// Represents an update to a single public account's state.
+///
+/// Small accounts that fit within the node's response threshold are sent as `Full` replacements.
+/// Oversized accounts (too many storage map entries or vault assets) are sent as incremental
+/// `Delta` updates to avoid reconstructing the full account in memory.
+#[derive(Debug, Clone)]
+pub enum PublicAccountUpdate {
+    /// Full account state replacement.
+    Full(Account),
+    /// Incremental delta applied to the locally stored state.
+    Delta {
+        /// The new account header after the delta is applied.
+        new_header: AccountHeader,
+        /// The changes relative to the current locally-stored state.
+        delta: AccountDelta,
+    },
+}
+
+impl PublicAccountUpdate {
+    /// Returns the account ID for this update.
+    pub fn id(&self) -> AccountId {
+        match self {
+            Self::Full(account) => account.id(),
+            Self::Delta { new_header, .. } => new_header.id(),
+        }
+    }
+}
+
 // ACCOUNT UPDATES
 // ================================================================================================
 
 /// Contains account changes to apply to the store after a sync request.
 #[derive(Debug, Clone, Default)]
+#[allow(clippy::struct_field_names)]
 pub struct AccountUpdates {
-    /// Updated public accounts.
-    updated_public_accounts: Vec<Account>,
+    /// Updated public accounts, either as full state replacements or incremental deltas.
+    updated_public_accounts: Vec<PublicAccountUpdate>,
     /// Account commitments received from the network that don't match the currently
     /// locally-tracked state of the private accounts.
     ///
@@ -321,7 +359,7 @@ pub struct AccountUpdates {
 impl AccountUpdates {
     /// Creates a new instance of `AccountUpdates`.
     pub fn new(
-        updated_public_accounts: Vec<Account>,
+        updated_public_accounts: Vec<PublicAccountUpdate>,
         mismatched_private_accounts: Vec<(AccountId, Word)>,
     ) -> Self {
         Self {
@@ -331,7 +369,7 @@ impl AccountUpdates {
     }
 
     /// Returns the updated public accounts.
-    pub fn updated_public_accounts(&self) -> &[Account] {
+    pub fn updated_public_accounts(&self) -> &[PublicAccountUpdate] {
         &self.updated_public_accounts
     }
 

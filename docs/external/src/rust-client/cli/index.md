@@ -216,6 +216,31 @@ The downloaded notes will be added to the store.
 miden-client notes --fetch
 ```
 
+### `network-note-status`
+
+Query the network for the processing status of a note. This is useful for diagnosing issues with network transactions (NTX), such as notes that are stuck or have been discarded.
+
+```sh
+miden-client network-note-status <NOTE_ID>
+```
+
+The command displays a table with the following information:
+
+- **Status**: The current processing state of the note (`Pending`, `Processed`, `Discarded`, or `Committed`).
+- **Attempt Count**: The number of times the node has attempted to process the note.
+- **Last Error**: The last error encountered during processing, if any.
+- **Last Attempt Block**: The block number of the most recent processing attempt.
+
+The note ID must be provided as a full hex string:
+
+```sh
+miden-client network-note-status 0x70b7ecba1db44c3aa75e87a3394de95463cc094d7794b706e02a9228342faeb0
+```
+
+:::note
+This command queries the Miden node directly and does not require the note to be tracked locally.
+:::
+
 ### `sync`
 
 Sync the client with the latest state of the Miden network. Shows a brief summary at the end.
@@ -295,11 +320,12 @@ View and manage addresses.
 
 #### Action Subcommands
 
-| Subcommand                       | Description                                                                            |
-| -------------------------------- | ---------------------------------------------------------------------------------------|
-| `list <ID>`                      | List all addresses or only for the specified account ID (default command)              |
-| `add <ID> <INTERFACE> <TAG_LEN>` | Bind an address for an interface for the specified account ID with optional tag length |
-| `remove <ID> <ADDRESS>`          | Remove an address for the specified account ID                                         |
+| Subcommand                          | Description                                                                                      |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------|
+| `list <ID>`                         | List all addresses or only for the specified account ID (default command)                        |
+| `add <ID> <ADDRESS>`                | Track a bech32-encoded address on the specified account ID                                       |
+| `remove <ID> <ADDRESS>`             | Remove a bech32-encoded address from the specified account ID                                    |
+| `encode <ID> <INTERFACE> <TAG_LEN>` | Produce a bech32 address from the account ID, interface, and optional tag length                 |
 
 The `list` subcommand optionally takes an account ID to only show the addresses of that account, if it is not provided, it will show all addresses of all accounts.
 
@@ -307,13 +333,19 @@ The `list` subcommand optionally takes an account ID to only show the addresses 
 miden-client address list 0x17f13f4f83a8e8100c19d2961dfda2
 ```
 
-`add` and `remove` take the account ID as a mandatory argument, and also the interface of the address, this values can be:
-- `BasicWallet`: The basic wallet interface.
+`add` and `remove` take the account ID and a bech32-encoded address as arguments. `add` validates that the bech32 address encodes the same account ID and that its network matches the CLI's configured network.
 
-Note: the `Unspecified` denotes an address not bound to any interface, it's the default address for every account created.
+Use `encode` to produce a bech32 address from its fields — this output is what `add` expects. The interface can be:
+- `basic-wallet`: The basic wallet interface.
+
+Note: `Unspecified` (shown by `address list`) denotes an address not bound to any interface, it's the default address for every account created.
 
 ```sh
-miden-client address add 0x17f13f4f83a8e8100c19d2961dfda2 BasicWallet 10
+# Produce a bech32 address for the given account, interface, and tag length
+miden-client address encode 0x17f13f4f83a8e8100c19d2961dfda2 basic-wallet 10
+
+# Track that address on the account
+miden-client address add 0x17f13f4f83a8e8100c19d2961dfda2 mlcl1qple0ejnutx8zyp0cm0pme9wjfgqz0u9djq_qruqqypuyph
 ```
 
 ```sh
@@ -402,7 +434,7 @@ The file referenced by `--inputs-path` should contain a TOML array of inline tab
 The input file should contain a TOML table called `inputs`, as in the following example:
 
 ```toml
-inputs = [ { key = "0x0000001000000000000000000000000000000000000000000000000000000000", values = ["13", "9"]}, { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]}, ]
+inputs = [ { key = "0x0000000000000000000000000000000000000000000000000000001000000000", values = ["13", "9"]}, { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]}, ]
 ```
 
 ### `note-transport`

@@ -3,7 +3,13 @@ use alloc::vec::Vec;
 
 use miden_protocol::account::{Account, AccountId};
 use miden_protocol::note::{NoteId, NoteTag};
-use miden_tx::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+};
 use tracing::warn;
 
 use crate::Client;
@@ -94,6 +100,21 @@ impl NoteTagRecord {
             tag,
             source: NoteTagSource::Account(account_id),
         }
+    }
+}
+
+impl Serializable for NoteTagRecord {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.tag.write_into(target);
+        self.source.write_into(target);
+    }
+}
+
+impl Deserializable for NoteTagRecord {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let tag = NoteTag::read_from(source)?;
+        let source = NoteTagSource::read_from(source)?;
+        Ok(Self { tag, source })
     }
 }
 

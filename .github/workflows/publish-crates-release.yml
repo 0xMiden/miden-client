@@ -10,6 +10,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-24.04
+    if: ${{ github.repository_owner == '0xMiden' }}
     env:
       CARGO_TERM_COLOR: always
       # Important: use an absolute path so `cargo publish` verification builds
@@ -17,17 +18,20 @@ jobs:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
     steps:
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
 
       - name: Cleanup large tools for build space
         uses: ./.github/actions/cleanup-runner
 
       - name: Log release info
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          echo "Publishing release ${{ github.event.release.tag_name }}"
+          echo "Publishing release $RELEASE_TAG"
           echo "Commit: $(git rev-parse HEAD)"
 
       - name: Update Rust toolchain
@@ -39,11 +43,7 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
-          cargo publish --workspace --exclude miden-client-web --exclude miden-idxdb-store --dry-run
-          cd crates/idxdb-store
-          cargo publish --dry-run
-          cd ../web-client
-          cargo publish --dry-run
+          cargo publish --workspace --dry-run
 
       - name: Cleanup cargo package artifacts (after dry-run)
         if: always()
@@ -54,8 +54,55 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
-          cargo publish --workspace --exclude miden-client-web --exclude miden-idxdb-store
-          cd crates/idxdb-store
-          cargo publish
-          cd ../web-client
-          cargo publish
+          cargo publish --workspace
+
+  # Upload the miden-client CLI as an artifact on the Github release.
+  # This is used by midenup to speed installs up.
+  upload-artifacts:
+    name: upload pre-built miden-client executable artifacts
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        target: [aarch64-apple-darwin, x86_64-unknown-linux-gnu]
+        exclude:
+          - os: macos-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - uses: ./.github/actions/cleanup-runner
+      - name: Install Rust
+        run: |
+          rustup update --no-self-update
+          rustc --version
+      - name: Add target
+        run: |
+          rustup target add ${{ matrix.target }}
+      - name: Build miden-client-cli
+        run: |
+          BUILD_TARGET=${{ matrix.target }} make build
+      - name: Prepare artifact
+        run: |
+          mv target/${{ matrix.target }}/release/miden-client miden-client-${{ matrix.target }}
+      - name: Attest miden-client-cli
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+        with:
+          subject-path: miden-client-${{ matrix.target }}
+      - name: Upload
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh release upload "$RELEASE_TAG" "miden-client-${{ matrix.target }}"

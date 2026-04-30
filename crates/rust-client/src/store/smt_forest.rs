@@ -59,7 +59,7 @@ impl AccountSmtForest {
             return Err(MerkleError::UntrackedKey(vault_key_word).into());
         }
 
-        let asset = Asset::try_from(asset_word)?;
+        let asset = Asset::from_key_value_words(vault_key_word, asset_word)?;
         let witness = AssetWitness::new(proof)?;
         Ok((asset, witness))
     }
@@ -158,10 +158,10 @@ impl AccountSmtForest {
         let entries: Vec<(Word, Word)> = new_assets
             .map(|asset| {
                 let key: Word = asset.vault_key().into();
-                let value: Word = asset.into();
+                let value = asset.to_value_word();
                 (key, value)
             })
-            .chain(removed_vault_keys.map(|key| (key.into(), EMPTY_WORD)))
+            .chain(removed_vault_keys.map(|vault_key| (vault_key.into(), EMPTY_WORD)))
             .collect();
 
         if entries.is_empty() {
@@ -193,7 +193,7 @@ impl AccountSmtForest {
     pub fn insert_asset_nodes(&mut self, vault: &AssetVault) -> Result<(), StoreError> {
         let smt = Smt::with_entries(vault.assets().map(|asset| {
             let key: Word = asset.vault_key().into();
-            let value: Word = asset.into();
+            let value = asset.to_value_word();
             (key, value)
         }))
         .map_err(StoreError::from)?;
@@ -233,6 +233,20 @@ impl AccountSmtForest {
         Ok(())
     }
 
+    /// Inserts all SMT nodes for an account's vault and storage, then stages
+    /// the account's roots for later commit or discard.
+    pub fn insert_and_stage_account_state(
+        &mut self,
+        account_id: AccountId,
+        vault: &AssetVault,
+        storage: &AccountStorage,
+    ) -> Result<(), StoreError> {
+        self.insert_account_state(vault, storage)?;
+        let roots = Self::collect_account_roots(vault, storage);
+        self.stage_roots(account_id, roots);
+        Ok(())
+    }
+
     /// Inserts all SMT nodes for an account's vault and storage, then replaces
     /// the account's tracked roots atomically.
     pub fn insert_and_register_account_state(
@@ -247,6 +261,7 @@ impl AccountSmtForest {
         Ok(())
     }
 
+    /// Inserts storage map SMT nodes for a specific storage map.
     pub fn insert_storage_map_nodes_for_map(&mut self, map: &StorageMap) -> Result<(), StoreError> {
         let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
         let entries: Vec<(Word, Word)> =

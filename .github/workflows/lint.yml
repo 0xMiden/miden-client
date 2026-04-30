@@ -1,6 +1,8 @@
 name: Lint
+
 permissions:
   contents: read
+
 on:
   push:
     branches: [main, next]
@@ -12,143 +14,131 @@ concurrency:
 
 env:
   CARGO_PROFILE_DEV_DEBUG: 0
+  RUST_CACHE_KEY: rust-cache-2026.02.18
 
 jobs:
   unused_deps:
     name: Check for unused dependencies
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - name: machete
-        uses: bnjbvr/cargo-machete@main
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install cargo-shear
+        uses: taiki-e/install-action@055f5df8c3f65ea01cd41e9dc855becd88953486 # v2.75.18
+        with:
+          tool: cargo-shear@1.11.2
+      - name: Check for unused dependencies
+        run: make shear
+
+  workspace_inheritance:
+    name: Workspace inheritance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      # Do not pin taiki-e's moving tool shortcut tags by hash. Pin a released
+      # install-action commit and set tool explicitly, or zizmor's
+      # impostor-commit audit can flag stale shortcut-tag hashes.
+      - name: Install cargo-binstall
+        uses: taiki-e/install-action@055f5df8c3f65ea01cd41e9dc855becd88953486 # v2.75.18
+        with:
+          tool: cargo-binstall
+      - name: Install workspace inheritance checker
+        run: cargo binstall --no-confirm cargo-workspace-inheritance-check@1.2.0
+      - name: Check workspace inheritance
+        run: cargo workspace-inheritance-check --promotion-threshold 2 --promotion-failure
 
   typos:
     name: Spellcheck
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
-      - uses: taiki-e/install-action@v2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      # Keep this on a released install-action commit with an explicit tool; shortcut tags can
+      # trip zizmor's impostor-commit audit when they are later retagged.
+      - uses: taiki-e/install-action@055f5df8c3f65ea01cd41e9dc855becd88953486 # v2.75.18
         with:
           tool: typos@1.42.0
       - run: make typos-check
 
   toml:
     name: Toml formatting
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
-      - uses: taiki-e/install-action@v2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      # Keep this on a released install-action commit with an explicit tool; shortcut tags can
+      # trip zizmor's impostor-commit audit when they are later retagged.
+      - uses: taiki-e/install-action@055f5df8c3f65ea01cd41e9dc855becd88953486 # v2.75.18
         with:
           tool: taplo-cli@0.10.0
       - run: make toml-check
 
-  eslint:
-    name: Typescript eslint checks
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - run: make rust-client-ts-lint
-
-  react-sdk-lint:
-    name: React SDK lint and typecheck
-    runs-on: ubuntu-24.04
-    needs: [wasm-bindgen-types]
-    steps:
-      - uses: actions/checkout@v6
-      - name: Fetch web client dist
-        uses: actions/download-artifact@v4
-        with:
-          name: web-client-artifacts
-          path: ./crates/web-client/dist
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      - name: Install dependencies
-        run: ./scripts/retry-yarn-install.sh packages/react-sdk
-      - name: Run lint
-        run: make react-sdk-lint
-      - name: Run typecheck
-        run: cd ./packages/react-sdk && yarn typecheck
-
   clippy:
     name: Clippy
-    runs-on: ubuntu-24.04
+    runs-on: warp-ubuntu-latest-x64-8x
     steps:
-      - uses: actions/checkout@v6
-      - name: Install Rust with clippy
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
+      - name: Add Rust Cache
+        uses: WarpBuilds/rust-cache@9d0cc3090d9c87de74ea67617b246e978735b1a1 # v2.9.1
+        with:
+          shared-key: rust-release
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/next' }}
+      - name: Install Rust with nightly clippy
         run: |
-          rustup update --no-self-update
-          rustup component add clippy
+          rustup update --no-self-update nightly
+          rustup +nightly component add clippy rustfmt
       - name: make - clippy
         run: make clippy
 
-  clippy-wasm:
-    name: Clippy WASM
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - name: Install Rust with clippy
-        run: |
-          rustup update --no-self-update
-          rustup target add wasm32-unknown-unknown
-          rustup component add clippy
-      - name: make - clippy-wasm
-        run: make clippy-wasm
-
   format:
     name: Format check
-    runs-on: ubuntu-24.04
+    runs-on: warp-ubuntu-latest-x64-8x
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
+      - name: Add Rust Cache
+        uses: WarpBuilds/rust-cache@9d0cc3090d9c87de74ea67617b246e978735b1a1 # v2.9.1
+        with:
+          shared-key: rust-format
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/next' }}
       - name: Install Rust with rustfmt
         run: |
           rustup update --no-self-update nightly
           rustup +nightly component add rustfmt
-      - name: Install prettier
-        run: yarn install
       - name: make - format-check
         run: make format-check
 
-  wasm-bindgen-types:
-    name: Wasm bindgen types
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-          cache-dependency-path: |
-            crates/web-client/yarn.lock
-            crates/idxdb-store/src/yarn.lock
-      - name: Install Rust with wasm target
-        run: |
-          rustup update --no-self-update
-          rustup target add wasm32-unknown-unknown
-      - name: Install dependencies
-        working-directory: crates/web-client
-        run: yarn install --frozen-lockfile
-      - name: Build web client
-        working-directory: crates/web-client
-        run: yarn build
-      - name: Check bindgen type coverage
-        working-directory: crates/web-client
-        run: yarn check:wasm-types
-      - name: Upload web client dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-client-artifacts
-          path: ./crates/web-client/dist
-
   rustdocs:
     name: Build rust documentation
-    runs-on: ubuntu-24.04
+    runs-on: warp-ubuntu-latest-x64-8x
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
+      - name: Add Rust Cache
+        uses: WarpBuilds/rust-cache@9d0cc3090d9c87de74ea67617b246e978735b1a1 # v2.9.1
+        with:
+          shared-key: rust-docs
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/next' }}
       - name: Install Rust
         run: rustup update --no-self-update
       - name: make - doc

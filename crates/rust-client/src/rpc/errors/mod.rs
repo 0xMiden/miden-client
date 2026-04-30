@@ -8,7 +8,7 @@ use miden_protocol::account::AccountId;
 use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::errors::NoteError;
 use miden_protocol::note::NoteId;
-use miden_protocol::utils::DeserializationError;
+use miden_protocol::utils::serde::DeserializationError;
 use thiserror::Error;
 
 use super::RpcEndpoint;

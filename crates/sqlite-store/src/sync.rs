@@ -8,7 +8,7 @@ use miden_client::Word;
 use miden_client::account::AccountId;
 use miden_client::note::{BlockNumber, NoteTag};
 use miden_client::store::{AccountSmtForest, StoreError};
-use miden_client::sync::{NoteTagRecord, NoteTagSource, StateSyncUpdate};
+use miden_client::sync::{NoteTagRecord, NoteTagSource, PublicAccountUpdate, StateSyncUpdate};
 use miden_client::utils::{Deserializable, Serializable};
 use rusqlite::{Connection, Transaction, params};
 
@@ -83,7 +83,7 @@ impl SqliteStore {
     }
 
     pub(super) fn get_sync_height(conn: &mut Connection) -> Result<BlockNumber, StoreError> {
-        const QUERY: &str = "SELECT block_num FROM state_sync";
+        const QUERY: &str = "SELECT block_num FROM blockchain_checkpoint";
 
         conn.prepare_cached(QUERY)
             .into_store_error()?
@@ -104,7 +104,7 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         let StateSyncUpdate {
             block_num,
-            block_updates,
+            partial_blockchain_updates,
             note_updates,
             transaction_updates,
             account_updates,
@@ -112,26 +112,24 @@ impl SqliteStore {
 
         let tx = conn.transaction().into_store_error()?;
 
-        // Update state sync block number only if moving forward
-        const BLOCK_NUMBER_QUERY: &str = "UPDATE state_sync SET block_num = ? WHERE block_num < ?";
+        // Update blockchain checkpoint (block number and peaks) only if moving forward.
+        let new_peaks_bytes = partial_blockchain_updates.new_peaks.peaks().to_vec().to_bytes();
+        const BLOCKCHAIN_CHECKPOINT_QUERY: &str = "UPDATE blockchain_checkpoint SET block_num = ?, partial_blockchain_peaks = ? WHERE block_num < ?";
         tx.execute(
-            BLOCK_NUMBER_QUERY,
-            params![i64::from(block_num.as_u32()), i64::from(block_num.as_u32())],
+            BLOCKCHAIN_CHECKPOINT_QUERY,
+            params![i64::from(block_num.as_u32()), new_peaks_bytes, i64::from(block_num.as_u32())],
         )
         .into_store_error()?;
 
-        for (block_header, block_has_relevant_notes, new_mmr_peaks) in block_updates.block_headers()
-        {
-            Self::insert_block_header_tx(
-                &tx,
-                block_header,
-                new_mmr_peaks,
-                *block_has_relevant_notes,
-            )?;
+        for (block_header, block_has_relevant_notes) in partial_blockchain_updates.block_headers() {
+            Self::insert_block_header_tx(&tx, block_header, *block_has_relevant_notes)?;
         }
 
         // Insert new authentication nodes (inner nodes of the PartialBlockchain)
-        Self::insert_partial_blockchain_nodes_tx(&tx, block_updates.new_authentication_nodes())?;
+        Self::insert_partial_blockchain_nodes_tx(
+            &tx,
+            partial_blockchain_updates.new_authentication_nodes(),
+        )?;
 
         // Update notes
         apply_note_updates_tx(&tx, &note_updates)?;
@@ -178,8 +176,15 @@ impl SqliteStore {
         }
 
         // Update public accounts on the db that have been updated onchain
-        for account in account_updates.updated_public_accounts() {
-            Self::update_account_state(&tx, &mut smt_forest, account)?;
+        for update in account_updates.updated_public_accounts() {
+            match update {
+                PublicAccountUpdate::Full(account) => {
+                    Self::update_account_state(&tx, &mut smt_forest, account)?;
+                },
+                PublicAccountUpdate::Delta { new_header, delta } => {
+                    Self::apply_sync_account_delta(&tx, &mut smt_forest, new_header, delta)?;
+                },
+            }
         }
         drop(smt_forest);
 

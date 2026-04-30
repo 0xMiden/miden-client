@@ -20,6 +20,11 @@ rustdoc-args = ["--cfg", "docsrs"]
 # "prost-types" and "tonic-prost" are ignored because they are needed by the generated proto bindings.
 ignored = ["getrandom", "prost-types", "tonic-prost"]
 
+[package.metadata.cargo-shear]
+# getrandom is used through rand's wasm backend selection. The other entries are used by
+# generated proto bindings and std-only keystore code that shear does not fully resolve.
+ignored = ["getrandom", "prost-types", "serde", "serde_json", "tempfile", "tonic-prost"]
+
 [lib]
 crate-type = ["lib"]
 
@@ -28,6 +33,8 @@ default = ["std"]
 std = [
   "dep:argon2",
   "dep:chacha20poly1305",
+  "dep:tempfile",
+  "dep:tokio",
   "dep:zeroize",
   "miden-protocol/std",
   "miden-remote-prover-client/std",
@@ -42,7 +49,6 @@ tonic = []
 
 [dependencies]
 # Miden dependencies
-miden-mast-package         = { default-features = false, version = "0.20" }
 miden-protocol             = { workspace = true }
 miden-remote-prover-client = { default-features = false, features = ["tx-prover"], workspace = true }
 miden-standards            = { workspace = true }
@@ -54,26 +60,28 @@ anyhow           = { workspace = true }
 argon2           = { optional = true, version = "0.5" }
 async-trait      = { workspace = true }
 chacha20poly1305 = { default-features = false, features = ["std"], optional = true, version = "0.10" }
-chrono           = { optional = false, version = "0.4" }
+chrono           = { workspace = true }
 futures          = { version = "0.3" }
 hex              = { workspace = true }
-prost            = { default-features = false, features = ["derive"], version = "0.14" }
+prost            = { features = ["derive"], workspace = true }
 prost-types      = { version = "0.14" }
 rand             = { workspace = true }
 serde            = { workspace = true }
-serde_json       = { version = "1.0" }
+serde_json       = { workspace = true }
+tempfile         = { optional = true, workspace = true }
 thiserror        = { workspace = true }
-tonic            = { default-features = false, features = ["codegen"], version = "0.14" }
+tokio            = { features = ["time"], optional = true, workspace = true }
+tonic            = { features = ["codegen"], workspace = true }
 tonic-health     = { version = "0.14" }
 tonic-prost      = { version = "0.14" }
 tracing          = { workspace = true }
-uuid             = { features = ["js", "serde", "v4"], optional = true, version = "1.10" }
+uuid             = { features = ["js", "serde", "v4"], optional = true, workspace = true }
 zeroize          = { optional = true, version = "1.8" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom             = { features = ["wasm_js"], version = "0.3" }
+gloo-timers           = { features = ["futures"], version = "0.3" }
 tonic-web-wasm-client = { default-features = false, version = "0.9" }
-web-sys               = { features = ["Storage", "Window", "console"], version = "0.3" }
 
 [build-dependencies]
 miden-node-proto-build           = { workspace = true }
@@ -81,7 +89,7 @@ miden-note-transport-proto-build = { workspace = true }
 miden-protocol                   = { workspace = true }
 miden-standards                  = { workspace = true }
 miette                           = { workspace = true }
-prost                            = { default-features = false, features = ["derive"], version = "0.14" }
+prost                            = { features = ["derive"], workspace = true }
 tonic-prost-build                = { version = "0.14" }
 
 [dev-dependencies]
@@ -89,7 +97,6 @@ miden-protocol  = { default-features = false, features = ["testing"], workspace 
 miden-standards = { features = ["testing"], workspace = true }
 miden-testing   = { default-features = false, workspace = true }
 tokio           = { workspace = true }
-web-sys         = { features = ["console"], version = "0.3" }
 
 [lints]
 workspace = true

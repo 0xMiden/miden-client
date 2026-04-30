@@ -6,11 +6,13 @@ use std::time::Instant;
 use miden_client::account::component::{
     AccountComponent,
     AccountComponentMetadata,
+    BasicWallet,
     basic_wallet_library,
 };
 use miden_client::account::{
     Account,
     AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
     AccountId,
     AccountStorageMode,
     AccountType,
@@ -55,7 +57,7 @@ fn create_account_with_empty_maps(
     num_maps: usize,
     seed: [u8; 32],
 ) -> anyhow::Result<(Account, AuthSecretKey)> {
-    let sk = AuthSecretKey::new_falcon512_rpo_with_rng(&mut ChaCha20Rng::from_seed(seed));
+    let sk = AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut ChaCha20Rng::from_seed(seed));
 
     // Create empty storage map slots
     let storage_slots: Vec<StorageSlot> = (0..num_maps)
@@ -76,7 +78,7 @@ fn create_account_with_empty_maps(
     let expansion_component = AccountComponent::new(
         expansion_component_code,
         storage_slots,
-        AccountComponentMetadata::new("miden::testing::storage_expander").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::storage_expander", AccountType::all()),
     )
     .map_err(|e| anyhow::anyhow!("Failed to create expansion component: {e}"))?;
 
@@ -94,29 +96,26 @@ fn create_account_with_empty_maps(
     let reader_component = AccountComponent::new(
         reader_component_code,
         vec![],
-        AccountComponentMetadata::new("miden::testing::storage_reader").with_supports_all_types(),
+        AccountComponentMetadata::new("miden::testing::storage_reader", AccountType::all()),
     )
     .map_err(|e| anyhow::anyhow!("Failed to create reader component: {e}"))?;
 
     // Basic wallet for normal operations
-    let wallet_component = AccountComponent::new(
-        basic_wallet_library(),
-        vec![],
-        AccountComponentMetadata::new("miden::testing::basic_wallet").with_supports_all_types(),
-    )
-    .expect("basic wallet component should satisfy account component requirements");
+    let wallet_component =
+        AccountComponent::new(basic_wallet_library(), vec![], BasicWallet::component_metadata())
+            .expect("basic wallet component should satisfy account component requirements");
 
     let account = AccountBuilder::new(seed)
         .with_auth_component(AuthSingleSig::new(
             sk.public_key().to_commitment(),
-            AuthSchemeId::Falcon512Rpo,
+            AuthSchemeId::Falcon512Poseidon2,
         ))
         .account_type(AccountType::RegularAccountUpdatableCode)
         .with_component(wallet_component)
         .with_component(expansion_component)
         .with_component(reader_component)
         .storage_mode(AccountStorageMode::Public)
-        .build()?;
+        .build_with_schema_commitment()?;
 
     Ok((account, sk))
 }

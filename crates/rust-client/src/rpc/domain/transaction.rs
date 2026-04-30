@@ -1,11 +1,12 @@
+use alloc::collections::BTreeMap;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
-use miden_protocol::asset::FungibleAsset;
+use miden_protocol::asset::Asset;
 use miden_protocol::block::BlockNumber;
-use miden_protocol::note::{NoteHeader, Nullifier};
+use miden_protocol::note::{NoteHeader, NoteId, NoteInclusionProof, Nullifier};
 use miden_protocol::transaction::{
     InputNoteCommitment,
     InputNotes,
@@ -13,11 +14,11 @@ use miden_protocol::transaction::{
     TransactionId,
 };
 
+use super::note::{CommittedNote, CommittedNoteMetadata};
 use crate::rpc::{RpcConversionError, RpcError, generated as proto};
 
-// TODO: Remove this when we turn on fees and the node informs the correct asset account ID
-
 /// A native asset faucet ID for use in testing scenarios.
+#[cfg(test)]
 pub const ACCOUNT_ID_NATIVE_ASSET_FAUCET: u128 = 0xab00_0000_0000_cd20_0000_ac00_0000_de00_u128;
 
 // INTO TRANSACTION ID
@@ -56,7 +57,7 @@ impl From<TransactionId> for proto::transaction::TransactionId {
 // ================================================================================================
 
 /// Represents a transaction that was included in the node at a certain block.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct TransactionInclusion {
     /// The transaction identifier.
     pub transaction_id: TransactionId,
@@ -66,13 +67,20 @@ pub struct TransactionInclusion {
     pub account_id: AccountId,
     /// The initial account state commitment before the transaction was executed.
     pub initial_state_commitment: Word,
+    /// The nullifiers of the input notes consumed by this transaction.
+    pub nullifiers: Vec<Nullifier>,
+    /// Output notes committed by this transaction, with inclusion proofs.
+    /// Does not include erased notes.
+    pub output_notes: Vec<CommittedNote>,
+    /// IDs of output notes that were erased by same-batch note erasure.
+    pub erased_output_note_ids: Vec<NoteId>,
 }
 
 // TRANSACTIONS INFO
 // ================================================================================================
 
 /// Represent a list of transaction records that were included in a range of blocks.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct TransactionsInfo {
     /// Current chain tip
     pub chain_tip: BlockNumber,
@@ -115,12 +123,17 @@ impl TryFrom<proto::rpc::SyncTransactionsResponse> for TransactionsInfo {
 
 /// Contains information about a transaction that got included in the chain at a specific block
 /// number.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct TransactionRecord {
     /// Block number in which the transaction was included.
     pub block_num: BlockNumber,
     /// A transaction header.
     pub transaction_header: TransactionHeader,
+    /// Output notes with inclusion proofs, as returned by the node's `SyncTransactions`
+    /// response. Does not include erased notes.
+    pub output_notes: Vec<CommittedNote>,
+    /// IDs of output notes that were erased by same-batch note erasure.
+    pub erased_output_note_ids: Vec<NoteId>,
 }
 
 impl TryFrom<proto::rpc::TransactionRecord> for TransactionRecord {
@@ -128,98 +141,136 @@ impl TryFrom<proto::rpc::TransactionRecord> for TransactionRecord {
 
     fn try_from(value: proto::rpc::TransactionRecord) -> Result<Self, Self::Error> {
         let block_num = value.block_num.into();
-        let transaction_header =
+        let proto_header =
             value.header.ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
                 entity: "TransactionRecord",
                 field_name: "transaction_header",
             })?;
 
+        let (transaction_header, output_notes, erased_output_note_ids) =
+            convert_transaction_header(proto_header, value.output_note_proofs)?;
+
         Ok(Self {
             block_num,
-            transaction_header: transaction_header.try_into()?,
+            transaction_header,
+            output_notes,
+            erased_output_note_ids,
         })
     }
 }
 
-impl TryFrom<proto::transaction::TransactionHeader> for TransactionHeader {
-    type Error = RpcError;
-
-    fn try_from(value: proto::transaction::TransactionHeader) -> Result<Self, Self::Error> {
-        let account_id =
-            value
-                .account_id
-                .ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
-                    entity: "TransactionHeader",
-                    field_name: "account_id",
-                })?;
-
-        let initial_state_commitment = value.initial_state_commitment.ok_or(
-            RpcConversionError::MissingFieldInProtobufRepresentation {
+/// Converts a proto `TransactionHeader` and its associated output note inclusion proofs
+/// into the domain `TransactionHeader`, committed output notes, and erased note IDs.
+///
+/// The proto `TransactionHeader.output_notes` contains `NoteHeader`s for ALL output notes
+/// (including erased ones). Inclusion proofs for committed notes are provided separately in
+/// `output_note_proofs`. Notes present in `output_notes` but without a corresponding proof
+/// are erased (created and consumed within the same batch).
+fn convert_transaction_header(
+    value: proto::transaction::TransactionHeader,
+    output_note_proofs: Vec<proto::note::NoteInclusionInBlockProof>,
+) -> Result<(TransactionHeader, Vec<CommittedNote>, Vec<NoteId>), RpcError> {
+    let account_id =
+        value
+            .account_id
+            .ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
                 entity: "TransactionHeader",
-                field_name: "initial_state_commitment",
-            },
-        )?;
+                field_name: "account_id",
+            })?;
 
-        let final_state_commitment = value.final_state_commitment.ok_or(
-            RpcConversionError::MissingFieldInProtobufRepresentation {
-                entity: "TransactionHeader",
-                field_name: "final_state_commitment",
-            },
-        )?;
+    let initial_state_commitment = value.initial_state_commitment.ok_or(
+        RpcConversionError::MissingFieldInProtobufRepresentation {
+            entity: "TransactionHeader",
+            field_name: "initial_state_commitment",
+        },
+    )?;
 
-        let note_commitments = value
-            .nullifiers
-            .into_iter()
-            .map(|d| {
-                let word: Word = d
-                    .try_into()
-                    .map_err(|e: RpcConversionError| RpcError::InvalidResponse(e.to_string()))?;
-                Ok(InputNoteCommitment::from(Nullifier::from_raw(word)))
-            })
-            .collect::<Result<Vec<_>, RpcError>>()?;
-        let input_notes = InputNotes::new_unchecked(note_commitments);
+    let final_state_commitment = value.final_state_commitment.ok_or(
+        RpcConversionError::MissingFieldInProtobufRepresentation {
+            entity: "TransactionHeader",
+            field_name: "final_state_commitment",
+        },
+    )?;
 
-        let output_notes = value
-            .output_notes
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<NoteHeader>, RpcError>>()?;
+    let note_commitments = value
+        .input_notes
+        .into_iter()
+        .map(|d| {
+            let word: Word = d
+                .nullifier
+                .ok_or(RpcError::ExpectedDataMissing("nullifier".into()))?
+                .try_into()
+                .map_err(|e: RpcConversionError| RpcError::InvalidResponse(e.to_string()))?;
+            Ok(InputNoteCommitment::from(Nullifier::from_raw(word)))
+        })
+        .collect::<Result<Vec<_>, RpcError>>()?;
+    let input_notes = InputNotes::new_unchecked(note_commitments);
 
-        let transaction_header = TransactionHeader::new(
-            account_id.try_into()?,
-            initial_state_commitment.try_into()?,
-            final_state_commitment.try_into()?,
-            input_notes,
-            output_notes,
-            // TODO: handle this; should we open an issue in miden-node?
-            FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("is valid"), 0u64)
-                .unwrap(),
-        );
-        Ok(transaction_header)
-    }
-}
+    // Parse all output note headers from the transaction header.
+    let output_note_headers: Vec<NoteHeader> = value
+        .output_notes
+        .into_iter()
+        .map(|proto_header| {
+            proto_header
+                .try_into()
+                .map_err(|e: RpcConversionError| RpcError::InvalidResponse(e.to_string()))
+        })
+        .collect::<Result<Vec<_>, RpcError>>()?;
 
-impl TryFrom<proto::note::NoteSyncRecord> for NoteHeader {
-    type Error = RpcError;
-
-    fn try_from(value: proto::note::NoteSyncRecord) -> Result<Self, Self::Error> {
-        let note_id = value
+    // Build a map of note_id to inclusion_proof from the separate proofs field.
+    let mut proof_map: BTreeMap<NoteId, NoteInclusionProof> = BTreeMap::new();
+    for mut proto_proof in output_note_proofs {
+        let note_id: NoteId = proto_proof
             .note_id
-            .ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
-                entity: "NoteSyncRecord",
-                field_name: "note_id",
-            })?
-            .try_into()?;
-
-        let note_metadata = value
-            .metadata
-            .ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
-                entity: "NoteSyncRecord",
-                field_name: "metadata",
-            })?
-            .try_into()?;
-
-        let note_header = Self::new(note_id, note_metadata);
-        Ok(note_header)
+            .take()
+            .ok_or(RpcError::ExpectedDataMissing("output_note_proofs.note_id".into()))?
+            .try_into()
+            .map_err(|e: RpcConversionError| RpcError::InvalidResponse(e.to_string()))?;
+        let inclusion_proof: NoteInclusionProof = proto_proof
+            .try_into()
+            .map_err(|e: RpcConversionError| RpcError::InvalidResponse(e.to_string()))?;
+        proof_map.insert(note_id, inclusion_proof);
     }
+
+    // Join: notes with a matching proof are committed; notes without are erased.
+    let mut committed_output_notes = Vec::with_capacity(proof_map.len());
+    let mut erased_output_note_ids =
+        Vec::with_capacity(output_note_headers.len().saturating_sub(proof_map.len()));
+
+    for header in &output_note_headers {
+        let note_id = header.id();
+        if let Some(proof) = proof_map.remove(&note_id) {
+            let metadata = CommittedNoteMetadata::Full(header.metadata().clone());
+            committed_output_notes.push(CommittedNote::new(note_id, metadata, proof));
+        } else {
+            erased_output_note_ids.push(note_id);
+        }
+    }
+
+    let fee_asset: Asset = value
+        .fee
+        .ok_or(RpcConversionError::MissingFieldInProtobufRepresentation {
+            entity: "TransactionHeader",
+            field_name: "fee",
+        })?
+        .try_into()?;
+
+    let fee = match fee_asset {
+        Asset::Fungible(fungible) => fungible,
+        Asset::NonFungible(_) => {
+            return Err(RpcError::InvalidResponse(
+                "expected fungible asset for transaction fee".into(),
+            ));
+        },
+    };
+
+    let transaction_header = TransactionHeader::new(
+        account_id.try_into()?,
+        initial_state_commitment.try_into()?,
+        final_state_commitment.try_into()?,
+        input_notes,
+        output_note_headers,
+        fee,
+    );
+    Ok((transaction_header, committed_output_notes, erased_output_note_ids))
 }

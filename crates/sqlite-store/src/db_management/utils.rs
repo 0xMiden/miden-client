@@ -2,8 +2,8 @@ use std::string::String;
 use std::sync::LazyLock;
 use std::vec::Vec;
 
-use miden_client::crypto::{Blake3_160, Blake3Digest};
 use miden_client::store::StoreError;
+use miden_protocol::crypto::hash::blake::{Blake3_256, Blake3Digest};
 use rusqlite::types::FromSql;
 use rusqlite::{Connection, OptionalExtension, Result, ToSql, Transaction, params};
 use rusqlite_migration::{M, Migrations, SchemaVersion};
@@ -57,7 +57,7 @@ macro_rules! insert_sql {
 // MIGRATIONS
 // ================================================================================================
 
-type Hash = Blake3Digest<20>;
+type Hash = Blake3Digest<32>;
 
 const MIGRATION_SCRIPTS: [&str; 1] = [include_str!("../store.sql")];
 static MIGRATION_HASHES: LazyLock<Vec<Hash>> = LazyLock::new(compute_migration_hashes);
@@ -111,8 +111,8 @@ fn compute_migration_hashes() -> Vec<Hash> {
     MIGRATION_SCRIPTS
         .iter()
         .map(|sql| {
-            let script_hash = Blake3_160::hash(preprocess_sql(sql).as_bytes());
-            accumulator = Blake3_160::merge(&[accumulator, script_hash]);
+            let script_hash = Blake3_256::hash(preprocess_sql(sql).as_bytes());
+            accumulator = Blake3_256::merge(&[accumulator, script_hash]);
             accumulator
         })
         .collect()
