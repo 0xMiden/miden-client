@@ -700,12 +700,12 @@ where
                 )
                 .await?;
 
-            if execution.failed.is_empty() {
+            if execution.failed().is_empty() {
                 break;
             }
 
             let failed_note_ids: BTreeSet<NoteId> =
-                execution.failed.iter().map(|n| n.note.id()).collect();
+                execution.failed().iter().map(|n| n.note().id()).collect();
             let filtered_input_notes = InputNotes::new(
                 input_notes
                     .into_iter()

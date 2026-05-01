@@ -56,7 +56,7 @@ use miden_client::transaction::{
     TransactionRequestError,
     TransactionStatus,
 };
-use miden_client::utils::Serializable;
+use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_protocol::account::{
@@ -101,9 +101,11 @@ use miden_protocol::transaction::RawOutputNote;
 use miden_protocol::vm::AdviceInputs;
 use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
 use miden_standards::account::AccountBuilderSchemaCommitmentExt;
+use miden_standards::account::burn_policies::BurnAuthControlled;
 use miden_standards::account::faucets::BasicFungibleFaucet;
 use miden_standards::account::interface::AccountInterfaceError;
-use miden_standards::account::mint_policies::AuthControlled;
+use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
+use miden_standards::account::mint_policies::MintAuthControlled;
 use miden_standards::account::wallets::BasicWallet;
 use miden_standards::note::{NoteConsumptionStatus, P2idNoteStorage, StandardNote};
 use miden_standards::testing::mock_account::MockAccountExt;
@@ -323,7 +325,7 @@ async fn account_code() {
 
     let account_code_bytes = account_code.to_bytes();
 
-    let reconstructed_code = AccountCode::from_bytes(&account_code_bytes).unwrap();
+    let reconstructed_code = AccountCode::read_from_bytes(&account_code_bytes).unwrap();
     assert_eq!(*account_code, reconstructed_code);
 
     client.add_account(&account, false).await.unwrap();
@@ -2938,7 +2940,8 @@ async fn consume_note_with_custom_script() {
     client.sync_state().await.unwrap();
 
     let custom_note_script = "
-        begin
+        @note_script
+        pub proc main
             nop
         end
     ";
@@ -3480,7 +3483,15 @@ async fn insert_new_fungible_faucet(
     client.rng().fill_bytes(&mut init_seed);
 
     let symbol = TokenSymbol::new("TEST").unwrap();
-    let max_supply = Felt::new(9_999_999_u64);
+    let max_supply = 9_999_999_u64;
+    let token_metadata = FungibleTokenMetadata::builder(
+        TokenName::new("").expect("empty token name is always valid"),
+        symbol,
+        10,
+        max_supply,
+    )
+    .build()
+    .unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
@@ -3489,8 +3500,10 @@ async fn insert_new_fungible_faucet(
             pub_key.to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
         ))
-        .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
-        .with_component(AuthControlled::allow_all())
+        .with_component(token_metadata)
+        .with_component(BasicFungibleFaucet)
+        .with_component(MintAuthControlled::allow_all())
+        .with_component(BurnAuthControlled::allow_all())
         .build_with_schema_commitment()
         .unwrap();
 
@@ -3516,7 +3529,15 @@ async fn insert_new_ecdsa_fungible_faucet(
     client.rng().fill_bytes(&mut init_seed);
 
     let symbol = TokenSymbol::new("TEST").unwrap();
-    let max_supply = Felt::new(9_999_999_u64);
+    let max_supply = 9_999_999_u64;
+    let token_metadata = FungibleTokenMetadata::builder(
+        TokenName::new("").expect("empty token name is always valid"),
+        symbol,
+        10,
+        max_supply,
+    )
+    .build()
+    .unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
@@ -3525,8 +3546,10 @@ async fn insert_new_ecdsa_fungible_faucet(
             pub_key.to_commitment(),
             AuthSchemeId::EcdsaK256Keccak,
         ))
-        .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
-        .with_component(AuthControlled::allow_all())
+        .with_component(token_metadata)
+        .with_component(BasicFungibleFaucet)
+        .with_component(MintAuthControlled::allow_all())
+        .with_component(BurnAuthControlled::allow_all())
         .build_with_schema_commitment()
         .unwrap();
 

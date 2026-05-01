@@ -701,7 +701,8 @@ async fn debug_mode_outputs_logs() -> Result<()> {
 
     // Create the custom note with a script that will print the stack state
     let note_script = "
-            begin
+            @note_script
+            pub proc main
                 debug.stack
                 assert_eq
             end
@@ -1158,10 +1159,10 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
 
     // Create a TOML file with the InitStorageData
     let init_storage_data_toml = r#"
-        ["miden::standards::fungible_faucets::metadata"]
-        decimals="10"
-        max_supply="10000000"
-        symbol="BTC"
+        [fungible-faucet-metadata]
+        symbol = "BTC"
+        decimals = 10
+        max_supply = 10000000
         "#;
     let file_path = cli_path.join(INIT_DATA_FILENAME);
     fs::write(&file_path, init_storage_data_toml).unwrap();

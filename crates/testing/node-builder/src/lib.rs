@@ -38,11 +38,12 @@ use miden_protocol::block::FeeParameters;
 use miden_protocol::crypto::dsa::ecdsa_k256_keccak;
 use miden_protocol::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
 use miden_protocol::utils::serde::Serializable;
-use miden_protocol::{Felt, ONE, Word};
+use miden_protocol::{ONE, Word};
 use miden_standards::AuthMethod;
 use miden_standards::account::auth::AuthSingleSig;
 use miden_standards::account::components::basic_wallet_library;
 use miden_standards::account::faucets::create_basic_fungible_faucet;
+use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
 use tokio::net::TcpListener;
@@ -457,11 +458,16 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
         approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Poseidon2),
     };
 
-    let account = create_basic_fungible_faucet(
-        rng.random(),
+    let metadata = FungibleTokenMetadata::builder(
+        TokenName::new("").expect("empty token name is always valid"),
         TokenSymbol::try_from("TST").expect("TST should be a valid token symbol"),
         12,
-        Felt::from(1_000_000u32),
+        1_000_000,
+    )
+    .build()?;
+    let account = create_basic_fungible_faucet(
+        rng.random(),
+        metadata,
         miden_protocol::account::AccountStorageMode::Public,
         auth_method,
     )?;
@@ -545,11 +551,16 @@ fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Res
         approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Poseidon2),
     };
 
-    let faucet = create_basic_fungible_faucet(
-        init_seed,
+    let metadata = FungibleTokenMetadata::builder(
+        TokenName::new("").expect("empty token name is always valid"),
         TokenSymbol::new("TKN")?,
         FAUCET_DECIMALS,
-        Felt::from(FAUCET_MAX_SUPPLY),
+        u64::from(FAUCET_MAX_SUPPLY),
+    )
+    .build()?;
+    let faucet = create_basic_fungible_faucet(
+        init_seed,
+        metadata,
         miden_protocol::account::AccountStorageMode::Public,
         auth_scheme,
     )?;

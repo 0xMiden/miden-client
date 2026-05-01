@@ -281,6 +281,7 @@ pub mod vm {
         AdviceInputs,
         AdviceMap,
         AttributeSet,
+        MIN_STACK_DEPTH,
         Package,
         PackageExport,
         PackageManifest,

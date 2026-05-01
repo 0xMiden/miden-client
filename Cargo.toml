@@ -35,24 +35,24 @@ miden-client              = { default-features = false, path = "crates/rust-clie
 miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-store", version = "0.15.0" }
 
 # Miden protocol dependencies
-miden-protocol  = { default-features = false, version = "0.14" }
-miden-standards = { default-features = false, version = "0.14" }
-miden-testing   = { default-features = false, version = "0.14" }
-miden-tx        = { default-features = false, version = "0.14" }
+miden-protocol  = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
+miden-standards = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
+miden-testing   = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
+miden-tx        = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
 
 # Miden node dependencies
-miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/node.git" }
-miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/node.git" }
-miden-node-proto = { branch = "next", git = "https://github.com/0xMiden/node.git" }
-miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/node.git" }
-miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/node.git" }
-miden-node-store = { branch = "next", git = "https://github.com/0xMiden/node.git" }
-miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/node.git" }
-miden-node-validator = { branch = "next", git = "https://github.com/0xMiden/node.git" }
+miden-node-block-producer = { path = "../miden-node/crates/block-producer" }
+miden-node-ntx-builder = { path = "../miden-node/crates/ntx-builder" }
+miden-node-proto = { path = "../miden-node/crates/proto" }
+miden-node-proto-build = { default-features = false, path = "../miden-node/proto" }
+miden-node-rpc = { path = "../miden-node/crates/rpc" }
+miden-node-store = { path = "../miden-node/crates/store" }
+miden-node-utils = { path = "../miden-node/crates/utils" }
+miden-node-validator = { path = "../miden-node/crates/validator" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-remote-prover-client = { branch = "next", default-features = false, features = [
+miden-remote-prover-client = { default-features = false, features = [
   "tx-prover",
-], git = "https://github.com/0xMiden/node.git" }
+], path = "../miden-node/crates/remote-prover-client" }
 
 # External dependencies
 anyhow             = { default-features = false, version = "1.0" }
