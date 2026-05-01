@@ -137,3 +137,52 @@ client.submit_transaction(transaction_execution_result).await?
 
 You can decide whether you want the note details to be public or private through the `note_type` parameter.
 You may also customize the transaction request with the other `TransactionRequestBuilder` methods. This allows you to run custom code, with custom note arguments and additional output/input notes as well.
+
+## Screen note consumability with `NoteScreener`
+
+`NoteScreener` helps determine whether notes are relevant and consumable by accounts tracked in your client.
+It is useful for:
+
+- filtering notes before trying to consume them;
+- understanding whether a note is consumable now or requires additional authorization; and
+- checking a set of notes together to find a maximal consumable subset.
+
+You can create it directly from a client:
+
+```rust
+let screener = client.note_screener();
+```
+
+### Check one or many notes
+
+Use `can_consume` or `can_consume_batch` to test notes against all tracked accounts:
+
+```rust
+use miden_client::note::NoteConsumability;
+
+let notes = vec![note_a.clone(), note_b.clone()];
+let result = client.note_screener().can_consume_batch(&notes).await?;
+
+for (note_id, consumability) in result {
+    // Each entry is (account_id, NoteConsumptionStatus)
+    let statuses: Vec<NoteConsumability> = consumability;
+    println!("note {} is relevant for {} account(s)", note_id.to_hex(), statuses.len());
+}
+```
+
+Notes that are permanently unconsumable by all tracked accounts are omitted from the batch result.
+
+### Check consumability of multiple notes for one account
+
+Use `check_notes_consumability` to evaluate a list of notes as one potential consume transaction for a specific account:
+
+```rust
+let note_consumption_info = client
+    .note_screener()
+    .check_notes_consumability(target_account_id, notes)
+    .await?;
+
+println!("failed notes: {}", note_consumption_info.failed.len());
+```
+
+This method progressively excludes failing notes to find a maximal set that can be consumed together.
