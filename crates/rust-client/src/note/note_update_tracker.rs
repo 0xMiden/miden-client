@@ -2,7 +2,7 @@ use alloc::collections::BTreeMap;
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::note::{Note, NoteDetails, NoteId, NoteInclusionProof, Nullifier};
+use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
 use miden_tx::utils::serde::{
     ByteReader,
     ByteWriter,
@@ -15,7 +15,7 @@ use crate::ClientError;
 use crate::rpc::RpcError;
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::nullifier::NullifierUpdate;
-use crate::store::{InputNoteRecord, OutputNoteRecord, OutputNoteState};
+use crate::store::{InputNoteRecord, OutputNoteRecord};
 use crate::transaction::{TransactionRecord, TransactionStatus};
 
 // NOTE UPDATE
@@ -361,30 +361,6 @@ impl NoteUpdateTracker {
             )?;
         }
         Ok(())
-    }
-
-    /// Returns whether the note id is already tracked as either an input or output note.
-    pub(crate) fn contains_note(&self, note_id: &NoteId) -> bool {
-        self.input_notes.contains_key(note_id) || self.output_notes.contains_key(note_id)
-    }
-
-    /// Inserts a new committed output note built from a full [`Note`] plus its inclusion proof.
-    ///
-    /// Used to surface output notes produced by tracked accounts whose details weren't
-    /// previously known to this client (e.g. transactions executed against watch-only
-    /// accounts, where the note isn't synced via the per-account note tag).
-    pub(crate) fn track_new_committed_output_note(
-        &mut self,
-        note: Note,
-        inclusion_proof: NoteInclusionProof,
-    ) {
-        let block_num = inclusion_proof.location().block_num();
-        let metadata = note.metadata().clone();
-        let (assets, recipient) = NoteDetails::from(note).into_parts();
-        let recipient_digest = recipient.digest();
-        let state = OutputNoteState::CommittedFull { recipient, inclusion_proof };
-        let record = OutputNoteRecord::new(recipient_digest, assets, metadata, state, block_num);
-        self.insert_output_note(record, NoteUpdateType::Insert);
     }
 
     /// Marks an erased note as consumed.
