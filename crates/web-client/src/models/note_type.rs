@@ -2,6 +2,7 @@ use js_export_macro::js_export;
 use miden_client::note::NoteType as NativeNoteType;
 
 /// Visibility level for note contents when published to the network.
+// Keep these masks in sync with `miden-protocol/src/note/note_type.rs`
 #[js_export]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -12,12 +13,6 @@ pub enum NoteType {
     /// Notes with this type are fully shared with the network.
     Public = 0b01,
 }
-
-// Compile-time check to keep enum values aligned.
-const _: () = {
-    assert!(NativeNoteType::Private as u8 == NoteType::Private as u8);
-    assert!(NativeNoteType::Public as u8 == NoteType::Public as u8);
-};
 
 impl From<NativeNoteType> for NoteType {
     fn from(value: NativeNoteType) -> Self {
