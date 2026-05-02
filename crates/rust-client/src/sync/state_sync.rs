@@ -502,6 +502,7 @@ impl StateSync {
             &transactions,
         );
 
+        // Process each transaction
         for transaction in &transactions {
             // Transition tracked output notes to Committed using inclusion proofs from the
             // transaction sync response. This covers output notes regardless of whether their

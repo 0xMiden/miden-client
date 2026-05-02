@@ -175,7 +175,7 @@ impl<AUTH> Client<AUTH> {
     /// In watch-only mode, the account is added without registering its derived note tag, so
     /// notes targeted at it will not be synced. The account's on-chain state (commitment,
     /// nonce, storage) is still updated by `sync_state`. This is the path used by
-    /// [`Self::follow_account_by_id`].
+    /// [`Self::watch_account_by_id`].
     async fn add_account_with_watch_only(
         &mut self,
         account: &Account,
@@ -255,7 +255,7 @@ impl<AUTH> Client<AUTH> {
     /// being tracked by the client, it's state will be overwritten.
     ///
     /// To import an account in watch-only mode (state-tracking only, no note sync), use
-    /// [`Self::follow_account_by_id`] instead.
+    /// [`Self::watch_account_by_id`] instead.
     ///
     /// # Errors
     /// - If the account is not found on the network.
@@ -266,7 +266,7 @@ impl<AUTH> Client<AUTH> {
         self.add_account_with_watch_only(&account, true, false).await
     }
 
-    /// Starts following an on-chain account in watch-only mode.
+    /// Starts watching an on-chain account in watch-only mode.
     ///
     /// Like [`Self::import_account_by_id`], the account is fetched from the network by its ID.
     /// Unlike `import_account_by_id`, the account is added without registering its derived note
@@ -280,7 +280,7 @@ impl<AUTH> Client<AUTH> {
     /// - If the account is not found on the network.
     /// - If the account is private.
     /// - There was an error sending the request to the network.
-    pub async fn follow_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
+    pub async fn watch_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
         let account = self.fetch_public_account(account_id).await?;
         self.add_account_with_watch_only(&account, true, true).await
     }

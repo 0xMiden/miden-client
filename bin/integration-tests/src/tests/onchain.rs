@@ -424,14 +424,14 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     Ok(())
 }
 
-/// Watch-only follow flow:
+/// Watch-only flow:
 ///   - `client_1` owns the wallet and faucet, executes transactions.
-///   - `client_2` follows the wallet via `follow_account_by_id` (no note tag).
+///   - `client_2` watches the wallet via `watch_account_by_id` (no note tag).
 ///   - After `client_1` runs another mint+consume on the wallet, `client_2` should observe (a) the
 ///     new account commitment matching `client_1`, (b) no input note record for the mint targeted
 ///     at the wallet (no tag → not synced), and (c) no output note record for the consumed note
 ///     (watch-only is state-only; note activity is intentionally not surfaced).
-pub async fn test_follow_account_by_id(client_config: ClientConfig) -> Result<()> {
+pub async fn test_watch_account_by_id(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
     let (mut client_2, _keystore_2) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
@@ -456,18 +456,18 @@ pub async fn test_follow_account_by_id(client_config: ClientConfig) -> Result<()
     let wallet_id = wallet.id();
     let faucet_id = faucet_account.id();
 
-    // Fill the wallet with an asset so the followed account has non-trivial state.
+    // Fill the wallet with an asset so the watched account has non-trivial state.
     let tx_id = mint_and_consume(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
     wait_for_tx(&mut client_1, tx_id).await?;
 
-    // client_2 starts following the wallet in watch-only mode.
-    client_2.follow_account_by_id(wallet_id).await?;
+    // client_2 starts watching the wallet in watch-only mode.
+    client_2.watch_account_by_id(wallet_id).await?;
 
     let initial_source_commitment = client_1.account_reader(wallet_id).commitment().await?;
     let initial_watched_commitment = client_2.account_reader(wallet_id).commitment().await?;
     assert_eq!(
         initial_watched_commitment, initial_source_commitment,
-        "watched account commitment should match source after follow",
+        "watched account commitment should match source after watch",
     );
 
     let watched_record = client_2
@@ -475,7 +475,7 @@ pub async fn test_follow_account_by_id(client_config: ClientConfig) -> Result<()
         .get_account(wallet_id)
         .await?
         .context("watched account should be tracked in client_2's store")?;
-    assert!(watched_record.is_watch_only(), "followed account must be watch-only");
+    assert!(watched_record.is_watch_only(), "watched account must be watch-only");
 
     let tags = client_2.test_store().get_note_tags().await?;
     assert!(

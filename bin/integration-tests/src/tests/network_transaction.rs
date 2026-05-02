@@ -326,11 +326,11 @@ pub(crate) fn get_network_note_with_script<T: Rng>(
     Ok(network_note)
 }
 
-/// Watch-only follow flow against a network account:
+/// Watch-only flow against a network account:
 ///   - `client_1` deploys the counter as a network account and emits bump notes.
-///   - `client_2` follows the network account via `follow_account_by_id` (no note tag).
+///   - `client_2` watches the network account via `watch_account_by_id` (no note tag).
 ///   - The node-driven counter increments are observed by `client_2` after `sync_state`.
-pub async fn test_follow_network_account(client_config: ClientConfig) -> Result<()> {
+pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<()> {
     const BUMP_NOTE_NUMBER: u64 = 3;
 
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
@@ -352,15 +352,15 @@ pub async fn test_follow_network_account(client_config: ClientConfig) -> Result<
         .context("failed to find network account after deployment")?;
     assert_eq!(counter_value, Word::from([Felt::new(1), ZERO, ZERO, ZERO]));
 
-    // client_2 starts following the network account in watch-only mode.
-    client_2.follow_account_by_id(network_account_id).await?;
+    // client_2 starts watching the network account in watch-only mode.
+    client_2.watch_account_by_id(network_account_id).await?;
 
     let watched_record = client_2
         .test_store()
         .get_account(network_account_id)
         .await?
         .context("watched network account should be tracked in client_2's store")?;
-    assert!(watched_record.is_watch_only(), "followed network account must be watch-only");
+    assert!(watched_record.is_watch_only(), "watched network account must be watch-only");
 
     let tags = client_2.test_store().get_note_tags().await?;
     assert!(

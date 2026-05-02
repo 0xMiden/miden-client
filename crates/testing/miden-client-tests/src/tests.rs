@@ -3686,7 +3686,7 @@ async fn execute_transaction_fails_for_watch_only_account() {
     let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
     // Build a faucet locally and insert it directly as watch-only via the store. Bypasses the
-    // public `add_account`/`follow_account_by_id` paths so we don't need a mock RPC round-trip.
+    // public `add_account`/`watch_account_by_id` paths so we don't need a mock RPC round-trip.
     let key_pair = AuthSecretKey::new_falcon512_poseidon2();
     let auth_component =
         AuthSingleSig::new(key_pair.public_key().to_commitment(), AuthSchemeId::Falcon512Poseidon2);
