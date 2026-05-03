@@ -501,4 +501,3 @@ fn note_summary(
         exportable: output_note_record.is_some(),
     }
 }
-
