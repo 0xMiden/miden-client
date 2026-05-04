@@ -8,6 +8,10 @@
 * [BREAKING][param][rust] `NodeRpcClient::sync_chain_mmr()` replaced `block_to: Option<BlockNumber>` with `upper_bound: SyncTarget` to match the RPC definition. Use `SyncTarget::CommittedChainTip` for previous default behavior (`None`), or `SyncTarget::BlockNumber(num)` for a specific block number. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 * [BREAKING][rust] Added `submit_proven_batch` to `NodeRpcClient` trait. ([#2075](https://github.com/0xMiden/miden-client/pull/2075))
 * [BREAKING][param][cli] `address add` now takes `<ACCOUNT_ID> <BECH32_ADDRESS>` instead of `<ACCOUNT_ID> <INTERFACE> [TAG_LEN]`. Use the new `address encode` subcommand to build a bech32 string from `<ACCOUNT_ID> <INTERFACE> [TAG_LEN]`. ([#2115](https://github.com/0xMiden/miden-client/pull/2115))
+* [BREAKING][rename][rust] Mint policy components renamed under `account::component`: `AuthControlled` → `MintAuthControlled`, `OwnerControlled` → `MintOwnerControlled`, `AuthControlledInitConfig` → `MintAuthControlledConfig`, `OwnerControlledInitConfig` → `MintOwnerControlledConfig`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
+* [BREAKING][type][rust] `BasicFungibleFaucet` is now a unit struct; token symbol/decimals/max-supply moved to a new `FungibleTokenMetadata` component built via `FungibleTokenMetadata::builder`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
+* [BREAKING][behavior][cli] `account new-faucet` now requires a `[fungible-faucet-metadata]` block (typed `symbol`, `decimals`, `max_supply`, optional `name`) in the init data file passed via `-i`, replacing the previous `["miden::standards::fungible_faucets::metadata"]` section with stringly-typed values. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
+* [BREAKING][behavior][all] Note scripts must now use the package-style header `@note_script` + `pub proc main … end` instead of the bare `begin … end`, following the upstream protocol bump. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 
 ### Enhancements
 
@@ -19,6 +23,8 @@
 * Added `miden-cli call` command for invoking account procedures directly from the CLI ([#1943](https://github.com/0xMiden/miden-client/pull/1943)).
 * Made `TransactionStoreUpdate` serialization lossless ([#2112](https://github.com/0xMiden/miden-client/pull/2112)).
 * [FEATURE][cli] Added `address encode <ACCOUNT_ID> <INTERFACE> [TAG_LEN]` subcommand that prints the bech32 encoding of an address built from the given fields (useful for producing the input to `address add`). ([#2115](https://github.com/0xMiden/miden-client/pull/2115))
+* [FEATURE][rust] Re-exported burn-policy components (`BurnAuthControlled`, `BurnOwnerControlled`, `BurnAuthControlledConfig`, `BurnOwnerControlledConfig`) and token metadata types (`FungibleTokenMetadata`, `TokenName`) from `account::component`, plus `MIN_STACK_DEPTH` from `vm`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
+* [FEATURE][cli] `account new-faucet` now implicitly attaches `BurnAuthControlled::allow_all()` and a `FungibleTokenMetadata` component built from the init data file, alongside the existing implicit `MintAuthControlled::allow_all()`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 
 ## 0.14.4 (TBA)
 
