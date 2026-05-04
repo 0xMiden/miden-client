@@ -3209,6 +3209,7 @@ dependencies = [
 [[package]]
 name = "miden-large-smt-backend-rocksdb"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/node.git?branch=jmunoz-update-miden-deps#a05c730e47e99f048583f7fd2ba3c6dc828e1b0c"
 dependencies = [
  "miden-crypto",
  "miden-node-rocksdb-cxx-linkage-fix",
@@ -3270,6 +3271,7 @@ dependencies = [
 [[package]]
 name = "miden-node-block-producer"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/node.git?branch=jmunoz-update-miden-deps#a05c730e47e99f048583f7fd2ba3c6dc828e1b0c"
 dependencies = [
  "anyhow",
  "futures",
@@ -3295,6 +3297,7 @@ dependencies = [
 [[package]]
 name = "miden-node-db"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/node.git?branch=jmunoz-update-miden-deps#a05c730e47e99f048583f7fd2ba3c6dc828e1b0c"
 dependencies = [
  "deadpool",
  "deadpool-diesel",
@@ -3308,6 +3311,7 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/node.git?branch=jmunoz-update-miden-deps#a05c730e47e99f048583f7fd2ba3c6dc828e1b0c"
 dependencies = [
  "quote",
  "syn 2.0.117",
@@ -3316,6 +3320,7 @@ dependencies = [
 [[package]]
 name = "miden-node-ntx-builder"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/node.git?branch=jmunoz-update-miden-deps#a05c730e47e99f048583f7fd2ba3c6dc828e1b0c"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3344,6 +3349,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/node.git?branch=jmunoz-update-miden-deps#a05c730e47e99f048583f7fd2ba3c6dc828e1b0c"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3369,6 +3375,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/node.git?branch=jmunoz-update-miden-deps#a05c730e47e99f048583f7fd2ba3c6dc828e1b0c"
 dependencies = [
  "build-rs",
  "codegen",
@@ -3381,10 +3388,12 @@ dependencies = [
 [[package]]
 name = "miden-node-rocksdb-cxx-linkage-fix"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/node.git?branch=jmunoz-update-miden-deps#a05c730e47e99f048583f7fd2ba3c6dc828e1b0c"
 
 [[package]]
 name = "miden-node-rpc"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/node.git?branch=jmunoz-update-miden-deps#a05c730e47e99f048583f7fd2ba3c6dc828e1b0c"
 dependencies = [
  "anyhow",
  "futures",
@@ -3412,6 +3421,7 @@ dependencies = [
 [[package]]
 name = "miden-node-store"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/node.git?branch=jmunoz-update-miden-deps#a05c730e47e99f048583f7fd2ba3c6dc828e1b0c"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3452,6 +3462,7 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/node.git?branch=jmunoz-update-miden-deps#a05c730e47e99f048583f7fd2ba3c6dc828e1b0c"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3485,6 +3496,7 @@ dependencies = [
 [[package]]
 name = "miden-node-validator"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/node.git?branch=jmunoz-update-miden-deps#a05c730e47e99f048583f7fd2ba3c6dc828e1b0c"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -3619,6 +3631,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/node.git?branch=jmunoz-update-miden-deps#a05c730e47e99f048583f7fd2ba3c6dc828e1b0c"
 dependencies = [
  "build-rs",
  "fs-err",
