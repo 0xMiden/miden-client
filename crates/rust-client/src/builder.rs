@@ -509,11 +509,21 @@ where
 /// Marker trait to capture the bounds the builder requires for the authenticator type
 /// parameter.
 #[cfg(feature = "std")]
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` cannot be used as the authenticator for `ClientBuilder`",
+    label = "this type is missing required bounds",
+    note = "`{Self}` must implement `Keystore` and `From<FilesystemKeyStore>`, or use the built-in `FilesystemKeyStore` as the authenticator"
+)]
 pub trait BuilderAuthenticator: Keystore + From<FilesystemKeyStore> + 'static {}
 #[cfg(feature = "std")]
 impl<T> BuilderAuthenticator for T where T: Keystore + From<FilesystemKeyStore> + 'static {}
 
 #[cfg(not(feature = "std"))]
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` cannot be used as the authenticator for `ClientBuilder`",
+    label = "this type does not implement `Keystore`",
+    note = "implement `Keystore` for `{Self}`"
+)]
 pub trait BuilderAuthenticator: Keystore + 'static {}
 #[cfg(not(feature = "std"))]
 impl<T> BuilderAuthenticator for T where T: Keystore + 'static {}

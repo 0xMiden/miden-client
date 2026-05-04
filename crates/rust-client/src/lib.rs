@@ -496,6 +496,11 @@ impl<AUTH> Client<AUTH> {
 //   these bounds. (similar to TransactionAuthenticator)
 
 /// Marker trait for RNGs that can be shared across threads and used by the client.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` cannot be used as the RNG for the client",
+    label = "this type is not a thread-safe `FeltRng`",
+    note = "`{Self}` must implement `FeltRng` and be `Send + Sync`"
+)]
 pub trait ClientFeltRng: FeltRng + Send + Sync {}
 impl<T> ClientFeltRng for T where T: FeltRng + Send + Sync {}
 
