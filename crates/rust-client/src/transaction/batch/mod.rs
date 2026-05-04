@@ -160,7 +160,7 @@ where
         // Execute against the batch data store (uses the in-memory account state).
         let tx_result = self
             .client
-            .execute_transaction_with_data_store(&self.data_store, self.account_id, req)
+            .execute_transaction_for_batch(&self.data_store, self.account_id, req)
             .await?;
 
         // Extract TransactionInputs for later batch submission.

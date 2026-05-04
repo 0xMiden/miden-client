@@ -2312,7 +2312,7 @@ async fn missing_recipient_digest() {
         .unwrap_err();
 
     if let ClientError::MissingOutputRecipients(digests) = error {
-        assert!(digests == vec![dummy_recipient_digest]);
+        assert_eq!(digests, vec![dummy_recipient_digest]);
     }
 }
 
