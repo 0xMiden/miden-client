@@ -22,12 +22,7 @@ use miden_tx::auth::TransactionAuthenticator;
 use miden_tx_batch_prover::LocalBatchProver;
 
 use crate::store::data_store::build_partial_mmr_with_paths;
-use crate::transaction::{
-    InputNote,
-    TransactionRequest,
-    TransactionResult,
-    TransactionStoreUpdate,
-};
+use crate::transaction::{TransactionRequest, TransactionResult, TransactionStoreUpdate};
 use crate::{Client, ClientError};
 
 /// Accumulates transactions for a single local account and submits them as one
@@ -75,16 +70,19 @@ where
         }
 
         // 1. Treat the largest ref as the reference block and the rest as authenticated.
-        let mut ref_block_nums: BTreeSet<BlockNumber> = BTreeSet::new();
-        for tx in &self.proven_txs {
-            ref_block_nums.insert(tx.ref_block_num());
-        }
-        let ref_block_num = *ref_block_nums
+        let ref_block_num = self
+            .proven_txs
             .iter()
-            .next_back()
+            .map(|tx| tx.ref_block_num())
+            .max()
             .expect("non-empty — proven_txs.is_empty() was checked above");
-        let lower_refs: BTreeSet<BlockNumber> =
-            ref_block_nums.iter().copied().filter(|r| *r < ref_block_num).collect();
+
+        let lower_refs: BTreeSet<BlockNumber> = self
+            .proven_txs
+            .iter()
+            .map(|tx| tx.ref_block_num())
+            .filter(|&r| r < ref_block_num)
+            .collect();
 
         // 2. Fetch the reference block header (from the store).
         let (ref_block_header, _) = self
@@ -131,6 +129,7 @@ where
             LocalBatchProver::new(MIN_PROOF_SECURITY_LEVEL).prove(proposed_batch.clone())?;
 
         // 7. Submit via RPC.
+        let mut updates: Vec<TransactionStoreUpdate> = Vec::with_capacity(self.len());
         let block_num = self
             .client
             .rpc_api
@@ -138,7 +137,6 @@ where
             .await?;
 
         // 8. Build per-tx TransactionStoreUpdates.
-        let mut updates: Vec<TransactionStoreUpdate> = Vec::with_capacity(self.tx_results.len());
         for tx_result in &self.tx_results {
             let update = self.client.get_transaction_store_update(tx_result, block_num).await?;
             updates.push(update);
@@ -169,23 +167,9 @@ where
         let tx_inputs = tx_result.executed_transaction().tx_inputs().clone();
 
         // Check for duplicate input notes against earlier pushes.
-        let new_nullifiers: Vec<Nullifier> = tx_result
-            .consumed_notes()
-            .iter()
-            .map(ToInputNoteCommitments::nullifier)
-            .collect();
-
-        for nf in &new_nullifiers {
-            if self.consumed_nullifiers.contains(nf) {
-                let offending_note_id = tx_result
-                    .consumed_notes()
-                    .iter()
-                    .find(|n| n.nullifier() == *nf)
-                    .map(InputNote::id)
-                    .expect("nullifier just iterated, must be present");
-                return Err(ClientError::from(BatchBuilderError::DuplicateInputNote(
-                    offending_note_id,
-                )));
+        for note in tx_result.consumed_notes().iter() {
+            if self.consumed_nullifiers.contains(&note.nullifier()) {
+                return Err(ClientError::from(BatchBuilderError::DuplicateInputNote(note.id())));
             }
         }
 
@@ -201,8 +185,8 @@ where
         self.data_store.set_current_account(post_account);
 
         // Record consumed nullifiers.
-        for nf in new_nullifiers {
-            self.consumed_nullifiers.insert(nf);
+        for note in tx_result.consumed_notes().iter() {
+            self.consumed_nullifiers.insert(note.nullifier());
         }
 
         // Append proven tx, inputs, result.

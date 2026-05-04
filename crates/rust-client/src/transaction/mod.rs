@@ -369,7 +369,7 @@ where
 
         let ignore_invalid_notes = transaction_request.ignore_invalid_input_notes();
 
-        data_store.register_fpis(foreign_account_inputs.iter().cloned());
+        data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
         for fpi_account in &foreign_account_inputs {
             data_store.mast_store().load_account_code(fpi_account.code());
         }
@@ -887,7 +887,7 @@ pub(crate) trait BatchExecutionDataStore: DataStore {
     fn mast_store(&self) -> Arc<miden_tx::TransactionMastStore>;
 
     /// Registers foreign-account inputs so the executor can serve them on demand.
-    fn register_fpis(
+    fn register_foreign_account_inputs(
         &self,
         inputs: impl IntoIterator<Item = miden_protocol::transaction::AccountInputs>,
     );
@@ -898,11 +898,11 @@ impl BatchExecutionDataStore for ClientDataStore {
         ClientDataStore::mast_store(self)
     }
 
-    fn register_fpis(
+    fn register_foreign_account_inputs(
         &self,
         inputs: impl IntoIterator<Item = miden_protocol::transaction::AccountInputs>,
     ) {
-        self.register_foreign_account_inputs(inputs);
+        ClientDataStore::register_foreign_account_inputs(self, inputs);
     }
 }
 
@@ -911,11 +911,13 @@ impl BatchExecutionDataStore for crate::transaction::batch::InMemoryBatchDataSto
         crate::transaction::batch::InMemoryBatchDataStore::mast_store(self)
     }
 
-    fn register_fpis(
+    fn register_foreign_account_inputs(
         &self,
         inputs: impl IntoIterator<Item = miden_protocol::transaction::AccountInputs>,
     ) {
-        self.register_foreign_account_inputs(inputs);
+        crate::transaction::batch::InMemoryBatchDataStore::register_foreign_account_inputs(
+            self, inputs,
+        );
     }
 }
 
