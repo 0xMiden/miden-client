@@ -1,3 +1,37 @@
+//! Stacks multiple transactions against a single local account and submits them as one
+//! proven batch via the node's `SubmitProvenBatch` endpoint.
+//!
+//! ## Flow
+//!
+//! 1. Open a builder with [`Client::new_transaction_batch`](crate::Client::new_transaction_batch)
+//!    for a tracked local account.
+//! 2. Add transactions via [`BatchBuilder::push`]. Each push executes the request against the
+//!    batch's in-memory account state (so later pushes see the post-state of earlier ones), proves
+//!    it locally, and appends the proven transaction to the batch.
+//! 3. Finalize with [`BatchBuilder::submit`]. This assembles a `ProposedBatch`, proves it, submits
+//!    it to the node, and atomically applies the per-transaction updates to the local store.
+//!    Returns the [`BlockNumber`] the batch was accepted into.
+//!
+//! ## Constraints
+//!
+//! - All transactions in a batch belong to the same local account (fixed at construction).
+//! - No two transactions in a batch may consume the same input note (rejected with
+//!   [`BatchBuilderError::DuplicateInputNote`]).
+//! - At least one successful [`push`](BatchBuilder::push) is required before
+//!   [`submit`](BatchBuilder::submit) (otherwise [`BatchBuilderError::Empty`]).
+//!
+//! ## Error semantics after RPC accept
+//!
+//! Once the node accepts the batch, the local store still needs to be updated. If that step
+//! fails, the caller receives one of two errors that both carry the accepted `block_num`:
+//!
+//! - [`BatchBuilderError::BatchSubmittedButUpdateBuildFailed`] — building one of the per-tx
+//!   [`TransactionStoreUpdate`]s failed.
+//! - [`BatchBuilderError::BatchSubmittedButApplyFailed`] — applying the updates atomically to the
+//!   local store failed.
+//!
+//! In both cases the recovery path is to trigger `sync_state` to reconcile.
+
 mod data_store;
 mod error;
 
