@@ -160,17 +160,20 @@ miden-bench --store ./my-bench-data transaction --account-id 0x...
 
 ### CPU Flamegraph (`--flamegraph`)
 
-Wraps any subcommand with an in-process CPU profiler ([`pprof`](https://crates.io/crates/pprof)) and writes a flamegraph SVG. Pass without a value to write to `flamegraph.svg` in the current directory, or provide a path explicitly.
+Wraps any subcommand with an in-process CPU profiler ([`pprof`](https://crates.io/crates/pprof)) and writes a flamegraph SVG. Pass with no value to write to `flamegraph.svg` in the current directory, or pass an explicit path with `--flamegraph=PATH` (the `=` is required so clap does not consume the next token as the value).
 
 ```bash
 # Default output: ./flamegraph.svg
 miden-bench --flamegraph deploy --maps 2
 
 # Custom output path
-miden-bench --flamegraph ./profiles/expand.svg expand --account-id 0x... --map-idx 0 --offset 0 --count 200
+miden-bench --flamegraph=./profiles/expand.svg expand --account-id 0x... --map-idx 0 --offset 0 --count 200
 ```
 
 The profiler samples at 100 Hz and captures only on-CPU time. CPU flamegraphs explain hotspots in execution, proving, and serialization. They do **not** capture wall-clock time spent waiting on the network or on block finality, so I/O-bound paths (`submit`, network `import`) appear dominated by Tokio runtime plumbing. Use the per-phase timers reported by each subcommand for those.
+
+> [!WARNING]
+> **Known limitation.** `--flamegraph` is unstable on macOS aarch64 / Apple Silicon when profiling commands that invoke the Miden prover (`deploy`, `expand`, and the proving phases of `transaction`). [`pprof-rs`](https://crates.io/crates/pprof) samples with `SIGPROF` and unwinds from a signal handler, which can SIGTRAP during prover execution on this platform. Tracked upstream in [tikv/pprof-rs#75](https://github.com/tikv/pprof-rs/issues/75) and [#187](https://github.com/tikv/pprof-rs/issues/187). Use Linux for full CPU flamegraphs. Lightweight commands that do not prove transactions, such as `import`, may still work on macOS. The bench prints a runtime warning when this configuration is detected.
 
 For sharper frames, build with debug symbols:
 
