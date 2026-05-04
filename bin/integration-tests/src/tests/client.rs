@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use assert_matches::assert_matches;
 use miden_client::account::component::{AccountComponent, AccountComponentMetadata};
 use miden_client::account::{
     Account,
@@ -451,7 +452,7 @@ pub async fn test_get_account_update(client_config: ClientConfig) -> Result<()> 
     let details2 = rpc_api.get_account_details(basic_wallet_2.id()).await.unwrap();
 
     assert!(matches!(details1, FetchedAccount::Private(_, _)));
-    assert!(matches!(details2, FetchedAccount::Public(_, _)));
+    assert_matches!(details2, FetchedAccount::Public(account, _) if account.vault().get_balance(faucet_account.id()).unwrap() == MINT_AMOUNT);
     Ok(())
 }
 
@@ -1679,8 +1680,8 @@ pub async fn test_get_account_proof_returns_vault_details(
     let vault_root = details.header.vault_root();
 
     assert_eq!(
-        details.vault_details.assets.len(),
-        1,
+        details.vault_details.assets,
+        vec![Asset::Fungible(FungibleAsset::new(faucet.id(), MINT_AMOUNT).unwrap())],
         "expected exactly 1 asset (the minted fungible token)"
     );
 
