@@ -328,13 +328,13 @@ impl NodeRpcClient for MockRpcApi {
         let chain_tip = self.get_chain_tip_block_num();
         let upper_bound = block_to.unwrap_or(chain_tip);
 
-        // Collect all blocks with matching notes in the range (block_num, upper_bound]
+        // Collect all blocks with matching notes in the range [block_num, upper_bound]
         let mut blocks_with_notes: BTreeMap<BlockNumber, BTreeMap<NoteId, CommittedNote>> =
             BTreeMap::new();
         for note in self.mock_chain.read().committed_notes().values() {
             let note_block = note.inclusion_proof().location().block_num();
             if note_tags.contains(&note.metadata().tag())
-                && note_block > block_num
+                && note_block >= block_num
                 && note_block <= upper_bound
             {
                 let committed = CommittedNote::new(
@@ -346,10 +346,6 @@ impl NodeRpcClient for MockRpcApi {
             }
         }
 
-        // Always include the upper_bound block (with empty notes if needed), matching the
-        // node behavior where the range-end block is always present when the scan completes.
-        blocks_with_notes.entry(upper_bound).or_default();
-
         let blocks: Vec<NoteSyncBlock> = blocks_with_notes
             .into_iter()
             .map(|(bn, notes)| {
@@ -359,7 +355,11 @@ impl NodeRpcClient for MockRpcApi {
             })
             .collect();
 
-        Ok(NoteSyncInfo { chain_tip, block_to: upper_bound, blocks })
+        // `block_to` is the last block actually checked. When `blocks` is empty, fall back to
+        // `upper_bound` to signal that the full range was scanned.
+        let block_to = blocks.last().map_or(upper_bound, |b| b.block_header.block_num());
+
+        Ok(NoteSyncInfo { chain_tip, block_to, blocks })
     }
 
     async fn sync_chain_mmr(
