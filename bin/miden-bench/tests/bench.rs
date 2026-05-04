@@ -138,3 +138,19 @@ fn network_option_custom_url() {
     cmd.args(["--network", "http://custom.node:8080", "deploy", "--help"]);
     cmd.assert().success();
 }
+
+/// Tests that the flamegraph option is recognized without a value (uses default path)
+#[test]
+fn flamegraph_option_no_value() {
+    let mut cmd = cargo_bin_cmd!("miden-bench");
+    cmd.args(["--flamegraph", "deploy", "--help"]);
+    cmd.assert().success();
+}
+
+/// Tests that the flamegraph option accepts a custom path
+#[test]
+fn flamegraph_option_with_path() {
+    let mut cmd = cargo_bin_cmd!("miden-bench");
+    cmd.args(["--flamegraph", "out.svg", "deploy", "--help"]);
+    cmd.assert().success();
+}

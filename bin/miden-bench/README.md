@@ -158,6 +158,26 @@ miden-bench --store ./my-bench-data expand --account-id 0x... --map-idx 0 --offs
 miden-bench --store ./my-bench-data transaction --account-id 0x...
 ```
 
+### CPU Flamegraph (`--flamegraph`)
+
+Wraps any subcommand with an in-process CPU profiler ([`pprof`](https://crates.io/crates/pprof)) and writes a flamegraph SVG. Pass without a value to write to `flamegraph.svg` in the current directory, or provide a path explicitly.
+
+```bash
+# Default output: ./flamegraph.svg
+miden-bench --flamegraph deploy --maps 2
+
+# Custom output path
+miden-bench --flamegraph ./profiles/expand.svg expand --account-id 0x... --map-idx 0 --offset 0 --count 200
+```
+
+The profiler samples at 100 Hz and captures only on-CPU time. CPU flamegraphs explain hotspots in execution, proving, and serialization. They do **not** capture wall-clock time spent waiting on the network or on block finality, so I/O-bound paths (`submit`, network `import`) appear dominated by Tokio runtime plumbing. Use the per-phase timers reported by each subcommand for those.
+
+For sharper frames, build with debug symbols:
+
+```bash
+RUSTFLAGS="-C debuginfo=1" cargo build --release -p miden-client-bench
+```
+
 ### Command Options
 
 #### Deploy

@@ -25,6 +25,7 @@ miden-client-sqlite-store = { path = "../../crates/sqlite-store" }
 anyhow      = { features = ["std"], workspace = true }
 clap        = { features = ["derive", "env"], workspace = true }
 comfy-table = { workspace = true }
+pprof       = { features = ["flamegraph"], workspace = true }
 rand        = { workspace = true }
 rand_chacha = { workspace = true }
 tokio       = { workspace = true }
