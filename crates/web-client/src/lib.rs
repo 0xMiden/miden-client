@@ -29,7 +29,6 @@ pub mod mock;
 pub mod models;
 pub mod new_account;
 pub mod new_transactions;
-pub mod note_transport;
 pub mod notes;
 pub mod rpc_client;
 pub mod settings;
