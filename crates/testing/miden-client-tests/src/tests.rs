@@ -2754,11 +2754,7 @@ async fn storage_and_vault_proofs() {
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
 
-    client
-        .test_store()
-        .insert_account(&account, Address::new(account.id()))
-        .await
-        .unwrap();
+    client.add_account(&account, false).await.unwrap();
 
     let account_id = account.id();
 

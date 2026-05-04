@@ -403,7 +403,12 @@ impl SqliteStore {
         address: &Address,
         account_id: AccountId,
     ) -> Result<(), StoreError> {
-        Self::insert_address_internal(tx, address, account_id)
+        const QUERY: &str = insert_sql!(addresses { address, account_id } | REPLACE);
+        let serialized_address = address.to_bytes();
+        tx.execute(QUERY, params![serialized_address, account_id.to_hex(),])
+            .into_store_error()?;
+
+        Ok(())
     }
 
     pub(crate) fn remove_address(
@@ -411,7 +416,9 @@ impl SqliteStore {
         address: &Address,
     ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
-        Self::remove_address_internal(&tx, address)?;
+        let serialized_address = address.to_bytes();
+        const DELETE_QUERY: &str = "DELETE FROM addresses WHERE address = ?";
+        tx.execute(DELETE_QUERY, params![serialized_address]).into_store_error()?;
 
         tx.commit().into_store_error()
     }
@@ -994,19 +1001,6 @@ impl SqliteStore {
         Ok(())
     }
 
-    fn insert_address_internal(
-        tx: &Transaction<'_>,
-        address: &Address,
-        account_id: AccountId,
-    ) -> Result<(), StoreError> {
-        const QUERY: &str = insert_sql!(addresses { address, account_id } | REPLACE);
-        let serialized_address = address.to_bytes();
-        tx.execute(QUERY, params![serialized_address, account_id.to_hex(),])
-            .into_store_error()?;
-
-        Ok(())
-    }
-
     /// Prunes historical account states for a single account up to the given nonce.
     ///
     /// Deletes all historical entries with `replaced_at_nonce <= up_to_nonce`
@@ -1095,14 +1089,5 @@ impl SqliteStore {
 
         tx.commit().into_store_error()?;
         Ok(total_deleted)
-    }
-
-    fn remove_address_internal(tx: &Transaction<'_>, address: &Address) -> Result<(), StoreError> {
-        let serialized_address = address.to_bytes();
-
-        const DELETE_QUERY: &str = "DELETE FROM addresses WHERE address = ?";
-        tx.execute(DELETE_QUERY, params![serialized_address]).into_store_error()?;
-
-        Ok(())
     }
 }
