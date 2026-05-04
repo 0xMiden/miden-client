@@ -34,7 +34,7 @@ use crate::note::NoteScreenerError;
 use crate::note_transport::NoteTransportError;
 use crate::rpc::RpcError;
 use crate::store::{NoteRecordError, StoreError};
-use crate::transaction::{BatchBuilderError, TransactionRequestError};
+use crate::transaction::{BatchBuilderError, TransactionRequestError, TransactionStoreUpdateError};
 
 // ACTIONABLE HINTS
 // ================================================================================================
@@ -188,6 +188,16 @@ pub enum ClientError {
 impl From<ClientError> for String {
     fn from(err: ClientError) -> String {
         err.to_string()
+    }
+}
+
+impl From<TransactionStoreUpdateError> for ClientError {
+    fn from(err: TransactionStoreUpdateError) -> Self {
+        match err {
+            TransactionStoreUpdateError::Store(e) => ClientError::StoreError(e),
+            TransactionStoreUpdateError::NoteScreener(e) => ClientError::NoteScreenerError(e),
+            TransactionStoreUpdateError::NoteRecord(e) => ClientError::NoteRecordConversionError(e),
+        }
     }
 }
 

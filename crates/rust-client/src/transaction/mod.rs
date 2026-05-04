@@ -80,7 +80,7 @@ use tracing::info;
 
 use super::Client;
 use crate::ClientError;
-use crate::note::NoteUpdateTracker;
+use crate::note::{NoteScreenerError, NoteUpdateTracker};
 use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::rpc::{AccountStateAt, GrpcError, NodeRpcClient, RpcError};
 use crate::store::data_store::ClientDataStore;
@@ -89,8 +89,10 @@ use crate::store::{
     InputNoteRecord,
     InputNoteState,
     NoteFilter,
+    NoteRecordError,
     OutputNoteRecord,
     Store,
+    StoreError,
     TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
@@ -492,7 +494,7 @@ where
         &self,
         tx_result: &TransactionResult,
         submission_height: BlockNumber,
-    ) -> Result<TransactionStoreUpdate, ClientError> {
+    ) -> Result<TransactionStoreUpdate, TransactionStoreUpdateError> {
         let note_updates = self.get_note_updates(submission_height, tx_result).await?;
 
         let mut new_tags: Vec<NoteTagRecord> = note_updates
@@ -618,7 +620,7 @@ where
         &self,
         submission_height: BlockNumber,
         tx_result: &TransactionResult,
-    ) -> Result<NoteUpdateTracker, ClientError> {
+    ) -> Result<NoteUpdateTracker, TransactionStoreUpdateError> {
         let executed_tx = tx_result.executed_transaction();
         let current_timestamp = self.store.get_current_timestamp();
         let current_block_num = self.store.get_sync_height().await?;
@@ -676,7 +678,8 @@ where
         let consumed_note_ids =
             executed_tx.tx_inputs().input_notes().iter().map(InputNote::id).collect();
 
-        let consumed_notes = self.get_input_notes(NoteFilter::List(consumed_note_ids)).await?;
+        let consumed_notes =
+            self.store.get_input_notes(NoteFilter::List(consumed_note_ids)).await?;
 
         let mut updated_input_notes = vec![];
 
@@ -901,6 +904,21 @@ where
 
         Ok(executor)
     }
+}
+
+// TRANSACTION STORE UPDATE ERROR
+// ================================================================================================
+
+/// Error returned by [`Client::get_transaction_store_update`] when building the store update
+/// for a submitted transaction fails.
+#[derive(Debug, thiserror::Error)]
+pub enum TransactionStoreUpdateError {
+    #[error("store error")]
+    Store(#[from] StoreError),
+    #[error("note screener error")]
+    NoteScreener(#[from] NoteScreenerError),
+    #[error("note record error")]
+    NoteRecord(#[from] NoteRecordError),
 }
 
 // HELPERS

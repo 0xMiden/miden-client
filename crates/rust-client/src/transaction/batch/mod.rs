@@ -138,7 +138,13 @@ where
 
         // 8. Build per-tx TransactionStoreUpdates.
         for tx_result in &self.tx_results {
-            let update = self.client.get_transaction_store_update(tx_result, block_num).await?;
+            let update =
+                self.client.get_transaction_store_update(tx_result, block_num).await.map_err(
+                    |source| BatchBuilderError::BatchSubmittedButUpdateBuildFailed {
+                        block_num,
+                        source,
+                    },
+                )?;
             updates.push(update);
         }
 
