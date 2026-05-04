@@ -2756,7 +2756,7 @@ async fn storage_and_vault_proofs() {
 
     client
         .test_store()
-        .insert_account(&account, Address::new(account.id()), false)
+        .insert_account(&account, Address::new(account.id()))
         .await
         .unwrap();
 
@@ -3709,7 +3709,7 @@ async fn execute_transaction_fails_for_watch_only_account() {
 
     client
         .test_store()
-        .insert_account(&faucet, address, true)
+        .insert_account(&faucet, address)
         .await
         .expect("watch-only account should insert via the store");
 

@@ -207,9 +207,13 @@ impl<AUTH> Client<AUTH> {
 
                 let default_address = Address::new(account.id());
 
-                // If the account is not being tracked, insert it into the store regardless of the
-                // `overwrite` flag. Watch-only accounts skip the per-account note tag so that
-                // sync doesn't pull notes targeted at them.
+                self.store
+                    .insert_account(account, default_address.clone())
+                    .await
+                    .map_err(ClientError::StoreError)?;
+
+                // Watch-only accounts skip the per-account note tag so that sync doesn't pull
+                // notes targeted at them. "Watch-only" is defined as the absence of this tag.
                 if !watch_only {
                     let default_address_note_tag = default_address.to_note_tag();
                     let note_tag_record =
@@ -217,10 +221,7 @@ impl<AUTH> Client<AUTH> {
                     self.store.add_note_tag(note_tag_record).await?;
                 }
 
-                self.store
-                    .insert_account(account, default_address, watch_only)
-                    .await
-                    .map_err(ClientError::StoreError)
+                Ok(())
             },
             Some(tracked_account) => {
                 if !overwrite {
@@ -245,7 +246,21 @@ impl<AUTH> Client<AUTH> {
                     }
                 }
 
-                self.store.update_account(account).await.map_err(ClientError::StoreError)
+                self.store.update_account(account).await?;
+
+                // Reconcile the per-account note tag with the requested mode. Watch-only is
+                // defined as the absence of this tag, so to convert between modes we just
+                // add or remove it.
+                let default_tag = Address::new(account.id()).to_note_tag();
+                let note_tag_record = NoteTagRecord::with_account_source(default_tag, account.id());
+                let was_watch_only = tracked_account.is_watch_only();
+                if watch_only && !was_watch_only {
+                    self.store.remove_note_tag(note_tag_record).await?;
+                } else if !watch_only && was_watch_only {
+                    self.check_note_tag_limit().await?;
+                    self.store.add_note_tag(note_tag_record).await?;
+                }
+                Ok(())
             },
         }
     }
@@ -338,6 +353,7 @@ impl<AUTH> Client<AUTH> {
 
                 self.check_note_tag_limit().await?;
                 self.store.insert_address(address, account_id).await?;
+                self.store.add_note_tag(note_tag_record).await?;
                 Ok(())
             },
         }
@@ -353,7 +369,10 @@ impl<AUTH> Client<AUTH> {
         address: Address,
         account_id: AccountId,
     ) -> Result<(), ClientError> {
-        self.store.remove_address(address, account_id).await?;
+        let derived_note_tag = address.to_note_tag();
+        let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account_id);
+        self.store.remove_address(address).await?;
+        self.store.remove_note_tag(note_tag_record).await?;
         Ok(())
     }
 

@@ -522,6 +522,38 @@ pub async fn test_watch_account_by_id(client_config: ClientConfig) -> Result<()>
         "watch-only client must not surface output notes from followed account txs",
     );
 
+    // `import_account_by_id` on an account already tracked as watch-only should register the
+    // per-account tag.
+    client_2.import_account_by_id(wallet_id).await?;
+    let record = client_2
+        .test_store()
+        .get_account(wallet_id)
+        .await?
+        .context("account should still be tracked after promotion")?;
+    assert!(!record.is_watch_only(), "import_account_by_id must promote watch-only to full");
+    let tags = client_2.test_store().get_note_tags().await?;
+    assert!(
+        tags.iter()
+            .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
+        "promoting to fully-tracked must register the per-account note tag",
+    );
+
+    // `watch_account_by_id` on an account already tracked should remove the per-account tag.
+    client_2.watch_account_by_id(wallet_id).await?;
+    let record = client_2
+        .test_store()
+        .get_account(wallet_id)
+        .await?
+        .context("account should still be tracked after demotion")?;
+    assert!(record.is_watch_only(), "watch_account_by_id must demote fully-tracked to watch");
+    let tags = client_2.test_store().get_note_tags().await?;
+    assert!(
+        !tags
+            .iter()
+            .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
+        "demoting to watch-only must remove the per-account note tag",
+    );
+
     Ok(())
 }
 

@@ -36,7 +36,6 @@ CREATE TABLE latest_account_headers (
     nonce BIGINT NOT NULL,                   -- account nonce
     account_seed BLOB NULL,                  -- seed used to generate the ID; NULL for non-new accounts
     locked BOOLEAN NOT NULL,                 -- whether the account is locked
-    watch_only BOOLEAN NOT NULL DEFAULT FALSE, -- followed in watch-only mode (no per-account note tag)
     PRIMARY KEY (id),
     FOREIGN KEY (code_commitment) REFERENCES account_code(commitment)
 );
@@ -52,7 +51,6 @@ CREATE TABLE historical_account_headers (
     nonce BIGINT NOT NULL,                   -- nonce of this old state
     account_seed BLOB NULL,                  -- seed used to generate the ID; NULL for non-new accounts
     locked BOOLEAN NOT NULL,                 -- whether the account was locked
-    watch_only BOOLEAN NOT NULL DEFAULT FALSE, -- watch-only flag at the time of this archived state
     replaced_at_nonce BIGINT NOT NULL,       -- nonce of the new state that replaced this one
     PRIMARY KEY (account_commitment),
     FOREIGN KEY (code_commitment) REFERENCES account_code(commitment),

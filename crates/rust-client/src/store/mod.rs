@@ -337,8 +337,9 @@ pub trait Store: Send + Sync {
 
     /// Inserts an [`Account`] to the store.
     /// Receives an [`Address`] as the initial address to associate with the account. When the
-    /// account is **not** in watch-only mode, the address's derived note tag is also tracked so
-    /// that incoming notes are picked up by sync.
+    /// Inserts the [`Account`] into the store with its initial [`Address`] persisted.
+    ///
+    /// Tag registration is the caller's responsibility — see [`Self::add_note_tag`].
     ///
     /// # Errors
     ///
@@ -347,7 +348,6 @@ pub trait Store: Send + Sync {
         &self,
         account: &Account,
         initial_address: Address,
-        watch_only: bool,
     ) -> Result<(), StoreError>;
 
     /// Upserts the account code for a foreign account. This value will be used as a cache of known
@@ -377,19 +377,19 @@ pub trait Store: Send + Sync {
     /// Returns a `StoreError::AccountDataNotFound` if there is no account for the provided ID.
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError>;
 
-    /// Adds an [`Address`] to an [`Account`], alongside its derived note tag.
+    /// Adds an [`Address`] to an [`Account`].
+    ///
+    /// Tag registration is the caller's responsibility — see [`Self::add_note_tag`].
     async fn insert_address(
         &self,
         address: Address,
         account_id: AccountId,
     ) -> Result<(), StoreError>;
 
-    /// Removes an [`Address`] from an [`Account`], alongside its derived note tag.
-    async fn remove_address(
-        &self,
-        address: Address,
-        account_id: AccountId,
-    ) -> Result<(), StoreError>;
+    /// Removes an [`Address`].
+    ///
+    /// Tag removal is the caller's responsibility — see [`Self::remove_note_tag`].
+    async fn remove_address(&self, address: Address) -> Result<(), StoreError>;
 
     // SETTINGS
     // --------------------------------------------------------------------------------------------
