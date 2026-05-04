@@ -66,23 +66,29 @@ impl<AUTH> Client<AUTH> {
         Ok(())
     }
 
-    /// Re-send a previously-sent private note identified by its [`NoteId`].
+    /// Send a previously-committed private note identified by its [`NoteId`].
     ///
     /// Looks up the note from the client's output-note store, reconstructs
-    /// its [`Note`] form, and calls [`Client::send_private_note`]. Intended
-    /// for consumers that need to recover from transport-side failures:
-    /// the on-chain transaction already committed the note's commitment,
-    /// but the blob never reached the recipient's transport. Without a
-    /// resend the recipient can never discover the note (it's private —
-    /// no on-chain details), so the sender's asset is effectively lost.
+    /// its [`Note`] form, and delegates to [`Client::send_private_note`].
+    /// The same path serves both first-time delivery for notes whose
+    /// transport step never ran and recovery from transport-side failures
+    /// after the on-chain transaction committed: in either case the
+    /// recipient depends on the transport blob to discover the note (private
+    /// notes have no on-chain details), so calling this method is safe to
+    /// retry until the recipient acknowledges.
+    ///
+    /// Requires the note to be committed on chain. Pre-commit records lack
+    /// the recipient data needed for reconstruction; calling this method on
+    /// such a record is a programming error (the by-id flow is the wrong
+    /// tool — the caller already has the [`Note`] in memory).
     ///
     /// # Errors
     /// - [`ClientError::NoteNotFoundOnChain`] if no output note with this ID is tracked locally
     ///   (client likely wasn't the sender).
-    /// - [`ClientError::NoteRecordConversionError`] if the stored record lacks the full recipient
-    ///   data needed to reconstruct the note (e.g. it was built from a `PartialNote`).
+    /// - [`ClientError::NoteNotCommitted`] if the stored record exists but has not yet been
+    ///   committed on chain.
     /// - Any [`NoteTransportError`] from the underlying transport.
-    pub async fn resend_private_note_by_id(
+    pub async fn send_private_note_by_id(
         &mut self,
         note_id: NoteId,
         address: &Address,
@@ -96,9 +102,15 @@ impl<AUTH> Client<AUTH> {
             .pop()
             .ok_or(ClientError::NoteNotFoundOnChain(note_id))?;
 
+        if !record.is_committed() {
+            return Err(ClientError::NoteNotCommitted(note_id));
+        }
+
+        // Defensive: a committed record carries full recipient data by construction,
+        // but unwrap-by-error is preferable to a panic if that invariant ever breaks.
         let recipient = record.recipient().cloned().ok_or_else(|| {
             ClientError::NoteRecordConversionError(NoteRecordError::ConversionError(
-                "output note is missing recipient data; cannot reconstruct for resend".into(),
+                "committed output note is missing recipient data".into(),
             ))
         })?;
         let assets = record.assets().clone();
