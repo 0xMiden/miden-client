@@ -102,9 +102,7 @@ impl SqliteStore {
         conn: &mut Connection,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
-        let Some((header, status)) =
-            query_latest_account_headers(conn, "id = ?", params![account_id.to_hex()])?.pop()
-        else {
+        let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
             return Ok(None);
         };
 
@@ -141,9 +139,7 @@ impl SqliteStore {
         conn: &mut Connection,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
-        let Some((header, status)) =
-            query_latest_account_headers(conn, "id = ?", params![account_id.to_hex()])?.pop()
-        else {
+        let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
             return Ok(None);
         };
 
@@ -300,7 +296,7 @@ impl SqliteStore {
         conn: &mut Connection,
         account_id: AccountId,
     ) -> Result<Option<AccountCode>, StoreError> {
-        let Some((header, ..)) =
+        let Some((header, _)) =
             query_latest_account_headers(conn, "id = ?", params![account_id.to_hex()])?
                 .into_iter()
                 .next()
@@ -751,7 +747,7 @@ impl SqliteStore {
         let old_header = query_latest_account_headers(tx, "id = ?", params![account_id.to_hex()])?
             .into_iter()
             .next()
-            .map(|(header, ..)| header);
+            .map(|(header, _)| header);
 
         // Archive all old entries from latest → historical
         tx.execute(
@@ -827,7 +823,7 @@ impl SqliteStore {
         )
         .into_store_error()?;
 
-        // Insert account header (archives old header to historical).
+        // Insert account header (archives old header to historical)
         Self::insert_account_header(tx, &new_account_state.into(), None, old_header.as_ref())?;
 
         Ok(())
@@ -846,7 +842,7 @@ impl SqliteStore {
         let init_header = query_latest_account_headers(tx, "id = ?", params![account_id.to_hex()])?
             .into_iter()
             .next()
-            .map(|(header, ..)| header)
+            .map(|(header, _)| header)
             .ok_or(StoreError::AccountDataNotFound(account_id))?;
 
         // Read the fungible assets that will be affected by the delta.

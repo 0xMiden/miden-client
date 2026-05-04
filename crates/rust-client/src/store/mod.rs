@@ -335,9 +335,7 @@ pub trait Store: Send + Sync {
         account_id: AccountId,
     ) -> Result<Option<AccountCode>, StoreError>;
 
-    /// Inserts an [`Account`] to the store.
-    /// Receives an [`Address`] as the initial address to associate with the account. When the
-    /// Inserts the [`Account`] into the store with its initial [`Address`] persisted.
+    /// Inserts an [`Account`] to the store, alongside its initial [`Address`].
     ///
     /// Tag registration is the caller's responsibility — see [`Self::add_note_tag`].
     ///
