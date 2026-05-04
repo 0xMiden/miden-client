@@ -66,6 +66,37 @@ The number of storage maps is auto-detected from the account.
 miden-bench --network localhost transaction --account-id 0x...
 ```
 
+### `import`
+
+Imports an account into the local store. Two mutually exclusive modes:
+
+- `--filename <path>` reads a `.mac` file via `AccountFile::read`, inserts its auth secret keys into the keystore, and adds the account to the store.
+- `--account-id <hex>` downloads a public account from the network via `Client::import_account_by_id`.
+
+```bash
+# From a .mac file
+miden-bench import --filename account.mac
+
+# From the network
+miden-bench --network testnet import --account-id 0x...
+```
+
+The command reports import time and the imported size: input `.mac` file size for the file mode (which includes auth secret keys), and the post-import serialized account size for the network mode.
+
+### `export`
+
+Exports an account from the local store to a `.mac` file. The file contains the account alongside its auth secret keys retrieved from the keystore.
+
+```bash
+# Default output path: <account_id>.mac in the current directory
+miden-bench export --account-id 0x...
+
+# Custom output path
+miden-bench export --account-id 0x... --filename ./out/account.mac
+```
+
+The command reports export time and the resulting `.mac` file size.
+
 ## Workflow
 
 The typical workflow is: **deploy** -> **expand** -> **transaction**.
@@ -150,6 +181,18 @@ miden-bench deploy --maps 3
 - `-a, --account-id <ID>` - Public account ID to benchmark against (required, hex format)
 - `-r, --reads <N>` - Maximum storage reads per transaction. When total entries exceed this limit, reads are split across multiple transactions per benchmark iteration. Each iteration's time is the sum across all transactions. When omitted, all entries are read in a single transaction.
 - `-i, --iterations <N>` - Number of benchmark iterations (default: 5)
+
+#### Import
+
+Exactly one of the following must be provided:
+
+- `-f, --filename <PATH>` - Path to a `.mac` account file
+- `-a, --account-id <ID>` - Public account ID to download from the network (hex format)
+
+#### Export
+
+- `-a, --account-id <ID>` - Account ID to export (required, hex format)
+- `-f, --filename <PATH>` - Output `.mac` file path (defaults to `<account_id>.mac` in the current directory)
 
 ## Metrics
 
