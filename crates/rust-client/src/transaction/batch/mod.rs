@@ -143,8 +143,8 @@ where
             authenticated_blocks.push(header);
         }
 
-        // 4. Build PartialMmr + PartialBlockchain using the current blockchain peaks — this
-        //    matches the MMR convention used by `ClientDataStore::get_transaction_inputs`.
+        // 4. Build PartialMmr + PartialBlockchain using the current blockchain peaks — this matches
+        //    the MMR convention used by `ClientDataStore::get_transaction_inputs`.
         let current_peaks = self
             .client
             .store
