@@ -198,10 +198,11 @@ CREATE TABLE notes_scripts (
     PRIMARY KEY (script_root)
 );
 
--- ── State sync & tags ────────────────────────────────────────────────────
+-- ── Blockchain checkpoint & tags ─────────────────────────────────────────
 
-CREATE TABLE state_sync (
+CREATE TABLE blockchain_checkpoint (
     block_num UNSIGNED BIG INT NOT NULL,    -- the block number of the most recent state sync
+    partial_blockchain_peaks BLOB NOT NULL, -- serialized MMR peaks at the current sync height
     PRIMARY KEY (block_num)
 );
 
@@ -210,11 +211,11 @@ CREATE TABLE tags (
     source BLOB NOT NULL   -- the serialized tag source
 );
 
--- insert initial row into state_sync table
-INSERT OR IGNORE INTO state_sync (block_num)
-SELECT 0
+-- insert initial row into blockchain_checkpoint table
+INSERT OR IGNORE INTO blockchain_checkpoint (block_num, partial_blockchain_peaks)
+SELECT 0, X''
 WHERE (
-    SELECT COUNT(*) FROM state_sync
+    SELECT COUNT(*) FROM blockchain_checkpoint
 ) = 0;
 
 -- ── Block headers & partial blockchain ───────────────────────────────────
@@ -222,7 +223,6 @@ WHERE (
 CREATE TABLE block_headers (
     block_num UNSIGNED BIG INT NOT NULL,  -- block number
     header BLOB NOT NULL,                 -- serialized block header
-    partial_blockchain_peaks BLOB NOT NULL,        -- serialized peaks of the partial blockchain MMR at this block
     has_client_notes BOOL NOT NULL,       -- whether the block has notes relevant to the client
     PRIMARY KEY (block_num)
 );

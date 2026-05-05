@@ -12,6 +12,7 @@ use miden_client::account::component::{
 use miden_client::account::{
     Account,
     AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
     AccountId,
     AccountStorageMode,
     AccountType,
@@ -114,7 +115,7 @@ fn create_account_with_empty_maps(
         .with_component(expansion_component)
         .with_component(reader_component)
         .storage_mode(AccountStorageMode::Public)
-        .build()?;
+        .build_with_schema_commitment()?;
 
     Ok((account, sk))
 }

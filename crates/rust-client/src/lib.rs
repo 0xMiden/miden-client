@@ -6,7 +6,7 @@
 //! accounts and their state, and facilitates executing, proving, and submitting transactions.
 //!
 //! For a protocol-level overview and guides for getting started, please visit the official
-//! [Miden docs](https://0xMiden.github.io/miden-docs/).
+//! [Miden docs](https://docs.miden.xyz/).
 //!
 //! ## Overview
 //!
@@ -303,6 +303,7 @@ pub use miden_protocol::{
     MIN_TX_EXECUTION_CYCLES,
     ONE,
     PrettyPrint,
+    WORD_SIZE,
     Word,
     ZERO,
 };
@@ -324,6 +325,7 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
+use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::rand::FeltRng;
 use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
@@ -364,6 +366,10 @@ pub struct Client<AUTH> {
     exec_options: ExecutionOptions,
     /// Number of blocks after which pending transactions are considered stale and discarded.
     tx_discard_delta: Option<u32>,
+    /// Number of synced blocks between automatic irrelevant-block pruning runs.
+    irrelevant_block_prune_interval: Option<u32>,
+    /// Sync height at which the last automatic irrelevant-block prune completed.
+    last_irrelevant_block_prune_sync_height: Option<BlockNumber>,
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,

@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use miden_protocol::Word;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::MerklePath;
-use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
+use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, PartialMmr};
 #[cfg(feature = "testing")]
 use miden_protocol::transaction::TransactionKernel;
 use tracing::warn;
@@ -38,9 +38,7 @@ impl<AUTH> Client<AUTH> {
             .get_block_header_by_number(Some(BlockNumber::GENESIS), false)
             .await?;
 
-        let blank_mmr_peaks = MmrPeaks::new(Forest::empty(), vec![])
-            .expect("Blank MmrPeaks should not fail to instantiate");
-        self.store.insert_block_header(&genesis, blank_mmr_peaks, false).await?;
+        self.store.insert_block_header(&genesis, false).await?;
         self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         Ok(())
     }
@@ -63,9 +61,7 @@ impl<AUTH> Client<AUTH> {
         }
 
         let genesis = synthetic_offline_genesis_header();
-        let blank_mmr_peaks = MmrPeaks::new(Forest::empty(), vec![])
-            .expect("Blank MmrPeaks should not fail to instantiate");
-        self.store.insert_block_header(&genesis, blank_mmr_peaks, false).await?;
+        self.store.insert_block_header(&genesis, false).await?;
         self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         Ok(())
     }
@@ -104,9 +100,7 @@ impl<AUTH> Client<AUTH> {
         let tracked_nodes = authenticated_block_nodes(&block_header, path_nodes);
 
         // Insert header and MMR nodes
-        self.store
-            .insert_block_header(&block_header, current_partial_mmr.peaks(), true)
-            .await?;
+        self.store.insert_block_header(&block_header, true).await?;
         self.store.insert_partial_blockchain_nodes(&tracked_nodes).await?;
 
         Ok(block_header)

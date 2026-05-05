@@ -7,6 +7,7 @@ use miden_protocol::Word;
 use miden_protocol::account::delta::AccountUpdateDetails;
 use miden_protocol::account::{AccountCode, AccountId, StorageSlot, StorageSlotContent};
 use miden_protocol::address::NetworkId;
+use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::{Forest, Mmr, MmrProof};
 use miden_protocol::crypto::merkle::smt::SmtProof;
@@ -37,8 +38,9 @@ use crate::rpc::domain::note::{
     NoteSyncInfo,
 };
 use crate::rpc::domain::nullifier::NullifierUpdate;
+use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
-use crate::rpc::domain::sync::ChainMmrInfo;
+use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::transaction::{TransactionRecord, TransactionsInfo};
 use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError, RpcStatusInfo};
 
@@ -373,12 +375,17 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_chain_mmr(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError> {
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+        // The mock chain doesn't distinguish committed vs proven tips, but respects
+        // explicit block numbers.
+        let target_block = match upper_bound {
+            SyncTarget::BlockNumber(block_num) => block_num.min(chain_tip),
+            SyncTarget::CommittedChainTip | SyncTarget::ProvenChainTip => chain_tip,
+        };
 
-        let from_forest = if block_from == chain_tip {
+        let from_forest = if block_from == target_block {
             target_block.as_usize()
         } else {
             block_from.as_u32() as usize + 1
@@ -456,6 +463,25 @@ impl NodeRpcClient for MockRpcApi {
             let mut mock_chain = self.mock_chain.write();
             mock_chain.add_pending_proven_transaction(proven_transaction.clone());
         };
+
+        let block_num = self.get_chain_tip_block_num();
+
+        Ok(block_num)
+    }
+
+    /// Simulates the submission of a proven batch to the node by adding it to the mock chain's
+    /// pending batches. The `proposed_batch` and `transaction_inputs` arguments are accepted to
+    /// match the trait signature but are unused — the mock relies on the `ProvenBatch` alone,
+    /// matching how `submit_proven_transaction` ignores its `transaction_inputs`.
+    async fn submit_proven_batch(
+        &self,
+        proven_batch: ProvenBatch,
+        _proposed_batch: ProposedBatch,
+        _transaction_inputs: Vec<TransactionInputs>,
+    ) -> Result<BlockNumber, RpcError> {
+        let mut mock_chain = self.mock_chain.write();
+        mock_chain.add_pending_batch(proven_batch);
+        drop(mock_chain);
 
         let block_num = self.get_chain_tip_block_num();
 
@@ -607,7 +633,11 @@ impl NodeRpcClient for MockRpcApi {
             .collect())
     }
 
-    async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
+    async fn get_block_by_number(
+        &self,
+        block_num: BlockNumber,
+        _include_proof: bool,
+    ) -> Result<ProvenBlock, RpcError> {
         let block = self
             .mock_chain
             .read()
@@ -720,6 +750,13 @@ impl NodeRpcClient for MockRpcApi {
             store: None,
             block_producer: None,
         })
+    }
+
+    async fn get_network_note_status(
+        &self,
+        _note_id: NoteId,
+    ) -> Result<NetworkNoteStatusInfo, RpcError> {
+        todo!("We need to check if we want to implement this for the mockchain");
     }
 }
 
