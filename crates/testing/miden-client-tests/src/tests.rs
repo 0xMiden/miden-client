@@ -2783,7 +2783,8 @@ async fn consume_note_with_custom_script() {
     client.sync_state().await.unwrap();
 
     let custom_note_script = "
-        begin
+        @note_script
+        pub proc main
             nop
         end
     ";
