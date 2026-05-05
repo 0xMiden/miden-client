@@ -644,7 +644,7 @@ impl NodeRpcClient for MockRpcApi {
         let note = self
             .get_available_notes()
             .iter()
-            .find(|note| note.note().is_some_and(|n| n.script().root() == root))
+            .find(|note| note.note().is_some_and(|n| Word::from(n.script().root()) == root))
             .unwrap()
             .clone();
 

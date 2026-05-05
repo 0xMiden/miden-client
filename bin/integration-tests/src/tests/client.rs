@@ -1448,7 +1448,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .with_context(|| "no nullifier proof returned from check_nullifiers RPC API")?;
     let retrieved_note_script = client
         .test_rpc_api()
-        .get_note_script_by_root(note.script().root())
+        .get_note_script_by_root(note.script().root().into())
         .await
         .unwrap();
     let sync_storage_maps = client

@@ -15,7 +15,6 @@ use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use miden_protocol::transaction::TransactionId;
 use miden_standards::account::auth::AuthSingleSig;
-use miden_standards::account::burn_policies::BurnAuthControlled;
 use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
 use miden_standards::code_builder::CodeBuilder;
 use rand::RngCore;
@@ -26,7 +25,10 @@ use crate::account::component::{
     AccountComponent,
     BasicFungibleFaucet,
     BasicWallet,
-    MintAuthControlled,
+    BurnPolicyConfig,
+    MintPolicyConfig,
+    PolicyAuthority,
+    TokenPolicyManager,
 };
 use crate::account::{AccountBuilder, AccountBuilderSchemaCommitmentExt, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
@@ -141,8 +143,11 @@ pub async fn insert_new_fungible_faucet(
         .with_auth_component(auth_component)
         .with_component(token_metadata)
         .with_component(BasicFungibleFaucet)
-        .with_component(MintAuthControlled::allow_all())
-        .with_component(BurnAuthControlled::allow_all())
+        .with_components(TokenPolicyManager::new(
+            PolicyAuthority::AuthControlled,
+            MintPolicyConfig::AllowAll,
+            BurnPolicyConfig::AllowAll,
+        ))
         .build_with_schema_commitment()
         .unwrap();
 

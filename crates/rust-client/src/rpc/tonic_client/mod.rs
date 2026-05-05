@@ -990,7 +990,7 @@ impl NodeRpcClient for GrpcClient {
         )?;
 
         let fetched_root = note_script.root();
-        if fetched_root != root {
+        if Word::from(fetched_root) != root {
             return Err(RpcError::InvalidResponse(format!(
                 "node returned note script with root {fetched_root} for requested root {root}",
             )));

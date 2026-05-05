@@ -101,12 +101,6 @@ pub mod component {
     };
     pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
     pub use miden_standards::account::auth::*;
-    pub use miden_standards::account::burn_policies::{
-        BurnAuthControlled,
-        BurnAuthControlledConfig,
-        BurnOwnerControlled,
-        BurnOwnerControlledConfig,
-    };
     pub use miden_standards::account::components::{
         basic_fungible_faucet_library,
         basic_wallet_library,
@@ -122,11 +116,15 @@ pub mod component {
         TokenMetadata,
     };
     pub use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
-    pub use miden_standards::account::mint_policies::{
-        MintAuthControlled,
-        MintAuthControlledConfig,
-        MintOwnerControlled,
-        MintOwnerControlledConfig,
+    pub use miden_standards::account::policies::{
+        BurnAllowAll,
+        BurnOwnerOnly,
+        BurnPolicyConfig,
+        MintAllowAll,
+        MintOwnerOnly,
+        MintPolicyConfig,
+        PolicyAuthority,
+        TokenPolicyManager,
     };
     pub use miden_standards::account::wallets::BasicWallet;
 }

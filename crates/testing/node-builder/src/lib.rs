@@ -18,7 +18,7 @@ use miden_node_block_producer::{
 };
 use miden_node_ntx_builder::NtxBuilderConfig;
 use miden_node_rpc::Rpc;
-use miden_node_store::{DEFAULT_MAX_CONCURRENT_PROOFS, GenesisState, Store};
+use miden_node_store::{DEFAULT_MAX_CONCURRENT_PROOFS, GenesisState, Store, StoreMode};
 use miden_node_utils::clap::{GrpcOptionsExternal, GrpcOptionsInternal, StorageOptions};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_node_validator::{Validator, ValidatorSigner};
@@ -326,12 +326,14 @@ impl NodeBuilder {
                     Store {
                         data_directory,
                         rpc_listener,
-                        block_producer_listener,
-                        ntx_builder_listener,
-                        block_prover_url: None,
+                        mode: StoreMode::BlockProducer {
+                            block_producer_listener,
+                            ntx_builder_listener,
+                            block_prover_url: None,
+                            max_concurrent_proofs: DEFAULT_MAX_CONCURRENT_PROOFS,
+                        },
                         storage_options: StorageOptions::default(),
                         grpc_options: GrpcOptionsInternal::default(),
-                        max_concurrent_proofs: DEFAULT_MAX_CONCURRENT_PROOFS,
                     }
                     .serve()
                     .await

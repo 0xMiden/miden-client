@@ -8,12 +8,13 @@ use miden_client::note::{
     NoteConsumability,
     NoteConsumptionStatus,
     NoteMetadata,
+    NoteScriptRoot,
     NoteStorage,
     StandardNote,
     get_input_note_with_id_prefix,
 };
 use miden_client::store::{InputNoteRecord, NoteFilter as ClientNoteFilter, OutputNoteRecord};
-use miden_client::{Client, ClientError, IdPrefixFetchError, PrettyPrint, Word};
+use miden_client::{Client, ClientError, IdPrefixFetchError, PrettyPrint};
 
 use crate::errors::CliError;
 use crate::utils::{load_faucet_details_map, parse_account_id};
@@ -504,7 +505,7 @@ fn note_summary(
 
 /// Identifies if a note with the given script root is a standard note type.
 /// Returns the name of the standard note type if found, or `None` if not a standard note.
-fn identify_standard_note(script_root: Word) -> Option<&'static str> {
+fn identify_standard_note(script_root: NoteScriptRoot) -> Option<&'static str> {
     match script_root {
         sr if sr == StandardNote::P2ID.script_root() => Some("P2ID"),
         sr if sr == StandardNote::P2IDE.script_root() => Some("P2IDE"),

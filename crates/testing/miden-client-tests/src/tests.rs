@@ -101,11 +101,15 @@ use miden_protocol::transaction::RawOutputNote;
 use miden_protocol::vm::AdviceInputs;
 use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
 use miden_standards::account::AccountBuilderSchemaCommitmentExt;
-use miden_standards::account::burn_policies::BurnAuthControlled;
 use miden_standards::account::faucets::BasicFungibleFaucet;
 use miden_standards::account::interface::AccountInterfaceError;
 use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
-use miden_standards::account::mint_policies::MintAuthControlled;
+use miden_standards::account::policies::{
+    BurnPolicyConfig,
+    MintPolicyConfig,
+    PolicyAuthority,
+    TokenPolicyManager,
+};
 use miden_standards::account::wallets::BasicWallet;
 use miden_standards::note::{NoteConsumptionStatus, P2idNoteStorage, StandardNote};
 use miden_standards::testing::mock_account::MockAccountExt;
@@ -2956,7 +2960,7 @@ async fn consume_note_with_custom_script() {
     let custom_note = Note::new(note_assets, note_metadata, note_recipient);
 
     // At this point, the note script should no be stored locally
-    assert!(client.test_store().get_note_script(note_script.root()).await.is_err());
+    assert!(client.test_store().get_note_script(note_script.root().into()).await.is_err());
 
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![custom_note.clone()])
@@ -2967,7 +2971,8 @@ async fn consume_note_with_custom_script() {
     client.sync_state().await.unwrap();
 
     // At this point, the note script should be stored locally
-    let stored_script = client.test_store().get_note_script(note_script.root()).await.unwrap();
+    let stored_script =
+        client.test_store().get_note_script(note_script.root().into()).await.unwrap();
     assert_eq!(stored_script.root().to_hex(), note_script.root().to_hex());
 
     // Consume note
@@ -3502,8 +3507,11 @@ async fn insert_new_fungible_faucet(
         ))
         .with_component(token_metadata)
         .with_component(BasicFungibleFaucet)
-        .with_component(MintAuthControlled::allow_all())
-        .with_component(BurnAuthControlled::allow_all())
+        .with_components(TokenPolicyManager::new(
+            PolicyAuthority::AuthControlled,
+            MintPolicyConfig::AllowAll,
+            BurnPolicyConfig::AllowAll,
+        ))
         .build_with_schema_commitment()
         .unwrap();
 
@@ -3548,8 +3556,11 @@ async fn insert_new_ecdsa_fungible_faucet(
         ))
         .with_component(token_metadata)
         .with_component(BasicFungibleFaucet)
-        .with_component(MintAuthControlled::allow_all())
-        .with_component(BurnAuthControlled::allow_all())
+        .with_components(TokenPolicyManager::new(
+            PolicyAuthority::AuthControlled,
+            MintPolicyConfig::AllowAll,
+            BurnPolicyConfig::AllowAll,
+        ))
         .build_with_schema_commitment()
         .unwrap();
 
