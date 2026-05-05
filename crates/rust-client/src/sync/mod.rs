@@ -169,11 +169,14 @@ where
         self.fetch_transport_notes(cursor, note_tags).await
     }
 
-    /// Runs [`Client::sync_note_transport`] followed by [`Client::sync_chain`], failing fast on
-    /// the first error.
+    /// Runs the full client sync.
     ///
-    /// Note: private notes delivered via NTL are imported before
-    /// the chain sync reads its input set, so their nullifiers are checked in the same call.
+    /// First fetches private notes from the Note Transport Layer, then syncs the client's
+    /// on-chain state with the Miden node. If note transport is disabled, this is equivalent to
+    /// [`Client::sync_chain`].
+    ///
+    /// Fails fast on the first error. Private notes delivered via NTL are imported before the
+    /// chain sync reads its input set, so their nullifiers are checked in the same call.
     pub async fn sync_state(&mut self) -> Result<SyncSummary, ClientError> {
         self.sync_note_transport().await?;
         self.sync_chain().await
