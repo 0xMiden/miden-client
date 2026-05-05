@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.6 (2026-05-05)
+
+### Fixes
+
+* [FIX] When the client submits a network note and it is also tracking the recipient network account, now the `InputNoteReader` detects the consumed note ([#2113](https://github.com/0xMiden/miden-client/pull/2113)).
+
 ## 0.14.5 (2026-04-27)
 
 ### Enhancements
@@ -12,7 +18,6 @@
 * [FIX][rust] Fixed source manager mismatch panic (`invalid source span: starting byte is out of bounds`) in tests that compiled scripts with a standalone `SourceManager` and then executed them through the client. Test helpers now use `TransactionKernel::assembler_with_source_manager()` and the client's shared source manager ([#2047](https://github.com/0xMiden/miden-client/pull/2047)).
 * [FIX][react] Fixed `initializeSignerAccount` (the external-keystore init path used by `MidenFiSignerProvider`, Para, Turnkey, etc.) throwing `"invalid enum value passed"` on first connect. The code reached for `AuthScheme.AuthEcdsaK256Keccak`, which only exists on the internal wasm-bindgen `AuthScheme` enum, not on the public string-valued `AuthScheme` constant exported from `@miden-sdk/miden-sdk/lazy` — at runtime it resolved to `undefined`, and passing `undefined` to `AccountComponent.createAuthComponentFromCommitment` failed at the wasm boundary. `initializeSignerAccount` now calls `resolveAuthScheme(AuthScheme.ECDSA)`, where `resolveAuthScheme` is a newly-public helper from `@miden-sdk/miden-sdk` that converts the string constants to the numeric wasm-bindgen variant.
 * [FIX][react] `DEFAULTS.AUTH_SCHEME` was being initialized to `AuthScheme.AuthRpoFalcon512` — another nonexistent key on the public `AuthScheme`, silently resolving to `undefined`. Now set to `AuthScheme.Falcon`. The four hooks that read this default (`useCreateWallet`, `useCreateFaucet`, `useImportAccount`, `useSessionAccount`) now pipe the value through `resolveAuthScheme(...)` before handing it to the wasm-bindgen `newWallet` / `newFaucet` / `importPublicAccountFromSeed` calls. The public hook option types stay `authScheme?: AuthScheme`, which now correctly means `"falcon" | "ecdsa"`.
-* [FIX] When the client submits a network note and it is also tracking the recipient network account, now the `InputNoteReader` detects the consumed note ([#2113](https://github.com/0xMiden/miden-client/pull/2113)).
 
 ## 0.14.4 (2026-04-20)
 
