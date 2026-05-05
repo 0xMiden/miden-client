@@ -303,6 +303,7 @@ pub use miden_protocol::{
     MIN_TX_EXECUTION_CYCLES,
     ONE,
     PrettyPrint,
+    WORD_SIZE,
     Word,
     ZERO,
 };

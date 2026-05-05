@@ -20,10 +20,10 @@ anyhow             = { workspace = true }
 async-trait        = { workspace = true }
 tokio              = { features = ["net"], workspace = true }
 tokio-stream       = { features = ["net"], version = "0.1" }
-tonic              = { default-features = false, features = ["router", "transport"], version = "0.14" }
+tonic              = { features = ["router", "transport"], workspace = true }
 tonic-web          = { version = "0.14" }
-tracing            = { version = "0.1" }
-tracing-subscriber = { features = ["env-filter", "fmt", "json"], version = "0.3" }
+tracing            = { workspace = true }
+tracing-subscriber = { features = ["env-filter", "fmt", "json"], workspace = true }
 
 [lints]
 workspace = true

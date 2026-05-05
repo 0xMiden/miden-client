@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::hash::rpo::Rpo256;
 use miden_protocol::crypto::merkle::MerklePath;
-use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
+use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, PartialMmr};
 use miden_protocol::{Felt, Word};
 use tracing::warn;
 
@@ -37,9 +37,7 @@ impl<AUTH> Client<AUTH> {
             .get_block_header_by_number(Some(BlockNumber::GENESIS), false)
             .await?;
 
-        let blank_mmr_peaks = MmrPeaks::new(Forest::empty(), vec![])
-            .expect("Blank MmrPeaks should not fail to instantiate");
-        self.store.insert_block_header(&genesis, blank_mmr_peaks, false).await?;
+        self.store.insert_block_header(&genesis, false).await?;
         self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         Ok(())
     }
@@ -78,12 +76,7 @@ impl<AUTH> Client<AUTH> {
     /// Hashes the store's peaks at the current sync height. Used as the cache freshness
     /// fingerprint.
     async fn current_store_peaks_hash(&self) -> Result<Word, ClientError> {
-        let sync_height = self.store.get_sync_height().await?;
-        Ok(self
-            .store
-            .get_partial_blockchain_peaks_by_block_num(sync_height)
-            .await?
-            .hash_peaks())
+        Ok(self.store.get_current_blockchain_peaks().await?.hash_peaks())
     }
 
     /// Hashes the store's tracked block numbers (sorted). Used as the cache freshness
@@ -127,9 +120,7 @@ impl<AUTH> Client<AUTH> {
         let tracked_nodes = authenticated_block_nodes(&block_header, path_nodes);
 
         // Insert header and MMR nodes
-        self.store
-            .insert_block_header(&block_header, current_partial_mmr.peaks(), true)
-            .await?;
+        self.store.insert_block_header(&block_header, true).await?;
         self.store.insert_partial_blockchain_nodes(&tracked_nodes).await?;
 
         Ok(block_header)

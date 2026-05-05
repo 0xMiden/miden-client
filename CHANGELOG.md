@@ -7,13 +7,18 @@
 * [BREAKING][param][rust] `NodeRpcClient::get_block_by_number()` now takes an `include_proof: bool` parameter to control whether the block proof is included in the response. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 * [BREAKING][param][rust] `NodeRpcClient::sync_chain_mmr()` replaced `block_to: Option<BlockNumber>` with `upper_bound: SyncTarget` to match the RPC definition. Use `SyncTarget::CommittedChainTip` for previous default behavior (`None`), or `SyncTarget::BlockNumber(num)` for a specific block number. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 * [BREAKING][rust] Added `submit_proven_batch` to `NodeRpcClient` trait. ([#2075](https://github.com/0xMiden/miden-client/pull/2075))
+* [BREAKING][param][cli] `address add` now takes `<ACCOUNT_ID> <BECH32_ADDRESS>` instead of `<ACCOUNT_ID> <INTERFACE> [TAG_LEN]`. Use the new `address encode` subcommand to build a bech32 string from `<ACCOUNT_ID> <INTERFACE> [TAG_LEN]`. ([#2115](https://github.com/0xMiden/miden-client/pull/2115))
 
 ### Enhancements
 
+* [FEATURE][rust] Added `GrpcClient::with_bearer_auth(token)` to attach an `authorization: Bearer <token>` header to every outbound gRPC call, for use behind authenticating gateways. Tokens are validated at connection time and preserved across `set_genesis_commitment` updates ([#2101](https://github.com/0xMiden/miden-client/pull/2101)).
 * Made new-account construction use merged storage schema commitment (`build_with_schema_commitment`), re-exported `AccountBuilderSchemaCommitmentExt`, added WASM `buildWithoutSchemaCommitment()`, and fixed contract `accounts.create()` to require explicit `components` ([#1996](https://github.com/0xMiden/miden-client/pull/1996)).
 * Fixed the faucet token symbol display when showing account details ([#1985](https://github.com/0xMiden/miden-client/pull/1985)).
 * [FEATURE][rust,cli,web] Added `get_network_note_status` to `NodeRpcClient` trait for querying the processing status of notes submitted to the network (pending, nullifier-inflight, discarded, nullifier-committed), along with attempt count and error details. Exposed as `miden-client network-note-status <note_id>` CLI command and `RpcClient.getNetworkNoteStatus()` in the web client. ([#1981](https://github.com/0xMiden/miden-client/pull/1981))
-* Added `miden-cli call` command for invoking account procedures directly from the CLI.
+* Remove MMR peaks from the blocks table and store them alongside the sync height in a new `blockchain_checkpoint` table ([#2100](https://github.com/0xMiden/miden-client/pull/2100)).
+* Added `miden-cli call` command for invoking account procedures directly from the CLI ([#1943](https://github.com/0xMiden/miden-client/pull/1943)).
+* Made `TransactionStoreUpdate` serialization lossless ([#2112](https://github.com/0xMiden/miden-client/pull/2112)).
+* [FEATURE][cli] Added `address encode <ACCOUNT_ID> <INTERFACE> [TAG_LEN]` subcommand that prints the bech32 encoding of an address built from the given fields (useful for producing the input to `address add`). ([#2115](https://github.com/0xMiden/miden-client/pull/2115))
 
 ## 0.14.4 (TBA)
 
