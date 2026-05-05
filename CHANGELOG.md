@@ -5,6 +5,7 @@
 ### Fixes
 
 * [FIX] When the client submits a network note and it is also tracking the recipient network account, now the `InputNoteReader` detects the consumed note ([#2113](https://github.com/0xMiden/miden-client/pull/2113)).
+* Changed note transport integration tests to validate note ids and avoid matching with existing notes when running against testnet ([#2148](https://github.com/0xMiden/miden-client/pull/2148)).
 
 ## 0.14.5 (2026-04-27)
 
