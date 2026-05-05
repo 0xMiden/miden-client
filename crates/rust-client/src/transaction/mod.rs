@@ -288,7 +288,8 @@ where
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionResult, ClientError> {
-        let prep = self.prepare_transaction(account_id, transaction_request).await?;
+        let account = self.try_get_account(account_id).await?;
+        let prep = self.prepare_transaction(&account, transaction_request).await?;
 
         let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
         data_store.register_foreign_account_inputs(prep.foreign_account_inputs.iter().cloned());
@@ -296,13 +297,6 @@ where
             data_store.mast_store().load_account_code(fpi_account.code());
         }
 
-        // Lazy-fetch the executing account from the store.
-        let account_record = self
-            .store
-            .get_account(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))?;
-        let account: Account = account_record.try_into()?;
         data_store.mast_store().load_account_code(account.code());
 
         let mut notes = prep.notes;
@@ -329,16 +323,16 @@ where
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionResult, ClientError> {
-        let prep = self.prepare_transaction(account_id, transaction_request).await?;
+        // Use the in-batch account state (post-prev-tx in the batch) for both validation
+        // and the MAST forest, so balances reflect prior pushes in this batch.
+        let account = data_store.current_account().clone();
+        let prep = self.prepare_transaction(&account, transaction_request).await?;
 
         data_store.register_foreign_account_inputs(prep.foreign_account_inputs.iter().cloned());
         for fpi_account in &prep.foreign_account_inputs {
             data_store.mast_store().load_account_code(fpi_account.code());
         }
 
-        // Use the in-batch account state (post-prev-tx in the batch); only its code is needed
-        // for the MAST forest.
-        let account = data_store.current_account().clone();
         data_store.mast_store().load_account_code(account.code());
 
         let mut notes = prep.notes;
@@ -356,16 +350,22 @@ where
     }
 
     /// Performs the data-store-independent setup shared by `execute_transaction` and
-    /// `execute_transaction_for_batch`: validates the request, loads/filters input notes,
-    /// builds the transaction script and args, retrieves foreign-account inputs, upserts
-    /// output note scripts, and computes the reference block number.
+    /// `execute_transaction_for_batch`: validates the request against the supplied
+    /// `account`, loads/filters input notes, builds the transaction script and args,
+    /// retrieves foreign-account inputs, upserts output note scripts, and computes the
+    /// reference block number.
+    ///
+    /// `account` is the state validation runs against — for a single transaction this is
+    /// the persisted account; inside [`crate::transaction::BatchBuilder::push`] it is the
+    /// in-batch (stacked) state, so balances reflect prior pushes.
     async fn prepare_transaction(
         &self,
-        account_id: AccountId,
+        account: &Account,
         transaction_request: TransactionRequest,
     ) -> Result<PreparedTransaction, ClientError> {
-        // Validates the transaction request before executing
-        self.validate_request(account_id, &transaction_request).await?;
+        let account_id = account.id();
+        self.validate_recency().await?;
+        validate_account_request(&transaction_request, account)?;
 
         // Retrieve all input notes from the store.
         let mut stored_note_records = self
@@ -711,6 +711,14 @@ where
         account_id: AccountId,
         transaction_request: &TransactionRequest,
     ) -> Result<(), ClientError> {
+        self.validate_recency().await?;
+        let account = self.try_get_account(account_id).await?;
+        validate_account_request(transaction_request, &account)
+    }
+
+    /// Errors with [`ClientError::RecencyConditionError`] if the client's sync height is more
+    /// than `max_block_number_delta` blocks behind the current chain tip.
+    async fn validate_recency(&self) -> Result<(), ClientError> {
         if let Some(max_block_number_delta) = self.max_block_number_delta {
             let current_chain_tip =
                 self.rpc_api.get_block_header_by_number(None, false).await?.0.block_num();
@@ -721,14 +729,7 @@ where
                 ));
             }
         }
-
-        let account = self.try_get_account(account_id).await?;
-        if account.is_faucet() {
-            // TODO(SantiagoPittella): Add faucet validations.
-            Ok(())
-        } else {
-            validate_basic_account_request(transaction_request, &account)
-        }
+        Ok(())
     }
 
     /// Checks whether the node's `note_scripts` registry already has each of the expected NTX
@@ -965,6 +966,21 @@ fn get_outgoing_assets(
     let outgoing_assets = output_notes_assets.values().flat_map(|note_assets| note_assets.iter());
 
     request::collect_assets(outgoing_assets)
+}
+
+/// Validates a transaction request against the supplied `account`. Faucets are currently
+/// skipped; for non-faucets, defers to [`validate_basic_account_request`] for asset-balance
+/// checks.
+fn validate_account_request(
+    transaction_request: &TransactionRequest,
+    account: &Account,
+) -> Result<(), ClientError> {
+    if account.is_faucet() {
+        // TODO(SantiagoPittella): Add faucet validations.
+        Ok(())
+    } else {
+        validate_basic_account_request(transaction_request, account)
+    }
 }
 
 /// Ensures a transaction request is compatible with the current account state,
