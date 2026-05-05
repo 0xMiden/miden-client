@@ -160,35 +160,17 @@ miden-bench --store ./my-bench-data transaction --account-id 0x...
 
 ### CPU Profiling with Samply
 
-Use [`samply`](https://github.com/mstange/samply) when you need to inspect where CPU time is spent by function, stack, thread, or source line. `miden-bench` reports benchmark timings directly; Samply is the external profiler used to investigate the code paths behind those timings on macOS and Linux.
-
-Install Samply once:
+Use [`samply`](https://github.com/mstange/samply) to inspect CPU time by function, stack, thread, or source line. `miden-bench` timings remain the benchmark numbers.
 
 ```bash
 cargo install --locked samply
-```
-
-Build the benchmark binary in release mode with debug information so Samply can show Rust symbols, inline stacks, and source lines:
-
-```bash
 CARGO_PROFILE_RELEASE_DEBUG=true cargo build --release -p miden-client-bench
-```
 
-Then prepend `samply record` to the benchmark command:
-
-```bash
 samply record target/release/miden-bench --store ./miden-bench-store deploy --maps 1
 samply record target/release/miden-bench --store ./miden-bench-store transaction --account-id 0x... --iterations 3
-samply record target/release/miden-bench --store ./miden-bench-store import --filename account.mac
 ```
 
-On Linux, Samply uses perf events. If recording is denied, grant temporary access until the next reboot:
-
-```bash
-echo '1' | sudo tee /proc/sys/kernel/perf_event_paranoid
-```
-
-Samply is a sampling profiler, so function timings are estimates from collected stack samples. Use the per-phase timings printed by `miden-bench` for benchmark numbers, and Samply for hotspot investigation.
+On Linux, Samply may require perf event access if recording is denied.
 
 ### Command Options
 
