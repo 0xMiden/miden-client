@@ -93,7 +93,7 @@ Below are representative errors you may encounter, their likely causes, and sugg
 
 ### Transaction lifecycle (CLI-oriented overview)
 
-For the full protocol-level lifecycle, see the Miden book: [Transaction lifecycle](https://0xmiden.github.io/miden-docs/imported/miden-base/src/transaction.html#transaction-lifecycle).
+For the full protocol-level lifecycle, see the Miden book: [Transaction lifecycle](https://docs.miden.xyz/builder/smart-contracts/transactions/introduction#transaction-lifecycle).
 
 ```mermaid
 flowchart LR
@@ -144,4 +144,4 @@ Key states the CLI surfaces:
 
 - CLI debug flag and environment variable are documented in `CLI` and `Config` docs.
 - Common error enums originate from the client and RPC layers.
-- Protocol lifecycle: [Miden book — Transaction lifecycle](https://0xmiden.github.io/miden-docs/imported/miden-base/src/transaction.html#transaction-lifecycle)
+- Protocol lifecycle: [Miden book — Transaction lifecycle](https://docs.miden.xyz/builder/smart-contracts/transactions/introduction#transaction-lifecycle)

@@ -143,11 +143,17 @@ where
             authenticated_blocks.push(header);
         }
 
-        // 4. Build PartialMmr + PartialBlockchain using `ref_block_num` as the forest — this
+        // 4. Build PartialMmr + PartialBlockchain using the current blockchain peaks — this
         //    matches the MMR convention used by `ClientDataStore::get_transaction_inputs`.
-        let forest = ref_block_num.as_u32();
+        let current_peaks = self
+            .client
+            .store
+            .get_current_blockchain_peaks()
+            .await
+            .map_err(ClientError::StoreError)?;
         let partial_mmr =
-            build_partial_mmr_with_paths(&self.client.store, forest, &authenticated_blocks).await?;
+            build_partial_mmr_with_paths(&self.client.store, current_peaks, &authenticated_blocks)
+                .await?;
         let partial_blockchain = PartialBlockchain::new(partial_mmr, authenticated_blocks)?;
 
         // 5. Build ProposedBatch.
