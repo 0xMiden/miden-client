@@ -158,28 +158,37 @@ miden-bench --store ./my-bench-data expand --account-id 0x... --map-idx 0 --offs
 miden-bench --store ./my-bench-data transaction --account-id 0x...
 ```
 
-### CPU Flamegraph (`--flamegraph`)
+### CPU Profiling with Samply
 
-Wraps any subcommand with an in-process CPU profiler ([`pprof`](https://crates.io/crates/pprof)) and writes a flamegraph SVG. Pass with no value to write to `flamegraph.svg` in the current directory, or pass an explicit path with `--flamegraph=PATH` (the `=` is required so clap does not consume the next token as the value).
+Use [`samply`](https://github.com/mstange/samply) when you need to inspect where CPU time is spent by function, stack, thread, or source line. `miden-bench` reports benchmark timings directly; Samply is the external profiler used to investigate the code paths behind those timings on macOS and Linux.
 
-```bash
-# Default output: ./flamegraph.svg
-miden-bench --flamegraph deploy --maps 2
-
-# Custom output path
-miden-bench --flamegraph=./profiles/expand.svg expand --account-id 0x... --map-idx 0 --offset 0 --count 200
-```
-
-The profiler samples at 100 Hz and captures only on-CPU time. CPU flamegraphs explain hotspots in execution, proving, and serialization. They do **not** capture wall-clock time spent waiting on the network or on block finality, so I/O-bound paths (`submit`, network `import`) appear dominated by Tokio runtime plumbing. Use the per-phase timers reported by each subcommand for those.
-
-> [!WARNING]
-> **Known limitation.** `--flamegraph` is unstable on macOS aarch64 / Apple Silicon when profiling commands that invoke the Miden prover (`deploy`, `expand`, and the proving phases of `transaction`). [`pprof-rs`](https://crates.io/crates/pprof) samples with `SIGPROF` and unwinds from a signal handler, which can SIGTRAP during prover execution on this platform. Tracked upstream in [tikv/pprof-rs#75](https://github.com/tikv/pprof-rs/issues/75) and [#187](https://github.com/tikv/pprof-rs/issues/187). Use Linux for full CPU flamegraphs. Lightweight commands that do not prove transactions, such as `import`, may still work on macOS. The bench prints a runtime warning when this configuration is detected.
-
-For sharper frames, build with debug symbols:
+Install Samply once:
 
 ```bash
-RUSTFLAGS="-C debuginfo=1" cargo build --release -p miden-client-bench
+cargo install --locked samply
 ```
+
+Build the benchmark binary in release mode with debug information so Samply can show Rust symbols, inline stacks, and source lines:
+
+```bash
+CARGO_PROFILE_RELEASE_DEBUG=true cargo build --release -p miden-client-bench
+```
+
+Then prepend `samply record` to the benchmark command:
+
+```bash
+samply record target/release/miden-bench --store ./miden-bench-store deploy --maps 1
+samply record target/release/miden-bench --store ./miden-bench-store transaction --account-id 0x... --iterations 3
+samply record target/release/miden-bench --store ./miden-bench-store import --filename account.mac
+```
+
+On Linux, Samply uses perf events. If recording is denied, grant temporary access until the next reboot:
+
+```bash
+echo '1' | sudo tee /proc/sys/kernel/perf_event_paranoid
+```
+
+Samply is a sampling profiler, so function timings are estimates from collected stack samples. Use the per-phase timings printed by `miden-bench` for benchmark numbers, and Samply for hotspot investigation.
 
 ### Command Options
 

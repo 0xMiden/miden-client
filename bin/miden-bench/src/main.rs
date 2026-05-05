@@ -38,22 +38,6 @@ struct CliArgs {
     /// for the `SQLite` database and filesystem keystore.
     #[arg(long, global = true, default_value = DEFAULT_STORE_DIR)]
     store: String,
-
-    /// Generate a CPU flamegraph SVG while running the subcommand. Pass with
-    /// no value (`--flamegraph`) to write to `flamegraph.svg` in the current
-    /// directory, or pass an explicit path with `--flamegraph=PATH`. CPU
-    /// sampling is performed at 100 Hz; only on-CPU time is captured, so
-    /// I/O-bound paths (network, block-finality waits) appear dominated by
-    /// runtime plumbing. Use phase timers for those.
-    #[arg(
-        long,
-        global = true,
-        num_args = 0..=1,
-        require_equals = true,
-        default_missing_value = "flamegraph.svg",
-        value_name = "PATH",
-    )]
-    flamegraph: Option<PathBuf>,
 }
 
 #[derive(Subcommand, Clone)]
@@ -260,32 +244,7 @@ async fn main() {
         StartupMode::Unsynced => {},
     }
 
-    if args.flamegraph.is_some() && cfg!(all(target_os = "macos", target_arch = "aarch64")) {
-        eprintln!(
-            "warning: --flamegraph is unstable on macOS Apple Silicon for proving-heavy paths \
-             (deploy/expand/transaction). Heavy compute typically SIGTRAPs the process due to a \
-             known pprof-rs limitation (https://github.com/tikv/pprof-rs/issues/75, #187). \
-             Lightweight subcommands (import) work; for full profiles run on Linux."
-        );
-    }
-
-    let flamegraph_guard = args.flamegraph.is_some().then(|| {
-        pprof::ProfilerGuardBuilder::default()
-            .frequency(100)
-            .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-            .build()
-            .expect("Failed to build profiler guard")
-    });
-
     dispatch_command(args.command, &mut client, store_path, endpoint, &store_flag).await;
-
-    if let (Some(guard), Some(path)) = (flamegraph_guard, args.flamegraph) {
-        let report = guard.report().build().expect("Failed to build profiling report");
-        let file = std::fs::File::create(&path).expect("Failed to create flamegraph file");
-        report.flamegraph(file).expect("Failed to write flamegraph SVG");
-        println!();
-        println!("Flamegraph written to {}", path.display());
-    }
 }
 
 async fn dispatch_command(

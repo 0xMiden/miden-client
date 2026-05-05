@@ -138,27 +138,3 @@ fn network_option_custom_url() {
     cmd.args(["--network", "http://custom.node:8080", "deploy", "--help"]);
     cmd.assert().success();
 }
-
-/// Tests that the flamegraph option is recognized without a value (uses default path)
-#[test]
-fn flamegraph_option_no_value() {
-    let mut cmd = cargo_bin_cmd!("miden-bench");
-    cmd.args(["--flamegraph", "deploy", "--help"]);
-    cmd.assert().success().stdout(contains("Deploy a public wallet"));
-}
-
-/// Tests that the flamegraph option accepts a custom path with `=`
-#[test]
-fn flamegraph_option_with_path() {
-    let mut cmd = cargo_bin_cmd!("miden-bench");
-    cmd.args(["--flamegraph=out.svg", "deploy", "--help"]);
-    cmd.assert().success().stdout(contains("Deploy a public wallet"));
-}
-
-/// Tests that the flamegraph option rejects a space-separated path (`require_equals`)
-#[test]
-fn flamegraph_option_rejects_space_separated_path() {
-    let mut cmd = cargo_bin_cmd!("miden-bench");
-    cmd.args(["--flamegraph", "out.svg", "deploy"]);
-    cmd.assert().failure();
-}

@@ -63,7 +63,6 @@ clap               = { version = "4.5" }
 comfy-table        = { version = "7.1" }
 hex                = { version = "0.4" }
 miette             = { features = ["fancy"], version = "7.6" }
-pprof              = { default-features = false, version = "0.15" }
 predicates         = { version = "3.0" }
 prost              = { default-features = false, version = "0.14" }
 rand               = { version = "0.9" }
