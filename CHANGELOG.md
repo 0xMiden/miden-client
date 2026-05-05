@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.6 (2026-05-05)
+
+### Fixes
+
+* [FIX] When the client submits a network note and it is also tracking the recipient network account, now the `InputNoteReader` detects the consumed note ([#2113](https://github.com/0xMiden/miden-client/pull/2113)).
+
 ## 0.14.5 (2026-04-27)
 
 ### Breaking Changes

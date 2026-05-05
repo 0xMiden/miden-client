@@ -87,7 +87,7 @@ async fn transaction_creates_two_notes() {
     // Validate that the request is expected to create two assets in the first note
     let expected_notes = tx_request.expected_output_own_notes();
     assert!(!expected_notes.is_empty());
-    assert!(expected_notes[0].assets().num_assets() == 2);
+    assert_eq!(expected_notes[0].assets().num_assets(), 2);
 
     // Let the client process state changes (mock chain)
     client.sync_state().await.unwrap();
