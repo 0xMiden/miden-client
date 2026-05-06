@@ -641,14 +641,14 @@ where
             let script_root = script.root();
 
             // Check if the node already has this script registered.
-            match self.rpc_api.get_note_script_by_root(script_root).await {
+            match self.rpc_api.get_note_script_by_root(script_root.into()).await {
                 Ok(_) => {},
                 Err(RpcError::RequestError { error_kind: GrpcError::NotFound, .. }) => {
                     missing_scripts.push(script.clone());
                 },
                 Err(other) => {
                     return Err(ClientError::NtxScriptRegistrationFailed {
-                        script_root,
+                        script_root: script_root.into(),
                         source: other,
                     });
                 },
@@ -694,12 +694,12 @@ where
                 )
                 .await?;
 
-            if execution.failed.is_empty() {
+            if execution.failed().is_empty() {
                 break;
             }
 
             let failed_note_ids: BTreeSet<NoteId> =
-                execution.failed.iter().map(|n| n.note.id()).collect();
+                execution.failed().iter().map(|n| n.note().id()).collect();
             let filtered_input_notes = InputNotes::new(
                 input_notes
                     .into_iter()
@@ -836,12 +836,37 @@ where
         &'auth self,
         data_store: &'store STORE,
     ) -> Result<
-        TransactionExecutor<'store, 'auth, STORE, AUTH, miden_debug::DapExecutor>,
+        TransactionExecutor<'store, 'auth, STORE, AUTH, DapProgramExecutor>,
         TransactionExecutorError,
     > {
-        Ok(self
-            .build_executor(data_store)?
-            .with_program_executor::<miden_debug::DapExecutor>())
+        Ok(self.build_executor(data_store)?.with_program_executor::<DapProgramExecutor>())
+    }
+}
+
+/// Adapts [`miden_debug::DapExecutor`] (which exposes `new` + `execute_async`) to
+/// [`miden_tx::ProgramExecutor`]. `miden-debug` does not depend on `miden-tx`, so the impl
+/// must live here.
+#[cfg(feature = "dap")]
+pub(crate) struct DapProgramExecutor(miden_debug::DapExecutor);
+
+#[cfg(feature = "dap")]
+impl miden_tx::ProgramExecutor for DapProgramExecutor {
+    fn new(
+        stack_inputs: miden_processor::StackInputs,
+        advice_inputs: miden_processor::advice::AdviceInputs,
+        options: miden_processor::ExecutionOptions,
+    ) -> Self {
+        Self(miden_debug::DapExecutor::new(stack_inputs, advice_inputs, options))
+    }
+
+    fn execute<H: miden_processor::Host + Send>(
+        self,
+        program: &miden_processor::Program,
+        host: &mut H,
+    ) -> impl miden_processor::FutureMaybeSend<
+        Result<miden_processor::ExecutionOutput, miden_processor::ExecutionError>,
+    > {
+        self.0.execute_async(program, host)
     }
 }
 

@@ -1,17 +1,18 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_protocol::Word;
 use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::hash::rpo::Rpo256;
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, PartialMmr};
 #[cfg(feature = "testing")]
 use miden_protocol::transaction::TransactionKernel;
+use miden_protocol::{Felt, Word};
 use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
 use crate::store::{BlockRelevance, StoreError};
-use crate::{Client, ClientError};
+use crate::{CachedPartialMmr, Client, ClientError};
 
 /// Network information management methods.
 impl<AUTH> Client<AUTH> {
@@ -66,9 +67,53 @@ impl<AUTH> Client<AUTH> {
         Ok(())
     }
 
-    /// Fetches from the store the current view of the chain's [`PartialMmr`].
+    /// Returns the cached [`PartialMmr`] if in-memory caching is enabled and its fingerprint
+    /// matches the current store state, otherwise rebuilds from the store.
     pub async fn get_current_partial_mmr(&self) -> Result<PartialMmr, ClientError> {
+        if self.cache_partial_mmr_in_memory
+            && let Some(ref cached) = self.partial_mmr
+            && cached.store_peaks_hash == self.current_store_peaks_hash().await?
+            && cached.tracked_blocks_hash == self.current_tracked_blocks_hash().await?
+        {
+            return Ok(cached.mmr.clone());
+        }
         self.store.get_current_partial_mmr().await.map_err(Into::into)
+    }
+
+    /// Stores the MMR in the cache if in-memory caching is enabled, capturing the current store
+    /// fingerprint. Must run after any store mutation that may have changed the sync-height peaks
+    /// or the tracked block set.
+    pub(crate) async fn cache_partial_mmr(&mut self, mmr: PartialMmr) -> Result<(), ClientError> {
+        if !self.cache_partial_mmr_in_memory {
+            return Ok(());
+        }
+
+        let store_peaks_hash = self.current_store_peaks_hash().await?;
+        let tracked_blocks_hash = self.current_tracked_blocks_hash().await?;
+        self.partial_mmr = Some(CachedPartialMmr {
+            store_peaks_hash,
+            tracked_blocks_hash,
+            mmr,
+        });
+        Ok(())
+    }
+
+    /// Hashes the store's peaks at the current sync height. Used as the cache freshness
+    /// fingerprint.
+    async fn current_store_peaks_hash(&self) -> Result<Word, ClientError> {
+        Ok(self.store.get_current_blockchain_peaks().await?.hash_peaks())
+    }
+
+    /// Hashes the store's tracked block numbers (sorted). Used as the cache freshness
+    /// fingerprint to detect tracked-set drift without rebuilding the MMR.
+    async fn current_tracked_blocks_hash(&self) -> Result<Word, ClientError> {
+        // BTreeSet iterates in sorted order, so the hash is deterministic.
+        let tracked = self.store.get_tracked_block_header_numbers().await?;
+        let elements: Vec<Felt> = tracked
+            .iter()
+            .map(|&n| Felt::from(u32::try_from(n).expect("block number fits in u32")))
+            .collect();
+        Ok(Rpo256::hash_elements(&elements))
     }
 
     // HELPERS

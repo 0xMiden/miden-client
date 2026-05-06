@@ -27,6 +27,8 @@ use crate::{Client, ClientError, ClientRng, ClientRngBox, DebugMode, grpc_suppor
 const TX_DISCARD_DELTA: u32 = 20;
 /// The default number of synced blocks between automatic irrelevant-block pruning runs.
 const IRRELEVANT_BLOCK_PRUNE_INTERVAL: u32 = 1;
+/// Whether the client should cache the current Partial MMR in memory by default.
+const CACHE_PARTIAL_MMR_IN_MEMORY: bool = false;
 
 pub use grpc_support::*;
 
@@ -99,6 +101,10 @@ pub trait StoreFactory {
 /// - **Transaction discard delta**: Number of blocks after which pending transactions are
 ///   considered stale and discarded. Configure via [`tx_discard_delta()`](Self::tx_discard_delta).
 ///
+/// - **In-memory Partial MMR cache**: Reuses the current partial blockchain MMR instead of
+///   rebuilding it from store. Disabled by default. Configure via
+///   [`cache_partial_mmr_in_memory()`](Self::cache_partial_mmr_in_memory).
+///
 /// - **Max block number delta**: Maximum number of blocks the client can be behind the network for
 ///   transactions and account proofs to be considered valid. Configure via
 ///   [`max_block_number_delta()`](Self::max_block_number_delta).
@@ -119,6 +125,8 @@ pub struct ClientBuilder<AUTH> {
     /// Number of synced blocks between automatic pruning runs for irrelevant block data.
     /// If `None`, automatic irrelevant-block pruning is disabled.
     irrelevant_block_prune_interval: Option<u32>,
+    /// Whether the current Partial MMR should be cached in memory between sync-related operations.
+    cache_partial_mmr_in_memory: bool,
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
@@ -145,6 +153,7 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             in_debug_mode: DebugMode::Disabled,
             tx_discard_delta: Some(TX_DISCARD_DELTA),
             irrelevant_block_prune_interval: Some(IRRELEVANT_BLOCK_PRUNE_INTERVAL),
+            cache_partial_mmr_in_memory: CACHE_PARTIAL_MMR_IN_MEMORY,
             max_block_number_delta: None,
             note_transport_api: None,
             note_transport_config: None,
@@ -393,6 +402,17 @@ where
         self
     }
 
+    /// Enables or disables the in-memory Partial MMR cache.
+    ///
+    /// When enabled, the client reuses the current Partial MMR between sync and pruning
+    /// operations. When disabled, it rebuilds the Partial MMR from the store each time it is
+    /// needed.
+    #[must_use]
+    pub fn cache_partial_mmr_in_memory(mut self, enabled: bool) -> Self {
+        self.cache_partial_mmr_in_memory = enabled;
+        self
+    }
+
     /// Sets the number of blocks after which pending transactions are considered stale and
     /// discarded.
     ///
@@ -519,6 +539,8 @@ where
             last_irrelevant_block_prune_sync_height: None,
             max_block_number_delta: self.max_block_number_delta,
             note_transport_api: self.note_transport_api.clone(),
+            cache_partial_mmr_in_memory: self.cache_partial_mmr_in_memory,
+            partial_mmr: None,
         })
     }
 }
