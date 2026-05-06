@@ -412,7 +412,6 @@ impl TransactionRequestBuilder {
             note_type,
             NoteAttachment::default(),
             payback_note_type,
-            NoteAttachment::default(),
             rng,
         )?;
 

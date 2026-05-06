@@ -20,8 +20,7 @@ use miden_protocol::block::account_tree::AccountWitness;
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{Forest, MmrPath, MmrProof};
-use miden_protocol::crypto::merkle::smt::SmtProof;
-use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::note::{NoteId, NoteScript, NoteTag};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_protocol::utils::serde::Deserializable;
 use miden_protocol::{EMPTY_WORD, Word};
@@ -154,6 +153,10 @@ pub struct GrpcClient {
     max_retries: u32,
     /// Fallback retry interval in milliseconds when no `retry-after` header is present.
     retry_interval_ms: u64,
+    /// Optional bearer token injected as `authorization: Bearer <token>` on every outbound
+    /// gRPC call, alongside the standard `accept` header. Used when talking to an
+    /// authenticating gateway in front of the node.
+    bearer_token: Option<String>,
 }
 
 impl GrpcClient {
@@ -168,6 +171,7 @@ impl GrpcClient {
             limits: RwLock::new(None),
             max_retries: retry::DEFAULT_MAX_RETRIES,
             retry_interval_ms: retry::DEFAULT_RETRY_INTERVAL_MS,
+            bearer_token: None,
         }
     }
 
@@ -187,6 +191,36 @@ impl GrpcClient {
         self
     }
 
+    /// Attaches a `authorization: Bearer <token>` header to every outbound gRPC call made
+    /// by this client, alongside the standard `accept` header.
+    ///
+    /// Intended for connecting to a Miden node through an authenticating gateway
+    /// (e.g. `miden-testnet.eu-central-8.gateway.fm`) that rate-limits unauthenticated
+    /// traffic. Without an auth mechanism on the client side, callers would have no way
+    /// to supply the token the gateway requires.
+    ///
+    /// Calling this method twice overwrites the earlier token.
+    ///
+    /// Validation of the token against
+    /// [`AsciiMetadataValue`](tonic::metadata::AsciiMetadataValue) is deferred to
+    /// connection time (printable ASCII plus tab only — `HeaderValue::from_str` semantics):
+    /// invalid tokens surface as
+    /// [`RpcError::ConnectionError`](crate::rpc::RpcError::ConnectionError) on the first
+    /// request, so CR/LF header-injection attempts are rejected.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use miden_client::rpc::{Endpoint, GrpcClient};
+    /// let endpoint = Endpoint::new("https".into(), "node.example".into(), Some(443));
+    /// let client = GrpcClient::new(&endpoint, 10_000).with_bearer_auth("<api-key>".into());
+    /// ```
+    #[must_use]
+    pub fn with_bearer_auth(mut self, token: String) -> Self {
+        self.bearer_token = Some(token);
+        self
+    }
+
     /// Takes care of establishing the RPC connection if not connected yet. It ensures that the
     /// `rpc_api` field is initialized and returns a write guard to it.
     async fn ensure_connected(&self) -> Result<ApiClient, RpcError> {
@@ -201,9 +235,13 @@ impl GrpcClient {
     /// genesis commitment.
     async fn connect(&self) -> Result<(), RpcError> {
         let genesis_commitment = *self.genesis_commitment.read();
-        let new_client =
-            ApiClient::new_client(self.endpoint.clone(), self.timeout_ms, genesis_commitment)
-                .await?;
+        let new_client = ApiClient::new_client(
+            self.endpoint.clone(),
+            self.timeout_ms,
+            genesis_commitment,
+            self.bearer_token.clone(),
+        )
+        .await?;
         let mut client = self.client.write();
         client.replace(new_client);
 
@@ -254,11 +292,16 @@ impl GrpcClient {
     /// Fetches RPC status without injecting an Accept header.
     ///
     /// This instantiates a separate API client without the Accept interceptor, so it does not
-    /// reuse the primary gRPC client.
+    /// reuse the primary gRPC client. Any caller-supplied
+    /// [`with_bearer_auth`](Self::with_bearer_auth) token is still forwarded so gateway
+    /// authentication keeps working.
     pub async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {
-        let mut rpc_api =
-            ApiClient::new_client_without_accept_header(self.endpoint.clone(), self.timeout_ms)
-                .await?;
+        let mut rpc_api = ApiClient::new_client_without_accept_header(
+            self.endpoint.clone(),
+            self.timeout_ms,
+            self.bearer_token.clone(),
+        )
+        .await?;
         rpc_api
             .status(())
             .await
@@ -878,32 +921,6 @@ impl NodeRpcClient for GrpcClient {
         Ok(all_nullifiers.into_iter().collect::<Vec<_>>())
     }
 
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        let limits = self.get_rpc_limits().await?;
-        let mut proofs: Vec<SmtProof> = Vec::with_capacity(nullifiers.len());
-        for chunk in nullifiers.chunks(limits.nullifiers_limit as usize) {
-            let request = proto::rpc::NullifierList {
-                nullifiers: chunk.iter().map(|nul| nul.as_word().into()).collect(),
-            };
-
-            let response = self
-                .call_with_retry(RpcEndpoint::CheckNullifiers, |mut rpc_api| {
-                    let request = request.clone();
-                    Box::pin(async move { rpc_api.check_nullifiers(request).await })
-                })
-                .await?;
-
-            let mut response = response.into_inner();
-            let chunk_proofs = response
-                .proofs
-                .iter_mut()
-                .map(|r| r.to_owned().try_into())
-                .collect::<Result<Vec<SmtProof>, RpcConversionError>>()?;
-            proofs.extend(chunk_proofs);
-        }
-        Ok(proofs)
-    }
-
     async fn get_block_by_number(
         &self,
         block_num: BlockNumber,
@@ -946,7 +963,7 @@ impl NodeRpcClient for GrpcClient {
         )?;
 
         let fetched_root = note_script.root();
-        if fetched_root != root {
+        if Word::from(fetched_root) != root {
             return Err(RpcError::InvalidResponse(format!(
                 "node returned note script with root {fetched_root} for requested root {root}",
             )));
@@ -1173,6 +1190,7 @@ mod tests {
     use miden_protocol::block::BlockNumber;
 
     use super::{BlockPagination, GrpcClient, PaginationResult};
+    use crate::alloc::string::ToString;
     use crate::rpc::{Endpoint, NodeRpcClient, RpcError};
 
     fn assert_send_sync<T: Send + Sync>() {}
@@ -1294,5 +1312,76 @@ mod tests {
 
         assert_eq!(client.genesis_commitment.read().unwrap(), commitment);
         assert!(client.client.read().as_ref().is_some());
+    }
+
+    #[test]
+    fn with_bearer_auth_stores_token() {
+        let endpoint = &Endpoint::devnet();
+        let client = GrpcClient::new(endpoint, 10000).with_bearer_auth("token-one".to_string());
+
+        assert_eq!(client.bearer_token.as_deref(), Some("token-one"));
+    }
+
+    #[test]
+    fn with_bearer_auth_overwrites_on_repeat_call() {
+        let endpoint = &Endpoint::devnet();
+        let client = GrpcClient::new(endpoint, 10000)
+            .with_bearer_auth("token-one".to_string())
+            .with_bearer_auth("token-two".to_string());
+
+        // Second call replaces the first.
+        assert_eq!(client.bearer_token.as_deref(), Some("token-two"));
+    }
+
+    #[tokio::test]
+    async fn with_bearer_auth_surfaces_invalid_ascii_value_at_connect_time() {
+        // Tokens containing control characters are rejected by `AsciiMetadataValue`. The
+        // fluent builder defers the check to connection time, so the error must surface as
+        // a `ConnectionError` on the first request — preventing CR/LF header-injection.
+        let endpoint = &Endpoint::devnet();
+        let client = GrpcClient::new(endpoint, 10000).with_bearer_auth("bad\nvalue".to_string());
+
+        let err = client.connect().await.expect_err("expected invalid token to fail connect");
+        assert!(
+            matches!(err, RpcError::ConnectionError(_)),
+            "expected ConnectionError, got {err:?}",
+        );
+    }
+
+    #[tokio::test]
+    async fn with_bearer_auth_is_preserved_across_set_genesis_commitment() {
+        let endpoint = &Endpoint::devnet();
+        let client = GrpcClient::new(endpoint, 10000).with_bearer_auth("token".to_string());
+        client.connect().await.unwrap();
+
+        client.set_genesis_commitment(Word::default()).await.unwrap();
+
+        // Rebuilding the interceptor after a genesis update must not drop the caller token.
+        assert_eq!(client.bearer_token.as_deref(), Some("token"));
+        assert!(client.client.read().as_ref().is_some());
+    }
+
+    /// Real-network smoke test: hitting the public testnet with a caller-supplied bearer
+    /// token must return a real [`RpcStatusInfo`], proving the header is a valid
+    /// [`AsciiMetadataValue`](tonic::metadata::AsciiMetadataValue) on the wire and that an
+    /// unauthenticated node ignores it cleanly.
+    ///
+    /// `#[ignore]`d by default so offline CI doesn't fail; run with
+    /// `cargo test -- --ignored with_bearer_auth_does_not_break_real_rpc_against_testnet`
+    /// when validating against the real network. The interceptor-level test
+    /// (`api_client::tests::interceptor_injects_bearer_token_onto_request`)
+    /// already proves the header reaches outbound request metadata without needing the
+    /// network.
+    #[tokio::test]
+    #[ignore = "requires network access to public testnet"]
+    async fn with_bearer_auth_does_not_break_real_rpc_against_testnet() {
+        let endpoint = &Endpoint::testnet();
+        let client = GrpcClient::new(endpoint, 10_000).with_bearer_auth("smoke-test".to_string());
+
+        let status = client
+            .get_status_unversioned()
+            .await
+            .expect("testnet status with caller auth header must succeed");
+        assert!(!status.version.is_empty(), "status must include a server version");
     }
 }

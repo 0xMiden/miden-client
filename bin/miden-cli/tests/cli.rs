@@ -8,7 +8,7 @@ use anyhow::Result;
 use assert_cmd::Command;
 use assert_cmd::cargo::cargo_bin_cmd;
 use miden_client::account::{AccountId, AccountStorageMode};
-use miden_client::address::AddressInterface;
+use miden_client::address::{Address, NetworkId};
 use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::{FeltRng, RandomCoin};
@@ -566,11 +566,11 @@ async fn cli_export_import_account() -> Result<()> {
     for stored_pk_commitment in faucet_pks {
         let matching_secret_key = cli_keystore.get_key_sync(stored_pk_commitment).unwrap();
         assert!(matching_secret_key.is_some());
-        assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
+        assert_eq!(matching_secret_key.unwrap().public_key().to_commitment(), stored_pk_commitment);
 
         let public_key = cli_keystore.get_public_key(stored_pk_commitment).await;
         assert!(public_key.is_some());
-        assert!(public_key.unwrap().to_commitment() == stored_pk_commitment);
+        assert_eq!(public_key.unwrap().to_commitment(), stored_pk_commitment);
     }
 
     let wallet_pks = cli_keystore
@@ -580,11 +580,11 @@ async fn cli_export_import_account() -> Result<()> {
     for stored_pk_commitment in wallet_pks {
         let matching_secret_key = cli_keystore.get_key_sync(stored_pk_commitment).unwrap();
         assert!(matching_secret_key.is_some());
-        assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
+        assert_eq!(matching_secret_key.unwrap().public_key().to_commitment(), stored_pk_commitment);
 
         let public_key = cli_keystore.get_public_key(stored_pk_commitment).await;
         assert!(public_key.is_some());
-        assert!(public_key.unwrap().to_commitment() == stored_pk_commitment);
+        assert_eq!(public_key.unwrap().to_commitment(), stored_pk_commitment);
     }
 
     Ok(())
@@ -701,7 +701,8 @@ async fn debug_mode_outputs_logs() -> Result<()> {
 
     // Create the custom note with a script that will print the stack state
     let note_script = "
-            begin
+            @note_script
+            pub proc main
                 debug.stack
                 assert_eq
             end
@@ -793,16 +794,12 @@ async fn list_addresses_add() -> Result<()> {
     assert!(formatted_output.contains("Unspecified"));
     assert!(!formatted_output.contains("BasicWallet"));
 
-    // Add a basic wallet address to the account
+    // Encode a BasicWallet address with tag length 10, then add it to the account.
+    let encoded_address =
+        encode_address_cli(&temp_dir, &basic_account_id, "basic-wallet", Some("10"));
+
     let mut add_address_cmd = cargo_bin_cmd!("miden-client");
-    let custom_note_tag_len = "10";
-    add_address_cmd.args([
-        "address",
-        "add",
-        &basic_account_id,
-        &AddressInterface::BasicWallet.to_string(),
-        custom_note_tag_len,
-    ]);
+    add_address_cmd.args(["address", "add", &basic_account_id, &encoded_address]);
     let output = add_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
     assert!(output.status.success());
 
@@ -815,16 +812,12 @@ async fn list_addresses_add() -> Result<()> {
     assert_eq!(formatted_output.matches("Unspecified").count(), 1);
     assert_eq!(formatted_output.matches("BasicWallet").count(), 1);
 
-    // Add another basic wallet address to the account
+    // Encode another BasicWallet address (different tag length → different address) and add it too.
+    let encoded_address =
+        encode_address_cli(&temp_dir, &basic_account_id, "basic-wallet", Some("5"));
+
     let mut add_address_cmd = cargo_bin_cmd!("miden-client");
-    let custom_note_tag_len = "5";
-    add_address_cmd.args([
-        "address",
-        "add",
-        &basic_account_id,
-        &AddressInterface::BasicWallet.to_string(),
-        custom_note_tag_len,
-    ]);
+    add_address_cmd.args(["address", "add", &basic_account_id, &encoded_address]);
     let output = add_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
     assert!(output.status.success());
 
@@ -836,6 +829,66 @@ async fn list_addresses_add() -> Result<()> {
     assert!(formatted_output.contains(&basic_account_id));
     assert_eq!(formatted_output.matches("Unspecified").count(), 1);
     assert_eq!(formatted_output.matches("BasicWallet").count(), 2);
+
+    Ok(())
+}
+
+/// Verifies that `address add` rejects a bech32 address whose encoded account ID does not
+/// match the `<ACCOUNT_ID>` argument.
+#[tokio::test]
+async fn address_add_rejects_mismatched_account() -> Result<()> {
+    let temp_dir = init_cli().1;
+
+    let account_a = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let account_b = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    assert_ne!(account_a, account_b, "two new wallets should have distinct ids");
+
+    sync_cli(&temp_dir);
+
+    // Encode an address that points at account A.
+    let encoded_for_a = encode_address_cli(&temp_dir, &account_a, "basic-wallet", None);
+
+    // Trying to add it to account B must fail.
+    let mut add_cmd = cargo_bin_cmd!("miden-client");
+    add_cmd.args(["address", "add", &account_b, &encoded_for_a]);
+    let output = add_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(!output.status.success(), "expected add to fail on account mismatch");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("does not match the provided account ID"),
+        "unexpected stderr: {stderr}"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn address_add_rejects_mismatched_network() -> Result<()> {
+    let temp_dir = init_cli().1;
+
+    let account = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    sync_cli(&temp_dir);
+
+    // Encode a valid address against the CLI's configured network, then re-encode it under a
+    // different `NetworkId` so the HRP no longer matches.
+    let encoded_local = encode_address_cli(&temp_dir, &account, "basic-wallet", None);
+    let (cli_network_id, address) = Address::decode(&encoded_local)?;
+    let other_network_id = if cli_network_id == NetworkId::Mainnet {
+        NetworkId::Testnet
+    } else {
+        NetworkId::Mainnet
+    };
+    let encoded_other = address.encode(other_network_id);
+
+    let mut add_cmd = cargo_bin_cmd!("miden-client");
+    add_cmd.args(["address", "add", &account, &encoded_other]);
+    let output = add_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(!output.status.success(), "expected add to fail on network mismatch");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("does not match configured network"),
+        "unexpected stderr: {stderr}"
+    );
 
     Ok(())
 }
@@ -1112,10 +1165,10 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
 
     // Create a TOML file with the InitStorageData
     let init_storage_data_toml = r#"
-        ["miden::standards::fungible_faucets::metadata"]
-        decimals="10"
-        max_supply="10000000"
-        symbol="BTC"
+        [fungible-faucet-metadata]
+        symbol = "BTC"
+        decimals = 10
+        max_supply = 10000000
         "#;
     let file_path = cli_path.join(INIT_DATA_FILENAME);
     fs::write(&file_path, init_storage_data_toml).unwrap();
@@ -1167,6 +1220,29 @@ fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         .nth(1)
         .unwrap()
         .to_string()
+}
+
+/// Runs `miden-client address encode` and returns the printed bech32 address.
+fn encode_address_cli(
+    cli_path: &Path,
+    account_id: &str,
+    interface: &str,
+    tag_len: Option<&str>,
+) -> String {
+    let mut encode_cmd = cargo_bin_cmd!("miden-client");
+    let mut args = vec!["address", "encode", account_id, interface];
+    if let Some(tag_len) = tag_len {
+        args.push(tag_len);
+    }
+    encode_cmd.args(args);
+    let output = encode_cmd.current_dir(cli_path).output().unwrap();
+    assert!(
+        output.status.success(),
+        "address encode failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    String::from_utf8(output.stdout).unwrap().trim().to_string()
 }
 
 pub type TestClient = Client<FilesystemKeyStore>;

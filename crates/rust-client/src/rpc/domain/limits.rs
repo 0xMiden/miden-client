@@ -31,8 +31,7 @@ const DEFAULT_NOTE_TAGS_LIMIT: u32 = 1000;
 pub struct RpcLimits {
     /// Maximum number of note IDs that can be sent in a single `GetNotesById` request.
     pub note_ids_limit: u32,
-    /// Maximum number of nullifier prefixes that can be sent in `CheckNullifiers` or
-    /// `SyncNullifiers` requests.
+    /// Maximum number of nullifier prefixes that can be sent in a single `SyncNullifiers` request.
     pub nullifiers_limit: u32,
     /// Maximum number of account IDs that can be sent in a single `SyncTransactions` request.
     pub account_ids_limit: u32,
@@ -98,8 +97,7 @@ impl TryFrom<proto::RpcLimits> for RpcLimits {
     fn try_from(proto: proto::RpcLimits) -> Result<Self, Self::Error> {
         Ok(Self {
             note_ids_limit: get_param(&proto, RpcEndpoint::GetNotesById, "note_id")?,
-            nullifiers_limit: get_param(&proto, RpcEndpoint::CheckNullifiers, "nullifier")
-                .or_else(|_| get_param(&proto, RpcEndpoint::SyncNullifiers, "nullifier"))?,
+            nullifiers_limit: get_param(&proto, RpcEndpoint::SyncNullifiers, "nullifier_prefix")?,
             account_ids_limit: get_param(&proto, RpcEndpoint::SyncTransactions, "account_id")?,
             note_tags_limit: get_param(&proto, RpcEndpoint::SyncNotes, "note_tag")?,
         })

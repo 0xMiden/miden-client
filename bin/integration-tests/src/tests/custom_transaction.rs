@@ -285,7 +285,8 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
 
     // Create the custom note
     let note_script = "
-            begin
+            @note_script
+            pub proc main
                 push.1 push.1
                 assert_eq
             end

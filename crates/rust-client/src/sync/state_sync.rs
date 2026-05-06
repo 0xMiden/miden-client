@@ -437,19 +437,18 @@ impl StateSync {
             ..
         } = sync_data;
 
-        // Advance the partial MMR: apply delta (up to chain_tip - 1), capture peaks for
-        // storage, then add the chain tip leaf (which the delta excludes due to the
+        // Advance the partial MMR: apply delta (up to chain_tip - 1), capture peaks at that
+        // forest, then add the chain tip leaf (which the delta excludes due to the
         // one-block lag in block header MMR commitments).
         let mut new_authentication_nodes =
             current_partial_mmr.apply(mmr_delta).map_err(StoreError::MmrError)?;
-        let new_peaks = current_partial_mmr.peaks();
+        state_sync_update.partial_blockchain_updates.new_peaks = current_partial_mmr.peaks();
         new_authentication_nodes
             .append(&mut current_partial_mmr.add(chain_tip_header.commitment(), false));
 
-        state_sync_update.block_updates.insert(
+        state_sync_update.partial_blockchain_updates.insert(
             chain_tip_header.clone(),
             false,
-            new_peaks,
             new_authentication_nodes,
         );
 
@@ -487,10 +486,9 @@ impl StateSync {
                     .map(|(k, v)| (*k, *v))
                     .collect();
 
-                state_sync_update.block_updates.insert(
+                state_sync_update.partial_blockchain_updates.insert(
                     block.block_header,
                     true,
-                    current_partial_mmr.peaks(),
                     track_auth_nodes,
                 );
             }
@@ -1799,7 +1797,9 @@ mod tests {
         // Create a public output note. It won't be in the mock chain (simulating erasure).
         let sender_id: AccountId = ACCOUNT_ID_SENDER.try_into().unwrap();
         let metadata = NoteMetadata::new(sender_id, NoteType::Public);
-        let script = CodeBuilder::new().compile_note_script("begin nop end").unwrap();
+        let script = CodeBuilder::new()
+            .compile_note_script("@note_script pub proc main nop end")
+            .unwrap();
         let recipient = NoteRecipient::new(
             Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
             script,

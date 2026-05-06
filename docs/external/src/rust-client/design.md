@@ -43,7 +43,7 @@ The available gRPC methods are documented in the [Node gRPC Reference](https://d
 
 ## Transaction executor
 
-The transaction executor uses the [Miden VM](https://0xmiden.github.io/miden-docs/imported/miden-vm/src/intro/main.html) to execute transactions. All transactions run within the [transaction kernel](https://0xmiden.github.io/miden-docs/imported/miden-base/src/transaction.html).
+The transaction executor uses the [Miden VM](https://docs.miden.xyz/core-concepts/miden-vm/) to execute transactions. All transactions run within the [transaction kernel](https://docs.miden.xyz/builder/smart-contracts/transactions/introduction).
 
 When executing, the executor needs access to relevant blockchain history. The executor uses a `DataStore` interface for accessing this data. This means that there may be some coupling between the executor and the store.
 
