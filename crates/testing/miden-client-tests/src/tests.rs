@@ -3864,13 +3864,21 @@ async fn execute_transaction_fails_for_watch_only_account() {
     client.rng().fill_bytes(&mut init_seed);
 
     let symbol = TokenSymbol::new("WTCH").unwrap();
-    let max_supply = Felt::new(9_999_999_u64);
+    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
+    let max_supply = 9_999_999_u64;
+    let token_metadata =
+        FungibleTokenMetadata::builder(name, symbol, 10, max_supply).build().unwrap();
     let faucet = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(AccountStorageMode::Public)
         .with_auth_component(auth_component)
-        .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
-        .with_component(AuthControlled::allow_all())
+        .with_component(token_metadata)
+        .with_component(BasicFungibleFaucet)
+        .with_components(TokenPolicyManager::new(
+            PolicyAuthority::AuthControlled,
+            MintPolicyConfig::AllowAll,
+            BurnPolicyConfig::AllowAll,
+        ))
         .build_with_schema_commitment()
         .unwrap();
     let faucet_id = faucet.id();
