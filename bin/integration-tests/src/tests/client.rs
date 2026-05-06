@@ -1439,16 +1439,9 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap()
         .pop()
         .with_context(|| "no nullifier found in sync_nullifiers response")?;
-    let node_nullifier_proof = client
-        .test_rpc_api()
-        .check_nullifiers(&[nullifier])
-        .await
-        .unwrap()
-        .pop()
-        .with_context(|| "no nullifier proof returned from check_nullifiers RPC API")?;
     let retrieved_note_script = client
         .test_rpc_api()
-        .get_note_script_by_root(note.script().root())
+        .get_note_script_by_root(note.script().root().into())
         .await
         .unwrap();
     let sync_storage_maps = client
@@ -1468,7 +1461,6 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap();
 
     assert_eq!(node_nullifier.nullifier, nullifier);
-    assert_eq!(node_nullifier_proof.leaf().entries().first().unwrap().0, nullifier.as_word());
     assert_eq!(note.script().root(), retrieved_note_script.root());
     assert!(!sync_storage_maps.updates.is_empty());
     assert!(!account_vault_info.updates.is_empty());

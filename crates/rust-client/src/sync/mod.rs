@@ -135,11 +135,12 @@ where
             Arc::new(note_screener),
             self.tx_discard_delta,
         );
-        let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
         let input = self.build_sync_input().await?;
 
+        let mut partial_mmr = self.get_current_partial_mmr().await?;
+
         // Get the sync update from the network
-        let state_sync_update = state_sync.sync_state(&mut current_partial_mmr, input).await?;
+        let state_sync_update = state_sync.sync_state(&mut partial_mmr, input).await?;
 
         let sync_summary: SyncSummary = (&state_sync_update).into();
         debug!(sync_summary = ?sync_summary, "Sync summary computed");
@@ -150,6 +151,9 @@ where
             .apply_state_sync(state_sync_update)
             .await
             .map_err(ClientError::StoreError)?;
+
+        // Cache MMR so pruning can reuse in-memory MMR.
+        self.cache_partial_mmr(partial_mmr).await?;
 
         self.maybe_untrack_and_prune_irrelevant_blocks().await?;
 
@@ -230,7 +234,6 @@ where
 
         let sync_height = self.store.get_sync_height().await?;
 
-        // Check if we've exceeded the prune interval, early return if we haven't.
         if let Some(last_prune_height) = self.last_irrelevant_block_prune_sync_height
             && sync_height < last_prune_height + interval
         {
@@ -249,7 +252,8 @@ where
     /// `PartialMmr` to determine which authentication nodes are no longer needed, then delegates
     /// to [`Store::untrack_and_prune_irrelevant_blocks`] to atomically remove the stale nodes,
     /// mark the blocks as irrelevant, and delete irrelevant block headers.
-    async fn untrack_and_prune_irrelevant_blocks(&self) -> Result<(), ClientError> {
+    /// Any caller of this function should've cached the `PartialMmr` beforehand.
+    async fn untrack_and_prune_irrelevant_blocks(&mut self) -> Result<(), ClientError> {
         let tracked_blocks = self.store.get_tracked_block_header_numbers().await?;
         let to_untrack: Vec<usize> = if tracked_blocks.is_empty() {
             // Do not early-return: even without blocks to untrack, old irrelevant tip headers may
@@ -268,11 +272,12 @@ where
 
         let mut blocks_to_untrack = Vec::new();
         let mut nodes_to_remove = Vec::new();
+        let mut updated_partial_mmr = None;
 
         if !to_untrack.is_empty() {
             // Rebuild the PartialMmr and untrack each block to collect the authentication node
             // indices that are no longer needed by any remaining tracked leaf.
-            let mut partial_mmr = self.store.get_current_partial_mmr().await?;
+            let mut partial_mmr = self.get_current_partial_mmr().await?;
             for &block_pos in &to_untrack {
                 nodes_to_remove
                     .extend(partial_mmr.untrack(block_pos).into_iter().map(|(idx, _)| idx));
@@ -282,6 +287,7 @@ where
                 .iter()
                 .map(|&b| BlockNumber::from(u32::try_from(b).expect("block number fits in u32")))
                 .collect();
+            updated_partial_mmr = Some(partial_mmr);
         }
 
         // Store deletes stale auth nodes, marks blocks as irrelevant, and removes irrelevant
@@ -289,6 +295,10 @@ where
         self.store
             .untrack_and_prune_irrelevant_blocks(&blocks_to_untrack, &nodes_to_remove)
             .await?;
+
+        if let Some(partial_mmr) = updated_partial_mmr {
+            self.cache_partial_mmr(partial_mmr).await?;
+        }
 
         Ok(())
     }

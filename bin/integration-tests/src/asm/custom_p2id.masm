@@ -13,7 +13,8 @@ use miden::protocol::active_note
 use miden::standards::wallets::basic->basic_wallet
 use miden::core::mem
 
-begin
+@note_script
+pub proc main
     # push data from the advice map into the advice stack
     adv.push_mapval
     # => [NOTE_ARG]

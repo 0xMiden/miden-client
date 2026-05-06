@@ -115,11 +115,16 @@ pub mod component {
         NetworkFungibleFaucet,
         TokenMetadata,
     };
-    pub use miden_standards::account::mint_policies::{
-        AuthControlled,
-        AuthControlledInitConfig,
-        OwnerControlled,
-        OwnerControlledInitConfig,
+    pub use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
+    pub use miden_standards::account::policies::{
+        BurnAllowAll,
+        BurnOwnerOnly,
+        BurnPolicyConfig,
+        MintAllowAll,
+        MintOwnerOnly,
+        MintPolicyConfig,
+        PolicyAuthority,
+        TokenPolicyManager,
     };
     pub use miden_standards::account::wallets::BasicWallet;
 }
