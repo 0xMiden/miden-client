@@ -252,6 +252,7 @@ impl<AUTH> Client<AUTH> {
                 // defined as the absence of account-owned tags.
                 let was_watch_only = tracked_account.is_watch_only();
                 if watch_only && !was_watch_only {
+                    // Demote full account to watch-only by removing the account note tags.
                     let account_note_tag_records = self
                         .store
                         .get_note_tags()
@@ -262,10 +263,10 @@ impl<AUTH> Client<AUTH> {
                         self.store.remove_note_tag(note_tag_record).await?;
                     }
                 } else if !watch_only && was_watch_only {
+                    // Promote watch-only account to full by registering the account note tag.
                     let default_tag = Address::new(account.id()).to_note_tag();
                     let note_tag_record =
                         NoteTagRecord::with_account_source(default_tag, account.id());
-                    self.check_note_tag_limit().await?;
                     self.store.add_note_tag(note_tag_record).await?;
                 }
                 Ok(())
