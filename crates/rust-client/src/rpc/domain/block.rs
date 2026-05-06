@@ -33,7 +33,7 @@ impl From<&BlockHeader> for proto::blockchain::BlockHeader {
 impl From<&FeeParameters> for proto::blockchain::FeeParameters {
     fn from(fee_params: &FeeParameters) -> Self {
         Self {
-            native_asset_id: Some(fee_params.native_asset_id().into()),
+            native_asset_id: Some(fee_params.fee_faucet_id().into()),
             verification_base_fee: fee_params.verification_base_fee(),
         }
     }
