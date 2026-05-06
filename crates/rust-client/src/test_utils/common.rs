@@ -127,15 +127,10 @@ pub async fn insert_new_fungible_faucet(
     client.rng().fill_bytes(&mut init_seed);
 
     let symbol = TokenSymbol::new("TEST").unwrap();
+    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
     let max_supply = 9_999_999_u64;
-    let token_metadata = FungibleTokenMetadata::builder(
-        TokenName::new("").expect("empty token name is always valid"),
-        symbol,
-        10,
-        max_supply,
-    )
-    .build()
-    .unwrap();
+    let token_metadata =
+        FungibleTokenMetadata::builder(name, symbol, 10, max_supply).build().unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)

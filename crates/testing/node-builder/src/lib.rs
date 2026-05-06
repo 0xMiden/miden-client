@@ -460,13 +460,9 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
         approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Poseidon2),
     };
 
-    let metadata = FungibleTokenMetadata::builder(
-        TokenName::new("").expect("empty token name is always valid"),
-        TokenSymbol::try_from("TST").expect("TST should be a valid token symbol"),
-        12,
-        1_000_000,
-    )
-    .build()?;
+    let symbol = TokenSymbol::try_from("TST").expect("TST should be a valid token symbol");
+    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
+    let metadata = FungibleTokenMetadata::builder(name, symbol, 12, 1_000_000).build()?;
     let account = create_basic_fungible_faucet(
         rng.random(),
         metadata,
@@ -553,13 +549,11 @@ fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Res
         approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Poseidon2),
     };
 
-    let metadata = FungibleTokenMetadata::builder(
-        TokenName::new("").expect("empty token name is always valid"),
-        TokenSymbol::new("TKN")?,
-        FAUCET_DECIMALS,
-        u64::from(FAUCET_MAX_SUPPLY),
-    )
-    .build()?;
+    let symbol = TokenSymbol::new("TKN")?;
+    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
+    let metadata =
+        FungibleTokenMetadata::builder(name, symbol, FAUCET_DECIMALS, u64::from(FAUCET_MAX_SUPPLY))
+            .build()?;
     let faucet = create_basic_fungible_faucet(
         init_seed,
         metadata,
