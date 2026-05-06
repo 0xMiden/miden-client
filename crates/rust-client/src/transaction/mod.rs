@@ -813,7 +813,7 @@ fn check_input_note_script_trust(
 ) -> Result<(), ClientError> {
     let policy = transaction_request.note_script_trust_policy();
     for note in transaction_request.input_notes() {
-        let script_root = note.script().root();
+        let script_root = Word::from(note.script().root());
         if !policy.allows(script_root) {
             return Err(ClientError::UntrustedNoteScript { script_root, policy: policy.clone() });
         }

@@ -6,6 +6,7 @@ use alloc::collections::BTreeSet;
 use alloc::string::ToString;
 
 use miden_protocol::Word;
+use miden_protocol::note::NoteScriptRoot;
 use miden_standards::note::StandardNote;
 use miden_tx::utils::serde::{
     ByteReader,
@@ -61,7 +62,7 @@ impl NoteScriptTrustPolicy {
 }
 
 fn is_standard_script(root: Word) -> bool {
-    StandardNote::from_script_root(root).is_some()
+    StandardNote::from_script_root(NoteScriptRoot::from_raw(root)).is_some()
 }
 
 // SERIALIZATION
@@ -106,7 +107,7 @@ mod tests {
     fn standard_root() -> Word {
         // Pick any standard variant; the exact one doesn't matter, only that
         // `StandardNote::from_script_root` recognizes it.
-        StandardNote::P2ID.script_root()
+        StandardNote::P2ID.script_root().into()
     }
 
     fn unknown_root() -> Word {

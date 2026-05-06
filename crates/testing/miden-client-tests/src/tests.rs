@@ -3072,7 +3072,7 @@ async fn consume_note_with_custom_script() {
 
     // Consume note, trusting root of custom script.
     let transaction_request = TransactionRequestBuilder::new()
-        .trusted_input_note_script_roots([note_script.root()])
+        .trusted_input_note_script_roots([Word::from(note_script.root())])
         .build_consume_notes(vec![custom_note.clone()])
         .unwrap();
 
@@ -3130,7 +3130,8 @@ async fn consume_note_with_custom_script_default_policy_rejects_local_hit() {
     client.sync_state().await.unwrap();
 
     // The script is now in the local store.
-    let stored_script = client.test_store().get_note_script(note_script.root()).await.unwrap();
+    let stored_script =
+        client.test_store().get_note_script(note_script.root().into()).await.unwrap();
     assert_eq!(stored_script.root(), note_script.root());
 
     // Consume without trusting the root: must fail with `UntrustedNoteScript`, even though the
@@ -3141,7 +3142,7 @@ async fn consume_note_with_custom_script_default_policy_rejects_local_hit() {
 
     match Box::pin(client.submit_new_transaction(receiver_id, consume_request)).await {
         Err(ClientError::UntrustedNoteScript { script_root, .. }) => {
-            assert_eq!(script_root, note_script.root());
+            assert_eq!(script_root, Word::from(note_script.root()));
         },
         other => panic!("expected UntrustedNoteScript, got {other:?}"),
     }
