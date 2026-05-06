@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.7 (2026-06-05)
+
+### Enhancements
+
+* [FEATURE][rust] Added `GrpcClient::with_bearer_auth(token)` to attach an `authorization: Bearer <token>` header to every outbound gRPC call, for use behind authenticating gateways. Tokens are validated at connection time and preserved across `set_genesis_commitment` updates ([#2101](https://github.com/0xMiden/miden-client/pull/2101)).
+
 ## 0.14.6 (2026-05-05)
 
 ### Fixes
