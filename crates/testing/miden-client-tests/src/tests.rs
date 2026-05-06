@@ -439,6 +439,8 @@ async fn sync_state_mmr() {
     // verify that the latest block number has been updated
     assert_eq!(client.get_sync_height().await.unwrap(), rpc_api.get_chain_tip_block_num());
 
+    assert!(!client.test_has_cached_partial_mmr());
+
     // verify that we inserted the latest block into the DB via the client
     let latest_block = client.get_sync_height().await.unwrap();
     assert_eq!(sync_details.block_num, latest_block);
@@ -473,6 +475,99 @@ async fn sync_state_mmr() {
     // Only block 1 remains tracked after pruning; block 4 was untracked because all its
     // notes are already consumed externally.
     assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn sync_state_mmr_with_in_memory_cache() {
+    let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
+    let mut client = builder.cache_partial_mmr_in_memory(true).build().await.unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
+
+    // First sync populates the cache.
+    client.sync_state().await.unwrap();
+    assert!(client.test_has_cached_partial_mmr());
+
+    // Advance the chain and sync again to mutate the cached MMR.
+    rpc_api.advance_blocks(2);
+    client.sync_state().await.unwrap();
+
+    // Cache must agree with the store.
+    let cached = client.get_current_partial_mmr().await.unwrap();
+    let stored = client.test_store().get_current_partial_mmr().await.unwrap();
+    assert_eq!(cached.peaks(), stored.peaks());
+    assert_eq!(cached.forest(), stored.forest());
+}
+
+/// Verifies the `get_current_partial_mmr` rebuild path: when the cache fingerprint diverges
+/// from the store (here, by untracking a block directly via the store and bypassing
+/// `cache_partial_mmr`), the next read must detect the divergence and return the rebuilt
+/// store-backed MMR rather than the stale cache.
+#[tokio::test]
+async fn stale_cached_partial_mmr_is_rebuilt_from_store() {
+    let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
+    let mut client = builder.cache_partial_mmr_in_memory(true).build().await.unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+    insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
+
+    // Import the mock chain's public notes so a block becomes tracked after sync.
+    let notes: Vec<Note> = rpc_api
+        .get_public_available_notes()
+        .into_iter()
+        .filter_map(|n| n.note().cloned())
+        .collect();
+    for note in &notes {
+        client
+            .import_notes(&[NoteFile::NoteDetails {
+                details: note.clone().into(),
+                after_block_num: 0.into(),
+                tag: Some(note.metadata().tag()),
+            }])
+            .await
+            .unwrap();
+    }
+    client.sync_state().await.unwrap();
+    assert!(client.test_has_cached_partial_mmr());
+
+    // Pick any tracked block. The mock chain has an unspent public note in block 1,
+    // so the tracked set is non-empty after the sync above.
+    let tracked: Vec<usize> = client
+        .test_store()
+        .get_tracked_block_header_numbers()
+        .await
+        .unwrap()
+        .into_iter()
+        .collect();
+    let to_untrack = BlockNumber::from(u32::try_from(tracked[0]).unwrap());
+
+    // Confirm the cache currently sees the leaf as tracked.
+    let cached_before = client.get_current_partial_mmr().await.unwrap();
+    assert!(cached_before.open(to_untrack.as_usize()).unwrap().is_some());
+
+    // Mutate the store directly to untrack the block. This bypasses `cache_partial_mmr`,
+    // so the cached fingerprint stays stale.
+    client
+        .test_store()
+        .untrack_and_prune_irrelevant_blocks(&[to_untrack], &[])
+        .await
+        .unwrap();
+
+    // The freshness check must detect the tracked-set divergence and rebuild from the
+    // store. A blind cache hit would still report the leaf as tracked.
+    let after = client.get_current_partial_mmr().await.unwrap();
+    let stored = client.test_store().get_current_partial_mmr().await.unwrap();
+
+    assert_eq!(after.peaks(), stored.peaks());
+    assert_eq!(after.forest(), stored.forest());
+    assert!(
+        after.open(to_untrack.as_usize()).unwrap().is_none(),
+        "stale cache returned: rebuild path did not fire",
+    );
 }
 
 /// Tests that MMR authentication nodes are persisted even when `include_block` is false

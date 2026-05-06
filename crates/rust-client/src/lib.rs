@@ -326,6 +326,7 @@ pub mod testing {
 use alloc::sync::Arc;
 
 use miden_protocol::block::BlockNumber;
+use miden_protocol::crypto::merkle::mmr::PartialMmr;
 use miden_protocol::crypto::rand::FeltRng;
 use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
@@ -376,6 +377,28 @@ pub struct Client<AUTH> {
     /// An instance of [`NoteTransportClient`] which provides a way for the client to connect to
     /// the Miden Note Transport network.
     note_transport_api: Option<Arc<dyn NoteTransportClient>>,
+    /// Whether the client should cache the current Partial MMR in memory.
+    cache_partial_mmr_in_memory: bool,
+    /// Cached [`PartialMmr`] for the chain's MMR. Lazily built from the store and kept in sync
+    /// across sync/prune operations. `None` forces a rebuild on next access.
+    partial_mmr: Option<CachedPartialMmr>,
+}
+
+/// Cached [`PartialMmr`] with a two-part freshness fingerprint:
+///
+/// - `store_peaks_hash`: peaks at the current sync height - guards against chain/height drift.
+/// - `tracked_blocks_hash`: hash of the store's tracked block numbers - guards against drift
+///   between store-tracked and cache-tracked blocks. Required because a same-height update can mark
+///   an existing block relevant without changing peaks; pruning the cached MMR while it's missing
+///   such a block would over-delete auth nodes that the store still needs.
+///
+/// The cached MMR includes the sync-height block as a tracked leaf; the store persists the
+/// peaks committed by that block's header, i.e. the peaks over the chain *before* that block
+/// was added, so the two states are offset by one leaf.
+pub(crate) struct CachedPartialMmr {
+    pub(crate) store_peaks_hash: Word,
+    pub(crate) tracked_blocks_hash: Word,
+    pub(crate) mmr: PartialMmr,
 }
 
 /// Constructors.
@@ -482,6 +505,11 @@ impl<AUTH> Client<AUTH> {
     #[cfg(any(test, feature = "testing"))]
     pub fn test_store(&mut self) -> &mut Arc<dyn Store> {
         &mut self.store
+    }
+
+    #[cfg(any(test, feature = "testing"))]
+    pub fn test_has_cached_partial_mmr(&self) -> bool {
+        self.partial_mmr.is_some()
     }
 }
 
