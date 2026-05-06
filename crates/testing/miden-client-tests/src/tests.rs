@@ -2913,6 +2913,60 @@ async fn account_add_address_after_creation() {
 }
 
 #[tokio::test]
+async fn watch_account_by_id_removes_all_account_note_tags() {
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let account = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+    let account_id = account.id();
+    let rpc_api = MockRpcApi::new(mock_chain_builder.build().unwrap());
+    let arc_rpc_api = Arc::new(rpc_api);
+    let mut rng = rand::rng();
+    let coin_seed: [u64; 4] = rng.random();
+    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
+    let keystore = FilesystemKeyStore::new(temp_dir()).unwrap();
+    let mut client = ClientBuilder::new()
+        .rpc(arc_rpc_api)
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .in_debug_mode(DebugMode::Enabled)
+        .build()
+        .await
+        .unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    client.add_account(&account, false).await.unwrap();
+
+    let default_note_tag_record =
+        NoteTagRecord::with_account_source(Address::new(account_id).to_note_tag(), account_id);
+    let routing_params = RoutingParameters::new(AddressInterface::BasicWallet)
+        .with_note_tag_len(NoteTag::MAX_ACCOUNT_TARGET_TAG_LENGTH)
+        .unwrap();
+    let extra_address = Address::new(account_id).with_routing_parameters(routing_params);
+    let extra_address_note_tag_record =
+        NoteTagRecord::with_account_source(extra_address.to_note_tag(), account_id);
+
+    client.add_address(extra_address, account_id).await.unwrap();
+
+    let note_tags = client.get_note_tags().await.unwrap();
+    assert!(note_tags.contains(&default_note_tag_record));
+    assert!(note_tags.contains(&extra_address_note_tag_record));
+
+    client.watch_account_by_id(account_id).await.unwrap();
+
+    let note_tags = client.get_note_tags().await.unwrap();
+    assert!(
+        !note_tags
+            .iter()
+            .any(|record| record.source == NoteTagSource::Account(account_id)),
+        "watch-only demotion should remove every account-owned note tag"
+    );
+    let account_record = client.test_store().get_account(account_id).await.unwrap().unwrap();
+    assert!(account_record.is_watch_only());
+}
+
+#[tokio::test]
 async fn consume_note_with_custom_script() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
 

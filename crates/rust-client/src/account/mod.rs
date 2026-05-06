@@ -83,7 +83,7 @@ use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::rpc::node::{EndpointError, GetAccountError};
 use crate::store::{AccountStatus, AccountStorageFilter};
-use crate::sync::NoteTagRecord;
+use crate::sync::{NoteTagRecord, NoteTagSource};
 
 pub mod component {
     pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
@@ -248,15 +248,23 @@ impl<AUTH> Client<AUTH> {
 
                 self.store.update_account(account).await?;
 
-                // Reconcile the per-account note tag with the requested mode. Watch-only is
-                // defined as the absence of this tag, so to convert between modes we just
-                // add or remove it.
-                let default_tag = Address::new(account.id()).to_note_tag();
-                let note_tag_record = NoteTagRecord::with_account_source(default_tag, account.id());
+                // Reconcile account-owned note tags with the requested mode. Watch-only is
+                // defined as the absence of account-owned tags.
                 let was_watch_only = tracked_account.is_watch_only();
                 if watch_only && !was_watch_only {
-                    self.store.remove_note_tag(note_tag_record).await?;
+                    let account_note_tag_records = self
+                        .store
+                        .get_note_tags()
+                        .await?
+                        .into_iter()
+                        .filter(|record| record.source == NoteTagSource::Account(account.id()));
+                    for note_tag_record in account_note_tag_records {
+                        self.store.remove_note_tag(note_tag_record).await?;
+                    }
                 } else if !watch_only && was_watch_only {
+                    let default_tag = Address::new(account.id()).to_note_tag();
+                    let note_tag_record =
+                        NoteTagRecord::with_account_source(default_tag, account.id());
                     self.check_note_tag_limit().await?;
                     self.store.add_note_tag(note_tag_record).await?;
                 }
