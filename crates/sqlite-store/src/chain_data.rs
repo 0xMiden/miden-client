@@ -53,7 +53,7 @@ impl SqliteStore {
     }
 
     pub(crate) fn get_block_headers(
-        conn: &mut Connection,
+        conn: &Connection,
         block_numbers: &BTreeSet<BlockNumber>,
     ) -> Result<Vec<(BlockHeader, BlockRelevance)>, StoreError> {
         let block_number_list = block_numbers
@@ -76,7 +76,7 @@ impl SqliteStore {
     }
 
     pub(crate) fn get_tracked_block_headers(
-        conn: &mut Connection,
+        conn: &Connection,
     ) -> Result<Vec<BlockHeader>, StoreError> {
         const QUERY: &str = "SELECT block_num, header, has_client_notes FROM block_headers WHERE has_client_notes=true";
         conn.prepare(QUERY)
@@ -92,7 +92,7 @@ impl SqliteStore {
     }
 
     pub(crate) fn get_tracked_block_header_numbers(
-        conn: &mut Connection,
+        conn: &Connection,
     ) -> Result<BTreeSet<usize>, StoreError> {
         const QUERY: &str = "SELECT block_num FROM block_headers WHERE has_client_notes=true";
         conn.prepare(QUERY)
@@ -107,7 +107,7 @@ impl SqliteStore {
     }
 
     pub(crate) fn get_partial_blockchain_nodes(
-        conn: &mut Connection,
+        conn: &Connection,
         filter: &PartialBlockchainFilter,
     ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
         match filter {
@@ -145,9 +145,7 @@ impl SqliteStore {
         }
     }
 
-    pub(crate) fn get_current_blockchain_peaks(
-        conn: &mut Connection,
-    ) -> Result<MmrPeaks, StoreError> {
+    pub(crate) fn get_current_blockchain_peaks(conn: &Connection) -> Result<MmrPeaks, StoreError> {
         const QUERY: &str =
             "SELECT block_num, partial_blockchain_peaks FROM blockchain_checkpoint LIMIT 1";
 
@@ -290,7 +288,7 @@ fn insert_partial_blockchain_node(
 }
 
 fn query_partial_blockchain_nodes<P: rusqlite::Params>(
-    conn: &mut Connection,
+    conn: &Connection,
     sql: &str,
     params: P,
 ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {

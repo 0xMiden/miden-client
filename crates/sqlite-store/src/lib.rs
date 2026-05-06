@@ -159,11 +159,12 @@ impl Store for SqliteStore {
     }
 
     async fn get_note_tags(&self) -> Result<Vec<NoteTagRecord>, StoreError> {
-        self.interact_with_connection(SqliteStore::get_note_tags).await
+        self.interact_with_connection(|conn| SqliteStore::get_note_tags(conn)).await
     }
 
     async fn get_unique_note_tags(&self) -> Result<BTreeSet<NoteTag>, StoreError> {
-        self.interact_with_connection(SqliteStore::get_unique_note_tags).await
+        self.interact_with_connection(|conn| SqliteStore::get_unique_note_tags(conn))
+            .await
     }
 
     async fn add_note_tag(&self, tag: NoteTagRecord) -> Result<bool, StoreError> {
@@ -177,7 +178,7 @@ impl Store for SqliteStore {
     }
 
     async fn get_sync_height(&self) -> Result<BlockNumber, StoreError> {
-        self.interact_with_connection(SqliteStore::get_sync_height).await
+        self.interact_with_connection(|conn| SqliteStore::get_sync_height(conn)).await
     }
 
     async fn apply_state_sync(&self, state_sync_update: StateSyncUpdate) -> Result<(), StoreError> {
@@ -311,11 +312,12 @@ impl Store for SqliteStore {
     }
 
     async fn get_tracked_block_headers(&self) -> Result<Vec<BlockHeader>, StoreError> {
-        self.interact_with_connection(SqliteStore::get_tracked_block_headers).await
+        self.interact_with_connection(|conn| SqliteStore::get_tracked_block_headers(conn))
+            .await
     }
 
     async fn get_tracked_block_header_numbers(&self) -> Result<BTreeSet<usize>, StoreError> {
-        self.interact_with_connection(SqliteStore::get_tracked_block_header_numbers)
+        self.interact_with_connection(|conn| SqliteStore::get_tracked_block_header_numbers(conn))
             .await
     }
 
@@ -341,7 +343,8 @@ impl Store for SqliteStore {
     }
 
     async fn get_current_blockchain_peaks(&self) -> Result<MmrPeaks, StoreError> {
-        self.interact_with_connection(SqliteStore::get_current_blockchain_peaks).await
+        self.interact_with_connection(|conn| SqliteStore::get_current_blockchain_peaks(conn))
+            .await
     }
 
     async fn insert_account(
@@ -369,11 +372,12 @@ impl Store for SqliteStore {
     }
 
     async fn get_account_ids(&self) -> Result<Vec<AccountId>, StoreError> {
-        self.interact_with_connection(SqliteStore::get_account_ids).await
+        self.interact_with_connection(|conn| SqliteStore::get_account_ids(conn)).await
     }
 
     async fn get_account_headers(&self) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
-        self.interact_with_connection(SqliteStore::get_account_headers).await
+        self.interact_with_connection(|conn| SqliteStore::get_account_headers(conn))
+            .await
     }
 
     async fn get_account_header(
@@ -453,7 +457,7 @@ impl Store for SqliteStore {
     }
 
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {
-        self.interact_with_connection(SqliteStore::get_unspent_input_note_nullifiers)
+        self.interact_with_connection(|conn| SqliteStore::get_unspent_input_note_nullifiers(conn))
             .await
     }
 

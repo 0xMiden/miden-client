@@ -19,7 +19,7 @@ use crate::transaction::upsert_transaction_record;
 use crate::{insert_sql, subst};
 
 impl SqliteStore {
-    pub(crate) fn get_note_tags(conn: &mut Connection) -> Result<Vec<NoteTagRecord>, StoreError> {
+    pub(crate) fn get_note_tags(conn: &Connection) -> Result<Vec<NoteTagRecord>, StoreError> {
         const QUERY: &str = "SELECT tag, source FROM tags";
 
         conn.prepare_cached(QUERY)
@@ -38,9 +38,7 @@ impl SqliteStore {
             .collect::<Result<Vec<NoteTagRecord>, _>>()
     }
 
-    pub(crate) fn get_unique_note_tags(
-        conn: &mut Connection,
-    ) -> Result<BTreeSet<NoteTag>, StoreError> {
+    pub(crate) fn get_unique_note_tags(conn: &Connection) -> Result<BTreeSet<NoteTag>, StoreError> {
         const QUERY: &str = "SELECT DISTINCT tag FROM tags";
 
         conn.prepare_cached(QUERY)
@@ -82,7 +80,7 @@ impl SqliteStore {
         Ok(removed_tags)
     }
 
-    pub(super) fn get_sync_height(conn: &mut Connection) -> Result<BlockNumber, StoreError> {
+    pub(super) fn get_sync_height(conn: &Connection) -> Result<BlockNumber, StoreError> {
         const QUERY: &str = "SELECT block_num FROM blockchain_checkpoint";
 
         conn.prepare_cached(QUERY)

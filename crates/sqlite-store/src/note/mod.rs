@@ -129,7 +129,7 @@ struct SerializedNoteScriptPars {
 
 impl SqliteStore {
     pub(crate) fn get_input_notes(
-        conn: &mut Connection,
+        conn: &Connection,
         filter: &NoteFilter,
     ) -> Result<Vec<InputNoteRecord>, StoreError> {
         let (query, params) = note_filter_to_query_input_notes(filter);
@@ -146,7 +146,7 @@ impl SqliteStore {
 
     /// Retrieves the output notes from the database.
     pub(crate) fn get_output_notes(
-        conn: &mut Connection,
+        conn: &Connection,
         filter: &NoteFilter,
     ) -> Result<Vec<OutputNoteRecord>, StoreError> {
         let (query, params) = note_filter_to_query_output_notes(filter);
@@ -164,7 +164,7 @@ impl SqliteStore {
     /// Retrieves a single input note at the given offset from the filtered set, restricted to a
     /// consumer account and optionally to a block range.
     pub(crate) fn get_input_note_by_offset(
-        conn: &mut Connection,
+        conn: &Connection,
         filter: &NoteFilter,
         consumer: AccountId,
         block_start: Option<BlockNumber>,
@@ -214,7 +214,7 @@ impl SqliteStore {
     }
 
     pub(crate) fn get_unspent_input_note_nullifiers(
-        conn: &mut Connection,
+        conn: &Connection,
     ) -> Result<Vec<Nullifier>, StoreError> {
         const QUERY: &str =
             "SELECT nullifier FROM input_notes WHERE state_discriminant NOT IN rarray(?)";
@@ -250,7 +250,7 @@ impl SqliteStore {
 
     /// Retrieves the note scripts from the database.
     pub(crate) fn get_note_script(
-        conn: &mut Connection,
+        conn: &Connection,
         script_root: Word,
     ) -> Result<NoteScript, StoreError> {
         let script_root = script_root.to_hex();

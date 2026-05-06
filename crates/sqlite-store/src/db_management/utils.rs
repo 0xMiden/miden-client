@@ -128,9 +128,8 @@ fn remove_spaces(str: &str) -> String {
     str.chars().filter(|chr| !chr.is_whitespace()).collect()
 }
 
-pub fn get_migrations_value<T: FromSql>(conn: &mut Connection, name: &str) -> Result<Option<T>> {
-    conn.transaction()?
-        .query_row("SELECT value FROM migrations WHERE name = $1", params![name], |row| row.get(0))
+pub fn get_migrations_value<T: FromSql>(conn: &Connection, name: &str) -> Result<Option<T>> {
+    conn.query_row("SELECT value FROM migrations WHERE name = $1", params![name], |row| row.get(0))
         .optional()
 }
 
@@ -143,10 +142,8 @@ pub fn set_migrations_value<T: ToSql>(conn: &Connection, name: &str, value: &T) 
     Ok(())
 }
 
-pub fn get_setting<T: FromSql>(conn: &mut Connection, name: &str) -> Result<Option<T>, StoreError> {
-    conn.transaction()
-        .into_store_error()?
-        .query_row("SELECT value FROM settings WHERE name = $1", params![name], |row| row.get(0))
+pub fn get_setting<T: FromSql>(conn: &Connection, name: &str) -> Result<Option<T>, StoreError> {
+    conn.query_row("SELECT value FROM settings WHERE name = $1", params![name], |row| row.get(0))
         .optional()
         .into_store_error()
 }

@@ -57,7 +57,7 @@ impl SqliteStore {
     // READER METHODS
     // --------------------------------------------------------------------------------------------
 
-    pub(crate) fn get_account_ids(conn: &mut Connection) -> Result<Vec<AccountId>, StoreError> {
+    pub(crate) fn get_account_ids(conn: &Connection) -> Result<Vec<AccountId>, StoreError> {
         const QUERY: &str = "SELECT id FROM latest_account_headers";
 
         conn.prepare_cached(QUERY)
@@ -72,20 +72,20 @@ impl SqliteStore {
     }
 
     pub(crate) fn get_account_headers(
-        conn: &mut Connection,
+        conn: &Connection,
     ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
         query_latest_account_headers(conn, "1=1 ORDER BY id", params![])
     }
 
     pub(crate) fn get_account_header(
-        conn: &mut Connection,
+        conn: &Connection,
         account_id: AccountId,
     ) -> Result<Option<(AccountHeader, AccountStatus)>, StoreError> {
         Ok(query_latest_account_headers(conn, "id = ?", params![account_id.to_hex()])?.pop())
     }
 
     pub(crate) fn get_account_header_by_commitment(
-        conn: &mut Connection,
+        conn: &Connection,
         account_commitment: Word,
     ) -> Result<Option<AccountHeader>, StoreError> {
         let account_commitment_str: String = account_commitment.to_string();
@@ -100,7 +100,7 @@ impl SqliteStore {
 
     /// Retrieves a complete account record with full vault and storage data.
     pub(crate) fn get_account(
-        conn: &mut Connection,
+        conn: &Connection,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
         let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
@@ -135,7 +135,7 @@ impl SqliteStore {
 
     /// Retrieves a minimal partial account record with storage and vault witnesses.
     pub(crate) fn get_minimal_partial_account(
-        conn: &mut Connection,
+        conn: &Connection,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
         let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
@@ -183,7 +183,7 @@ impl SqliteStore {
     }
 
     pub fn get_foreign_account_code(
-        conn: &mut Connection,
+        conn: &Connection,
         account_ids: Vec<AccountId>,
     ) -> Result<BTreeMap<AccountId, AccountCode>, StoreError> {
         let params: Vec<Value> =
@@ -237,7 +237,7 @@ impl SqliteStore {
     /// Fetches a specific asset from the account's vault without the need of loading the entire
     /// vault. The witness is retrieved from the [`AccountSmtForest`].
     pub(crate) fn get_account_asset(
-        conn: &mut Connection,
+        conn: &Connection,
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
         account_id: AccountId,
         vault_key: AssetVaultKey,
@@ -257,7 +257,7 @@ impl SqliteStore {
     /// Retrieves a specific item from the account's storage map without loading the entire storage.
     /// The witness is retrieved from the [`AccountSmtForest`].
     pub(crate) fn get_account_map_item(
-        conn: &mut Connection,
+        conn: &Connection,
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
         account_id: AccountId,
         slot_name: StorageSlotName,
@@ -283,7 +283,7 @@ impl SqliteStore {
     }
 
     pub(crate) fn get_account_addresses(
-        conn: &mut Connection,
+        conn: &Connection,
         account_id: AccountId,
     ) -> Result<Vec<Address>, StoreError> {
         query_account_addresses(conn, account_id)
@@ -291,7 +291,7 @@ impl SqliteStore {
 
     /// Retrieves the account code for a specific account by ID.
     pub(crate) fn get_account_code_by_id(
-        conn: &mut Connection,
+        conn: &Connection,
         account_id: AccountId,
     ) -> Result<Option<AccountCode>, StoreError> {
         let Some((header, _)) =
