@@ -20,8 +20,7 @@ use miden_protocol::block::account_tree::AccountWitness;
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{Forest, MmrPath, MmrProof};
-use miden_protocol::crypto::merkle::smt::SmtProof;
-use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::note::{NoteId, NoteScript, NoteTag};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_protocol::utils::serde::Deserializable;
 use miden_protocol::{EMPTY_WORD, Word};
@@ -920,32 +919,6 @@ impl NodeRpcClient for GrpcClient {
             ));
         }
         Ok(all_nullifiers.into_iter().collect::<Vec<_>>())
-    }
-
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        let limits = self.get_rpc_limits().await?;
-        let mut proofs: Vec<SmtProof> = Vec::with_capacity(nullifiers.len());
-        for chunk in nullifiers.chunks(limits.nullifiers_limit as usize) {
-            let request = proto::rpc::NullifierList {
-                nullifiers: chunk.iter().map(|nul| nul.as_word().into()).collect(),
-            };
-
-            let response = self
-                .call_with_retry(RpcEndpoint::CheckNullifiers, |mut rpc_api| {
-                    let request = request.clone();
-                    Box::pin(async move { rpc_api.check_nullifiers(request).await })
-                })
-                .await?;
-
-            let mut response = response.into_inner();
-            let chunk_proofs = response
-                .proofs
-                .iter_mut()
-                .map(|r| r.to_owned().try_into())
-                .collect::<Result<Vec<SmtProof>, RpcConversionError>>()?;
-            proofs.extend(chunk_proofs);
-        }
-        Ok(proofs)
     }
 
     async fn get_block_by_number(

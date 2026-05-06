@@ -10,8 +10,7 @@ use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::{Forest, Mmr, MmrProof};
-use miden_protocol::crypto::merkle::smt::SmtProof;
-use miden_protocol::note::{NoteHeader, NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::note::{NoteHeader, NoteId, NoteScript, NoteTag};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
@@ -613,14 +612,6 @@ impl NodeRpcClient for MockRpcApi {
             .collect::<Vec<_>>();
 
         Ok(nullifiers)
-    }
-
-    /// Returns proofs for all the provided nullifiers.
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        Ok(nullifiers
-            .iter()
-            .map(|nullifier| self.mock_chain.read().nullifier_tree().open(nullifier).into_proof())
-            .collect())
     }
 
     async fn get_block_by_number(
