@@ -151,9 +151,7 @@ pub async fn show_account<AUTH>(
             GrpcClient::new(&rpc_config.endpoint.clone().into(), rpc_config.timeout_ms);
 
         let fetched_account = rpc_client.get_account_details(account_id).await.map_err(|err| {
-            CliError::Input(
-                format!("Unable to fetch account {account_id} from the network: {err}",),
-            )
+            CliError::Input(format!("Unable to fetch account {account_id} from the network: {err}"))
         })?;
 
         let account: Option<Account> = fetched_account.into();
