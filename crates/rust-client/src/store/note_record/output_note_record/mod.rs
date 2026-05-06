@@ -100,7 +100,7 @@ impl OutputNoteRecord {
     pub fn nullifier(&self) -> Option<Nullifier> {
         let recipient = self.recipient()?;
         Some(Nullifier::new(
-            recipient.script().root(),
+            recipient.script().root().into(),
             recipient.storage().commitment(),
             self.assets.commitment(),
             recipient.serial_num(),

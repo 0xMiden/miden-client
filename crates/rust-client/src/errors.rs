@@ -55,7 +55,8 @@ impl fmt::Display for ErrorHint {
 
 // TODO: This is mostly illustrative but we could add a URL with fragemtn identifiers
 // for each error
-const TROUBLESHOOTING_DOC: &str = "https://0xmiden.github.io/miden-client/cli-troubleshooting.html";
+const TROUBLESHOOTING_DOC: &str =
+    "https://docs.miden.xyz/builder/tools/clients/rust-client/cli/cli-troubleshooting";
 
 // CLIENT ERROR
 // ================================================================================================

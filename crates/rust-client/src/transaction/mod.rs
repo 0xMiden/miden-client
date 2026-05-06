@@ -647,14 +647,14 @@ where
             let script_root = script.root();
 
             // Check if the node already has this script registered.
-            match self.rpc_api.get_note_script_by_root(script_root).await {
+            match self.rpc_api.get_note_script_by_root(script_root.into()).await {
                 Ok(_) => {},
                 Err(RpcError::RequestError { error_kind: GrpcError::NotFound, .. }) => {
                     missing_scripts.push(script.clone());
                 },
                 Err(other) => {
                     return Err(ClientError::NtxScriptRegistrationFailed {
-                        script_root,
+                        script_root: script_root.into(),
                         source: other,
                     });
                 },
@@ -700,12 +700,12 @@ where
                 )
                 .await?;
 
-            if execution.failed.is_empty() {
+            if execution.failed().is_empty() {
                 break;
             }
 
             let failed_note_ids: BTreeSet<NoteId> =
-                execution.failed.iter().map(|n| n.note.id()).collect();
+                execution.failed().iter().map(|n| n.note().id()).collect();
             let filtered_input_notes = InputNotes::new(
                 input_notes
                     .into_iter()

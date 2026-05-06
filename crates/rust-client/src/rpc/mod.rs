@@ -57,7 +57,6 @@ use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
-use miden_protocol::crypto::merkle::smt::SmtProof;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 
@@ -286,10 +285,6 @@ pub trait NodeRpcClient: Send + Sync {
         block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
 
-    /// Fetches the nullifier proofs corresponding to a list of nullifiers using the
-    /// `/CheckNullifiers` RPC endpoint.
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError>;
-
     /// Fetches the account proof and optionally its details from the node, using the
     /// `GetAccountProof` endpoint.
     ///
@@ -493,7 +488,6 @@ pub trait NodeRpcClient: Send + Sync {
 #[derive(Debug, Clone, Copy)]
 pub enum RpcEndpoint {
     Status,
-    CheckNullifiers,
     SyncNullifiers,
     GetAccount,
     GetBlockByNumber,
@@ -516,7 +510,6 @@ impl RpcEndpoint {
     pub fn proto_name(&self) -> &'static str {
         match self {
             RpcEndpoint::Status => "Status",
-            RpcEndpoint::CheckNullifiers => "CheckNullifiers",
             RpcEndpoint::SyncNullifiers => "SyncNullifiers",
             RpcEndpoint::GetAccount => "GetAccount",
             RpcEndpoint::GetBlockByNumber => "GetBlockByNumber",
@@ -540,7 +533,6 @@ impl fmt::Display for RpcEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RpcEndpoint::Status => write!(f, "status"),
-            RpcEndpoint::CheckNullifiers => write!(f, "check_nullifiers"),
             RpcEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
             },
