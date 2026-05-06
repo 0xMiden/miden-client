@@ -87,7 +87,7 @@ pub use state_sync::{
 mod state_sync_update;
 pub use state_sync_update::{
     AccountUpdates,
-    BlockUpdates,
+    PartialBlockchainUpdates,
     PublicAccountDelta,
     PublicAccountUpdate,
     StateSyncUpdate,

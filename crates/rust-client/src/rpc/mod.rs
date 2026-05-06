@@ -406,8 +406,14 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the note script with the specified root.
     ///
+    /// Implementations must verify that the returned script's root matches the requested
+    /// `root` and return [`RpcError::InvalidResponse`] otherwise; callers may rely on this
+    /// invariant.
+    ///
     /// Errors:
     /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
+    /// - [`RpcError::InvalidResponse`] if the node returns a script whose root does not match the
+    ///   requested `root`.
     async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError>;
 
     /// Fetches storage map updates for specified account and storage slots within a block range,
