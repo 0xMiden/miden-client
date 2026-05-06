@@ -462,7 +462,7 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
 
     let symbol = TokenSymbol::try_from("TST").expect("TST should be a valid token symbol");
     let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
-    let metadata = FungibleTokenMetadata::builder(name, symbol, 12, 1_000_000).build()?;
+    let metadata = FungibleTokenMetadata::builder(name, symbol, 12, 1_000_000_000_000).build()?;
     let account = create_basic_fungible_faucet(
         rng.random(),
         metadata,
