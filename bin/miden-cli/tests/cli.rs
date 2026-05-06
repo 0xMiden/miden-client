@@ -368,6 +368,7 @@ async fn show_untracked_public_account() -> Result<()> {
     // First client: creates a public fungible faucet and commits it to the node via a mint.
     let (_store_path_a, temp_dir_a, endpoint) = init_cli();
     let fungible_faucet_account_id = new_faucet_cli(&temp_dir_a, AccountStorageMode::Public);
+    sync_cli(&temp_dir_a);
 
     mint_cli(
         &temp_dir_a,
