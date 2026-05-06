@@ -151,7 +151,7 @@ pub(crate) fn query_account_code(
         .into_store_error()?
         .map(|result| {
             let bytes: Vec<u8> = result.into_store_error()?;
-            Ok(AccountCode::from_bytes(&bytes)?)
+            Ok(AccountCode::read_from_bytes(&bytes)?)
         })
         .next()
         .transpose()

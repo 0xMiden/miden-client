@@ -31,7 +31,7 @@ use miden_client::store::{
     AccountStorageFilter,
     StoreError,
 };
-use miden_client::utils::Serializable;
+use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
 use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
 use miden_protocol::asset::{AssetVaultKey, PartialVault};
@@ -209,7 +209,8 @@ impl SqliteStore {
                                     AccountError::FinalAccountHeaderIdParsingFailed(err),
                                 )
                             })?,
-                            AccountCode::from_bytes(&code).map_err(StoreError::AccountError)?,
+                            AccountCode::read_from_bytes(&code)
+                                .map_err(StoreError::DataDeserializationError)?,
                         ))
                     },
                 )
