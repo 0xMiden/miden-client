@@ -72,8 +72,9 @@ pub struct TransactionInclusion {
     /// Output notes committed by this transaction, with inclusion proofs.
     /// Does not include erased notes.
     pub output_notes: Vec<CommittedNote>,
-    /// IDs of output notes that were erased by same-batch note erasure.
-    pub erased_output_note_ids: Vec<NoteId>,
+    /// Output notes that were erased by same-batch note erasure.
+    /// Contains the full note header (ID + metadata) from the transaction header.
+    pub erased_output_notes: Vec<NoteHeader>,
 }
 
 // TRANSACTIONS INFO
@@ -132,8 +133,8 @@ pub struct TransactionRecord {
     /// Output notes with inclusion proofs, as returned by the node's `SyncTransactions`
     /// response. Does not include erased notes.
     pub output_notes: Vec<CommittedNote>,
-    /// IDs of output notes that were erased by same-batch note erasure.
-    pub erased_output_note_ids: Vec<NoteId>,
+    /// Output notes that were erased by same-batch note erasure.
+    pub erased_output_notes: Vec<NoteHeader>,
 }
 
 impl TryFrom<proto::rpc::TransactionRecord> for TransactionRecord {
@@ -147,14 +148,14 @@ impl TryFrom<proto::rpc::TransactionRecord> for TransactionRecord {
                 field_name: "transaction_header",
             })?;
 
-        let (transaction_header, output_notes, erased_output_note_ids) =
+        let (transaction_header, output_notes, erased_output_notes) =
             convert_transaction_header(proto_header, value.output_note_proofs)?;
 
         Ok(Self {
             block_num,
             transaction_header,
             output_notes,
-            erased_output_note_ids,
+            erased_output_notes,
         })
     }
 }
@@ -169,7 +170,7 @@ impl TryFrom<proto::rpc::TransactionRecord> for TransactionRecord {
 fn convert_transaction_header(
     value: proto::transaction::TransactionHeader,
     output_note_proofs: Vec<proto::note::NoteInclusionInBlockProof>,
-) -> Result<(TransactionHeader, Vec<CommittedNote>, Vec<NoteId>), RpcError> {
+) -> Result<(TransactionHeader, Vec<CommittedNote>, Vec<NoteHeader>), RpcError> {
     let account_id =
         value
             .account_id
@@ -234,7 +235,7 @@ fn convert_transaction_header(
 
     // Join: notes with a matching proof are committed; notes without are erased.
     let mut committed_output_notes = Vec::with_capacity(proof_map.len());
-    let mut erased_output_note_ids =
+    let mut erased_output_notes =
         Vec::with_capacity(output_note_headers.len().saturating_sub(proof_map.len()));
 
     for header in &output_note_headers {
@@ -243,7 +244,7 @@ fn convert_transaction_header(
             let metadata = CommittedNoteMetadata::Full(header.metadata().clone());
             committed_output_notes.push(CommittedNote::new(note_id, metadata, proof));
         } else {
-            erased_output_note_ids.push(note_id);
+            erased_output_notes.push(header.clone());
         }
     }
 
@@ -272,5 +273,5 @@ fn convert_transaction_header(
         output_note_headers,
         fee,
     );
-    Ok((transaction_header, committed_output_notes, erased_output_note_ids))
+    Ok((transaction_header, committed_output_notes, erased_output_notes))
 }

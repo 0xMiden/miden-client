@@ -29,7 +29,8 @@ ignored = ["getrandom", "prost-types", "serde", "serde_json", "tempfile", "tonic
 crate-type = ["lib"]
 
 [features]
-default = ["std"]
+dap = ["dep:miden-debug", "dep:miden-processor"]
+default = ["dap", "std"]
 std = [
   "dep:tempfile",
   "dep:tokio",
@@ -46,6 +47,8 @@ tonic = []
 
 [dependencies]
 # Miden dependencies
+miden-debug                = { optional = true, workspace = true }
+miden-processor            = { optional = true, workspace = true }
 miden-protocol             = { workspace = true }
 miden-remote-prover-client = { default-features = false, features = ["tx-prover"], workspace = true }
 miden-standards            = { workspace = true }
