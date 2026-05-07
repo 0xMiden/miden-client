@@ -18,7 +18,7 @@ use miden_node_block_producer::{
 };
 use miden_node_ntx_builder::NtxBuilderConfig;
 use miden_node_rpc::Rpc;
-use miden_node_store::{DEFAULT_MAX_CONCURRENT_PROOFS, GenesisState, Store};
+use miden_node_store::{DEFAULT_MAX_CONCURRENT_PROOFS, GenesisState, Store, StoreMode};
 use miden_node_utils::clap::{GrpcOptionsExternal, GrpcOptionsInternal, StorageOptions};
 use miden_node_utils::crypto::get_rpo_random_coin;
 use miden_node_validator::{Validator, ValidatorSigner};
@@ -38,11 +38,12 @@ use miden_protocol::block::FeeParameters;
 use miden_protocol::crypto::dsa::ecdsa_k256_keccak;
 use miden_protocol::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
 use miden_protocol::utils::serde::Serializable;
-use miden_protocol::{Felt, ONE, Word};
+use miden_protocol::{ONE, Word};
 use miden_standards::AuthMethod;
 use miden_standards::account::auth::AuthSingleSig;
 use miden_standards::account::components::basic_wallet_library;
 use miden_standards::account::faucets::create_basic_fungible_faucet;
+use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
 use tokio::net::TcpListener;
@@ -325,12 +326,14 @@ impl NodeBuilder {
                     Store {
                         data_directory,
                         rpc_listener,
-                        block_producer_listener,
-                        ntx_builder_listener,
-                        block_prover_url: None,
+                        mode: StoreMode::BlockProducer {
+                            block_producer_listener,
+                            ntx_builder_listener,
+                            block_prover_url: None,
+                            max_concurrent_proofs: DEFAULT_MAX_CONCURRENT_PROOFS,
+                        },
                         storage_options: StorageOptions::default(),
                         grpc_options: GrpcOptionsInternal::default(),
-                        max_concurrent_proofs: DEFAULT_MAX_CONCURRENT_PROOFS,
                     }
                     .serve()
                     .await
@@ -457,11 +460,12 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
         approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Poseidon2),
     };
 
+    let symbol = TokenSymbol::try_from("TST").expect("TST should be a valid token symbol");
+    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
+    let metadata = FungibleTokenMetadata::builder(name, symbol, 12, 1_000_000_000_000).build()?;
     let account = create_basic_fungible_faucet(
         rng.random(),
-        TokenSymbol::try_from("TST").expect("TST should be a valid token symbol"),
-        12,
-        Felt::from(1_000_000u32),
+        metadata,
         miden_protocol::account::AccountStorageMode::Public,
         auth_method,
     )?;
@@ -545,11 +549,14 @@ fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Res
         approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Poseidon2),
     };
 
+    let symbol = TokenSymbol::new("TKN")?;
+    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
+    let metadata =
+        FungibleTokenMetadata::builder(name, symbol, FAUCET_DECIMALS, u64::from(FAUCET_MAX_SUPPLY))
+            .build()?;
     let faucet = create_basic_fungible_faucet(
         init_seed,
-        TokenSymbol::new("TKN")?,
-        FAUCET_DECIMALS,
-        Felt::from(FAUCET_MAX_SUPPLY),
+        metadata,
         miden_protocol::account::AccountStorageMode::Public,
         auth_scheme,
     )?;

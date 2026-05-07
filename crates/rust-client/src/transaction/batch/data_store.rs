@@ -12,7 +12,7 @@ use miden_protocol::account::{
 };
 use miden_protocol::asset::{AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::note::NoteScript;
+use miden_protocol::note::{NoteScript, NoteScriptRoot};
 use miden_protocol::transaction::{AccountInputs, PartialBlockchain};
 use miden_protocol::vm::FutureMaybeSend;
 use miden_protocol::{MastForest, Word};
@@ -150,7 +150,7 @@ impl DataStore for InMemoryBatchDataStore {
 
     fn get_note_script(
         &self,
-        script_root: Word,
+        script_root: NoteScriptRoot,
     ) -> impl FutureMaybeSend<Result<Option<NoteScript>, DataStoreError>> {
         self.inner.get_note_script(script_root)
     }
