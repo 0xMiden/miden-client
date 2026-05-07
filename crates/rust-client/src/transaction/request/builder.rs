@@ -419,53 +419,33 @@ impl TransactionRequestBuilder {
     /// Consumes the builder and returns a [`TransactionRequest`] for creating a partial swap
     /// (PSWAP) note.
     ///
-    /// - `creator_account_id` is the account creating the swap.
-    /// - `offered_asset` is the asset being offered.
-    /// - `requested_asset` is the asset being requested in return.
+    /// - `pswap_data` is the data for the partial swap that contains the creator account ID, the
+    ///   offered fungible asset, and the requested fungible asset.
     /// - `note_type` determines the visibility of the PSWAP note itself.
-    /// - `payback_note_type` determines the visibility of the payback note that fillers emit
-    ///   back to the creator. Typically [`NoteType::Private`] (cheaper; the fill amount is
-    ///   already visible in the executing transaction).
+    /// - `payback_note_type` determines the visibility of the payback note that fillers emit back
+    ///   to the creator. Typically [`NoteType::Private`] (cheaper; the fill amount is already
+    ///   visible in the executing transaction).
     /// - `note_attachment` is the optional attachment for the note.
     pub fn build_pswap_create(
         self,
-        creator_account_id: AccountId,
-        offered_asset: Asset,
-        requested_asset: Asset,
+        pswap_data: &PswapTransactionData,
         note_type: NoteType,
         payback_note_type: NoteType,
         note_attachment: NoteAttachment,
         rng: &mut ClientRng,
     ) -> Result<TransactionRequest, TransactionRequestError> {
-        let offered_fungible = match offered_asset {
-            Asset::Fungible(asset) => asset,
-            Asset::NonFungible(_) => {
-                return Err(TransactionRequestError::NoteCreationError(NoteError::other(
-                    "PSWAP notes only support fungible offered assets",
-                )));
-            },
-        };
-        let requested_fungible = match requested_asset {
-            Asset::Fungible(asset) => asset,
-            Asset::NonFungible(_) => {
-                return Err(TransactionRequestError::NoteCreationError(NoteError::other(
-                    "PSWAP notes only support fungible requested assets",
-                )));
-            },
-        };
-
         let storage = PswapNoteStorage::builder()
-            .requested_asset(requested_fungible)
-            .creator_account_id(creator_account_id)
+            .requested_asset(pswap_data.requested_asset())
+            .creator_account_id(pswap_data.account_id())
             .payback_note_type(payback_note_type)
             .build();
 
         let pswap_note = PswapNote::builder()
-            .sender(creator_account_id)
+            .sender(pswap_data.account_id())
             .storage(storage)
             .serial_number(rng.draw_word())
             .note_type(note_type)
-            .offered_asset(offered_fungible)
+            .offered_asset(pswap_data.offered_asset())
             .attachment(note_attachment)
             .build()
             .map_err(TransactionRequestError::NoteCreationError)?;
@@ -477,7 +457,7 @@ impl TransactionRequestBuilder {
     /// Consumes the builder and returns a [`TransactionRequest`] for consuming (filling) a
     /// partial swap (PSWAP) note.
     ///
-    /// - `pswap_note` is the Pswap note being consumed.
+    /// - `pswap_note` is the PSWAP note being consumed.
     /// - `consumer_account_id` is the account consuming the swap.
     /// - `account_fill_amount` is the amount of the requested asset being provided by the consumer account.
     /// - `note_fill_amount` is any additional amount being provided by other notes.
@@ -535,7 +515,7 @@ impl TransactionRequestBuilder {
     /// Consumes the builder and returns a [`TransactionRequest`] for canceling a partial swap
     /// (PSWAP) note.
     ///
-    /// - `pswap_note` is the swap note to cancel. The caller must be the creator of the note.
+    /// - `pswap_note` is the PSWAP note to cancel. The caller must be the creator of the note.
     pub fn build_pswap_cancel(
         self,
         pswap_note: Note,
@@ -766,6 +746,55 @@ impl SwapTransactionData {
 
     /// Returns the transaction requested [`Asset`].
     pub fn requested_asset(&self) -> Asset {
+        self.requested_asset
+    }
+}
+
+// PSWAP TRANSACTION DATA
+// ================================================================================================
+
+/// Contains information related to a partial swap (PSWAP) transaction.
+///
+/// A PSWAP transaction involves creating a PSWAP note that carries the offered fungible asset
+/// and, when consumed (filled), produces a payback note carrying the requested fungible asset
+/// taken from the filler's vault. Both legs are restricted to fungible assets so that fills can
+/// be denominated in arbitrary amounts.
+#[derive(Clone, Debug)]
+pub struct PswapTransactionData {
+    /// Account ID of the creator account.
+    creator_account_id: AccountId,
+    /// Fungible asset offered in the swap.
+    offered_asset: FungibleAsset,
+    /// Fungible asset expected in the payback note generated when the PSWAP is filled.
+    requested_asset: FungibleAsset,
+}
+
+impl PswapTransactionData {
+    /// Creates a new [`PswapTransactionData`].
+    pub fn new(
+        creator_account_id: AccountId,
+        offered_asset: FungibleAsset,
+        requested_asset: FungibleAsset,
+    ) -> PswapTransactionData {
+        PswapTransactionData {
+            creator_account_id,
+            offered_asset,
+            requested_asset,
+        }
+    }
+
+    /// Returns the creator [`AccountId`].
+    pub fn account_id(&self) -> AccountId {
+        self.creator_account_id
+    }
+
+    /// Returns the offered [`FungibleAsset`].
+    pub fn offered_asset(&self) -> FungibleAsset {
+        self.offered_asset
+    }
+
+    /// Returns the requested [`FungibleAsset`].
+    pub fn requested_asset(&self) -> FungibleAsset {
         self.requested_asset
     }
 }

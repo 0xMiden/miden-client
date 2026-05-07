@@ -44,7 +44,9 @@ use miden_tx::utils::serde::{
 use thiserror::Error;
 
 mod builder;
-pub use builder::{PaymentNoteDescription, SwapTransactionData, TransactionRequestBuilder};
+pub use builder::{
+    PaymentNoteDescription, PswapTransactionData, SwapTransactionData, TransactionRequestBuilder,
+};
 
 mod foreign;
 pub use foreign::ForeignAccount;

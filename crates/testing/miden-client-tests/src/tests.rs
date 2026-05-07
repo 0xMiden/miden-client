@@ -32,8 +32,8 @@ use miden_client::testing::common::{
 };
 use miden_client::testing::mock::{MockClient, MockRpcApi};
 use miden_client::transaction::{
-    DiscardCause, PaymentNoteDescription, SwapTransactionData, TransactionExecutorError,
-    TransactionRequestBuilder, TransactionRequestError, TransactionStatus,
+    DiscardCause, PaymentNoteDescription, PswapTransactionData, SwapTransactionData,
+    TransactionExecutorError, TransactionRequestBuilder, TransactionRequestError, TransactionStatus,
 };
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{ClientError, DebugMode};
@@ -2720,15 +2720,15 @@ async fn pswap_test() {
     // Step 1: Alice creates a PSWAP note offering faucet1 tokens for faucet2 tokens.
     let offered_amount = 100u64;
     let requested_amount = 50u64;
-    let offered_asset = Asset::Fungible(FungibleAsset::new(faucet1.id(), offered_amount).unwrap());
-    let requested_asset =
-        Asset::Fungible(FungibleAsset::new(faucet2.id(), requested_amount).unwrap());
+    let pswap_data = PswapTransactionData::new(
+        alice_wallet.id(),
+        FungibleAsset::new(faucet1.id(), offered_amount).unwrap(),
+        FungibleAsset::new(faucet2.id(), requested_amount).unwrap(),
+    );
 
     let create_request = TransactionRequestBuilder::new()
         .build_pswap_create(
-            alice_wallet.id(),
-            offered_asset,
-            requested_asset,
+            &pswap_data,
             NoteType::Private,
             NoteType::Private,
             NoteAttachment::default(),
@@ -2835,15 +2835,15 @@ async fn pswap_cancel_test() {
     // Step 1: Alice creates a PSWAP note.
     let offered_amount = 100u64;
     let requested_amount = 50u64;
-    let offered_asset = Asset::Fungible(FungibleAsset::new(faucet1.id(), offered_amount).unwrap());
-    let requested_asset =
-        Asset::Fungible(FungibleAsset::new(faucet2.id(), requested_amount).unwrap());
+    let pswap_data = PswapTransactionData::new(
+        alice_wallet.id(),
+        FungibleAsset::new(faucet1.id(), offered_amount).unwrap(),
+        FungibleAsset::new(faucet2.id(), requested_amount).unwrap(),
+    );
 
     let create_request = TransactionRequestBuilder::new()
         .build_pswap_create(
-            alice_wallet.id(),
-            offered_asset,
-            requested_asset,
+            &pswap_data,
             NoteType::Private,
             NoteType::Private,
             NoteAttachment::default(),

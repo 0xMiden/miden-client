@@ -666,7 +666,8 @@ fn pswap_cli_help_output() {
     assert!(output.status.success(), "pswap create --help should succeed");
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("--sender"), "Help should show --sender flag");
-    assert!(stdout.contains("--offered-faucet"), "Help should show --offered-faucet flag");
+    assert!(stdout.contains("--offered-asset"), "Help should show --offered-asset flag");
+    assert!(stdout.contains("--requested-asset"), "Help should show --requested-asset flag");
     assert!(stdout.contains("--note-type"), "Help should show --note-type flag");
     assert!(stdout.contains("Examples:"), "Help should contain examples section");
 
@@ -687,36 +688,24 @@ fn pswap_cli_help_output() {
 fn pswap_cli_invalid_args() {
     let temp_dir = init_cli().1;
 
-    // Invalid u64 values for numeric fields (offered-amount, requested-amount)
-    // are rejected by clap at parse time.
-    for (field, bad_value) in [
-        ("--offered-amount", "not_a_number"),
-        ("--requested-amount", "abc"),
-        ("--offered-amount", "-10"),
-    ] {
-        let mut cmd = cargo_bin_cmd!("miden-client");
-        let mut args = vec![
+    // Malformed asset strings (the `<AMOUNT>::<FAUCET>` shape is enforced by
+    // `parse_fungible_asset` and only fails when the CLI runs against a client
+    // — at parse time, both --offered-asset and --requested-asset are required,
+    // so omitting them must fail).
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        cmd.args([
             "pswap",
             "create",
             "--sender",
             "0xaabbccdd",
-            "--offered-faucet",
-            "0x1111111111111111",
-            "--offered-amount",
-            "100",
-            "--requested-faucet",
-            "0x2222222222222222",
-            "--requested-amount",
-            "50",
+            "--offered-asset",
+            "100::0x1111111111111111",
             "--note-type",
             "public",
-        ];
-        // Replace the default value with the bad value for the target field
-        if let Some(pos) = args.iter().position(|a| *a == field) {
-            args[pos + 1] = bad_value;
-        }
-        assert_command_fails_but_does_not_panic(cmd.args(&args).current_dir(&temp_dir));
-    }
+        ])
+        .current_dir(&temp_dir),
+    );
 
     // Invalid note-type
     let mut cmd = cargo_bin_cmd!("miden-client");
@@ -726,14 +715,10 @@ fn pswap_cli_invalid_args() {
             "create",
             "--sender",
             "0xaabbccdd",
-            "--offered-faucet",
-            "0x1111111111111111",
-            "--offered-amount",
-            "100",
-            "--requested-faucet",
-            "0x2222222222222222",
-            "--requested-amount",
-            "50",
+            "--offered-asset",
+            "100::0x1111111111111111",
+            "--requested-asset",
+            "50::0x2222222222222222",
             "--note-type",
             "invalid",
         ])

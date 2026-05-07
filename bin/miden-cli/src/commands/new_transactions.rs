@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use miden_client::account::AccountId;
-use miden_client::asset::{Asset, FungibleAsset, NonFungibleDeltaAction};
 use miden_client::keystore::Keystore;
 use miden_client::note::{
     BlockNumber,
@@ -16,6 +15,7 @@ use miden_client::note::{
 use miden_client::store::NoteRecordError;
 use miden_client::transaction::{
     PaymentNoteDescription,
+    PswapTransactionData,
     RawOutputNote,
     SwapTransactionData,
     TransactionRequest,
@@ -308,16 +308,7 @@ impl ConsumeNotesCmd {
         let mut input_notes = Vec::new();
 
         for note_id in &self.list_of_notes {
-            let note_record = get_input_note_with_id_prefix(&client, note_id)
-                .await
-                .map_err(|_| CliError::Input(format!("Input note ID {note_id} is neither a valid Note ID nor a prefix of a known Note ID")))?;
-
-            input_notes.push((
-                note_record.try_into().map_err(|err: NoteRecordError| {
-                    CliError::Transaction(err.into(), "Failed to convert note record".to_string())
-                })?,
-                None,
-            ));
+            input_notes.push((resolve_input_note(&client, note_id).await?, None));
         }
 
         let account_id =
@@ -412,19 +403,15 @@ Examples:
   # Offer 100 tokens from faucet A for 50 tokens from faucet B (public note)
   miden-client pswap create \\
     --sender 0xd0e1f2a3b4c5d6e7 \\
-    --offered-faucet 0x2a7e654f2c508c10 \\
-    --offered-amount 100 \\
-    --requested-faucet 0x398e39a0535a3b0e \\
-    --requested-amount 50 \\
+    --offered-asset 100::0x2a7e654f2c508c10 \\
+    --requested-asset 50::0x398e39a0535a3b0e \\
     --note-type public
 
   # Same as above but skip confirmation and delegate proving
   miden-client pswap create \\
     --sender 0xd0e1f2a3b4c5d6e7 \\
-    --offered-faucet 0x2a7e654f2c508c10 \\
-    --offered-amount 100 \\
-    --requested-faucet 0x398e39a0535a3b0e \\
-    --requested-amount 50 \\
+    --offered-asset 100::0x2a7e654f2c508c10 \\
+    --requested-asset 50::0x398e39a0535a3b0e \\
     --note-type private --force --delegate-proving
 ")]
 pub struct PswapCreateCmd {
@@ -432,21 +419,13 @@ pub struct PswapCreateCmd {
     #[arg(short = 's', long = "sender")]
     sender_account_id: String,
 
-    /// Faucet ID of the offered asset.
-    #[arg(long)]
-    offered_faucet: String,
+    /// Asset offered.
+    #[arg(short = 'o', long = "offered-asset", help=format!("Asset offered.\n{SHARED_TOKEN_DOCUMENTATION}"))]
+    offered_asset: String,
 
-    /// Amount of the offered asset.
-    #[arg(long)]
-    offered_amount: u64,
-
-    /// Faucet ID of the requested asset.
-    #[arg(long)]
-    requested_faucet: String,
-
-    /// Amount of the requested asset.
-    #[arg(long)]
-    requested_amount: u64,
+    /// Asset requested.
+    #[arg(short, long, help=format!("Asset requested.\n{SHARED_TOKEN_DOCUMENTATION}"))]
+    requested_asset: String,
 
     /// Visibility of the PSWAP note to be created.
     #[arg(short, long, value_enum)]
@@ -474,22 +453,21 @@ impl PswapCreateCmd {
     ) -> Result<(), CliError> {
         let sender_id = parse_account_id(&client, &self.sender_account_id).await?;
 
-        let offered_faucet_id = parse_account_id(&client, &self.offered_faucet).await?;
-        let offered_asset = Asset::Fungible(
-            FungibleAsset::new(offered_faucet_id, self.offered_amount).map_err(CliError::Asset)?,
-        );
+        let faucet_details_map = load_faucet_details_map()?;
+        let offered_fungible_asset =
+            faucet_details_map.parse_fungible_asset(&client, &self.offered_asset).await?;
+        let requested_fungible_asset =
+            faucet_details_map.parse_fungible_asset(&client, &self.requested_asset).await?;
 
-        let requested_faucet_id = parse_account_id(&client, &self.requested_faucet).await?;
-        let requested_asset = Asset::Fungible(
-            FungibleAsset::new(requested_faucet_id, self.requested_amount)
-                .map_err(CliError::Asset)?,
+        let pswap_data = PswapTransactionData::new(
+            sender_id,
+            offered_fungible_asset,
+            requested_fungible_asset,
         );
 
         let tx_request = TransactionRequestBuilder::new()
             .build_pswap_create(
-                sender_id,
-                offered_asset,
-                requested_asset,
+                &pswap_data,
                 (&self.note_type).into(),
                 (&self.payback_note_type).into(),
                 NoteAttachment::default(),
