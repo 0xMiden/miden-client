@@ -244,3 +244,17 @@ CREATE TABLE addresses (
 ) WITHOUT ROWID;
 
 CREATE INDEX idx_addresses_account_id ON addresses(account_id);
+
+-- ── Faucet metadata ──────────────────────────────────────────────────────
+
+-- Cache of faucet display metadata (symbol + decimals) for both tracked and untracked
+-- public faucets. Populated lazily by the CLI when an unknown faucet is encountered.
+CREATE TABLE faucet_metadata (
+    account_id TEXT NOT NULL,
+    symbol     TEXT NOT NULL,
+    decimals   INTEGER NOT NULL,
+
+    PRIMARY KEY (account_id),
+    CONSTRAINT faucet_metadata_symbol_is_not_empty CHECK (length(symbol) > 0),
+    CONSTRAINT faucet_metadata_decimals_is_byte    CHECK (decimals BETWEEN 0 AND 255)
+) STRICT, WITHOUT ROWID;

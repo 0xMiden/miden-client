@@ -15,8 +15,9 @@ use miden_client::note::{
 use miden_client::store::{InputNoteRecord, NoteFilter as ClientNoteFilter, OutputNoteRecord};
 use miden_client::{Client, ClientError, IdPrefixFetchError, PrettyPrint};
 
+use crate::config::CliConfig;
 use crate::errors::CliError;
-use crate::utils::{load_faucet_details_map, parse_account_id};
+use crate::utils::{load_faucet_metadata_resolver, parse_account_id};
 use crate::{Parser, create_dynamic_table, get_output_note_with_id_prefix};
 
 #[derive(Clone, Debug, ValueEnum)]
@@ -88,7 +89,7 @@ impl NotesCmd {
                 .await?;
             },
             NotesCmd { show: Some(id), .. } => {
-                show_note(client, id.to_owned(), self.with_code).await?;
+                show_note(&mut client, id.to_owned(), self.with_code).await?;
             },
             NotesCmd { send: Some(args), .. } => {
                 let note_id = &args[0];
@@ -148,12 +149,12 @@ async fn list_notes<AUTH: Keystore + Sync>(
 // ================================================================================================
 #[allow(clippy::too_many_lines)]
 async fn show_note<AUTH: Keystore + Sync>(
-    client: Client<AUTH>,
+    client: &mut Client<AUTH>,
     note_id: String,
     with_code: bool,
 ) -> Result<(), CliError> {
-    let input_note_record = get_input_note_with_id_prefix(&client, &note_id).await;
-    let output_note_record = get_output_note_with_id_prefix(&client, &note_id).await;
+    let input_note_record = get_input_note_with_id_prefix(client, &note_id).await;
+    let output_note_record = get_output_note_with_id_prefix(client, &note_id).await;
 
     // If we don't find an input note nor an output note return an error
     if matches!(input_note_record, Err(IdPrefixFetchError::NoMatch(_)))
@@ -258,13 +259,15 @@ async fn show_note<AUTH: Keystore + Sync>(
         Cell::new("Faucet ID").add_attribute(Attribute::Bold),
         Cell::new("Amount").add_attribute(Attribute::Bold),
     ]);
-    let faucet_details_map = load_faucet_details_map()?;
+    let resolver = load_faucet_metadata_resolver()?;
+    let network_id = CliConfig::load()?.rpc.endpoint.0.to_network_id();
     let assets = assets.iter();
 
     for asset in assets {
         let (asset_type, faucet, amount) = match asset {
             Asset::Fungible(fungible_asset) => {
-                let (faucet, amount) = faucet_details_map.format_fungible_asset(fungible_asset)?;
+                let (faucet, amount) =
+                    resolver.format_fungible_asset(client, fungible_asset, &network_id).await?;
                 ("Fungible Asset", faucet, amount)
             },
             Asset::NonFungible(non_fungible_asset) => (

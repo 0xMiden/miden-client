@@ -9,6 +9,7 @@ use miden_client::transaction::{AdviceInputs, TransactionRequestBuilder, Transac
 use miden_client::vm::{Package, PackageExport};
 use miden_client::{Client, Deserializable, Felt, Word};
 
+use crate::config::CliConfig;
 use crate::errors::CliError;
 use crate::utils::{parse_account_id, print_executed_program_stack, print_executed_transaction};
 
@@ -108,7 +109,13 @@ impl CallCmd {
 
         match client.execute_transaction(account_id, tx_request).await {
             Ok(tx_result) => {
-                print_executed_transaction(tx_result.executed_transaction())?;
+                let network_id = CliConfig::load()?.rpc.endpoint.0.to_network_id();
+                print_executed_transaction(
+                    &mut client,
+                    tx_result.executed_transaction(),
+                    &network_id,
+                )
+                .await?;
             },
             Err(e) => {
                 println!("\n(Could not compute state delta: {e})");

@@ -26,7 +26,7 @@ use crate::errors::CliError;
 use crate::utils::{
     SHARED_TOKEN_DOCUMENTATION,
     get_input_acc_id_by_prefix_or_default,
-    load_faucet_details_map,
+    load_faucet_metadata_resolver,
     parse_account_id,
     print_executed_transaction,
 };
@@ -74,9 +74,9 @@ impl MintCmd {
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
         let force = self.force;
-        let faucet_details_map = load_faucet_details_map()?;
+        let resolver = load_faucet_metadata_resolver()?;
 
-        let fungible_asset = faucet_details_map.parse_fungible_asset(&client, &self.asset).await?;
+        let fungible_asset = resolver.parse_fungible_asset(&client, &self.asset).await?;
 
         let target_account_id = parse_account_id(&client, self.target_account_id.as_str()).await?;
 
@@ -146,9 +146,9 @@ impl SendCmd {
     ) -> Result<(), CliError> {
         let force = self.force;
 
-        let faucet_details_map = load_faucet_details_map()?;
+        let resolver = load_faucet_metadata_resolver()?;
 
-        let fungible_asset = faucet_details_map.parse_fungible_asset(&client, &self.asset).await?;
+        let fungible_asset = resolver.parse_fungible_asset(&client, &self.asset).await?;
 
         // try to use either the provided argument or the default account
         let sender_account_id =
@@ -224,12 +224,12 @@ impl SwapCmd {
     ) -> Result<(), CliError> {
         let force = self.force;
 
-        let faucet_details_map = load_faucet_details_map()?;
+        let resolver = load_faucet_metadata_resolver()?;
 
         let offered_fungible_asset =
-            faucet_details_map.parse_fungible_asset(&client, &self.offered_asset).await?;
+            resolver.parse_fungible_asset(&client, &self.offered_asset).await?;
         let requested_fungible_asset =
-            faucet_details_map.parse_fungible_asset(&client, &self.requested_asset).await?;
+            resolver.parse_fungible_asset(&client, &self.requested_asset).await?;
 
         // try to use either the provided argument or the default account
         let sender_account_id =
@@ -378,7 +378,8 @@ async fn execute_transaction<AUTH: Keystore + Sync + 'static>(
     let executed_transaction = transaction_result.executed_transaction().clone();
 
     // Show delta and ask for confirmation
-    print_executed_transaction(&executed_transaction)?;
+    let network_id = CliConfig::load()?.rpc.endpoint.0.to_network_id();
+    print_executed_transaction(client, &executed_transaction, &network_id).await?;
     if !force {
         println!(
             "\nContinue with proving and submission? Changes will be irreversible once the proof is finalized on the network (y/N)"

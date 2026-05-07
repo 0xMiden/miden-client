@@ -107,14 +107,14 @@ impl AccountCmd {
 
 async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     let accounts = client.get_account_headers().await?;
+    let network_id = CliConfig::load()?.rpc.endpoint.0.to_network_id();
 
-    let mut table =
-        create_dynamic_table(&["Account ID", "Type", "Storage Mode", "Nonce", "Status"]);
+    let mut table = create_dynamic_table(&["Address", "Type", "Storage Mode", "Nonce", "Status"]);
     for (acc, _acc_seed) in &accounts {
         let status = client.account_reader(acc.id()).status().await?.to_string();
 
         table.add_row(vec![
-            acc.id().to_hex(),
+            Address::new(acc.id()).encode(network_id.clone()),
             account_type_display_name(&client, acc.id()).await?,
             acc.id().storage_mode().to_string(),
             acc.nonce().as_canonical_u64().to_string(),
