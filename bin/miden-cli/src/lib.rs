@@ -473,8 +473,8 @@ impl Cli {
             Command::Export(cmd) => cmd.execute(client, keystore).await,
             Command::Mint(mint) => Box::pin(mint.execute(client)).await,
             Command::Send(send) => Box::pin(send.execute(client)).await,
-            Command::Swap(swap) => Box::pin(swap.execute(client)).await,
             Command::Pswap(pswap) => Box::pin(pswap.execute(client)).await,
+            Command::Swap(swap) => Box::pin(swap.execute(client)).await,
             Command::ConsumeNotes(consume_notes) => Box::pin(consume_notes.execute(client)).await,
         }
     }

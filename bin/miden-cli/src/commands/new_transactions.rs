@@ -359,9 +359,10 @@ impl ConsumeNotesCmd {
 // PSWAP COMMANDS
 // ================================================================================================
 
-/// The CLI does not currently support in-flight (pending) fill amounts.
-/// Pass zero so the full remaining balance is available for filling.
-const PSWAP_INFLIGHT_AMOUNT: u64 = 0;
+/// The CLI does not currently support note-supplied fill amounts (i.e., in-flight
+/// fills routed through other notes). Pass zero so the full remaining balance is
+/// available for the account to fill directly.
+const PSWAP_NOTE_FILL_AMOUNT: u64 = 0;
 
 /// Partial swap (PSWAP) commands.
 #[derive(Debug, Parser, Clone)]
@@ -529,7 +530,7 @@ impl PswapConsumeCmd {
         let note = resolve_input_note(&client, &self.note).await?;
 
         let tx_request = TransactionRequestBuilder::new()
-            .build_pswap_consume(&note, consumer_id, self.fill_amount, PSWAP_INFLIGHT_AMOUNT)
+            .build_pswap_consume(&note, consumer_id, self.fill_amount, PSWAP_NOTE_FILL_AMOUNT)
             .map_err(|err| {
                 CliError::Transaction(
                     err.into(),
@@ -559,7 +560,7 @@ Examples:
 pub struct PswapCancelCmd {
     /// Account ID or its hex prefix of the note creator.
     #[arg(short = 's', long = "sender")]
-    sender: String,
+    sender_account_id: String,
 
     /// Note ID or hex prefix of the PSWAP note to cancel.
     #[arg(long)]
@@ -579,7 +580,7 @@ impl PswapCancelCmd {
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
-        let sender_id = parse_account_id(&client, &self.sender).await?;
+        let sender_id = parse_account_id(&client, &self.sender_account_id).await?;
         let note = resolve_input_note(&client, &self.note).await?;
 
         let tx_request =

@@ -2710,7 +2710,7 @@ async fn pswap_test() {
     // 2. Bob can consume (fill) the PSWAP note by providing faucet2 tokens and receiving faucet1
     //    tokens in return.
 
-    let (mut client, mock_rpc_api, keystore) = create_test_client().await;
+    let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
 
     // Setup Alice's wallet and faucet1 (offered asset).
     let (alice_wallet, faucet1) = setup_wallet_and_faucet(
@@ -2779,7 +2779,9 @@ async fn pswap_test() {
         .unwrap();
 
     let pswap_note = create_request.expected_output_own_notes()[0].clone();
-    client.submit_new_transaction(alice_wallet.id(), create_request).await.unwrap();
+    Box::pin(client.submit_new_transaction(alice_wallet.id(), create_request))
+        .await
+        .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -2799,14 +2801,16 @@ async fn pswap_test() {
     );
 
     // Step 2: Bob consumes the PSWAP note (full fill).
-    let fill_amount = requested_amount;
-    let inflight_amount = 0u64;
+    let account_fill_amount = requested_amount;
+    let note_fill_amount = 0u64;
 
     let consume_request = TransactionRequestBuilder::new()
-        .build_pswap_consume(&pswap_note, bob_wallet.id(), fill_amount, inflight_amount)
+        .build_pswap_consume(&pswap_note, bob_wallet.id(), account_fill_amount, note_fill_amount)
         .unwrap();
 
-    client.submit_new_transaction(bob_wallet.id(), consume_request).await.unwrap();
+    Box::pin(client.submit_new_transaction(bob_wallet.id(), consume_request))
+        .await
+        .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
@@ -2814,11 +2818,11 @@ async fn pswap_test() {
     let bob_account: Account =
         client.get_account(bob_wallet.id()).await.unwrap().unwrap().try_into().unwrap();
 
-    // Bob should have spent fill_amount of faucet2 tokens.
+    // Bob should have spent account_fill_amount of faucet2 tokens.
     let bob_faucet2_after = bob_account.vault().get_balance(faucet2.id()).unwrap();
     assert_eq!(
         bob_faucet2_after,
-        MINT_AMOUNT - fill_amount,
+        MINT_AMOUNT - account_fill_amount,
         "Bob's faucet2 balance should decrease by the fill amount"
     );
 

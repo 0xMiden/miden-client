@@ -434,8 +434,8 @@ impl TransactionRequestBuilder {
         self.own_output_notes(registration_notes).build()
     }
 
-    /// Consumes the builder and returns a [`TransactionRequest`] for creating a partial swap
-    /// (PSWAP) note.
+    /// Consumes the builder and returns a [`TransactionRequest`] for a transaction that creates a
+    /// partial swap (PSWAP) note. This request must be executed against the wallet creator account.
     ///
     /// - `pswap_data` is the data for the partial swap that contains the creator account ID, the
     ///   offered fungible asset, and the requested fungible asset.
@@ -443,7 +443,12 @@ impl TransactionRequestBuilder {
     /// - `payback_note_type` determines the visibility of the payback note that fillers emit back
     ///   to the creator. Typically [`NoteType::Private`] (cheaper; the fill amount is already
     ///   visible in the executing transaction).
-    /// - `note_attachment` is the optional attachment for the note.
+    /// - `note_attachment` is the attachment for the PSWAP note. Pass [`NoteAttachment::default`]
+    ///   when there is nothing to attach.
+    /// - `rng` is the random number generator used to generate the serial number for the created
+    ///   note.
+    ///
+    /// This function cannot be used with a previously set custom script.
     pub fn build_pswap_create(
         self,
         pswap_data: &PswapTransactionData,
@@ -472,14 +477,17 @@ impl TransactionRequestBuilder {
         self.own_output_notes(vec![note]).build()
     }
 
-    /// Consumes the builder and returns a [`TransactionRequest`] for consuming (filling) a
-    /// partial swap (PSWAP) note.
+    /// Consumes the builder and returns a [`TransactionRequest`] for a transaction that consumes
+    /// (fills) a partial swap (PSWAP) note. This request must be executed against the wallet
+    /// consumer account.
     ///
     /// - `pswap_note` is the PSWAP note being consumed.
     /// - `consumer_account_id` is the account consuming the swap.
     /// - `account_fill_amount` is the amount of the requested asset being provided by the consumer
     ///   account.
-    /// - `note_fill_amount` is any additional amount being provided by other notes.
+    /// - `note_fill_amount` is any additional amount being provided by other (in-flight) notes.
+    ///
+    /// This function cannot be used with a previously set custom script.
     pub fn build_pswap_consume(
         self,
         pswap_note: &Note,
@@ -496,13 +504,13 @@ impl TransactionRequestBuilder {
             .map_err(|e| NoteError::other_with_source("invalid fill amount", e))?;
 
         let note_fill_asset = FungibleAsset::new(requested_faucet_id, note_fill_amount)
-            .map_err(|e| NoteError::other_with_source("invalid inflight amount", e))?;
+            .map_err(|e| NoteError::other_with_source("invalid note fill amount", e))?;
 
         let (p2id_note, remainder_pswap) = pswap
             .execute(consumer_account_id, Some(account_fill_asset), Some(note_fill_asset))
             .map_err(TransactionRequestError::NoteCreationError)?;
 
-        // Note args: [0, 0, inflight_amount, fill_amount]
+        // Note args: [0, 0, note_fill_amount, account_fill_amount]
         let note_args = Word::from([
             Felt::new(0),
             Felt::new(0),
@@ -531,10 +539,12 @@ impl TransactionRequestBuilder {
             .build()
     }
 
-    /// Consumes the builder and returns a [`TransactionRequest`] for canceling a partial swap
-    /// (PSWAP) note.
+    /// Consumes the builder and returns a [`TransactionRequest`] for a transaction that cancels a
+    /// partial swap (PSWAP) note. This request must be executed against the wallet creator account.
     ///
     /// - `pswap_note` is the PSWAP note to cancel. The caller must be the creator of the note.
+    ///
+    /// This function cannot be used with a previously set custom script.
     pub fn build_pswap_cancel(
         self,
         pswap_note: Note,
