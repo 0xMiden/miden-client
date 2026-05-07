@@ -175,8 +175,9 @@ where
 
     /// Runs the full client sync.
     ///
-    /// First fetches private notes from the Note Transport Layer, then syncs the client's
-    /// on-chain state with the Miden node. If note transport is disabled, this is equivalent to
+    /// First fetches private notes from the Note Transport Layer (see
+    /// [`Client::sync_note_transport`]), then syncs the client's on-chain state with the Miden
+    /// node (see [`Client::sync_chain`]). If note transport is disabled, this is equivalent to
     /// [`Client::sync_chain`].
     ///
     /// Fails fast on the first error. Private notes delivered via NTL are imported before the
