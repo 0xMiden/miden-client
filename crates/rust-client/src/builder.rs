@@ -139,6 +139,8 @@ pub struct ClientBuilder<AUTH> {
     tx_prover: Option<Arc<dyn TransactionProver + Send + Sync>>,
     /// The endpoint used by the builder for network configuration.
     endpoint: Option<Endpoint>,
+    /// An optional shared source manager for MASM source information.
+    source_manager: Option<Arc<dyn SourceManagerSync>>,
 }
 
 impl<AUTH> Default for ClientBuilder<AUTH> {
@@ -157,6 +159,7 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             note_transport_config: None,
             tx_prover: None,
             endpoint: None,
+            source_manager: None,
         }
     }
 }
@@ -352,6 +355,22 @@ where
         self
     }
 
+    /// Overrides the source manager used to retain MASM source information for assembled programs.
+    ///
+    /// If not set, the client uses a default [`DefaultSourceManager`]. The same instance is
+    /// forwarded to the transaction executor and to every script compiled through the client
+    /// (e.g. via [`Client::code_builder`](crate::Client::code_builder)).
+    ///
+    /// Set this explicitly only when scripts or modules are compiled outside the client (for
+    /// example, using an external [`Assembler`](miden_protocol::assembly::Assembler)): pass the
+    /// same `Arc` used by that external assembler so all source spans resolve correctly at
+    /// runtime.
+    #[must_use]
+    pub fn source_manager(mut self, sm: Arc<dyn SourceManagerSync>) -> Self {
+        self.source_manager = Some(sm);
+        self
+    }
+
     /// Optionally set a maximum number of blocks that the client can be behind the network.
     /// By default, there's no maximum.
     #[must_use]
@@ -471,6 +490,10 @@ where
         let tx_prover: Arc<dyn TransactionProver + Send + Sync> =
             self.tx_prover.unwrap_or_else(|| Arc::new(LocalTransactionProver::default()));
 
+        // Use the provided source manager, or create a default one.
+        let source_manager: Arc<dyn SourceManagerSync> =
+            self.source_manager.unwrap_or_else(|| Arc::new(DefaultSourceManager::default()));
+
         // Initialize genesis commitment in RPC client
         if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
@@ -494,9 +517,6 @@ where
 
             self.note_transport_api = Some(Arc::new(transport) as Arc<dyn NoteTransportClient>);
         }
-
-        // Create source manager for MASM source information
-        let source_manager: Arc<dyn SourceManagerSync> = Arc::new(DefaultSourceManager::default());
 
         // Construct and return the Client
         Ok(Client {

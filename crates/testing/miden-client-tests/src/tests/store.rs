@@ -1,8 +1,10 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
-use miden_client::assembly::CodeBuilder;
+use miden_client::account::Address;
+use miden_client::assembly::{CodeBuilder, Module, ModuleKind, Path, SourceManagerSync};
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, PublicKeyCommitment};
 use miden_client::keystore::Keystore;
 use miden_client::store::AccountStorageFilter;
@@ -25,6 +27,7 @@ use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
 };
+use miden_protocol::transaction::TransactionKernel;
 use miden_protocol::{EMPTY_WORD, Felt, Word, ZERO};
 use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::wallets::BasicWallet;
@@ -334,9 +337,22 @@ async fn build_three_slot_account(
 }
 
 /// Compiles a transaction script that calls a procedure from the slots component.
-fn compile_slot_tx_script(proc_name: &str) -> miden_client::transaction::TransactionScript {
-    CodeBuilder::new()
-        .with_linked_module("external_contract::slots_contract", SLOTS_COMPONENT_MASM)
+fn compile_slot_tx_script(
+    proc_name: &str,
+    source_manager: Arc<dyn SourceManagerSync>,
+) -> miden_client::transaction::TransactionScript {
+    let assembler = TransactionKernel::assembler_with_source_manager(source_manager.clone());
+    let module = Module::parser(ModuleKind::Library)
+        .parse_str(
+            Path::new("external_contract::slots_contract"),
+            SLOTS_COMPONENT_MASM,
+            source_manager.clone(),
+        )
+        .unwrap();
+    let library = assembler.assemble_library([module]).unwrap();
+
+    CodeBuilder::with_source_manager(source_manager)
+        .with_dynamically_linked_library(library)
         .unwrap()
         .compile_tx_script(format!(
             "use external_contract::slots_contract
@@ -365,8 +381,9 @@ async fn prune_preserves_unmodified_storage_slots() {
 
     let account_id = build_three_slot_account(&mut client, &keystore).await;
 
-    let tx_script_set_a = compile_slot_tx_script("set_a_to_10");
-    let tx_script_set_b = compile_slot_tx_script("set_b_to_20");
+    let source_manager = client.source_manager();
+    let tx_script_set_a = compile_slot_tx_script("set_a_to_10", source_manager.clone());
+    let tx_script_set_b = compile_slot_tx_script("set_b_to_20", source_manager);
 
     // Prove the initial block so the account is committed
     mock_rpc_api.prove_block();
