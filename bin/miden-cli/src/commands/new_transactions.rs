@@ -508,7 +508,7 @@ pub struct PswapConsumeCmd {
     #[arg(long)]
     note: String,
 
-    /// Amount to fill from the swap.
+    /// Amount of the requested asset the consumer account is providing to fill the swap.
     #[arg(long)]
     fill_amount: u64,
 

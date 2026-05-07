@@ -510,7 +510,7 @@ impl TransactionRequestBuilder {
             .execute(consumer_account_id, Some(account_fill_asset), Some(note_fill_asset))
             .map_err(TransactionRequestError::NoteCreationError)?;
 
-        // Note args: [0, 0, note_fill_amount, account_fill_amount]
+        // Note args: [0, 0, note_fill_amount, account_fill_amount].
         let note_args = Word::from([
             Felt::new(0),
             Felt::new(0),
@@ -518,7 +518,7 @@ impl TransactionRequestBuilder {
             Felt::new(account_fill_amount),
         ]);
 
-        // Register output notes as expected future notes (created by the script, not the account)
+        // Register output notes as expected future notes (created by the script, not the account).
         let p2id_details = NoteDetails::from(&p2id_note);
         let p2id_tag = p2id_note.metadata().tag();
         let p2id_recipient = p2id_note.recipient().clone();
@@ -799,6 +799,9 @@ pub struct PswapTransactionData {
 }
 
 impl PswapTransactionData {
+    // CONSTRUCTORS
+    // --------------------------------------------------------------------------------------------
+
     /// Creates a new [`PswapTransactionData`].
     pub fn new(
         creator_account_id: AccountId,
@@ -812,7 +815,7 @@ impl PswapTransactionData {
         }
     }
 
-    /// Returns the creator [`AccountId`].
+    /// Returns the executor [`AccountId`].
     pub fn account_id(&self) -> AccountId {
         self.creator_account_id
     }
