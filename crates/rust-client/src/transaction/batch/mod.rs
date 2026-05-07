@@ -45,13 +45,8 @@ use miden_protocol::MIN_PROOF_SECURITY_LEVEL;
 use miden_protocol::account::AccountId;
 use miden_protocol::batch::ProposedBatch;
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::note::Nullifier;
-use miden_protocol::transaction::{
-    PartialBlockchain,
-    ProvenTransaction,
-    ToInputNoteCommitments,
-    TransactionInputs,
-};
+use miden_protocol::note::NoteId;
+use miden_protocol::transaction::{PartialBlockchain, ProvenTransaction, TransactionInputs};
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx_batch_prover::LocalBatchProver;
 
@@ -70,7 +65,7 @@ pub struct BatchBuilder<'c, AUTH> {
     pub(crate) proven_txs: Vec<Arc<ProvenTransaction>>,
     pub(crate) transaction_inputs: Vec<TransactionInputs>,
     pub(crate) tx_results: Vec<TransactionResult>,
-    pub(crate) consumed_nullifiers: BTreeSet<Nullifier>,
+    pub(crate) consumed_input_notes: BTreeSet<NoteId>,
 }
 
 impl<AUTH> BatchBuilder<'_, AUTH> {
@@ -157,11 +152,12 @@ where
         let partial_blockchain = PartialBlockchain::new(partial_mmr, authenticated_blocks)?;
 
         // 5. Build ProposedBatch.
+        let unauthenticated_note_proofs = BTreeMap::new();
         let proposed_batch = ProposedBatch::new(
             self.proven_txs.clone(),
             ref_block_header,
             partial_blockchain,
-            BTreeMap::new(),
+            unauthenticated_note_proofs,
         )?;
 
         // 6. Prove synchronously.
@@ -203,6 +199,13 @@ where
     /// the client's configured [`crate::transaction::TransactionProver`], and append the
     /// resulting proven transaction to the batch.
     pub async fn push(mut self, req: TransactionRequest) -> Result<Self, ClientError> {
+        // Check for duplicate input notes against earlier pushes.
+        for note_id in req.input_note_ids() {
+            if self.consumed_input_notes.contains(&note_id) {
+                return Err(ClientError::from(BatchBuilderError::DuplicateInputNote(note_id)));
+            }
+        }
+
         // Execute against the batch data store (uses the in-memory account state).
         let tx_result = self
             .client
@@ -211,13 +214,6 @@ where
 
         // Extract TransactionInputs for later batch submission.
         let tx_inputs = tx_result.executed_transaction().tx_inputs().clone();
-
-        // Check for duplicate input notes against earlier pushes.
-        for note in tx_result.consumed_notes().iter() {
-            if self.consumed_nullifiers.contains(&note.nullifier()) {
-                return Err(ClientError::from(BatchBuilderError::DuplicateInputNote(note.id())));
-            }
-        }
 
         // Prove using the client's default tx prover.
         let proven_tx =
@@ -230,9 +226,9 @@ where
             .map_err(ClientError::AccountError)?;
         self.data_store.set_current_account(post_account);
 
-        // Record consumed nullifiers.
+        // Record consumed input notes.
         for note in tx_result.consumed_notes().iter() {
-            self.consumed_nullifiers.insert(note.nullifier());
+            self.consumed_input_notes.insert(note.id());
         }
 
         // Append proven tx, inputs, result.

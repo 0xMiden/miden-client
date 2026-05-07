@@ -181,7 +181,7 @@ where
 
     /// Open a new [`BatchBuilder`] for the given local `account_id`.
     ///
-    /// Fails with [`BatchBuilderError::AccountNotTracked`] if the account is not
+    /// Fails with [`ClientError::AccountDataNotFound`] if the account is not
     /// tracked by the client's store.
     pub async fn new_transaction_batch(
         &self,
@@ -191,7 +191,7 @@ where
             .store
             .get_account(account_id)
             .await?
-            .ok_or(BatchBuilderError::AccountNotTracked(account_id))?;
+            .ok_or(ClientError::AccountDataNotFound(account_id))?;
 
         let initial_account: Account = account_record.try_into()?;
 
@@ -205,7 +205,7 @@ where
             proven_txs: Vec::new(),
             transaction_inputs: Vec::new(),
             tx_results: Vec::new(),
-            consumed_nullifiers: BTreeSet::new(),
+            consumed_input_notes: BTreeSet::new(),
         })
     }
 

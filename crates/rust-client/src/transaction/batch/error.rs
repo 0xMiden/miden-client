@@ -1,4 +1,3 @@
-use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::NoteId;
 
@@ -8,10 +7,6 @@ use crate::transaction::TransactionStoreUpdateError;
 /// Errors specific to `BatchBuilder` construction and operation.
 #[derive(Debug, thiserror::Error)]
 pub enum BatchBuilderError {
-    /// The account is not tracked by the client's store.
-    #[error("account {0} is not tracked by the client")]
-    AccountNotTracked(AccountId),
-
     /// A push consumed an input note that an earlier push in this batch already
     /// consumed. Guarded client-side to fail fast before hitting the node.
     #[error("input note {0} is already consumed by an earlier transaction in this batch")]

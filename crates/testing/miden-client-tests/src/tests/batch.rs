@@ -358,3 +358,97 @@ async fn batch_builder_empty_submit_returns_empty_error() {
         other => panic!("expected BatchBuilderError::Empty, got {other:?}"),
     }
 }
+
+/// Verify that pushing two transactions that consume the same input note in one batch
+/// fails the second push with `BatchBuilderError::DuplicateInputNote(note_id)`.
+#[tokio::test]
+async fn batch_builder_push_rejects_duplicate_input_note() {
+    let (mut client, rpc_api, authenticator) = Box::pin(create_test_client()).await;
+
+    let (first_regular_account, _second_regular_account, faucet_account_header) =
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
+
+    let from_account_id = first_regular_account.id();
+    let faucet_account_id = faucet_account_header.id();
+
+    // Get the account on-chain so its first batch-tx delta is partial, not full-state.
+    mint_and_consume(&mut client, from_account_id, faucet_account_id, NoteType::Private).await;
+    rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Mint a single note for `from_account` — left UNCONSUMED.
+    let (_mint_tx_id, note) =
+        mint_note(&mut client, from_account_id, faucet_account_id, NoteType::Private).await;
+    rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    let note_id = note.id();
+
+    // Two requests that both reference the SAME note as their input.
+    let req1 = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![note.clone()])
+        .unwrap();
+    let req2 = TransactionRequestBuilder::new().build_consume_notes(vec![note]).unwrap();
+
+    // First push must succeed; second must fail with DuplicateInputNote(note_id).
+    let result = Box::pin(async {
+        client
+            .new_transaction_batch(from_account_id)
+            .await?
+            .push(req1)
+            .await?
+            .push(req2)
+            .await
+    })
+    .await;
+
+    match result {
+        Err(ClientError::BatchBuilder(BatchBuilderError::DuplicateInputNote(id))) => {
+            assert_eq!(id, note_id, "DuplicateInputNote should carry the duplicated note id");
+        },
+        Err(other) => {
+            panic!("expected BatchBuilderError::DuplicateInputNote({note_id}), got {other:?}")
+        },
+        Ok(_) => {
+            panic!("expected BatchBuilderError::DuplicateInputNote({note_id}), got Ok(_)")
+        },
+    }
+}
+
+/// Verify that opening a batch for an account that's not tracked by the client's store
+/// fails with `ClientError::AccountDataNotFound`.
+#[tokio::test]
+async fn new_transaction_batch_unknown_account_returns_account_data_not_found() {
+    let (client, rpc_api, _keystore) = Box::pin(create_test_client()).await;
+
+    // Pick an account that EXISTS on the mock chain but is NOT registered with the client
+    // store (we never call `client.add_account` for it).
+    let account_id = rpc_api
+        .mock_chain
+        .read()
+        .proven_blocks()
+        .iter()
+        .flat_map(|block| block.body().updated_accounts())
+        .next()
+        .unwrap()
+        .account_id();
+
+    match client.new_transaction_batch(account_id).await {
+        Err(ClientError::AccountDataNotFound(id)) => {
+            assert_eq!(id, account_id, "AccountDataNotFound should carry the requested id");
+        },
+        Err(other) => {
+            panic!("expected ClientError::AccountDataNotFound({account_id}), got {other:?}")
+        },
+        Ok(_) => {
+            panic!("expected ClientError::AccountDataNotFound({account_id}), got Ok(_)")
+        },
+    }
+}
