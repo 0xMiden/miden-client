@@ -3109,7 +3109,13 @@ async fn consume_note_with_custom_script_default_policy_rejects_local_hit() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    let note_script = client.code_builder().compile_note_script("begin nop end").unwrap();
+    let custom_note_script = "
+        @note_script
+        pub proc main
+            nop
+        end
+    ";
+    let note_script = client.code_builder().compile_note_script(custom_note_script).unwrap();
 
     let note_storage = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
