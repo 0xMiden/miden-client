@@ -255,6 +255,34 @@ pub(crate) fn query_storage_slots(
         .collect())
 }
 
+/// Returns just the names of map-typed storage slots for the given account, without loading
+/// any slot values or map entries. Used by `Client::build_sync_input` to populate
+/// `AccountSyncHint`s cheaply.
+pub(crate) fn query_map_slot_names(
+    conn: &Connection,
+    account_id: AccountId,
+) -> Result<Vec<StorageSlotName>, StoreError> {
+    const QUERY: &str =
+        "SELECT slot_name FROM latest_account_storage WHERE account_id = ?1 AND slot_type = ?2";
+    let account_id_hex = account_id.to_hex();
+    let map_type = StorageSlotType::Map as u8;
+
+    let mut stmt = conn.prepare(QUERY).into_store_error()?;
+    let names = stmt
+        .query_map(params![account_id_hex, map_type], |row| {
+            let name: String = row.get(0)?;
+            Ok(name)
+        })
+        .into_store_error()?
+        .map(|res| {
+            let name = res.into_store_error()?;
+            StorageSlotName::new(name).map_err(|err| StoreError::ParsingError(err.to_string()))
+        })
+        .collect::<Result<Vec<_>, StoreError>>()?;
+
+    Ok(names)
+}
+
 pub(crate) fn query_storage_maps(
     conn: &Connection,
     account_id: AccountId,

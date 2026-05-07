@@ -485,6 +485,16 @@ impl Store for SqliteStore {
         .await
     }
 
+    async fn get_account_map_slot_names(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Vec<StorageSlotName>, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_account_map_slot_names(conn, account_id)
+        })
+        .await
+    }
+
     async fn get_account_map_item(
         &self,
         account_id: AccountId,

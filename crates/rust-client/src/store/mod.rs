@@ -37,6 +37,7 @@ use miden_protocol::account::{
     StorageSlot,
     StorageSlotContent,
     StorageSlotName,
+    StorageSlotType,
 };
 use miden_protocol::address::Address;
 use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness};
@@ -585,6 +586,25 @@ pub trait Store: Send + Sync {
         account_id: AccountId,
         filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError>;
+
+    /// Returns the names of all map slots tracked for the given account.
+    ///
+    /// This is a lightweight read used by `Client::build_sync_input` to populate
+    /// `AccountSyncHint`s without paying the cost of reading the full storage (incl. all map
+    /// entries). The default implementation falls back to `get_account_storage`; backends are
+    /// encouraged to override it with a focused query.
+    async fn get_account_map_slot_names(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Vec<StorageSlotName>, StoreError> {
+        let storage = self.get_account_storage(account_id, AccountStorageFilter::All).await?;
+        Ok(storage
+            .slots()
+            .iter()
+            .filter(|slot| slot.slot_type() == StorageSlotType::Map)
+            .map(|slot| slot.name().clone())
+            .collect())
+    }
 
     /// Retrieves a storage slot value by name.
     ///

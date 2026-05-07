@@ -15,7 +15,7 @@ use miden_protocol::account::{
 use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks};
-use miden_protocol::errors::AccountDeltaError;
+use miden_protocol::errors::{AccountDeltaError, AccountError};
 use miden_protocol::note::{NoteId, Nullifier};
 use miden_protocol::transaction::TransactionId;
 use miden_protocol::{Felt, Word};
@@ -335,6 +335,7 @@ impl TransactionUpdateTracker {
 ///   incremental updates from `sync_storage_maps` and `sync_account_vault`, used when any part of
 ///   the account is oversized). The store calls [`PublicAccountDelta::compute_account_delta`] to
 ///   derive the [`AccountDelta`] to apply.
+#[derive(Debug, Clone)]
 pub enum PublicAccountUpdate {
     /// The account fits in a single proof response — the new full state is carried as-is.
     Full(Account),
@@ -359,6 +360,7 @@ impl PublicAccountUpdate {
 /// endpoints (`sync_storage_maps` and `sync_account_vault`). The store derives the
 /// [`AccountDelta`] to apply by replaying these updates against its locally-stored account state
 /// via [`Self::compute_account_delta`].
+#[derive(Debug, Clone)]
 pub struct PublicAccountDelta {
     /// The new account header after applying these updates.
     new_header: AccountHeader,
@@ -423,6 +425,17 @@ impl PublicAccountDelta {
         local_storage: &AccountStorage,
         local_vault: &AssetVault,
     ) -> Result<AccountDelta, AccountDeltaError> {
+        let old_nonce = local_header.nonce().as_canonical_u64();
+        let new_nonce = self.new_header.nonce().as_canonical_u64();
+        if new_nonce <= old_nonce {
+            return Err(AccountDeltaError::AccountDeltaApplicationFailed {
+                account_id: self.new_header.id(),
+                source: AccountError::other(format!(
+                    "node returned non-monotonic account nonce: local {old_nonce} >= new {new_nonce}"
+                )),
+            });
+        }
+
         let storage_delta = replay_storage_updates(
             local_storage,
             &self.value_slot_updates,
@@ -430,9 +443,7 @@ impl PublicAccountDelta {
         )?;
         let vault_delta = replay_vault_updates(local_vault, &self.vault_updates)?;
 
-        let old_nonce = local_header.nonce().as_canonical_u64();
-        let new_nonce = self.new_header.nonce().as_canonical_u64();
-        let nonce_delta = Felt::new(new_nonce.saturating_sub(old_nonce));
+        let nonce_delta = Felt::new(new_nonce - old_nonce);
 
         AccountDelta::new(self.new_header.id(), storage_delta, vault_delta, nonce_delta)
     }
@@ -565,5 +576,338 @@ impl AccountUpdates {
     pub fn extend(&mut self, other: AccountUpdates) {
         self.updated_public_accounts.extend(other.updated_public_accounts);
         self.mismatched_private_accounts.extend(other.mismatched_private_accounts);
+    }
+}
+
+// TESTS
+// ================================================================================================
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec;
+
+    use miden_protocol::account::{StorageMapKey, StorageSlot};
+    use miden_protocol::asset::{Asset, AssetVault, FungibleAsset};
+    use miden_protocol::testing::account_id::{
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+    };
+
+    use super::*;
+
+    fn account_id() -> AccountId {
+        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap()
+    }
+
+    fn faucet_id() -> AccountId {
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap()
+    }
+
+    fn slot_name(name: &str) -> StorageSlotName {
+        StorageSlotName::new(name).unwrap()
+    }
+
+    fn map_key(n: u64) -> StorageMapKey {
+        StorageMapKey::from_raw(word(n))
+    }
+
+    fn word(n: u64) -> Word {
+        Word::from([Felt::new(n), Felt::new(0), Felt::new(0), Felt::new(0)])
+    }
+
+    fn fungible(amount: u64) -> Asset {
+        Asset::Fungible(FungibleAsset::new(faucet_id(), amount).unwrap())
+    }
+
+    fn header_with_nonce(nonce: u64) -> AccountHeader {
+        AccountHeader::new(
+            account_id(),
+            Felt::new(nonce),
+            Word::default(),
+            Word::default(),
+            Word::default(),
+        )
+    }
+
+    fn empty_payload(new_header: AccountHeader) -> PublicAccountDelta {
+        PublicAccountDelta::new(
+            new_header,
+            BlockNumber::from(0u32),
+            BlockNumber::from(1u32),
+            vec![],
+            vec![],
+            vec![],
+        )
+    }
+
+    // REPLAY STORAGE UPDATES
+    // --------------------------------------------------------------------------------------------
+
+    #[test]
+    fn replay_storage_empty_inputs_returns_empty_delta() {
+        let storage = AccountStorage::new(vec![]).unwrap();
+        let delta = replay_storage_updates(&storage, &[], &[]).unwrap();
+        assert!(delta.is_empty());
+    }
+
+    #[test]
+    fn replay_storage_value_slot_changed_emits_delta() {
+        let value_slot = slot_name("miden::test::value");
+        let storage =
+            AccountStorage::new(vec![StorageSlot::with_value(value_slot.clone(), word(1))])
+                .unwrap();
+
+        let delta =
+            replay_storage_updates(&storage, &[(value_slot.clone(), word(2))], &[]).unwrap();
+
+        let entry = delta.get(&value_slot).expect("delta should contain value slot");
+        assert_eq!(entry.clone().unwrap_value(), word(2));
+    }
+
+    #[test]
+    fn replay_storage_value_slot_unchanged_is_skipped() {
+        let value_slot = slot_name("miden::test::value");
+        let storage =
+            AccountStorage::new(vec![StorageSlot::with_value(value_slot.clone(), word(1))])
+                .unwrap();
+
+        let delta =
+            replay_storage_updates(&storage, &[(value_slot.clone(), word(1))], &[]).unwrap();
+
+        assert!(delta.is_empty());
+    }
+
+    #[test]
+    fn replay_storage_map_dedup_keeps_latest_block_per_key() {
+        let map_slot = slot_name("miden::test::map");
+        let storage =
+            AccountStorage::new(vec![StorageSlot::with_empty_map(map_slot.clone())]).unwrap();
+
+        let key = map_key(42);
+        let updates = vec![
+            StorageMapUpdate {
+                block_num: BlockNumber::from(1u32),
+                slot_name: map_slot.clone(),
+                key,
+                value: word(100),
+            },
+            StorageMapUpdate {
+                block_num: BlockNumber::from(3u32),
+                slot_name: map_slot.clone(),
+                key,
+                value: word(300),
+            },
+            StorageMapUpdate {
+                block_num: BlockNumber::from(2u32),
+                slot_name: map_slot.clone(),
+                key,
+                value: word(200),
+            },
+        ];
+
+        let delta = replay_storage_updates(&storage, &[], &updates).unwrap();
+
+        let map_delta = delta.get(&map_slot).expect("delta should contain map slot").clone();
+        let map = map_delta.unwrap_map();
+        assert_eq!(map.entries().len(), 1);
+        assert_eq!(*map.entries().values().next().unwrap(), word(300));
+    }
+
+    #[test]
+    fn replay_storage_map_multiple_keys_in_same_slot_all_kept() {
+        let map_slot = slot_name("miden::test::map");
+        let storage =
+            AccountStorage::new(vec![StorageSlot::with_empty_map(map_slot.clone())]).unwrap();
+
+        let updates = vec![
+            StorageMapUpdate {
+                block_num: BlockNumber::from(1u32),
+                slot_name: map_slot.clone(),
+                key: map_key(1),
+                value: word(100),
+            },
+            StorageMapUpdate {
+                block_num: BlockNumber::from(2u32),
+                slot_name: map_slot.clone(),
+                key: map_key(2),
+                value: word(200),
+            },
+        ];
+
+        let delta = replay_storage_updates(&storage, &[], &updates).unwrap();
+        let map = delta.get(&map_slot).unwrap().clone().unwrap_map();
+        assert_eq!(map.entries().len(), 2);
+    }
+
+    // REPLAY VAULT UPDATES
+    // --------------------------------------------------------------------------------------------
+
+    #[test]
+    fn replay_vault_empty_inputs_returns_empty_delta() {
+        let vault = AssetVault::new(&[]).unwrap();
+        let delta = replay_vault_updates(&vault, &[]).unwrap();
+        assert!(delta.is_empty());
+    }
+
+    #[test]
+    fn replay_vault_added_asset_emits_add() {
+        let vault = AssetVault::new(&[]).unwrap();
+        let asset = fungible(100);
+        let updates = vec![AccountVaultUpdate {
+            block_num: BlockNumber::from(1u32),
+            asset: Some(asset),
+            vault_key: asset.vault_key(),
+        }];
+
+        let delta = replay_vault_updates(&vault, &updates).unwrap();
+        let added: Vec<_> = delta.added_assets().collect();
+        assert_eq!(added, vec![asset]);
+        assert_eq!(delta.removed_assets().count(), 0);
+    }
+
+    #[test]
+    fn replay_vault_removed_asset_emits_remove() {
+        let asset = fungible(100);
+        let vault = AssetVault::new(&[asset]).unwrap();
+        let updates = vec![AccountVaultUpdate {
+            block_num: BlockNumber::from(1u32),
+            asset: None,
+            vault_key: asset.vault_key(),
+        }];
+
+        let delta = replay_vault_updates(&vault, &updates).unwrap();
+        let removed: Vec<_> = delta.removed_assets().collect();
+        assert_eq!(removed, vec![asset]);
+        assert_eq!(delta.added_assets().count(), 0);
+    }
+
+    #[test]
+    fn replay_vault_replace_asset_emits_net_diff() {
+        let asset_a = fungible(100);
+        let asset_b = fungible(150);
+        let vault = AssetVault::new(&[asset_a]).unwrap();
+        let updates = vec![AccountVaultUpdate {
+            block_num: BlockNumber::from(1u32),
+            asset: Some(asset_b),
+            vault_key: asset_b.vault_key(),
+        }];
+
+        let delta = replay_vault_updates(&vault, &updates).unwrap();
+        let added: Vec<_> = delta.added_assets().collect();
+        assert_eq!(added, vec![fungible(50)]);
+        assert_eq!(delta.removed_assets().count(), 0);
+    }
+
+    #[test]
+    fn replay_vault_dedup_keeps_latest_block_per_key() {
+        let vault = AssetVault::new(&[]).unwrap();
+        let asset_v1 = fungible(100);
+        let asset_v2 = fungible(200);
+        let asset_v3 = fungible(300);
+        let key = asset_v1.vault_key();
+
+        let updates = vec![
+            AccountVaultUpdate {
+                block_num: BlockNumber::from(1u32),
+                asset: Some(asset_v1),
+                vault_key: key,
+            },
+            AccountVaultUpdate {
+                block_num: BlockNumber::from(3u32),
+                asset: Some(asset_v3),
+                vault_key: key,
+            },
+            AccountVaultUpdate {
+                block_num: BlockNumber::from(2u32),
+                asset: Some(asset_v2),
+                vault_key: key,
+            },
+        ];
+
+        let delta = replay_vault_updates(&vault, &updates).unwrap();
+        let added: Vec<_> = delta.added_assets().collect();
+        assert_eq!(added, vec![asset_v3]);
+    }
+
+    #[test]
+    fn replay_vault_added_then_removed_is_noop() {
+        let vault = AssetVault::new(&[]).unwrap();
+        let asset = fungible(100);
+        let key = asset.vault_key();
+
+        let updates = vec![
+            AccountVaultUpdate {
+                block_num: BlockNumber::from(1u32),
+                asset: Some(asset),
+                vault_key: key,
+            },
+            AccountVaultUpdate {
+                block_num: BlockNumber::from(2u32),
+                asset: None,
+                vault_key: key,
+            },
+        ];
+
+        let delta = replay_vault_updates(&vault, &updates).unwrap();
+        assert!(delta.is_empty());
+    }
+
+    // COMPUTE ACCOUNT DELTA
+    // --------------------------------------------------------------------------------------------
+
+    #[test]
+    fn compute_delta_happy_path_emits_nonce_delta() {
+        let local_header = header_with_nonce(1);
+        let local_storage = AccountStorage::new(vec![]).unwrap();
+        let local_vault = AssetVault::new(&[]).unwrap();
+        let payload = empty_payload(header_with_nonce(4));
+
+        let delta = payload
+            .compute_account_delta(&local_header, &local_storage, &local_vault)
+            .unwrap();
+
+        assert_eq!(delta.nonce_delta(), Felt::new(3));
+        assert!(delta.storage().is_empty());
+        assert!(delta.vault().is_empty());
+    }
+
+    #[test]
+    fn compute_delta_rejects_equal_nonce() {
+        let local_header = header_with_nonce(5);
+        let local_storage = AccountStorage::new(vec![]).unwrap();
+        let local_vault = AssetVault::new(&[]).unwrap();
+        let payload = empty_payload(header_with_nonce(5));
+
+        let err = payload
+            .compute_account_delta(&local_header, &local_storage, &local_vault)
+            .unwrap_err();
+
+        assert!(matches!(
+            err,
+            AccountDeltaError::AccountDeltaApplicationFailed {
+                source: AccountError::Other { .. },
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn compute_delta_rejects_decreasing_nonce() {
+        let local_header = header_with_nonce(10);
+        let local_storage = AccountStorage::new(vec![]).unwrap();
+        let local_vault = AssetVault::new(&[]).unwrap();
+        let payload = empty_payload(header_with_nonce(9));
+
+        let err = payload
+            .compute_account_delta(&local_header, &local_storage, &local_vault)
+            .unwrap_err();
+
+        assert!(matches!(
+            err,
+            AccountDeltaError::AccountDeltaApplicationFailed {
+                source: AccountError::Other { .. },
+                ..
+            }
+        ));
     }
 }

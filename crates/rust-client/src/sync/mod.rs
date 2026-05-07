@@ -68,7 +68,7 @@ use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::serde::{Deserializable, DeserializationError, Serializable};
 use tracing::{debug, info};
 
-use crate::store::{AccountStorageFilter, NoteFilter, TransactionFilter};
+use crate::store::{NoteFilter, TransactionFilter};
 use crate::{Client, ClientError};
 mod block_header;
 
@@ -172,22 +172,9 @@ where
         for (header, _status) in self.store.get_account_headers().await? {
             // Carry the account's map slot names as a hint so `StateSync` can request all map
             // data in a single proof call when the account changes. Falls back to the discovery
-            // path if the storage read fails.
-            let map_slot_names = match self
-                .store
-                .get_account_storage(header.id(), AccountStorageFilter::All)
-                .await
-            {
-                Ok(storage) => storage
-                    .slots()
-                    .iter()
-                    .filter(|slot| {
-                        slot.slot_type() == miden_protocol::account::StorageSlotType::Map
-                    })
-                    .map(|slot| slot.name().clone())
-                    .collect(),
-                Err(_) => Vec::new(),
-            };
+            // path if the read fails.
+            let map_slot_names =
+                self.store.get_account_map_slot_names(header.id()).await.unwrap_or_default();
             accounts.push(AccountSyncHint { header, map_slot_names });
         }
 
