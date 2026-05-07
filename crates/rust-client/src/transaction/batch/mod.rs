@@ -152,6 +152,8 @@ where
         let partial_blockchain = PartialBlockchain::new(partial_mmr, authenticated_blocks)?;
 
         // 5. Build ProposedBatch.
+        // TODO: field is left unused as of now because all txs in batch are already proven.
+        // This will be populated once a feature like remote proving in batches is implemented.
         let unauthenticated_note_proofs = BTreeMap::new();
         let proposed_batch = ProposedBatch::new(
             self.proven_txs.clone(),
