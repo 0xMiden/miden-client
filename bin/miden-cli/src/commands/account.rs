@@ -136,7 +136,7 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
 // SHOW ACCOUNT
 // ================================================================================================
 
-pub async fn show_account<AUTH>(
+async fn show_account<AUTH>(
     client: Client<AUTH>,
     account_id: AccountId,
     rpc_config: &RpcConfig,
