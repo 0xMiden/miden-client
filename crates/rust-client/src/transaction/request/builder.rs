@@ -11,18 +11,36 @@ use miden_protocol::crypto::merkle::store::MerkleStore;
 use miden_protocol::crypto::rand::FeltRng;
 use miden_protocol::errors::NoteError;
 use miden_protocol::note::{
-    Note, NoteAssets, NoteAttachment, NoteDetails, NoteId, NoteMetadata, NoteRecipient, NoteScript,
-    NoteStorage, NoteTag, NoteType, PartialNote,
+    Note,
+    NoteAssets,
+    NoteAttachment,
+    NoteDetails,
+    NoteId,
+    NoteMetadata,
+    NoteRecipient,
+    NoteScript,
+    NoteStorage,
+    NoteTag,
+    NoteType,
+    PartialNote,
 };
 use miden_protocol::transaction::TransactionScript;
 use miden_protocol::vm::AdviceMap;
 use miden_protocol::{Felt, Word};
 use miden_standards::note::{
-    P2idNote, P2ideNote, P2ideNoteStorage, PswapNote, PswapNoteStorage, SwapNote,
+    P2idNote,
+    P2ideNote,
+    P2ideNoteStorage,
+    PswapNote,
+    PswapNoteStorage,
+    SwapNote,
 };
 
 use super::{
-    ForeignAccount, NoteArgs, TransactionRequest, TransactionRequestError,
+    ForeignAccount,
+    NoteArgs,
+    TransactionRequest,
+    TransactionRequestError,
     TransactionScriptTemplate,
 };
 use crate::ClientRng;
@@ -459,7 +477,8 @@ impl TransactionRequestBuilder {
     ///
     /// - `pswap_note` is the PSWAP note being consumed.
     /// - `consumer_account_id` is the account consuming the swap.
-    /// - `account_fill_amount` is the amount of the requested asset being provided by the consumer account.
+    /// - `account_fill_amount` is the amount of the requested asset being provided by the consumer
+    ///   account.
     /// - `note_fill_amount` is any additional amount being provided by other notes.
     pub fn build_pswap_consume(
         self,

@@ -45,7 +45,10 @@ use thiserror::Error;
 
 mod builder;
 pub use builder::{
-    PaymentNoteDescription, PswapTransactionData, SwapTransactionData, TransactionRequestBuilder,
+    PaymentNoteDescription,
+    PswapTransactionData,
+    SwapTransactionData,
+    TransactionRequestBuilder,
 };
 
 mod foreign;

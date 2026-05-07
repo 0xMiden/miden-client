@@ -459,11 +459,8 @@ impl PswapCreateCmd {
         let requested_fungible_asset =
             faucet_details_map.parse_fungible_asset(&client, &self.requested_asset).await?;
 
-        let pswap_data = PswapTransactionData::new(
-            sender_id,
-            offered_fungible_asset,
-            requested_fungible_asset,
-        );
+        let pswap_data =
+            PswapTransactionData::new(sender_id, offered_fungible_asset, requested_fungible_asset);
 
         let tx_request = TransactionRequestBuilder::new()
             .build_pswap_create(

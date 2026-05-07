@@ -1,18 +1,20 @@
 use core::future::Future;
 use core::pin::Pin;
 use std::boxed::Box;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env::temp_dir;
 use std::println;
 use std::sync::Arc;
 
 use miden_client::account::{Address, AddressInterface};
 use miden_client::address::RoutingParameters;
-use miden_client::assembly::{
-    Assembler, CodeBuilder, DefaultSourceManager, Module, ModuleKind, Path,
-};
+use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{
-    AuthSchemeId, AuthSecretKey, AuthSingleSig, PublicKeyCommitment, RPO_FALCON_SCHEME_ID,
+    AuthSchemeId,
+    AuthSecretKey,
+    AuthSingleSig,
+    PublicKeyCommitment,
+    RPO_FALCON_SCHEME_ID,
 };
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
@@ -20,39 +22,80 @@ use miden_client::note::{BlockNumber, NoteId};
 use miden_client::rpc::{NodeRpcClient, RpcLimits};
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{
-    AccountStorageFilter, InputNoteRecord, InputNoteState, NoteFilter, OutputNoteState,
+    AccountStorageFilter,
+    InputNoteRecord,
+    InputNoteState,
+    NoteFilter,
+    OutputNoteState,
     TransactionFilter,
 };
 use miden_client::sync::{NoteTagRecord, NoteTagSource};
 use miden_client::testing::common::{
-    ACCOUNT_ID_REGULAR, MINT_AMOUNT, RECALL_HEIGHT_DELTA, TRANSFER_AMOUNT, TestClient,
-    assert_account_has_single_asset, assert_note_cannot_be_consumed_twice, consume_notes,
-    create_test_store_path, execute_failing_tx, mint_and_consume, mint_note,
-    setup_two_wallets_and_faucet, setup_wallet_and_faucet,
+    ACCOUNT_ID_REGULAR,
+    MINT_AMOUNT,
+    RECALL_HEIGHT_DELTA,
+    TRANSFER_AMOUNT,
+    TestClient,
+    assert_account_has_single_asset,
+    assert_note_cannot_be_consumed_twice,
+    consume_notes,
+    create_test_store_path,
+    execute_failing_tx,
+    mint_and_consume,
+    mint_note,
+    setup_two_wallets_and_faucet,
+    setup_wallet_and_faucet,
 };
 use miden_client::testing::mock::{MockClient, MockRpcApi};
 use miden_client::transaction::{
-    DiscardCause, PaymentNoteDescription, PswapTransactionData, SwapTransactionData,
-    TransactionExecutorError, TransactionRequestBuilder, TransactionRequestError, TransactionStatus,
+    DiscardCause,
+    PaymentNoteDescription,
+    PswapTransactionData,
+    SwapTransactionData,
+    TransactionExecutorError,
+    TransactionRequestBuilder,
+    TransactionRequestError,
+    TransactionStatus,
 };
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_protocol::account::{
-    Account, AccountBuilder, AccountCode, AccountComponent, AccountComponentMetadata,
-    AccountHeader, AccountId, AccountStorageMode, AccountType, StorageMap, StorageMapKey,
-    StorageSlot, StorageSlotContent, StorageSlotName,
+    Account,
+    AccountBuilder,
+    AccountCode,
+    AccountComponent,
+    AccountComponentMetadata,
+    AccountHeader,
+    AccountId,
+    AccountStorageMode,
+    AccountType,
+    StorageMap,
+    StorageMapKey,
+    StorageSlot,
+    StorageSlotContent,
+    StorageSlotName,
 };
 use miden_protocol::asset::{Asset, AssetVaultKey, AssetWitness, FungibleAsset, TokenSymbol};
 use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
 use miden_protocol::note::{
-    Note, NoteAssets, NoteAttachment, NoteFile, NoteMetadata, NoteRecipient, NoteStorage, NoteTag,
+    Note,
+    NoteAssets,
+    NoteAttachment,
+    NoteFile,
+    NoteMetadata,
+    NoteRecipient,
+    NoteStorage,
+    NoteTag,
     NoteType,
 };
 use miden_protocol::testing::account_id::{
-    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PRIVATE_SENDER,
-    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-    ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET, ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
+    ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+    ACCOUNT_ID_PRIVATE_SENDER,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
+    ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
+    ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
+    ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
 };
@@ -610,10 +653,9 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
         state_sync_update.partial_blockchain_updates.block_headers().next().unwrap();
     assert_eq!(tip_header.block_num(), rpc_api.get_chain_tip_block_num());
 
-    // Authentication nodes must be non-empty: they include nodes produced during
-    // the intermediate sync steps (blocks 1 and 4) via `extend_authentication_nodes`.
-    // These nodes are needed for the tracked genesis leaf's Merkle proof path, which
-    // changes as the tree grows.
+    // Authentication nodes must be non-empty: they include nodes produced by applying
+    // the MMR delta and adding the chain tip leaf. These nodes are needed for the
+    // tracked genesis leaf's Merkle proof path, which changes as the tree grows.
     assert!(
         !state_sync_update
             .partial_blockchain_updates
@@ -1043,7 +1085,7 @@ async fn execute_program() {
         wallet.id(),
         tx_script,
         AdviceInputs::default(),
-        std::collections::BTreeMap::new(),
+        BTreeMap::new(),
     ))
     .await
     .unwrap();
@@ -2665,8 +2707,8 @@ async fn partial_output_note_receives_inclusion_proof_after_sync() {
 async fn pswap_test() {
     // This test verifies that:
     // 1. Alice can create a PSWAP note offering faucet1 tokens for faucet2 tokens.
-    // 2. Bob can consume (fill) the PSWAP note by providing faucet2 tokens and receiving
-    //    faucet1 tokens in return.
+    // 2. Bob can consume (fill) the PSWAP note by providing faucet2 tokens and receiving faucet1
+    //    tokens in return.
 
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
 
@@ -2874,9 +2916,7 @@ async fn pswap_cancel_test() {
     );
 
     // Step 2: Alice cancels the PSWAP note.
-    let cancel_request = TransactionRequestBuilder::new()
-        .build_pswap_cancel(pswap_note)
-        .unwrap();
+    let cancel_request = TransactionRequestBuilder::new().build_pswap_cancel(pswap_note).unwrap();
 
     Box::pin(client.submit_new_transaction(alice_wallet.id(), cancel_request))
         .await
@@ -3098,8 +3138,7 @@ async fn storage_and_vault_proofs() {
         assert_eq!(account_vault_root, vault.root());
 
         // Check that specific asset proof matches the one in the vault
-        let vault_key =
-            AssetVaultKey::new_fungible(faucet_account_id).expect("faucet id is fungible");
+        let vault_key = AssetVaultKey::new_fungible(faucet_account_id).unwrap();
         let (asset, witness) = client
             .test_store()
             .get_account_asset(account_id, vault_key)
@@ -3963,8 +4002,7 @@ async fn storage_and_vault_proofs_ecdsa() {
         assert_eq!(account_vault_root, vault.root());
 
         // Check that specific asset proof matches the one in the vault
-        let vault_key =
-            AssetVaultKey::new_fungible(faucet_account_id).expect("faucet id is fungible");
+        let vault_key = AssetVaultKey::new_fungible(faucet_account_id).unwrap();
         let (asset, witness) = client
             .test_store()
             .get_account_asset(account_id, vault_key)
