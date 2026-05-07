@@ -15,8 +15,8 @@
 * [BREAKING][type][rust] `NoteScript::root()` now returns `NoteScriptRoot` instead of `Word`. Use `Word::from(root)` (or `root.into()`) where a `Word` is required. `NoteScriptRoot` is re-exported from `miden_client::note`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * [BREAKING][rename][rust] `FeeParameters::native_asset_id()` renamed to `fee_faucet_id()`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * [BREAKING][rust] Removed `NodeRpcClient::check_nullifiers`, `RpcEndpoint::CheckNullifiers`, `EndpointError::CheckNullifiers`, and `CheckNullifiersError` after the upstream node dropped the `CheckNullifiers` gRPC method. Use `NodeRpcClient::sync_nullifiers` to retrieve nullifier updates. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
-* [BREAKING][behavior][cli] Faucet/account IDs in human-facing CLI output (account list, `notes -s`, transaction summaries) are now rendered as bech32 addresses using the configured network instead of hex IDs. Hex remains in error messages and debug output. ([#1990](https://github.com/0xMiden/miden-client/issues/1990))
-* [BREAKING][behavior][cli] `token_symbol_map.toml` requires the `id` field to be a bech32 address; hex `AccountId`s are no longer accepted. Convert existing entries by copying the bech32 address from `account list`. ([#1990](https://github.com/0xMiden/miden-client/issues/1990))
+* [BREAKING][behavior][cli] Faucet/account IDs in human-facing CLI output (account list, `notes -s`, transaction summaries) are now rendered as bech32 addresses using the configured network instead of hex IDs. Hex remains in error messages and debug output. ([#2159](https://github.com/0xMiden/miden-client/pull/2159))
+* [BREAKING][behavior][cli] `token_symbol_map.toml` requires the `id` field to be a bech32 address; hex `AccountId`s are no longer accepted. Convert existing entries by copying the bech32 address from `account list`. ([#2159](https://github.com/0xMiden/miden-client/pull/2159))
 
 ### Enhancements
 
@@ -28,7 +28,7 @@
 * Added `miden-cli call` command for invoking account procedures directly from the CLI ([#1943](https://github.com/0xMiden/miden-client/pull/1943)).
 * Made `TransactionStoreUpdate` serialization lossless ([#2112](https://github.com/0xMiden/miden-client/pull/2112)).
 * [FEATURE][cli] Added `address encode <ACCOUNT_ID> <INTERFACE> [TAG_LEN]` subcommand that prints the bech32 encoding of an address built from the given fields (useful for producing the input to `address add`). ([#2115](https://github.com/0xMiden/miden-client/pull/2115))
-* [FEATURE][cli] On asset display, the CLI now lazily fetches on-chain `TokenMetadata` for untracked public faucets via RPC and caches the result in a new `faucet_metadata` store table, so symbols/decimals show up without manual TOML curation. ([#1990](https://github.com/0xMiden/miden-client/issues/1990))
+* [FEATURE][cli] On asset display, the CLI now lazily fetches on-chain `TokenMetadata` for untracked public faucets via RPC and caches the result in a new `faucet_metadata` store table, so symbols/decimals show up without manual TOML curation. ([#2159](https://github.com/0xMiden/miden-client/pull/2159))
 
 ## 0.14.4 (TBA)
 
