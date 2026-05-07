@@ -289,7 +289,12 @@ fn print_summary_table(account: &Account, network_id: NetworkId, token_symbol: O
     println!("{table}\n");
 }
 
-/// Reads the token metadata from a fungible faucet account's storage via its [`AccountReader`].
+/// Reads the token metadata via the [`AccountReader`]. Accesses the client's store to fetch the
+/// storage item.
+///
+/// # Errors
+/// Returns an error if the account is not tracked by the client, thus the storage item is not
+/// found.
 async fn get_token_metadata(
     reader: &AccountReader,
     account_id: AccountId,
@@ -309,6 +314,9 @@ async fn get_token_metadata(
 
 /// Reads the token metadata directly from an [`Account`]'s storage, without going through the
 /// client's store.
+///
+/// # Errors
+/// Returns an error if the storage item is not present in the Account's storage.
 fn get_token_metadata_from_account(account: &Account) -> Result<TokenMetadata, CliError> {
     let account_id = account.id();
     let word = account.storage().get_item(TokenMetadata::metadata_slot()).map_err(|err| {
