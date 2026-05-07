@@ -100,7 +100,7 @@ impl OutputNoteRecord {
     pub fn nullifier(&self) -> Option<Nullifier> {
         let recipient = self.recipient()?;
         Some(Nullifier::new(
-            recipient.script().root(),
+            recipient.script().root().into(),
             recipient.storage().commitment(),
             self.assets.commitment(),
             recipient.serial_num(),
@@ -401,6 +401,34 @@ impl OutputNoteState {
                 ))
             },
         }
+    }
+}
+
+impl Serializable for OutputNoteRecord {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.recipient_digest.write_into(target);
+        self.assets.write_into(target);
+        self.metadata.write_into(target);
+        self.state.write_into(target);
+        self.expected_height.write_into(target);
+    }
+}
+
+impl Deserializable for OutputNoteRecord {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let recipient_digest = Word::read_from(source)?;
+        let assets = NoteAssets::read_from(source)?;
+        let metadata = NoteMetadata::read_from(source)?;
+        let state = OutputNoteState::read_from(source)?;
+        let expected_height = BlockNumber::read_from(source)?;
+
+        Ok(Self {
+            assets,
+            metadata,
+            recipient_digest,
+            state,
+            expected_height,
+        })
     }
 }
 

@@ -12,7 +12,7 @@
 //!
 //! ```rust
 //! # use miden_client::{
-//! #   account::{Account, AccountBuilder, AccountType, component::BasicWallet},
+//! #   account::{Account, AccountBuilder, AccountBuilderSchemaCommitmentExt, AccountType, component::BasicWallet},
 //! #   crypto::FeltRng
 //! # };
 //! # use miden_protocol::account::AccountStorageMode;
@@ -24,7 +24,7 @@
 //!     .account_type(AccountType::RegularAccountImmutableCode)
 //!     .storage_mode(AccountStorageMode::Private)
 //!     .with_component(BasicWallet)
-//!     .build()?;
+//!     .build_with_schema_commitment()?;
 //!
 //! // Add the account to the client. The account already embeds its seed information.
 //! client.add_account(&account, false).await?;
@@ -71,6 +71,7 @@ use miden_protocol::note::NoteTag;
 
 mod account_reader;
 pub use account_reader::AccountReader;
+pub use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::auth::AuthSingleSig;
 // RE-EXPORTS
 // ================================================================================================
@@ -95,6 +96,8 @@ pub mod component {
         StorageSchema,
         StorageSlotSchema,
         StorageValueName,
+        ValueSlotSchema,
+        WordSchema,
     };
     pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
     pub use miden_standards::account::auth::*;
@@ -107,12 +110,21 @@ pub mod component {
         singlesig_acl_library,
         singlesig_library,
     };
-    pub use miden_standards::account::faucets::{BasicFungibleFaucet, NetworkFungibleFaucet};
-    pub use miden_standards::account::mint_policies::{
-        AuthControlled,
-        AuthControlledInitConfig,
-        OwnerControlled,
-        OwnerControlledInitConfig,
+    pub use miden_standards::account::faucets::{
+        BasicFungibleFaucet,
+        NetworkFungibleFaucet,
+        TokenMetadata,
+    };
+    pub use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
+    pub use miden_standards::account::policies::{
+        BurnAllowAll,
+        BurnOwnerOnly,
+        BurnPolicyConfig,
+        MintAllowAll,
+        MintOwnerOnly,
+        MintPolicyConfig,
+        PolicyAuthority,
+        TokenPolicyManager,
     };
     pub use miden_standards::account::wallets::BasicWallet;
 }
@@ -124,7 +136,10 @@ pub mod component {
 ///
 /// - **Account creation:** Use the [`AccountBuilder`] to construct new accounts, specifying account
 ///   type, storage mode (public/private), and attaching necessary components (e.g., basic wallet or
-///   fungible faucet). After creation, they can be added to the client.
+///   fungible faucet). Prefer [`AccountBuilderSchemaCommitmentExt::build_with_schema_commitment`]
+///   so the account includes merged storage schema commitment metadata; use plain
+///   [`AccountBuilder::build`] only when you need to opt out. After creation, accounts can be added
+///   to the client.
 ///
 /// - **Account tracking:** Accounts added via the client are persisted to the local store, where
 ///   their state (including nonce, balance, and metadata) is updated upon every synchronization
@@ -452,7 +467,45 @@ pub fn build_wallet_id(
         .storage_mode(storage_mode)
         .with_auth_component(auth_component)
         .with_component(BasicWallet)
-        .build()?;
+        .build_with_schema_commitment()?;
 
     Ok(account.id())
+}
+
+#[cfg(test)]
+mod schema_commitment_tests {
+    use miden_protocol::EMPTY_WORD;
+    use miden_protocol::account::AccountStorageMode;
+    use miden_protocol::account::auth::AuthSecretKey;
+    use miden_standards::account::metadata::AccountSchemaCommitment;
+
+    use super::{
+        AccountBuilder,
+        AccountBuilderSchemaCommitmentExt,
+        AccountType,
+        AuthSingleSig,
+        BasicWallet,
+    };
+    use crate::auth::AuthSchemeId;
+
+    #[test]
+    fn wallet_build_includes_schema_commitment_metadata_slot() {
+        let key = AuthSecretKey::new_falcon512_poseidon2();
+        let account = AccountBuilder::new([2u8; 32])
+            .account_type(AccountType::RegularAccountImmutableCode)
+            .storage_mode(AccountStorageMode::Private)
+            .with_auth_component(AuthSingleSig::new(
+                key.public_key().to_commitment(),
+                AuthSchemeId::Falcon512Poseidon2,
+            ))
+            .with_component(BasicWallet)
+            .build_with_schema_commitment()
+            .expect("build_with_schema_commitment");
+
+        let commitment = account
+            .storage()
+            .get_item(AccountSchemaCommitment::schema_commitment_slot())
+            .expect("schema commitment slot");
+        assert_ne!(commitment, EMPTY_WORD);
+    }
 }

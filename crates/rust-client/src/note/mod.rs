@@ -91,6 +91,7 @@ pub use miden_protocol::note::{
     NoteMetadataHeader,
     NoteRecipient,
     NoteScript,
+    NoteScriptRoot,
     NoteStorage,
     NoteTag,
     NoteType,

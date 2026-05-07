@@ -673,6 +673,11 @@ impl AccountProof {
         self.state_headers.as_ref().map(|d| &d.storage_details)
     }
 
+    /// Returns the vault details, if available (public accounts only).
+    pub fn vault_details(&self) -> Option<&AccountVaultDetails> {
+        self.state_headers.as_ref().map(|d| &d.vault_details)
+    }
+
     /// Returns the storage map details for a specific slot, if available.
     pub fn find_map_details(
         &self,
@@ -757,7 +762,8 @@ impl TryFrom<proto::account::AccountWitness> for AccountWitness {
             .ok_or(proto::account::AccountWitness::missing_field(stringify!(witness_id)))?
             .try_into()?;
 
-        let witness = AccountWitness::new(account_id, state_commitment, merkle_path).unwrap();
+        let witness = AccountWitness::new(account_id, state_commitment, merkle_path)
+            .map_err(|err| RpcError::InvalidResponse(format!("{err}")))?;
         Ok(witness)
     }
 }

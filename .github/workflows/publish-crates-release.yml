@@ -18,17 +18,20 @@ jobs:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
     steps:
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
 
       - name: Cleanup large tools for build space
         uses: ./.github/actions/cleanup-runner
 
       - name: Log release info
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          echo "Publishing release ${{ github.event.release.tag_name }}"
+          echo "Publishing release $RELEASE_TAG"
           echo "Commit: $(git rev-parse HEAD)"
 
       - name: Update Rust toolchain
@@ -73,10 +76,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
       - uses: ./.github/actions/cleanup-runner
       - name: Install Rust
         run: |
@@ -92,7 +96,7 @@ jobs:
         run: |
           mv target/${{ matrix.target }}/release/miden-client miden-client-${{ matrix.target }}
       - name: Attest miden-client-cli
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
           subject-path: miden-client-${{ matrix.target }}
       - name: Upload
@@ -101,4 +105,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          gh release upload ${RELEASE_TAG} miden-client-${{ matrix.target }}
+          gh release upload "$RELEASE_TAG" "miden-client-${{ matrix.target }}"

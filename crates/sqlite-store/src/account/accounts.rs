@@ -32,7 +32,7 @@ use miden_client::store::{
     StoreError,
 };
 use miden_client::sync::NoteTagRecord;
-use miden_client::utils::Serializable;
+use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
 use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
 use miden_protocol::asset::{AssetVaultKey, PartialVault};
@@ -206,7 +206,8 @@ impl SqliteStore {
                                     AccountError::FinalAccountHeaderIdParsingFailed(err),
                                 )
                             })?,
-                            AccountCode::from_bytes(&code).map_err(StoreError::AccountError)?,
+                            AccountCode::read_from_bytes(&code)
+                                .map_err(StoreError::DataDeserializationError)?,
                         ))
                     },
                 )
@@ -580,6 +581,9 @@ impl SqliteStore {
         }
 
         // Step 4: Restore old header from the earliest discarded nonce
+        // SAFETY: `nonces` is non-empty because `undo_account_nonces` is only called for
+        // accounts that appear in `nonces_by_account`, which only contains entries built
+        // from at least one nonce being pushed — so the slice is guaranteed non-empty here.
         let min_nonce = *nonces.last().unwrap();
         let min_nonce_val = u64_to_value(min_nonce);
 

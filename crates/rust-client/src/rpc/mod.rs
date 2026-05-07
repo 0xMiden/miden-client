@@ -5,6 +5,7 @@
 //! to:
 //!
 //! - Submit proven transactions.
+//! - Submit proven batches.
 //! - Retrieve block headers (optionally with MMR proofs).
 //! - Sync state updates (including notes, nullifiers, and account updates).
 //! - Fetch details for specific notes and accounts.
@@ -49,13 +50,13 @@ use core::fmt;
 use domain::account::{AccountProof, FetchedAccount};
 use domain::note::{FetchedNote, NoteSyncInfo, SyncNotesResult};
 use domain::nullifier::NullifierUpdate;
-use domain::sync::ChainMmrInfo;
+use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
 use miden_protocol::account::{AccountCode, AccountId};
 use miden_protocol::address::NetworkId;
+use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
-use miden_protocol::crypto::merkle::smt::SmtProof;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 
@@ -71,7 +72,7 @@ pub use errors::*;
 mod endpoint;
 pub(crate) use domain::limits::RPC_LIMITS_STORE_SETTING;
 pub use domain::limits::RpcLimits;
-pub use domain::status::RpcStatusInfo;
+pub use domain::status::{NetworkNoteStatus, NetworkNoteStatusInfo, RpcStatusInfo};
 pub use endpoint::Endpoint;
 
 #[cfg(not(feature = "testing"))]
@@ -125,6 +126,18 @@ pub trait NodeRpcClient: Send + Sync {
         transaction_inputs: TransactionInputs,
     ) -> Result<BlockNumber, RpcError>;
 
+    /// Given a Proven Batch together with the corresponding [`ProposedBatch`] and the list of
+    /// [`TransactionInputs`] (one per transaction, matching the ordering of the batch), sends
+    /// the batch to the node for inclusion in a future block using the `/SubmitProvenBatch`
+    /// RPC endpoint. All transactions in the batch must build on the current mempool state
+    /// following normal transaction submission rules.
+    async fn submit_proven_batch(
+        &self,
+        proven_batch: ProvenBatch,
+        proposed_batch: ProposedBatch,
+        transaction_inputs: Vec<TransactionInputs>,
+    ) -> Result<BlockNumber, RpcError>;
+
     /// Given a block number, fetches the block header corresponding to that height from the node
     /// using the `/GetBlockHeaderByNumber` endpoint.
     /// If `include_mmr_proof` is set to true and the function returns an `Ok`, the second value
@@ -139,7 +152,13 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Given a block number, fetches the block corresponding to that height from the node using
     /// the `/GetBlockByNumber` RPC endpoint.
-    async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError>;
+    ///
+    /// If `include_proof` is set to true, the block proof will be included in the response.
+    async fn get_block_by_number(
+        &self,
+        block_num: BlockNumber,
+        include_proof: bool,
+    ) -> Result<ProvenBlock, RpcError>;
 
     /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById`
     /// RPC endpoint.
@@ -157,11 +176,14 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches the MMR delta for a given block range using the `/SyncChainMmr` RPC endpoint.
     ///
     /// - `block_from` is the last block number already present in the caller's MMR.
-    /// - `block_to` is the optional upper bound of the range. If `None`, syncs up to the chain tip.
+    /// - `upper_bound` determines the upper bound of the sync range. Can be a specific block number
+    ///   (`BlockNumber`), or a chain tip finality level: `CommittedChainTip` syncs up to the latest
+    ///   committed block (the chain tip), while `ProvenChainTip` syncs up to the latest proven
+    ///   block which may be behind the committed tip.
     async fn sync_chain_mmr(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError>;
 
     /// Fetches the current state of an account from the node using the `/GetAccountDetails` RPC
@@ -262,10 +284,6 @@ pub trait NodeRpcClient: Send + Sync {
         block_num: BlockNumber,
         block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
-
-    /// Fetches the nullifier proofs corresponding to a list of nullifiers using the
-    /// `/CheckNullifiers` RPC endpoint.
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError>;
 
     /// Fetches the account proof and optionally its details from the node, using the
     /// `GetAccountProof` endpoint.
@@ -383,8 +401,14 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the note script with the specified root.
     ///
+    /// Implementations must verify that the returned script's root matches the requested
+    /// `root` and return [`RpcError::InvalidResponse`] otherwise; callers may rely on this
+    /// invariant.
+    ///
     /// Errors:
     /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
+    /// - [`RpcError::InvalidResponse`] if the node returns a script whose root does not match the
+    ///   requested `root`.
     async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError>;
 
     /// Fetches storage map updates for specified account and storage slots within a block range,
@@ -447,6 +471,14 @@ pub trait NodeRpcClient: Send + Sync {
     /// This is useful for diagnostics when version negotiation fails, as it allows
     /// retrieving node information even when there's a version mismatch.
     async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError>;
+
+    /// Fetches the status of a specific network note ID.
+    ///
+    /// This is useful for debugging when a network note fails.
+    async fn get_network_note_status(
+        &self,
+        note_id: NoteId,
+    ) -> Result<NetworkNoteStatusInfo, RpcError>;
 }
 
 // RPC API ENDPOINT
@@ -456,7 +488,6 @@ pub trait NodeRpcClient: Send + Sync {
 #[derive(Debug, Clone, Copy)]
 pub enum RpcEndpoint {
     Status,
-    CheckNullifiers,
     SyncNullifiers,
     GetAccount,
     GetBlockByNumber,
@@ -464,12 +495,14 @@ pub enum RpcEndpoint {
     GetNotesById,
     SyncChainMmr,
     SubmitProvenTx,
+    SubmitProvenBatch,
     SyncNotes,
     GetNoteScriptByRoot,
     SyncStorageMaps,
     SyncAccountVault,
     SyncTransactions,
     GetLimits,
+    GetNetworkNoteStatus,
 }
 
 impl RpcEndpoint {
@@ -477,7 +510,6 @@ impl RpcEndpoint {
     pub fn proto_name(&self) -> &'static str {
         match self {
             RpcEndpoint::Status => "Status",
-            RpcEndpoint::CheckNullifiers => "CheckNullifiers",
             RpcEndpoint::SyncNullifiers => "SyncNullifiers",
             RpcEndpoint::GetAccount => "GetAccount",
             RpcEndpoint::GetBlockByNumber => "GetBlockByNumber",
@@ -485,12 +517,14 @@ impl RpcEndpoint {
             RpcEndpoint::GetNotesById => "GetNotesById",
             RpcEndpoint::SyncChainMmr => "SyncChainMmr",
             RpcEndpoint::SubmitProvenTx => "SubmitProvenTransaction",
+            RpcEndpoint::SubmitProvenBatch => "SubmitProvenBatch",
             RpcEndpoint::SyncNotes => "SyncNotes",
             RpcEndpoint::GetNoteScriptByRoot => "GetNoteScriptByRoot",
             RpcEndpoint::SyncStorageMaps => "SyncStorageMaps",
             RpcEndpoint::SyncAccountVault => "SyncAccountVault",
             RpcEndpoint::SyncTransactions => "SyncTransactions",
             RpcEndpoint::GetLimits => "GetLimits",
+            RpcEndpoint::GetNetworkNoteStatus => "GetNetworkNoteStatus",
         }
     }
 }
@@ -499,7 +533,6 @@ impl fmt::Display for RpcEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RpcEndpoint::Status => write!(f, "status"),
-            RpcEndpoint::CheckNullifiers => write!(f, "check_nullifiers"),
             RpcEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
             },
@@ -511,12 +544,14 @@ impl fmt::Display for RpcEndpoint {
             RpcEndpoint::GetNotesById => write!(f, "get_notes_by_id"),
             RpcEndpoint::SyncChainMmr => write!(f, "sync_chain_mmr"),
             RpcEndpoint::SubmitProvenTx => write!(f, "submit_proven_transaction"),
+            RpcEndpoint::SubmitProvenBatch => write!(f, "submit_proven_batch"),
             RpcEndpoint::SyncNotes => write!(f, "sync_notes"),
             RpcEndpoint::GetNoteScriptByRoot => write!(f, "get_note_script_by_root"),
             RpcEndpoint::SyncStorageMaps => write!(f, "sync_storage_maps"),
             RpcEndpoint::SyncAccountVault => write!(f, "sync_account_vault"),
             RpcEndpoint::SyncTransactions => write!(f, "sync_transactions"),
             RpcEndpoint::GetLimits => write!(f, "get_limits"),
+            RpcEndpoint::GetNetworkNoteStatus => write!(f, "get_network_note_status"),
         }
     }
 }

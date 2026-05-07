@@ -13,7 +13,11 @@ use miden_client::{Client, Felt, Word};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
 use crate::errors::CliError;
-use crate::utils::get_input_acc_id_by_prefix_or_default;
+use crate::utils::{
+    get_input_acc_id_by_prefix_or_default,
+    print_executed_program_stack,
+    print_executed_program_stack_hex_words,
+};
 
 // EXEC COMMAND
 // ================================================================================================
@@ -102,38 +106,12 @@ impl ExecCmd {
             self.execute_program(&mut client, account_id, tx_script, advice_inputs).await?;
 
         println!("Program executed successfully");
-        println!("Output stack:");
-        self.print_stack(output_stack);
-        Ok(())
-    }
-
-    /// Print the output stack in a human-readable format
-    fn print_stack(&self, stack: [Felt; 16]) {
         if self.hex_words {
-            for i in 0..4 {
-                let word_idx = i * 4;
-                let word_idx_end = word_idx + 3;
-
-                if word_idx == 12 {
-                    print!("└── {word_idx:2} - {word_idx_end:2}: ");
-                } else {
-                    print!("├── {word_idx:2} - {word_idx_end:2}: ");
-                }
-
-                let word: [Felt; 4] =
-                    stack[word_idx..=word_idx_end].try_into().expect("Length should be 4");
-
-                println!("{:?} ({})", word, Word::from(word).to_hex());
-            }
+            print_executed_program_stack_hex_words(&output_stack);
         } else {
-            for (i, value) in stack.iter().enumerate() {
-                if i == 15 {
-                    println!("└── {i:2}: {value}");
-                } else {
-                    println!("├── {i:2}: {value}");
-                }
-            }
+            print_executed_program_stack(&output_stack, None);
         }
+        Ok(())
     }
 
     async fn execute_program<AUTH: Keystore + Sync + 'static>(

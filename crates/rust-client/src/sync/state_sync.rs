@@ -39,6 +39,7 @@ use crate::rpc::domain::account::{
 };
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
 use crate::rpc::domain::storage_map::StorageMapUpdate;
+use crate::rpc::domain::sync::SyncTarget;
 use crate::rpc::domain::transaction::{
     TransactionInclusion,
     TransactionRecord as RpcTransactionRecord,
@@ -319,7 +320,10 @@ impl StateSync {
         note_tags: &Arc<BTreeSet<NoteTag>>,
     ) -> Result<Option<RawStateSyncData>, ClientError> {
         // Step 1: Fetch the MMR delta and chain tip header.
-        let chain_mmr_info = self.rpc_api.sync_chain_mmr(current_block_num, None).await?;
+        let chain_mmr_info = self
+            .rpc_api
+            .sync_chain_mmr(current_block_num, SyncTarget::CommittedChainTip)
+            .await?;
         let chain_tip = chain_mmr_info.block_to;
 
         // No progress — already at the tip.
@@ -435,19 +439,18 @@ impl StateSync {
             ..
         } = sync_data;
 
-        // Advance the partial MMR: apply delta (up to chain_tip - 1), capture peaks for
-        // storage, then add the chain tip leaf (which the delta excludes due to the
+        // Advance the partial MMR: apply delta (up to chain_tip - 1), capture peaks at that
+        // forest, then add the chain tip leaf (which the delta excludes due to the
         // one-block lag in block header MMR commitments).
         let mut new_authentication_nodes =
             current_partial_mmr.apply(mmr_delta).map_err(StoreError::MmrError)?;
-        let new_peaks = current_partial_mmr.peaks();
+        state_sync_update.partial_blockchain_updates.new_peaks = current_partial_mmr.peaks();
         new_authentication_nodes
             .append(&mut current_partial_mmr.add(chain_tip_header.commitment(), false));
 
-        state_sync_update.block_updates.insert(
+        state_sync_update.partial_blockchain_updates.insert(
             chain_tip_header.clone(),
             false,
-            new_peaks,
             new_authentication_nodes,
         );
 
@@ -485,10 +488,9 @@ impl StateSync {
                     .map(|(k, v)| (*k, *v))
                     .collect();
 
-                state_sync_update.block_updates.insert(
+                state_sync_update.partial_blockchain_updates.insert(
                     block.block_header,
                     true,
-                    current_partial_mmr.peaks(),
                     track_auth_nodes,
                 );
             }
@@ -1256,7 +1258,7 @@ fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> V
     result
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "testing"))]
 mod tests {
     use alloc::collections::BTreeSet;
     use alloc::sync::Arc;
@@ -1290,7 +1292,7 @@ mod tests {
 
     use super::*;
     use crate::store::{OutputNoteRecord, OutputNoteState};
-    use crate::testing::mock::MockRpcApi;
+    use crate::test_utils::mock::MockRpcApi;
 
     /// Mock note screener that discards all notes, for minimal test setup.
     struct MockScreener;
