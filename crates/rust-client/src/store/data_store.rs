@@ -17,7 +17,7 @@ use miden_protocol::asset::{AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks, PartialMmr};
 use miden_protocol::crypto::merkle::{MerkleError, MerklePath};
-use miden_protocol::note::NoteScript;
+use miden_protocol::note::{NoteScript, NoteScriptRoot};
 use miden_protocol::transaction::{AccountInputs, PartialBlockchain};
 use miden_protocol::vm::FutureMaybeSend;
 use miden_protocol::{MastForest, Word, ZERO};
@@ -411,14 +411,14 @@ impl DataStore for ClientDataStore {
     /// fetching it from the RPC if not available locally.
     fn get_note_script(
         &self,
-        script_root: Word,
+        script_root: NoteScriptRoot,
     ) -> impl FutureMaybeSend<Result<Option<NoteScript>, DataStoreError>> {
         let store = self.store.clone();
         let rpc_api = self.rpc_api.clone();
 
         async move {
             // Fast path: check the local store first.
-            match store.get_note_script(script_root).await {
+            match store.get_note_script(script_root.into()).await {
                 Ok(note_script) => return Ok(Some(note_script)),
                 Err(StoreError::NoteScriptNotFound(_)) => {},
                 Err(err) => {
@@ -431,7 +431,7 @@ impl DataStore for ClientDataStore {
 
             // Store miss, fetch from the network via RPC.
             let note_script: NoteScript =
-                rpc_api.get_note_script_by_root(script_root).await.map_err(|err| {
+                rpc_api.get_note_script_by_root(script_root.into()).await.map_err(|err| {
                     DataStoreError::other_with_source("failed to fetch note script via RPC", err)
                 })?;
 

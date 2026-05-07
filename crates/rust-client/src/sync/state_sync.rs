@@ -1539,7 +1539,9 @@ mod tests {
         // Create a public output note. It won't be in the mock chain (simulating erasure).
         let sender_id: AccountId = ACCOUNT_ID_SENDER.try_into().unwrap();
         let metadata = NoteMetadata::new(sender_id, NoteType::Public);
-        let script = CodeBuilder::new().compile_note_script("begin nop end").unwrap();
+        let script = CodeBuilder::new()
+            .compile_note_script("@note_script pub proc main nop end")
+            .unwrap();
         let recipient = NoteRecipient::new(
             Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
             script,
