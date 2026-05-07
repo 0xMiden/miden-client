@@ -73,7 +73,7 @@ use miden_protocol::note::NoteTag;
 /// Cached, display-only metadata for a faucet account.
 ///
 /// Populated lazily by the CLI resolver from the on-chain `TokenMetadata` of a public faucet
-/// and persisted in the [`Store`]'s `faucet_metadata` table.
+/// and persisted in the [`Store`](crate::store::Store)'s `faucet_metadata` table.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FaucetMetadata {
     pub symbol: String,
