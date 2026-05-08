@@ -73,6 +73,7 @@ use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
 use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
 use miden_protocol::transaction::AccountInputs;
+use miden_protocol::vm::MIN_STACK_DEPTH;
 use miden_protocol::{EMPTY_WORD, Felt, Word};
 use miden_standards::account::interface::AccountInterfaceExt;
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
@@ -465,7 +466,7 @@ where
         tx_script: TransactionScript,
         advice_inputs: AdviceInputs,
         foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
-    ) -> Result<[Felt; 16], ClientError> {
+    ) -> Result<[Felt; MIN_STACK_DEPTH], ClientError> {
         let (data_store, block_ref) =
             self.prepare_program_execution(account_id, foreign_accounts).await?;
 
@@ -484,7 +485,7 @@ where
         tx_script: TransactionScript,
         advice_inputs: AdviceInputs,
         foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
-    ) -> Result<[Felt; 16], ClientError> {
+    ) -> Result<[Felt; MIN_STACK_DEPTH], ClientError> {
         let (data_store, block_ref) =
             self.prepare_program_execution(account_id, foreign_accounts).await?;
 

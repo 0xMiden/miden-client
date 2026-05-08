@@ -8,7 +8,7 @@ use clap::Parser;
 use miden_client::account::AccountId;
 use miden_client::keystore::Keystore;
 use miden_client::transaction::{ForeignAccount, TransactionScript};
-use miden_client::vm::AdviceInputs;
+use miden_client::vm::{AdviceInputs, MIN_STACK_DEPTH};
 use miden_client::{Client, Felt, Word};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
@@ -120,7 +120,7 @@ impl ExecCmd {
         account_id: AccountId,
         tx_script: TransactionScript,
         advice_inputs: AdviceInputs,
-    ) -> Result<[Felt; 16], CliError> {
+    ) -> Result<[Felt; MIN_STACK_DEPTH], CliError> {
         let foreign_accounts = BTreeMap::<AccountId, ForeignAccount>::new();
 
         #[cfg(feature = "dap")]
