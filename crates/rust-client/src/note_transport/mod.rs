@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use futures::Stream;
 use miden_protocol::address::Address;
 use miden_protocol::block::BlockNumber;
-use miden_protocol::note::{Note, NoteDetails, NoteFile, NoteHeader, NoteTag};
+use miden_protocol::note::{Note, NoteDetails, NoteFile, NoteHeader, NoteId, NoteTag};
 use miden_protocol::utils::serde::Serializable;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::serde::{
@@ -110,12 +110,12 @@ where
     /// Fetch notes from the note transport network for provided note tags
     ///
     /// Pagination is employed, where only notes after the provided cursor are requested.
-    /// Downloaded notes are imported.
+    /// Downloaded notes are imported. Returns the IDs of the imported notes.
     pub(crate) async fn fetch_transport_notes<I>(
         &mut self,
         cursor: NoteTransportCursor,
         tags: I,
-    ) -> Result<(), ClientError>
+    ) -> Result<Vec<NoteId>, ClientError>
     where
         I: IntoIterator<Item = NoteTag>,
     {
@@ -154,12 +154,12 @@ where
             };
             note_requests.push(note_file);
         }
-        self.import_notes(&note_requests).await?;
+        let imported_note_ids = self.import_notes(&note_requests).await?;
 
         // Update cursor (pagination)
         self.store.update_note_transport_cursor(rcursor).await?;
 
-        Ok(())
+        Ok(imported_note_ids)
     }
 }
 
