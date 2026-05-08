@@ -7,6 +7,7 @@ use miden_client::account::component::{AccountComponent, AccountComponentMetadat
 use miden_client::account::{
     Account,
     AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
     AccountId,
     AccountStorageMode,
     AccountType,
@@ -1317,7 +1318,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .test_rpc_api()
         .get_block_header_by_number(Some(first_block_num), false)
         .await?;
-    let block = client.test_rpc_api().get_block_by_number(first_block_num).await.unwrap();
+    let block = client.test_rpc_api().get_block_by_number(first_block_num, false).await.unwrap();
 
     assert_eq!(&block_header, block.header());
 
@@ -1329,6 +1330,30 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let tx_id =
         consume_notes(&mut client, first_basic_account.id(), std::slice::from_ref(&note)).await;
     wait_for_tx(&mut client, tx_id).await?;
+
+    // Test get_account_proof retrieval (account must be deployed on-chain first)
+    let (proof_block_num, account_proof) = client
+        .test_rpc_api()
+        .get_account_proof(
+            first_basic_account.id(),
+            AccountStorageRequirements::default(),
+            AccountStateAt::ChainTip,
+            None,
+            None,
+        )
+        .await?;
+    assert!(proof_block_num >= first_block_num);
+    assert_eq!(account_proof.account_id(), first_basic_account.id());
+    assert!(account_proof.account_header().is_some());
+
+    // The witness's merkle path should resolve to the account root committed
+    // in the block header for `proof_block_num`.
+    let (proof_block_header, _) = client
+        .test_rpc_api()
+        .get_block_header_by_number(Some(proof_block_num), false)
+        .await?;
+    let computed_account_root = account_proof.account_witness().clone().into_proof().compute_root();
+    assert_eq!(computed_account_root, proof_block_header.account_root());
 
     // Define the account code for the custom library
     let custom_code = r#"
@@ -1415,16 +1440,9 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap()
         .pop()
         .with_context(|| "no nullifier found in sync_nullifiers response")?;
-    let node_nullifier_proof = client
-        .test_rpc_api()
-        .check_nullifiers(&[nullifier])
-        .await
-        .unwrap()
-        .pop()
-        .with_context(|| "no nullifier proof returned from check_nullifiers RPC API")?;
     let retrieved_note_script = client
         .test_rpc_api()
-        .get_note_script_by_root(note.script().root())
+        .get_note_script_by_root(note.script().root().into())
         .await
         .unwrap();
     let sync_storage_maps = client
@@ -1444,7 +1462,6 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap();
 
     assert_eq!(node_nullifier.nullifier, nullifier);
-    assert_eq!(node_nullifier_proof.leaf().entries().first().unwrap().0, nullifier.as_word());
     assert_eq!(note.script().root(), retrieved_note_script.root());
     assert!(!sync_storage_maps.updates.is_empty());
     assert!(!account_vault_info.updates.is_empty());
@@ -1583,7 +1600,7 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
         .with_component(component)
         .with_auth_component(auth_component)
         .storage_mode(AccountStorageMode::Public)
-        .build()
+        .build_with_schema_commitment()
         .context("failed to build account")?;
     let account_id = account.id();
 

@@ -22,8 +22,8 @@ use crate::transaction::{DiscardCause, TransactionRecord, TransactionStatus};
 pub struct StateSyncUpdate {
     /// The block number of the last block that was synced.
     pub block_num: BlockNumber,
-    /// New blocks and authentication nodes.
-    pub block_updates: BlockUpdates,
+    /// New blocks, authentication nodes and MMR peaks.
+    pub partial_blockchain_updates: PartialBlockchainUpdates,
     /// New and updated notes to be upserted in the store.
     pub note_updates: NoteUpdateTracker,
     /// Committed and discarded transactions after the sync.
@@ -77,6 +77,8 @@ impl From<&StateSyncUpdate> for SyncSummary {
         SyncSummary::new(
             value.block_num,
             new_public_note_ids,
+            // Populated by Client::sync_state from the Note Transport Layer fetch.
+            Vec::new(),
             committed_note_ids.into_iter().collect(),
             consumed_note_ids.into_iter().collect(),
             value
@@ -96,59 +98,45 @@ impl From<&StateSyncUpdate> for SyncSummary {
     }
 }
 
-/// Contains all the block information that needs to be added in the client's store after a sync.
+/// Contains all the partial blockchain information that needs to be added in the client's store
+/// after a sync: block headers, authentication nodes and the MMR peaks at the new sync height.
 #[derive(Debug, Clone, Default)]
-pub struct BlockUpdates {
+pub struct PartialBlockchainUpdates {
     /// New block headers to be stored, keyed by block number. The value contains the block
-    /// header, a flag indicating whether the block contains notes relevant to the client, and
-    /// the MMR peaks for the block.
-    block_headers: BTreeMap<BlockNumber, (BlockHeader, bool, MmrPeaks)>,
+    /// header and a flag indicating whether the block contains notes relevant to the client.
+    block_headers: BTreeMap<BlockNumber, (BlockHeader, bool)>,
     /// New authentication nodes that are meant to be stored in order to authenticate block
     /// headers.
     new_authentication_nodes: Vec<(InOrderIndex, Word)>,
+    /// MMR peaks at the new sync height.
+    pub new_peaks: MmrPeaks,
 }
 
-impl BlockUpdates {
-    /// Adds or updates a block header and its corresponding data in this [`BlockUpdates`].
+impl PartialBlockchainUpdates {
+    /// Adds or updates a block header in this [`PartialBlockchainUpdates`].
     ///
     /// If the block header already exists (same block number), the `has_client_notes` flag is
-    /// OR-ed and the peaks are kept from the first insertion. Otherwise a new entry is added.
+    /// OR-ed. Otherwise a new entry is added.
     pub fn insert(
         &mut self,
         block_header: BlockHeader,
         has_client_notes: bool,
-        peaks: MmrPeaks,
         new_authentication_nodes: Vec<(InOrderIndex, Word)>,
     ) {
-        debug_assert_eq!(
-            peaks.forest().num_leaves(),
-            block_header.block_num().as_usize(),
-            "MMR peaks stored for a block header must use that block number as the forest",
-        );
-
         self.block_headers
             .entry(block_header.block_num())
-            .and_modify(|(_, existing_has_notes, _)| {
+            .and_modify(|(_, existing_has_notes)| {
                 *existing_has_notes |= has_client_notes;
             })
-            .or_insert((block_header, has_client_notes, peaks));
+            .or_insert((block_header, has_client_notes));
 
         self.new_authentication_nodes.extend(new_authentication_nodes);
     }
 
     /// Returns the new block headers to be stored, along with a flag indicating whether the block
-    /// contains notes that are relevant to the client and the MMR peaks for the block.
-    pub fn block_headers(&self) -> impl Iterator<Item = &(BlockHeader, bool, MmrPeaks)> {
+    /// contains notes that are relevant to the client.
+    pub fn block_headers(&self) -> impl Iterator<Item = &(BlockHeader, bool)> {
         self.block_headers.values()
-    }
-
-    /// Adds authentication nodes without an associated block header.
-    ///
-    /// This is used when a synced block is not stored (no relevant notes and not the chain tip)
-    /// but the MMR authentication nodes it produced must still be persisted so that the on-disk
-    /// state stays consistent with the in-memory `PartialMmr`.
-    pub fn extend_authentication_nodes(&mut self, nodes: Vec<(InOrderIndex, Word)>) {
-        self.new_authentication_nodes.extend(nodes);
     }
 
     /// Returns the new authentication nodes that are meant to be stored in order to authenticate

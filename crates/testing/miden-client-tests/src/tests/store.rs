@@ -29,6 +29,7 @@ use miden_protocol::testing::account_id::{
 };
 use miden_protocol::transaction::TransactionKernel;
 use miden_protocol::{EMPTY_WORD, Felt, Word, ZERO};
+use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::wallets::BasicWallet;
 use miden_standards::testing::mock_account::MockAccountExt;
 use rand::RngCore;
@@ -325,7 +326,7 @@ async fn build_three_slot_account(
         ))
         .with_component(BasicWallet)
         .with_component(component)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     let account_id = account.id();

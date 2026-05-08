@@ -15,12 +15,12 @@ use miden_protocol::account::{
     Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot, StorageSlotType,
 };
 use miden_protocol::address::NetworkId;
+use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::account_tree::AccountWitness;
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{Forest, MmrPath, MmrProof};
-use miden_protocol::crypto::merkle::smt::SmtProof;
-use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::note::{NoteId, NoteScript, NoteTag};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_protocol::utils::serde::Deserializable;
 use miden_protocol::{EMPTY_WORD, Word};
@@ -39,7 +39,8 @@ use super::{
     Endpoint, FetchedAccount, NodeRpcClient, RpcEndpoint, NoteSyncInfo, RpcError,
     RpcStatusInfo,
 };
-use crate::rpc::domain::sync::ChainMmrInfo;
+use crate::rpc::domain::status::NetworkNoteStatusInfo;
+use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::transaction::TransactionsInfo;
@@ -484,10 +485,11 @@ impl GrpcClient {
     async fn fetch_full_vault(
         &self,
         account_id: AccountId,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
     ) -> Result<Vec<Asset>, RpcError> {
-        let vault_info =
-            self.sync_account_vault(BlockNumber::from(0), block_to, account_id).await?;
+        let vault_info = self
+            .sync_account_vault(BlockNumber::from(0), Some(block_to), account_id)
+            .await?;
         let mut updates = vault_info.updates;
         updates.sort_by_key(|u| u.block_num);
         Ok(updates
@@ -545,6 +547,28 @@ impl NodeRpcClient for GrpcClient {
             .call_with_retry(RpcEndpoint::SubmitProvenTx, |mut rpc_api| {
                 let request = request.clone();
                 Box::pin(async move { rpc_api.submit_proven_transaction(request).await })
+            })
+            .await?;
+
+        Ok(BlockNumber::from(api_response.into_inner().block_num))
+    }
+
+    async fn submit_proven_batch(
+        &self,
+        proven_batch: ProvenBatch,
+        proposed_batch: ProposedBatch,
+        transaction_inputs: Vec<TransactionInputs>,
+    ) -> Result<BlockNumber, RpcError> {
+        let request = proto::transaction::TransactionBatch {
+            batch_proof: proven_batch.to_bytes(),
+            proposed_batch: Some(proposed_batch.to_bytes()),
+            transaction_inputs: transaction_inputs.iter().map(Serializable::to_bytes).collect(),
+        };
+
+        let api_response = self
+            .call_with_retry(RpcEndpoint::SubmitProvenBatch, |mut rpc_api| {
+                let request = request.clone();
+                Box::pin(async move { rpc_api.submit_proven_batch(request).await })
             })
             .await?;
 
@@ -630,17 +654,13 @@ impl NodeRpcClient for GrpcClient {
     async fn sync_chain_mmr(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError> {
-        let block_range = Some(BlockRange {
-            block_from: block_from.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        });
+        let block_from = block_from.as_u32();
 
-        let request = proto::rpc::SyncChainMmrRequest {
-            block_range,
-            finality: proto::rpc::Finality::Committed as i32,
-        };
+        let upper_bound = Some(upper_bound.into());
+
+        let request = proto::rpc::SyncChainMmrRequest { block_from, upper_bound };
 
         let response = self
             .call_with_retry(RpcEndpoint::SyncChainMmr, |mut rpc_api| {
@@ -683,7 +703,7 @@ impl NodeRpcClient for GrpcClient {
             // If the vault exceeds the node's size threshold, download the full vault
             // via the sync endpoint; otherwise use the assets from the response directly.
             let assets = if details.vault_details.too_many_assets {
-                self.fetch_full_vault(account_id, Some(block_number)).await?
+                self.fetch_full_vault(account_id, block_number).await?
             } else {
                 details.vault_details.assets
             };
@@ -788,8 +808,7 @@ impl NodeRpcClient for GrpcClient {
                 .into_domain(&known_codes_by_commitment, &storage_requirements)?;
 
             if details.vault_details.too_many_assets {
-                details.vault_details.assets =
-                    self.fetch_full_vault(account_id, Some(block_num)).await?;
+                details.vault_details.assets = self.fetch_full_vault(account_id, block_num).await?;
             }
 
             Some(details)
@@ -902,34 +921,15 @@ impl NodeRpcClient for GrpcClient {
         Ok(all_nullifiers.into_iter().collect::<Vec<_>>())
     }
 
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        let limits = self.get_rpc_limits().await?;
-        let mut proofs: Vec<SmtProof> = Vec::with_capacity(nullifiers.len());
-        for chunk in nullifiers.chunks(limits.nullifiers_limit as usize) {
-            let request = proto::rpc::NullifierList {
-                nullifiers: chunk.iter().map(|nul| nul.as_word().into()).collect(),
-            };
-
-            let response = self
-                .call_with_retry(RpcEndpoint::CheckNullifiers, |mut rpc_api| {
-                    let request = request.clone();
-                    Box::pin(async move { rpc_api.check_nullifiers(request).await })
-                })
-                .await?;
-
-            let mut response = response.into_inner();
-            let chunk_proofs = response
-                .proofs
-                .iter_mut()
-                .map(|r| r.to_owned().try_into())
-                .collect::<Result<Vec<SmtProof>, RpcConversionError>>()?;
-            proofs.extend(chunk_proofs);
-        }
-        Ok(proofs)
-    }
-
-    async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
-        let request = proto::blockchain::BlockNumber { block_num: block_num.as_u32() };
+    async fn get_block_by_number(
+        &self,
+        block_num: BlockNumber,
+        include_proof: bool,
+    ) -> Result<ProvenBlock, RpcError> {
+        let request = proto::blockchain::BlockRequest {
+            block_num: block_num.as_u32(),
+            include_proof: Some(include_proof),
+        };
 
         let response = self
             .call_with_retry(RpcEndpoint::GetBlockByNumber, |mut rpc_api| {
@@ -961,6 +961,13 @@ impl NodeRpcClient for GrpcClient {
                 .script
                 .ok_or(RpcError::ExpectedDataMissing("GetNoteScriptByRoot.script".to_string()))?,
         )?;
+
+        let fetched_root = note_script.root();
+        if Word::from(fetched_root) != root {
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned note script with root {fetched_root} for requested root {root}",
+            )));
+        }
 
         Ok(note_script)
     }
@@ -1121,6 +1128,21 @@ impl NodeRpcClient for GrpcClient {
 
     async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {
         GrpcClient::get_status_unversioned(self).await
+    }
+
+    async fn get_network_note_status(
+        &self,
+        note_id: NoteId,
+    ) -> Result<NetworkNoteStatusInfo, RpcError> {
+        let request = proto::note::NoteId { id: Some(note_id.into()) };
+
+        let response = self
+            .call_with_retry(RpcEndpoint::GetNetworkNoteStatus, |mut rpc_api| {
+                Box::pin(async move { rpc_api.get_network_note_status(request).await })
+            })
+            .await?;
+
+        response.into_inner().try_into()
     }
 }
 

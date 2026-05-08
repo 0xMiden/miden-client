@@ -39,6 +39,7 @@ use crate::rpc::domain::account::{
 };
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
 use crate::rpc::domain::storage_map::StorageMapUpdate;
+use crate::rpc::domain::sync::SyncTarget;
 use crate::rpc::domain::transaction::{
     TransactionInclusion,
     TransactionRecord as RpcTransactionRecord,
@@ -208,20 +209,15 @@ impl StateSync {
     /// mutable reference so callers can keep it in memory across syncs.
     ///
     /// During the sync process, the following steps are performed:
-    /// 1. A request is sent to the node to get the state updates. This request includes tracked
-    ///    account IDs and the tags of notes that might have changed or that might be of interest to
-    ///    the client.
-    /// 2. A response is received with the current state of the network. The response includes
-    ///    information about new and committed notes, updated accounts, and committed transactions.
-    /// 3. Tracked public accounts are updated and private accounts are validated against the node
-    ///    state.
-    /// 4. Tracked notes are updated with their new states. Notes might be committed or nullified
-    ///    during the sync processing.
-    /// 5. New notes are checked, and only relevant ones are stored. Relevance is determined by the
-    ///    [`OnNoteReceived`] callback.
-    /// 6. Transactions are updated with their new states. Transactions might be committed or
-    ///    discarded.
-    /// 7. The MMR is updated with the new peaks and authentication nodes.
+    /// 1. Fetch sync data from the node (MMR delta, note inclusions, transactions).
+    /// 2. Update account states (fetch updated public accounts, flag mismatched private ones).
+    /// 3. Advance the partial MMR to the chain tip.
+    /// 4. Screen note inclusions via the configured [`OnNoteReceived`] callback and track relevant
+    ///    blocks in the MMR.
+    /// 5. Process transaction inclusions (commit local txs, record external consumers, discard
+    ///    stale/expired txs, commit output notes).
+    /// 6. Detect consumed notes via nullifier sync (optional, see
+    ///    [`Self::disable_nullifier_sync`]).
     pub async fn sync_state(
         &self,
         current_partial_mmr: &mut PartialMmr,
@@ -319,7 +315,10 @@ impl StateSync {
         note_tags: &Arc<BTreeSet<NoteTag>>,
     ) -> Result<Option<RawStateSyncData>, ClientError> {
         // Step 1: Fetch the MMR delta and chain tip header.
-        let chain_mmr_info = self.rpc_api.sync_chain_mmr(current_block_num, None).await?;
+        let chain_mmr_info = self
+            .rpc_api
+            .sync_chain_mmr(current_block_num, SyncTarget::CommittedChainTip)
+            .await?;
         let chain_tip = chain_mmr_info.block_to;
 
         // No progress — already at the tip.
@@ -435,19 +434,18 @@ impl StateSync {
             ..
         } = sync_data;
 
-        // Advance the partial MMR: apply delta (up to chain_tip - 1), capture peaks for
-        // storage, then add the chain tip leaf (which the delta excludes due to the
+        // Advance the partial MMR: apply delta (up to chain_tip - 1), capture peaks at that
+        // forest, then add the chain tip leaf (which the delta excludes due to the
         // one-block lag in block header MMR commitments).
         let mut new_authentication_nodes =
             current_partial_mmr.apply(mmr_delta).map_err(StoreError::MmrError)?;
-        let new_peaks = current_partial_mmr.peaks();
+        state_sync_update.partial_blockchain_updates.new_peaks = current_partial_mmr.peaks();
         new_authentication_nodes
             .append(&mut current_partial_mmr.add(chain_tip_header.commitment(), false));
 
-        state_sync_update.block_updates.insert(
+        state_sync_update.partial_blockchain_updates.insert(
             chain_tip_header.clone(),
             false,
-            new_peaks,
             new_authentication_nodes,
         );
 
@@ -485,10 +483,9 @@ impl StateSync {
                     .map(|(k, v)| (*k, *v))
                     .collect();
 
-                state_sync_update.block_updates.insert(
+                state_sync_update.partial_blockchain_updates.insert(
                     block.block_header,
                     true,
-                    current_partial_mmr.peaks(),
                     track_auth_nodes,
                 );
             }
@@ -1256,7 +1253,7 @@ fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> V
     result
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "testing"))]
 mod tests {
     use alloc::collections::BTreeSet;
     use alloc::sync::Arc;
@@ -1290,7 +1287,7 @@ mod tests {
 
     use super::*;
     use crate::store::{OutputNoteRecord, OutputNoteState};
-    use crate::testing::mock::MockRpcApi;
+    use crate::test_utils::mock::MockRpcApi;
 
     /// Mock note screener that discards all notes, for minimal test setup.
     struct MockScreener;

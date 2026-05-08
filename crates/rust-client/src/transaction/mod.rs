@@ -73,6 +73,7 @@ use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
 use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
 use miden_protocol::transaction::AccountInputs;
+use miden_protocol::vm::MIN_STACK_DEPTH;
 use miden_protocol::{EMPTY_WORD, Felt, Word};
 use miden_standards::account::interface::AccountInterfaceExt;
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
@@ -178,10 +179,6 @@ where
     ///
     /// Uses the client's default prover (configured via
     /// [`crate::builder::ClientBuilder::prover`]).
-    ///
-    /// If the transaction utilizes foreign account data, there is a chance that the client
-    /// doesn't have the required block header in the local database. In these scenarios, a sync to
-    /// the chain tip is performed, and the required block header is retrieved.
     pub async fn submit_new_transaction(
         &mut self,
         account_id: AccountId,
@@ -198,10 +195,6 @@ where
     ///
     /// This is useful for falling back to a different prover (e.g., local) when the default
     /// prover (e.g., remote) fails with a [`ClientError::TransactionProvingError`].
-    ///
-    /// If the transaction utilizes foreign account data, there is a chance that the client
-    /// doesn't have the required block header in the local database. In these scenarios, a sync to
-    /// the chain tip is performed, and the required block header is retrieved.
     pub async fn submit_new_transaction_with_prover(
         &mut self,
         account_id: AccountId,
@@ -233,10 +226,6 @@ where
 
     /// Creates and executes a transaction specified by the request against the specified account,
     /// but doesn't change the local database.
-    ///
-    /// If the transaction utilizes foreign account data, there is a chance that the client doesn't
-    /// have the required block header in the local database. In these scenarios, a sync to
-    /// the chain tip is performed, and the required block header is retrieved.
     ///
     /// # Errors
     ///
@@ -477,7 +466,7 @@ where
         tx_script: TransactionScript,
         advice_inputs: AdviceInputs,
         foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
-    ) -> Result<[Felt; 16], ClientError> {
+    ) -> Result<[Felt; MIN_STACK_DEPTH], ClientError> {
         let (data_store, block_ref) =
             self.prepare_program_execution(account_id, foreign_accounts).await?;
 
@@ -496,7 +485,7 @@ where
         tx_script: TransactionScript,
         advice_inputs: AdviceInputs,
         foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
-    ) -> Result<[Felt; 16], ClientError> {
+    ) -> Result<[Felt; MIN_STACK_DEPTH], ClientError> {
         let (data_store, block_ref) =
             self.prepare_program_execution(account_id, foreign_accounts).await?;
 
@@ -653,14 +642,14 @@ where
             let script_root = script.root();
 
             // Check if the node already has this script registered.
-            match self.rpc_api.get_note_script_by_root(script_root).await {
+            match self.rpc_api.get_note_script_by_root(script_root.into()).await {
                 Ok(_) => {},
                 Err(RpcError::RequestError { error_kind: GrpcError::NotFound, .. }) => {
                     missing_scripts.push(script.clone());
                 },
                 Err(other) => {
                     return Err(ClientError::NtxScriptRegistrationFailed {
-                        script_root,
+                        script_root: script_root.into(),
                         source: other,
                     });
                 },
@@ -706,12 +695,12 @@ where
                 )
                 .await?;
 
-            if execution.failed.is_empty() {
+            if execution.failed().is_empty() {
                 break;
             }
 
             let failed_note_ids: BTreeSet<NoteId> =
-                execution.failed.iter().map(|n| n.note.id()).collect();
+                execution.failed().iter().map(|n| n.note().id()).collect();
             let filtered_input_notes = InputNotes::new(
                 input_notes
                     .into_iter()
@@ -741,10 +730,6 @@ where
     /// For any [`ForeignAccount::Public`] in `foreign_accounts`, these pieces of data are retrieved
     /// from the network. For any [`ForeignAccount::Private`] account, inner data is used and only
     /// a proof of the account's existence on the network is fetched.
-    ///
-    /// Account data is retrieved for the node's current chain tip, so we need to check whether we
-    /// currently have the corresponding block header data. Otherwise, we additionally need to
-    /// retrieve it, this implies a state sync call which may update the client in other ways.
     async fn retrieve_foreign_account_inputs(
         &mut self,
         foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
@@ -852,12 +837,37 @@ where
         &'auth self,
         data_store: &'store STORE,
     ) -> Result<
-        TransactionExecutor<'store, 'auth, STORE, AUTH, miden_debug::DapExecutor>,
+        TransactionExecutor<'store, 'auth, STORE, AUTH, DapProgramExecutor>,
         TransactionExecutorError,
     > {
-        Ok(self
-            .build_executor(data_store)?
-            .with_program_executor::<miden_debug::DapExecutor>())
+        Ok(self.build_executor(data_store)?.with_program_executor::<DapProgramExecutor>())
+    }
+}
+
+/// Adapts [`miden_debug::DapExecutor`] (which exposes `new` + `execute_async`) to
+/// [`miden_tx::ProgramExecutor`]. `miden-debug` does not depend on `miden-tx`, so the impl
+/// must live here.
+#[cfg(feature = "dap")]
+pub(crate) struct DapProgramExecutor(miden_debug::DapExecutor);
+
+#[cfg(feature = "dap")]
+impl miden_tx::ProgramExecutor for DapProgramExecutor {
+    fn new(
+        stack_inputs: miden_processor::StackInputs,
+        advice_inputs: miden_processor::advice::AdviceInputs,
+        options: miden_processor::ExecutionOptions,
+    ) -> Self {
+        Self(miden_debug::DapExecutor::new(stack_inputs, advice_inputs, options))
+    }
+
+    fn execute<H: miden_processor::Host + Send>(
+        self,
+        program: &miden_processor::Program,
+        host: &mut H,
+    ) -> impl miden_processor::FutureMaybeSend<
+        Result<miden_processor::ExecutionOutput, miden_processor::ExecutionError>,
+    > {
+        self.0.execute_async(program, host)
     }
 }
 
@@ -961,13 +971,19 @@ pub(crate) async fn fetch_public_account_inputs(
     let known_account_code: Option<AccountCode> =
         store.get_foreign_account_code(vec![account_id]).await?.into_values().next();
 
+    // Get vault assets only if known commitment doesn't match the current one.
+    let known_vault_commitment = store
+        .get_account_header(account_id)
+        .await?
+        .map_or(EMPTY_WORD, |(header, _)| header.vault_root());
+
     let (_, account_proof) = rpc_api
         .get_account_proof(
             account_id,
             storage_requirements.clone(),
             account_state_at,
             known_account_code,
-            Some(EMPTY_WORD),
+            Some(known_vault_commitment),
         )
         .await?;
 
