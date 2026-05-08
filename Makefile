@@ -122,7 +122,7 @@ integration-test-full: ## Run the integration test binary with ignored tests inc
 	cargo nextest run --workspace --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
 
 .PHONY: integration-test-miden-bench
-integration-test-miden-bench: install-bench ## Run miden-bench smoke tests (requires node)
+integration-test-miden-bench: install-bench ## Run miden-bench smoke tests
 	./scripts/test-miden-bench-smoke.sh
 
 .PHONY: test-dev
