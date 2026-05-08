@@ -35,10 +35,10 @@ miden-client              = { default-features = false, path = "crates/rust-clie
 miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-store", version = "0.15.0" }
 
 # Miden protocol dependencies
-miden-protocol  = { default-features = false, version = "0.14" }
-miden-standards = { default-features = false, version = "0.14" }
-miden-testing   = { default-features = false, version = "0.14" }
-miden-tx        = { default-features = false, version = "0.14" }
+miden-protocol  = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
+miden-standards = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
+miden-testing   = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
+miden-tx        = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
 
 # Miden node dependencies
 miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/node.git" }
@@ -53,6 +53,10 @@ miden-note-transport-proto-build = { default-features = false, version = "0.2" }
 miden-remote-prover-client = { branch = "next", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/node.git" }
+
+# Miden debug dependency
+miden-debug     = { default-features = false, features = ["dap", "std"], version = "0.7" }
+miden-processor = { default-features = false, version = "0.22" }
 
 # External dependencies
 anyhow             = { default-features = false, version = "1.0" }

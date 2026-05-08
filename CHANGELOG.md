@@ -8,9 +8,17 @@
 * [BREAKING][param][rust] `NodeRpcClient::sync_chain_mmr()` replaced `block_to: Option<BlockNumber>` with `upper_bound: SyncTarget` to match the RPC definition. Use `SyncTarget::CommittedChainTip` for previous default behavior (`None`), or `SyncTarget::BlockNumber(num)` for a specific block number. ([#1991](https://github.com/0xMiden/miden-client/pull/1991))
 * [BREAKING][rust] Added `submit_proven_batch` to `NodeRpcClient` trait. ([#2075](https://github.com/0xMiden/miden-client/pull/2075))
 * [BREAKING][param][cli] `address add` now takes `<ACCOUNT_ID> <BECH32_ADDRESS>` instead of `<ACCOUNT_ID> <INTERFACE> [TAG_LEN]`. Use the new `address encode` subcommand to build a bech32 string from `<ACCOUNT_ID> <INTERFACE> [TAG_LEN]`. ([#2115](https://github.com/0xMiden/miden-client/pull/2115))
+* [BREAKING][type][rust] `BasicFungibleFaucet` is now a unit struct; token symbol/decimals/max-supply moved to a new `FungibleTokenMetadata` component built via `FungibleTokenMetadata::builder`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
+* [BREAKING][behavior][cli] `account new-faucet` now requires a `[fungible-faucet-metadata]` block (typed `symbol`, `decimals`, `max_supply`, optional `name`) in the init data file passed via `-i`, replacing the previous `["miden::standards::fungible_faucets::metadata"]` section with stringly-typed values. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
+* [BREAKING][behavior][all] Note scripts must now use the package-style header `@note_script` + `pub proc main … end` instead of the bare `begin … end`, following the upstream protocol bump. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
+* [BREAKING][type][rust] Token-policy components in `account::component` were redesigned: removed `MintAuthControlled`, `MintOwnerControlled`, `BurnAuthControlled`, `BurnOwnerControlled` (and their `*Config` variants); faucets now install a single `TokenPolicyManager` configured with `PolicyAuthority` + `MintPolicyConfig` / `BurnPolicyConfig`, plus standalone `MintAllowAll` / `MintOwnerOnly` / `BurnAllowAll` / `BurnOwnerOnly` policy components. Construct via `AccountBuilder::with_components(TokenPolicyManager::new(...))`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
+* [BREAKING][type][rust] `NoteScript::root()` now returns `NoteScriptRoot` instead of `Word`. Use `Word::from(root)` (or `root.into()`) where a `Word` is required. `NoteScriptRoot` is re-exported from `miden_client::note`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
+* [BREAKING][rename][rust] `FeeParameters::native_asset_id()` renamed to `fee_faucet_id()`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
+* [BREAKING][rust] Removed `NodeRpcClient::check_nullifiers`, `RpcEndpoint::CheckNullifiers`, `EndpointError::CheckNullifiers`, and `CheckNullifiersError` after the upstream node dropped the `CheckNullifiers` gRPC method. Use `NodeRpcClient::sync_nullifiers` to retrieve nullifier updates. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 
 ### Enhancements
 
+* [FEATURE][rust] Added `Client::sync_chain()` (on-chain sync only) and `Client::sync_note_transport()` (Note Transport Layer fetch only) for callers needing finer-grained control over sync. ([#2091](https://github.com/0xMiden/miden-client/pull/2091))
 * [FEATURE][rust] Added `GrpcClient::with_bearer_auth(token)` to attach an `authorization: Bearer <token>` header to every outbound gRPC call, for use behind authenticating gateways. Tokens are validated at connection time and preserved across `set_genesis_commitment` updates ([#2101](https://github.com/0xMiden/miden-client/pull/2101)).
 * Made new-account construction use merged storage schema commitment (`build_with_schema_commitment`), re-exported `AccountBuilderSchemaCommitmentExt`, added WASM `buildWithoutSchemaCommitment()`, and fixed contract `accounts.create()` to require explicit `components` ([#1996](https://github.com/0xMiden/miden-client/pull/1996)).
 * Fixed the faucet token symbol display when showing account details ([#1985](https://github.com/0xMiden/miden-client/pull/1985) ([#2158](https://github.com/0xMiden/miden-client/pull/2158))).
@@ -19,12 +27,53 @@
 * Added `miden-cli call` command for invoking account procedures directly from the CLI ([#1943](https://github.com/0xMiden/miden-client/pull/1943)).
 * Made `TransactionStoreUpdate` serialization lossless ([#2112](https://github.com/0xMiden/miden-client/pull/2112)).
 * [FEATURE][cli] Added `address encode <ACCOUNT_ID> <INTERFACE> [TAG_LEN]` subcommand that prints the bech32 encoding of an address built from the given fields (useful for producing the input to `address add`). ([#2115](https://github.com/0xMiden/miden-client/pull/2115))
+* [FEATURE][web] Added `StorageView` JS wrapper over WASM `AccountStorage`. `account.storage()` now returns a `StorageView` that makes `getItem()` work intuitively for both Value and StorageMap slots. WASM primitives are unchanged; the raw `AccountStorage` is accessible via `.raw` ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
+* [FEATURE][web] Added `wordToBigInt()` utility export for losslessly converting a `Word`'s first felt to a `BigInt`. `StorageResult.toString()` is BigInt-backed, and `valueOf()` returns a JS number for values fitting in `Number.MAX_SAFE_INTEGER` and throws `RangeError` for larger u64 values — use `.toBigInt()` for exact access ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 
-## 0.14.4 (TBA)
+## 0.14.7 (2026-06-05)
+
+### Enhancements
+
+* [FEATURE][rust] Added `GrpcClient::with_bearer_auth(token)` to attach an `authorization: Bearer <token>` header to every outbound gRPC call, for use behind authenticating gateways. Tokens are validated at connection time and preserved across `set_genesis_commitment` updates ([#2101](https://github.com/0xMiden/miden-client/pull/2101)).
+
+## 0.14.6 (2026-05-05)
+
+### Fixes
+
+* [FIX] When the client submits a network note and it is also tracking the recipient network account, now the `InputNoteReader` detects the consumed note ([#2113](https://github.com/0xMiden/miden-client/pull/2113)).
+* Changed note transport integration tests to validate note ids and avoid matching with existing notes when running against testnet ([#2148](https://github.com/0xMiden/miden-client/pull/2148)).
+
+## 0.14.5 (2026-04-27)
+
+### Breaking Changes
+
+* [BREAKING][behavior][rust,web] `CodeBuilder::compile_note_script` now expects a library module with a single procedure annotated `@note_script` (e.g. `@note_script\npub proc main\n    ...\nend`) instead of a `begin..end` program. Inherited from `miden-standards` 0.14.5, which switched the underlying call from `assemble_program` to `assemble_library` ([#2128](https://github.com/0xMiden/miden-client/pull/2128)).
+
+### Enhancements
+
+* Added `ClientBuilder::source_manager()` to override the `SourceManager` used by the client. When not set, the client defaults to `DefaultSourceManager`. Set this when compiling scripts outside the client with an external `Assembler`, so source spans resolve against the same manager ([#2047](https://github.com/0xMiden/miden-client/pull/2047)).
+
+### Fixes
+
+* [FIX][web] Stopped the wasm-bindgen-generated array constructors (`NoteArray`, `OutputNoteArray`, `NoteAndArgsArray`, `NoteRecipientArray`, `StorageSlotArray`, `TransactionScriptInputPairArray`, `FeltArray`, `AccountIdArray`, `AccountArray`, `ForeignAccountArray`, `NoteIdAndArgsArray`) from silently moving each input element's underlying Rust value out of the caller's JS handle. The default `pub fn new(elements: Option<Vec<T>>)` path took every element by value via wasm-bindgen's `Vec<T>` ABI: the JS handle's `__wbg_ptr` was left unchanged so the object looked fine, but any subsequent method on it panicked inside WASM with the opaque `"null pointer passed to rust"` error. The auto-generated array exports are now overridden in `js/index.js` with thin wrappers that build the same array via `push(&T)` (which already borrows + clones) so callers can keep using the originals after construction. Same pattern applied to `replaceAt` on the Rust side, which now takes `elem: &T` instead of `elem: T`. Repro: `const note = new Note(...); new NoteArray([note]); note.id();` — used to panic, now succeeds.
+* [FIX][rust] Fixed source manager mismatch panic (`invalid source span: starting byte is out of bounds`) in tests that compiled scripts with a standalone `SourceManager` and then executed them through the client. Test helpers now use `TransactionKernel::assembler_with_source_manager()` and the client's shared source manager ([#2047](https://github.com/0xMiden/miden-client/pull/2047)).
+* [FIX][react] Fixed `initializeSignerAccount` (the external-keystore init path used by `MidenFiSignerProvider`, Para, Turnkey, etc.) throwing `"invalid enum value passed"` on first connect. The code reached for `AuthScheme.AuthEcdsaK256Keccak`, which only exists on the internal wasm-bindgen `AuthScheme` enum, not on the public string-valued `AuthScheme` constant exported from `@miden-sdk/miden-sdk/lazy` — at runtime it resolved to `undefined`, and passing `undefined` to `AccountComponent.createAuthComponentFromCommitment` failed at the wasm boundary. `initializeSignerAccount` now calls `resolveAuthScheme(AuthScheme.ECDSA)`, where `resolveAuthScheme` is a newly-public helper from `@miden-sdk/miden-sdk` that converts the string constants to the numeric wasm-bindgen variant.
+* [FIX][react] `DEFAULTS.AUTH_SCHEME` was being initialized to `AuthScheme.AuthRpoFalcon512` — another nonexistent key on the public `AuthScheme`, silently resolving to `undefined`. Now set to `AuthScheme.Falcon`. The four hooks that read this default (`useCreateWallet`, `useCreateFaucet`, `useImportAccount`, `useSessionAccount`) now pipe the value through `resolveAuthScheme(...)` before handing it to the wasm-bindgen `newWallet` / `newFaucet` / `importPublicAccountFromSeed` calls. The public hook option types stay `authScheme?: AuthScheme`, which now correctly means `"falcon" | "ecdsa"`.
+
+## 0.14.4 (2026-04-20)
 
 ### Features
 
+* Added DAP-backed transaction script debugging support with `--start-debug-adapter` flag on the `exec` CLI command, `execute_program_with_dap` client method, and offline bootstrap mode for node-less execution ([#1959](https://github.com/0xMiden/miden-client/pull/1959)).
+* [FEATURE][web] Serialize all async `WebClient` JS methods — both the explicit wrappers and every async call that falls through `createClientProxy` to the underlying WASM client (e.g. `getAccount`, `importAccountById`, `getAccountStorage`) — via an internal `_serializeWasmCall` chain. Prevents `"recursive use of an object detected"` panics when an unwrapped read/write races the auto-sync timer or any explicitly-wrapped method. Expose `waitForIdle()` on `MidenClient` so callers can drain in-flight work before mutating non-WASM state ([#2057](https://github.com/0xMiden/miden-client/pull/2057)).
+* [FEATURE][web] Split `@miden-sdk/miden-sdk` into eager and lazy entry points. The default entry (`import from "@miden-sdk/miden-sdk"`) now awaits WASM at module top level via a small shim (`js/eager.js`) — consumers don't need `await MidenClient.ready()` / `isReady` before constructing wasm-bindgen types. The lazy entry (`import from "@miden-sdk/miden-sdk/lazy"`) preserves the previous behavior and is required for Capacitor WKWebView hosts (the custom-scheme handler hangs on TLA) and Next.js SSR. Verified empirically against the Miden Wallet's iOS E2E suite on devnet. `@miden-sdk/react` imports from `/lazy` internally and manages readiness via `isReady`.
+* [FEATURE][web] Expose `lastAuthError()` on `MidenClient` for typed sign-callback failure recovery — preserves the raw thrown value from the JS signCallback so consumers can distinguish locked/rejected/IO-error failure modes ([#2058](https://github.com/0xMiden/miden-client/pull/2058)).
 * [FEATURE][web] Added `"custom"` operation to `preview()` so users can dry-run any pre-built `TransactionRequest`, not just send/mint/consume/swap ([#2052](https://github.com/0xMiden/miden-client/pull/2052)).
+* [FEATURE][web] Exposed `BlockHeader.nativeAssetId()` so JavaScript consumers can read the native fungible-faucet account ID from a block header. The field already rides the RPC wire and is decoded into the Rust `BlockHeader`, but no WASM accessor existed, forcing wallets and dApps to hardcode the native faucet per network ([#2070](https://github.com/0xMiden/miden-client/issues/2070)).
+
+### Fixes
+
+* [FIX][web] `proveTransactionWithProver` now takes `&TransactionProver` by reference instead of consuming by value — the old signature invalidated the JS handle after one use, silently falling back to local proving on subsequent calls ([#2062](https://github.com/0xMiden/miden-client/pull/2062)).
 
 ## 0.14.3 (2026-04-16)
 
@@ -61,8 +110,6 @@
 
 ### Enhancements
 
-* [FEATURE][web] Added `StorageView` JS wrapper over WASM `AccountStorage`. `account.storage()` now returns a `StorageView` that makes `getItem()` work intuitively for both Value and StorageMap slots. WASM primitives are unchanged; the raw `AccountStorage` is accessible via `.raw` ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
-* [FEATURE][web] Added `wordToBigInt()` utility export for losslessly converting a `Word`'s first felt to a `BigInt`. `StorageResult.toString()` is BigInt-backed, and `valueOf()` returns a JS number for values fitting in `Number.MAX_SAFE_INTEGER` and throws `RangeError` for larger u64 values — use `.toBigInt()` for exact access ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * Made `GrpcNoteTransportClient` connection lazy, deferring it to the first RPC call instead of connecting eagerly at client initialization ([#1970](https://github.com/0xMiden/miden-client/pull/1970)).
 * Updated the `GrpcClient` to fetch the RPC limits from the node ([#1724](https://github.com/0xMiden/miden-client/pull/1724)) ([#1737](https://github.com/0xMiden/miden-client/pull/1737), [#1809](https://github.com/0xMiden/miden-client/pull/1809)).
 * Added typed error parsing for node RPC endpoints, enabling programmatic error handling instead of string parsing ([#1734](https://github.com/0xMiden/miden-client/pull/1734)).

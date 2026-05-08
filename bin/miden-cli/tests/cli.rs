@@ -24,6 +24,7 @@ use miden_client::note::{
     NoteTag,
     NoteType,
 };
+use miden_client::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT;
 use miden_client::rpc::Endpoint;
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
@@ -127,6 +128,15 @@ fn silent_initialization_uses_default_values() {
     assert!(
         config_content.contains("keystore"),
         "Should use default keystore directory (relative to config file)"
+    );
+    // Verify note transport defaults to the testnet endpoint
+    assert!(
+        config_content.contains("[note_transport]"),
+        "Silent init should write a [note_transport] section"
+    );
+    assert!(
+        config_content.contains(NOTE_TRANSPORT_TESTNET_ENDPOINT),
+        "Silent init should default note transport to the testnet endpoint"
     );
     // Verify that the paths don't have the .miden prefix in the config
     // (they're relative to the config file location now)
@@ -737,7 +747,8 @@ async fn debug_mode_outputs_logs() -> Result<()> {
 
     // Create the custom note with a script that will print the stack state
     let note_script = "
-            begin
+            @note_script
+            pub proc main
                 debug.stack
                 assert_eq
             end
@@ -1194,10 +1205,10 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
 
     // Create a TOML file with the InitStorageData
     let init_storage_data_toml = r#"
-        ["miden::standards::fungible_faucets::metadata"]
-        decimals="10"
-        max_supply="10000000"
-        symbol="BTC"
+        [fungible-faucet-metadata]
+        symbol = "BTC"
+        decimals = 10
+        max_supply = 10000000
         "#;
     let file_path = cli_path.join(INIT_DATA_FILENAME);
     fs::write(&file_path, init_storage_data_toml).unwrap();

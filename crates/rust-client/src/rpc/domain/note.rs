@@ -39,6 +39,26 @@ impl TryFrom<proto::note::NoteId> for NoteId {
     }
 }
 
+fn note_type_from_proto(raw: i32) -> Result<NoteType, RpcConversionError> {
+    let proto_note_type = proto::note::NoteType::try_from(raw)
+        .map_err(|_| RpcConversionError::InvalidField(alloc::format!("note_type={raw}")))?;
+    match proto_note_type {
+        proto::note::NoteType::Public => Ok(NoteType::Public),
+        proto::note::NoteType::Private => Ok(NoteType::Private),
+        proto::note::NoteType::Unspecified => {
+            Err(RpcConversionError::InvalidField("note_type=NOTE_TYPE_UNSPECIFIED".into()))
+        },
+    }
+}
+
+fn note_type_to_proto(note_type: NoteType) -> i32 {
+    let proto_note_type = match note_type {
+        NoteType::Public => proto::note::NoteType::Public,
+        NoteType::Private => proto::note::NoteType::Private,
+    };
+    proto_note_type as i32
+}
+
 impl TryFrom<proto::note::NoteMetadata> for NoteMetadata {
     type Error = RpcConversionError;
 
@@ -47,8 +67,7 @@ impl TryFrom<proto::note::NoteMetadata> for NoteMetadata {
             .sender
             .ok_or_else(|| proto::note::NoteMetadata::missing_field(stringify!(sender)))?
             .try_into()?;
-        let note_type =
-            NoteType::try_from(u64::try_from(value.note_type).expect("invalid note type"))?;
+        let note_type = note_type_from_proto(value.note_type)?;
         let tag = NoteTag::new(value.tag);
 
         // Deserialize attachment if present
@@ -68,7 +87,7 @@ impl From<NoteMetadata> for proto::note::NoteMetadata {
         use miden_tx::utils::serde::Serializable;
         proto::note::NoteMetadata {
             sender: Some(value.sender().into()),
-            note_type: value.note_type() as i32,
+            note_type: note_type_to_proto(value.note_type()),
             tag: value.tag().as_u32(),
             attachment: value.attachment().to_bytes(),
         }
@@ -324,8 +343,7 @@ impl TryFrom<proto::note::NoteSyncRecord> for CommittedNote {
                 notes.metadata_header.sender
             )))?
             .try_into()?;
-        let note_type =
-            NoteType::try_from(u64::try_from(proto_header.note_type).expect("invalid note type"))?;
+        let note_type = note_type_from_proto(proto_header.note_type)?;
         let tag = NoteTag::new(proto_header.tag);
         let attachment_kind = u8::try_from(proto_header.attachment_kind)
             .ok()

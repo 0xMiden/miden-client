@@ -27,6 +27,8 @@ use crate::{Client, ClientError, ClientRng, ClientRngBox, DebugMode, grpc_suppor
 const TX_DISCARD_DELTA: u32 = 20;
 /// The default number of synced blocks between automatic irrelevant-block pruning runs.
 const IRRELEVANT_BLOCK_PRUNE_INTERVAL: u32 = 1;
+/// Whether the client should cache the current Partial MMR in memory by default.
+const CACHE_PARTIAL_MMR_IN_MEMORY: bool = false;
 
 pub use grpc_support::*;
 
@@ -99,6 +101,10 @@ pub trait StoreFactory {
 /// - **Transaction discard delta**: Number of blocks after which pending transactions are
 ///   considered stale and discarded. Configure via [`tx_discard_delta()`](Self::tx_discard_delta).
 ///
+/// - **In-memory Partial MMR cache**: Reuses the current partial blockchain MMR instead of
+///   rebuilding it from store. Disabled by default. Configure via
+///   [`cache_partial_mmr_in_memory()`](Self::cache_partial_mmr_in_memory).
+///
 /// - **Max block number delta**: Maximum number of blocks the client can be behind the network for
 ///   transactions and account proofs to be considered valid. Configure via
 ///   [`max_block_number_delta()`](Self::max_block_number_delta).
@@ -119,6 +125,8 @@ pub struct ClientBuilder<AUTH> {
     /// Number of synced blocks between automatic pruning runs for irrelevant block data.
     /// If `None`, automatic irrelevant-block pruning is disabled.
     irrelevant_block_prune_interval: Option<u32>,
+    /// Whether the current Partial MMR should be cached in memory between sync-related operations.
+    cache_partial_mmr_in_memory: bool,
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
@@ -131,6 +139,8 @@ pub struct ClientBuilder<AUTH> {
     tx_prover: Option<Arc<dyn TransactionProver + Send + Sync>>,
     /// The endpoint used by the builder for network configuration.
     endpoint: Option<Endpoint>,
+    /// An optional shared source manager for MASM source information.
+    source_manager: Option<Arc<dyn SourceManagerSync>>,
 }
 
 impl<AUTH> Default for ClientBuilder<AUTH> {
@@ -143,11 +153,13 @@ impl<AUTH> Default for ClientBuilder<AUTH> {
             in_debug_mode: DebugMode::Disabled,
             tx_discard_delta: Some(TX_DISCARD_DELTA),
             irrelevant_block_prune_interval: Some(IRRELEVANT_BLOCK_PRUNE_INTERVAL),
+            cache_partial_mmr_in_memory: CACHE_PARTIAL_MMR_IN_MEMORY,
             max_block_number_delta: None,
             note_transport_api: None,
             note_transport_config: None,
             tx_prover: None,
             endpoint: None,
+            source_manager: None,
         }
     }
 }
@@ -343,6 +355,22 @@ where
         self
     }
 
+    /// Overrides the source manager used to retain MASM source information for assembled programs.
+    ///
+    /// If not set, the client uses a default [`DefaultSourceManager`]. The same instance is
+    /// forwarded to the transaction executor and to every script compiled through the client
+    /// (e.g. via [`Client::code_builder`](crate::Client::code_builder)).
+    ///
+    /// Set this explicitly only when scripts or modules are compiled outside the client (for
+    /// example, using an external [`Assembler`](miden_protocol::assembly::Assembler)): pass the
+    /// same `Arc` used by that external assembler so all source spans resolve correctly at
+    /// runtime.
+    #[must_use]
+    pub fn source_manager(mut self, sm: Arc<dyn SourceManagerSync>) -> Self {
+        self.source_manager = Some(sm);
+        self
+    }
+
     /// Optionally set a maximum number of blocks that the client can be behind the network.
     /// By default, there's no maximum.
     #[must_use]
@@ -371,6 +399,17 @@ where
     #[must_use]
     pub fn irrelevant_block_prune_interval(mut self, interval: Option<u32>) -> Self {
         self.irrelevant_block_prune_interval = interval;
+        self
+    }
+
+    /// Enables or disables the in-memory Partial MMR cache.
+    ///
+    /// When enabled, the client reuses the current Partial MMR between sync and pruning
+    /// operations. When disabled, it rebuilds the Partial MMR from the store each time it is
+    /// needed.
+    #[must_use]
+    pub fn cache_partial_mmr_in_memory(mut self, enabled: bool) -> Self {
+        self.cache_partial_mmr_in_memory = enabled;
         self
     }
 
@@ -451,6 +490,10 @@ where
         let tx_prover: Arc<dyn TransactionProver + Send + Sync> =
             self.tx_prover.unwrap_or_else(|| Arc::new(LocalTransactionProver::default()));
 
+        // Use the provided source manager, or create a default one.
+        let source_manager: Arc<dyn SourceManagerSync> =
+            self.source_manager.unwrap_or_else(|| Arc::new(DefaultSourceManager::default()));
+
         // Initialize genesis commitment in RPC client
         if let Some((genesis, _)) = store.get_block_header_by_num(BlockNumber::GENESIS).await? {
             rpc_api.set_genesis_commitment(genesis.commitment()).await?;
@@ -475,9 +518,6 @@ where
             self.note_transport_api = Some(Arc::new(transport) as Arc<dyn NoteTransportClient>);
         }
 
-        // Create source manager for MASM source information
-        let source_manager: Arc<dyn SourceManagerSync> = Arc::new(DefaultSourceManager::default());
-
         // Construct and return the Client
         Ok(Client {
             store,
@@ -499,6 +539,8 @@ where
             last_irrelevant_block_prune_sync_height: None,
             max_block_number_delta: self.max_block_number_delta,
             note_transport_api: self.note_transport_api.clone(),
+            cache_partial_mmr_in_memory: self.cache_partial_mmr_in_memory,
+            partial_mmr: None,
         })
     }
 }
