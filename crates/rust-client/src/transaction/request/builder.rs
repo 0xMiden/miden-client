@@ -443,7 +443,7 @@ impl TransactionRequestBuilder {
     /// - `payback_note_type` determines the visibility of the payback note that fillers emit back
     ///   to the creator. Typically [`NoteType::Private`] (cheaper; the fill amount is already
     ///   visible in the executing transaction).
-    /// - `note_attachment` is the attachment for the PSWAP note. Pass [`NoteAttachment::default`]
+    /// - `note_attachment` is the attachment for the PSWAP note. Pass [`NoteAttachment::default()`]
     ///   when there is nothing to attach.
     /// - `rng` is the random number generator used to generate the serial number for the created
     ///   note.
