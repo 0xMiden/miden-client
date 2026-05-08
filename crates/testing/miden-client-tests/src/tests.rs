@@ -2704,7 +2704,7 @@ async fn partial_output_note_receives_inclusion_proof_after_sync() {
 }
 
 #[tokio::test]
-async fn pswap_test() {
+async fn pswap_full_fill_test() {
     // This test verifies that:
     // 1. Alice can create a PSWAP note offering faucet1 tokens for faucet2 tokens.
     // 2. Bob can consume (fill) the PSWAP note by providing faucet2 tokens and receiving faucet1

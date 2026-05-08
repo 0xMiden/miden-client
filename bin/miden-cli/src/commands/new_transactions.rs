@@ -394,22 +394,6 @@ impl PswapCmd {
 
 /// Create a partial swap note offering one fungible asset in exchange for another.
 #[derive(Debug, Parser, Clone)]
-#[command(after_long_help = "\
-Examples:
-  # Offer 100 tokens from faucet A for 50 tokens from faucet B (public note)
-  miden-client pswap create \\
-    --sender 0xd0e1f2a3b4c5d6e7 \\
-    --offered-asset 100::0x2a7e654f2c508c10 \\
-    --requested-asset 50::0x398e39a0535a3b0e \\
-    --note-type public
-
-  # Same as above but skip confirmation and delegate proving
-  miden-client pswap create \\
-    --sender 0xd0e1f2a3b4c5d6e7 \\
-    --offered-asset 100::0x2a7e654f2c508c10 \\
-    --requested-asset 50::0x398e39a0535a3b0e \\
-    --note-type private --force --delegate-proving
-")]
 pub struct PswapCreateCmd {
     /// Sender account ID or its hex prefix. If none is provided, the default account is used.
     #[arg(short = 's', long = "sender")]
@@ -481,20 +465,6 @@ impl PswapCreateCmd {
 
 /// Consume (partially fill) an existing partial swap note.
 #[derive(Debug, Parser, Clone)]
-#[command(after_long_help = "\
-Examples:
-  # Fill 25 tokens from an existing PSWAP note
-  miden-client pswap consume \\
-    --account 0xd0e1f2a3b4c5d6e7 \\
-    --note 0x1a2b3c4d \\
-    --fill-amount 25
-
-  # Same as above but skip confirmation
-  miden-client pswap consume \\
-    --account 0xd0e1f2a3b4c5d6e7 \\
-    --note 0x1a2b3c4d \\
-    --fill-amount 25 --force
-")]
 pub struct PswapConsumeCmd {
     /// Consumer account ID or its hex prefix.
     #[arg(short = 'a', long = "account")]
@@ -543,18 +513,6 @@ impl PswapConsumeCmd {
 
 /// Cancel an existing partial swap note, reclaiming the offered asset.
 #[derive(Debug, Parser, Clone)]
-#[command(after_long_help = "\
-Examples:
-  # Cancel a PSWAP note by its ID prefix
-  miden-client pswap cancel \\
-    --sender 0xd0e1f2a3b4c5d6e7 \\
-    --note 0x1a2b3c4d
-
-  # Same as above but skip confirmation
-  miden-client pswap cancel \\
-    --sender 0xd0e1f2a3b4c5d6e7 \\
-    --note 0x1a2b3c4d --force
-")]
 pub struct PswapCancelCmd {
     /// Account ID or its hex prefix of the note creator. If none is provided, the default
     /// account is used.

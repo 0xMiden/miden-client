@@ -435,7 +435,7 @@ impl TransactionRequestBuilder {
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction that creates a
-    /// partial swap (PSWAP) note. This request must be executed against the wallet creator account.
+    /// partial swap (PSWAP) note. This request must be executed against the creator account.
     ///
     /// - `pswap_data` is the data for the partial swap that contains the creator account ID, the
     ///   offered fungible asset, and the requested fungible asset.
@@ -478,8 +478,8 @@ impl TransactionRequestBuilder {
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction that consumes
-    /// (fills) a partial swap (PSWAP) note. This request must be executed against the wallet
-    /// consumer account.
+    /// (fills) a partial swap (PSWAP) note. This request must be executed against the consumer
+    /// account.
     ///
     /// - `pswap_note` is the PSWAP note being consumed.
     /// - `consumer_account_id` is the account consuming the swap.
@@ -532,7 +532,7 @@ impl TransactionRequestBuilder {
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction that cancels a
-    /// partial swap (PSWAP) note. This request must be executed against the wallet creator account.
+    /// partial swap (PSWAP) note. This request must be executed against the creator account.
     ///
     /// - `pswap_note` is the PSWAP note to cancel. The caller must be the creator of the note.
     ///

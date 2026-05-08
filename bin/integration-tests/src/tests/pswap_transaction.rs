@@ -44,14 +44,14 @@ pub async fn test_pswap_full_fill_onchain(client_config: ClientConfig) -> Result
     )
     .await?;
 
-    let (btc_faucet, _) = insert_new_fungible_faucet(
+    let (btc_faucet_account, _) = insert_new_fungible_faucet(
         &mut client1,
         AccountStorageMode::Private,
         &authenticator_1,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
-    let (eth_faucet, _) = insert_new_fungible_faucet(
+    let (eth_faucet_account, _) = insert_new_fungible_faucet(
         &mut client2,
         AccountStorageMode::Private,
         &authenticator_2,
@@ -60,14 +60,14 @@ pub async fn test_pswap_full_fill_onchain(client_config: ClientConfig) -> Result
     .await?;
 
     let tx_id =
-        mint_and_consume(&mut client1, account_a.id(), btc_faucet.id(), NoteType::Public).await;
+        mint_and_consume(&mut client1, account_a.id(), btc_faucet_account.id(), NoteType::Public).await;
     wait_for_tx(&mut client1, tx_id).await?;
     let tx_id =
-        mint_and_consume(&mut client2, account_b.id(), eth_faucet.id(), NoteType::Public).await;
+        mint_and_consume(&mut client2, account_b.id(), eth_faucet_account.id(), NoteType::Public).await;
     wait_for_tx(&mut client2, tx_id).await?;
 
-    let offered_asset = FungibleAsset::new(btc_faucet.id(), OFFERED_AMOUNT)?;
-    let requested_asset = FungibleAsset::new(eth_faucet.id(), REQUESTED_AMOUNT)?;
+    let offered_asset = FungibleAsset::new(btc_faucet_account.id(), OFFERED_AMOUNT)?;
+    let requested_asset = FungibleAsset::new(eth_faucet_account.id(), REQUESTED_AMOUNT)?;
 
     info!("Executing PSWAP create transaction");
     let tx_request = TransactionRequestBuilder::new().build_pswap_create(
@@ -112,12 +112,12 @@ pub async fn test_pswap_full_fill_onchain(client_config: ClientConfig) -> Result
     execute_tx_and_sync(&mut client1, account_a.id(), consume_payback).await?;
 
     let account_a_reader = client1.account_reader(account_a.id());
-    assert_eq!(account_a_reader.get_balance(btc_faucet.id()).await?, MINT_AMOUNT - OFFERED_AMOUNT);
-    assert_eq!(account_a_reader.get_balance(eth_faucet.id()).await?, REQUESTED_AMOUNT);
+    assert_eq!(account_a_reader.get_balance(btc_faucet_account.id()).await?, MINT_AMOUNT - OFFERED_AMOUNT);
+    assert_eq!(account_a_reader.get_balance(eth_faucet_account.id()).await?, REQUESTED_AMOUNT);
 
     let account_b_reader = client2.account_reader(account_b.id());
-    assert_eq!(account_b_reader.get_balance(btc_faucet.id()).await?, OFFERED_AMOUNT);
-    assert_eq!(account_b_reader.get_balance(eth_faucet.id()).await?, MINT_AMOUNT - REQUESTED_AMOUNT);
+    assert_eq!(account_b_reader.get_balance(btc_faucet_account.id()).await?, OFFERED_AMOUNT);
+    assert_eq!(account_b_reader.get_balance(eth_faucet_account.id()).await?, MINT_AMOUNT - REQUESTED_AMOUNT);
 
     Ok(())
 }
@@ -161,14 +161,14 @@ pub async fn test_pswap_partial_fill_onchain(client_config: ClientConfig) -> Res
     )
     .await?;
 
-    let (btc_faucet, _) = insert_new_fungible_faucet(
+    let (btc_faucet_account, _) = insert_new_fungible_faucet(
         &mut client1,
         AccountStorageMode::Private,
         &authenticator_1,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
-    let (eth_faucet, _) = insert_new_fungible_faucet(
+    let (eth_faucet_account, _) = insert_new_fungible_faucet(
         &mut client2,
         AccountStorageMode::Private,
         &authenticator_2,
@@ -177,14 +177,14 @@ pub async fn test_pswap_partial_fill_onchain(client_config: ClientConfig) -> Res
     .await?;
 
     let tx_id =
-        mint_and_consume(&mut client1, account_a.id(), btc_faucet.id(), NoteType::Public).await;
+        mint_and_consume(&mut client1, account_a.id(), btc_faucet_account.id(), NoteType::Public).await;
     wait_for_tx(&mut client1, tx_id).await?;
     let tx_id =
-        mint_and_consume(&mut client2, account_b.id(), eth_faucet.id(), NoteType::Public).await;
+        mint_and_consume(&mut client2, account_b.id(), eth_faucet_account.id(), NoteType::Public).await;
     wait_for_tx(&mut client2, tx_id).await?;
 
-    let offered_asset = FungibleAsset::new(btc_faucet.id(), OFFERED_AMOUNT)?;
-    let requested_asset = FungibleAsset::new(eth_faucet.id(), REQUESTED_AMOUNT)?;
+    let offered_asset = FungibleAsset::new(btc_faucet_account.id(), OFFERED_AMOUNT)?;
+    let requested_asset = FungibleAsset::new(eth_faucet_account.id(), REQUESTED_AMOUNT)?;
 
     let tx_request = TransactionRequestBuilder::new().build_pswap_create(
         &PswapTransactionData::new(account_a.id(), offered_asset, requested_asset),
@@ -221,12 +221,12 @@ pub async fn test_pswap_partial_fill_onchain(client_config: ClientConfig) -> Res
     // wrong layout would either fall through to the script's full-fill default or be rejected.
     let account_b_reader = client2.account_reader(account_b.id());
     assert_eq!(
-        account_b_reader.get_balance(btc_faucet.id()).await?,
+        account_b_reader.get_balance(btc_faucet_account.id()).await?,
         EXPECTED_PAYOUT,
         "Bob should have received a proportional share, not the full offered amount"
     );
     assert_eq!(
-        account_b_reader.get_balance(eth_faucet.id()).await?,
+        account_b_reader.get_balance(eth_faucet_account.id()).await?,
         MINT_AMOUNT - ACCOUNT_FILL,
         "Bob should have spent only the partial fill amount"
     );
@@ -269,7 +269,7 @@ pub async fn test_pswap_cancel_onchain(client_config: ClientConfig) -> Result<()
     )
     .await?;
 
-    let (btc_faucet, _) = insert_new_fungible_faucet(
+    let (btc_faucet_account, _) = insert_new_fungible_faucet(
         &mut client1,
         AccountStorageMode::Private,
         &authenticator_1,
@@ -277,7 +277,7 @@ pub async fn test_pswap_cancel_onchain(client_config: ClientConfig) -> Result<()
     )
     .await?;
     // The requested-side faucet exists only so the FungibleAsset is well-formed.
-    let (eth_faucet, _) = insert_new_fungible_faucet(
+    let (eth_faucet_account, _) = insert_new_fungible_faucet(
         &mut client1,
         AccountStorageMode::Private,
         &authenticator_1,
@@ -286,11 +286,11 @@ pub async fn test_pswap_cancel_onchain(client_config: ClientConfig) -> Result<()
     .await?;
 
     let tx_id =
-        mint_and_consume(&mut client1, account_a.id(), btc_faucet.id(), NoteType::Private).await;
+        mint_and_consume(&mut client1, account_a.id(), btc_faucet_account.id(), NoteType::Private).await;
     wait_for_tx(&mut client1, tx_id).await?;
 
-    let offered_asset = FungibleAsset::new(btc_faucet.id(), OFFERED_AMOUNT)?;
-    let requested_asset = FungibleAsset::new(eth_faucet.id(), REQUESTED_AMOUNT)?;
+    let offered_asset = FungibleAsset::new(btc_faucet_account.id(), OFFERED_AMOUNT)?;
+    let requested_asset = FungibleAsset::new(eth_faucet_account.id(), REQUESTED_AMOUNT)?;
 
     let create_request = TransactionRequestBuilder::new().build_pswap_create(
         &PswapTransactionData::new(account_a.id(), offered_asset, requested_asset),
@@ -304,7 +304,7 @@ pub async fn test_pswap_cancel_onchain(client_config: ClientConfig) -> Result<()
 
     let account_a_reader = client1.account_reader(account_a.id());
     assert_eq!(
-        account_a_reader.get_balance(btc_faucet.id()).await?,
+        account_a_reader.get_balance(btc_faucet_account.id()).await?,
         MINT_AMOUNT - OFFERED_AMOUNT,
         "creating the PSWAP should debit the offered asset"
     );
@@ -316,7 +316,7 @@ pub async fn test_pswap_cancel_onchain(client_config: ClientConfig) -> Result<()
 
     let account_a_reader = client1.account_reader(account_a.id());
     assert_eq!(
-        account_a_reader.get_balance(btc_faucet.id()).await?,
+        account_a_reader.get_balance(btc_faucet_account.id()).await?,
         MINT_AMOUNT,
         "cancelling should restore the offered asset to the creator"
     );
