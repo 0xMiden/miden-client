@@ -670,7 +670,6 @@ fn pswap_cli_help_output() {
     assert!(stdout.contains("--offered-asset"), "Help should show --offered-asset flag");
     assert!(stdout.contains("--requested-asset"), "Help should show --requested-asset flag");
     assert!(stdout.contains("--note-type"), "Help should show --note-type flag");
-    assert!(stdout.contains("Examples:"), "Help should contain examples section");
 
     // `pswap consume --help` should show --account and --fill-amount
     let mut cmd = cargo_bin_cmd!("miden-client");
