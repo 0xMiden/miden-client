@@ -298,7 +298,8 @@ View and manage addresses.
 | Subcommand                       | Description                                                                            |
 | -------------------------------- | ---------------------------------------------------------------------------------------|
 | `list <ID>`                      | List all addresses or only for the specified account ID (default command)              |
-| `add <ID> <INTERFACE> <TAG_LEN>` | Bind an address for an interface for the specified account ID with optional tag length |
+| `add <ID> <ADDRESS>`             | Bind an encoded address to the specified account ID                                    |
+| `encode <ID> <INTERFACE> [TAG_LEN]` | Encode an address for the specified account ID                                      |
 | `remove <ID> <ADDRESS>`          | Remove an address for the specified account ID                                         |
 
 The `list` subcommand optionally takes an account ID to only show the addresses of that account, if it is not provided, it will show all addresses of all accounts.
@@ -307,13 +308,16 @@ The `list` subcommand optionally takes an account ID to only show the addresses 
 miden-client address list 0x17f13f4f83a8e8100c19d2961dfda2
 ```
 
-`add` and `remove` take the account ID as a mandatory argument, and also the interface of the address, this values can be:
+`encode` takes the account ID and address interface as mandatory arguments, with an optional tag length. The supported interfaces are:
 - `BasicWallet`: The basic wallet interface.
+
+`add` and `remove` take the account ID and encoded address as mandatory arguments.
 
 Note: the `Unspecified` denotes an address not bound to any interface, it's the default address for every account created.
 
 ```sh
-miden-client address add 0x17f13f4f83a8e8100c19d2961dfda2 BasicWallet 10
+miden-client address encode 0x17f13f4f83a8e8100c19d2961dfda2 BasicWallet 10
+miden-client address add 0x17f13f4f83a8e8100c19d2961dfda2 mlcl1qple0ejnutx8zyp0cm0pme9wjfgqz0u9djq
 ```
 
 ```sh

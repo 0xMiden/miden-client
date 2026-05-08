@@ -788,17 +788,18 @@ async fn list_addresses_add() -> Result<()> {
     assert!(!formatted_output.contains("BasicWallet"));
 
     // Add a basic wallet address to the account
-    let mut add_address_cmd = cargo_bin_cmd!("miden-client");
     let custom_note_tag_len = "10";
-    add_address_cmd.args([
-        "address",
-        "add",
-        &basic_account_id,
-        &AddressInterface::BasicWallet.to_string(),
-        custom_note_tag_len,
-    ]);
+    let basic_wallet_address =
+        encode_address_cli(&temp_dir, &basic_account_id, custom_note_tag_len);
+    let mut add_address_cmd = cargo_bin_cmd!("miden-client");
+    add_address_cmd.args(["address", "add", &basic_account_id, &basic_wallet_address]);
     let output = add_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "address add failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     // List of addresses for created account should now contain a BasicWallet address
     sync_cli(&temp_dir);
@@ -810,17 +811,18 @@ async fn list_addresses_add() -> Result<()> {
     assert_eq!(formatted_output.matches("BasicWallet").count(), 1);
 
     // Add another basic wallet address to the account
-    let mut add_address_cmd = cargo_bin_cmd!("miden-client");
     let custom_note_tag_len = "5";
-    add_address_cmd.args([
-        "address",
-        "add",
-        &basic_account_id,
-        &AddressInterface::BasicWallet.to_string(),
-        custom_note_tag_len,
-    ]);
+    let basic_wallet_address =
+        encode_address_cli(&temp_dir, &basic_account_id, custom_note_tag_len);
+    let mut add_address_cmd = cargo_bin_cmd!("miden-client");
+    add_address_cmd.args(["address", "add", &basic_account_id, &basic_wallet_address]);
     let output = add_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "address add failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     // List of addresses for created account should now contain two BasicWallet addresses
     sync_cli(&temp_dir);
@@ -1009,6 +1011,27 @@ fn sync_cli(cli_path: &Path) -> SyncResult {
         }
         std::thread::sleep(std::time::Duration::from_secs(3));
     }
+}
+
+fn encode_address_cli(cli_path: &Path, account_id: &str, tag_len: &str) -> String {
+    let mut encode_address_cmd = cargo_bin_cmd!("miden-client");
+    encode_address_cmd.args([
+        "address",
+        "encode",
+        account_id,
+        &AddressInterface::BasicWallet.to_string(),
+        tag_len,
+    ]);
+
+    let output = encode_address_cmd.current_dir(cli_path).output().unwrap();
+    assert!(
+        output.status.success(),
+        "address encode failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    String::from_utf8(output.stdout).unwrap().trim().to_string()
 }
 
 /// Mints 100 units of the corresponding faucet using the cli and checks that the command runs
