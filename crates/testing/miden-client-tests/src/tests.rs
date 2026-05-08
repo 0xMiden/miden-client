@@ -113,7 +113,7 @@ use miden_standards::account::policies::{
     TokenPolicyManager,
 };
 use miden_standards::account::wallets::BasicWallet;
-use miden_standards::note::{NoteConsumptionStatus, P2idNoteStorage, StandardNote};
+use miden_standards::note::{NoteConsumptionStatus, P2idNoteStorage, PswapNote, StandardNote};
 use miden_standards::testing::mock_account::MockAccountExt;
 use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
@@ -2831,6 +2831,130 @@ async fn pswap_test() {
     assert_eq!(
         bob_faucet1_after, offered_amount,
         "Bob should have received all offered faucet1 tokens"
+    );
+}
+
+#[tokio::test]
+async fn pswap_partial_fill_test() {
+    // This test verifies that:
+    // 1. Bob can partially fill a PSWAP note by paying less than the full requested amount.
+    // 2. Bob receives a proportional share of the offered asset.
+    // 3. A remainder PSWAP note is produced with the correct remaining_offered/remaining_requested.
+
+    let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
+
+    let (alice_wallet, faucet1) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    let (bob_wallet, faucet2) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    mint_and_consume(&mut client, alice_wallet.id(), faucet1.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    mint_and_consume(&mut client, bob_wallet.id(), faucet2.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // offered=100, requested=50, account_fill=25 (half).
+    // payout = offered * fill / requested = 100 * 25 / 50 = 50.
+    // remaining_offered = 100 - 50 = 50; remaining_requested = 50 - 25 = 25.
+    let offered_amount = 100u64;
+    let requested_amount = 50u64;
+    let account_fill_amount = 25u64;
+    let expected_payout = 50u64;
+    let expected_remaining_offered = 50u64;
+    let expected_remaining_requested = 25u64;
+
+    let pswap_data = PswapTransactionData::new(
+        alice_wallet.id(),
+        FungibleAsset::new(faucet1.id(), offered_amount).unwrap(),
+        FungibleAsset::new(faucet2.id(), requested_amount).unwrap(),
+    );
+
+    let create_request = TransactionRequestBuilder::new()
+        .build_pswap_create(
+            &pswap_data,
+            NoteType::Private,
+            NoteType::Private,
+            NoteAttachment::default(),
+            client.rng(),
+        )
+        .unwrap();
+
+    let pswap_note = create_request.expected_output_own_notes()[0].clone();
+    Box::pin(client.submit_new_transaction(alice_wallet.id(), create_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Bob partially fills the PSWAP note.
+    let consume_request = TransactionRequestBuilder::new()
+        .build_pswap_consume(&pswap_note, bob_wallet.id(), account_fill_amount, 0)
+        .unwrap();
+
+    Box::pin(client.submit_new_transaction(bob_wallet.id(), consume_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    let bob_account: Account =
+        client.get_account(bob_wallet.id()).await.unwrap().unwrap().try_into().unwrap();
+
+    // Bob spent only the partial fill amount, not the full requested amount — proves the
+    // account_fill argument was honored (catches a wrong NOTE_ARGS layout, which would fall
+    // back to the script's full-fill default path).
+    assert_eq!(
+        bob_account.vault().get_balance(faucet2.id()).unwrap(),
+        MINT_AMOUNT - account_fill_amount,
+        "Bob should have spent only the partial fill amount"
+    );
+
+    // Bob received a proportional share, not the full offered amount.
+    assert_eq!(
+        bob_account.vault().get_balance(faucet1.id()).unwrap(),
+        expected_payout,
+        "Bob should have received a proportional share of the offered asset"
+    );
+
+    // Locate the remainder PSWAP note among the client's tracked notes and verify its amounts.
+    let all_notes = client.get_input_notes(NoteFilter::All).await.unwrap();
+    let remainder = all_notes
+        .iter()
+        .filter_map(|record| {
+            let note: Note = record.try_into().ok()?;
+            if note.id() == pswap_note.id() {
+                return None;
+            }
+            PswapNote::try_from(&note).ok()
+        })
+        .next()
+        .expect("remainder PSWAP note should exist after partial fill");
+
+    assert_eq!(
+        remainder.offered_asset().amount(),
+        expected_remaining_offered,
+        "remainder offered amount should reflect the unfilled portion"
+    );
+    assert_eq!(
+        remainder.storage().requested_asset_amount(),
+        expected_remaining_requested,
+        "remainder requested amount should reflect the unfilled portion"
     );
 }
 

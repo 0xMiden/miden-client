@@ -10,6 +10,7 @@ use miden_protocol::Word;
 use miden_protocol::account::AccountId;
 use miden_protocol::assembly::SourceManagerSync;
 use miden_protocol::asset::{Asset, NonFungibleAsset};
+use miden_protocol::errors::AssetError;
 use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::store::MerkleStore;
 use miden_protocol::errors::{
@@ -480,6 +481,8 @@ pub enum TransactionRequestError {
     AccountInterfaceError(#[from] AccountInterfaceError),
     #[error("account error")]
     AccountError(#[from] AccountError),
+    #[error("asset error")]
+    AssetError(#[from] AssetError),
     #[error("duplicate input note: note {0} was added more than once to the transaction")]
     DuplicateInputNote(NoteId),
     #[error(

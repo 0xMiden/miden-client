@@ -459,12 +459,12 @@ impl TransactionRequestBuilder {
     ) -> Result<TransactionRequest, TransactionRequestError> {
         let storage = PswapNoteStorage::builder()
             .requested_asset(pswap_data.requested_asset())
-            .creator_account_id(pswap_data.account_id())
+            .creator_account_id(pswap_data.creator_account_id())
             .payback_note_type(payback_note_type)
             .build();
 
         let pswap_note = PswapNote::builder()
-            .sender(pswap_data.account_id())
+            .sender(pswap_data.creator_account_id())
             .storage(storage)
             .serial_number(rng.draw_word())
             .note_type(note_type)
@@ -500,23 +500,15 @@ impl TransactionRequestBuilder {
 
         let requested_faucet_id = pswap.storage().requested_asset().faucet_id();
 
-        let account_fill_asset = FungibleAsset::new(requested_faucet_id, account_fill_amount)
-            .map_err(|e| NoteError::other_with_source("invalid fill amount", e))?;
-
-        let note_fill_asset = FungibleAsset::new(requested_faucet_id, note_fill_amount)
-            .map_err(|e| NoteError::other_with_source("invalid note fill amount", e))?;
+        let account_fill_asset = FungibleAsset::new(requested_faucet_id, account_fill_amount)?;
+        let note_fill_asset = FungibleAsset::new(requested_faucet_id, note_fill_amount)?;
 
         let (p2id_note, remainder_pswap) = pswap
             .execute(consumer_account_id, Some(account_fill_asset), Some(note_fill_asset))
             .map_err(TransactionRequestError::NoteCreationError)?;
 
-        // Note args: [0, 0, note_fill_amount, account_fill_amount].
-        let note_args = Word::from([
-            Felt::new(0),
-            Felt::new(0),
-            Felt::new(note_fill_amount),
-            Felt::new(account_fill_amount),
-        ]);
+        let note_args = PswapNote::create_args(account_fill_amount, note_fill_amount)
+            .map_err(TransactionRequestError::NoteCreationError)?;
 
         // Register output notes as expected future notes (created by the script, not the account).
         let p2id_details = NoteDetails::from(&p2id_note);
@@ -549,6 +541,8 @@ impl TransactionRequestBuilder {
         self,
         pswap_note: Note,
     ) -> Result<TransactionRequest, TransactionRequestError> {
+        // Validate that the note is actually a PSWAP note before submitting the transaction.
+        PswapNote::try_from(&pswap_note).map_err(TransactionRequestError::NoteCreationError)?;
         self.input_notes(vec![(pswap_note, None)]).build()
     }
 
@@ -815,8 +809,8 @@ impl PswapTransactionData {
         }
     }
 
-    /// Returns the executor [`AccountId`].
-    pub fn account_id(&self) -> AccountId {
+    /// Returns the creator [`AccountId`].
+    pub fn creator_account_id(&self) -> AccountId {
         self.creator_account_id
     }
 

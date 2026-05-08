@@ -359,11 +359,6 @@ impl ConsumeNotesCmd {
 // PSWAP COMMANDS
 // ================================================================================================
 
-/// The CLI does not currently support note-supplied fill amounts (i.e., in-flight
-/// fills routed through other notes). Pass zero so the full remaining balance is
-/// available for the account to fill directly.
-const PSWAP_NOTE_FILL_AMOUNT: u64 = 0;
-
 /// Partial swap (PSWAP) commands.
 #[derive(Debug, Parser, Clone)]
 #[command(about = "Create, consume, or cancel partial swap notes")]
@@ -416,9 +411,9 @@ Examples:
     --note-type private --force --delegate-proving
 ")]
 pub struct PswapCreateCmd {
-    /// Sender account ID or its hex prefix.
+    /// Sender account ID or its hex prefix. If none is provided, the default account is used.
     #[arg(short = 's', long = "sender")]
-    sender_account_id: String,
+    sender_account_id: Option<String>,
 
     /// Asset offered.
     #[arg(short = 'o', long = "offered-asset", help=format!("Asset offered.\n{SHARED_TOKEN_DOCUMENTATION}"))]
@@ -452,7 +447,8 @@ impl PswapCreateCmd {
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
-        let sender_id = parse_account_id(&client, &self.sender_account_id).await?;
+        let sender_id =
+            get_input_acc_id_by_prefix_or_default(&client, self.sender_account_id.clone()).await?;
 
         let faucet_details_map = load_faucet_details_map()?;
         let offered_fungible_asset =
@@ -529,8 +525,10 @@ impl PswapConsumeCmd {
         let consumer_id = parse_account_id(&client, &self.account).await?;
         let note = resolve_input_note(&client, &self.note).await?;
 
+        // The CLI does not yet support note-supplied fills (in-flight fills routed through
+        // other notes), so pass 0 for `note_fill_amount`.
         let tx_request = TransactionRequestBuilder::new()
-            .build_pswap_consume(&note, consumer_id, self.fill_amount, PSWAP_NOTE_FILL_AMOUNT)
+            .build_pswap_consume(&note, consumer_id, self.fill_amount, 0)
             .map_err(|err| {
                 CliError::Transaction(
                     err.into(),
@@ -558,9 +556,10 @@ Examples:
     --note 0x1a2b3c4d --force
 ")]
 pub struct PswapCancelCmd {
-    /// Account ID or its hex prefix of the note creator.
+    /// Account ID or its hex prefix of the note creator. If none is provided, the default
+    /// account is used.
     #[arg(short = 's', long = "sender")]
-    sender_account_id: String,
+    sender_account_id: Option<String>,
 
     /// Note ID or hex prefix of the PSWAP note to cancel.
     #[arg(long)]
@@ -580,7 +579,8 @@ impl PswapCancelCmd {
         &self,
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
-        let sender_id = parse_account_id(&client, &self.sender_account_id).await?;
+        let sender_id =
+            get_input_acc_id_by_prefix_or_default(&client, self.sender_account_id.clone()).await?;
         let note = resolve_input_note(&client, &self.note).await?;
 
         let tx_request =
