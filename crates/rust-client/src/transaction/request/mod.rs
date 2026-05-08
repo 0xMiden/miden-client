@@ -10,11 +10,11 @@ use miden_protocol::Word;
 use miden_protocol::account::AccountId;
 use miden_protocol::assembly::SourceManagerSync;
 use miden_protocol::asset::{Asset, NonFungibleAsset};
-use miden_protocol::errors::AssetError;
 use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::store::MerkleStore;
 use miden_protocol::errors::{
     AccountError,
+    AssetError,
     AssetVaultError,
     NoteError,
     StorageMapError,
@@ -511,6 +511,8 @@ pub enum TransactionRequestError {
     NoteNotFound(String),
     #[error("failed to create note")]
     NoteCreationError(#[from] NoteError),
+    #[error("note failed validation")]
+    NoteValidationError(#[source] NoteError),
     #[error("pay-to-ID note must contain at least one asset to transfer")]
     P2IDNoteWithoutAsset,
     #[error("error building script")]

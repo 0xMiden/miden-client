@@ -495,15 +495,15 @@ impl TransactionRequestBuilder {
         account_fill_amount: u64,
         note_fill_amount: u64,
     ) -> Result<TransactionRequest, TransactionRequestError> {
-        let pswap =
-            PswapNote::try_from(pswap_note).map_err(TransactionRequestError::NoteCreationError)?;
+        let pswap = PswapNote::try_from(pswap_note)
+            .map_err(TransactionRequestError::NoteValidationError)?;
 
         let requested_faucet_id = pswap.storage().requested_asset().faucet_id();
 
         let account_fill_asset = FungibleAsset::new(requested_faucet_id, account_fill_amount)?;
         let note_fill_asset = FungibleAsset::new(requested_faucet_id, note_fill_amount)?;
 
-        let (p2id_note, remainder_pswap) = pswap
+        let (payback_note, remainder_pswap) = pswap
             .execute(consumer_account_id, Some(account_fill_asset), Some(note_fill_asset))
             .map_err(TransactionRequestError::NoteCreationError)?;
 
@@ -511,12 +511,12 @@ impl TransactionRequestBuilder {
             .map_err(TransactionRequestError::NoteCreationError)?;
 
         // Register output notes as expected future notes (created by the script, not the account).
-        let p2id_details = NoteDetails::from(&p2id_note);
-        let p2id_tag = p2id_note.metadata().tag();
-        let p2id_recipient = p2id_note.recipient().clone();
+        let payback_details = NoteDetails::from(&payback_note);
+        let payback_tag = payback_note.metadata().tag();
+        let payback_recipient = payback_note.recipient().clone();
 
-        let mut expected_future_notes = vec![(p2id_details, p2id_tag)];
-        let mut expected_recipients = vec![p2id_recipient];
+        let mut expected_future_notes = vec![(payback_details, payback_tag)];
+        let mut expected_recipients = vec![payback_recipient];
 
         if let Some(remainder) = remainder_pswap {
             let remainder_note: Note = remainder.into();
@@ -542,7 +542,7 @@ impl TransactionRequestBuilder {
         pswap_note: Note,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         // Validate that the note is actually a PSWAP note before submitting the transaction.
-        PswapNote::try_from(&pswap_note).map_err(TransactionRequestError::NoteCreationError)?;
+        PswapNote::try_from(&pswap_note).map_err(TransactionRequestError::NoteValidationError)?;
         self.input_notes(vec![(pswap_note, None)]).build()
     }
 

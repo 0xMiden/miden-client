@@ -119,6 +119,7 @@ use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
+use rstest::rstest;
 
 mod batch;
 pub mod store;
@@ -2703,17 +2704,25 @@ async fn partial_output_note_receives_inclusion_proof_after_sync() {
     );
 }
 
+// Verifies that Alice can create a PSWAP note offering ETH for USD, and Bob can fill it. With
+// a full fill (`account_fill_amount == requested_amount`) no remainder is produced; with a
+// partial fill, Bob receives a proportional payout and a remainder PSWAP note is produced
+// carrying the unfilled amounts.
+#[rstest]
+#[case::full_fill(100, 50, 50, 100, None)]
+#[case::partial_fill(100, 50, 25, 50, Some((50, 25)))]
 #[tokio::test]
-async fn pswap_full_fill_test() {
-    // This test verifies that:
-    // 1. Alice can create a PSWAP note offering faucet1 tokens for faucet2 tokens.
-    // 2. Bob can consume (fill) the PSWAP note by providing faucet2 tokens and receiving faucet1
-    //    tokens in return.
-
+async fn pswap_fill_test(
+    #[case] offered_amount: u64,
+    #[case] requested_amount: u64,
+    #[case] account_fill_amount: u64,
+    #[case] expected_payout: u64,
+    #[case] expected_remainder: Option<(u64, u64)>,
+) {
     let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
 
-    // Setup Alice's wallet and faucet1 (offered asset).
-    let (alice_wallet, faucet1) = setup_wallet_and_faucet(
+    // Setup Alice's wallet and the ETH faucet (offered asset).
+    let (alice_wallet, eth_faucet) = setup_wallet_and_faucet(
         &mut client,
         AccountStorageMode::Private,
         &keystore,
@@ -2722,8 +2731,8 @@ async fn pswap_full_fill_test() {
     .await
     .unwrap();
 
-    // Setup Bob's wallet and faucet2 (requested asset).
-    let (bob_wallet, faucet2) = setup_wallet_and_faucet(
+    // Setup Bob's wallet and the USD faucet (requested asset).
+    let (bob_wallet, usd_faucet) = setup_wallet_and_faucet(
         &mut client,
         AccountStorageMode::Private,
         &keystore,
@@ -2732,40 +2741,19 @@ async fn pswap_full_fill_test() {
     .await
     .unwrap();
 
-    // Mint faucet1 tokens to Alice.
-    mint_and_consume(&mut client, alice_wallet.id(), faucet1.id(), NoteType::Private).await;
+    mint_and_consume(&mut client, alice_wallet.id(), eth_faucet.id(), NoteType::Private).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    // Mint faucet2 tokens to Bob.
-    mint_and_consume(&mut client, bob_wallet.id(), faucet2.id(), NoteType::Private).await;
+    mint_and_consume(&mut client, bob_wallet.id(), usd_faucet.id(), NoteType::Private).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    // Verify Alice has faucet1 tokens before creating PSWAP.
-    let alice_account: Account = client
-        .get_account(alice_wallet.id())
-        .await
-        .unwrap()
-        .unwrap()
-        .try_into()
-        .unwrap();
-    let alice_faucet1_before = alice_account.vault().get_balance(faucet1.id()).unwrap();
-    assert_eq!(alice_faucet1_before, MINT_AMOUNT, "Alice should have MINT_AMOUNT of faucet1");
-
-    // Verify Bob has faucet2 tokens before consuming PSWAP.
-    let bob_account: Account =
-        client.get_account(bob_wallet.id()).await.unwrap().unwrap().try_into().unwrap();
-    let bob_faucet2_before = bob_account.vault().get_balance(faucet2.id()).unwrap();
-    assert_eq!(bob_faucet2_before, MINT_AMOUNT, "Bob should have MINT_AMOUNT of faucet2");
-
-    // Step 1: Alice creates a PSWAP note offering faucet1 tokens for faucet2 tokens.
-    let offered_amount = 100u64;
-    let requested_amount = 50u64;
+    // Step 1: Alice creates a PSWAP note offering ETH for USD.
     let pswap_data = PswapTransactionData::new(
         alice_wallet.id(),
-        FungibleAsset::new(faucet1.id(), offered_amount).unwrap(),
-        FungibleAsset::new(faucet2.id(), requested_amount).unwrap(),
+        FungibleAsset::new(eth_faucet.id(), offered_amount).unwrap(),
+        FungibleAsset::new(usd_faucet.id(), requested_amount).unwrap(),
     );
 
     let create_request = TransactionRequestBuilder::new()
@@ -2785,124 +2773,15 @@ async fn pswap_full_fill_test() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    // Verify Alice's faucet1 balance decreased after creating the PSWAP note.
-    let alice_account: Account = client
-        .get_account(alice_wallet.id())
-        .await
-        .unwrap()
-        .unwrap()
-        .try_into()
-        .unwrap();
-    let alice_faucet1_after_create = alice_account.vault().get_balance(faucet1.id()).unwrap();
+    // Alice's ETH balance should decrease by the full offered amount regardless of fill.
+    let alice_account = client.get_account(alice_wallet.id()).await.unwrap().unwrap();
     assert_eq!(
-        alice_faucet1_after_create,
+        alice_account.vault().get_balance(eth_faucet.id()).unwrap(),
         MINT_AMOUNT - offered_amount,
-        "Alice's faucet1 balance should decrease by the offered amount"
+        "Alice's ETH balance should decrease by the offered amount"
     );
 
-    // Step 2: Bob consumes the PSWAP note (full fill).
-    let account_fill_amount = requested_amount;
-    let note_fill_amount = 0u64;
-
-    let consume_request = TransactionRequestBuilder::new()
-        .build_pswap_consume(&pswap_note, bob_wallet.id(), account_fill_amount, note_fill_amount)
-        .unwrap();
-
-    Box::pin(client.submit_new_transaction(bob_wallet.id(), consume_request))
-        .await
-        .unwrap();
-    mock_rpc_api.prove_block();
-    client.sync_state().await.unwrap();
-
-    // Verify Bob's balances after consuming the PSWAP note.
-    let bob_account: Account =
-        client.get_account(bob_wallet.id()).await.unwrap().unwrap().try_into().unwrap();
-
-    // Bob should have spent account_fill_amount of faucet2 tokens.
-    let bob_faucet2_after = bob_account.vault().get_balance(faucet2.id()).unwrap();
-    assert_eq!(
-        bob_faucet2_after,
-        MINT_AMOUNT - account_fill_amount,
-        "Bob's faucet2 balance should decrease by the fill amount"
-    );
-
-    // Bob should have received the offered faucet1 tokens (full fill = all offered tokens).
-    let bob_faucet1_after = bob_account.vault().get_balance(faucet1.id()).unwrap();
-    assert_eq!(
-        bob_faucet1_after, offered_amount,
-        "Bob should have received all offered faucet1 tokens"
-    );
-}
-
-#[tokio::test]
-async fn pswap_partial_fill_test() {
-    // This test verifies that:
-    // 1. Bob can partially fill a PSWAP note by paying less than the full requested amount.
-    // 2. Bob receives a proportional share of the offered asset.
-    // 3. A remainder PSWAP note is produced with the correct remaining_offered/remaining_requested.
-
-    let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
-
-    let (alice_wallet, faucet1) = setup_wallet_and_faucet(
-        &mut client,
-        AccountStorageMode::Private,
-        &keystore,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await
-    .unwrap();
-
-    let (bob_wallet, faucet2) = setup_wallet_and_faucet(
-        &mut client,
-        AccountStorageMode::Private,
-        &keystore,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await
-    .unwrap();
-
-    mint_and_consume(&mut client, alice_wallet.id(), faucet1.id(), NoteType::Private).await;
-    mock_rpc_api.prove_block();
-    client.sync_state().await.unwrap();
-
-    mint_and_consume(&mut client, bob_wallet.id(), faucet2.id(), NoteType::Private).await;
-    mock_rpc_api.prove_block();
-    client.sync_state().await.unwrap();
-
-    // offered=100, requested=50, account_fill=25 (half).
-    // payout = offered * fill / requested = 100 * 25 / 50 = 50.
-    // remaining_offered = 100 - 50 = 50; remaining_requested = 50 - 25 = 25.
-    let offered_amount = 100u64;
-    let requested_amount = 50u64;
-    let account_fill_amount = 25u64;
-    let expected_payout = 50u64;
-    let expected_remaining_offered = 50u64;
-    let expected_remaining_requested = 25u64;
-
-    let pswap_data = PswapTransactionData::new(
-        alice_wallet.id(),
-        FungibleAsset::new(faucet1.id(), offered_amount).unwrap(),
-        FungibleAsset::new(faucet2.id(), requested_amount).unwrap(),
-    );
-
-    let create_request = TransactionRequestBuilder::new()
-        .build_pswap_create(
-            &pswap_data,
-            NoteType::Private,
-            NoteType::Private,
-            NoteAttachment::default(),
-            client.rng(),
-        )
-        .unwrap();
-
-    let pswap_note = create_request.expected_output_own_notes()[0].clone();
-    Box::pin(client.submit_new_transaction(alice_wallet.id(), create_request))
-        .await
-        .unwrap();
-    mock_rpc_api.prove_block();
-    client.sync_state().await.unwrap();
-
-    // Bob partially fills the PSWAP note.
+    // Step 2: Bob fills the PSWAP note.
     let consume_request = TransactionRequestBuilder::new()
         .build_pswap_consume(&pswap_note, bob_wallet.id(), account_fill_amount, 0)
         .unwrap();
@@ -2913,49 +2792,52 @@ async fn pswap_partial_fill_test() {
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    let bob_account: Account =
-        client.get_account(bob_wallet.id()).await.unwrap().unwrap().try_into().unwrap();
+    let bob_account = client.get_account(bob_wallet.id()).await.unwrap().unwrap();
 
-    // Bob spent only the partial fill amount, not the full requested amount — proves the
-    // account_fill argument was honored (catches a wrong NOTE_ARGS layout, which would fall
-    // back to the script's full-fill default path).
+    // Bob spent exactly the fill amount — proves NOTE_ARGS were honored (a wrong layout would
+    // fall back to the script's full-fill default path).
     assert_eq!(
-        bob_account.vault().get_balance(faucet2.id()).unwrap(),
+        bob_account.vault().get_balance(usd_faucet.id()).unwrap(),
         MINT_AMOUNT - account_fill_amount,
-        "Bob should have spent only the partial fill amount"
+        "Bob's USD balance should decrease by exactly the fill amount"
     );
 
-    // Bob received a proportional share, not the full offered amount.
+    // Bob received the proportional payout.
     assert_eq!(
-        bob_account.vault().get_balance(faucet1.id()).unwrap(),
+        bob_account.vault().get_balance(eth_faucet.id()).unwrap(),
         expected_payout,
-        "Bob should have received a proportional share of the offered asset"
+        "Bob should have received the expected ETH payout"
     );
 
-    // Locate the remainder PSWAP note among the client's tracked notes and verify its amounts.
+    // The remainder note is produced only on partial fills.
     let all_notes = client.get_input_notes(NoteFilter::All).await.unwrap();
-    let remainder = all_notes
-        .iter()
-        .filter_map(|record| {
-            let note: Note = record.try_into().ok()?;
-            if note.id() == pswap_note.id() {
-                return None;
-            }
-            PswapNote::try_from(&note).ok()
-        })
-        .next()
-        .expect("remainder PSWAP note should exist after partial fill");
+    let remainder = all_notes.iter().find_map(|record| {
+        let note: Note = record.try_into().ok()?;
+        if note.id() == pswap_note.id() {
+            return None;
+        }
+        PswapNote::try_from(&note).ok()
+    });
 
-    assert_eq!(
-        remainder.offered_asset().amount(),
-        expected_remaining_offered,
-        "remainder offered amount should reflect the unfilled portion"
-    );
-    assert_eq!(
-        remainder.storage().requested_asset_amount(),
-        expected_remaining_requested,
-        "remainder requested amount should reflect the unfilled portion"
-    );
+    match expected_remainder {
+        Some((rem_offered, rem_requested)) => {
+            let remainder =
+                remainder.expect("remainder PSWAP note should exist after partial fill");
+            assert_eq!(
+                remainder.offered_asset().amount(),
+                rem_offered,
+                "remainder offered amount should reflect the unfilled portion"
+            );
+            assert_eq!(
+                remainder.storage().requested_asset_amount(),
+                rem_requested,
+                "remainder requested amount should reflect the unfilled portion"
+            );
+        },
+        None => {
+            assert!(remainder.is_none(), "no remainder PSWAP note should exist after a full fill");
+        },
+    }
 }
 
 #[tokio::test]
@@ -2966,8 +2848,7 @@ async fn pswap_cancel_test() {
 
     let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
 
-    // Setup Alice's wallet and faucet1 (offered asset).
-    let (alice_wallet, faucet1) = setup_wallet_and_faucet(
+    let (alice_wallet, eth_faucet) = setup_wallet_and_faucet(
         &mut client,
         AccountStorageMode::Private,
         &keystore,
@@ -2976,8 +2857,7 @@ async fn pswap_cancel_test() {
     .await
     .unwrap();
 
-    // Setup faucet2 (requested asset).
-    let (_bob_wallet, faucet2) = setup_wallet_and_faucet(
+    let (_bob_wallet, usd_faucet) = setup_wallet_and_faucet(
         &mut client,
         AccountStorageMode::Private,
         &keystore,
@@ -2986,29 +2866,17 @@ async fn pswap_cancel_test() {
     .await
     .unwrap();
 
-    // Mint faucet1 tokens to Alice.
-    mint_and_consume(&mut client, alice_wallet.id(), faucet1.id(), NoteType::Private).await;
+    mint_and_consume(&mut client, alice_wallet.id(), eth_faucet.id(), NoteType::Private).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    // Verify Alice's balance before creating the PSWAP note.
-    let alice_account: Account = client
-        .get_account(alice_wallet.id())
-        .await
-        .unwrap()
-        .unwrap()
-        .try_into()
-        .unwrap();
-    let alice_balance_before = alice_account.vault().get_balance(faucet1.id()).unwrap();
-    assert_eq!(alice_balance_before, MINT_AMOUNT, "Alice should have MINT_AMOUNT of faucet1");
-
-    // Step 1: Alice creates a PSWAP note.
+    // Step 1: Alice creates a PSWAP note offering ETH for USD.
     let offered_amount = 100u64;
     let requested_amount = 50u64;
     let pswap_data = PswapTransactionData::new(
         alice_wallet.id(),
-        FungibleAsset::new(faucet1.id(), offered_amount).unwrap(),
-        FungibleAsset::new(faucet2.id(), requested_amount).unwrap(),
+        FungibleAsset::new(eth_faucet.id(), offered_amount).unwrap(),
+        FungibleAsset::new(usd_faucet.id(), requested_amount).unwrap(),
     );
 
     let create_request = TransactionRequestBuilder::new()
@@ -3029,18 +2897,11 @@ async fn pswap_cancel_test() {
     client.sync_state().await.unwrap();
 
     // Verify Alice's balance decreased after creating the PSWAP note.
-    let alice_account: Account = client
-        .get_account(alice_wallet.id())
-        .await
-        .unwrap()
-        .unwrap()
-        .try_into()
-        .unwrap();
-    let alice_balance_after_create = alice_account.vault().get_balance(faucet1.id()).unwrap();
+    let alice_account = client.get_account(alice_wallet.id()).await.unwrap().unwrap();
     assert_eq!(
-        alice_balance_after_create,
+        alice_account.vault().get_balance(eth_faucet.id()).unwrap(),
         MINT_AMOUNT - offered_amount,
-        "Alice's faucet1 balance should decrease by the offered amount"
+        "Alice's ETH balance should decrease by the offered amount"
     );
 
     // Step 2: Alice cancels the PSWAP note.
@@ -3053,17 +2914,11 @@ async fn pswap_cancel_test() {
     client.sync_state().await.unwrap();
 
     // Verify Alice's balance is restored after canceling the PSWAP note.
-    let alice_account: Account = client
-        .get_account(alice_wallet.id())
-        .await
-        .unwrap()
-        .unwrap()
-        .try_into()
-        .unwrap();
-    let alice_balance_after_cancel = alice_account.vault().get_balance(faucet1.id()).unwrap();
+    let alice_account = client.get_account(alice_wallet.id()).await.unwrap().unwrap();
     assert_eq!(
-        alice_balance_after_cancel, MINT_AMOUNT,
-        "Alice's balance should be fully restored after canceling the PSWAP note"
+        alice_account.vault().get_balance(eth_faucet.id()).unwrap(),
+        MINT_AMOUNT,
+        "Alice's ETH balance should be fully restored after canceling the PSWAP note"
     );
 }
 
