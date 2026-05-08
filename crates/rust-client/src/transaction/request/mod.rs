@@ -513,6 +513,10 @@ pub enum TransactionRequestError {
     NoteCreationError(#[from] NoteError),
     #[error("note failed validation")]
     NoteValidationError(#[source] NoteError),
+    #[error("note execution failed")]
+    NoteExecutionError(#[source] NoteError),
+    #[error("failed to build note args")]
+    NoteArgError(#[source] NoteError),
     #[error("pay-to-ID note must contain at least one asset to transfer")]
     P2IDNoteWithoutAsset,
     #[error("error building script")]

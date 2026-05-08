@@ -505,10 +505,10 @@ impl TransactionRequestBuilder {
 
         let (payback_note, remainder_pswap) = pswap
             .execute(consumer_account_id, Some(account_fill_asset), Some(note_fill_asset))
-            .map_err(TransactionRequestError::NoteCreationError)?;
+            .map_err(TransactionRequestError::NoteExecutionError)?;
 
         let note_args = PswapNote::create_args(account_fill_amount, note_fill_amount)
-            .map_err(TransactionRequestError::NoteCreationError)?;
+            .map_err(TransactionRequestError::NoteArgError)?;
 
         // Register output notes as expected future notes (created by the script, not the account).
         let payback_details = NoteDetails::from(&payback_note);
