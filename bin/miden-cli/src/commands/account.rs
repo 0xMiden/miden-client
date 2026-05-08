@@ -185,10 +185,9 @@ async fn show_account<AUTH>(
                             metadata.symbol().to_string(),
                             base_units_to_tokens(fungible_asset.amount(), metadata.decimals()),
                         ),
-                        Err(_) => (
-                            faucet_id.prefix().to_hex(),
-                            format!("{} (raw)", fungible_asset.amount()),
-                        ),
+                        Err(_) => {
+                            (faucet_id.prefix().to_hex(), fungible_asset.amount().to_string())
+                        },
                     };
                     ("Fungible Asset", faucet, amount)
                 },
