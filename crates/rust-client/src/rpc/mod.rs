@@ -85,9 +85,6 @@ mod tonic_client;
 #[cfg(feature = "tonic")]
 pub use tonic_client::GrpcClient;
 
-#[cfg(test)]
-mod tests;
-
 use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::rpc::domain::account_vault::AccountVaultInfo;
 use crate::rpc::domain::transaction::TransactionsInfo;
@@ -231,6 +228,8 @@ pub trait NodeRpcClient: Send + Sync {
             chain_tip = note_sync.chain_tip;
             cursor = note_sync.block_to + 1;
             let range_end = block_to.unwrap_or(chain_tip);
+            // `range_end` is inclusive, so after advancing the cursor, equality means
+            // the final block is still the next page to fetch.
             let done = note_sync.blocks.is_empty() || cursor > range_end;
             all_blocks.extend(note_sync.blocks);
 
