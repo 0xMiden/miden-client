@@ -819,9 +819,11 @@ impl NodeRpcClient for GrpcClient {
         Ok((block_num, proof))
     }
 
-    /// Sends one or more `SyncNoteRequest`s to the node and merges the responses into a list of [`NoteSyncBlock`]s.
+    /// Sends one or more `SyncNoteRequest`s to the node and merges the responses into a list of
+    /// [`NoteSyncBlock`]s.
     ///
-    /// Chunks `note_tags` by [`RpcLimits::note_tags_limit`] and paginates each chunk across the requested block range.
+    /// Chunks `note_tags` by [`RpcLimits::note_tags_limit`] and paginates each chunk across the
+    /// requested block range.
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
