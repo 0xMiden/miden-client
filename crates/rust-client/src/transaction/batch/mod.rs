@@ -54,6 +54,15 @@ use crate::store::data_store::build_partial_mmr_with_paths;
 use crate::transaction::{TransactionRequest, TransactionResult, TransactionStoreUpdate};
 use crate::{Client, ClientError};
 
+/// A transaction successfully pushed into a [`BatchBuilder`]: bundles the locally-proven
+/// transaction with the [`TransactionInputs`] needed by the RPC submission and the
+/// [`TransactionResult`] used to build the per-tx [`TransactionStoreUpdate`].
+pub(crate) struct PushedTx {
+    pub(crate) proven_tx: Arc<ProvenTransaction>,
+    pub(crate) transaction_inputs: TransactionInputs,
+    pub(crate) tx_result: TransactionResult,
+}
+
 /// Accumulates transactions for a single local account and submits them as one
 /// proven batch via the node's `SubmitProvenBatch` endpoint.
 ///
@@ -62,21 +71,19 @@ pub struct BatchBuilder<'c, AUTH> {
     pub(crate) client: &'c Client<AUTH>,
     pub(crate) account_id: AccountId,
     pub(crate) data_store: InMemoryBatchDataStore,
-    pub(crate) proven_txs: Vec<Arc<ProvenTransaction>>,
-    pub(crate) transaction_inputs: Vec<TransactionInputs>,
-    pub(crate) tx_results: Vec<TransactionResult>,
+    pub(crate) pushed_txs: Vec<PushedTx>,
     pub(crate) consumed_input_notes: BTreeSet<NoteId>,
 }
 
 impl<AUTH> BatchBuilder<'_, AUTH> {
     /// Number of successfully-pushed transactions in this batch.
     pub fn len(&self) -> usize {
-        self.proven_txs.len()
+        self.pushed_txs.len()
     }
 
     /// True if no transaction has been pushed yet.
     pub fn is_empty(&self) -> bool {
-        self.proven_txs.is_empty()
+        self.pushed_txs.is_empty()
     }
 
     /// The account id this batch is locked to.
@@ -94,22 +101,22 @@ where
     /// updates to the local store. Returns the block number the batch was
     /// accepted into.
     pub async fn submit(self) -> Result<BlockNumber, ClientError> {
-        if self.proven_txs.is_empty() {
+        if self.pushed_txs.is_empty() {
             return Err(ClientError::from(BatchBuilderError::Empty));
         }
 
         // 1. Treat the largest ref as the reference block and the rest as authenticated.
         let ref_block_num = self
-            .proven_txs
+            .pushed_txs
             .iter()
-            .map(|tx| tx.ref_block_num())
+            .map(|p| p.proven_tx.ref_block_num())
             .max()
-            .expect("non-empty — proven_txs.is_empty() was checked above");
+            .expect("non-empty — pushed_txs.is_empty() was checked above");
 
         let lower_refs: BTreeSet<BlockNumber> = self
-            .proven_txs
+            .pushed_txs
             .iter()
-            .map(|tx| tx.ref_block_num())
+            .map(|p| p.proven_tx.ref_block_num())
             .filter(|&r| r < ref_block_num)
             .collect();
 
@@ -133,10 +140,8 @@ where
             .get_block_headers(&lower_refs)
             .await
             .map_err(ClientError::StoreError)?;
-        let mut authenticated_blocks: Vec<BlockHeader> = Vec::with_capacity(fetched.len());
-        for (header, _relevance) in fetched {
-            authenticated_blocks.push(header);
-        }
+        let authenticated_blocks: Vec<BlockHeader> =
+            fetched.into_iter().map(|(header, _)| header).collect();
 
         // 4. Build PartialMmr + PartialBlockchain using the current blockchain peaks — this matches
         //    the MMR convention used by `ClientDataStore::get_transaction_inputs`.
@@ -151,12 +156,23 @@ where
                 .await?;
         let partial_blockchain = PartialBlockchain::new(partial_mmr, authenticated_blocks)?;
 
-        // 5. Build ProposedBatch.
+        // 5. Split pushed_txs into the three views required by the remaining steps and build the
+        //    ProposedBatch.
+        let len = self.pushed_txs.len();
+        let mut proven_txs: Vec<Arc<ProvenTransaction>> = Vec::with_capacity(len);
+        let mut transaction_inputs: Vec<TransactionInputs> = Vec::with_capacity(len);
+        let mut tx_results: Vec<TransactionResult> = Vec::with_capacity(len);
+        for pushed in self.pushed_txs {
+            proven_txs.push(pushed.proven_tx);
+            transaction_inputs.push(pushed.transaction_inputs);
+            tx_results.push(pushed.tx_result);
+        }
+
         // TODO: field is left unused as of now because all txs in batch are already proven.
         // This will be populated once a feature like remote proving in batches is implemented.
         let unauthenticated_note_proofs = BTreeMap::new();
         let proposed_batch = ProposedBatch::new(
-            self.proven_txs.clone(),
+            proven_txs,
             ref_block_header,
             partial_blockchain,
             unauthenticated_note_proofs,
@@ -167,15 +183,15 @@ where
             LocalBatchProver::new(MIN_PROOF_SECURITY_LEVEL).prove(proposed_batch.clone())?;
 
         // 7. Submit via RPC.
-        let mut updates: Vec<TransactionStoreUpdate> = Vec::with_capacity(self.len());
+        let mut updates: Vec<TransactionStoreUpdate> = Vec::with_capacity(len);
         let block_num = self
             .client
             .rpc_api
-            .submit_proven_batch(proven_batch, proposed_batch, self.transaction_inputs)
+            .submit_proven_batch(proven_batch, proposed_batch, transaction_inputs)
             .await?;
 
         // 8. Build per-tx TransactionStoreUpdates.
-        for tx_result in &self.tx_results {
+        for tx_result in &tx_results {
             let update =
                 self.client.get_transaction_store_update(tx_result, block_num).await.map_err(
                     |source| BatchBuilderError::BatchSubmittedButUpdateBuildFailed {
@@ -197,7 +213,7 @@ where
         Ok(block_num)
     }
 
-    /// Execute requested `tx` against the batch's stacked in-memory state, prove it using
+    /// Execute requested `req` against the batch's stacked in-memory state, prove it using
     /// the client's configured [`crate::transaction::TransactionProver`], and append the
     /// resulting proven transaction to the batch.
     pub async fn push(mut self, req: TransactionRequest) -> Result<Self, ClientError> {
@@ -233,10 +249,12 @@ where
             self.consumed_input_notes.insert(note.id());
         }
 
-        // Append proven tx, inputs, result.
-        self.proven_txs.push(Arc::new(proven_tx));
-        self.transaction_inputs.push(tx_inputs);
-        self.tx_results.push(tx_result);
+        // Append the pushed transaction (proven tx + inputs + result).
+        self.pushed_txs.push(PushedTx {
+            proven_tx: Arc::new(proven_tx),
+            transaction_inputs: tx_inputs,
+            tx_result,
+        });
 
         Ok(self)
     }

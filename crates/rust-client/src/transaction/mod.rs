@@ -182,7 +182,8 @@ where
     /// Open a new [`BatchBuilder`] for the given local `account_id`.
     ///
     /// Fails with [`ClientError::AccountDataNotFound`] if the account is not
-    /// tracked by the client's store.
+    /// tracked by the client's store, or [`ClientError::AccountLocked`] if the account is
+    /// locked.
     pub async fn new_transaction_batch(
         &self,
         account_id: AccountId,
@@ -193,6 +194,10 @@ where
             .await?
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
 
+        if account_record.is_locked() {
+            return Err(ClientError::AccountLocked(account_id));
+        }
+
         let initial_account: Account = account_record.try_into()?;
 
         let inner_data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
@@ -202,9 +207,7 @@ where
             client: self,
             account_id,
             data_store,
-            proven_txs: Vec::new(),
-            transaction_inputs: Vec::new(),
-            tx_results: Vec::new(),
+            pushed_txs: Vec::new(),
             consumed_input_notes: BTreeSet::new(),
         })
     }

@@ -24,7 +24,7 @@ use crate::store::data_store::ClientDataStore;
 // ================================================================================================
 
 /// A [`DataStore`] scoped to a single batch on one local account. Wraps an inner
-/// [`ClientDataStore`] and, for the batch's locked account, substitutes the
+/// [`ClientDataStore`] and, for the batch's account, substitutes the
 /// current in-batch account state (produced by the most recent successful push)
 /// in place of the state read from the store. All other reads remain unchanged.
 pub(crate) struct InMemoryBatchDataStore {
@@ -104,10 +104,11 @@ impl DataStore for InMemoryBatchDataStore {
             // which would cause a vault root mismatch when the executor compares the root
             // exposed by the substituted PartialAccount against what the store returns.
             let vault = self.current_account.vault();
-            if vault.root() != vault_root {
-                return Err(DataStoreError::other(
-                    "Vault root mismatch against in-batch account state",
-                ));
+            let in_batch_root = vault.root();
+            if in_batch_root != vault_root {
+                return Err(DataStoreError::other(format!(
+                    "vault root mismatch for account {account_id}: in-batch root = {in_batch_root:?}, requested root = {vault_root:?}",
+                )));
             }
             let witnesses = vault_keys.into_iter().map(|key| vault.open(key)).collect();
             Ok(witnesses)
@@ -133,9 +134,9 @@ impl DataStore for InMemoryBatchDataStore {
                     return Ok(map.open(&map_key));
                 }
             }
-            return Err(DataStoreError::other(
-                "Storage map root not found in in-batch account state",
-            ));
+            return Err(DataStoreError::other(format!(
+                "storage map root not found in in-batch account state for account {account_id}: requested root = {map_root:?}",
+            )));
         }
         self.inner.get_storage_map_witness(account_id, map_root, map_key).await
     }
