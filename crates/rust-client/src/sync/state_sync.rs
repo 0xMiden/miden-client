@@ -4,24 +4,48 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use async_trait::async_trait;
-use miden_protocol::Word;
-use miden_protocol::account::{Account, AccountHeader, AccountId};
+use miden_protocol::account::{
+    Account,
+    AccountCode,
+    AccountDelta,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    AccountStorageDelta,
+    AccountVaultDelta,
+    StorageMapKey,
+    StorageSlot,
+    StorageSlotContent,
+    StorageSlotName,
+    StorageSlotType,
+};
+use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey};
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::crypto::merkle::mmr::{Forest, MmrDelta, PartialMmr};
+use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
 use miden_protocol::note::{Note, NoteId, NoteTag, NoteType, Nullifier};
+use miden_protocol::transaction::InputNoteCommitment;
+use miden_protocol::{EMPTY_WORD, Felt, Word};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
-use super::{AccountUpdates, StateSyncUpdate};
+use super::{AccountUpdates, PublicAccountUpdate, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
-use crate::rpc::NodeRpcClient;
+use crate::rpc::domain::account::{
+    AccountDetails,
+    AccountStorageMapDetails,
+    AccountStorageRequirements,
+    FetchedAccount,
+};
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
+use crate::rpc::domain::storage_map::StorageMapUpdate;
+use crate::rpc::domain::sync::SyncTarget;
 use crate::rpc::domain::transaction::{
     TransactionInclusion,
     TransactionRecord as RpcTransactionRecord,
 };
-use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
+use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError};
+use crate::store::{AccountStorageFilter, InputNoteRecord, OutputNoteRecord, Store, StoreError};
 use crate::transaction::TransactionRecord;
 
 // STATE UPDATE DATA
@@ -29,13 +53,10 @@ use crate::transaction::TransactionRecord;
 
 /// Raw data fetched from the node needed to sync the client to the chain tip.
 ///
-/// Aggregates the responses of `get_block_header_by_number`, `sync_chain_mmr`, `sync_notes`,
-/// and `sync_transactions`. This may contain more data than a particular
-/// client needs to store — it is filtered and transformed into a [`StateSyncUpdate`] before being
-/// applied.
+/// Aggregates the responses of `sync_chain_mmr`, `sync_notes`, `get_notes_by_id`, and
+/// `sync_transactions`. This may contain more data than a particular client needs to store — it is
+/// filtered and transformed into a [`StateSyncUpdate`] before being applied.
 struct RawStateSyncData {
-    /// The chain tip at the time of the response.
-    chain_tip: BlockNumber,
     /// MMR delta covering the full range from `current_block` to `chain_tip`.
     mmr_delta: MmrDelta,
     /// Chain tip block header.
@@ -123,6 +144,10 @@ pub trait OnNoteReceived {
 pub struct StateSync {
     /// The RPC client used to communicate with the node.
     rpc_api: Arc<dyn NodeRpcClient>,
+    /// The client's store, used to fetch account storage and vault data on demand during
+    /// delta-based sync of public accounts. When `None`, oversized public accounts fall back
+    /// to `get_account_details` (full sync from block 0).
+    store: Option<Arc<dyn Store>>,
     /// Responsible for checking the relevance of notes and executing the
     /// [`OnNoteReceived`] callback when a new note inclusion is received.
     note_screener: Arc<dyn OnNoteReceived>,
@@ -144,15 +169,18 @@ impl StateSync {
     /// # Arguments
     ///
     /// * `rpc_api` - The RPC client used to communicate with the node.
+    /// * `store` - Optional store for on-demand account data access during delta sync.
     /// * `note_screener` - The note screener used to check the relevance of notes.
     /// * `tx_discard_delta` - Number of blocks after which pending transactions are discarded.
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient>,
+        store: Option<Arc<dyn Store>>,
         note_screener: Arc<dyn OnNoteReceived>,
         tx_discard_delta: Option<u32>,
     ) -> Self {
         Self {
             rpc_api,
+            store,
             note_screener,
             tx_discard_delta,
             sync_nullifiers: true,
@@ -181,20 +209,15 @@ impl StateSync {
     /// mutable reference so callers can keep it in memory across syncs.
     ///
     /// During the sync process, the following steps are performed:
-    /// 1. A request is sent to the node to get the state updates. This request includes tracked
-    ///    account IDs and the tags of notes that might have changed or that might be of interest to
-    ///    the client.
-    /// 2. A response is received with the current state of the network. The response includes
-    ///    information about new and committed notes, updated accounts, and committed transactions.
-    /// 3. Tracked public accounts are updated and private accounts are validated against the node
-    ///    state.
-    /// 4. Tracked notes are updated with their new states. Notes might be committed or nullified
-    ///    during the sync processing.
-    /// 5. New notes are checked, and only relevant ones are stored. Relevance is determined by the
-    ///    [`OnNoteReceived`] callback.
-    /// 6. Transactions are updated with their new states. Transactions might be committed or
-    ///    discarded.
-    /// 7. The MMR is updated with the new peaks and authentication nodes.
+    /// 1. Fetch sync data from the node (MMR delta, note inclusions, transactions).
+    /// 2. Update account states (fetch updated public accounts, flag mismatched private ones).
+    /// 3. Advance the partial MMR to the chain tip.
+    /// 4. Screen note inclusions via the configured [`OnNoteReceived`] callback and track relevant
+    ///    blocks in the MMR.
+    /// 5. Process transaction inclusions (commit local txs, record external consumers, discard
+    ///    stale/expired txs, commit output notes).
+    /// 6. Detect consumed notes via nullifier sync (optional, see
+    ///    [`Self::disable_nullifier_sync`]).
     pub async fn sync_state(
         &self,
         current_partial_mmr: &mut PartialMmr,
@@ -211,25 +234,26 @@ impl StateSync {
             .map_err(|_| ClientError::InvalidPartialMmrForest)?
             .into();
 
+        let note_tags = Arc::new(note_tags);
+        let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
+        let tracked_accounts: BTreeSet<AccountId> = account_ids.iter().copied().collect();
+
         let mut state_sync_update = StateSyncUpdate {
             block_num,
-            note_updates: NoteUpdateTracker::new(input_notes, output_notes),
+            note_updates: NoteUpdateTracker::new(input_notes, output_notes)
+                .with_tracked_accounts(tracked_accounts),
             transaction_updates: TransactionUpdateTracker::new(uncommitted_transactions),
             ..Default::default()
         };
-
-        let note_tags = Arc::new(note_tags);
-        let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
-        let mut sync_data = self
+        let Some(mut sync_data) = self
             .fetch_sync_data(state_sync_update.block_num, &account_ids, &note_tags)
-            .await?;
-
-        // No progress — already at the tip.
-        if sync_data.chain_tip == state_sync_update.block_num {
+            .await?
+        else {
+            // No progress — already at the tip.
             return Ok(state_sync_update);
-        }
+        };
 
-        state_sync_update.block_num = sync_data.chain_tip;
+        state_sync_update.block_num = sync_data.chain_tip_header.block_num();
 
         // Build input note records for public notes from the fetched note bodies and the
         // inclusion proofs already present in the note blocks.
@@ -256,12 +280,11 @@ impl StateSync {
             &mut state_sync_update.account_updates,
             &accounts,
             &sync_data.account_commitment_updates,
+            block_num,
         )
         .await?;
 
-        // Apply local changes. These involve updating the MMR and applying state transitions
-        // to notes based on the received information.
-        info!("Applying state transitions locally.");
+        // Apply local changes: update the MMR, screen notes, and apply state transitions.
         self.apply_sync_result(
             sync_data,
             &public_note_records,
@@ -271,7 +294,6 @@ impl StateSync {
         .await?;
 
         if self.sync_nullifiers {
-            info!("Syncing nullifiers.");
             self.nullifiers_state_sync(&mut state_sync_update, block_num).await?;
         }
 
@@ -279,65 +301,66 @@ impl StateSync {
     }
 
     /// Fetches the sync data from the node by calling the following endpoints:
-    /// 1. `get_block_header_by_number` — gets the chain tip block header.
-    /// 2. `sync_chain_mmr` — gets the MMR delta to the chain tip.
-    /// 3. `sync_notes` — loops until the full range to the chain tip is covered (handles paginated
+    /// 1. `sync_chain_mmr` — discovers the chain tip, gets the MMR delta and chain tip header.
+    /// 2. `sync_notes` — loops until the full range to the chain tip is covered (handles paginated
     ///    responses).
+    /// 3. `get_notes_by_id` — fetches full metadata for notes with attachments.
     /// 4. `sync_transactions` — gets transaction data for the full range.
     ///
-    /// Returns a [`RawStateSyncData`] where `chain_tip == current_block_num` signals no progress.
+    /// Returns `None` when the client is already at the chain tip (no progress).
     async fn fetch_sync_data(
         &self,
         current_block_num: BlockNumber,
         account_ids: &[AccountId],
         note_tags: &Arc<BTreeSet<NoteTag>>,
-    ) -> Result<RawStateSyncData, ClientError> {
-        info!("Fetching sync data from node.");
+    ) -> Result<Option<RawStateSyncData>, ClientError> {
+        // Step 1: Fetch the MMR delta and chain tip header.
+        let chain_mmr_info = self
+            .rpc_api
+            .sync_chain_mmr(current_block_num, SyncTarget::CommittedChainTip)
+            .await?;
+        let chain_tip = chain_mmr_info.block_to;
 
-        // Step 1: Discover the chain tip.
-        let (chain_tip_header, _) = self.rpc_api.get_block_header_by_number(None, false).await?;
-        let chain_tip = chain_tip_header.block_num();
-
+        // No progress — already at the tip.
         if chain_tip == current_block_num {
-            return Ok(RawStateSyncData {
-                chain_tip,
-                mmr_delta: MmrDelta {
-                    forest: Forest::new(current_block_num.as_usize()),
-                    data: vec![],
-                },
-                chain_tip_header,
-                note_blocks: vec![],
-                public_notes: BTreeMap::new(),
-                account_commitment_updates: vec![],
-                transactions: vec![],
-                nullifiers: vec![],
-            });
+            info!(block_num = %current_block_num, "Already at chain tip, nothing to sync.");
+            return Ok(None);
         }
 
-        // Fetch the MMR delta to the chain tip.
-        let chain_mmr_info =
-            self.rpc_api.sync_chain_mmr(current_block_num, Some(chain_tip)).await?;
+        info!(
+            block_from = %current_block_num,
+            block_to = %chain_tip,
+            "Syncing state.",
+        );
 
-        // Step 2: Paginate sync_notes over the full range, then fetch note details in one call.
+        // Step 2: Paginate sync_notes using the same chain tip so MMR paths are opened at
+        // a consistent forest.
         let sync_notes_result = self
             .rpc_api
             .sync_notes_with_details(current_block_num, Some(chain_tip), note_tags.as_ref())
             .await?;
 
+        let note_count: usize = sync_notes_result.blocks.iter().map(|b| b.notes.len()).sum();
+        info!(
+            blocks_with_notes = sync_notes_result.blocks.len(),
+            notes = note_count,
+            public_notes = sync_notes_result.public_notes.len(),
+            "Fetched note sync data.",
+        );
+
         // Step 3: Gather transactions for tracked accounts over the full range.
         let (account_commitment_updates, transactions, nullifiers) =
             self.fetch_transaction_data(current_block_num, chain_tip, account_ids).await?;
 
-        Ok(RawStateSyncData {
-            chain_tip,
+        Ok(Some(RawStateSyncData {
             mmr_delta: chain_mmr_info.mmr_delta,
-            chain_tip_header,
+            chain_tip_header: chain_mmr_info.block_header,
             note_blocks: sync_notes_result.blocks,
             public_notes: sync_notes_result.public_notes,
             account_commitment_updates,
             transactions,
             nullifiers,
-        })
+        }))
     }
 
     /// Fetches transaction data for the given range and account IDs.
@@ -357,20 +380,31 @@ impl StateSync {
             .sync_transactions(block_from, Some(block_to), account_ids.to_vec())
             .await?;
 
-        let account_updates = derive_account_commitment_updates(&tx_info.transaction_records);
+        let transaction_records = tx_info.transaction_records;
 
-        let tx_inclusions = tx_info
-            .transaction_records
-            .iter()
-            .map(|r| TransactionInclusion {
-                transaction_id: r.transaction_header.id(),
-                block_num: r.block_num,
-                account_id: r.transaction_header.account_id(),
-                initial_state_commitment: r.transaction_header.initial_state_commitment(),
+        let account_updates = derive_account_commitment_updates(&transaction_records);
+        let nullifiers = compute_ordered_nullifiers(&transaction_records);
+
+        let tx_inclusions = transaction_records
+            .into_iter()
+            .map(|r| {
+                let nullifiers = r
+                    .transaction_header
+                    .input_notes()
+                    .iter()
+                    .map(InputNoteCommitment::nullifier)
+                    .collect();
+                TransactionInclusion {
+                    transaction_id: r.transaction_header.id(),
+                    block_num: r.block_num,
+                    account_id: r.transaction_header.account_id(),
+                    initial_state_commitment: r.transaction_header.initial_state_commitment(),
+                    nullifiers,
+                    output_notes: r.output_notes,
+                    erased_output_notes: r.erased_output_notes,
+                }
             })
             .collect();
-
-        let nullifiers = compute_ordered_nullifiers(&tx_info.transaction_records);
 
         Ok((account_updates, tx_inclusions, nullifiers))
     }
@@ -400,19 +434,18 @@ impl StateSync {
             ..
         } = sync_data;
 
-        // Advance the partial MMR: apply delta (up to chain_tip - 1), capture peaks for
-        // storage, then add the chain tip leaf (which the delta excludes due to the
+        // Advance the partial MMR: apply delta (up to chain_tip - 1), capture peaks at that
+        // forest, then add the chain tip leaf (which the delta excludes due to the
         // one-block lag in block header MMR commitments).
         let mut new_authentication_nodes =
             current_partial_mmr.apply(mmr_delta).map_err(StoreError::MmrError)?;
-        let new_peaks = current_partial_mmr.peaks();
+        state_sync_update.partial_blockchain_updates.new_peaks = current_partial_mmr.peaks();
         new_authentication_nodes
             .append(&mut current_partial_mmr.add(chain_tip_header.commitment(), false));
 
-        state_sync_update.block_updates.insert(
+        state_sync_update.partial_blockchain_updates.insert(
             chain_tip_header.clone(),
             false,
-            new_peaks,
             new_authentication_nodes,
         );
 
@@ -431,25 +464,28 @@ impl StateSync {
             if found_relevant_note {
                 let block_pos = block.block_header.block_num().as_usize();
 
-                let track_auth_nodes = if current_partial_mmr.is_tracked(block_pos) {
-                    vec![]
-                } else {
-                    let nodes_before: BTreeMap<_, _> =
-                        current_partial_mmr.nodes().map(|(k, v)| (*k, *v)).collect();
+                let nodes_before: BTreeMap<_, _> =
+                    current_partial_mmr.nodes().map(|(k, v)| (*k, *v)).collect();
+
+                if !current_partial_mmr.is_tracked(block_pos) {
                     current_partial_mmr
                         .track(block_pos, block.block_header.commitment(), &block.mmr_path)
                         .map_err(StoreError::MmrError)?;
-                    current_partial_mmr
-                        .nodes()
-                        .filter(|(k, _)| !nodes_before.contains_key(k))
-                        .map(|(k, v)| (*k, *v))
-                        .collect()
-                };
+                }
 
-                state_sync_update.block_updates.insert(
+                // Always collect new authentication nodes — even when the block was
+                // already tracked from the MMR delta, the delta's nodes may not include
+                // the full authentication path needed to reconstruct the PartialMmr
+                // from storage later.
+                let track_auth_nodes: Vec<_> = current_partial_mmr
+                    .nodes()
+                    .filter(|(k, _)| !nodes_before.contains_key(k))
+                    .map(|(k, v)| (*k, *v))
+                    .collect();
+
+                state_sync_update.partial_blockchain_updates.insert(
                     block.block_header,
                     true,
-                    current_partial_mmr.peaks(),
                     track_auth_nodes,
                 );
             }
@@ -463,15 +499,44 @@ impl StateSync {
             &transactions,
         );
 
+        // Process each transaction
+        for transaction in &transactions {
+            // Transition tracked output notes to Committed using inclusion proofs from the
+            // transaction sync response. This covers output notes regardless of whether their
+            // tags were tracked in the note sync.
+            state_sync_update
+                .note_updates
+                .apply_output_note_inclusion_proofs(&transaction.output_notes)?;
+
+            // Detect output notes erased by same-batch note erasure.
+            Self::mark_erased_notes_as_consumed(state_sync_update, transaction);
+        }
+
         Ok(())
     }
 
+    /// Marks output notes that were erased by same-batch note erasure as consumed.
+    ///
+    /// When a note is created and consumed in the same batch, note erasure removes it from
+    /// the block body. The node reports these as erased output notes in the transaction
+    /// record (note ID only, no inclusion proof). We mark them as consumed.
+    fn mark_erased_notes_as_consumed(
+        state_sync_update: &mut StateSyncUpdate,
+        transaction: &TransactionInclusion,
+    ) {
+        for note_header in &transaction.erased_output_notes {
+            // Best-effort: ignore errors for notes not tracked by this client.
+            let _ = state_sync_update
+                .note_updates
+                .mark_erased_note_as_consumed(note_header, transaction.block_num);
+        }
+    }
+
     /// Compares the state of tracked accounts with the updates received from the node. The method
-    /// updates the `state_sync_update` field with the details of the accounts that need to be
-    /// updated.
+    /// Updates the `account_updates` with the details of the accounts that need to be updated.
     ///
     /// The account updates might include:
-    /// * Public accounts that have been updated in the node.
+    /// * Public accounts that have been updated in the node (full or delta-based).
     /// * Network accounts that have been updated in the node and are being tracked by the client.
     /// * Private accounts that have been marked as mismatched because the current commitment
     ///   doesn't match the one received from the node. The client will need to handle these cases
@@ -481,53 +546,503 @@ impl StateSync {
         account_updates: &mut AccountUpdates,
         accounts: &[AccountHeader],
         account_commitment_updates: &[(AccountId, Word)],
+        block_num: BlockNumber,
     ) -> Result<(), ClientError> {
+        // "Public" here includes both Public and Network accounts, since both have
+        // their state stored on-chain and follow the same sync path.
         let (public_accounts, private_accounts): (Vec<_>, Vec<_>) =
-            accounts.iter().partition(|account_header| !account_header.id().is_private());
+            accounts.iter().partition(|a| !a.id().is_private());
 
-        let updated_public_accounts = self
-            .get_updated_public_accounts(account_commitment_updates, &public_accounts)
-            .await?;
+        self.sync_public_accounts(
+            account_updates,
+            account_commitment_updates,
+            &public_accounts,
+            block_num,
+        )
+        .await?;
 
         let mismatched_private_accounts = account_commitment_updates
             .iter()
             .filter(|(account_id, digest)| {
-                private_accounts.iter().any(|account| {
-                    account.id() == *account_id && &account.to_commitment() != digest
-                })
+                private_accounts
+                    .iter()
+                    .any(|a| a.id() == *account_id && &a.to_commitment() != digest)
             })
             .copied()
             .collect::<Vec<_>>();
 
-        account_updates
-            .extend(AccountUpdates::new(updated_public_accounts, mismatched_private_accounts));
+        account_updates.extend(AccountUpdates::new(Vec::new(), mismatched_private_accounts));
 
         Ok(())
     }
 
-    /// Queries the node for the latest state of the public accounts that don't match the current
-    /// state of the client.
-    async fn get_updated_public_accounts(
+    /// Queries the node for updated public accounts and populates `account_updates`.
+    ///
+    /// When a store is available, storage and vault data are fetched on demand to build
+    /// deltas for oversized accounts. Without a store, oversized accounts fall back to
+    /// `get_account_details` (full sync from block 0).
+    async fn sync_public_accounts(
         &self,
-        account_updates: &[(AccountId, Word)],
+        account_updates: &mut AccountUpdates,
+        commitment_updates: &[(AccountId, Word)],
         current_public_accounts: &[&AccountHeader],
-    ) -> Result<Vec<Account>, ClientError> {
-        let mut mismatched_public_accounts = vec![];
-
-        for (id, commitment) in account_updates {
-            // check if this updated account state is tracked by the client
-            if let Some(account) = current_public_accounts
+        block_num: BlockNumber,
+    ) -> Result<(), ClientError> {
+        for (id, commitment) in commitment_updates {
+            let Some(local_header) = current_public_accounts
                 .iter()
                 .find(|acc| *id == acc.id() && *commitment != acc.to_commitment())
+            else {
+                continue;
+            };
+
+            let account_id = local_header.id();
+
+            // Build storage requirements and known code from store (if available) to
+            // request all entries for every map slot and avoid re-downloading code.
+            let (storage_requirements, known_code) =
+                self.fetch_local_account_hints(account_id).await;
+
+            let (proof_block_num, proof) = self
+                .rpc_api
+                .get_account_proof(
+                    account_id,
+                    storage_requirements,
+                    AccountStateAt::ChainTip,
+                    known_code,
+                    Some(EMPTY_WORD),
+                )
+                .await
+                .map_err(ClientError::RpcError)?;
+
+            let Some(details) = proof.into_parts().1 else {
+                // Private account returned — should not happen for public accounts.
+                continue;
+            };
+
+            // Skip if the remote nonce is not newer than what we already have.
+            if details.header.nonce().as_canonical_u64() <= local_header.nonce().as_canonical_u64()
             {
-                mismatched_public_accounts.push(*account);
+                continue;
+            }
+
+            let has_oversized_data = details.vault_details.too_many_assets
+                || details.storage_details.map_details.iter().any(|m| m.too_many_entries);
+
+            if has_oversized_data {
+                if self.store.is_some() {
+                    // Delta path: build an AccountDelta from incremental updates,
+                    // fetching storage slots and vault from the store on demand.
+                    let delta = self
+                        .build_account_delta(&details, local_header, block_num, proof_block_num)
+                        .await?;
+                    account_updates.extend(AccountUpdates::new(
+                        vec![PublicAccountUpdate::Delta {
+                            new_header: details.header.clone(),
+                            delta,
+                        }],
+                        Vec::new(),
+                    ));
+                } else {
+                    // No store available — fall back to get_account_details which
+                    // handles oversized data internally (syncing from block 0).
+                    let response = self
+                        .rpc_api
+                        .get_account_details(account_id)
+                        .await
+                        .map_err(ClientError::RpcError)?;
+
+                    match response {
+                        FetchedAccount::Public(account, _) => {
+                            account_updates.extend(AccountUpdates::new(
+                                vec![PublicAccountUpdate::Full(*account)],
+                                Vec::new(),
+                            ));
+                        },
+                        // This should not happen since we only fetch public accounts here.
+                        FetchedAccount::Private(..) => {},
+                    }
+                }
+            } else {
+                // Small account: build directly from the response details.
+                let account = Account::try_from(&details).map_err(ClientError::RpcError)?;
+                account_updates.extend(AccountUpdates::new(
+                    vec![PublicAccountUpdate::Full(account)],
+                    Vec::new(),
+                ));
             }
         }
 
-        self.rpc_api
-            .get_updated_public_accounts(&mismatched_public_accounts)
+        Ok(())
+    }
+
+    /// Fetches storage requirements and known code from the store for a given account.
+    ///
+    /// Returns defaults when no store is available.
+    async fn fetch_local_account_hints(
+        &self,
+        account_id: AccountId,
+    ) -> (AccountStorageRequirements, Option<AccountCode>) {
+        let Some(store) = &self.store else {
+            return (AccountStorageRequirements::default(), None);
+        };
+
+        let storage_requirements = store
+            .get_account_storage(account_id, AccountStorageFilter::All)
             .await
-            .map_err(ClientError::RpcError)
+            .map(|storage| Self::build_storage_requirements(&storage))
+            .unwrap_or_default();
+
+        let known_code = store.get_account_code(account_id).await.ok().flatten();
+
+        (storage_requirements, known_code)
+    }
+
+    /// Builds [`AccountStorageRequirements`] from [`AccountStorage`], requesting all entries for
+    /// every map slot.
+    fn build_storage_requirements(storage: &AccountStorage) -> AccountStorageRequirements {
+        let map_slots = storage.slots().iter().filter_map(|slot: &StorageSlot| {
+            if slot.slot_type() == StorageSlotType::Map {
+                // Passing an empty key list requests all entries for this map slot.
+                Some((slot.name().clone(), core::iter::empty::<&StorageMapKey>()))
+            } else {
+                None
+            }
+        });
+        AccountStorageRequirements::new(map_slots)
+    }
+
+    /// Builds an [`AccountDelta`] from incremental RPC sync data, fetching local account
+    /// data from the store on demand.
+    ///
+    /// For oversized storage maps: fetches delta entries via `sync_storage_maps`.
+    /// For oversized vaults: fetches delta entries via `sync_account_vault`.
+    /// Non-oversized parts are diffed against local data fetched from the store.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `self.store` is `None` (store not configured for delta sync),
+    /// or if building the storage delta, vault delta, or account delta fails.
+    #[allow(clippy::too_many_lines)]
+    async fn build_account_delta(
+        &self,
+        details: &AccountDetails,
+        local_header: &AccountHeader,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
+    ) -> Result<AccountDelta, ClientError> {
+        let store = self.store.as_ref().ok_or_else(|| {
+            ClientError::RpcError(RpcError::InvalidResponse(
+                "build_account_delta called without a configured store;                  call with_store() before performing delta sync"
+                    .into(),
+            ))
+        })?;
+        let account_id = details.header.id();
+
+        let storage_delta = self
+            .build_storage_delta(details, account_id, block_from, block_to, store.as_ref())
+            .await?;
+
+        let vault_delta = self
+            .build_vault_delta(details, account_id, block_from, block_to, store.as_ref())
+            .await?;
+
+        // --- Nonce delta ---
+        let old_nonce = local_header.nonce().as_canonical_u64();
+        let new_nonce = details.header.nonce().as_canonical_u64();
+        let nonce_delta = Felt::new(new_nonce - old_nonce);
+
+        AccountDelta::new(account_id, storage_delta, vault_delta, nonce_delta).map_err(|err| {
+            ClientError::RpcError(RpcError::InvalidResponse(format!(
+                "failed to construct account delta: {err}"
+            )))
+        })
+    }
+
+    /// Computes the full storage delta (value slots + map slots) for the account.
+    ///
+    /// For value slots, compares the response values against the local store. For map slots,
+    /// oversized maps (`too_many_entries`) fetch incremental delta entries from the sync endpoint
+    /// and deduplicate by key keeping the latest value; non-oversized maps diff the full response
+    /// entries against the local store.
+    async fn build_storage_delta(
+        &self,
+        details: &AccountDetails,
+        account_id: AccountId,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
+        store: &dyn Store,
+    ) -> Result<AccountStorageDelta, ClientError> {
+        let mut storage_delta = AccountStorageDelta::new();
+
+        for slot_header in details.storage_details.header.slots() {
+            if slot_header.slot_type() == StorageSlotType::Value {
+                let local_value = store
+                    .get_account_storage_item(account_id, slot_header.name().clone())
+                    .await
+                    .ok();
+
+                if local_value.as_ref() != Some(&slot_header.value()) {
+                    storage_delta
+                        .set_item(slot_header.name().clone(), slot_header.value())
+                        .map_err(|err| {
+                            ClientError::RpcError(RpcError::InvalidResponse(format!(
+                                "failed to set storage delta item: {err}"
+                            )))
+                        })?;
+                }
+            }
+        }
+
+        let mut map_delta_cache: Option<Vec<StorageMapUpdate>> = None;
+
+        for slot_header in details.storage_details.header.slots() {
+            if slot_header.slot_type() != StorageSlotType::Map {
+                continue;
+            }
+
+            let map_details =
+                details.storage_details.find_map_details(slot_header.name()).ok_or_else(|| {
+                    ClientError::RpcError(RpcError::ExpectedDataMissing(format!(
+                        "slot '{}' is a map but has no map_details in response",
+                        slot_header.name()
+                    )))
+                })?;
+
+            if map_details.too_many_entries {
+                // Oversized map: fetch delta entries from the sync endpoint.
+                if map_delta_cache.is_none() {
+                    let map_info = self
+                        .rpc_api
+                        .sync_storage_maps(block_from, Some(block_to), account_id)
+                        .await
+                        .map_err(ClientError::RpcError)?;
+                    map_delta_cache = Some(map_info.updates);
+                }
+
+                Self::apply_oversized_map_delta(
+                    map_delta_cache.as_deref().unwrap_or_default(),
+                    slot_header.name(),
+                    &mut storage_delta,
+                )?;
+            } else {
+                Self::apply_full_map_delta(
+                    map_details,
+                    slot_header.name(),
+                    account_id,
+                    store,
+                    &mut storage_delta,
+                )
+                .await?;
+            }
+        }
+
+        Ok(storage_delta)
+    }
+
+    /// Applies delta updates from the sync endpoint for an oversized storage map slot.
+    ///
+    /// Filters the cached delta updates to the target slot, sorts by block number, and
+    /// deduplicates by key (keeping the latest value).
+    fn apply_oversized_map_delta(
+        delta_updates: &[StorageMapUpdate],
+        slot_name: &StorageSlotName,
+        storage_delta: &mut AccountStorageDelta,
+    ) -> Result<(), ClientError> {
+        let mut relevant: Vec<_> =
+            delta_updates.iter().filter(|u| u.slot_name == *slot_name).collect();
+        relevant.sort_by_key(|u| u.block_num);
+
+        // Deduplicate: keep latest value per key.
+        let mut seen = BTreeMap::new();
+        for update in relevant {
+            seen.insert(update.key, update.value);
+        }
+
+        for (key, value) in seen {
+            storage_delta.set_map_item(slot_name.clone(), key, value).map_err(|err| {
+                ClientError::RpcError(RpcError::InvalidResponse(format!(
+                    "failed to set storage map delta: {err}"
+                )))
+            })?;
+        }
+
+        Ok(())
+    }
+
+    /// Diffs the full response map entries against the local store for a non-oversized map slot.
+    ///
+    /// Entries present in the response but missing or different locally are added to the delta.
+    /// Entries present locally but absent in the response are set to `Word::default()` (removal).
+    async fn apply_full_map_delta(
+        map_details: &AccountStorageMapDetails,
+        slot_name: &StorageSlotName,
+        account_id: AccountId,
+        store: &dyn Store,
+        storage_delta: &mut AccountStorageDelta,
+    ) -> Result<(), ClientError> {
+        let response_map = map_details
+            .entries
+            .clone()
+            .into_storage_map()
+            .ok_or_else(|| {
+                ClientError::RpcError(RpcError::ExpectedDataMissing(
+                    "expected AllEntries for map, got EntriesWithProofs".into(),
+                ))
+            })?
+            .map_err(|err| {
+                ClientError::RpcError(RpcError::InvalidResponse(format!(
+                    "the rpc api returned a non-valid map entry: {err}"
+                )))
+            })?;
+
+        let local_entries: BTreeMap<StorageMapKey, Word> = store
+            .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
+            .await
+            .ok()
+            .and_then(|storage| storage.get(slot_name).cloned())
+            .map(|slot| match slot.content() {
+                StorageSlotContent::Map(map) => map.entries().map(|(k, v)| (*k, *v)).collect(),
+                StorageSlotContent::Value(_) => BTreeMap::new(),
+            })
+            .unwrap_or_default();
+
+        let response_entries: BTreeMap<StorageMapKey, Word> =
+            response_map.entries().map(|(k, v)| (*k, *v)).collect();
+
+        // Entries in response but not in local, or with different values.
+        for (key, value) in &response_entries {
+            if local_entries.get(key) != Some(value) {
+                storage_delta.set_map_item(slot_name.clone(), *key, *value).map_err(|err| {
+                    ClientError::RpcError(RpcError::InvalidResponse(format!(
+                        "failed to set storage map delta: {err}"
+                    )))
+                })?;
+            }
+        }
+
+        // Entries in local but removed in response (set to empty word).
+        for key in local_entries.keys() {
+            if !response_entries.contains_key(key) {
+                storage_delta.set_map_item(slot_name.clone(), *key, Word::default()).map_err(
+                    |err| {
+                        ClientError::RpcError(RpcError::InvalidResponse(format!(
+                            "failed to set storage map delta for removal: {err}"
+                        )))
+                    },
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Computes the vault delta between local and remote account state.
+    ///
+    /// For oversized vaults (`too_many_assets`), fetches incremental updates from the sync
+    /// endpoint and replays them on top of the local vault. For non-oversized vaults, diffs
+    /// the full response assets against the local vault.
+    async fn build_vault_delta(
+        &self,
+        details: &AccountDetails,
+        account_id: AccountId,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
+        store: &dyn Store,
+    ) -> Result<AccountVaultDelta, ClientError> {
+        let mut vault_delta = AccountVaultDelta::default();
+        let local_vault =
+            store.get_account_vault(account_id).await.map_err(ClientError::StoreError)?;
+
+        if details.vault_details.too_many_assets {
+            // Oversized vault: fetch delta from sync endpoint.
+            let vault_info = self
+                .rpc_api
+                .sync_account_vault(block_from, Some(block_to), account_id)
+                .await
+                .map_err(ClientError::RpcError)?;
+
+            // Build the final vault state by applying updates to local vault.
+            let mut vault_map: BTreeMap<AssetVaultKey, Asset> =
+                local_vault.assets().map(|asset| (asset.vault_key(), asset)).collect();
+
+            let mut vault_updates = vault_info.updates;
+            vault_updates.sort_by_key(|u| u.block_num);
+
+            for update in vault_updates {
+                match update.asset {
+                    Some(asset) => {
+                        vault_map.insert(update.vault_key, asset);
+                    },
+                    None => {
+                        vault_map.remove(&update.vault_key);
+                    },
+                }
+            }
+
+            Self::compute_vault_delta_from_diff(&local_vault, &vault_map, &mut vault_delta)?;
+        } else {
+            // Non-oversized vault: diff response assets against local.
+            let final_assets: BTreeMap<AssetVaultKey, Asset> = details
+                .vault_details
+                .assets
+                .iter()
+                .map(|asset| (asset.vault_key(), *asset))
+                .collect();
+
+            Self::compute_vault_delta_from_diff(&local_vault, &final_assets, &mut vault_delta)?;
+        }
+
+        Ok(vault_delta)
+    }
+
+    /// Computes a vault delta from the difference between a local vault and a final asset map.
+    fn compute_vault_delta_from_diff(
+        local_vault: &AssetVault,
+        final_assets: &BTreeMap<AssetVaultKey, Asset>,
+        vault_delta: &mut AccountVaultDelta,
+    ) -> Result<(), ClientError> {
+        let local_assets: BTreeMap<AssetVaultKey, Asset> =
+            local_vault.assets().map(|a| (a.vault_key(), a)).collect();
+
+        // Assets in final but not in local -> add. Changed amounts -> remove old, add new.
+        for (key, final_asset) in final_assets {
+            match local_assets.get(key) {
+                None => {
+                    vault_delta.add_asset(*final_asset).map_err(|err| {
+                        ClientError::RpcError(RpcError::InvalidResponse(format!(
+                            "failed to add asset to vault delta: {err}"
+                        )))
+                    })?;
+                },
+                Some(local_asset) if local_asset != final_asset => {
+                    vault_delta.remove_asset(*local_asset).map_err(|err| {
+                        ClientError::RpcError(RpcError::InvalidResponse(format!(
+                            "failed to remove old asset from vault delta: {err}"
+                        )))
+                    })?;
+                    vault_delta.add_asset(*final_asset).map_err(|err| {
+                        ClientError::RpcError(RpcError::InvalidResponse(format!(
+                            "failed to add new asset to vault delta: {err}"
+                        )))
+                    })?;
+                },
+                _ => {}, // No change
+            }
+        }
+
+        // Assets in local but not in final -> remove.
+        for (key, local_asset) in &local_assets {
+            if !final_assets.contains_key(key) {
+                vault_delta.remove_asset(*local_asset).map_err(|err| {
+                    ClientError::RpcError(RpcError::InvalidResponse(format!(
+                        "failed to remove asset from vault delta: {err}"
+                    )))
+                })?;
+            }
+        }
+
+        Ok(())
     }
 
     /// Applies the changes received from the sync response to the notes and transactions tracked
@@ -612,9 +1127,14 @@ impl StateSync {
         new_nullifiers.retain(|update| update.block_num <= state_sync_update.block_num);
 
         for nullifier_update in new_nullifiers {
+            let external_consumer_account = state_sync_update
+                .transaction_updates
+                .external_nullifier_account(&nullifier_update.nullifier);
+
             state_sync_update.note_updates.apply_nullifiers_state_transitions(
                 &nullifier_update,
                 state_sync_update.transaction_updates.committed_transactions(),
+                external_consumer_account,
             )?;
 
             // Process nullifiers and track the updates of local tracked transactions that were
@@ -739,21 +1259,41 @@ fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> V
     result
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "testing"))]
 mod tests {
     use alloc::collections::BTreeSet;
     use alloc::sync::Arc;
 
     use async_trait::async_trait;
+    use miden_protocol::account::Account;
     use miden_protocol::assembly::DefaultSourceManager;
+    use miden_protocol::asset::{Asset, FungibleAsset};
+    use miden_protocol::block::BlockNumber;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, PartialMmr};
-    use miden_protocol::note::{NoteTag, NoteType};
+    use miden_protocol::note::{
+        Note,
+        NoteAssets,
+        NoteAttachment,
+        NoteHeader,
+        NoteMetadata,
+        NoteRecipient,
+        NoteStorage,
+        NoteTag,
+        NoteType,
+    };
+    use miden_protocol::testing::account_id::{
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_REGULAR_NETWORK_ACCOUNT_IMMUTABLE_CODE,
+        ACCOUNT_ID_SENDER,
+    };
     use miden_protocol::{Felt, Word};
     use miden_standards::code_builder::CodeBuilder;
-    use miden_testing::MockChainBuilder;
+    use miden_standards::note::{NetworkAccountTarget, NoteExecutionHint};
+    use miden_testing::{MockChainBuilder, TxContextInput};
 
     use super::*;
-    use crate::testing::mock::MockRpcApi;
+    use crate::store::{OutputNoteRecord, OutputNoteState};
+    use crate::test_utils::mock::MockRpcApi;
 
     /// Mock note screener that discards all notes, for minimal test setup.
     struct MockScreener;
@@ -832,6 +1372,8 @@ mod tests {
                     vec![],
                     fee,
                 ),
+                output_notes: vec![],
+                erased_output_notes: vec![],
             }
         }
 
@@ -881,6 +1423,8 @@ mod tests {
                     vec![],
                     fee,
                 ),
+                output_notes: vec![],
+                erased_output_notes: vec![],
             };
 
             let result = super::super::compute_ordered_nullifiers(&[tx_a2, tx_b1, tx_a3, tx_a1]);
@@ -936,22 +1480,11 @@ mod tests {
         }
     }
 
-    use miden_protocol::account::Account;
-    use miden_protocol::note::Note;
-
     /// Builds a `MockChain` where 3 notes are consumed by chained transactions in the same block.
     ///
     /// Returns the chain, the account, and the 3 notes (in consumption order).
     async fn build_chain_with_chained_consume_txs() -> (miden_testing::MockChain, Account, [Note; 3])
     {
-        use miden_protocol::asset::{Asset, FungibleAsset};
-        use miden_protocol::note::NoteType;
-        use miden_protocol::testing::account_id::{
-            ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-            ACCOUNT_ID_SENDER,
-        };
-        use miden_testing::{MockChainBuilder, TxContextInput};
-
         let sender_id: AccountId = ACCOUNT_ID_SENDER.try_into().unwrap();
         let faucet_id: AccountId = ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap();
 
@@ -1008,7 +1541,7 @@ mod tests {
 
         let mock_rpc = MockRpcApi::new(chain);
         let state_sync =
-            StateSync::new(Arc::new(mock_rpc.clone()), Arc::new(CommitAllScreener), None);
+            StateSync::new(Arc::new(mock_rpc.clone()), None, Arc::new(CommitAllScreener), None);
 
         let genesis_peaks = mock_rpc.get_mmr().peaks_at(Forest::new(1)).unwrap();
         let mut partial_mmr = PartialMmr::from_peaks(genesis_peaks);
@@ -1021,8 +1554,9 @@ mod tests {
         let note_tags: BTreeSet<NoteTag> =
             input_notes.iter().filter_map(|n| n.metadata().map(NoteMetadata::tag)).collect();
 
+        let account_id = account.id();
         let sync_input = StateSyncInput {
-            accounts: vec![account.into()],
+            accounts: vec![AccountHeader::from(account)],
             note_tags,
             input_notes,
             output_notes: vec![],
@@ -1043,6 +1577,18 @@ mod tests {
         assert_eq!(find_order(note1.id()), Some(0), "note1 should have tx_order 0");
         assert_eq!(find_order(note2.id()), Some(1), "note2 should have tx_order 1");
         assert_eq!(find_order(note3.id()), Some(2), "note3 should have tx_order 2");
+
+        // Since there are no uncommitted_transactions, these notes were consumed by a tracked
+        // account via external transactions. Verify that consumer_account is populated.
+        for note in &updated_notes {
+            let record = note.inner();
+            assert!(record.is_consumed(), "note should be in a consumed state");
+            assert_eq!(
+                record.consumer_account(),
+                Some(account_id),
+                "externally-consumed notes by a tracked account should have consumer_account set",
+            );
+        }
     }
 
     #[tokio::test]
@@ -1052,7 +1598,8 @@ mod tests {
         mock_rpc.advance_blocks(3);
         let chain_tip_1 = mock_rpc.get_chain_tip_block_num();
 
-        let state_sync = StateSync::new(Arc::new(mock_rpc.clone()), Arc::new(MockScreener), None);
+        let state_sync =
+            StateSync::new(Arc::new(mock_rpc.clone()), None, Arc::new(MockScreener), None);
 
         // Build the initial PartialMmr from genesis (only 1 leaf).
         let genesis_peaks = mock_rpc.get_mmr().peaks_at(Forest::new(1)).unwrap();
@@ -1194,7 +1741,8 @@ mod tests {
 
         // Test that fetch_sync_data returns note blocks with valid MMR paths that
         // can be used to track blocks in the partial MMR.
-        let state_sync = StateSync::new(Arc::new(mock_rpc.clone()), Arc::new(MockScreener), None);
+        let state_sync =
+            StateSync::new(Arc::new(mock_rpc.clone()), None, Arc::new(MockScreener), None);
 
         let genesis_peaks = mock_rpc.get_mmr().peaks_at(Forest::new(1)).unwrap();
         let mut partial_mmr = PartialMmr::from_peaks(genesis_peaks);
@@ -1202,10 +1750,11 @@ mod tests {
         let sync_data = state_sync
             .fetch_sync_data(BlockNumber::GENESIS, &[], &Arc::new(note_tags.clone()))
             .await
-            .unwrap();
+            .unwrap()
+            .expect("should have progressed past genesis");
 
         // Should have advanced to the chain tip.
-        assert_eq!(sync_data.chain_tip, chain_tip);
+        assert_eq!(sync_data.chain_tip_header.block_num(), chain_tip);
         assert!(!sync_data.note_blocks.is_empty(), "should have note blocks");
 
         // Apply the MMR delta and add the chain tip block.
@@ -1236,5 +1785,192 @@ mod tests {
                 "block {bn} with notes should be tracked in partial MMR"
             );
         }
+    }
+
+    /// Tests that erased notes are marked as consumed when a committed transaction
+    /// reports output notes that were erased by same-batch note erasure.
+    ///
+    /// This simulates same-batch note erasure: the transaction was committed, its header
+    /// says it produced a note, but the note was erased and doesn't exist on the node.
+    #[tokio::test]
+    async fn erased_notes_are_marked_as_consumed() {
+        // Create a public output note. It won't be in the mock chain (simulating erasure).
+        let sender_id: AccountId = ACCOUNT_ID_SENDER.try_into().unwrap();
+        let metadata = NoteMetadata::new(sender_id, NoteType::Public);
+        let script = CodeBuilder::new()
+            .compile_note_script("@note_script\npub proc main\n    nop\nend")
+            .unwrap();
+        let recipient = NoteRecipient::new(
+            Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]),
+            script,
+            NoteStorage::new(vec![]).unwrap(),
+        );
+        let output_note = OutputNoteRecord::new(
+            recipient.digest(),
+            NoteAssets::new(vec![]).unwrap(),
+            metadata.clone(),
+            OutputNoteState::ExpectedFull { recipient },
+            BlockNumber::from(1u32),
+        );
+        let note_id = output_note.id();
+        let note_header = NoteHeader::new(note_id, metadata);
+
+        // Build a NoteUpdateTracker with the output note.
+        let mut note_updates = NoteUpdateTracker::new(vec![], vec![output_note]);
+
+        // Mark the note as erased (created and consumed in the same batch).
+        let block_num = BlockNumber::from(3u32);
+        note_updates
+            .mark_erased_note_as_consumed(&note_header, block_num)
+            .expect("marking erased note should succeed");
+
+        let updated = note_updates
+            .updated_output_notes()
+            .find(|n| n.id() == note_id)
+            .expect("output note should be in the update");
+
+        assert!(
+            updated.inner().is_consumed(),
+            "output note should be consumed after erasure detection, but state is: {}",
+            updated.inner().state()
+        );
+    }
+
+    /// Tests that erased notes targeting a tracked network account are marked as consumed
+    /// by that account through the full sync flow.
+    ///
+    /// Same-batch erasure scenario: a sender's transaction creates an output note
+    /// targeting a network account that consumes it in the same batch, so the note never
+    /// appears in the block body and the mock RPC surfaces it as erased in the
+    /// transaction sync response.
+    ///
+    /// When the client tracks the network account, the expected end state is that an
+    /// input note record is created for the erased note in a consumed state with the
+    /// network account as the consumer.
+    #[tokio::test]
+    async fn erased_notes_are_marked_as_consumed_by_network_account() {
+        // Build a chain with a sender that executes one tx so `sync_transactions` returns
+        // a record. The mock attaches the registered erased note header to that record.
+        let mut builder = MockChainBuilder::new();
+        let p2id_sender: AccountId = ACCOUNT_ID_SENDER.try_into().unwrap();
+        let faucet_id: AccountId = ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET.try_into().unwrap();
+        let sender_account =
+            builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
+        let sender_id = sender_account.id();
+
+        let asset = Asset::Fungible(FungibleAsset::new(faucet_id, 100u64).unwrap());
+        let note = builder
+            .add_p2id_note(p2id_sender, sender_id, &[asset], NoteType::Public)
+            .unwrap();
+
+        let mut chain = builder.build().unwrap();
+        chain.prove_next_block().unwrap();
+
+        let tx = Box::pin(
+            chain
+                .build_tx_context(
+                    TxContextInput::Account(sender_account.clone()),
+                    &[],
+                    core::slice::from_ref(&note),
+                )
+                .unwrap()
+                .build()
+                .unwrap()
+                .execute(),
+        )
+        .await
+        .unwrap();
+        chain.add_pending_executed_transaction(&tx).unwrap();
+        chain.prove_next_block().unwrap();
+
+        // Construct the erased note that will be marked as consumed by the network account.
+        let network_account_id: AccountId =
+            ACCOUNT_ID_REGULAR_NETWORK_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap();
+        let target =
+            NetworkAccountTarget::new(network_account_id, NoteExecutionHint::Always).unwrap();
+        let attachment: NoteAttachment = target.into();
+        let metadata = NoteMetadata::new(sender_id, NoteType::Public).with_attachment(attachment);
+        let script = CodeBuilder::new()
+            .compile_note_script("@note_script\npub proc main\n    nop\nend")
+            .unwrap();
+        let recipient = NoteRecipient::new(
+            Word::from([Felt::new(7), Felt::new(8), Felt::new(9), Felt::new(10)]),
+            script,
+            NoteStorage::new(vec![]).unwrap(),
+        );
+        let recipient_digest = recipient.digest();
+        let assets = NoteAssets::new(vec![]).unwrap();
+
+        // Output note record tracked by the sender prior to sync. The flow that builds the
+        // input record from the erased header relies on this output entry being present.
+        let output_note = OutputNoteRecord::new(
+            recipient_digest,
+            assets.clone(),
+            metadata.clone(),
+            OutputNoteState::ExpectedFull { recipient },
+            BlockNumber::from(1u32),
+        );
+        let erased_note_id = output_note.id();
+        let erased_note_header = NoteHeader::new(erased_note_id, metadata);
+
+        let mock_rpc = MockRpcApi::new(chain);
+        mock_rpc.mark_note_as_erased(erased_note_header);
+
+        // Track both the sender (so its tx is returned) and the network account (so the
+        // gating in `mark_erased_note_as_consumed` allows creating the input record).
+        let network_header = AccountHeader::new(
+            network_account_id,
+            Felt::new(0),
+            EMPTY_WORD,
+            EMPTY_WORD,
+            EMPTY_WORD,
+        );
+
+        let state_sync =
+            StateSync::new(Arc::new(mock_rpc.clone()), None, Arc::new(MockScreener), None);
+
+        let genesis_peaks = mock_rpc.get_mmr().peaks_at(Forest::new(1)).unwrap();
+        let mut partial_mmr = PartialMmr::from_peaks(genesis_peaks);
+
+        let sync_input = StateSyncInput {
+            accounts: vec![AccountHeader::from(sender_account), network_header],
+            note_tags: BTreeSet::new(),
+            input_notes: vec![],
+            output_notes: vec![output_note],
+            uncommitted_transactions: vec![],
+        };
+
+        let update = state_sync.sync_state(&mut partial_mmr, sync_input).await.unwrap();
+
+        // The output note record should transition to consumed.
+        let updated_output = update
+            .note_updates
+            .updated_output_notes()
+            .find(|n| n.id() == erased_note_id)
+            .expect("output note should be in the update");
+        assert!(
+            updated_output.inner().is_consumed(),
+            "output note should be consumed, got: {}",
+            updated_output.inner().state()
+        );
+
+        // A new input note record should be created with the network account as consumer.
+        let input_note_update = update
+            .note_updates
+            .updated_input_notes()
+            .find(|n| n.id() == erased_note_id)
+            .expect("input note should be created from the erased output note");
+
+        let inner = input_note_update.inner();
+        assert!(
+            inner.is_consumed(),
+            "input note should be in a consumed state, got: {}",
+            inner.state()
+        );
+        assert_eq!(
+            inner.consumer_account(),
+            Some(network_account_id),
+            "consumer should be the tracked network account"
+        );
     }
 }
