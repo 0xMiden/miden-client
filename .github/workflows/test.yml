@@ -84,7 +84,7 @@ jobs:
         uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: target/release/testing-node-builder
-          key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
       - name: Install Rust
         if: steps.cache-node-builder.outputs.cache-hit != 'true'
         run: rustup update --no-self-update
@@ -175,7 +175,7 @@ jobs:
         uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: target/release/testing-remote-prover
-          key: ${{ runner.os }}-prover-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/prover/**/*') }}
+          key: ${{ runner.os }}-prover-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/prover/**/*') }}
       - name: Install Rust
         if: steps.cache-remote-prover.outputs.cache-hit != 'true'
         run: rustup update --no-self-update
