@@ -1688,7 +1688,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2353,7 +2353,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.3",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -3199,8 +3199,7 @@ dependencies = [
 [[package]]
 name = "miden-debug"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d80d7ddedcde678eaaf8ef1f77b2a4e019cb991e7906ddbc618497c2b741eb3e"
+source = "git+https://github.com/0xMiden/miden-debug.git?branch=feature%2Fvscode-dap-plugin#87afa460c61f50e5302cae93226411f918fbd586"
 dependencies = [
  "clap",
  "compact_str",
@@ -3221,8 +3220,7 @@ dependencies = [
 [[package]]
 name = "miden-debug-dap"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8279a25a0a199f3ddbc8054193f3a80e193b94d1c308704062602adafe76de7"
+source = "git+https://github.com/0xMiden/miden-debug.git?branch=feature%2Fvscode-dap-plugin#87afa460c61f50e5302cae93226411f918fbd586"
 dependencies = [
  "serde",
  "serde_json",
@@ -3232,8 +3230,7 @@ dependencies = [
 [[package]]
 name = "miden-debug-engine"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a10c9e9e718b92d3fb1f3dfc28059d733778f58e09080c3ed721bf94058420f4"
+source = "git+https://github.com/0xMiden/miden-debug.git?branch=feature%2Fvscode-dap-plugin#87afa460c61f50e5302cae93226411f918fbd586"
 dependencies = [
  "clap",
  "glob",
@@ -4937,7 +4934,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
  "heck",
- "itertools 0.14.0",
+ "itertools 0.13.0",
  "log",
  "multimap",
  "petgraph 0.8.3",
@@ -4958,7 +4955,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27c6023962132f4b30eb4c172c91ce92d933da334c59c23cddee82358ddafb0b"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -5420,7 +5417,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6059,7 +6056,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7137,7 +7134,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
