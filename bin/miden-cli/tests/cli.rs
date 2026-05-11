@@ -24,6 +24,7 @@ use miden_client::note::{
     NoteTag,
     NoteType,
 };
+use miden_client::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT;
 use miden_client::rpc::Endpoint;
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
@@ -127,6 +128,15 @@ fn silent_initialization_uses_default_values() {
     assert!(
         config_content.contains("keystore"),
         "Should use default keystore directory (relative to config file)"
+    );
+    // Verify note transport defaults to the testnet endpoint
+    assert!(
+        config_content.contains("[note_transport]"),
+        "Silent init should write a [note_transport] section"
+    );
+    assert!(
+        config_content.contains(NOTE_TRANSPORT_TESTNET_ENDPOINT),
+        "Silent init should default note transport to the testnet endpoint"
     );
     // Verify that the paths don't have the .miden prefix in the config
     // (they're relative to the config file location now)
@@ -448,6 +458,42 @@ async fn public_faucet_metadata_is_fetched_and_cached() -> Result<()> {
     let cached = cached.unwrap();
     assert_eq!(cached.symbol, "BTC");
     assert_eq!(cached.decimals, 10);
+    Ok(())
+}
+
+// ACCOUNT SHOW TESTS
+// ================================================================================================
+
+/// Runs `account show` against a public account that is NOT tracked by the local client. The
+/// account must be fetched from the node, its token metadata read from the fetched `Account`
+/// storage, and its bech32 address rendered without hitting the client's store.
+#[tokio::test]
+async fn show_untracked_public_account() -> Result<()> {
+    // First client: creates a public fungible faucet and commits it to the node via a mint.
+    let (_store_path_a, temp_dir_a, endpoint) = init_cli();
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir_a, AccountStorageMode::Public);
+    sync_cli(&temp_dir_a);
+
+    mint_cli(
+        &temp_dir_a,
+        &AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap().to_hex(),
+        &fungible_faucet_account_id,
+    );
+    sync_until_committed_transaction(&temp_dir_a);
+
+    // Second client: fresh CLI on the same network, not tracking the faucet.
+    let store_path_b = create_test_store_path();
+    let temp_dir_b = init_cli_with_store_path(&store_path_b, &endpoint);
+
+    let mut show_cmd = cargo_bin_cmd!("miden-client");
+    show_cmd.args(["account", "--show", &fungible_faucet_account_id]);
+    show_cmd
+        .current_dir(&temp_dir_b)
+        .assert()
+        .success()
+        .stdout(contains("Fetching from the network"))
+        .stdout(contains("Fungible faucet (token symbol: BTC)"));
+
     Ok(())
 }
 

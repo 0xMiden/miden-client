@@ -6,6 +6,7 @@ use miden_client::address::{Address, AddressId, NetworkId};
 use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
 use miden_client::transaction::{ExecutedTransaction, InputNote};
 use miden_client::utils::{base_units_to_tokens, tokens_to_base_units};
+use miden_client::vm::MIN_STACK_DEPTH;
 use miden_client::{Client, Felt, WORD_SIZE, Word};
 use serde::Deserialize;
 
@@ -211,7 +212,10 @@ pub async fn print_executed_transaction<AUTH>(
 ///
 /// If `expected_results` is `Some(n)`, prints the top `n` values. If `None`, prints up to the
 /// last non-zero value so trailing zero-padding is hidden.
-pub fn print_executed_program_stack(stack: &[Felt; 16], expected_results: Option<usize>) {
+pub fn print_executed_program_stack(
+    stack: &[Felt; MIN_STACK_DEPTH],
+    expected_results: Option<usize>,
+) {
     let count = match expected_results {
         Some(n) => n,
         None => stack.iter().rposition(|v| v.as_canonical_u64() != 0).map_or(0, |pos| pos + 1),
@@ -230,11 +234,10 @@ pub fn print_executed_program_stack(stack: &[Felt; 16], expected_results: Option
 }
 
 /// Prints the output stack as four 4-felt words with their hex encoding.
-pub fn print_executed_program_stack_hex_words(stack: &[Felt; 16]) {
-    let stack_depth = stack.len();
-    let last_word_start = stack_depth - WORD_SIZE;
+pub fn print_executed_program_stack_hex_words(stack: &[Felt; MIN_STACK_DEPTH]) {
+    let last_word_start = MIN_STACK_DEPTH - WORD_SIZE;
     println!("Output stack:");
-    for word_idx in (0..stack_depth).step_by(WORD_SIZE) {
+    for word_idx in (0..MIN_STACK_DEPTH).step_by(WORD_SIZE) {
         let word_idx_end = word_idx + WORD_SIZE - 1;
         let prefix = if word_idx == last_word_start {
             "└──"

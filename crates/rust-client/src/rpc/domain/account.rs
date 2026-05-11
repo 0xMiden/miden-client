@@ -29,6 +29,7 @@ use crate::rpc::generated::{self as proto};
 // ================================================================================================
 
 /// Describes the possible responses from the `GetAccountDetails` endpoint for an account.
+#[derive(Debug)]
 pub enum FetchedAccount {
     /// Private accounts are stored off-chain. Only a commitment to the state of the account is
     /// shared with the network. The full account state is to be tracked locally.
@@ -87,6 +88,7 @@ impl From<FetchedAccount> for Option<Account> {
 // ================================================================================================
 
 /// Contains public updated information about the account requested.
+#[derive(Debug)]
 pub struct AccountUpdateSummary {
     /// Commitment of the account, that represents a commitment to its updated state.
     pub commitment: Word,
