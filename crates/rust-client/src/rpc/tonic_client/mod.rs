@@ -819,14 +819,9 @@ impl NodeRpcClient for GrpcClient {
         Ok((block_num, proof))
     }
 
-    /// Sends one or more `SyncNoteRequest`s to the Miden node and merges the responses
-    /// into a single list of [`NoteSyncBlock`]s.
+    /// Sends one or more `SyncNoteRequest`s to the node and merges the responses into a list of [`NoteSyncBlock`]s.
     ///
-    /// Chunks `note_tags` by [`RpcLimits::note_tags_limit`] and paginates each chunk
-    /// across the requested block range, matching the structure of [`Self::sync_nullifiers`].
-    ///
-    /// When `note_tags` is empty no RPC call is made (matching `sync_nullifiers` on empty
-    /// input) and an empty list is returned.
+    /// Chunks `note_tags` by [`RpcLimits::note_tags_limit`] and paginates each chunk across the requested block range.
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
