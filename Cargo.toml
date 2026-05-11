@@ -84,6 +84,12 @@ tracing            = { version = "0.1" }
 tracing-subscriber = { default-features = false, version = "0.3" }
 uuid               = { version = "1.10" }
 
+# Pull miden-debug from the feature branch that carries the VS Code DAP
+# support until the required debugger changes are available in a published
+# miden-debug release.
+[patch.crates-io]
+miden-debug = { git = "https://github.com/0xMiden/miden-debug.git", branch = "feature/vscode-dap-plugin" }
+
 # Lints are set to warn for development, which are promoted to errors in CI.
 [workspace.lints.clippy]
 # Pedantic lints are set to a lower priority which allows lints in the group to be selectively enabled.
