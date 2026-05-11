@@ -35,10 +35,11 @@ miden-client              = { default-features = false, path = "crates/rust-clie
 miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-store", version = "0.15.0" }
 
 # Miden protocol dependencies
-miden-protocol  = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
-miden-standards = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
-miden-testing   = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
-miden-tx        = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
+miden-protocol        = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
+miden-standards       = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
+miden-testing         = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
+miden-tx              = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
+miden-tx-batch-prover = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
 
 # Miden node dependencies
 miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/node.git" }
