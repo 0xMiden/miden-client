@@ -32,13 +32,10 @@ use tracing::info;
 use super::domain::account::{
     AccountProof, AccountStorageDetails, AccountStorageRequirements, AccountUpdateSummary,
 };
-use super::domain::{note::FetchedNote, nullifier::NullifierUpdate};
+use super::domain::{note::{FetchedNote, NoteSyncBlock}, nullifier::NullifierUpdate};
 use super::generated::rpc::account_request::AccountDetailRequest;
 use super::generated::rpc::AccountRequest;
-use super::{
-    Endpoint, FetchedAccount, NodeRpcClient, RpcEndpoint, NoteSyncInfo, RpcError,
-    RpcStatusInfo,
-};
+use super::{Endpoint, FetchedAccount, NodeRpcClient, RpcEndpoint, RpcError, RpcStatusInfo};
 use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
@@ -822,31 +819,82 @@ impl NodeRpcClient for GrpcClient {
         Ok((block_num, proof))
     }
 
-    /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [`NoteSyncInfo`] from the
-    /// response.
+    /// Sends one or more `SyncNoteRequest`s to the Miden node and merges the responses
+    /// into a single list of [`NoteSyncBlock`]s.
+    ///
+    /// Chunks `note_tags` by [`RpcLimits::note_tags_limit`] and paginates each chunk
+    /// across the requested block range, matching the structure of [`Self::sync_nullifiers`].
+    ///
+    /// When `note_tags` is empty no RPC call is made (matching `sync_nullifiers` on empty
+    /// input) and an empty list is returned.
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
         block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<NoteSyncInfo, RpcError> {
-        let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
+    ) -> Result<Vec<NoteSyncBlock>, RpcError> {
+        if note_tags.is_empty() {
+            return Ok(Vec::new());
+        }
 
-        let block_range = Some(BlockRange {
-            block_from: block_num.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        });
+        let limits = self.get_rpc_limits().await?;
+        let tags_vec: Vec<NoteTag> = note_tags.iter().copied().collect();
 
-        let request = proto::rpc::SyncNotesRequest { block_range, note_tags };
+        // Merge blocks across tag-chunks: the same block (in particular the range-end
+        // boundary) appears in every chunk's response. Union the per-block notes; the
+        // header and MMR path are identical across chunks for a given block, so the
+        // first-seen entry is authoritative.
+        let mut merged_blocks: BTreeMap<BlockNumber, NoteSyncBlock> = BTreeMap::new();
 
-        let response = self
-            .call_with_retry(RpcEndpoint::SyncNotes, |mut rpc_api| {
-                let request = request.clone();
-                Box::pin(async move { rpc_api.sync_notes(request).await })
-            })
-            .await?;
+        for chunk in tags_vec.chunks(limits.note_tags_limit as usize) {
+            let proto_tags: Vec<u32> = chunk.iter().map(|&t| t.into()).collect();
+            let mut pagination = BlockPagination::new(block_num, block_to);
 
-        response.into_inner().try_into()
+            loop {
+                let request = proto::rpc::SyncNotesRequest {
+                    block_range: Some(BlockRange {
+                        block_from: pagination.current_block_from().as_u32(),
+                        block_to: pagination.block_to().map(|b| b.as_u32()),
+                    }),
+                    note_tags: proto_tags.clone(),
+                };
+
+                let response = self
+                    .call_with_retry(RpcEndpoint::SyncNotes, |mut rpc_api| {
+                        let request = request.clone();
+                        Box::pin(async move { rpc_api.sync_notes(request).await })
+                    })
+                    .await?
+                    .into_inner();
+
+                let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
+                    "SyncNotesResponse.pagination_info".to_owned(),
+                ))?;
+                let page_chain_tip = BlockNumber::from(page.chain_tip);
+                let page_block_to = BlockNumber::from(page.block_num);
+
+                for proto_block in response.blocks {
+                    let block: NoteSyncBlock = proto_block.try_into()?;
+                    let bn = block.block_header.block_num();
+                    if let Some(existing) = merged_blocks.get_mut(&bn) {
+                        for (id, note) in block.notes {
+                            existing.notes.entry(id).or_insert(note);
+                        }
+                    } else {
+                        merged_blocks.insert(bn, block);
+                    }
+                }
+
+                if matches!(
+                    pagination.advance(page_block_to, page_chain_tip)?,
+                    PaginationResult::Done { .. }
+                ) {
+                    break;
+                }
+            }
+        }
+
+        Ok(merged_blocks.into_values().collect())
     }
 
     async fn sync_nullifiers(

@@ -29,13 +29,7 @@ use crate::rpc::domain::account::{
     StorageMapEntry,
 };
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
-use crate::rpc::domain::note::{
-    CommittedNote,
-    CommittedNoteMetadata,
-    FetchedNote,
-    NoteSyncBlock,
-    NoteSyncInfo,
-};
+use crate::rpc::domain::note::{CommittedNote, CommittedNoteMetadata, FetchedNote, NoteSyncBlock};
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
@@ -333,7 +327,7 @@ impl NodeRpcClient for MockRpcApi {
         block_num: BlockNumber,
         block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<NoteSyncInfo, RpcError> {
+    ) -> Result<Vec<NoteSyncBlock>, RpcError> {
         let chain_tip = self.get_chain_tip_block_num();
         let upper_bound = block_to.unwrap_or(chain_tip);
 
@@ -359,16 +353,14 @@ impl NodeRpcClient for MockRpcApi {
         // node behavior where the range-end block is always present when the scan completes.
         blocks_with_notes.entry(upper_bound).or_default();
 
-        let blocks: Vec<NoteSyncBlock> = blocks_with_notes
+        Ok(blocks_with_notes
             .into_iter()
             .map(|(bn, notes)| {
                 let block_header = self.get_block_by_num(bn);
                 let mmr_path = self.get_mmr().open(bn.as_usize()).unwrap().merkle_path().clone();
                 NoteSyncBlock { block_header, mmr_path, notes }
             })
-            .collect();
-
-        Ok(NoteSyncInfo { chain_tip, block_to: upper_bound, blocks })
+            .collect())
     }
 
     async fn sync_chain_mmr(

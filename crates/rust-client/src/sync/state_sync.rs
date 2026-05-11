@@ -1721,17 +1721,17 @@ mod tests {
         let chain_tip = mock_rpc.get_chain_tip_block_num();
 
         // Verify the mock returns notes across multiple blocks.
-        let note_sync =
+        let note_blocks =
             mock_rpc.sync_notes(BlockNumber::from(0u32), None, &note_tags).await.unwrap();
         assert!(
-            note_sync.blocks.len() >= 2,
+            note_blocks.len() >= 2,
             "expected notes in multiple blocks, got {}",
-            note_sync.blocks.len()
+            note_blocks.len()
         );
 
         // Collect the block numbers that have notes.
         let note_block_nums: BTreeSet<BlockNumber> =
-            note_sync.blocks.iter().map(|b| b.block_header.block_num()).collect();
+            note_blocks.iter().map(|b| b.block_header.block_num()).collect();
 
         // Test that fetch_sync_data returns note blocks with valid MMR paths that
         // can be used to track blocks in the partial MMR.

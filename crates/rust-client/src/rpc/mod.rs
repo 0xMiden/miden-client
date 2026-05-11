@@ -48,7 +48,7 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use domain::account::{AccountProof, FetchedAccount};
-use domain::note::{FetchedNote, NoteSyncInfo, SyncNotesResult};
+use domain::note::{FetchedNote, NoteSyncBlock, SyncNotesResult};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
@@ -194,16 +194,17 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the notes related to the specified tags using the `/SyncNotes` RPC endpoint.
     ///
-    /// - `block_num` is the last block number known by the client.
-    /// - `note_tags` is a list of tags used to filter the notes the client is interested in.
+    /// - `block_num` is the last block number known by the client; results cover the range
+    ///   `(block_num, block_to]`, or up to the chain tip when `block_to` is `None`.
+    /// - `note_tags` is the set of tags used to filter the notes the client is interested in.
     async fn sync_notes(
         &self,
         block_num: BlockNumber,
         block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<NoteSyncInfo, RpcError>;
+    ) -> Result<Vec<NoteSyncBlock>, RpcError>;
 
-    /// Paginates [`NodeRpcClient::sync_notes`] over the full block range, then makes a single
+    /// Calls [`NodeRpcClient::sync_notes`] for the requested range, then makes a single
     /// [`NodeRpcClient::get_notes_by_id`] call to:
     /// - Fill metadata for notes with attachments (whose sync response only had header fields).
     /// - Fetch full note bodies for public notes (scripts, assets, recipient).
@@ -211,33 +212,16 @@ pub trait NodeRpcClient: Send + Sync {
     /// All notes that are public or have missing metadata are fetched (not just the ones the
     /// client tracks) to avoid revealing which specific notes the client is interested in.
     ///
-    /// Returns the chain tip, the fully-resolved note blocks, and the fetched note details.
+    /// Returns the fully-resolved note blocks and the fetched public note bodies.
     async fn sync_notes_with_details(
         &self,
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<SyncNotesResult, RpcError> {
-        let mut all_blocks = Vec::new();
-        let mut cursor = block_from;
-        let mut chain_tip;
+        let mut blocks = self.sync_notes(block_from, block_to, note_tags).await?;
 
-        loop {
-            let note_sync = self.sync_notes(cursor, block_to, note_tags).await?;
-
-            chain_tip = note_sync.chain_tip;
-            cursor = note_sync.block_to + 1;
-            let range_end = block_to.unwrap_or(chain_tip);
-            let done = note_sync.blocks.is_empty() || cursor >= range_end;
-            all_blocks.extend(note_sync.blocks);
-
-            if done {
-                break;
-            }
-        }
-
-        // Single get_notes_by_id call for all notes that are public or missing metadata.
-        let note_ids: Vec<NoteId> = all_blocks
+        let note_ids: Vec<NoteId> = blocks
             .iter()
             .flat_map(|b| b.notes.values())
             .filter(|n| n.metadata().is_none() || n.note_type() != NoteType::Private)
@@ -250,9 +234,8 @@ pub trait NodeRpcClient: Send + Sync {
             let fetched = self.get_notes_by_id(&note_ids).await?;
 
             for fetched_note in fetched {
-                // Fill metadata on committed notes that were missing it.
                 let note_id = fetched_note.id();
-                for block in &mut all_blocks {
+                for block in &mut blocks {
                     if let Some(note) = block.notes.get_mut(&note_id)
                         && note.metadata().is_none()
                     {
@@ -260,14 +243,13 @@ pub trait NodeRpcClient: Send + Sync {
                     }
                 }
 
-                // Collect full note bodies for public notes.
                 if let FetchedNote::Public(note, _) = fetched_note {
                     public_notes.insert(note.id(), note);
                 }
             }
         }
 
-        Ok(SyncNotesResult { blocks: all_blocks, public_notes })
+        Ok(SyncNotesResult { blocks, public_notes })
     }
 
     /// Fetches the nullifiers corresponding to a list of prefixes using the
