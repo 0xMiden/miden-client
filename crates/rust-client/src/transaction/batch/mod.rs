@@ -145,6 +145,13 @@ where
             .map_err(ClientError::StoreError)?;
         let authenticated_blocks: Vec<BlockHeader> =
             fetched.into_iter().map(|(header, _)| header).collect();
+        let fetched_nums: BTreeSet<BlockNumber> =
+            authenticated_blocks.iter().map(BlockHeader::block_num).collect();
+        if let Some(&missing) = lower_refs.difference(&fetched_nums).next() {
+            return Err(ClientError::StoreError(crate::store::StoreError::BlockHeaderNotFound(
+                missing,
+            )));
+        }
 
         // 4. Build PartialMmr + PartialBlockchain using the current blockchain peaks — this matches
         //    the MMR convention used by `ClientDataStore::get_transaction_inputs`.
