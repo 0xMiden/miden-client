@@ -17,8 +17,8 @@
 //! - All transactions in a batch belong to the same local account (fixed at construction).
 //! - No two transactions in a batch may consume the same input note (rejected with
 //!   [`BatchBuilderError::DuplicateInputNote`]).
-//! - At least one successful [`push`](BatchBuilder::push) is required before
-//!   [`submit`](BatchBuilder::submit) (otherwise [`BatchBuilderError::Empty`]).
+//! - The builder is succeed-only: every transaction must be pushed successfully for the batch to
+//!   reach [`submit`](BatchBuilder::submit).
 //!
 //! ## Error semantics after RPC accept
 //!
@@ -66,7 +66,10 @@ pub(crate) struct PushedTx {
 /// Accumulates transactions for a single local account and submits them as one
 /// proven batch via the node's `SubmitProvenBatch` endpoint.
 ///
-/// See the module-level docs for usage.
+/// The builder is all-or-nothing: it can only be submitted if every
+/// [`push`](BatchBuilder::push) succeeded. A failing `push` consumes the builder and discards
+/// every transaction accumulated so far — there is no way to skip the failing transaction and
+/// continue with the rest. See the module-level docs for full usage and error semantics.
 pub struct BatchBuilder<'c, AUTH> {
     pub(crate) client: &'c Client<AUTH>,
     pub(crate) account_id: AccountId,
@@ -216,6 +219,11 @@ where
     /// Execute requested `req` against the batch's stacked in-memory state, prove it using
     /// the client's configured [`crate::transaction::TransactionProver`], and append the
     /// resulting proven transaction to the batch.
+    ///
+    /// Consumes the builder and returns it on success. On failure the builder is dropped
+    /// along with every transaction accumulated so far; the caller cannot recover the partial
+    /// batch or skip the failing transaction and must restart from
+    /// [`Client::new_transaction_batch`](crate::Client::new_transaction_batch).
     pub async fn push(mut self, req: TransactionRequest) -> Result<Self, ClientError> {
         // Check for duplicate input notes against earlier pushes.
         for note_id in req.input_note_ids() {
