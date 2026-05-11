@@ -83,7 +83,7 @@ pub async fn test_pswap_full_fill_onchain(client_config: ClientConfig) -> Result
     let tx_request = TransactionRequestBuilder::new().build_pswap_create(
         &PswapTransactionData::new(alice_account.id(), offered_asset, requested_asset),
         NoteType::Public,
-        NoteType::Private,
+        NoteType::Public,
         NoteAttachment::default(),
         alice_client.rng(),
     )?;
@@ -221,7 +221,7 @@ pub async fn test_pswap_partial_fill_onchain(client_config: ClientConfig) -> Res
     let tx_request = TransactionRequestBuilder::new().build_pswap_create(
         &PswapTransactionData::new(alice_account.id(), offered_asset, requested_asset),
         NoteType::Public,
-        NoteType::Private,
+        NoteType::Public,
         NoteAttachment::default(),
         alice_client.rng(),
     )?;
