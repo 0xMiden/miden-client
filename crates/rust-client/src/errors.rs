@@ -5,7 +5,6 @@ use core::fmt;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
-use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::merkle::MerkleError;
 pub use miden_protocol::errors::{AccountError, AccountIdError, AssetError, NetworkIdError};
 use miden_protocol::errors::{
@@ -15,7 +14,6 @@ use miden_protocol::errors::{
     TransactionScriptError,
 };
 use miden_protocol::note::{NoteId, NoteTag};
-use miden_protocol::transaction::TransactionId;
 use miden_standards::account::interface::AccountInterfaceError;
 // RE-EXPORTS
 // ================================================================================================
@@ -169,14 +167,14 @@ pub enum ClientError {
         source: RpcError,
     },
     #[error(
-        "transaction {tx_id} was accepted by the node at block {submission_height} but the local \
-         store update failed after a retry. The pending store update is attached and can be \
-         re-applied later via `apply_transaction_update`; resubmitting the same transaction will \
-         be rejected because the nullifiers are already consumed by the mempool-accepted copy."
+        "transaction {} was accepted by the node at block {} but the local store update failed. \
+         The pending store update is attached and can be re-applied later via \
+         `apply_transaction_update`; resubmitting the same transaction will be rejected because \
+         the nullifiers are already consumed by the mempool-accepted copy.",
+        pending_update.executed_transaction().id(),
+        pending_update.submission_height()
     )]
     ApplyTransactionAfterSubmitFailed {
-        tx_id: TransactionId,
-        submission_height: BlockNumber,
         pending_update: Box<crate::transaction::TransactionStoreUpdate>,
         #[source]
         source: Box<ClientError>,
@@ -244,15 +242,17 @@ impl From<&ClientError> for Option<ErrorHint> {
                           or provide the seed when importing.".to_string(),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
-            ClientError::ApplyTransactionAfterSubmitFailed { tx_id, submission_height, .. } => {
+            ClientError::ApplyTransactionAfterSubmitFailed { pending_update, .. } => {
+                let tx_id = pending_update.executed_transaction().id();
+                let submission_height = pending_update.submission_height();
                 Some(ErrorHint {
                     message: format!(
                         "Transaction {tx_id} was accepted by the node at block \
-                         {submission_height} but the local store update failed (twice). The \
-                         pending update is attached to this error as `pending_update`; you can \
-                         re-apply it later via `Client::apply_transaction_update`. Do NOT \
-                         resubmit the same transaction: its nullifiers are already consumed by \
-                         the mempool-accepted copy, so the node will reject the retry."
+                         {submission_height} but the local store update failed. The pending \
+                         update is attached to this error as `pending_update`; you can re-apply \
+                         it later via `Client::apply_transaction_update`. Do NOT resubmit the \
+                         same transaction: its nullifiers are already consumed by the \
+                         mempool-accepted copy, so the node will reject the retry."
                     ),
                     docs_url: Some(TROUBLESHOOTING_DOC),
                 })

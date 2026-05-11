@@ -227,30 +227,25 @@ where
             self.submit_proven_transaction(proven_transaction, &tx_result).await?;
 
         // The transaction has been accepted by the node; the local store update
-        // is a separate step that can fail independently. Build the update once
-        // and retry the write once before surfacing a distinct error that
-        // carries the pending update for caller-driven recovery.
+        // is a separate step that can fail independently. On failure, return a
+        // distinct error carrying the pending update so the caller can decide
+        // how to recover (re-apply later via `apply_transaction_update`,
+        // persist for the next session, etc.).
         //
         // The update is boxed so it does not inflate the enclosing future
         // across await points (triggers clippy::large_futures).
         let tx_update =
             Box::new(self.get_transaction_store_update(&tx_result, submission_height).await?);
 
-        if let Err(first_err) = self.apply_transaction_update((*tx_update).clone()).await {
-            info!("apply_transaction_update failed once; retrying to cover transient errors");
-            if let Err(second_err) = self.apply_transaction_update((*tx_update).clone()).await {
-                info!(
-                    "apply_transaction_update failed twice for submitted tx {tx_id}; \
-                     returning ApplyTransactionAfterSubmitFailed with the pending update \
-                     attached. First error: {first_err}"
-                );
-                return Err(ClientError::ApplyTransactionAfterSubmitFailed {
-                    tx_id,
-                    submission_height,
-                    pending_update: tx_update,
-                    source: Box::new(second_err),
-                });
-            }
+        if let Err(apply_err) = self.apply_transaction_update((*tx_update).clone()).await {
+            info!(
+                "apply_transaction_update failed for submitted tx {tx_id}; returning \
+                 ApplyTransactionAfterSubmitFailed with the pending update attached: {apply_err}"
+            );
+            return Err(ClientError::ApplyTransactionAfterSubmitFailed {
+                pending_update: tx_update,
+                source: Box::new(apply_err),
+            });
         }
 
         Ok(tx_id)
