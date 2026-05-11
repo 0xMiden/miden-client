@@ -62,16 +62,20 @@ struct RawStateSyncData {
 // SYNC REQUEST
 // ================================================================================================
 
-/// A tracked account passed into a sync, along with optional hints that let `StateSync` make
-/// fewer RPC calls when the account's storage layout is already known to the caller.
+/// A tracked account passed into a sync, with an optional hint that lets `StateSync` save
+/// one RPC roundtrip when the account's map slot layout is already known to the caller.
+///
+/// Hints are purely an optimization: correctness does not depend on them. If `map_slot_names`
+/// is empty, or if it is stale (a new map slot has appeared on-chain since the hint was
+/// produced), `StateSync` transparently falls back to a discovery RPC call and the account
+/// is still synced correctly — just at the cost of one extra roundtrip.
 #[derive(Debug, Clone)]
 pub struct AccountSyncHint {
     /// The account header.
     pub header: AccountHeader,
-    /// Names of the account's map storage slots, if known. When provided, `StateSync` can
-    /// request all map data in a single `get_account_proof` call. When empty, `StateSync`
-    /// falls back to a discovery call that learns the slot layout from the response (one
-    /// extra RPC roundtrip).
+    /// Names of the account's map storage slots, if known. When non-empty and accurate,
+    /// `StateSync` can request all map data in a single `get_account_proof` call. When
+    /// empty or stale, `StateSync` discovers the slot layout via an extra RPC call.
     pub map_slot_names: Vec<StorageSlotName>,
 }
 
@@ -722,7 +726,7 @@ impl StateSync {
                 storage_requirements,
                 AccountStateAt::Block(block_to),
                 Some(discovery_details.code.clone()),
-                Some(discovery_details.header.vault_root()),
+                Some(EMPTY_WORD),
             )
             .await
             .map_err(ClientError::RpcError)?;

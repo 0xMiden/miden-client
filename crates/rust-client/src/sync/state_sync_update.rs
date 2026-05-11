@@ -421,6 +421,8 @@ impl PublicAccountDelta {
 
     /// Computes the [`AccountDelta`] implied by this payload by replaying the carried
     /// incremental updates against the locally-stored account state.
+    // TODO #2171:
+    // skip building AccountDelta; have the store accept raw RPC updates directly.
     pub fn compute_account_delta(
         &self,
         local_header: &AccountHeader,

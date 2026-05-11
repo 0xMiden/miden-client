@@ -188,11 +188,7 @@ where
     pub async fn build_sync_input(&self) -> Result<StateSyncInput, ClientError> {
         let mut accounts = Vec::new();
         for (header, _status) in self.store.get_account_headers().await? {
-            // Carry the account's map slot names as a hint so `StateSync` can request all map
-            // data in a single proof call when the account changes. Falls back to the discovery
-            // path if the read fails.
-            let map_slot_names =
-                self.store.get_account_map_slot_names(header.id()).await.unwrap_or_default();
+            let map_slot_names = self.store.get_account_map_slot_names(header.id()).await?;
             accounts.push(AccountSyncHint { header, map_slot_names });
         }
 
