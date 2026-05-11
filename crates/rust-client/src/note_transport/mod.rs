@@ -83,9 +83,9 @@ impl<AUTH> Client<AUTH> {
     /// tool — the caller already has the [`Note`] in memory).
     ///
     /// # Errors
-    /// - [`ClientError::NoteNotFoundOnChain`] if no output note with this ID is tracked locally
+    /// - [`ClientError::OutputNoteNotInStore`] if no output note with this ID is tracked locally
     ///   (client likely wasn't the sender).
-    /// - [`ClientError::NoteNotCommitted`] if the stored record exists but has not yet been
+    /// - [`ClientError::NoteNotFoundOnChain`] if the stored record exists but has not yet been
     ///   committed on chain.
     /// - Any [`NoteTransportError`] from the underlying transport.
     pub async fn send_private_note_by_id(
@@ -100,10 +100,10 @@ impl<AUTH> Client<AUTH> {
             .get_output_notes(NoteFilter::Unique(note_id))
             .await?
             .pop()
-            .ok_or(ClientError::NoteNotFoundOnChain(note_id))?;
+            .ok_or(ClientError::OutputNoteNotInStore(note_id))?;
 
         if !record.is_committed() {
-            return Err(ClientError::NoteNotCommitted(note_id));
+            return Err(ClientError::NoteNotFoundOnChain(note_id));
         }
 
         // Defensive: a committed record carries full recipient data by construction,
