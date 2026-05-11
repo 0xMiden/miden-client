@@ -175,14 +175,14 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the MMR delta for a given block range using the `/SyncChainMmr` RPC endpoint.
     ///
-    /// - `block_from` is the last block number already present in the caller's MMR.
+    /// - `current_block_height` is the last block number already present in the caller's MMR.
     /// - `upper_bound` determines the upper bound of the sync range. Can be a specific block number
     ///   (`BlockNumber`), or a chain tip finality level: `CommittedChainTip` syncs up to the latest
     ///   committed block (the chain tip), while `ProvenChainTip` syncs up to the latest proven
     ///   block which may be behind the committed tip.
     async fn sync_chain_mmr(
         &self,
-        block_from: BlockNumber,
+        current_block_height: BlockNumber,
         upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError>;
 
@@ -194,12 +194,13 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the notes related to the specified tags using the `/SyncNotes` RPC endpoint.
     ///
-    /// - `block_num` is the last block number known by the client; results cover the range
-    ///   `(block_num, block_to]`, or up to the chain tip when `block_to` is `None`.
+    /// - `block_from`: The starting block number for the range (inclusive).
+    /// - `block_to`: The ending block number for the range (inclusive), or `None` to sync up to the
+    ///   chain tip.
     /// - `note_tags` is the set of tags used to filter the notes the client is interested in.
     async fn sync_notes(
         &self,
-        block_num: BlockNumber,
+        block_from: BlockNumber,
         block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<Vec<NoteSyncBlock>, RpcError>;
@@ -256,14 +257,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// `/SyncNullifiers` RPC endpoint.
     ///
     /// - `prefix` is a list of nullifiers prefixes to search for.
-    /// - `block_num` is the block number to start the search from. Nullifiers created in this block
-    ///   or the following blocks will be included.
-    /// - `block_to` is the optional block number to stop the search at. If not provided, syncs up
-    ///   to the network chain tip.
+    /// - `block_from`: The starting block number for the range (inclusive).
+    /// - `block_to`: The ending block number for the range (inclusive), or `None` to sync up to the
+    ///   chain tip.
     async fn sync_nullifiers(
         &self,
         prefix: &[u16],
-        block_num: BlockNumber,
+        block_from: BlockNumber,
         block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
 
@@ -297,7 +297,7 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the commit height where the nullifier was consumed. If the nullifier isn't found,
     /// then `None` is returned.
-    /// The `block_num` parameter is the block number to start the search from.
+    /// The `block_num` parameter is the block number to start the search from (inclusive).
     ///
     /// The default implementation of this method uses
     /// [`NodeRpcClient::sync_nullifiers`].
@@ -396,8 +396,8 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches storage map updates for specified account and storage slots within a block range,
     /// using the `/SyncStorageMaps` RPC endpoint.
     ///
-    /// - `block_from`: The starting block number for the range.
-    /// - `block_to`: The ending block number for the range.
+    /// - `block_from`: The starting block number for the range (inclusive).
+    /// - `block_to`: The ending block number for the range (inclusive).
     /// - `account_id`: The account ID for which to fetch storage map updates.
     async fn sync_storage_maps(
         &self,
@@ -409,8 +409,8 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches account vault updates for specified account within a block range,
     /// using the `/SyncAccountVault` RPC endpoint.
     ///
-    /// - `block_from`: The starting block number for the range.
-    /// - `block_to`: The ending block number for the range.
+    /// - `block_from`: The starting block number for the range (inclusive).
+    /// - `block_to`: The ending block number for the range (inclusive).
     /// - `account_id`: The account ID for which to fetch storage map updates.
     async fn sync_account_vault(
         &self,
@@ -422,8 +422,9 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches transaction records for specific accounts within a block range using the
     /// `/SyncTransactions` RPC endpoint.
     ///
-    /// - `block_from`: The starting block number for the range.
-    /// - `block_to`: The ending block number for the range, or `None` to sync up to the chain tip.
+    /// - `block_from`: The starting block number for the range (inclusive).
+    /// - `block_to`: The ending block number for the range (inclusive), or `None` to sync up to the
+    ///   chain tip.
     /// - `account_ids`: The account IDs for which to fetch transactions.
     async fn sync_transactions(
         &self,

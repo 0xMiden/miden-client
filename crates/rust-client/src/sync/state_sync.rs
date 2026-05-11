@@ -337,7 +337,7 @@ impl StateSync {
         // a consistent forest.
         let sync_notes_result = self
             .rpc_api
-            .sync_notes_with_details(current_block_num, Some(chain_tip), note_tags.as_ref())
+            .sync_notes_with_details(current_block_num + 1, Some(chain_tip), note_tags.as_ref())
             .await?;
 
         let note_count: usize = sync_notes_result.blocks.iter().map(|b| b.notes.len()).sum();
@@ -349,8 +349,9 @@ impl StateSync {
         );
 
         // Step 3: Gather transactions for tracked accounts over the full range.
-        let (account_commitment_updates, transactions, nullifiers) =
-            self.fetch_transaction_data(current_block_num, chain_tip, account_ids).await?;
+        let (account_commitment_updates, transactions, nullifiers) = self
+            .fetch_transaction_data(current_block_num + 1, chain_tip, account_ids)
+            .await?;
 
         Ok(Some(RawStateSyncData {
             mmr_delta: chain_mmr_info.mmr_delta,
@@ -1099,8 +1100,7 @@ impl StateSync {
     ) -> Result<(), ClientError> {
         // To receive information about added nullifiers, we reduce them to the higher 16 bits
         // Note that besides filtering by nullifier prefixes, the node also filters by block number
-        // (it only returns nullifiers from current_block_num until
-        // response.block_header.block_num())
+        // (it only returns nullifiers from current_block_num + 1 until state_sync_update.block_num)
 
         // Check for new nullifiers for input notes that were updated
         let nullifiers_tags: Vec<u16> = state_sync_update
@@ -1111,7 +1111,11 @@ impl StateSync {
 
         let mut new_nullifiers = self
             .rpc_api
-            .sync_nullifiers(&nullifiers_tags, current_block_num, Some(state_sync_update.block_num))
+            .sync_nullifiers(
+                &nullifiers_tags,
+                current_block_num + 1,
+                Some(state_sync_update.block_num),
+            )
             .await?;
 
         // Discard nullifiers that are newer than the current block (this might happen if the block

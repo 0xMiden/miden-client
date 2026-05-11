@@ -650,10 +650,10 @@ impl NodeRpcClient for GrpcClient {
 
     async fn sync_chain_mmr(
         &self,
-        block_from: BlockNumber,
+        current_block_height: BlockNumber,
         upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError> {
-        let block_from = block_from.as_u32();
+        let block_from = current_block_height.as_u32();
 
         let upper_bound = Some(upper_bound.into());
 
@@ -826,7 +826,7 @@ impl NodeRpcClient for GrpcClient {
     /// requested block range.
     async fn sync_notes(
         &self,
-        block_num: BlockNumber,
+        block_from: BlockNumber,
         block_to: Option<BlockNumber>,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<Vec<NoteSyncBlock>, RpcError> {
@@ -843,7 +843,7 @@ impl NodeRpcClient for GrpcClient {
 
         for chunk in tags.chunks(limits.note_tags_limit as usize) {
             let proto_tags: Vec<u32> = chunk.iter().map(|&t| t.into()).collect();
-            let mut pagination = BlockPagination::new(block_num, block_to);
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
                 let request = proto::rpc::SyncNotesRequest {
@@ -893,7 +893,7 @@ impl NodeRpcClient for GrpcClient {
     async fn sync_nullifiers(
         &self,
         prefixes: &[u16],
-        block_num: BlockNumber,
+        block_from: BlockNumber,
         block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         const MAX_ITERATIONS: u32 = 1000; // Safety limit to prevent infinite loops
@@ -904,7 +904,7 @@ impl NodeRpcClient for GrpcClient {
         // If the prefixes are too many, we need to chunk them into smaller groups to avoid
         // violating the RPC limit.
         'chunk_nullifiers: for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
-            let mut current_block_from = block_num.as_u32();
+            let mut current_block_from = block_from.as_u32();
 
             for _ in 0..MAX_ITERATIONS {
                 let request = proto::rpc::SyncNullifiersRequest {
