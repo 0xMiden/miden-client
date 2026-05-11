@@ -1455,7 +1455,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .sync_account_vault(0.into(), None, first_basic_account.id())
         .await
         .unwrap();
-    let transactions_info = client
+    let transactions = client
         .test_rpc_api()
         .sync_transactions(0.into(), None, vec![first_basic_account.id()])
         .await
@@ -1465,7 +1465,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     assert_eq!(note.script().root(), retrieved_note_script.root());
     assert!(!sync_storage_maps.updates.is_empty());
     assert!(!account_vault_info.updates.is_empty());
-    assert!(!transactions_info.transaction_records.is_empty());
+    assert!(!transactions.is_empty());
 
     Ok(())
 }

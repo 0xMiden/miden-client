@@ -87,7 +87,7 @@ pub use tonic_client::GrpcClient;
 
 use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::rpc::domain::account_vault::AccountVaultInfo;
-use crate::rpc::domain::transaction::TransactionsInfo;
+use crate::rpc::domain::transaction::TransactionRecord;
 use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
 
@@ -419,18 +419,18 @@ pub trait NodeRpcClient: Send + Sync {
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError>;
 
-    /// Fetches transactions records for specific accounts within a block range.
-    /// Using the `/SyncTransactions` RPC endpoint.
+    /// Fetches transaction records for specific accounts within a block range using the
+    /// `/SyncTransactions` RPC endpoint.
     ///
     /// - `block_from`: The starting block number for the range.
-    /// - `block_to`: The ending block number for the range.
-    /// - `account_ids`: The account IDs for which to fetch storage map updates.
+    /// - `block_to`: The ending block number for the range, or `None` to sync up to the chain tip.
+    /// - `account_ids`: The account IDs for which to fetch transactions.
     async fn sync_transactions(
         &self,
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
         account_ids: Vec<AccountId>,
-    ) -> Result<TransactionsInfo, RpcError>;
+    ) -> Result<Vec<TransactionRecord>, RpcError>;
 
     /// Fetches the network ID of the node.
     /// Errors:

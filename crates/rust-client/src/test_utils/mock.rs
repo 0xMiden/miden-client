@@ -34,7 +34,7 @@ use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
-use crate::rpc::domain::transaction::{TransactionRecord, TransactionsInfo};
+use crate::rpc::domain::transaction::TransactionRecord;
 use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError, RpcStatusInfo};
 
 pub type MockClient<AUTH> = Client<AUTH>;
@@ -185,14 +185,11 @@ impl MockRpcApi {
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
         account_ids: &[AccountId],
-    ) -> TransactionsInfo {
+    ) -> Vec<TransactionRecord> {
         let chain_tip = self.get_chain_tip_block_num();
-        let block_to = match block_to {
-            Some(block_to) => block_to,
-            None => chain_tip,
-        };
+        let block_to = block_to.unwrap_or(chain_tip);
 
-        let mut transaction_records = vec![];
+        let mut transactions = Vec::new();
         for block in self.mock_chain.read().proven_blocks() {
             let block_number = block.header().block_num();
             if block_number <= block_from || block_number > block_to {
@@ -206,7 +203,7 @@ impl MockRpcApi {
 
                 let erased_output_notes = self.erased_notes.read().clone();
 
-                transaction_records.push(TransactionRecord {
+                transactions.push(TransactionRecord {
                     block_num: block_number,
                     transaction_header: transaction_header.clone(),
                     output_notes: vec![],
@@ -215,11 +212,7 @@ impl MockRpcApi {
             }
         }
 
-        TransactionsInfo {
-            chain_tip,
-            block_num: block_to,
-            transaction_records,
-        }
+        transactions
     }
 
     /// Retrieves storage map updates in a given block range.
@@ -701,9 +694,8 @@ impl NodeRpcClient for MockRpcApi {
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
         account_ids: Vec<AccountId>,
-    ) -> Result<TransactionsInfo, RpcError> {
-        let response = self.get_sync_transactions_request(block_from, block_to, &account_ids);
-        Ok(response)
+    ) -> Result<Vec<TransactionRecord>, RpcError> {
+        Ok(self.get_sync_transactions_request(block_from, block_to, &account_ids))
     }
 
     async fn get_network_id(&self) -> Result<NetworkId, RpcError> {

@@ -375,12 +375,10 @@ impl StateSync {
             return Ok((vec![], vec![], vec![]));
         }
 
-        let tx_info = self
+        let transaction_records = self
             .rpc_api
             .sync_transactions(block_from, Some(block_to), account_ids.to_vec())
             .await?;
-
-        let transaction_records = tx_info.transaction_records;
 
         let account_updates = derive_account_commitment_updates(&transaction_records);
         let nullifiers = compute_ordered_nullifiers(&transaction_records);

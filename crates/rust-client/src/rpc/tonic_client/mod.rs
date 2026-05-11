@@ -40,7 +40,7 @@ use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
-use crate::rpc::domain::transaction::TransactionsInfo;
+use crate::rpc::domain::transaction::TransactionRecord;
 use crate::rpc::errors::node::parse_node_error;
 use crate::rpc::errors::{AcceptHeaderContext, AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::account_request::account_detail_request::storage_map_detail_request::SlotData;
@@ -1109,29 +1109,63 @@ impl NodeRpcClient for GrpcClient {
         Ok(AccountVaultInfo { chain_tip, block_number, updates })
     }
 
+    /// Sends one or more `SyncTransactions` requests to the node and concatenates the responses
+    /// into a flat list of [`TransactionRecord`]s.
+    ///
+    /// Chunks `account_ids` by [`RpcLimits::account_ids_limit`] and paginates each chunk across the
+    /// requested block range.
     async fn sync_transactions(
         &self,
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
         account_ids: Vec<AccountId>,
-    ) -> Result<TransactionsInfo, RpcError> {
-        let block_range = Some(BlockRange {
-            block_from: block_from.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        });
+    ) -> Result<Vec<TransactionRecord>, RpcError> {
+        if account_ids.is_empty() {
+            return Ok(Vec::new());
+        }
 
-        let account_ids = account_ids.iter().map(|acc_id| (*acc_id).into()).collect();
+        let limits = self.get_rpc_limits().await?;
+        let mut transactions: Vec<TransactionRecord> = Vec::new();
 
-        let request = proto::rpc::SyncTransactionsRequest { block_range, account_ids };
+        for chunk in account_ids.chunks(limits.account_ids_limit as usize) {
+            let proto_account_ids: Vec<_> = chunk.iter().map(|acc_id| (*acc_id).into()).collect();
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
-        let response = self
-            .call_with_retry(RpcEndpoint::SyncTransactions, |mut rpc_api| {
-                let request = request.clone();
-                Box::pin(async move { rpc_api.sync_transactions(request).await })
-            })
-            .await?;
+            loop {
+                let request = proto::rpc::SyncTransactionsRequest {
+                    block_range: Some(BlockRange {
+                        block_from: pagination.current_block_from().as_u32(),
+                        block_to: pagination.block_to().map(|b| b.as_u32()),
+                    }),
+                    account_ids: proto_account_ids.clone(),
+                };
 
-        response.into_inner().try_into()
+                let response = self
+                    .call_with_retry(RpcEndpoint::SyncTransactions, |mut rpc_api| {
+                        let request = request.clone();
+                        Box::pin(async move { rpc_api.sync_transactions(request).await })
+                    })
+                    .await?
+                    .into_inner();
+
+                let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
+                    "SyncTransactionsResponse.pagination_info".to_owned(),
+                ))?;
+                let page_chain_tip = BlockNumber::from(page.chain_tip);
+                let page_block_to = BlockNumber::from(page.block_num);
+
+                for proto_tx in response.transactions {
+                    transactions.push(TransactionRecord::try_from(proto_tx)?);
+                }
+
+                match pagination.advance(page_block_to, page_chain_tip)? {
+                    PaginationResult::Continue => {},
+                    PaginationResult::Done { .. } => break,
+                }
+            }
+        }
+
+        Ok(transactions)
     }
 
     async fn get_network_id(&self) -> Result<NetworkId, RpcError> {
