@@ -46,10 +46,8 @@ impl<AUTH> Client<AUTH> {
         }
     }
 
-    /// Wrapper around the store's `add_note_tag` method that checks the note tags limit before the
-    /// insert.
+    /// Wrapper around the store's `add_note_tag` method.
     pub async fn insert_note_tag(&self, tag_record: NoteTagRecord) -> Result<bool, ClientError> {
-        self.check_note_tag_limit().await?;
         self.store.add_note_tag(tag_record).await.map_err(Into::into)
     }
 

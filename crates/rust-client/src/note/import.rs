@@ -55,7 +55,6 @@ where
     /// # Errors
     ///
     /// - If an attempt is made to overwrite a note that is currently processing.
-    /// - If the client has reached the note tags limit.
     ///
     /// Note: This operation is atomic. If any note file is invalid or any existing note is in the
     /// processing state, the entire operation fails and no notes are imported.
