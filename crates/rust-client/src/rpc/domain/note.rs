@@ -152,8 +152,6 @@ pub struct NoteSyncBlock {
 /// (scripts, assets, recipient) keyed by note ID.
 pub struct SyncNotesResult {
     /// Blocks containing matching notes with fully-resolved metadata.
-    /// After pagination is fully resolved, the last block is the range-end block
-    /// (chain tip when `block_to` is `None`), even if it contained no matching notes.
     pub blocks: Vec<NoteSyncBlock>,
     /// Full note bodies for public notes, keyed by note ID.
     pub public_notes: BTreeMap<NoteId, Note>,

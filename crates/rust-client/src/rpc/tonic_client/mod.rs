@@ -835,15 +835,13 @@ impl NodeRpcClient for GrpcClient {
         }
 
         let limits = self.get_rpc_limits().await?;
-        let tags_vec: Vec<NoteTag> = note_tags.iter().copied().collect();
+        let tags: Vec<NoteTag> = note_tags.iter().copied().collect();
 
-        // Merge blocks across tag-chunks: the same block (in particular the range-end
-        // boundary) appears in every chunk's response. Union the per-block notes; the
-        // header and MMR path are identical across chunks for a given block, so the
-        // first-seen entry is authoritative.
+        // Merge blocks across tag-chunks: a single block can hold notes whose tags fall into
+        // different chunks, so the same block can appear in multiple chunks' responses.
         let mut merged_blocks: BTreeMap<BlockNumber, NoteSyncBlock> = BTreeMap::new();
 
-        for chunk in tags_vec.chunks(limits.note_tags_limit as usize) {
+        for chunk in tags.chunks(limits.note_tags_limit as usize) {
             let proto_tags: Vec<u32> = chunk.iter().map(|&t| t.into()).collect();
             let mut pagination = BlockPagination::new(block_num, block_to);
 
@@ -882,11 +880,9 @@ impl NodeRpcClient for GrpcClient {
                     }
                 }
 
-                if matches!(
-                    pagination.advance(page_block_to, page_chain_tip)?,
-                    PaginationResult::Done { .. }
-                ) {
-                    break;
+                match pagination.advance(page_block_to, page_chain_tip)? {
+                    PaginationResult::Continue => {},
+                    PaginationResult::Done { .. } => break,
                 }
             }
         }
