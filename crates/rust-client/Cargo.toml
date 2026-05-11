@@ -24,15 +24,23 @@ ignored = ["getrandom", "prost-types", "tonic-prost"]
 crate-type = ["lib"]
 
 [features]
+# Rayon-parallel proving in miden-tx + miden-prover. Surfaced independently
+# of `std` so wasm32 consumers (the web-sdk's MT WASM bundle, the
+# miden-mobile-prover crate that ships in iOS/Android Capacitor plugins)
+# can opt in to parallel proving without also pulling in tokio/tempfile.
+# Native `std`-using consumers get this transitively through `std`; the
+# duplication is intentional so each consumer can pick the smallest
+# feature set they need.
+concurrent = ["miden-tx/concurrent"]
 dap = ["dep:miden-debug"]
 default = ["dap", "std"]
 std = [
+  "concurrent",
   "dep:tempfile",
   "dep:tokio",
   "miden-protocol/std",
   "miden-remote-prover-client/std",
   "miden-remote-prover-client/tx-prover",
-  "miden-tx/concurrent",
   "tonic/tls-native-roots",
   "tonic/tls-ring",
   "tonic/transport",
