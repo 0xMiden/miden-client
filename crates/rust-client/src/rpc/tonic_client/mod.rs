@@ -827,7 +827,7 @@ impl NodeRpcClient for GrpcClient {
     async fn sync_notes(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<Vec<NoteSyncBlock>, RpcError> {
         if note_tags.is_empty() {
@@ -843,7 +843,7 @@ impl NodeRpcClient for GrpcClient {
 
         for chunk in tags.chunks(limits.note_tags_limit as usize) {
             let proto_tags: Vec<u32> = chunk.iter().map(|&t| t.into()).collect();
-            let mut pagination = BlockPagination::new(block_from, block_to);
+            let mut pagination = BlockPagination::new(block_from, Some(block_to));
 
             loop {
                 let request = proto::rpc::SyncNotesRequest {

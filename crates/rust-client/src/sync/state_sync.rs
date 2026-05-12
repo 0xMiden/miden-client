@@ -337,7 +337,7 @@ impl StateSync {
         // a consistent forest.
         let sync_notes_result = self
             .rpc_api
-            .sync_notes_with_details(current_block_num + 1, Some(chain_tip), note_tags.as_ref())
+            .sync_notes_with_details(current_block_num + 1, chain_tip, note_tags.as_ref())
             .await?;
 
         let note_count: usize = sync_notes_result.blocks.iter().map(|b| b.notes.len()).sum();
@@ -1723,8 +1723,10 @@ mod tests {
         let chain_tip = mock_rpc.get_chain_tip_block_num();
 
         // Verify the mock returns notes across multiple blocks.
-        let note_blocks =
-            mock_rpc.sync_notes(BlockNumber::from(0u32), None, &note_tags).await.unwrap();
+        let note_blocks = mock_rpc
+            .sync_notes(BlockNumber::from(0u32), chain_tip, &note_tags)
+            .await
+            .unwrap();
         assert!(
             note_blocks.len() >= 2,
             "expected notes in multiple blocks, got {}",

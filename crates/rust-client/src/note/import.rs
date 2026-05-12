@@ -387,7 +387,7 @@ where
 
         let sync_result = self
             .rpc_api
-            .sync_notes_with_details(request_block_num, Some(current_block_num), &tracked_tags)
+            .sync_notes_with_details(request_block_num, current_block_num, &tracked_tags)
             .await
             .map_err(ClientError::RpcError)?;
 

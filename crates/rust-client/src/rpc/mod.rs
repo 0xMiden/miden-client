@@ -195,13 +195,12 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches the notes related to the specified tags using the `/SyncNotes` RPC endpoint.
     ///
     /// - `block_from`: The starting block number for the range (inclusive).
-    /// - `block_to`: The ending block number for the range (inclusive), or `None` to sync up to the
-    ///   chain tip.
+    /// - `block_to`: The ending block number for the range (inclusive).
     /// - `note_tags` is the set of tags used to filter the notes the client is interested in.
     async fn sync_notes(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<Vec<NoteSyncBlock>, RpcError>;
 
@@ -217,7 +216,7 @@ pub trait NodeRpcClient: Send + Sync {
     async fn sync_notes_with_details(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<SyncNotesResult, RpcError> {
         let mut blocks = self.sync_notes(block_from, block_to, note_tags).await?;
