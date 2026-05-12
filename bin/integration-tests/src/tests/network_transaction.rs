@@ -483,10 +483,15 @@ pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<(
     )
     .await?;
 
+    let source_manager = client_1.source_manager();
     let mut network_notes = vec![];
     for _ in 0..BUMP_NOTE_NUMBER {
-        let network_note =
-            get_network_note(native_account.id(), network_account_id, &mut client_1.rng())?;
+        let network_note = get_network_note(
+            native_account.id(),
+            network_account_id,
+            source_manager.clone(),
+            &mut client_1.rng(),
+        )?;
         network_notes.push(network_note);
     }
 

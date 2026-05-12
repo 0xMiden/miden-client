@@ -3889,6 +3889,11 @@ async fn execute_transaction_fails_for_watch_only_account() {
         .insert_account(&faucet, address)
         .await
         .expect("watch-only account should insert via the store");
+    client
+        .test_store()
+        .set_account_watch_only(faucet_id, true)
+        .await
+        .expect("flipping watch_only should succeed");
 
     let target_account_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1).unwrap();
     let tx_request = TransactionRequestBuilder::new()

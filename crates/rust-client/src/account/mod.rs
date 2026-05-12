@@ -217,9 +217,10 @@ impl<AUTH> Client<AUTH> {
                     .await
                     .map_err(ClientError::StoreError)?;
 
-                // Watch-only accounts skip the per-account note tag so that sync doesn't pull
-                // notes targeted at them. "Watch-only" is defined as the absence of this tag.
-                if !watch_only {
+                if watch_only {
+                    self.store.set_account_watch_only(account.id(), true).await?;
+                } else {
+                    // Set the default address note tag so sync pulls notes.
                     let default_address_note_tag = default_address.to_note_tag();
                     let note_tag_record =
                         NoteTagRecord::with_account_source(default_address_note_tag, account.id());
@@ -253,9 +254,10 @@ impl<AUTH> Client<AUTH> {
 
                 self.store.update_account(account).await?;
 
-                // Reconcile account-owned note tags with the requested mode. Watch-only is
-                // defined as the absence of account-owned tags.
                 let was_watch_only = tracked_account.is_watch_only();
+                if watch_only != was_watch_only {
+                    self.store.set_account_watch_only(account.id(), watch_only).await?;
+                }
                 if watch_only && !was_watch_only {
                     // Demote full account to watch-only by removing the account note tags.
                     let account_note_tag_records = self
@@ -268,11 +270,15 @@ impl<AUTH> Client<AUTH> {
                         self.store.remove_note_tag(note_tag_record).await?;
                     }
                 } else if !watch_only && was_watch_only {
-                    // Promote watch-only account to full by registering the account note tag.
-                    let default_tag = Address::new(account.id()).to_note_tag();
-                    let note_tag_record =
-                        NoteTagRecord::with_account_source(default_tag, account.id());
-                    self.store.add_note_tag(note_tag_record).await?;
+                    // Promote watch-only account to full by registering the account note tags for
+                    // all registered addresses.
+                    let addresses = self.store.get_addresses_by_account_id(account.id()).await?;
+                    for address in addresses {
+                        self.check_note_tag_limit().await?;
+                        let note_tag_record =
+                            NoteTagRecord::with_account_source(address.to_note_tag(), account.id());
+                        self.store.add_note_tag(note_tag_record).await?;
+                    }
                 }
                 Ok(())
             },

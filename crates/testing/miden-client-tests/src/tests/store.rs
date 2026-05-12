@@ -3,7 +3,6 @@ use alloc::vec::Vec;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use miden_client::account::Address;
 use miden_client::assembly::{CodeBuilder, Module, ModuleKind, Path, SourceManagerSync};
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, PublicKeyCommitment};
 use miden_client::keystore::Keystore;

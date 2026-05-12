@@ -15,10 +15,8 @@ use miden_client::account::{
 };
 use miden_client::asset::Asset;
 use miden_client::store::{AccountStatus, AccountStorageFilter, StoreError};
-use miden_client::sync::NoteTagSource;
-use miden_client::utils::Serializable;
 use miden_client::{Deserializable, Word};
-use rusqlite::{Connection, Params, params, params_from_iter};
+use rusqlite::{Connection, OptionalExtension, Params, params, params_from_iter};
 
 use crate::column_value_as_u64;
 use crate::sql_error::SqlResultExt;
@@ -118,20 +116,21 @@ fn query_account_headers_from_table(
         .collect::<Result<Vec<(AccountHeader, AccountStatus)>, StoreError>>()
 }
 
-/// Returns `true` if the given account has its derived per-account note tag registered,
-/// i.e. it is tracked in fully-tracked mode (not watch-only).
+/// Returns the `watch_only` flag for the given account from `latest_account_headers`.
 ///
-/// "Watch-only" is defined as the *absence* of a [`NoteTagSource::Account`] entry pointing
-/// at this account ID in the `tags` table.
-pub(crate) fn account_has_per_account_tag(
+/// Returns `false` if the account is not present in the store.
+pub(crate) fn query_latest_watch_only(
     conn: &Connection,
     account_id: AccountId,
 ) -> Result<bool, StoreError> {
-    let serialized_source = NoteTagSource::Account(account_id).to_bytes();
     let mut stmt = conn
-        .prepare_cached("SELECT 1 FROM tags WHERE source = ? LIMIT 1")
+        .prepare_cached("SELECT watch_only FROM latest_account_headers WHERE id = ?")
         .into_store_error()?;
-    stmt.exists(params![serialized_source]).into_store_error()
+    Ok(stmt
+        .query_row(params![account_id.to_hex()], |row| row.get::<_, bool>(0))
+        .optional()
+        .into_store_error()?
+        .unwrap_or(false))
 }
 
 // TODO: this function will probably be refactored to receive more complex where clauses and

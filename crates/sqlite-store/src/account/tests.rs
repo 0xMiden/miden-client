@@ -30,9 +30,7 @@ use miden_client::asset::{
 };
 use miden_client::auth::{AuthSchemeId, AuthSingleSig, PublicKeyCommitment};
 use miden_client::store::Store;
-use miden_client::sync::NoteTagSource;
 use miden_client::testing::common::ACCOUNT_ID_REGULAR;
-use miden_client::utils::Serializable;
 use miden_client::{EMPTY_WORD, Felt, ONE, ZERO};
 use miden_protocol::account::AccountComponentMetadata;
 use miden_protocol::testing::account_id::{
@@ -1846,51 +1844,6 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
 }
 
 #[tokio::test]
-async fn account_is_watch_only_when_per_account_tag_is_absent() -> anyhow::Result<()> {
-    let store = create_test_store().await;
-
-    let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .with_auth_component(AuthSingleSig::new(
-            PublicKeyCommitment::from(EMPTY_WORD),
-            AuthSchemeId::Falcon512Poseidon2,
-        ))
-        .with_component(AccountComponent::new(
-            basic_wallet_library(),
-            vec![],
-            AccountComponentMetadata::new("miden::testing::watch_only_dummy", AccountType::all()),
-        )?)
-        .build_with_schema_commitment()?;
-    let account_id = account.id();
-    let default_address = Address::new(account_id);
-
-    // `insert_account` only persists data; tag registration is the caller's responsibility.
-    store.insert_account(&account, default_address).await?;
-
-    // Without a per-account note tag, the record reports as watch-only.
-    let record = store
-        .get_account(account_id)
-        .await?
-        .context("inserted account should be retrievable")?;
-    assert!(record.is_watch_only(), "missing tag → account is watch-only");
-
-    // Sanity: tag table is indeed empty for this account.
-    let tag_count: usize = store
-        .interact_with_connection(move |conn| {
-            conn.query_row(
-                "SELECT COUNT(*) FROM tags WHERE source = ?",
-                params![NoteTagSource::Account(account_id).to_bytes()],
-                |row| row.get(0),
-            )
-            .into_store_error()
-        })
-        .await?;
-    assert_eq!(tag_count, 0, "no per-account tag should be registered");
-
-    Ok(())
-}
-
-#[tokio::test]
 async fn watch_only_status_survives_state_replacement() -> anyhow::Result<()> {
     let store = create_test_store().await;
 
@@ -1909,9 +1862,7 @@ async fn watch_only_status_survives_state_replacement() -> anyhow::Result<()> {
     let account_id = account.id();
     store.insert_account(&account, Address::new(account_id)).await?;
 
-    // Bump the account's nonce and run it through update_account. Since watch-only is
-    // derived from "no per-account tag", and update_account doesn't touch tags, the
-    // status must remain watch-only after replacement.
+    // Bump the account's nonce and run it through update_account.
     let mut updated = account.clone();
     let storage_delta = AccountStorageDelta::new();
     let vault_delta = AccountVaultDelta::from_iters([], []);

@@ -42,7 +42,8 @@ pub struct AccountRecord {
     account_data: AccountRecordData,
     /// Status of the tracked account.
     status: AccountStatus,
-    /// Whether the account is followed in watch-only mode (no note sync, no tag).
+    /// Whether the account is followed in watch-only mode (no note sync, no transaction
+    /// execution).
     watch_only: bool,
 }
 

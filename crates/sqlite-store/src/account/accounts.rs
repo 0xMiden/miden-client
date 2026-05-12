@@ -40,11 +40,11 @@ use rusqlite::types::Value;
 use rusqlite::{Connection, OptionalExtension, Transaction, named_params, params};
 
 use crate::account::helpers::{
-    account_has_per_account_tag,
     query_account_addresses,
     query_account_code,
     query_historical_account_headers,
     query_latest_account_headers,
+    query_latest_watch_only,
     query_storage_slots,
     query_storage_values,
     query_vault_assets,
@@ -106,7 +106,7 @@ impl SqliteStore {
             return Ok(None);
         };
 
-        let watch_only = !account_has_per_account_tag(conn, account_id)?;
+        let watch_only = query_latest_watch_only(conn, account_id)?;
 
         let assets = query_vault_assets(conn, account_id)?;
         let vault = AssetVault::new(&assets)?;
@@ -143,7 +143,7 @@ impl SqliteStore {
             return Ok(None);
         };
 
-        let watch_only = !account_has_per_account_tag(conn, account_id)?;
+        let watch_only = query_latest_watch_only(conn, account_id)?;
 
         // Partial vault retrieval
         let partial_vault = PartialVault::new(header.vault_root());
@@ -418,6 +418,26 @@ impl SqliteStore {
         tx.execute(DELETE_QUERY, params![serialized_address]).into_store_error()?;
 
         tx.commit().into_store_error()
+    }
+
+    /// Sets the per-account watch-only flag.
+    ///
+    /// Errors if the account is not present in `latest_account_headers`.
+    pub(crate) fn set_account_watch_only(
+        conn: &mut Connection,
+        account_id: AccountId,
+        watch_only: bool,
+    ) -> Result<(), StoreError> {
+        let updated = conn
+            .execute(
+                "UPDATE latest_account_headers SET watch_only = ? WHERE id = ?",
+                params![watch_only, account_id.to_hex()],
+            )
+            .into_store_error()?;
+        if updated == 0 {
+            return Err(StoreError::AccountDataNotFound(account_id));
+        }
+        Ok(())
     }
 
     /// Inserts an [`AccountCode`].
@@ -726,8 +746,8 @@ impl SqliteStore {
 
     /// Replaces the account state with a completely new one from the network.
     ///
-    /// Replaces the account state entirely: archives old state to historical,
-    /// clears latest, inserts new state to latest only.
+    /// Replaces the account state entirely: archives old state to historical, clears latest,
+    /// inserts new state to latest only. Preserves the `watch_only` flag.
     pub(crate) fn update_account_state(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,
@@ -900,12 +920,26 @@ impl SqliteStore {
     ///
     /// If `old_header` is provided, the old header is archived to the historical table.
     /// For initial inserts (no previous state), pass `None` for `old_header`.
+    ///
+    /// The `watch_only` flag on the latest row is preserved. For fresh inserts, it is set to false.
     fn insert_account_header(
         tx: &Transaction<'_>,
         new_header: &AccountHeader,
         account_seed: Option<Word>,
         old_header: Option<&AccountHeader>,
     ) -> Result<(), StoreError> {
+        // Read the current latest row's preserved-on-replace fields (seed, locked, watch_only).
+        let id_for_lookup = new_header.id().to_hex();
+        let (old_seed, old_locked, old_watch_only): (Option<Vec<u8>>, bool, bool) = tx
+            .query_row(
+                "SELECT account_seed, locked, watch_only FROM latest_account_headers WHERE id = ?",
+                params![&id_for_lookup],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .into_store_error()?
+            .unwrap_or((None, false, false));
+
         // Archive the old header to historical before overwriting latest.
         if let Some(old) = old_header {
             let old_id = old.id().to_hex();
@@ -915,17 +949,6 @@ impl SqliteStore {
             let old_nonce = u64_to_value(old.nonce().as_canonical_u64());
             let old_commitment = old.to_commitment().to_string();
             let replaced_at_nonce = u64_to_value(new_header.nonce().as_canonical_u64());
-
-            // Read the old seed and locked status from latest (if any)
-            let (old_seed, old_locked): (Option<Vec<u8>>, bool) = tx
-                .query_row(
-                    "SELECT account_seed, locked FROM latest_account_headers WHERE id = ?",
-                    params![&old_id],
-                    |row| Ok((row.get(0)?, row.get(1)?)),
-                )
-                .optional()
-                .into_store_error()?
-                .unwrap_or((None, false));
 
             const HISTORICAL_QUERY: &str = insert_sql!(
                 historical_account_headers {
@@ -976,7 +999,8 @@ impl SqliteStore {
                 nonce,
                 account_seed,
                 account_commitment,
-                locked
+                locked,
+                watch_only
             } | REPLACE
         );
 
@@ -991,6 +1015,7 @@ impl SqliteStore {
                 account_seed,
                 commitment,
                 false,
+                old_watch_only,
             ],
         )
         .into_store_error()?;
