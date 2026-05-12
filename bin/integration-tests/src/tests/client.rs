@@ -1455,9 +1455,16 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .sync_account_vault(0.into(), None, first_basic_account.id())
         .await
         .unwrap();
+    let chain_tip = client
+        .test_rpc_api()
+        .get_block_header_by_number(None, false)
+        .await
+        .unwrap()
+        .0
+        .block_num();
     let transactions = client
         .test_rpc_api()
-        .sync_transactions(0.into(), None, vec![first_basic_account.id()])
+        .sync_transactions(0.into(), chain_tip, vec![first_basic_account.id()])
         .await
         .unwrap();
 

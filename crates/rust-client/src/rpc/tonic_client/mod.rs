@@ -1117,7 +1117,7 @@ impl NodeRpcClient for GrpcClient {
     async fn sync_transactions(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_ids: Vec<AccountId>,
     ) -> Result<Vec<TransactionRecord>, RpcError> {
         if account_ids.is_empty() {
@@ -1129,7 +1129,7 @@ impl NodeRpcClient for GrpcClient {
 
         for chunk in account_ids.chunks(limits.account_ids_limit as usize) {
             let proto_account_ids: Vec<_> = chunk.iter().map(|acc_id| (*acc_id).into()).collect();
-            let mut pagination = BlockPagination::new(block_from, block_to);
+            let mut pagination = BlockPagination::new(block_from, Some(block_to));
 
             loop {
                 let request = proto::rpc::SyncTransactionsRequest {

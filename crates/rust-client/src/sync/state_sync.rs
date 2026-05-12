@@ -378,7 +378,7 @@ impl StateSync {
 
         let transaction_records = self
             .rpc_api
-            .sync_transactions(block_from, Some(block_to), account_ids.to_vec())
+            .sync_transactions(block_from, block_to, account_ids.to_vec())
             .await?;
 
         let account_updates = derive_account_commitment_updates(&transaction_records);

@@ -183,12 +183,9 @@ impl MockRpcApi {
     fn get_sync_transactions_request(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_ids: &[AccountId],
     ) -> Vec<TransactionRecord> {
-        let chain_tip = self.get_chain_tip_block_num();
-        let block_to = block_to.unwrap_or(chain_tip);
-
         let mut transactions = Vec::new();
         for block in self.mock_chain.read().proven_blocks() {
             let block_number = block.header().block_num();
@@ -688,7 +685,7 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_transactions(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_ids: Vec<AccountId>,
     ) -> Result<Vec<TransactionRecord>, RpcError> {
         Ok(self.get_sync_transactions_request(block_from, block_to, &account_ids))
