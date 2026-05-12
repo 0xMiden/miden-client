@@ -240,6 +240,8 @@ jobs:
           path: target/release
       - name: Restore note-transport permissions
         run: chmod +x target/release/miden-note-transport-node-bin
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@c7450ba673e133f5ee30098b3b54f444d3a2ca2d # v1.8
       - name: Start test node
         run: ./scripts/start-ci-service.sh testing-node-builder 57291 target/release/testing-node-builder
       - name: Start note transport

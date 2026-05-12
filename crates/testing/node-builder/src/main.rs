@@ -44,10 +44,15 @@ async fn main() -> anyhow::Result<()> {
     ensure_data_dir(&data_dir)?;
     write_pid_file()?;
 
-    let builder = NodeBuilder::new(data_dir)
+    let mut builder = NodeBuilder::new(data_dir)
         .with_rpc_port(DEFAULT_RPC_PORT)
         .with_block_interval(Duration::from_millis(DEFAULT_BLOCK_INTERVAL))
         .with_batch_interval(Duration::from_millis(DEFAULT_BATCH_INTERVAL));
+
+    if std::env::var("AGGLAYER_GENESIS").is_ok() {
+        builder = builder.with_agglayer_accounts();
+        println!("Agglayer genesis accounts enabled");
+    }
 
     let handle = builder.start().await?;
     println!("Node started successfully with PID: {}", process::id());
