@@ -1,0 +1,8 @@
+label: Bridge ETH from Sepolia
+# Determines where this documentation section appears relative to other pages in Getting Started
+position: 4
+collapsed: false
+link:
+  type: generated-index
+  title: Bridge ETH from Sepolia
+  description: Bridge ETH between Ethereum Sepolia and the Miden testnet (Bali).

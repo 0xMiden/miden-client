@@ -1,0 +1,57 @@
+# Copy this file to bali-bridge.conf and fill in values for your bridge run.
+
+# Sepolia deployment values.
+# -----------------------------------------------------------------------------
+# Bridge contract address
+BRIDGE_ADDRESS=0x1348947e282138d8f377b467f7d9c2eb0f335d1f
+# -----------------------------------------------------------------------------
+
+# AggLayer Bali testnet deployment values.
+# -----------------------------------------------------------------------------
+# Miden's assigned network ID within Bali
+DEST_NETWORK=73
+# Network ID of the destination network for withdrawal from Miden. 0 = Sepolia L1.
+DEST_L1_NETWORK=0
+# -----------------------------------------------------------------------------
+
+# Miden network deployment values.
+# -----------------------------------------------------------------------------
+MIDEN_BRIDGE_ID=mtst1aqn4y5pyessyw5rukd0wnmgq6srmn7np
+MIDEN_FAUCET_ID=mtst1az5g5k0tj7vsqcrp90z2dshsmskhyely
+# -----------------------------------------------------------------------------
+
+# Service APIs
+# -----------------------------------------------------------------------------
+BRIDGE_SERVICE_API=https://miden-testnet-bridge.dev.eu-north-3.gateway.fm/api
+MIDEN_NODE_URL=https://rpc.testnet.miden.io:443
+SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+# -----------------------------------------------------------------------------
+
+# Account data
+# -----------------------------------------------------------------------------
+# The keystore created by `cast wallet new`
+ETH_KEYSTORE=./miden-bali-sepolia
+# The miden-client data directory created by `miden-client init`.
+MIDEN_STORE_DIR=~/.miden
+# Optional. If unset, cast prompts for the keystore password.
+# ETH_KEYSTORE_PASSWORD_FILE=./eth-keystore-password.txt
+# -----------------------------------------------------------------------------
+
+# Transaction data
+# -----------------------------------------------------------------------------
+# Bridge contract call parameters
+FORCE_UPDATE_GLOBAL_EXIT_ROOT=true
+GAS_TOKEN_ADDRESS=0x0000000000000000000000000000000000000000
+GAS_LIMIT=300000
+
+# The Miden account that receives L1 deposits and sends L2 withdrawals.
+MIDEN_ACCOUNT_ID=
+
+# The Sepolia account that receives L2 withdrawals.
+ETH_ACCOUNT_ID=
+
+# The amount of ETH to deposit on Sepolia.
+AMOUNT_ETH=0.001
+
+# The amount of ETH to withdraw from Miden.
+MIDEN_WITHDRAW_AMOUNT=10000
