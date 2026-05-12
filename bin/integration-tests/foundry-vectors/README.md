@@ -1,5 +1,7 @@
 # Foundry Test Vector Generator
 
+> **Note:** This `README.md` is only for reference, we do not expect the user to manually generate test vectors using foundry (it is done automatically as part of the Rust integration tests).
+
 Solidity-based test vector generator for the agglayer bridge integration tests. Uses Foundry to simulate L1 `bridgeAsset()` transactions and produce JSON files containing valid Merkle proofs, leaf data, and exit roots that the Rust integration tests consume.
 
 ## Prerequisites
