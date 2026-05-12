@@ -24,13 +24,34 @@ ignored = ["getrandom", "prost-types", "tonic-prost"]
 crate-type = ["lib"]
 
 [features]
-default = ["std"]
+# Rayon-parallel proving in miden-tx + miden-prover. Surfaced independently
+# of `miden-client`'s own `std` feature so wasm32 consumers (the web-sdk's
+# MT WASM bundle, the miden-mobile-prover crate that ships in iOS/Android
+# Capacitor plugins) can opt in to parallel proving without dragging in
+# the heavy `miden-client/std` deps — `dep:tokio`, `dep:tempfile`, and
+# `tonic`'s `transport`/`tls-*` features.
+#
+# Note: `miden-tx`'s own `concurrent` feature is defined upstream as
+# `["miden-prover/concurrent", "std"]`, so enabling `concurrent` here
+# does activate `std` on the protocol crates (miden-tx, miden-prover,
+# miden-protocol). That `std` is unavoidable for parallel proving and
+# is cheap on wasm32 — it doesn't reach the tokio/tempfile/transport
+# pieces gated above. The win this feature delivers is dropping those
+# `miden-client`-side deps; full no_std is not a goal of this feature.
+#
+# Native `std`-using consumers get `concurrent` transitively through
+# `std`; the duplication in the `std` feature list is intentional so
+# each consumer can pick the smallest feature set they need.
+concurrent = ["miden-tx/concurrent"]
+dap = ["dep:miden-debug"]
+default = ["dap", "std"]
 std = [
+  "concurrent",
+  "dep:tempfile",
   "dep:tokio",
   "miden-protocol/std",
   "miden-remote-prover-client/std",
   "miden-remote-prover-client/tx-prover",
-  "miden-tx/concurrent",
   "tonic/tls-native-roots",
   "tonic/tls-ring",
   "tonic/transport",
@@ -40,6 +61,7 @@ tonic = []
 
 [dependencies]
 # Miden dependencies
+miden-debug                = { optional = true, workspace = true }
 miden-protocol             = { workspace = true }
 miden-remote-prover-client = { default-features = false, features = ["tx-prover"], workspace = true }
 miden-standards            = { workspace = true }
@@ -57,6 +79,7 @@ prost-types  = { version = "0.14" }
 rand         = { workspace = true }
 serde        = { workspace = true }
 serde_json   = { version = "1.0" }
+tempfile     = { optional = true, version = "3.0" }
 thiserror    = { workspace = true }
 tokio        = { features = ["time"], optional = true, workspace = true }
 tonic        = { default-features = false, features = ["codegen"], version = "0.14" }

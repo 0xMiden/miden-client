@@ -5,10 +5,10 @@ use core::fmt::{self, Debug, Display, Formatter};
 
 use miden_protocol::Word;
 use miden_protocol::account::{
-    Account, AccountCode, AccountHeader, AccountId, AccountStorageHeader, StorageMap,
-    StorageMapKey, StorageSlotHeader, StorageSlotName, StorageSlotType,
+    Account, AccountCode, AccountHeader, AccountId, AccountStorage, AccountStorageHeader,
+    StorageMap, StorageMapKey, StorageSlot, StorageSlotHeader, StorageSlotName, StorageSlotType,
 };
-use miden_protocol::asset::Asset;
+use miden_protocol::asset::{Asset, AssetVault};
 use miden_protocol::block::BlockNumber;
 use miden_protocol::block::account_tree::AccountWitness;
 use miden_protocol::crypto::merkle::SparseMerklePath;
@@ -29,6 +29,7 @@ use crate::rpc::generated::{self as proto};
 // ================================================================================================
 
 /// Describes the possible responses from the `GetAccountDetails` endpoint for an account.
+#[derive(Debug)]
 pub enum FetchedAccount {
     /// Private accounts are stored off-chain. Only a commitment to the state of the account is
     /// shared with the network. The full account state is to be tracked locally.
@@ -87,6 +88,7 @@ impl From<FetchedAccount> for Option<Account> {
 // ================================================================================================
 
 /// Contains public updated information about the account requested.
+#[derive(Debug)]
 pub struct AccountUpdateSummary {
     /// Commitment of the account, that represents a commitment to its updated state.
     pub commitment: Word,
@@ -331,6 +333,99 @@ pub struct AccountDetails {
     pub storage_details: AccountStorageDetails,
     pub code: AccountCode,
     pub vault_details: AccountVaultDetails,
+}
+
+impl TryFrom<&AccountDetails> for Account {
+    type Error = RpcError;
+
+    /// Builds an [`Account`] from [`AccountDetails`].
+    ///
+    /// This conversion fails if the account details are incomplete, i.e., when the account's
+    /// storage maps or vault exceed the node's size threshold (`too_many_entries` or
+    /// `too_many_assets` flags are set).
+    fn try_from(details: &AccountDetails) -> Result<Self, Self::Error> {
+        if details.vault_details.too_many_assets {
+            return Err(RpcError::ExpectedDataMissing(
+                "cannot build account: vault has too many assets".into(),
+            ));
+        }
+
+        if let Some(slot_name) = details
+            .storage_details
+            .map_details
+            .iter()
+            .find(|m| m.too_many_entries)
+            .map(|m| &m.slot_name)
+        {
+            return Err(RpcError::ExpectedDataMissing(format!(
+                "cannot build account: storage map slot '{slot_name}' has too many entries",
+            )));
+        }
+
+        let mut slots: Vec<StorageSlot> = Vec::new();
+
+        for slot_header in details.storage_details.header.slots() {
+            match slot_header.slot_type() {
+                StorageSlotType::Value => {
+                    slots.push(StorageSlot::with_value(
+                        slot_header.name().clone(),
+                        slot_header.value(),
+                    ));
+                },
+                StorageSlotType::Map => {
+                    let map_details = details
+                        .storage_details
+                        .find_map_details(slot_header.name())
+                        .ok_or_else(|| {
+                            RpcError::ExpectedDataMissing(format!(
+                                "slot '{}' is a map but has no map_details in response",
+                                slot_header.name()
+                            ))
+                        })?;
+
+                    let storage_map = map_details
+                        .entries
+                        .clone()
+                        .into_storage_map()
+                        .ok_or_else(|| {
+                            RpcError::ExpectedDataMissing(
+                                "expected AllEntries for full account fetch, got EntriesWithProofs"
+                                    .into(),
+                            )
+                        })?
+                        .map_err(|err| {
+                            RpcError::InvalidResponse(format!(
+                                "the rpc api returned a non-valid map entry: {err}"
+                            ))
+                        })?;
+
+                    slots.push(StorageSlot::with_map(slot_header.name().clone(), storage_map));
+                },
+            }
+        }
+
+        let asset_vault = AssetVault::new(&details.vault_details.assets).map_err(|err| {
+            RpcError::InvalidResponse(format!("rpc api returned non-valid assets: {err}"))
+        })?;
+
+        let account_storage = AccountStorage::new(slots).map_err(|err| {
+            RpcError::InvalidResponse(format!("rpc api returned non-valid storage slots: {err}"))
+        })?;
+
+        Account::new(
+            details.header.id(),
+            asset_vault,
+            account_storage,
+            details.code.clone(),
+            details.header.nonce(),
+            None,
+        )
+        .map_err(|err| {
+            RpcError::InvalidResponse(format!(
+                "failed to construct account from rpc api response: {err}"
+            ))
+        })
+    }
 }
 
 // ACCOUNT STORAGE DETAILS

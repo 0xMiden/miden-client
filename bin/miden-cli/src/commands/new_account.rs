@@ -98,6 +98,14 @@ pub struct NewWalletCmd {
     /// authentication transaction.
     #[arg(long, default_value_t = false)]
     pub deploy: bool,
+    /// Seed local-only state so the wallet can be created and used for execution without a node.
+    /// Only available when built with the `testing` feature.
+    #[cfg_attr(
+        feature = "testing",
+        arg(long, default_value_t = false, conflicts_with = "deploy")
+    )]
+    #[cfg_attr(not(feature = "testing"), arg(skip = false))]
+    pub offline: bool,
 }
 
 impl NewWalletCmd {
@@ -126,6 +134,7 @@ impl NewWalletCmd {
             &package_paths,
             self.init_storage_data_path.clone(),
             self.deploy,
+            self.offline,
         )
         .await?;
 
@@ -193,6 +202,14 @@ pub struct NewAccountCmd {
     /// authentication transaction.
     #[arg(long, default_value_t = false)]
     pub deploy: bool,
+    /// Seed local-only state so the account can be created and used for execution without a node.
+    /// Only available when built with the `testing` feature.
+    #[cfg_attr(
+        feature = "testing",
+        arg(long, default_value_t = false, conflicts_with = "deploy")
+    )]
+    #[cfg_attr(not(feature = "testing"), arg(skip = false))]
+    pub offline: bool,
 }
 
 impl NewAccountCmd {
@@ -209,6 +226,7 @@ impl NewAccountCmd {
             &self.packages,
             self.init_storage_data_path.clone(),
             self.deploy,
+            self.offline,
         )
         .await?;
 
@@ -385,6 +403,7 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     package_paths: &[PathBuf],
     init_storage_data_path: Option<PathBuf>,
     deploy: bool,
+    offline: bool,
 ) -> Result<Account, CliError> {
     if package_paths.is_empty() {
         return Err(CliError::InvalidArgument(format!(
@@ -453,6 +472,14 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
         println!("Generated and stored Falcon512 authentication key in keystore.");
     } else {
         println!("Using custom authentication component from package (no key generated).");
+    }
+
+    let _ = offline;
+
+    #[cfg(feature = "testing")]
+    if offline {
+        client.prepare_offline_bootstrap().await?;
+        println!("Offline mode seeded default RPC limits and a synthetic genesis header.");
     }
 
     client.add_account(&account, false).await?;

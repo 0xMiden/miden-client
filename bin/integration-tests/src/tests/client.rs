@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use assert_matches::assert_matches;
 use miden_client::account::component::{AccountComponent, AccountComponentMetadata};
 use miden_client::account::{
     Account,
@@ -14,7 +15,7 @@ use miden_client::account::{
     StorageSlot,
     StorageSlotName,
 };
-use miden_client::assembly::{CodeBuilder, DefaultSourceManager, Module, ModuleKind, Path};
+use miden_client::assembly::CodeBuilder;
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::builder::ClientBuilder;
@@ -39,7 +40,6 @@ use miden_client::transaction::{
     PaymentNoteDescription,
     ProvenTransaction,
     TransactionInputs,
-    TransactionKernel,
     TransactionProver,
     TransactionProverError,
     TransactionRequestBuilder,
@@ -452,7 +452,7 @@ pub async fn test_get_account_update(client_config: ClientConfig) -> Result<()> 
     let details2 = rpc_api.get_account_details(basic_wallet_2.id()).await.unwrap();
 
     assert!(matches!(details1, FetchedAccount::Private(_, _)));
-    assert!(matches!(details2, FetchedAccount::Public(_, _)));
+    assert_matches!(details2, FetchedAccount::Public(account, _) if account.vault().get_balance(faucet_account.id()).unwrap() == MINT_AMOUNT);
     Ok(())
 }
 
@@ -1368,15 +1368,8 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     client.sync_state().await.unwrap();
 
-    let assembler = TransactionKernel::assembler();
-    let source_manager = Arc::new(DefaultSourceManager::default());
-    let module = Module::parser(ModuleKind::Library)
-        .parse_str(Path::new("custom_library::set_map_item_library"), custom_code, source_manager)
-        .unwrap();
-    let custom_lib = assembler.assemble_library([module]).unwrap();
-
     let tx_script = CodeBuilder::new()
-        .with_statically_linked_library(&custom_lib)?
+        .with_linked_module("custom_library::set_map_item_library", custom_code)?
         .compile_tx_script(
             "
         use custom_library::set_map_item_library
@@ -1687,8 +1680,8 @@ pub async fn test_get_account_proof_returns_vault_details(
     let vault_root = details.header.vault_root();
 
     assert_eq!(
-        details.vault_details.assets.len(),
-        1,
+        details.vault_details.assets,
+        vec![Asset::Fungible(FungibleAsset::new(faucet.id(), MINT_AMOUNT).unwrap())],
         "expected exactly 1 asset (the minted fungible token)"
     );
 
