@@ -16,12 +16,13 @@
 # NOT broadcast it. To actually send, re-run with DRY_RUN=0.
 #
 # Env vars:
-#   SEPOLIA_RPC_URL     (required) Infura/Alchemy/etc; needs eth_sendRawTransaction
-#   SEPOLIA_PRIVATE_KEY (required) 0x... hex, funded with Sepolia ETH
-#   DEST_MIDEN          (optional) 0x<30-hex-chars> Miden AccountId to target.
-#                                  Defaults to the sender's own Eth address (dev usage).
-#   AMOUNT_ETH          (optional) amount in ETH (default 0.001 for a first test)
-#   DRY_RUN             (optional) 1 to print only, 0 to broadcast (default 1)
+#   SEPOLIA_RPC_URL                 (required) Infura/Alchemy/etc; needs eth_sendRawTransaction
+#   SEPOLIA_KEYSTORE                (required) Path to a Foundry keystore file, funded with Sepolia ETH
+#   SEPOLIA_KEYSTORE_PASSWORD_FILE  (optional) Path to the keystore password file. If unset, cast prompts.
+#   DEST_MIDEN                      (optional) 0x<30-hex-chars> Miden AccountId to target.
+#                                              Defaults to the sender's own Eth address (dev usage).
+#   AMOUNT_ETH                      (optional) amount in ETH (default 0.001 for a first test)
+#   DRY_RUN                         (optional) 1 to print only, 0 to broadcast (default 1)
 
 set -euo pipefail
 
@@ -38,10 +39,15 @@ DRY_RUN="${DRY_RUN:-1}"
 
 # --- Required env vars ------------------------------------------------------
 : "${SEPOLIA_RPC_URL:?SEPOLIA_RPC_URL must be set (Infura/Alchemy/etc)}"
-: "${SEPOLIA_PRIVATE_KEY:?SEPOLIA_PRIVATE_KEY must be set (0x...)}"
+: "${SEPOLIA_KEYSTORE:?SEPOLIA_KEYSTORE must be set (path to Foundry keystore file)}"
 
-# Derive sender address from private key for logging / default-destination
-FROM_ADDRESS="$(cast wallet address "$SEPOLIA_PRIVATE_KEY")"
+WALLET_ARGS=(--keystore "$SEPOLIA_KEYSTORE")
+if [[ -n "${SEPOLIA_KEYSTORE_PASSWORD_FILE:-}" ]]; then
+    WALLET_ARGS+=(--password-file "$SEPOLIA_KEYSTORE_PASSWORD_FILE")
+fi
+
+# Derive sender address from the keystore for logging / default-destination.
+FROM_ADDRESS="$(cast wallet address "${WALLET_ARGS[@]}")"
 
 # Destination: either a Miden AccountId (15-byte / 30-hex) mapped into a 20-byte
 # eth slot by padding 4 leading zero bytes + 1 trailing zero byte, or fall back
@@ -83,6 +89,7 @@ cat <<EOF
 === Bali L1->L2 deposit (Sepolia -> Miden rollup 73) ===
 L1 RPC                : $SEPOLIA_RPC_URL
 From                  : $FROM_ADDRESS
+Keystore              : $SEPOLIA_KEYSTORE
 Destination           : $DEST_LABEL
 Bridge contract       : $BRIDGE_ADDRESS
 GlobalExitRoot (L1)   : $GLOBAL_EXIT_ROOT_ADDRESS
@@ -112,7 +119,7 @@ CMD=(
     cast send "$BRIDGE_ADDRESS"
     "$CALLDATA"
     --value "$AMOUNT_WEI"
-    --private-key "<SEPOLIA_PRIVATE_KEY>"
+    "${WALLET_ARGS[@]}"
     --rpc-url "$SEPOLIA_RPC_URL"
     --gas-limit 300000
 )
@@ -132,7 +139,7 @@ echo "Broadcasting deposit..."
 RESULT="$(cast send "$BRIDGE_ADDRESS" \
     "$CALLDATA" \
     --value "$AMOUNT_WEI" \
-    --private-key "$SEPOLIA_PRIVATE_KEY" \
+    "${WALLET_ARGS[@]}" \
     --rpc-url "$SEPOLIA_RPC_URL" \
     --gas-limit 300000 \
     --json)"

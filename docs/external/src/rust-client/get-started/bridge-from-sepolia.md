@@ -25,8 +25,9 @@ working `miden-client` install. If not, set the client up first.
 
 ## Prerequisites
 
-- A funded Sepolia EOA. The private key is used both to broadcast the
-  L1 deposit and to pay gas on `claimAsset` in the reverse direction.
+- A funded Sepolia EOA stored in a password-protected Foundry keystore.
+  This account broadcasts the L1 deposit and pays gas on `claimAsset`
+  in the reverse direction.
 - [Foundry](https://book.getfoundry.sh/getting-started/installation),
   specifically `cast`, on your `$PATH`.
 - A working `miden-client` install (see
@@ -34,14 +35,6 @@ working `miden-client` install. If not, set the client up first.
 - For the Miden → Sepolia direction only: the Miden bridge account ID
   and Miden ETH faucet ID for Bali. These are not yet exposed on a
   public endpoint - request them from the Miden team.
-
-:::note Version compatibility
-The deployed Bali agglayer is pinned to a specific `miden-protocol`
-release. If you build `miden-client` from the latest `main`, account
-authentication may use a variant the deployed agglayer does not yet
-accept. If you encounter signature or auth errors during a claim,
-contact the Miden team for a known-compatible client version.
-:::
 
 ## Direction 1: Sepolia to Miden (L1 to L2)
 
@@ -66,7 +59,30 @@ To view account details execute miden-client account -s 0xc0ffee...c0ffee
 Copy the 30-hex-character account ID - you will pass it as the bridge
 destination in the next step.
 
-### 2. Download the L1 deposit helper
+### 2. Create and fund a Sepolia keystore wallet
+
+Create a password-protected Foundry keystore. `cast` prompts for the
+password and writes the encrypted key to `<PATH>/<ACCOUNT_NAME>`:
+
+```sh
+KEYSTORE_DIR=./
+ACCOUNT_NAME=miden-bali-sepolia
+cast wallet new "$KEYSTORE_DIR" "$ACCOUNT_NAME"
+```
+
+Set the keystore path and print the address:
+
+```sh
+SEPOLIA_KEYSTORE="$KEYSTORE_DIR/$ACCOUNT_NAME"
+cast wallet address --keystore "$SEPOLIA_KEYSTORE"
+```
+
+Use a Sepolia faucet (e.g. https://cloud.google.com/application/web3/faucet/ethereum/sepolia) to send test ETH to that address before
+broadcasting the deposit. The helper checks the balance before sending,
+but the transaction will fail without enough Sepolia ETH for the
+deposit amount and gas.
+
+### 3. Download the L1 deposit helper
 
 The `bali-l1-deposit.sh` helper builds and broadcasts the
 `bridgeAsset` transaction on Sepolia. It lives alongside this doc;
@@ -81,12 +97,16 @@ By default the script runs in `DRY_RUN=1` mode: it prints the exact
 `cast send` command it would issue without broadcasting. Use this to
 sanity-check inputs before spending gas.
 
-### 3. Broadcast the deposit
+### 4. Broadcast the deposit
+
+Run the helper with the keystore path. If you do not provide a password
+file, `cast` prompts for the keystore password when it derives the
+sender and when it signs the transaction:
 
 ```sh
 DEST_MIDEN=<account-id-from-step-1> \
 AMOUNT_ETH=0.001 \
-SEPOLIA_PRIVATE_KEY=<your-key> \
+SEPOLIA_KEYSTORE="$SEPOLIA_KEYSTORE" \
 SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com \
 DRY_RUN=0 \
 ./bali-l1-deposit.sh
@@ -103,13 +123,13 @@ command shows you exactly what will be signed, and the script also
 performs a balance check against `SEPOLIA_RPC_URL`.
 :::
 
-### 4. Wait for the agglayer to issue the claim note
+### 5. Wait for the agglayer to issue the claim note
 
 Budget roughly 15 minutes from broadcast. Sepolia finality takes
 about 6 minutes before the agglayer can act; claim creation and
 submission to Miden are fast.
 
-### 5. Consume the claim note
+### 6. Consume the claim note
 
 Sync the client and consume the note targeted at your wallet:
 
@@ -190,7 +210,7 @@ The high-level flow is:
 - "Sender has zero Sepolia balance" warnings from `bali-l1-deposit.sh`
   mean the script could reach the RPC but your funded EOA has no
   balance there. Either fund the address or fix the
-  `SEPOLIA_PRIVATE_KEY`.
+  `SEPOLIA_KEYSTORE` path.
 - The destination address must be the 15-byte Miden account ID (30
   hex chars). Other formats are rejected by the helper script before
   any transaction is built.
