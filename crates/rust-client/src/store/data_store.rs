@@ -465,7 +465,7 @@ impl MastForestStore for ClientDataStore {
 ///
 /// `authenticated_blocks` must not contain the block whose forest matches `peaks`. For that
 /// block the kernel extends the MMR itself, so an authentication path is not needed.
-async fn build_partial_mmr_with_paths(
+pub(crate) async fn build_partial_mmr_with_paths(
     store: &alloc::sync::Arc<dyn Store>,
     peaks: MmrPeaks,
     authenticated_blocks: &[BlockHeader],

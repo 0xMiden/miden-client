@@ -94,7 +94,7 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
         mint_and_consume(&mut client, from_account_id, faucet_account_id, NoteType::Private).await;
     wait_for_tx(&mut client, tx_id).await?;
 
-    // Do a transfer from first account to second account
+    // Build two P2ID transfer requests of TRANSFER_AMOUNT each.
     let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
     let tx_request_1 = TransactionRequestBuilder::new()
         .build_pay_to_id(
@@ -119,62 +119,76 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
         )
         .unwrap();
 
-    info!(from = %from_account_id, to = %to_account_id, "Running P2ID transaction");
+    let note_id_1 = tx_request_1
+        .expected_output_own_notes()
+        .pop()
+        .expect("tx_request_1 should produce one P2ID note")
+        .id();
+    let note_id_2 = tx_request_2
+        .expected_output_own_notes()
+        .pop()
+        .expect("tx_request_2 should produce one P2ID note")
+        .id();
 
-    // Create transactions
-    let transaction_result_1 =
-        client.execute_transaction(from_account_id, tx_request_1).await.unwrap();
-    let transaction_id_1 = transaction_result_1.id();
-    let proven_transaction_1 = client.prove_transaction(&transaction_result_1).await.unwrap();
+    info!(from = %from_account_id, to = %to_account_id, "Submitting 2-tx P2ID batch");
 
-    // NOTE: we manually construct a [`TransactionStoreUpdate`] because we want to submit both
-    // proofs at the same time, but we can't apply the transaction to the store before submitting
-    // it to the node (since we need the submission height).
-    let current_height = client.get_sync_height().await?;
-    client.apply_transaction(&transaction_result_1, current_height).await?;
-
-    let transaction_result_2 =
-        client.execute_transaction(from_account_id, tx_request_2).await.unwrap();
-    let transaction_id_2 = transaction_result_2.id();
-    let proven_transaction_2 = client.prove_transaction(&transaction_result_2).await.unwrap();
-
-    client
-        .submit_proven_transaction(proven_transaction_1, &transaction_result_1)
+    // Submit both requests as a single proven batch via the node's `SubmitProvenBatch` path.
+    let block_num = client
+        .new_transaction_batch(from_account_id)
+        .await?
+        .push(tx_request_1)
+        .await?
+        .push(tx_request_2)
+        .await?
+        .submit()
         .await?;
-    let submission_height_2 = client
-        .submit_proven_transaction(proven_transaction_2, &transaction_result_2)
-        .await
-        .unwrap();
 
-    client
-        .apply_transaction(&transaction_result_2, submission_height_2)
-        .await
-        .unwrap();
+    info!(
+        submitted_at = block_num.as_u32(),
+        "batch submitted; submission_height returned (actual inclusion block may be later)"
+    );
 
-    client.sync_state().await.unwrap();
+    let sender_committed = {
+        let mut found: Vec<_> = Vec::new();
+        for _ in 0..30 {
+            wait_for_blocks(&mut client, 1).await;
+            client.sync_state().await?;
+            found = client
+                .get_transactions(TransactionFilter::All)
+                .await?
+                .into_iter()
+                .filter(|tx| tx.details.account_id == from_account_id)
+                .filter(|tx| matches!(tx.status, TransactionStatus::Committed { .. }))
+                .collect();
+            if found.len() >= 3 {
+                break;
+            }
+        }
+        found
+    };
+    assert!(
+        sender_committed.len() >= 3,
+        "expected at least 3 committed sender transactions (1 mint + 2 batch), got {}",
+        sender_committed.len()
+    );
 
-    // wait for 1 block
-    wait_for_blocks(&mut client, 1).await;
+    // Same-block guarantee: the 2 batch txs must share a committed block_number.
+    let mut per_block: std::collections::BTreeMap<_, usize> = std::collections::BTreeMap::new();
+    for tx in &sender_committed {
+        if let TransactionStatus::Committed { block_number, .. } = tx.status {
+            *per_block.entry(block_number).or_insert(0) += 1;
+        }
+    }
+    assert!(
+        per_block.values().any(|&count| count >= 2),
+        "expected 2 batch txs to share a committed block_number, got per-block counts: {per_block:?}"
+    );
 
-    // wait for both transactions to be committed
-    wait_for_tx(&mut client, transaction_id_1).await?;
-    wait_for_tx(&mut client, transaction_id_2).await?;
-
-    let transactions = client
-        .get_transactions(TransactionFilter::All)
-        .await
-        .unwrap()
-        .into_iter()
-        .filter(|tx| tx.id == transaction_id_1 || tx.id == transaction_id_2)
-        .collect::<Vec<_>>();
-
-    assert_eq!(transactions.len(), 2);
-    assert!(matches!(transactions[0].status, TransactionStatus::Committed { .. }));
-    assert_eq!(transactions[0].status, transactions[1].status);
-
-    let note_id = transactions[0].details.output_notes.iter().next().unwrap().id();
-    let note = client.get_output_note(note_id).await.unwrap().unwrap();
-    assert!(matches!(note.state(), OutputNoteState::CommittedFull { .. }));
+    // Both P2ID output notes must be persisted as CommittedFull after apply.
+    let note_1 = client.get_output_note(note_id_1).await?.expect("note 1 missing");
+    let note_2 = client.get_output_note(note_id_2).await?.expect("note 2 missing");
+    assert!(matches!(note_1.state(), OutputNoteState::CommittedFull { .. }));
+    assert!(matches!(note_2.state(), OutputNoteState::CommittedFull { .. }));
 
     let sender_balance = client
         .account_reader(from_account_id)
