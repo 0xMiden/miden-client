@@ -9,6 +9,8 @@ pub use miden_protocol::errors::{AccountError, AccountIdError, AssetError, Netwo
 use miden_protocol::errors::{
     NoteError,
     PartialBlockchainError,
+    ProposedBatchError,
+    ProvenBatchError,
     TransactionInputError,
     TransactionScriptError,
 };
@@ -20,14 +22,19 @@ pub use miden_standards::errors::CodeBuilderError;
 pub use miden_tx::AuthenticationError;
 use miden_tx::utils::HexParseError;
 use miden_tx::utils::serde::DeserializationError;
-use miden_tx::{NoteCheckerError, TransactionExecutorError, TransactionProverError};
+use miden_tx::{
+    DataStoreError,
+    NoteCheckerError,
+    TransactionExecutorError,
+    TransactionProverError,
+};
 use thiserror::Error;
 
 use crate::note::NoteScreenerError;
 use crate::note_transport::NoteTransportError;
 use crate::rpc::RpcError;
 use crate::store::{NoteRecordError, StoreError};
-use crate::transaction::TransactionRequestError;
+use crate::transaction::{BatchBuilderError, TransactionRequestError, TransactionStoreUpdateError};
 
 // ACTIONABLE HINTS
 // ================================================================================================
@@ -96,8 +103,16 @@ pub enum ClientError {
     AssetError(#[from] AssetError),
     #[error("account data wasn't found for account id {0}")]
     AccountDataNotFound(AccountId),
+    #[error(transparent)]
+    BatchBuilder(#[from] BatchBuilderError),
+    #[error("data store error")]
+    DataStoreError(#[from] DataStoreError),
     #[error("failed to construct the partial blockchain")]
     PartialBlockchainError(#[from] PartialBlockchainError),
+    #[error("failed to build proposed batch")]
+    ProposedBatchError(#[from] ProposedBatchError),
+    #[error("failed to prove batch")]
+    ProvenBatchError(#[from] ProvenBatchError),
     #[error("failed to deserialize data")]
     DataDeserializationError(#[from] DeserializationError),
     #[error("note with id {0} not found on chain")]
@@ -178,6 +193,16 @@ pub enum ClientError {
 impl From<ClientError> for String {
     fn from(err: ClientError) -> String {
         err.to_string()
+    }
+}
+
+impl From<TransactionStoreUpdateError> for ClientError {
+    fn from(err: TransactionStoreUpdateError) -> Self {
+        match err {
+            TransactionStoreUpdateError::Store(e) => ClientError::StoreError(e),
+            TransactionStoreUpdateError::NoteScreener(e) => ClientError::NoteScreenerError(e),
+            TransactionStoreUpdateError::NoteRecord(e) => ClientError::NoteRecordConversionError(e),
+        }
     }
 }
 
