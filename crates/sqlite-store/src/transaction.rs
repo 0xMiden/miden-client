@@ -104,32 +104,35 @@ impl SqliteStore {
     }
 
     /// Inserts a transaction and updates the current state based on the `tx_result` changes.
+    ///
+    /// SQL writes and `AccountSmtForest` mutations are committed atomically: on any error
+    /// (including commit failure) both the rusqlite transaction and the in-memory forest are
+    /// rolled back to their pre-call state.
     pub fn apply_transaction(
         conn: &mut Connection,
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
         tx_update: &TransactionStoreUpdate,
     ) -> Result<(), StoreError> {
-        let mut db_tx = conn.transaction().into_store_error()?;
-        Self::apply_transaction_in_txn(&mut db_tx, smt_forest, tx_update)?;
-        db_tx.commit().into_store_error()?;
-
-        Ok(())
+        with_forest_snapshot(conn, smt_forest, |db_tx, forest| {
+            Self::apply_transaction_in_txn(db_tx, forest, tx_update)
+        })
     }
 
     /// Applies a batch of [`TransactionStoreUpdate`]s atomically. Either every update in the
     /// slice is persisted or none are. Executes in order inside a single
-    /// [`rusqlite::Transaction`]; on any error the transaction is rolled back automatically.
+    /// [`rusqlite::Transaction`]; on any error the transaction is rolled back automatically
+    /// and the in-memory `AccountSmtForest` is restored to its pre-batch state.
     pub fn apply_transaction_batch(
         conn: &mut Connection,
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
         tx_updates: &[TransactionStoreUpdate],
     ) -> Result<(), StoreError> {
-        let mut db_tx = conn.transaction().into_store_error()?;
-        for update in tx_updates {
-            Self::apply_transaction_in_txn(&mut db_tx, smt_forest, update)?;
-        }
-        db_tx.commit().into_store_error()?;
-        Ok(())
+        with_forest_snapshot(conn, smt_forest, |db_tx, forest| {
+            for update in tx_updates {
+                Self::apply_transaction_in_txn(db_tx, forest, update)?;
+            }
+            Ok(())
+        })
     }
 
     /// Applies a transaction's store update within the provided rusqlite transaction.
@@ -139,7 +142,7 @@ impl SqliteStore {
     /// that each call sees writes made by prior calls within the same outer transaction.
     pub(crate) fn apply_transaction_in_txn(
         db_tx: &mut Transaction<'_>,
-        smt_forest: &Arc<RwLock<AccountSmtForest>>,
+        smt_forest: &mut AccountSmtForest,
         tx_update: &TransactionStoreUpdate,
     ) -> Result<(), StoreError> {
         let executed_transaction = tx_update.executed_transaction();
@@ -188,17 +191,15 @@ impl SqliteStore {
         upsert_transaction_record(db_tx, &transaction_record)?;
 
         // Account Data
-        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
         Self::apply_account_delta(
             db_tx,
-            &mut smt_forest,
+            smt_forest,
             &executed_transaction.initial_account().into(),
             executed_transaction.final_account(),
             updated_fungible_assets,
             &old_map_roots,
             executed_transaction.account_delta(),
         )?;
-        drop(smt_forest);
 
         // Note Updates
         apply_note_updates_tx(db_tx, tx_update.note_updates())?;
@@ -210,6 +211,37 @@ impl SqliteStore {
 
         Ok(())
     }
+}
+
+/// Runs `f` inside a SQL transaction with the SMT forest write lock held, snapshotting
+/// the forest before execution and restoring it on any error (including commit failure).
+///
+/// Guarantees that the in-memory `AccountSmtForest` stays in sync with the `SQLite` store:
+/// either both are advanced atomically, or both are reverted.
+pub(crate) fn with_forest_snapshot<F, T>(
+    conn: &mut Connection,
+    smt_forest: &Arc<RwLock<AccountSmtForest>>,
+    f: F,
+) -> Result<T, StoreError>
+where
+    F: FnOnce(&mut Transaction<'_>, &mut AccountSmtForest) -> Result<T, StoreError>,
+{
+    let mut db_tx = conn.transaction().into_store_error()?;
+    let mut forest = smt_forest
+        .write()
+        .map_err(|_| StoreError::DatabaseError("smt_forest write lock poisoned".to_string()))?;
+    let snapshot = forest.clone();
+
+    let result = (|| -> Result<T, StoreError> {
+        let value = f(&mut db_tx, &mut forest)?;
+        db_tx.commit().into_store_error()?;
+        Ok(value)
+    })();
+
+    if result.is_err() {
+        *forest = snapshot;
+    }
+    result
 }
 
 /// Updates the transaction record in the database, inserting it if it doesn't exist.
