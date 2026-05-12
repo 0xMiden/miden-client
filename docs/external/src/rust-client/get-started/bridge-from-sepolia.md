@@ -21,6 +21,8 @@ working `miden-client` install. If not, set the client up first.
 | Bridge service REST API | `https://miden-testnet-bridge.dev.eu-north-3.gateway.fm/api` |
 | Destination network ID (Miden on Bali) | `73` |
 | L2 chain ID | `1259691107` |
+| Miden bridge account (testnet v0.14) | `mtst1aqn4y5pyessyw5rukd0wnmgq6srmn7np` |
+| Miden ETH faucet account (testnet v0.14) | `mtst1az5g5k0tj7vsqcrp90z2dshsmskhyely` |
 | Sepolia public RPC (fallback) | `https://ethereum-sepolia-rpc.publicnode.com` |
 
 ## Prerequisites
@@ -30,11 +32,11 @@ working `miden-client` install. If not, set the client up first.
   in the reverse direction.
 - [Foundry](https://book.getfoundry.sh/getting-started/installation),
   specifically `cast`, on your `$PATH`.
+- `curl` and `python3` for the deposit status helper.
 - A working `miden-client` install (see
   [CLI setup](../cli/index.md)).
-- For the Miden → Sepolia direction only: the Miden bridge account ID
-  and Miden ETH faucet ID for Bali. These are not yet exposed on a
-  public endpoint - request them from the Miden team.
+- For the Miden → Sepolia direction only: use the Bali Miden bridge
+  account and Miden ETH faucet account listed above.
 
 ## Direction 1: Sepolia to Miden (L1 to L2)
 
@@ -59,10 +61,13 @@ To view account details execute miden-client account -s 0xc0ffee...c0ffee
 Copy the 30-hex-character account ID - you will pass it as the bridge
 destination in the next step.
 
+This step also creates the local Miden client data directory used by the
+reverse bridge flow. With the default global configuration, that
+directory is `~/.miden`.
+
 ### 2. Create and fund a Sepolia keystore wallet
 
-Create a password-protected Foundry keystore. `cast` prompts for the
-password and writes the encrypted key to `<PATH>/<ACCOUNT_NAME>`:
+Create a Foundry keystore:
 
 ```sh
 KEYSTORE_DIR=./
@@ -70,58 +75,55 @@ ACCOUNT_NAME=miden-bali-sepolia
 cast wallet new "$KEYSTORE_DIR" "$ACCOUNT_NAME"
 ```
 
-Set the keystore path and print the address:
+Use a Sepolia faucet (e.g. https://cloud.google.com/application/web3/faucet/ethereum/sepolia) to send test ETH to the new address so you can make a deposit to the L1 bridge deposit contract.
 
-```sh
-SEPOLIA_KEYSTORE="$KEYSTORE_DIR/$ACCOUNT_NAME"
-cast wallet address --keystore "$SEPOLIA_KEYSTORE"
-```
-
-Use a Sepolia faucet (e.g. https://cloud.google.com/application/web3/faucet/ethereum/sepolia) to send test ETH to that address before
-broadcasting the deposit. The helper checks the balance before sending,
-but the transaction will fail without enough Sepolia ETH for the
-deposit amount and gas.
-
-### 3. Download the L1 deposit helper
+### 3. Download the helpers
 
 The `bali-l1-deposit.sh` helper builds and broadcasts the
-`bridgeAsset` transaction on Sepolia. It lives alongside this doc;
-download it and make it executable:
+`bridgeAsset` transaction on Sepolia. The
+`bali-l1-deposit-status.sh` helper checks the bridge service for the
+latest deposit targeting your Miden account. The reverse-direction
+`bali-l2-withdraw.sh` helper submits the B2AGG note on Miden. All
+helpers read shared settings from `bali-bridge.conf`. They live
+alongside this doc; download them and make them executable:
 
 ```sh
 curl -O https://raw.githubusercontent.com/0xMiden/miden-client/main/docs/external/src/rust-client/get-started/bali-l1-deposit.sh
-chmod +x bali-l1-deposit.sh
+curl -O https://raw.githubusercontent.com/0xMiden/miden-client/main/docs/external/src/rust-client/get-started/bali-l1-deposit-status.sh
+curl -O https://raw.githubusercontent.com/0xMiden/miden-client/main/docs/external/src/rust-client/get-started/bali-l2-withdraw.sh
+curl -O https://raw.githubusercontent.com/0xMiden/miden-client/main/docs/external/src/rust-client/get-started/bali-bridge.conf.example
+chmod +x bali-l1-deposit.sh bali-l1-deposit-status.sh bali-l2-withdraw.sh
+cp bali-bridge.conf.example bali-bridge.conf
 ```
 
-By default the script runs in `DRY_RUN=1` mode: it prints the exact
-`cast send` command it would issue without broadcasting. Use this to
-sanity-check inputs before spending gas.
+Edit `bali-bridge.conf` and fill in the Miden account ID you created in step 1:
+
+```sh
+MIDEN_ACCOUNT_ID=<account-id-from-step-1>
+```
+
+The config file also contains other bridge constants, so edit the file
+for every value you want to change.
+
+By default the deposit helper runs in `DRY_RUN=1` mode: it prints the
+exact `cast send` command it would issue without broadcasting. Use this
+to sanity-check inputs before spending gas. `DRY_RUN` is intentionally
+not part of `bali-bridge.conf`; pass it only for the command you are
+running.
 
 ### 4. Broadcast the deposit
 
-Run the helper with the keystore path. If you do not provide a password
-file, `cast` prompts for the keystore password when it derives the
-sender and when it signs the transaction:
+After checking the dry run output, pass `DRY_RUN=0` for the real
+broadcast:
 
 ```sh
-DEST_MIDEN=<account-id-from-step-1> \
-AMOUNT_ETH=0.001 \
-SEPOLIA_KEYSTORE="$SEPOLIA_KEYSTORE" \
-SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com \
-DRY_RUN=0 \
-./bali-l1-deposit.sh
+DRY_RUN=0 ./bali-l1-deposit.sh
 ```
 
 The script zero-pads the 15-byte Miden account ID into the 20-byte
 slot the bridge contract expects, builds the `bridgeAsset` calldata,
-and broadcasts via `cast send`. On success it prints the L1
-transaction hash; save it for reference.
-
-:::tip
-Run once with the default `DRY_RUN=1` first - the printed `cast`
-command shows you exactly what will be signed, and the script also
-performs a balance check against `SEPOLIA_RPC_URL`.
-:::
+and broadcasts via `cast send`. On success it prints the Sepolia L1
+transaction hash.
 
 ### 5. Wait for the agglayer to issue the claim note
 
@@ -129,27 +131,21 @@ Budget roughly 15 minutes from broadcast. Sepolia finality takes
 about 6 minutes before the agglayer can act; claim creation and
 submission to Miden are fast.
 
+To check the latest deposit for your destination account, run:
+
+```sh
+./bali-l1-deposit-status.sh
+```
+
+If `ready_for_claim=false`, wait a bit and run the status helper again.
+
 ### 6. Consume the claim note
 
-Sync the client and consume the note targeted at your wallet:
+Sync the client and consume the note targeted at your Miden account:
 
 ```sh
 miden-client sync
 miden-client consume-notes
-```
-
-With no arguments, `consume-notes` discovers any notes consumable by
-the default account and consumes them. If you have multiple accounts,
-target one explicitly:
-
-```sh
-miden-client consume-notes --account <account-id> <note-id>
-```
-
-Look up the note ID first with:
-
-```sh
-miden-client notes
 ```
 
 ### Decimal scaling
@@ -160,35 +156,90 @@ lands as `100_000` Miden-ETH units in your wallet.
 
 ## Direction 2: Miden to Sepolia (L2 to L1)
 
-The reverse direction requires the `bridge-out-tool` binary and a
-reference `claimAsset` script. Both live in
+The reverse direction uses `bridge-out-tool` from
 [gateway-fm/miden-agglayer](https://github.com/gateway-fm/miden-agglayer/tree/main)
-(see `scripts/e2e-l2-to-l1.sh`). Build instructions are in that
-repository's README.
+to submit a Bridge-to-Agglayer (B2AGG) note on Miden. The helper script
+in this guide reads `bali-bridge.conf` and passes the required
+arguments to `bridge-out-tool` for you.
 
-The high-level flow is:
+### 1. Build `bridge-out-tool`
 
-1. Submit a Bridge-to-Agglayer (B2AGG) note on Miden via
-   `bridge-out-tool`, providing your Miden wallet ID, the bridge ID,
-   the faucet ID, the destination L1 address, and an amount in
-   Miden-ETH units (recall the 8-decimal scaling - `10000` units =
-   `0.0001` ETH on L1).
-2. The agglayer indexes the consumed note and emits a synthetic
-   `BridgeEvent` (typically within 30 seconds on a healthy node).
-3. Wait for the aggsender certificate to settle on L1. AggLayer
-   settles certificates on a once-per-hour cadence, and aggsender
-   builds the cert at the 50%-of-epoch mark, so broadcast-to-claimable
-   is usually 30 to 90 minutes depending on where in the epoch you
-   submit.
-4. Poll the bridge service for `ready_for_claim=true`:
+Clone `miden-agglayer` and build the binary:
 
-   ```sh
-   curl https://miden-testnet-bridge.dev.eu-north-3.gateway.fm/api/bridges/<DEST_L1_ADDRESS>
-   ```
+```sh
+git clone https://github.com/gateway-fm/miden-agglayer.git
+cd miden-agglayer
+cargo build --release --bin bridge-out-tool
+```
 
-5. Once ready, fetch the merkle proof and call `claimAsset` on the
-   Sepolia bridge contract with `cast send`. The reference script in
-   `gateway-fm/miden-agglayer` shows the calldata construction.
+Add the binary to your `PATH`.
+
+### 2. Fill in the reverse-direction config
+
+Edit `bali-bridge.conf` and set:
+
+```sh
+MIDEN_STORE_DIR=~/.miden
+ETH_ACCOUNT_ID=<your-sepolia-address>
+MIDEN_WITHDRAW_AMOUNT=10000
+```
+
+The helper uses the same `MIDEN_ACCOUNT_ID` from the L1-to-L2 setup. `MIDEN_STORE_DIR` is the Miden client
+data directory created by `miden-client init --network testnet` earlier. If you initialized the client with `MIDEN_CLIENT_HOME` or a
+local `.miden` directory, set `MIDEN_STORE_DIR` to that directory instead.
+
+`10000` Miden-ETH units = `0.0001 ETH` on L1.
+
+### 3. Submit the B2AGG note
+
+Run the helper once without setting `DRY_RUN` to inspect the exact
+command:
+
+```sh
+./bali-l2-withdraw.sh
+```
+
+It prints the `bridge-out-tool` invocation it will run:
+
+```sh
+bridge-out-tool \
+  --store-dir ~/.miden \
+  --node-url https://rpc.testnet.miden.io:443 \
+  --wallet-id <account-id-from-step-1> \
+  --bridge-id mtst1aqn4y5pyessyw5rukd0wnmgq6srmn7np \
+  --faucet-id mtst1az5g5k0tj7vsqcrp90z2dshsmskhyely \
+  --amount 10000 \
+  --dest-address <your-sepolia-address> \
+  --dest-network 0
+```
+
+After checking the dry run output, pass `DRY_RUN=0` to submit the
+B2AGG note:
+
+```sh
+DRY_RUN=0 ./bali-l2-withdraw.sh
+```
+
+The agglayer indexes the consumed note and emits a synthetic
+`BridgeEvent`, typically within 30 seconds on a healthy node.
+
+### 4. Wait for the certificate to settle
+
+AggLayer settles certificates on a once-per-hour cadence, and
+aggsender builds the certificate at the 50%-of-epoch mark, so
+broadcast-to-claimable is usually 30 to 90 minutes depending on where
+in the epoch you submit.
+
+Poll the bridge service for `ready_for_claim=true`:
+
+```sh
+curl https://miden-testnet-bridge.dev.eu-north-3.gateway.fm/api/bridges/<ETH_ACCOUNT_ID>
+```
+
+Once ready, fetch the merkle proof and call `claimAsset` on the
+Sepolia bridge contract with `cast send`. The reference script in
+`miden-agglayer` (`scripts/e2e-l2-to-l1.sh`) shows the calldata
+construction.
 
 ### Verification
 
@@ -210,7 +261,4 @@ The high-level flow is:
 - "Sender has zero Sepolia balance" warnings from `bali-l1-deposit.sh`
   mean the script could reach the RPC but your funded EOA has no
   balance there. Either fund the address or fix the
-  `SEPOLIA_KEYSTORE` path.
-- The destination address must be the 15-byte Miden account ID (30
-  hex chars). Other formats are rejected by the helper script before
-  any transaction is built.
+  `ETH_KEYSTORE` path.

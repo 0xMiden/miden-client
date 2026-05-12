@@ -6,44 +6,42 @@
 # locks ETH on the Sepolia bridge contract for delivery to a Miden
 # account on rollup 73.
 #
-# Bali constants (from the deployment manifest):
-#   polygonZkEVMBridgeAddress  = 0x1348947e282138d8f377b467f7d9c2eb0f335d1f
-#   rollupID / DEST_NETWORK    = 73
-#   l2ChainID                  = 1259691107
-#   gasTokenAddress            = 0x0 (ETH)
-#
-# Defaults to DRY_RUN=1: prints the exact `cast send` command but does
-# NOT broadcast it. To actually send, re-run with DRY_RUN=0.
-#
-# Env vars:
-#   SEPOLIA_RPC_URL                 (required) Infura/Alchemy/etc; needs eth_sendRawTransaction
-#   SEPOLIA_KEYSTORE                (required) Path to a Foundry keystore file, funded with Sepolia ETH
-#   SEPOLIA_KEYSTORE_PASSWORD_FILE  (optional) Path to the keystore password file. If unset, cast prompts.
-#   DEST_MIDEN                      (optional) 0x<30-hex-chars> Miden AccountId to target.
-#                                              Defaults to the sender's own Eth address (dev usage).
-#   AMOUNT_ETH                      (optional) amount in ETH (default 0.001 for a first test)
-#   DRY_RUN                         (optional) 1 to print only, 0 to broadcast (default 1)
+# Reads all settings from ./bali-bridge.conf.
 
 set -euo pipefail
 
-# --- Bali constants (from deployment manifest) ------------------------------
-BRIDGE_ADDRESS="0x1348947e282138d8f377b467f7d9c2eb0f335d1f"
-GLOBAL_EXIT_ROOT_ADDRESS="0x2968d6d736178f8fe7393cc33c87f29d9c287e78"
-ROLLUP_MANAGER_ADDRESS="0xe2ef6215adc132df6913c8dd16487abf118d1764"
-DEST_NETWORK=73
-L2_CHAIN_ID=1259691107
+config_file="./bali-bridge.conf"
 
-# --- Sane first-test defaults ----------------------------------------------
-AMOUNT_ETH="${AMOUNT_ETH:-0.001}"
+if [[ ! -f "$config_file" ]]; then
+    echo "ERROR: missing $config_file. Copy bali-bridge.conf.example and fill it in." >&2
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "$config_file"
+
+require_config() {
+    local key="$1"
+    if [[ -z "${!key:-}" ]]; then
+        echo "ERROR: $key must be set in $config_file" >&2
+        exit 1
+    fi
+}
+
+require_config SEPOLIA_RPC_URL
+require_config ETH_KEYSTORE
+require_config BRIDGE_ADDRESS
+require_config DEST_NETWORK
+require_config GAS_TOKEN_ADDRESS
+require_config FORCE_UPDATE_GLOBAL_EXIT_ROOT
+require_config GAS_LIMIT
+require_config AMOUNT_ETH
+
 DRY_RUN="${DRY_RUN:-1}"
 
-# --- Required env vars ------------------------------------------------------
-: "${SEPOLIA_RPC_URL:?SEPOLIA_RPC_URL must be set (Infura/Alchemy/etc)}"
-: "${SEPOLIA_KEYSTORE:?SEPOLIA_KEYSTORE must be set (path to Foundry keystore file)}"
-
-WALLET_ARGS=(--keystore "$SEPOLIA_KEYSTORE")
-if [[ -n "${SEPOLIA_KEYSTORE_PASSWORD_FILE:-}" ]]; then
-    WALLET_ARGS+=(--password-file "$SEPOLIA_KEYSTORE_PASSWORD_FILE")
+WALLET_ARGS=(--keystore "$ETH_KEYSTORE")
+if [[ -n "${ETH_KEYSTORE_PASSWORD_FILE:-}" ]]; then
+    WALLET_ARGS+=(--password-file "$ETH_KEYSTORE_PASSWORD_FILE")
 fi
 
 # Derive sender address from the keystore for logging / default-destination.
@@ -55,15 +53,15 @@ FROM_ADDRESS="$(cast wallet address "${WALLET_ARGS[@]}")"
 miden_to_eth() {
     local miden_addr="${1#0x}"
     if [[ ${#miden_addr} -ne 30 ]]; then
-        echo "ERROR: DEST_MIDEN must be 30 hex chars (15 bytes), got ${#miden_addr}" >&2
+        echo "ERROR: MIDEN_ACCOUNT_ID must be 30 hex chars (15 bytes), got ${#miden_addr}" >&2
         exit 1
     fi
     echo "0x00000000${miden_addr}00"
 }
 
-if [[ -n "${DEST_MIDEN:-}" ]]; then
-    DEST_ADDRESS="$(miden_to_eth "$DEST_MIDEN")"
-    DEST_LABEL="$DEST_MIDEN (Miden) -> $DEST_ADDRESS (Eth)"
+if [[ -n "${MIDEN_ACCOUNT_ID:-}" ]]; then
+    DEST_ADDRESS="$(miden_to_eth "$MIDEN_ACCOUNT_ID")"
+    DEST_LABEL="$MIDEN_ACCOUNT_ID (Miden) -> $DEST_ADDRESS (Eth)"
 else
     DEST_ADDRESS="$FROM_ADDRESS"
     DEST_LABEL="$FROM_ADDRESS (sender)"
@@ -80,8 +78,8 @@ CALLDATA="$(cast calldata 'bridgeAsset(uint32,address,uint256,address,bool,bytes
     "$DEST_NETWORK" \
     "$DEST_ADDRESS" \
     "$AMOUNT_WEI" \
-    "0x0000000000000000000000000000000000000000" \
-    true \
+    "$GAS_TOKEN_ADDRESS" \
+    "$FORCE_UPDATE_GLOBAL_EXIT_ROOT" \
     "0x")"
 
 # --- Pre-flight report ------------------------------------------------------
@@ -89,10 +87,9 @@ cat <<EOF
 === Bali L1->L2 deposit (Sepolia -> Miden rollup 73) ===
 L1 RPC                : $SEPOLIA_RPC_URL
 From                  : $FROM_ADDRESS
-Keystore              : $SEPOLIA_KEYSTORE
+Keystore              : $ETH_KEYSTORE
 Destination           : $DEST_LABEL
 Bridge contract       : $BRIDGE_ADDRESS
-GlobalExitRoot (L1)   : $GLOBAL_EXIT_ROOT_ADDRESS
 Amount                : $AMOUNT_ETH ETH ($AMOUNT_WEI wei)
 DEST_NETWORK (rollup) : $DEST_NETWORK
 DRY_RUN               : $DRY_RUN
@@ -121,7 +118,7 @@ CMD=(
     --value "$AMOUNT_WEI"
     "${WALLET_ARGS[@]}"
     --rpc-url "$SEPOLIA_RPC_URL"
-    --gas-limit 300000
+    --gas-limit "$GAS_LIMIT"
 )
 echo
 echo "Would run:"
@@ -141,7 +138,7 @@ RESULT="$(cast send "$BRIDGE_ADDRESS" \
     --value "$AMOUNT_WEI" \
     "${WALLET_ARGS[@]}" \
     --rpc-url "$SEPOLIA_RPC_URL" \
-    --gas-limit 300000 \
+    --gas-limit "$GAS_LIMIT" \
     --json)"
 TX_HASH="$(echo "$RESULT" | jq -r '.transactionHash // empty')"
 echo "tx: $TX_HASH"
