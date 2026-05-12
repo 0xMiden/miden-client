@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
@@ -165,6 +166,19 @@ pub enum ClientError {
         #[source]
         source: RpcError,
     },
+    #[error(
+        "transaction {} was accepted by the node at block {} but the local store update failed. \
+         The pending store update is attached and can be re-applied later via \
+         `apply_transaction_update`; resubmitting the same transaction will be rejected because \
+         the nullifiers are already consumed by the mempool-accepted copy.",
+        pending_update.executed_transaction().id(),
+        pending_update.submission_height()
+    )]
+    ApplyTransactionAfterSubmitFailed {
+        pending_update: Box<crate::transaction::TransactionStoreUpdate>,
+        #[source]
+        source: Box<ClientError>,
+    },
 }
 
 // CONVERSIONS
@@ -228,6 +242,21 @@ impl From<&ClientError> for Option<ErrorHint> {
                           or provide the seed when importing.".to_string(),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
+            ClientError::ApplyTransactionAfterSubmitFailed { pending_update, .. } => {
+                let tx_id = pending_update.executed_transaction().id();
+                let submission_height = pending_update.submission_height();
+                Some(ErrorHint {
+                    message: format!(
+                        "Transaction {tx_id} was accepted by the node at block \
+                         {submission_height} but the local store update failed. The pending \
+                         update is attached to this error as `pending_update`; you can re-apply \
+                         it later via `Client::apply_transaction_update`. Do NOT resubmit the \
+                         same transaction: its nullifiers are already consumed by the \
+                         mempool-accepted copy, so the node will reject the retry."
+                    ),
+                    docs_url: Some(TROUBLESHOOTING_DOC),
+                })
+            },
             _ => None,
         }
     }
