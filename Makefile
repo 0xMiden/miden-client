@@ -37,8 +37,12 @@ format: ## Run format using nightly toolchain
 format-check: ## Run format using nightly toolchain but only in check mode
 	cargo +nightly fmt --all --check
 
+.PHONY: shear
+shear: ## Run cargo-shear to find unused or misplaced dependencies
+	cargo shear
+
 .PHONY: lint
-lint: fix format toml clippy typos-check ## Run all linting tasks at once (clippy, fixing, formatting, typos)
+lint: fix format toml clippy typos-check shear ## Run all linting tasks at once (clippy, fixing, formatting, typos)
 
 .PHONY: toml
 toml: ## Runs Format for all TOML files
@@ -172,6 +176,7 @@ check-tools: ## Checks if development tools are installed
 	@command -v mdbook        >/dev/null 2>&1 && echo "[OK] mdbook is installed"        || echo "[MISSING] mdbook       (make install-tools)"
 	@command -v typos         >/dev/null 2>&1 && echo "[OK] typos is installed"         || echo "[MISSING] typos        (make install-tools)"
 	@command -v cargo nextest >/dev/null 2>&1 && echo "[OK] cargo-nextest is installed" || echo "[MISSING] cargo-nextest(make install-tools)"
+	@command -v cargo-shear   >/dev/null 2>&1 && echo "[OK] cargo-shear is installed"   || echo "[MISSING] cargo-shear  (make install-tools)"
 	@command -v taplo         >/dev/null 2>&1 && echo "[OK] taplo is installed"         || echo "[MISSING] taplo        (make install-tools)"
 
 .PHONY: install-tools
@@ -185,5 +190,6 @@ install-tools: ## Installs Rust tools required by the Makefile
 	cargo install mdbook --locked
 	cargo install typos-cli@1.42.3 --locked
 	cargo install cargo-nextest@0.9.128 --locked
+	cargo install cargo-shear@1.11.2 --locked
 	cargo install taplo-cli --locked
 	@echo "Development tools installation complete!"

@@ -57,17 +57,28 @@ miden-remote-prover-client       = { default-features = false, features = ["tx-p
 miden-debug = { default-features = false, features = ["dap", "std"], version = "0.6" }
 
 # External dependencies
-anyhow      = { default-features = false, version = "1.0" }
-async-trait = { version = "0.1" }
-chrono      = { version = "0.4" }
-hex         = { version = "0.4" }
-miette      = { features = ["fancy"], version = "7.6" }
-rand        = { version = "0.9" }
-serde       = { features = ["derive"], version = "1.0" }
-serde_json  = { features = ["arbitrary_precision"], version = "1.0" }
-thiserror   = { default-features = false, version = "2.0" }
-tokio       = { features = ["macros", "rt-multi-thread"], version = "1.48" }
-tracing     = { version = "0.1" }
+anyhow             = { default-features = false, version = "1.0" }
+assert_cmd         = { version = "2.0" }
+async-trait        = { version = "0.1" }
+chrono             = { version = "0.4" }
+clap               = { version = "4.5" }
+comfy-table        = { version = "7.1" }
+hex                = { version = "0.4" }
+miette             = { features = ["fancy"], version = "7.6" }
+predicates         = { version = "3.0" }
+prost              = { default-features = false, version = "0.14" }
+rand               = { version = "0.9" }
+rand_chacha        = { version = "0.9" }
+regex              = { version = "1.0" }
+serde              = { features = ["derive"], version = "1.0" }
+serde_json         = { version = "1.0" }
+tempfile           = { version = "3.0" }
+thiserror          = { default-features = false, version = "2.0" }
+tokio              = { features = ["macros", "rt-multi-thread"], version = "1.48" }
+tonic              = { default-features = false, version = "0.14" }
+tracing            = { version = "0.1" }
+tracing-subscriber = { default-features = false, version = "0.3" }
+uuid               = { version = "1.10" }
 
 # Lints are set to warn for development, which are promoted to errors in CI.
 [workspace.lints.clippy]
