@@ -336,15 +336,18 @@ impl NodeRpcClient for MockRpcApi {
     ) -> Result<NoteSyncInfo, RpcError> {
         let chain_tip = self.get_chain_tip_block_num();
         let upper_bound = block_to.unwrap_or(chain_tip);
+        let page_end_block: BlockNumber = (block_num.as_u32() + Self::PAGINATION_BLOCK_LIMIT)
+            .min(upper_bound.as_u32())
+            .into();
 
-        // Collect all blocks with matching notes in the range (block_num, upper_bound]
+        // Collect all blocks with matching notes in the range (block_num, page_end_block]
         let mut blocks_with_notes: BTreeMap<BlockNumber, BTreeMap<NoteId, CommittedNote>> =
             BTreeMap::new();
         for note in self.mock_chain.read().committed_notes().values() {
             let note_block = note.inclusion_proof().location().block_num();
             if note_tags.contains(&note.metadata().tag())
                 && note_block > block_num
-                && note_block <= upper_bound
+                && note_block <= page_end_block
             {
                 let committed = CommittedNote::new(
                     note.id(),
@@ -355,9 +358,9 @@ impl NodeRpcClient for MockRpcApi {
             }
         }
 
-        // Always include the upper_bound block (with empty notes if needed), matching the
-        // node behavior where the range-end block is always present when the scan completes.
-        blocks_with_notes.entry(upper_bound).or_default();
+        // Always include the page-end block (with empty notes if needed) so callers can observe
+        // pagination progress even if no note matched that block.
+        blocks_with_notes.entry(page_end_block).or_default();
 
         let blocks: Vec<NoteSyncBlock> = blocks_with_notes
             .into_iter()
@@ -368,7 +371,11 @@ impl NodeRpcClient for MockRpcApi {
             })
             .collect();
 
-        Ok(NoteSyncInfo { chain_tip, block_to: upper_bound, blocks })
+        Ok(NoteSyncInfo {
+            chain_tip,
+            block_to: page_end_block,
+            blocks,
+        })
     }
 
     async fn sync_chain_mmr(
