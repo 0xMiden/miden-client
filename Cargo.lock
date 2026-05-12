@@ -3038,17 +3038,12 @@ dependencies = [
 name = "miden-client-unit-tests"
 version = "0.14.8"
 dependencies = [
- "anyhow",
- "miden-agglayer",
  "miden-client",
  "miden-client-sqlite-store",
  "miden-protocol",
  "miden-standards",
  "miden-testing",
- "miden-tx",
  "rand 0.9.2",
- "serde",
- "serde_json",
  "tokio",
 ]
 
