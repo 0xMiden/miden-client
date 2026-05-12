@@ -215,7 +215,11 @@ impl SqliteStore {
         let local_header = Self::get_account_header(tx, account_id)?
             .map(|(header, _)| header)
             .ok_or(StoreError::AccountDataNotFound(account_id))?;
-        let local_storage = Self::get_account_storage(tx, account_id, &AccountStorageFilter::All)?;
+        let local_storage = Self::get_account_storage(
+            tx,
+            account_id,
+            &AccountStorageFilter::SlotNames(delta.value_slot_names()),
+        )?;
         let local_vault = Self::get_account_vault(tx, account_id)?;
 
         let account_delta =

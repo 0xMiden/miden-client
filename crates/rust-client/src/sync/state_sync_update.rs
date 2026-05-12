@@ -414,6 +414,12 @@ impl PublicAccountDelta {
         self.block_from
     }
 
+    /// Returns the names of the value slots referenced by this delta. The store can use this to
+    /// load only the slots needed by [`Self::compute_account_delta`] instead of the full storage.
+    pub fn value_slot_names(&self) -> Vec<StorageSlotName> {
+        self.value_slot_updates.iter().map(|(name, _)| name.clone()).collect()
+    }
+
     /// Returns the last block of the synced range.
     pub fn block_to(&self) -> BlockNumber {
         self.block_to
@@ -541,7 +547,7 @@ fn replay_vault_updates(
 // ================================================================================================
 
 /// Contains account changes to apply to the store after a sync request.
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 #[allow(clippy::struct_field_names)]
 pub struct AccountUpdates {
     /// Updated public accounts, either as full state replacements or incremental deltas.

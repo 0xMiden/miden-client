@@ -807,4 +807,8 @@ pub enum AccountStorageFilter {
     Root(Word),
     /// Return an [`AccountStorage`] with a single slot that matches the provided slot name.
     SlotName(StorageSlotName),
+    /// Return an [`AccountStorage`] containing only the slots whose names are in the provided
+    /// list. Useful to avoid loading the full storage when only a known subset of slots is needed
+    /// (e.g. when applying a delta to a large account).
+    SlotNames(Vec<StorageSlotName>),
 }
