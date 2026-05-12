@@ -1649,17 +1649,8 @@ fn build_call_test_masp(out_path: &Path) {
         WordSchema,
     };
     use miden_client::assembly::{CodeBuilder, Library};
-    use miden_client::vm::{
-        Package,
-        PackageExport,
-        PackageManifest,
-        ProcedureExport,
-        QualifiedProcedureName,
-        Section,
-        SectionId,
-        TargetType,
-    };
-    use midenc_hir_type::{CallConv, FunctionType, Type};
+    use miden_client::utils::Serializable;
+    use miden_client::vm::{Package, PackageManifest, Section, SectionId, TargetType};
 
     let call_test_code = r#"
         use miden::protocol::native_account
@@ -1677,6 +1668,10 @@ fn build_call_test_masp(out_path: &Path) {
             exec.native_account::set_item
             dropw
             exec.sys::truncate_stack
+        end
+
+        pub proc take_account_id
+            nop
         end
     "#;
 
@@ -1703,11 +1698,45 @@ fn build_call_test_masp(out_path: &Path) {
 
     let metadata = AccountComponentMetadata::new("call-test").with_storage_schema(storage_schema);
 
-    let signature_overrides: [(&str, FunctionType); 2] = [
+    let manifest = PackageManifest::new(build_call_test_exports(&library))
+        .expect("manifest validation failed");
+    let (debug_funcs, debug_types) = build_take_account_id_debug_sections();
+
+    let package = Package {
+        name: metadata.name().to_string().into(),
+        version: metadata.version().clone(),
+        description: Some(metadata.description().to_string()),
+        mast: Arc::new(library),
+        manifest,
+        sections: vec![
+            Section::new(SectionId::ACCOUNT_COMPONENT_METADATA, metadata.to_bytes()),
+            Section::new(SectionId::DEBUG_FUNCTIONS, debug_funcs.to_bytes()),
+            Section::new(SectionId::DEBUG_TYPES, debug_types.to_bytes()),
+        ],
+        kind: TargetType::AccountComponent,
+    };
+
+    fs::write(out_path, package.to_bytes()).expect("failed to write call-test .masp");
+}
+
+/// Walks `library`'s module infos and produces a `PackageExport` per procedure, overriding the
+/// signatures of the call-test procs with their declared `FunctionType` so the manifest
+/// carries param/result counts the CLI can read back.
+fn build_call_test_exports(
+    library: &miden_client::assembly::Library,
+) -> Vec<miden_client::vm::PackageExport> {
+    use miden_client::vm::{PackageExport, ProcedureExport, QualifiedProcedureName};
+    use midenc_hir_type::{CallConv, FunctionType, Type};
+
+    let signature_overrides: [(&str, FunctionType); 3] = [
         ("add", FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt], [Type::Felt])),
         (
             "set_value",
             FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt, Type::Felt, Type::Felt], []),
+        ),
+        (
+            "take_account_id",
+            FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt], [Type::Felt, Type::Felt]),
         ),
     ];
 
@@ -1728,21 +1757,66 @@ fn build_call_test_masp(out_path: &Path) {
             exports.push(PackageExport::Procedure(export));
         }
     }
+    exports
+}
 
-    let manifest = PackageManifest::new(exports).expect("manifest validation failed");
-    let section = Section::new(SectionId::ACCOUNT_COMPONENT_METADATA, metadata.to_bytes());
-
-    let package = Package {
-        name: metadata.name().to_string().into(),
-        version: metadata.version().clone(),
-        description: Some(metadata.description().to_string()),
-        mast: Arc::new(library),
-        manifest,
-        sections: vec![section],
-        kind: TargetType::AccountComponent,
+/// Builds DEBUG sections describing `take-account-id(id: account-id) -> account-id` so the
+/// `call` command exercises its typed encode/decode path. Only this proc is annotated; `add`
+/// and `set_value` resolve to `None` in `TypedProcInfo` and stay on the raw path.
+fn build_take_account_id_debug_sections() -> (
+    miden_mast_package::debug_info::DebugFunctionsSection,
+    miden_mast_package::debug_info::DebugTypesSection,
+) {
+    use miden_debug_types::{ColumnNumber, LineNumber};
+    use miden_mast_package::debug_info::{
+        DebugFieldInfo,
+        DebugFunctionInfo,
+        DebugFunctionsSection,
+        DebugPrimitiveType,
+        DebugTypeInfo,
+        DebugTypesSection,
+        DebugVariableInfo,
     };
 
-    fs::write(out_path, package.to_bytes()).expect("failed to write call-test .masp");
+    let mut types = DebugTypesSection::new();
+    let felt_t = types.add_type(DebugTypeInfo::Primitive(DebugPrimitiveType::Felt));
+    let aid_name = types.add_string(Arc::from("miden:base/core-types@1.0.0/account-id"));
+    let prefix_n = types.add_string(Arc::from("prefix"));
+    let suffix_n = types.add_string(Arc::from("suffix"));
+    let aid_t = types.add_type(DebugTypeInfo::Struct {
+        name_idx: aid_name,
+        size: 16,
+        fields: vec![
+            DebugFieldInfo {
+                name_idx: prefix_n,
+                type_idx: felt_t,
+                offset: 0,
+            },
+            DebugFieldInfo {
+                name_idx: suffix_n,
+                type_idx: felt_t,
+                offset: 8,
+            },
+        ],
+    });
+    let fn_t = types.add_type(DebugTypeInfo::Function {
+        return_type_idx: Some(aid_t),
+        param_type_indices: vec![aid_t],
+    });
+
+    let mut funcs = DebugFunctionsSection::new();
+    let proc_name = funcs.add_string(Arc::from("take-account-id"));
+    let arg_name = funcs.add_string(Arc::from("id"));
+    let mut func =
+        DebugFunctionInfo::new(proc_name, 0, LineNumber::default(), ColumnNumber::default())
+            .with_type(fn_t);
+    func.add_variable(
+        DebugVariableInfo::new(arg_name, aid_t, LineNumber::default(), ColumnNumber::default())
+            .with_arg_index(1),
+    );
+    funcs.add_function(func);
+
+    (funcs, types)
 }
 
 /// Helper: creates an account with the `call-test.masp` package and returns (`temp_dir`,
@@ -1870,6 +1944,40 @@ fn call_set_value_shows_storage_delta() {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Storage Slot"), "Expected storage delta in output:\n{stdout}");
+}
+
+/// Tests the typed encode/decode path: an `account-id` hex token is expanded to two felts on
+/// the way in and rendered back as `account-id(0x..)` on the way out.
+#[test]
+fn call_typed_account_id_roundtrip() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    let acct_hex = "0xa591009a3022e800788f9ed177dcdb";
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &format!("{account_id}:take_account_id"),
+        acct_hex,
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
+
+    let output = cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "Call failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Signature: take-account-id(id: account-id) -> account-id"),
+        "Expected typed signature in output:\n{stdout}"
+    );
+    assert!(
+        stdout.contains(&format!("Result: account-id({acct_hex})")),
+        "Expected typed result in output:\n{stdout}"
+    );
 }
 
 /// Tests that calling a `add` with the wrong number of arguments fails

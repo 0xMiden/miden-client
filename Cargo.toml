@@ -47,8 +47,10 @@ miden-note-transport-proto-build = { default-features = false, version = "0.4" }
 miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.15.0" }
 
 # Miden debug dependency
-miden-debug     = { default-features = false, features = ["dap", "std"], version = "0.8" }
-miden-processor = { default-features = false, version = "0.23" }
+miden-debug        = { default-features = false, features = ["dap", "std"], version = "0.8" }
+miden-debug-types  = { default-features = false, version = "0.23" }
+miden-mast-package = { default-features = false, version = "0.23" }
+miden-processor    = { default-features = false, version = "0.23" }
 
 # External dependencies
 anyhow             = { default-features = false, version = "1.0" }
