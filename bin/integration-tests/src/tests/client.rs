@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -21,13 +22,13 @@ use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteFile, NoteType};
-use miden_client::rpc::AccountStateAt;
+use miden_client::note::{BlockNumber, NoteFile, NoteTag, NoteType};
 use miden_client::rpc::domain::account::{
     AccountStorageRequirements,
     FetchedAccount,
     StorageMapEntries,
 };
+use miden_client::rpc::{AccountStateAt, GrpcClient, NodeRpcClient};
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
@@ -535,6 +536,49 @@ pub async fn test_sync_detail_values(client_config: ClientConfig) -> Result<()> 
     let new_details = client1.sync_state().await.unwrap();
     assert_eq!(new_details.committed_notes.len(), 0);
     assert_eq!(new_details.consumed_notes.len(), 1);
+    Ok(())
+}
+
+/// Verifies the client chunks for an over-the-limit `sync_notes` request
+pub async fn test_sync_notes_chunks_when_exceeding_limits(
+    client_config: ClientConfig,
+) -> Result<()> {
+    let rpc_endpoint = client_config.rpc_endpoint.clone();
+    let rpc_timeout = client_config.rpc_timeout_ms;
+    let (mut client, authenticator) = client_config.into_client().await?;
+
+    let (wallet, faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    let fungible_asset = FungibleAsset::new(faucet.id(), MINT_AMOUNT)?;
+    let tx_request = TransactionRequestBuilder::new().build_mint_fungible_asset(
+        fungible_asset,
+        wallet.id(),
+        NoteType::Public,
+        client.rng(),
+    )?;
+    let minted_note = tx_request.expected_output_own_notes().pop().unwrap();
+    execute_tx_and_sync(&mut client, faucet.id(), tx_request).await?;
+
+    let real_tag = minted_note.metadata().tag();
+
+    let grpc = GrpcClient::new(&rpc_endpoint, rpc_timeout);
+    let limits = grpc.get_rpc_limits().await?;
+    let sync_height = client.get_sync_height().await?;
+
+    let mut tags: BTreeSet<NoteTag> = (0..limits.note_tags_limit).map(NoteTag::new).collect();
+    tags.insert(real_tag);
+    let blocks = grpc.sync_notes(BlockNumber::from(0u32), sync_height, &tags).await?;
+    assert!(
+        blocks.iter().any(|b| b.notes.contains_key(&minted_note.id())),
+        "expected the minted note in the sync_notes response",
+    );
+
     Ok(())
 }
 
