@@ -2905,7 +2905,9 @@ async fn pswap_cancel_test() {
     );
 
     // Step 2: Alice cancels the PSWAP note.
-    let cancel_request = TransactionRequestBuilder::new().build_pswap_cancel(pswap_note).unwrap();
+    let cancel_request = TransactionRequestBuilder::new()
+        .build_pswap_cancel(pswap_note, alice_wallet.id())
+        .unwrap();
 
     Box::pin(client.submit_new_transaction(alice_wallet.id(), cancel_request))
         .await

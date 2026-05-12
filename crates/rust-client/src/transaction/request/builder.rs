@@ -534,15 +534,27 @@ impl TransactionRequestBuilder {
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction that cancels a
     /// partial swap (PSWAP) note. This request must be executed against the creator account.
     ///
-    /// - `pswap_note` is the PSWAP note to cancel. The caller must be the creator of the note.
+    /// - `pswap_note` is the PSWAP note to cancel.
+    /// - `creator_account_id` is the account that created the note. The note's stored creator must
+    ///   match this ID; this is the account the resulting transaction must be executed against.
     ///
     /// This function cannot be used with a previously set custom script.
     pub fn build_pswap_cancel(
         self,
         pswap_note: Note,
+        creator_account_id: AccountId,
     ) -> Result<TransactionRequest, TransactionRequestError> {
-        // Validate that the note is actually a PSWAP note before submitting the transaction.
-        PswapNote::try_from(&pswap_note).map_err(TransactionRequestError::NoteValidationError)?;
+        let pswap = PswapNote::try_from(&pswap_note)
+            .map_err(TransactionRequestError::NoteValidationError)?;
+
+        let note_creator = pswap.storage().creator_account_id();
+        if note_creator != creator_account_id {
+            return Err(TransactionRequestError::PswapCancelCreatorMismatch {
+                expected: note_creator,
+                actual: creator_account_id,
+            });
+        }
+
         self.input_notes(vec![(pswap_note, None)]).build()
     }
 

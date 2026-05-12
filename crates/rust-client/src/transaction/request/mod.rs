@@ -519,6 +519,8 @@ pub enum TransactionRequestError {
     NoteArgError(#[source] NoteError),
     #[error("pay-to-ID note must contain at least one asset to transfer")]
     P2IDNoteWithoutAsset,
+    #[error("PSWAP note can only be cancelled by its creator: expected {expected}, got {actual}")]
+    PswapCancelCreatorMismatch { expected: AccountId, actual: AccountId },
     #[error("error building script")]
     CodeBuilderError(#[from] CodeBuilderError),
     #[error("transaction script template error: {0}")]

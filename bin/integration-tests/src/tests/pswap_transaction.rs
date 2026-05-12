@@ -348,7 +348,8 @@ pub async fn test_pswap_cancel_onchain(client_config: ClientConfig) -> Result<()
     );
 
     info!(note_id = %pswap_note.id(), "Alice cancels the PSWAP");
-    let cancel_request = TransactionRequestBuilder::new().build_pswap_cancel(pswap_note)?;
+    let cancel_request =
+        TransactionRequestBuilder::new().build_pswap_cancel(pswap_note, alice_account.id())?;
     execute_tx_and_sync(&mut alice_client, alice_account.id(), cancel_request).await?;
 
     let alice_account_reader = alice_client.account_reader(alice_account.id());

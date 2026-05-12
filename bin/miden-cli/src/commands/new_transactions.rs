@@ -541,8 +541,9 @@ impl PswapCancelCmd {
             get_input_acc_id_by_prefix_or_default(&client, self.sender_account_id.clone()).await?;
         let note = resolve_input_note(&client, &self.note).await?;
 
-        let tx_request =
-            TransactionRequestBuilder::new().build_pswap_cancel(note).map_err(|err| {
+        let tx_request = TransactionRequestBuilder::new()
+            .build_pswap_cancel(note, sender_id)
+            .map_err(|err| {
                 CliError::Transaction(
                     err.into(),
                     "Failed to build PSWAP cancel transaction".to_string(),
