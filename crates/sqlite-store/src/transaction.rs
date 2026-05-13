@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 use std::string::{String, ToString};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockWriteGuard};
 use std::vec::Vec;
 
 use miden_client::Word;
@@ -213,11 +213,48 @@ impl SqliteStore {
     }
 }
 
+/// RAII guard that restores an [`AccountSmtForest`] from a snapshot on drop unless
+/// explicitly disarmed. Holding the write guard plus the snapshot inside one type ensures
+/// the restore runs on early returns, `?` propagation, and panic-driven unwinds alike.
+struct ForestRollbackGuard<'a> {
+    forest: RwLockWriteGuard<'a, AccountSmtForest>,
+    snapshot: Option<AccountSmtForest>,
+}
+
+impl<'a> ForestRollbackGuard<'a> {
+    fn new(forest: RwLockWriteGuard<'a, AccountSmtForest>) -> Self {
+        let snapshot = forest.clone();
+        Self { forest, snapshot: Some(snapshot) }
+    }
+
+    fn forest_mut(&mut self) -> &mut AccountSmtForest {
+        &mut self.forest
+    }
+
+    fn disarm(mut self) {
+        self.snapshot = None;
+    }
+}
+
+impl Drop for ForestRollbackGuard<'_> {
+    fn drop(&mut self) {
+        if let Some(snapshot) = self.snapshot.take() {
+            *self.forest = snapshot;
+        }
+    }
+}
+
 /// Runs `f` inside a SQL transaction with the SMT forest write lock held, snapshotting
-/// the forest before execution and restoring it on any error (including commit failure).
+/// the forest before execution and restoring it on any error (including commit failure
+/// or a panic unwinding through the closure).
 ///
 /// Guarantees that the in-memory `AccountSmtForest` stays in sync with the `SQLite` store:
 /// either both are advanced atomically, or both are reverted.
+///
+/// Cost: the snapshot is `AccountSmtForest::clone()`, which deep-clones the entire
+/// `SmtForest` (every tracked SMT plus root refcounts). This is O(forest size) per call
+/// and runs on every transaction apply and sync round — acceptable today but worth
+/// revisiting (e.g. an inverse-op journal) if the forest grows large.
 pub(crate) fn with_forest_snapshot<F, T>(
     conn: &mut Connection,
     smt_forest: &Arc<RwLock<AccountSmtForest>>,
@@ -227,21 +264,16 @@ where
     F: FnOnce(&mut Transaction<'_>, &mut AccountSmtForest) -> Result<T, StoreError>,
 {
     let mut db_tx = conn.transaction().into_store_error()?;
-    let mut forest = smt_forest
+    let forest = smt_forest
         .write()
         .map_err(|_| StoreError::DatabaseError("smt_forest write lock poisoned".to_string()))?;
-    let snapshot = forest.clone();
+    let mut guard = ForestRollbackGuard::new(forest);
 
-    let result = (|| -> Result<T, StoreError> {
-        let value = f(&mut db_tx, &mut forest)?;
-        db_tx.commit().into_store_error()?;
-        Ok(value)
-    })();
+    let value = f(&mut db_tx, guard.forest_mut())?;
+    db_tx.commit().into_store_error()?;
 
-    if result.is_err() {
-        *forest = snapshot;
-    }
-    result
+    guard.disarm();
+    Ok(value)
 }
 
 /// Updates the transaction record in the database, inserting it if it doesn't exist.
