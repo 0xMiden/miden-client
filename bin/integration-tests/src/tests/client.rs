@@ -36,6 +36,7 @@ use miden_client::store::{
     OutputNoteState,
     TransactionFilter,
 };
+use miden_client::testing::account_id::AccountIdBuilder;
 use miden_client::testing::common::*;
 use miden_client::transaction::{
     DiscardCause,
@@ -578,6 +579,53 @@ pub async fn test_sync_notes_chunks_when_exceeding_limits(
     assert!(
         blocks.iter().any(|b| b.notes.contains_key(&minted_note.id())),
         "expected the minted note in the sync_notes response",
+    );
+
+    Ok(())
+}
+
+/// Verifies the client chunks for an over-the-limit `sync_transactions` request
+pub async fn test_sync_transactions_chunks_when_exceeding_limits(
+    client_config: ClientConfig,
+) -> Result<()> {
+    let rpc_endpoint = client_config.rpc_endpoint.clone();
+    let rpc_timeout = client_config.rpc_timeout_ms;
+    let (mut client, authenticator) = client_config.into_client().await?;
+
+    let (wallet, faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &authenticator,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    let fungible_asset = FungibleAsset::new(faucet.id(), MINT_AMOUNT)?;
+    let tx_request = TransactionRequestBuilder::new().build_mint_fungible_asset(
+        fungible_asset,
+        wallet.id(),
+        NoteType::Public,
+        client.rng(),
+    )?;
+    let tx_id = client.submit_new_transaction(faucet.id(), tx_request).await?;
+    wait_for_tx(&mut client, tx_id).await?;
+
+    let grpc = GrpcClient::new(&rpc_endpoint, rpc_timeout);
+    let limits = grpc.get_rpc_limits().await?;
+    let sync_height = client.get_sync_height().await?;
+
+    let rng = client.rng();
+    let mut account_ids: Vec<AccountId> = (0..limits.account_ids_limit)
+        .map(|_| AccountIdBuilder::new().build_with_rng(rng))
+        .collect();
+    account_ids.push(faucet.id());
+    let txs = grpc
+        .sync_transactions(BlockNumber::from(0u32), sync_height, account_ids.clone())
+        .await?;
+    assert!(account_ids.len() as u32 > limits.account_ids_limit);
+    assert!(
+        txs.iter().any(|t| t.transaction_header.id() == tx_id),
+        "expected the executed transaction in the sync_transactions response",
     );
 
     Ok(())
