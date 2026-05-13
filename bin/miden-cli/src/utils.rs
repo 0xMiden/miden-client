@@ -328,8 +328,8 @@ impl FaucetMetadataResolver {
         Ok(Self { toml: parsed })
     }
 
-    /// Looks up `(symbol, decimals)` for a faucet, walking TOML → store cache → RPC fetch.
-    /// On RPC success, the result is written back to the store cache.
+    /// Looks up `(symbol, decimals)` for a faucet, walking TOML → settings cache → RPC fetch.
+    /// On RPC success, the result is written back to the settings cache.
     pub async fn resolve<AUTH>(
         &self,
         client: &mut Client<AUTH>,
@@ -339,14 +339,15 @@ impl FaucetMetadataResolver {
         if let Some((symbol, decimals)) = self.lookup_toml(&faucet_id) {
             return Ok(Some(FaucetMetadata { symbol, decimals }));
         }
-        // 2) store cache
-        if let Some(cached) = client.get_faucet_metadata(faucet_id).await? {
+        let cache_key = faucet_metadata_setting_key(faucet_id);
+        // 2) settings cache
+        if let Some(cached) = client.get_setting::<FaucetMetadata>(cache_key.clone()).await? {
             return Ok(Some(cached));
         }
         // 3) RPC fetch
         match client.fetch_remote_token_metadata(faucet_id).await {
             Ok(Some(meta)) => {
-                if let Err(err) = client.upsert_faucet_metadata(faucet_id, meta.clone()).await {
+                if let Err(err) = client.set_setting(cache_key, meta.clone()).await {
                     tracing::warn!(
                         "failed to cache faucet metadata for {}: {err}",
                         faucet_id.to_hex(),
@@ -431,6 +432,14 @@ impl FaucetMetadataResolver {
             .find(|(_, entry)| &entry.account_id == faucet_id)
             .map(|(symbol, entry)| (symbol.clone(), entry.decimals))
     }
+}
+
+/// Settings key prefix under which cached faucet display metadata is stored.
+const FAUCET_METADATA_SETTING_PREFIX: &str = "faucet_metadata:";
+
+/// Returns the settings-store key under which the cached metadata for `faucet_id` is stored.
+fn faucet_metadata_setting_key(faucet_id: AccountId) -> String {
+    format!("{FAUCET_METADATA_SETTING_PREFIX}{}", faucet_id.to_hex())
 }
 
 /// Parses an `id` string from the TOML as a bech32 address.

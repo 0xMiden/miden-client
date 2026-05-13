@@ -7,7 +7,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use assert_cmd::Command;
 use assert_cmd::cargo::cargo_bin_cmd;
-use miden_client::account::{AccountId, AccountStorageMode};
+use miden_client::account::{AccountId, AccountStorageMode, FaucetMetadata};
 use miden_client::address::{Address, NetworkId};
 use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
 use miden_client::builder::ClientBuilder;
@@ -379,8 +379,8 @@ async fn token_symbol_mapping() -> Result<()> {
 /// `Client::fetch_remote_token_metadata`. Asserts:
 /// 1. `notes -s` stdout contains the faucet's symbol ("BTC" — the constant baked into
 ///    `new_faucet_cli`'s init storage data).
-/// 2. After the display, the local store's `faucet_metadata` table contains a row for the faucet,
-///    proving the resolver wrote back its RPC result.
+/// 2. After the display, the settings store contains a cached entry for the faucet, proving the
+///    resolver wrote back its RPC result.
 #[tokio::test]
 async fn public_faucet_metadata_is_fetched_and_cached() -> Result<()> {
     let (store_path, temp_dir, endpoint) = init_cli();
@@ -447,13 +447,14 @@ async fn public_faucet_metadata_is_fetched_and_cached() -> Result<()> {
         "expected `notes -s` stdout to contain `BTC` (faucet symbol fetched via RPC), got:\n{show_stdout}",
     );
 
-    // Assert the resolver wrote the metadata into the local store.
+    // Assert the resolver wrote the metadata into the settings store.
     let faucet_id = AccountId::from_hex(&fungible_faucet_account_id).unwrap();
     let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
-    let cached = client.get_faucet_metadata(faucet_id).await?;
+    let cache_key = format!("faucet_metadata:{}", faucet_id.to_hex());
+    let cached: Option<FaucetMetadata> = client.get_setting(cache_key).await?;
     assert!(
         cached.is_some(),
-        "expected faucet_metadata table to contain row for {fungible_faucet_account_id} after notes -s",
+        "expected settings store to contain cached metadata for {fungible_faucet_account_id} after notes -s",
     );
     let cached = cached.unwrap();
     assert_eq!(cached.symbol, "BTC");

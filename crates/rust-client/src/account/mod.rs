@@ -69,15 +69,37 @@ pub use miden_protocol::address::{Address, AddressInterface, AddressType, Networ
 use miden_protocol::asset::AssetVault;
 pub use miden_protocol::errors::{AccountIdError, AddressError, NetworkIdError};
 use miden_protocol::note::NoteTag;
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+};
 
 /// Cached, display-only metadata for a faucet account.
 ///
 /// Populated lazily by the CLI resolver from the on-chain `TokenMetadata` of a public faucet
-/// and persisted in the [`Store`](crate::store::Store)'s `faucet_metadata` table.
+/// and persisted in the client's settings store under a `faucet_metadata:<faucet-id>` key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FaucetMetadata {
     pub symbol: String,
     pub decimals: u8,
+}
+
+impl Serializable for FaucetMetadata {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.symbol.write_into(target);
+        target.write_u8(self.decimals);
+    }
+}
+
+impl Deserializable for FaucetMetadata {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let symbol = String::read_from(source)?;
+        let decimals = source.read_u8()?;
+        Ok(Self { symbol, decimals })
+    }
 }
 
 mod account_reader;
@@ -455,26 +477,6 @@ impl<AUTH> Client<AUTH> {
     /// ```
     pub fn account_reader(&self, account_id: AccountId) -> AccountReader {
         AccountReader::new(self.store.clone(), account_id)
-    }
-
-    /// Returns the cached display metadata for a faucet, or `None` if not cached.
-    pub async fn get_faucet_metadata(
-        &self,
-        faucet_id: AccountId,
-    ) -> Result<Option<FaucetMetadata>, ClientError> {
-        self.store.get_faucet_metadata(faucet_id).await.map_err(ClientError::StoreError)
-    }
-
-    /// Inserts or replaces the cached display metadata for a faucet.
-    pub async fn upsert_faucet_metadata(
-        &self,
-        faucet_id: AccountId,
-        metadata: FaucetMetadata,
-    ) -> Result<(), ClientError> {
-        self.store
-            .upsert_faucet_metadata(faucet_id, metadata)
-            .await
-            .map_err(ClientError::StoreError)
     }
 
     /// Prunes historical account states for the specified account up to the given nonce.

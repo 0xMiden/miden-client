@@ -14,12 +14,10 @@ use std::vec::Vec;
 use db_management::pool_manager::{Pool, SqlitePoolManager};
 use db_management::utils::{
     apply_migrations,
-    get_faucet_metadata,
     get_setting,
     list_setting_keys,
     remove_setting,
     set_setting,
-    upsert_faucet_metadata,
 };
 use miden_client::Word;
 use miden_client::account::{
@@ -29,7 +27,6 @@ use miden_client::account::{
     AccountId,
     AccountStorage,
     Address,
-    FaucetMetadata,
     StorageMapKey,
     StorageSlotName,
 };
@@ -453,25 +450,6 @@ impl Store for SqliteStore {
 
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
         self.interact_with_connection(move |conn| list_setting_keys(conn)).await
-    }
-
-    async fn get_faucet_metadata(
-        &self,
-        faucet_id: AccountId,
-    ) -> Result<Option<FaucetMetadata>, StoreError> {
-        self.interact_with_connection(move |conn| get_faucet_metadata(conn, faucet_id))
-            .await
-    }
-
-    async fn upsert_faucet_metadata(
-        &self,
-        faucet_id: AccountId,
-        metadata: FaucetMetadata,
-    ) -> Result<(), StoreError> {
-        self.interact_with_connection(move |conn| {
-            upsert_faucet_metadata(conn, faucet_id, &metadata)
-        })
-        .await
     }
 
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {

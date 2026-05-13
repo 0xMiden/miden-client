@@ -2,7 +2,6 @@ use std::string::String;
 use std::sync::LazyLock;
 use std::vec::Vec;
 
-use miden_client::account::{AccountId, FaucetMetadata};
 use miden_client::store::StoreError;
 use miden_protocol::crypto::hash::blake::{Blake3_256, Blake3Digest};
 use rusqlite::types::FromSql;
@@ -177,41 +176,6 @@ pub fn list_setting_keys(conn: &Connection) -> Result<Vec<String>, StoreError> {
         .into_store_error()?
         .collect::<Result<Vec<String>, _>>()
         .into_store_error()
-}
-
-pub fn get_faucet_metadata(
-    conn: &mut Connection,
-    faucet_id: AccountId,
-) -> Result<Option<FaucetMetadata>, StoreError> {
-    conn.transaction()
-        .into_store_error()?
-        .query_row(
-            "SELECT symbol, decimals FROM faucet_metadata WHERE account_id = $1",
-            params![faucet_id.to_hex()],
-            |row| {
-                Ok(FaucetMetadata {
-                    symbol: row.get::<_, String>(0)?,
-                    decimals: row.get::<_, u8>(1)?,
-                })
-            },
-        )
-        .optional()
-        .into_store_error()
-}
-
-pub fn upsert_faucet_metadata(
-    conn: &Connection,
-    faucet_id: AccountId,
-    metadata: &FaucetMetadata,
-) -> Result<(), StoreError> {
-    let count = conn
-        .execute(
-            insert_sql!(faucet_metadata { account_id, symbol, decimals } | REPLACE),
-            params![faucet_id.to_hex(), metadata.symbol, metadata.decimals],
-        )
-        .into_store_error()?;
-    debug_assert_eq!(count, 1);
-    Ok(())
 }
 
 /// Checks if a table exists in the database.

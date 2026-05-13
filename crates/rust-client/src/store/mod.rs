@@ -48,7 +48,6 @@ use miden_protocol::transaction::TransactionId;
 use miden_protocol::{Felt, Word};
 use miden_tx::utils::serde::{Deserializable, Serializable};
 
-use crate::account::FaucetMetadata;
 use crate::note_transport::{NOTE_TRANSPORT_CURSOR_STORE_SETTING, NoteTransportCursor};
 use crate::rpc::{RPC_LIMITS_STORE_SETTING, RpcLimits};
 use crate::sync::{NoteTagRecord, StateSyncUpdate};
@@ -404,22 +403,6 @@ pub trait Store: Send + Sync {
 
     /// Returns all the keys from the `settings` table.
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError>;
-
-    // FAUCET METADATA
-    // --------------------------------------------------------------------------------------------
-
-    /// Returns the cached display metadata for a faucet, or `None` if not cached.
-    async fn get_faucet_metadata(
-        &self,
-        faucet_id: AccountId,
-    ) -> Result<Option<FaucetMetadata>, StoreError>;
-
-    /// Inserts or replaces the cached display metadata for a faucet.
-    async fn upsert_faucet_metadata(
-        &self,
-        faucet_id: AccountId,
-        metadata: FaucetMetadata,
-    ) -> Result<(), StoreError>;
 
     // SYNC
     // --------------------------------------------------------------------------------------------
