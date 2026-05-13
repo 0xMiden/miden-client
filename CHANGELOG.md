@@ -31,6 +31,10 @@
 * [FEATURE][web] Added `StorageView` JS wrapper over WASM `AccountStorage`. `account.storage()` now returns a `StorageView` that makes `getItem()` work intuitively for both Value and StorageMap slots. WASM primitives are unchanged; the raw `AccountStorage` is accessible via `.raw` ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][web] Added `wordToBigInt()` utility export for losslessly converting a `Word`'s first felt to a `BigInt`. `StorageResult.toString()` is BigInt-backed, and `valueOf()` returns a JS number for values fitting in `Number.MAX_SAFE_INTEGER` and throws `RangeError` for larger u64 values — use `.toBigInt()` for exact access ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 
+### Fixes
+
+* [FIX][rust] Fixed `sync_notes_with_details` pagination terminating early when a page contains no matching notes, causing intermittent note discovery failures. Notes committed in later blocks were permanently skipped because the sync height was updated to the chain tip. ([#2180](https://github.com/0xMiden/miden-client/pull/2180))
+
 ## 0.14.7 (2026-06-05)
 
 ### Enhancements
