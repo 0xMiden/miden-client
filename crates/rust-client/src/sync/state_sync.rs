@@ -5,9 +5,19 @@ use alloc::vec::Vec;
 
 use async_trait::async_trait;
 use miden_protocol::account::{
-    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountStorage,
-    AccountStorageDelta, AccountVaultDelta, StorageMapKey, StorageSlot, StorageSlotContent,
-    StorageSlotName, StorageSlotType,
+    Account,
+    AccountCode,
+    AccountDelta,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    AccountStorageDelta,
+    AccountVaultDelta,
+    StorageMapKey,
+    StorageSlot,
+    StorageSlotContent,
+    StorageSlotName,
+    StorageSlotType,
 };
 use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey};
 use miden_protocol::block::{BlockHeader, BlockNumber};
@@ -22,13 +32,17 @@ use super::{AccountUpdates, PublicAccountUpdate, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
 use crate::rpc::domain::account::{
-    AccountDetails, AccountStorageMapDetails, AccountStorageRequirements, FetchedAccount,
+    AccountDetails,
+    AccountStorageMapDetails,
+    AccountStorageRequirements,
+    FetchedAccount,
 };
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
 use crate::rpc::domain::storage_map::StorageMapUpdate;
 use crate::rpc::domain::sync::SyncTarget;
 use crate::rpc::domain::transaction::{
-    TransactionInclusion, TransactionRecord as RpcTransactionRecord,
+    TransactionInclusion,
+    TransactionRecord as RpcTransactionRecord,
 };
 use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError};
 use crate::store::{AccountStorageFilter, InputNoteRecord, OutputNoteRecord, Store, StoreError};
@@ -308,6 +322,13 @@ impl StateSync {
         let chain_tip = chain_mmr_info.block_to;
 
         // Validate the response covers the range we requested.
+        if chain_mmr_info.block_header.block_num() != chain_mmr_info.block_to {
+            return Err(ClientError::ChainValidationError(format!(
+                "sync_chain_mmr block_header.block_num ({}) does not match block_to ({})",
+                chain_mmr_info.block_header.block_num(),
+                chain_mmr_info.block_to
+            )));
+        }
         if chain_mmr_info.block_from != current_block_num {
             return Err(ClientError::ChainValidationError(format!(
                 "sync_chain_mmr block_from mismatch: expected {current_block_num}, got {}",
@@ -1299,11 +1320,19 @@ mod tests {
     use miden_protocol::block::BlockNumber;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, PartialMmr};
     use miden_protocol::note::{
-        Note, NoteAssets, NoteAttachment, NoteHeader, NoteMetadata, NoteRecipient, NoteStorage,
-        NoteTag, NoteType,
+        Note,
+        NoteAssets,
+        NoteAttachment,
+        NoteHeader,
+        NoteMetadata,
+        NoteRecipient,
+        NoteStorage,
+        NoteTag,
+        NoteType,
     };
     use miden_protocol::testing::account_id::{
-        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_REGULAR_NETWORK_ACCOUNT_IMMUTABLE_CODE,
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_REGULAR_NETWORK_ACCOUNT_IMMUTABLE_CODE,
         ACCOUNT_ID_SENDER,
     };
     use miden_protocol::{Felt, Word};
@@ -1352,7 +1381,8 @@ mod tests {
         use miden_protocol::{Felt, ZERO};
 
         use crate::rpc::domain::transaction::{
-            ACCOUNT_ID_NATIVE_ASSET_FAUCET, TransactionRecord as RpcTransactionRecord,
+            ACCOUNT_ID_NATIVE_ASSET_FAUCET,
+            TransactionRecord as RpcTransactionRecord,
         };
 
         fn word(n: u64) -> miden_protocol::Word {
