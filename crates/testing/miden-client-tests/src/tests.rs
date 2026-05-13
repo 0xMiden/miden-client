@@ -19,7 +19,7 @@ use miden_client::auth::{
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::note::{BlockNumber, NoteId};
-use miden_client::rpc::{NodeRpcClient, RpcLimits};
+use miden_client::rpc::NodeRpcClient;
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{
     AccountStorageFilter,
@@ -3305,62 +3305,6 @@ async fn consume_note_with_custom_script() {
 
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
-}
-
-#[tokio::test]
-async fn add_note_tag_fails_if_note_tag_limit_is_exceeded() {
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
-    let note_tags_limit = RpcLimits::default().note_tags_limit;
-
-    // add note tags until the limit is exceeded
-    for i in 0..note_tags_limit {
-        client.add_note_tag(NoteTag::from(i)).await.unwrap();
-    }
-
-    // try to add a note tag
-    let tag = NoteTag::from(note_tags_limit);
-    let result = client.add_note_tag(tag).await;
-
-    assert!(matches!(result, Err(ClientError::NoteTagsLimitExceeded(_))));
-}
-
-#[tokio::test]
-async fn add_account_fails_if_accounts_limit_is_exceeded() {
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
-
-    // add accounts until the limit is exceeded
-    for i in 0..RpcLimits::default().account_ids_limit {
-        // first 7 bits are used for metadata so we shift by 8 bits to get distinct ids
-        client
-            .add_account(
-                &Account::mock(
-                    (i << 8).into(),
-                    AuthSingleSig::new(
-                        PublicKeyCommitment::from(EMPTY_WORD),
-                        AuthSchemeId::Falcon512Poseidon2,
-                    ),
-                ),
-                false,
-            )
-            .await
-            .unwrap();
-    }
-
-    // try to add an account
-    let result = client
-        .add_account(
-            &Account::mock(
-                (RpcLimits::default().account_ids_limit << 8).into(),
-                AuthSingleSig::new(
-                    PublicKeyCommitment::from(EMPTY_WORD),
-                    AuthSchemeId::Falcon512Poseidon2,
-                ),
-            ),
-            false,
-        )
-        .await;
-
-    assert!(matches!(result, Err(ClientError::AccountsLimitExceeded(_))));
 }
 
 // PAGINATION TESTS

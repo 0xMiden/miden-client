@@ -29,18 +29,12 @@ use crate::rpc::domain::account::{
     StorageMapEntry,
 };
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
-use crate::rpc::domain::note::{
-    CommittedNote,
-    CommittedNoteMetadata,
-    FetchedNote,
-    NoteSyncBlock,
-    NoteSyncInfo,
-};
+use crate::rpc::domain::note::{CommittedNote, CommittedNoteMetadata, FetchedNote, NoteSyncBlock};
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
 use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
-use crate::rpc::domain::transaction::{TransactionRecord, TransactionsInfo};
+use crate::rpc::domain::transaction::TransactionRecord;
 use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError, RpcStatusInfo};
 
 pub type MockClient<AUTH> = Client<AUTH>;
@@ -189,19 +183,13 @@ impl MockRpcApi {
     fn get_sync_transactions_request(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_ids: &[AccountId],
-    ) -> TransactionsInfo {
-        let chain_tip = self.get_chain_tip_block_num();
-        let block_to = match block_to {
-            Some(block_to) => block_to,
-            None => chain_tip,
-        };
-
-        let mut transaction_records = vec![];
+    ) -> Vec<TransactionRecord> {
+        let mut transactions = Vec::new();
         for block in self.mock_chain.read().proven_blocks() {
             let block_number = block.header().block_num();
-            if block_number <= block_from || block_number > block_to {
+            if block_number < block_from || block_number > block_to {
                 continue;
             }
 
@@ -212,7 +200,7 @@ impl MockRpcApi {
 
                 let erased_output_notes = self.erased_notes.read().clone();
 
-                transaction_records.push(TransactionRecord {
+                transactions.push(TransactionRecord {
                     block_num: block_number,
                     transaction_header: transaction_header.clone(),
                     output_notes: vec![],
@@ -221,11 +209,7 @@ impl MockRpcApi {
             }
         }
 
-        TransactionsInfo {
-            chain_tip,
-            block_num: block_to,
-            transaction_records,
-        }
+        transactions
     }
 
     /// Retrieves storage map updates in a given block range.
@@ -326,28 +310,21 @@ impl NodeRpcClient for MockRpcApi {
         Ok(())
     }
 
-    /// Returns note updates after the specified block number. Only notes that match the
-    /// provided tags will be returned, grouped by block.
+    /// Returns note updates in the inclusive block range `[block_from, block_to]`.
+    /// Only notes that match the provided tags will be returned, grouped by block.
     async fn sync_notes(
         &self,
-        block_num: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<NoteSyncInfo, RpcError> {
-        let chain_tip = self.get_chain_tip_block_num();
-        let upper_bound = block_to.unwrap_or(chain_tip);
-        let page_end_block: BlockNumber = (block_num.as_u32() + Self::PAGINATION_BLOCK_LIMIT)
-            .min(upper_bound.as_u32())
-            .into();
-
-        // Collect all blocks with matching notes in the range [block_num, page_end_block]
+    ) -> Result<Vec<NoteSyncBlock>, RpcError> {
         let mut blocks_with_notes: BTreeMap<BlockNumber, BTreeMap<NoteId, CommittedNote>> =
             BTreeMap::new();
         for note in self.mock_chain.read().committed_notes().values() {
             let note_block = note.inclusion_proof().location().block_num();
             if note_tags.contains(&note.metadata().tag())
-                && note_block >= block_num
-                && note_block <= page_end_block
+                && note_block >= block_from
+                && note_block <= block_to
             {
                 let committed = CommittedNote::new(
                     note.id(),
@@ -358,29 +335,19 @@ impl NodeRpcClient for MockRpcApi {
             }
         }
 
-        // Always include the page-end block (with empty notes if needed) so callers can observe
-        // pagination progress even if no note matched that block.
-        blocks_with_notes.entry(page_end_block).or_default();
-
-        let blocks: Vec<NoteSyncBlock> = blocks_with_notes
+        Ok(blocks_with_notes
             .into_iter()
             .map(|(bn, notes)| {
                 let block_header = self.get_block_by_num(bn);
                 let mmr_path = self.get_mmr().open(bn.as_usize()).unwrap().merkle_path().clone();
                 NoteSyncBlock { block_header, mmr_path, notes }
             })
-            .collect();
-
-        Ok(NoteSyncInfo {
-            chain_tip,
-            block_to: page_end_block,
-            blocks,
-        })
+            .collect())
     }
 
     async fn sync_chain_mmr(
         &self,
-        block_from: BlockNumber,
+        current_block_height: BlockNumber,
         upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError> {
         let chain_tip = self.get_chain_tip_block_num();
@@ -391,10 +358,10 @@ impl NodeRpcClient for MockRpcApi {
             SyncTarget::CommittedChainTip | SyncTarget::ProvenChainTip => chain_tip,
         };
 
-        let from_forest = if block_from == target_block {
+        let from_forest = if current_block_height == target_block {
             target_block.as_usize()
         } else {
-            block_from.as_u32() as usize + 1
+            current_block_height.as_u32() as usize + 1
         };
 
         let mmr_delta = self
@@ -405,7 +372,7 @@ impl NodeRpcClient for MockRpcApi {
         let block_header = self.get_block_by_num(target_block);
 
         Ok(ChainMmrInfo {
-            block_from,
+            block_from: current_block_height,
             block_to: target_block,
             mmr_delta,
             block_header,
@@ -605,7 +572,7 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_nullifiers(
         &self,
         prefixes: &[u16],
-        from_block_num: BlockNumber,
+        block_from: BlockNumber,
         block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         let nullifiers = self
@@ -615,9 +582,9 @@ impl NodeRpcClient for MockRpcApi {
             .entries()
             .filter_map(|(nullifier, block_num)| {
                 let within_range = if let Some(to_block) = block_to {
-                    block_num >= from_block_num && block_num <= to_block
+                    block_num >= block_from && block_num <= to_block
                 } else {
-                    block_num >= from_block_num
+                    block_num >= block_from
                 };
 
                 if prefixes.contains(&nullifier.prefix()) && within_range {
@@ -718,11 +685,10 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_transactions(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_ids: Vec<AccountId>,
-    ) -> Result<TransactionsInfo, RpcError> {
-        let response = self.get_sync_transactions_request(block_from, block_to, &account_ids);
-        Ok(response)
+    ) -> Result<Vec<TransactionRecord>, RpcError> {
+        Ok(self.get_sync_transactions_request(block_from, block_to, &account_ids))
     }
 
     async fn get_network_id(&self) -> Result<NetworkId, RpcError> {
