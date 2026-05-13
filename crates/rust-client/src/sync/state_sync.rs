@@ -22,7 +22,7 @@ use tracing::info;
 use super::state_sync_update::TransactionUpdateTracker;
 use super::{AccountUpdates, PublicAccountDelta, PublicAccountUpdate, StateSyncUpdate};
 use crate::ClientError;
-use crate::note::NoteUpdateTracker;
+use crate::note::{NoteConsumption, NoteUpdateTracker};
 use crate::rpc::domain::account::{AccountDetails, AccountStorageRequirements};
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
 use crate::rpc::domain::sync::SyncTarget;
@@ -868,15 +868,24 @@ impl StateSync {
         // changes between the sync_state and the check_nullifier calls)
         new_nullifiers.retain(|update| update.block_num <= state_sync_update.block_num);
 
-        for nullifier_update in new_nullifiers {
-            let external_consumer_account = state_sync_update
-                .transaction_updates
-                .external_nullifier_account(&nullifier_update.nullifier);
+        // Enrich each raw nullifier update with the externally-tracked consumer account, joining
+        // the two sources (sync_nullifiers + tracked transaction inclusions) once at this
+        // boundary so the note tracker sees a single, complete value per consumption event.
+        let consumptions: Vec<NoteConsumption> = new_nullifiers
+            .into_iter()
+            .map(|update| NoteConsumption {
+                external_consumer: state_sync_update
+                    .transaction_updates
+                    .external_nullifier_account(&update.nullifier),
+                nullifier: update.nullifier,
+                block_num: update.block_num,
+            })
+            .collect();
 
-            state_sync_update.note_updates.apply_nullifiers_state_transitions(
-                &nullifier_update,
+        for consumption in consumptions {
+            state_sync_update.note_updates.apply_note_consumption(
+                &consumption,
                 state_sync_update.transaction_updates.committed_transactions(),
-                external_consumer_account,
             )?;
 
             // Process nullifiers and track the updates of local tracked transactions that were
@@ -884,7 +893,7 @@ impl StateSync {
             // another transaction.
             state_sync_update
                 .transaction_updates
-                .apply_input_note_nullified(nullifier_update.nullifier);
+                .apply_input_note_nullified(consumption.nullifier);
         }
 
         Ok(())
