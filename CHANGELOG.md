@@ -30,6 +30,7 @@
 * [FEATURE][cli] Added `address encode <ACCOUNT_ID> <INTERFACE> [TAG_LEN]` subcommand that prints the bech32 encoding of an address built from the given fields (useful for producing the input to `address add`). ([#2115](https://github.com/0xMiden/miden-client/pull/2115))
 * [FEATURE][web] Added `StorageView` JS wrapper over WASM `AccountStorage`. `account.storage()` now returns a `StorageView` that makes `getItem()` work intuitively for both Value and StorageMap slots. WASM primitives are unchanged; the raw `AccountStorage` is accessible via `.raw` ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][web] Added `wordToBigInt()` utility export for losslessly converting a `Word`'s first felt to a `BigInt`. `StorageResult.toString()` is BigInt-backed, and `valueOf()` returns a JS number for values fitting in `Number.MAX_SAFE_INTEGER` and throws `RangeError` for larger u64 values — use `.toBigInt()` for exact access ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
+* [FEATURE][rust,cli] Added partial swap (PSWAP) support: `TransactionRequestBuilder::build_pswap_create` / `build_pswap_consume` / `build_pswap_cancel` and a `miden-client pswap` CLI command (`create`, `consume`, `cancel`) for partially-fillable fungible swaps ([#2162](https://github.com/0xMiden/miden-client/pull/2162)).
 
 ## 0.14.7 (2026-06-05)
 
