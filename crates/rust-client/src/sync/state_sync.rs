@@ -42,7 +42,7 @@ use crate::transaction::TransactionRecord;
 /// Aggregates the responses of `sync_chain_mmr`, `sync_notes`, `get_notes_by_id`, and
 /// `sync_transactions`. This may contain more data than a particular client needs to store — it is
 /// filtered and transformed into a [`StateSyncUpdate`] before being applied.
-struct RawStateSyncData {
+struct FetchedSyncData {
     /// MMR delta covering the full range from `current_block` to `chain_tip`.
     mmr_delta: MmrDelta,
     /// Chain tip block header.
@@ -56,6 +56,18 @@ struct RawStateSyncData {
     /// Transaction inclusions for the synced range.
     transactions: Vec<TransactionInclusion>,
     /// Nullifiers for the synced range.
+    nullifiers: Vec<Nullifier>,
+}
+
+/// Derived collections produced from a single `sync_transactions` RPC response. All three
+/// fields are computed locally from the same set of transaction records and are kept together
+/// because they share that provenance and lifetime.
+struct TransactionSyncData {
+    /// Latest account commitment per account in the synced range.
+    account_commitment_updates: Vec<(AccountId, Word)>,
+    /// Per-transaction inclusion records (id, block, account, nullifiers, output notes, ...).
+    transactions: Vec<TransactionInclusion>,
+    /// Input-note nullifiers from the synced transactions, in execution order per account.
     nullifiers: Vec<Nullifier>,
 }
 
@@ -317,7 +329,7 @@ impl StateSync {
         current_block_num: BlockNumber,
         account_ids: &[AccountId],
         note_tags: &Arc<BTreeSet<NoteTag>>,
-    ) -> Result<Option<RawStateSyncData>, ClientError> {
+    ) -> Result<Option<FetchedSyncData>, ClientError> {
         // Step 1: Fetch the MMR delta and chain tip header.
         let chain_mmr_info = self
             .rpc_api
@@ -353,10 +365,13 @@ impl StateSync {
         );
 
         // Step 3: Gather transactions for tracked accounts over the full range.
-        let (account_commitment_updates, transactions, nullifiers) =
-            self.fetch_transaction_data(current_block_num, chain_tip, account_ids).await?;
+        let TransactionSyncData {
+            account_commitment_updates,
+            transactions,
+            nullifiers,
+        } = self.fetch_transaction_data(current_block_num, chain_tip, account_ids).await?;
 
-        Ok(Some(RawStateSyncData {
+        Ok(Some(FetchedSyncData {
             mmr_delta: chain_mmr_info.mmr_delta,
             chain_tip_header: chain_mmr_info.block_header,
             note_blocks: sync_notes_result.blocks,
@@ -373,10 +388,13 @@ impl StateSync {
         block_from: BlockNumber,
         block_to: BlockNumber,
         account_ids: &[AccountId],
-    ) -> Result<(Vec<(AccountId, Word)>, Vec<TransactionInclusion>, Vec<Nullifier>), ClientError>
-    {
+    ) -> Result<TransactionSyncData, ClientError> {
         if account_ids.is_empty() {
-            return Ok((vec![], vec![], vec![]));
+            return Ok(TransactionSyncData {
+                account_commitment_updates: vec![],
+                transactions: vec![],
+                nullifiers: vec![],
+            });
         }
 
         let tx_info = self
@@ -386,10 +404,10 @@ impl StateSync {
 
         let transaction_records = tx_info.transaction_records;
 
-        let account_updates = derive_account_commitment_updates(&transaction_records);
+        let account_commitment_updates = derive_account_commitment_updates(&transaction_records);
         let nullifiers = compute_ordered_nullifiers(&transaction_records);
 
-        let tx_inclusions = transaction_records
+        let transactions = transaction_records
             .into_iter()
             .map(|r| {
                 let nullifiers = r
@@ -410,7 +428,11 @@ impl StateSync {
             })
             .collect();
 
-        Ok((account_updates, tx_inclusions, nullifiers))
+        Ok(TransactionSyncData {
+            account_commitment_updates,
+            transactions,
+            nullifiers,
+        })
     }
 
     // HELPERS
@@ -424,12 +446,12 @@ impl StateSync {
     /// 3. Applies transaction and nullifier updates.
     async fn apply_sync_result(
         &self,
-        sync_data: RawStateSyncData,
+        sync_data: FetchedSyncData,
         public_note_records: &BTreeMap<NoteId, InputNoteRecord>,
         state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<(), ClientError> {
-        let RawStateSyncData {
+        let FetchedSyncData {
             mmr_delta,
             chain_tip_header,
             note_blocks,
@@ -926,11 +948,9 @@ impl StateSync {
 // HELPERS
 // ================================================================================================
 
-/// Derives account commitment updates from transaction records.
-///
-/// For each unique account, takes the `final_state_commitment` from the transaction with the
-/// highest `block_num`. This replicates the old `SyncState` behavior where the node returned
-/// the latest account commitment per account in the synced range.
+/// For each unique account in the transaction set, returns the `final_state_commitment` from
+/// the transaction with the highest `block_num` — i.e. the canonical post-sync commitment for
+/// that account over the synced range.
 fn derive_account_commitment_updates(
     transaction_records: &[RpcTransactionRecord],
 ) -> Vec<(AccountId, Word)> {
