@@ -574,6 +574,7 @@ pub async fn test_sync_notes_chunks_when_exceeding_limits(
     let mut tags: BTreeSet<NoteTag> = (0..limits.note_tags_limit).map(NoteTag::new).collect();
     tags.insert(real_tag);
     let blocks = grpc.sync_notes(BlockNumber::from(0u32), sync_height, &tags).await?;
+    assert!(tags.len() as u32 > limits.note_tags_limit);
     assert!(
         blocks.iter().any(|b| b.notes.contains_key(&minted_note.id())),
         "expected the minted note in the sync_notes response",
