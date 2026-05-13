@@ -24,7 +24,7 @@ use commands::info::InfoCmd;
 use commands::init::InitCmd;
 use commands::network_note_status::NetworkNoteStatusCmd;
 use commands::new_account::{NewAccountCmd, NewWalletCmd};
-use commands::new_transactions::{ConsumeNotesCmd, MintCmd, SendCmd, SwapCmd};
+use commands::new_transactions::{ConsumeNotesCmd, MintCmd, PswapCmd, SendCmd, SwapCmd};
 use commands::notes::NotesCmd;
 use commands::sync::SyncCmd;
 use commands::tags::TagsCmd;
@@ -399,6 +399,7 @@ pub enum Command {
     Transaction(TransactionCmd),
     Mint(MintCmd),
     Send(SendCmd),
+    Pswap(PswapCmd),
     Swap(SwapCmd),
     ConsumeNotes(ConsumeNotesCmd),
     Exec(ExecCmd),
@@ -471,6 +472,7 @@ impl Cli {
             Command::Export(cmd) => cmd.execute(client, keystore).await,
             Command::Mint(mint) => Box::pin(mint.execute(client)).await,
             Command::Send(send) => Box::pin(send.execute(client)).await,
+            Command::Pswap(pswap) => Box::pin(pswap.execute(client)).await,
             Command::Swap(swap) => Box::pin(swap.execute(client)).await,
             Command::ConsumeNotes(consume_notes) => Box::pin(consume_notes.execute(client)).await,
         }

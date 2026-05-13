@@ -1781,6 +1781,28 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn sync_notes_with_details_fetches_inclusive_upper_bound_page() {
+        let (chain, note_tags) = build_chain_with_mint_notes(10).await;
+        let mock_rpc = MockRpcApi::new(chain);
+
+        let result = mock_rpc
+            .sync_notes_with_details(4_u32.into(), Some(10_u32.into()), &note_tags)
+            .await
+            .expect("sync notes should succeed");
+
+        assert_eq!(
+            result.blocks.last().unwrap().block_header.block_num(),
+            BlockNumber::from(10u32)
+        );
+        assert!(
+            result
+                .blocks
+                .iter()
+                .any(|block| block.block_header.block_num() == BlockNumber::from(9u32))
+        );
+    }
+
     /// Tests that erased notes are marked as consumed when a committed transaction
     /// reports output notes that were erased by same-batch note erasure.
     ///
