@@ -151,8 +151,7 @@ pub struct NoteSyncBlock {
 /// blocks carry metadata + inclusion proofs, while `public_notes` carries the note content
 /// (scripts, assets, recipient) keyed by note ID.
 pub struct SyncNotesResult {
-    /// Blocks containing matching notes with fully-resolved metadata, ordered by block number
-    /// ascending. May be empty if no notes matched in the requested range.
+    /// Blocks containing matching notes with fully-resolved metadata.
     pub blocks: Vec<NoteSyncBlock>,
     /// Full note bodies for public notes, keyed by note ID.
     pub public_notes: BTreeMap<NoteId, Note>,
