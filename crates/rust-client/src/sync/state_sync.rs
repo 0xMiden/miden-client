@@ -803,11 +803,13 @@ impl StateSync {
                 })?;
 
             if map_details.too_many_entries {
-                // Oversized map: fetch delta entries from the sync endpoint.
+                // Oversized map: fetch delta entries from the sync endpoint. The lower bound
+                // is inclusive at the node, so request from `block_from + 1` to skip the
+                // block whose state we already have.
                 if map_delta_cache.is_none() {
                     let map_info = self
                         .rpc_api
-                        .sync_storage_maps(block_from, Some(block_to), account_id)
+                        .sync_storage_maps(block_from + 1, Some(block_to), account_id)
                         .await
                         .map_err(ClientError::RpcError)?;
                     map_delta_cache = Some(map_info.updates);
@@ -948,10 +950,12 @@ impl StateSync {
             store.get_account_vault(account_id).await.map_err(ClientError::StoreError)?;
 
         if details.vault_details.too_many_assets {
-            // Oversized vault: fetch delta from sync endpoint.
+            // Oversized vault: fetch delta from sync endpoint. The lower bound is inclusive
+            // at the node, so request from `block_from + 1` to skip the block whose state
+            // we already have.
             let vault_info = self
                 .rpc_api
-                .sync_account_vault(block_from, Some(block_to), account_id)
+                .sync_account_vault(block_from + 1, Some(block_to), account_id)
                 .await
                 .map_err(ClientError::RpcError)?;
 
