@@ -178,7 +178,21 @@ When you need to check notes that are not already covered by the client helpers,
 let screener = client.note_screener();
 ```
 
-You can also pass custom transaction arguments to the screener via `with_transaction_args`.
+You can also pass custom transaction arguments to the screener via `with_transaction_args`. The screener uses them during its trial executions, which lets it evaluate consumability under the same conditions you will use when actually consuming. For example:
+
+```rust
+use std::collections::BTreeMap;
+
+use miden_client::Word;
+use miden_client::note::NoteId;
+use miden_client::transaction::{AdviceMap, TransactionArgs};
+
+// Per-note arguments passed to the note script.
+let note_args: BTreeMap<NoteId, Word> = BTreeMap::from([(note_id, custom_args)]);
+let tx_args = TransactionArgs::new(AdviceMap::default()).with_note_args(note_args);
+
+let screener_with_args = client.note_screener().with_transaction_args(tx_args);
+```
 
 ### Check one note
 
