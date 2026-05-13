@@ -371,7 +371,11 @@ impl NodeRpcClient for MockRpcApi {
             })
             .collect();
 
-        Ok(NoteSyncInfo { chain_tip, block_to: page_end_block, blocks })
+        Ok(NoteSyncInfo {
+            chain_tip,
+            block_to: page_end_block,
+            blocks,
+        })
     }
 
     async fn sync_chain_mmr(
