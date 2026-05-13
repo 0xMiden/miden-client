@@ -434,11 +434,11 @@ impl PswapCreateCmd {
         let sender_id =
             get_input_acc_id_by_prefix_or_default(&client, self.sender_account_id.clone()).await?;
 
-        let faucet_details_map = load_faucet_details_map()?;
+        let resolver = load_faucet_metadata_resolver()?;
         let offered_fungible_asset =
-            faucet_details_map.parse_fungible_asset(&client, &self.offered_asset).await?;
+            resolver.parse_fungible_asset(&client, &self.offered_asset).await?;
         let requested_fungible_asset =
-            faucet_details_map.parse_fungible_asset(&client, &self.requested_asset).await?;
+            resolver.parse_fungible_asset(&client, &self.requested_asset).await?;
 
         let pswap_data =
             PswapTransactionData::new(sender_id, offered_fungible_asset, requested_fungible_asset);
