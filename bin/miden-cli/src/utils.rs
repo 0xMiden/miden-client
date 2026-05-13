@@ -2,7 +2,8 @@ use miden_client::account::AccountId;
 use miden_client::address::{Address, AddressId};
 use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
 use miden_client::transaction::{ExecutedTransaction, InputNote};
-use miden_client::{Client, Word};
+use miden_client::vm::MIN_STACK_DEPTH;
+use miden_client::{Client, Felt, WORD_SIZE, Word};
 
 use super::{CLIENT_CONFIG_FILE_NAME, create_dynamic_table, get_account_with_id_prefix};
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
@@ -196,4 +197,48 @@ pub fn print_executed_transaction(executed_tx: &ExecutedTransaction) -> Result<(
     println!("Nonce incremented by: {}.", delta.nonce_delta());
 
     Ok(())
+}
+
+/// Prints the output stack from `execute_program`.
+///
+/// If `expected_results` is `Some(n)`, prints the top `n` values. If `None`, prints up to the
+/// last non-zero value so trailing zero-padding is hidden.
+pub fn print_executed_program_stack(
+    stack: &[Felt; MIN_STACK_DEPTH],
+    expected_results: Option<usize>,
+) {
+    let count = match expected_results {
+        Some(n) => n,
+        None => stack.iter().rposition(|v| v.as_canonical_u64() != 0).map_or(0, |pos| pos + 1),
+    };
+
+    match count {
+        0 => println!("\nResult: 0"),
+        1 => println!("\nResult: {}", stack[0]),
+        _ => {
+            println!("\nResult ({count} values):");
+            for (i, val) in stack.iter().enumerate().take(count) {
+                println!("  [{i}]: {val}");
+            }
+        },
+    }
+}
+
+/// Prints the output stack as four 4-felt words with their hex encoding.
+pub fn print_executed_program_stack_hex_words(stack: &[Felt; MIN_STACK_DEPTH]) {
+    let last_word_start = MIN_STACK_DEPTH - WORD_SIZE;
+    println!("Output stack:");
+    for word_idx in (0..MIN_STACK_DEPTH).step_by(WORD_SIZE) {
+        let word_idx_end = word_idx + WORD_SIZE - 1;
+        let prefix = if word_idx == last_word_start {
+            "└──"
+        } else {
+            "├──"
+        };
+        let word = [stack[word_idx], stack[word_idx + 1], stack[word_idx + 2], stack[word_idx + 3]];
+        println!(
+            "{prefix} {word_idx:2} - {word_idx_end:2}: {word:?} ({})",
+            Word::from(word).to_hex()
+        );
+    }
 }

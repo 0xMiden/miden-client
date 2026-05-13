@@ -1,8 +1,9 @@
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::note::{NoteId, NoteInclusionProof, Nullifier};
+use miden_protocol::note::{Note, NoteHeader, NoteId, NoteInclusionProof, Nullifier};
+use miden_standards::note::NetworkAccountTarget;
 use miden_tx::utils::serde::{
     ByteReader,
     ByteWriter,
@@ -192,6 +193,9 @@ pub struct NoteUpdateTracker {
     /// Nullifiers from the same account are in execution order; ordering across different
     /// accounts is not guaranteed.
     nullifier_order: BTreeMap<Nullifier, u32>,
+    /// Account IDs tracked by this client. Used to detect if the consumer of an erased note is
+    /// tracked.
+    tracked_accounts_ids: BTreeSet<AccountId>,
 }
 
 impl NoteUpdateTracker {
@@ -209,6 +213,13 @@ impl NoteUpdateTracker {
         }
 
         tracker
+    }
+
+    /// Sets the accounts tracked by this client.
+    #[must_use]
+    pub fn with_tracked_accounts(mut self, tracked_accounts_ids: BTreeSet<AccountId>) -> Self {
+        self.tracked_accounts_ids = tracked_accounts_ids;
+        self
     }
 
     /// Creates a [`NoteUpdateTracker`] for updates related to transactions.
@@ -370,9 +381,11 @@ impl NoteUpdateTracker {
     /// The `block_num` is the block in which the creating transaction was committed.
     pub(crate) fn mark_erased_note_as_consumed(
         &mut self,
-        note_id: NoteId,
+        note_header: &NoteHeader,
         block_num: BlockNumber,
     ) -> Result<(), ClientError> {
+        let note_id = note_header.id();
+
         if let Some(output_note) = self.get_output_note_by_id(note_id)
             && !output_note.is_consumed()
             && !output_note.is_committed()
@@ -381,22 +394,63 @@ impl NoteUpdateTracker {
             output_note.nullifier_received(nullifier, block_num)?;
         }
 
+        // Extract the consumer from the `NetworkAccountTarget` attachment, only if the target
+        // is a network account and it is tracked by this client.
+        let consumer_network_account_id =
+            NetworkAccountTarget::try_from(note_header.metadata().attachment())
+                .ok()
+                .map(|t| t.target_id())
+                .filter(|id| self.tracked_accounts_ids.contains(id));
+
+        // Only create an input record when the consumer is a tracked account.
+        if let Some(consumer_id) = consumer_network_account_id {
+            self.try_insert_consumed_input_from_output(note_id, consumer_id, block_num, Some(0))?;
+        }
+
         // Also mark the corresponding input note if tracked.
         if let Some(input_note_update) = self.input_notes.get_mut(&note_id)
             && !input_note_update.inner().is_consumed()
         {
             let nullifier = input_note_update.inner().nullifier();
-            let consumer = input_note_update.inner().metadata().and_then(|m| {
-                miden_standards::note::NetworkAccountTarget::try_from(m.attachment())
-                    .ok()
-                    .map(|t| t.target_id())
-            });
-            input_note_update
-                .inner_mut()
-                .consumed_externally(nullifier, block_num, consumer)?;
+            input_note_update.inner_mut().consumed_externally(
+                nullifier,
+                block_num,
+                consumer_network_account_id,
+            )?;
             input_note_update.inner_mut().set_consumed_tx_order(Some(0));
         }
 
+        Ok(())
+    }
+
+    /// Builds a consumed input note record from a tracked output note and inserts it.
+    ///
+    /// Used when an output note is consumed externally and the client should also surface
+    /// it as a consumed input — for example, when the same client tracks both the sender
+    /// and the consumer of the note. No-op if the input is already tracked, the output is
+    /// not tracked, or the output cannot be converted to a [`Note`].
+    fn try_insert_consumed_input_from_output(
+        &mut self,
+        note_id: NoteId,
+        consumer: AccountId,
+        block_num: BlockNumber,
+        consumed_tx_order: Option<u32>,
+    ) -> Result<(), ClientError> {
+        if self.input_notes.contains_key(&note_id) {
+            return Ok(());
+        }
+        let Some(output_note) = self.output_notes.get(&note_id) else {
+            return Ok(());
+        };
+        let Ok(note) = Note::try_from(output_note.inner().clone()) else {
+            return Ok(());
+        };
+
+        let mut input_record = InputNoteRecord::from(note);
+        let nullifier = input_record.nullifier();
+        input_record.consumed_externally(nullifier, block_num, Some(consumer))?;
+        input_record.set_consumed_tx_order(consumed_tx_order);
+        self.insert_input_note(input_record, NoteUpdateType::Insert);
         Ok(())
     }
 
@@ -422,17 +476,22 @@ impl NoteUpdateTracker {
     ///    consumption by untracked accounts as well as consumption by tracked accounts whose
     ///    transactions were submitted by other client instances. If a local transaction was
     ///    processing the note and it didn't get committed, the transaction should be discarded.
+    ///
+    /// If the note is tracked as an output but not as an input (e.g. the client tracks both the
+    /// sender and the consumer), a new input record is created from the output details so the
+    /// consumption surfaces through `InputNoteReader`.
     pub(crate) fn apply_nullifiers_state_transitions<'a>(
         &mut self,
         nullifier_update: &NullifierUpdate,
         mut committed_transactions: impl Iterator<Item = &'a TransactionRecord>,
         external_consumer_account: Option<AccountId>,
     ) -> Result<(), ClientError> {
-        let order = self.get_nullifier_order(nullifier_update.nullifier);
+        let nullifier = nullifier_update.nullifier;
+        let block_num = nullifier_update.block_num;
+        let order = self.get_nullifier_order(nullifier);
+        let input_present = self.input_notes_by_nullifier.contains_key(&nullifier);
 
-        if let Some(input_note_update) =
-            self.get_input_note_update_by_nullifier(nullifier_update.nullifier)
-        {
+        if let Some(input_note_update) = self.get_input_note_update_by_nullifier(nullifier) {
             if let Some(consumer_transaction) = committed_transactions
                 .find(|t| input_note_update.inner().consumer_transaction_id() == Some(&t.id))
             {
@@ -448,19 +507,23 @@ impl NoteUpdateTracker {
                 // The note was consumed by a transaction not submitted by this client.
                 // If the consuming account is tracked, external_consumer_account will be Some.
                 input_note_update.inner_mut().consumed_externally(
-                    nullifier_update.nullifier,
-                    nullifier_update.block_num,
+                    nullifier,
+                    block_num,
                     external_consumer_account,
                 )?;
             }
             input_note_update.inner_mut().set_consumed_tx_order(order);
         }
 
-        if let Some(output_note_record) =
-            self.get_output_note_by_nullifier(nullifier_update.nullifier)
+        if let Some(output_note_record) = self.get_output_note_by_nullifier(nullifier) {
+            output_note_record.nullifier_received(nullifier, block_num)?;
+        }
+
+        if !input_present
+            && let Some(consumer) = external_consumer_account
+            && let Some(note_id) = self.output_notes_by_nullifier.get(&nullifier).copied()
         {
-            output_note_record
-                .nullifier_received(nullifier_update.nullifier, nullifier_update.block_num)?;
+            self.try_insert_consumed_input_from_output(note_id, consumer, block_num, order)?;
         }
 
         Ok(())
@@ -613,6 +676,7 @@ impl Deserializable for NoteUpdateTracker {
             input_notes_by_nullifier,
             output_notes_by_nullifier,
             nullifier_order,
+            tracked_accounts_ids: BTreeSet::new(),
         })
     }
 }

@@ -9,11 +9,16 @@ use miden_client::Client;
 use miden_client::account::component::{
     AccountComponent,
     AccountComponentMetadata,
-    AuthControlled,
     BasicFungibleFaucet,
+    BurnPolicyConfig,
+    FungibleTokenMetadata,
     InitStorageData,
     MIDEN_PACKAGE_EXTENSION,
+    MintPolicyConfig,
+    PolicyAuthority,
     StorageSlotSchema,
+    TokenName,
+    TokenPolicyManager,
 };
 use miden_client::account::{
     Account,
@@ -22,12 +27,14 @@ use miden_client::account::{
     AccountStorageMode,
     AccountType,
 };
+use miden_client::asset::TokenSymbol;
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig};
 use miden_client::keystore::Keystore;
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
 use miden_client::vm::{Package, SectionId};
 use rand::RngCore;
+use serde::Deserialize;
 use tracing::debug;
 
 use crate::commands::account::set_default_account_if_unset;
@@ -104,6 +111,14 @@ pub struct NewWalletCmd {
     /// authentication transaction.
     #[arg(long, default_value_t = false)]
     pub deploy: bool,
+    /// Seed local-only state so the wallet can be created and used for execution without a node.
+    /// Only available when built with the `testing` feature.
+    #[cfg_attr(
+        feature = "testing",
+        arg(long, default_value_t = false, conflicts_with = "deploy")
+    )]
+    #[cfg_attr(not(feature = "testing"), arg(skip = false))]
+    pub offline: bool,
 }
 
 impl NewWalletCmd {
@@ -132,6 +147,7 @@ impl NewWalletCmd {
             &package_paths,
             self.init_storage_data_path.clone(),
             self.deploy,
+            self.offline,
         )
         .await?;
 
@@ -199,6 +215,14 @@ pub struct NewAccountCmd {
     /// authentication transaction.
     #[arg(long, default_value_t = false)]
     pub deploy: bool,
+    /// Seed local-only state so the account can be created and used for execution without a node.
+    /// Only available when built with the `testing` feature.
+    #[cfg_attr(
+        feature = "testing",
+        arg(long, default_value_t = false, conflicts_with = "deploy")
+    )]
+    #[cfg_attr(not(feature = "testing"), arg(skip = false))]
+    pub offline: bool,
 }
 
 impl NewAccountCmd {
@@ -215,6 +239,7 @@ impl NewAccountCmd {
             &self.packages,
             self.init_storage_data_path.clone(),
             self.deploy,
+            self.offline,
         )
         .await?;
 
@@ -290,29 +315,68 @@ fn load_packages(
     Ok(packages)
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FungibleFaucetMetadata {
+    symbol: String,
+    decimals: u8,
+    max_supply: u64,
+    #[serde(default)]
+    name: String,
+}
+
 /// Loads the initialization storage data from an optional TOML file.
 /// If None is passed, an empty object is returned.
-fn load_init_storage_data(path: Option<&PathBuf>) -> Result<InitStorageData, CliError> {
-    if let Some(path) = &path {
-        let mut contents = String::new();
-        File::open(path)
-            .and_then(|mut f| f.read_to_string(&mut contents))
-            .map_err(|err| {
-                CliError::InitDataError(
-                    Box::new(err),
-                    format!("Failed to open init data  file {}", path.display()),
-                )
-            })?;
+fn load_init_storage_data(
+    path: Option<&PathBuf>,
+) -> Result<(InitStorageData, Option<FungibleFaucetMetadata>), CliError> {
+    let Some(path) = path else {
+        return Ok((InitStorageData::default(), None));
+    };
 
-        InitStorageData::from_toml(&contents).map_err(|err| {
+    let mut contents = String::new();
+    File::open(path)
+        .and_then(|mut f| f.read_to_string(&mut contents))
+        .map_err(|err| {
             CliError::InitDataError(
                 Box::new(err),
-                format!("Failed to deserialize init data from file {}", path.display()),
+                format!("Failed to open init data  file {}", path.display()),
             )
-        })
-    } else {
-        Ok(InitStorageData::default())
-    }
+        })?;
+
+    let mut table: toml::Table = toml::from_str(&contents).map_err(|err| {
+        CliError::InitDataError(
+            Box::new(err),
+            format!("Failed to parse init data file {} as TOML", path.display()),
+        )
+    })?;
+
+    let faucet_metadata = table
+        .remove("fungible-faucet-metadata")
+        .map(FungibleFaucetMetadata::deserialize)
+        .transpose()
+        .map_err(|err| {
+            CliError::InitDataError(
+                Box::new(err),
+                format!("Invalid `fungible-faucet-metadata` in init data file {}", path.display()),
+            )
+        })?;
+
+    let stripped = toml::to_string(&table).map_err(|err| {
+        CliError::InitDataError(
+            Box::new(err),
+            format!("Failed to re-serialize init data from file {}", path.display()),
+        )
+    })?;
+
+    let init = InitStorageData::from_toml(&stripped).map_err(|err| {
+        CliError::InitDataError(
+            Box::new(err),
+            format!("Failed to deserialize init data from file {}", path.display()),
+        )
+    })?;
+
+    Ok((init, faucet_metadata))
 }
 
 /// Separates account components into auth and regular components.
@@ -349,34 +413,72 @@ fn separate_auth_components(
     Ok((auth_component, regular_components))
 }
 
-/// Returns `true` when the CLI should inject `AuthControlled::allow_all()` for a
-/// fungible faucet account built from package components.
+/// Returns `true` when the CLI should inject a default `TokenPolicyManager` for a fungible
+/// faucet account built from package components.
 ///
 /// Why this exists:
-/// - RC fungible faucets require a mint policy manager component in addition to
+/// - Fungible faucets require a token policy manager (with mint and burn policies) in addition to
 ///   `BasicFungibleFaucet`.
 /// - The CLI's built-in `basic-fungible-faucet` package only contributes the faucet component
-///   itself; it does not include `AuthControlled`.
-/// - Other faucet creation paths in this repo add `AuthControlled::allow_all()` explicitly, so the
-///   CLI adds it implicitly here to preserve the same behavior and keep the old UX working.
+///   itself; it does not include a `TokenPolicyManager`.
+/// - Other faucet creation paths in this repo install a manager configured with `AllowAll` mint and
+///   burn policies explicitly, so the CLI adds the same configuration implicitly here to preserve
+///   behavior and keep the old UX working.
 ///
 /// What it does:
 /// - only applies to `AccountType::FungibleFaucet`,
 /// - only triggers when `BasicFungibleFaucet` is present,
-/// - and skips injection if an `AuthControlled` component is already present so user-provided mint
-///   policy components are not duplicated or overridden.
-fn should_add_implicit_auth_controlled(
+/// - and skips injection if a `TokenPolicyManager` component is already present so user-provided
+///   policy configurations are not duplicated or overridden.
+fn should_add_implicit_token_policy_manager(
     account_type: AccountType,
     regular_components: &[AccountComponent],
 ) -> bool {
     let has_basic_fungible_faucet = regular_components
         .iter()
         .any(|component| component.metadata().name() == BasicFungibleFaucet::NAME);
-    let has_auth_controlled = regular_components
+    let has_token_policy_manager = regular_components
         .iter()
-        .any(|component| component.metadata().name() == AuthControlled::NAME);
+        .any(|component| component.metadata().name() == TokenPolicyManager::NAME);
 
-    account_type == AccountType::FungibleFaucet && has_basic_fungible_faucet && !has_auth_controlled
+    account_type == AccountType::FungibleFaucet
+        && has_basic_fungible_faucet
+        && !has_token_policy_manager
+}
+
+fn should_add_implicit_fungible_token_metadata(
+    account_type: AccountType,
+    regular_components: &[AccountComponent],
+) -> bool {
+    const FUNGIBLE_TOKEN_METADATA_NAME: &str =
+        "miden::standards::components::faucets::fungible_token_metadata";
+
+    let has_basic_fungible_faucet = regular_components
+        .iter()
+        .any(|component| component.metadata().name() == BasicFungibleFaucet::NAME);
+    let has_metadata = regular_components
+        .iter()
+        .any(|component| component.metadata().name() == FUNGIBLE_TOKEN_METADATA_NAME);
+
+    account_type == AccountType::FungibleFaucet && has_basic_fungible_faucet && !has_metadata
+}
+
+fn build_fungible_token_metadata(
+    metadata: &FungibleFaucetMetadata,
+) -> Result<AccountComponent, CliError> {
+    let symbol = TokenSymbol::new(&metadata.symbol).map_err(|err| {
+        CliError::InvalidArgument(format!("invalid token symbol `{}`: {err}", metadata.symbol))
+    })?;
+    let name = TokenName::new(&metadata.name).map_err(|err| {
+        CliError::InvalidArgument(format!("invalid token name `{}`: {err}", metadata.name))
+    })?;
+    let token_metadata =
+        FungibleTokenMetadata::builder(name, symbol, metadata.decimals, metadata.max_supply)
+            .build()
+            .map_err(|err| {
+                CliError::InvalidArgument(format!("failed to build fungible token metadata: {err}"))
+            })?;
+    Ok(token_metadata.into())
 }
 
 /// Helper function to create the seed, initialize the account builder, add the given components,
@@ -391,6 +493,7 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     package_paths: &[PathBuf],
     init_storage_data_path: Option<PathBuf>,
     deploy: bool,
+    offline: bool,
 ) -> Result<Account, CliError> {
     if package_paths.is_empty() {
         return Err(CliError::InvalidArgument(format!(
@@ -406,7 +509,8 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     let packages = load_packages(&cli_config, package_paths)?;
     debug!("Loaded {} packages", packages.len());
     debug!("Loading initialization storage data...");
-    let init_storage_data = load_init_storage_data(init_storage_data_path.as_ref())?;
+    let (init_storage_data, faucet_metadata) =
+        load_init_storage_data(init_storage_data_path.as_ref())?;
     debug!("Loaded initialization storage data");
 
     let mut init_seed = [0u8; 32];
@@ -420,12 +524,25 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     let account_components = process_packages(packages, &init_storage_data)?;
     let (auth_component, mut regular_components) = separate_auth_components(account_components)?;
 
-    // Faucet accounts require a mint policy manager component. The CLI's standard
+    // Faucet accounts require a token policy manager component. The CLI's standard
     // `basic-fungible-faucet` package only provides the faucet component itself, so add the
     // default `allow_all` policy manager implicitly.
-    if should_add_implicit_auth_controlled(account_type, &regular_components) {
-        debug!("Adding implicit AuthControlled mint policy component for fungible faucet");
-        regular_components.push(AuthControlled::allow_all().into());
+    if should_add_implicit_token_policy_manager(account_type, &regular_components) {
+        debug!("Adding implicit TokenPolicyManager component for fungible faucet");
+        regular_components.extend(TokenPolicyManager::new(
+            PolicyAuthority::AuthControlled,
+            MintPolicyConfig::AllowAll,
+            BurnPolicyConfig::AllowAll,
+        ));
+    }
+    if should_add_implicit_fungible_token_metadata(account_type, &regular_components) {
+        let metadata = faucet_metadata.ok_or_else(|| {
+            CliError::InvalidArgument(
+                "fungible-faucet accounts require a [fungible-faucet-metadata] block (with `symbol`, `decimals`, `max_supply`) in the init data file passed via -i".into(),
+            )
+        })?;
+        debug!("Adding implicit FungibleTokenMetadata component for fungible faucet");
+        regular_components.push(build_fungible_token_metadata(&metadata)?);
     }
 
     // Add the auth component (either from packages or default Falcon)
@@ -459,6 +576,14 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
         println!("Generated and stored Falcon512 authentication key in keystore.");
     } else {
         println!("Using custom authentication component from package (no key generated).");
+    }
+
+    let _ = offline;
+
+    #[cfg(feature = "testing")]
+    if offline {
+        client.prepare_offline_bootstrap().await?;
+        println!("Offline mode seeded default RPC limits and a synthetic genesis header.");
     }
 
     client.add_account(&account, false).await?;
@@ -571,46 +696,40 @@ fn process_packages(
 
 #[cfg(test)]
 mod tests {
-    use miden_client::Felt;
     use miden_client::account::component::BasicWallet;
-    use miden_client::asset::TokenSymbol;
 
     use super::*;
 
     #[test]
-    fn implicit_auth_controlled_is_added_for_basic_faucet_accounts() {
-        let regular_components = vec![
-            BasicFungibleFaucet::new(TokenSymbol::new("BTC").unwrap(), 10, Felt::new(1_000_000))
-                .unwrap()
-                .into(),
-        ];
+    fn implicit_token_policy_manager_is_added_for_basic_faucet_accounts() {
+        let regular_components = vec![BasicFungibleFaucet.into()];
 
-        assert!(should_add_implicit_auth_controlled(
+        assert!(should_add_implicit_token_policy_manager(
             AccountType::FungibleFaucet,
             &regular_components
         ));
     }
 
     #[test]
-    fn implicit_auth_controlled_is_skipped_when_component_already_present() {
-        let regular_components = vec![
-            BasicFungibleFaucet::new(TokenSymbol::new("BTC").unwrap(), 10, Felt::new(1_000_000))
-                .unwrap()
-                .into(),
-            AuthControlled::allow_all().into(),
-        ];
+    fn implicit_token_policy_manager_is_skipped_when_component_already_present() {
+        let mut regular_components: Vec<AccountComponent> = vec![BasicFungibleFaucet.into()];
+        regular_components.extend(TokenPolicyManager::new(
+            PolicyAuthority::AuthControlled,
+            MintPolicyConfig::AllowAll,
+            BurnPolicyConfig::AllowAll,
+        ));
 
-        assert!(!should_add_implicit_auth_controlled(
+        assert!(!should_add_implicit_token_policy_manager(
             AccountType::FungibleFaucet,
             &regular_components
         ));
     }
 
     #[test]
-    fn implicit_auth_controlled_is_not_added_for_non_faucet_accounts() {
+    fn implicit_token_policy_manager_is_not_added_for_non_faucet_accounts() {
         let regular_components = vec![AccountComponent::from(BasicWallet)];
 
-        assert!(!should_add_implicit_auth_controlled(
+        assert!(!should_add_implicit_token_policy_manager(
             AccountType::RegularAccountImmutableCode,
             &regular_components
         ));

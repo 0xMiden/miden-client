@@ -10,8 +10,7 @@ use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::{Forest, Mmr, MmrProof};
-use miden_protocol::crypto::merkle::smt::SmtProof;
-use miden_protocol::note::{NoteHeader, NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::note::{NoteHeader, NoteId, NoteScript, NoteTag};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
@@ -61,6 +60,8 @@ pub struct MockRpcApi {
     account_commitment_updates: Arc<RwLock<BTreeMap<BlockNumber, BTreeMap<AccountId, Word>>>>,
     pub mock_chain: Arc<RwLock<MockChain>>,
     oversize_threshold: usize,
+    /// Note headers to report as erased in sync transaction responses.
+    erased_notes: Arc<RwLock<Vec<NoteHeader>>>,
 }
 
 impl Default for MockRpcApi {
@@ -79,6 +80,7 @@ impl MockRpcApi {
             account_commitment_updates: Arc::new(RwLock::new(build_account_updates(&mock_chain))),
             mock_chain: Arc::new(RwLock::new(mock_chain)),
             oversize_threshold: 1000,
+            erased_notes: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
@@ -89,6 +91,11 @@ impl MockRpcApi {
     pub fn with_oversize_threshold(mut self, threshold: usize) -> Self {
         self.oversize_threshold = threshold;
         self
+    }
+
+    /// Registers a note header to be reported as erased in subsequent sync transaction responses.
+    pub fn mark_note_as_erased(&self, header: NoteHeader) {
+        self.erased_notes.write().push(header);
     }
 
     /// Returns the current MMR of the blockchain.
@@ -203,11 +210,13 @@ impl MockRpcApi {
                     continue;
                 }
 
+                let erased_output_notes = self.erased_notes.read().clone();
+
                 transaction_records.push(TransactionRecord {
                     block_num: block_number,
                     transaction_header: transaction_header.clone(),
                     output_notes: vec![],
-                    erased_output_note_ids: vec![],
+                    erased_output_notes,
                 });
             }
         }
@@ -327,15 +336,18 @@ impl NodeRpcClient for MockRpcApi {
     ) -> Result<NoteSyncInfo, RpcError> {
         let chain_tip = self.get_chain_tip_block_num();
         let upper_bound = block_to.unwrap_or(chain_tip);
+        let page_end_block: BlockNumber = (block_num.as_u32() + Self::PAGINATION_BLOCK_LIMIT)
+            .min(upper_bound.as_u32())
+            .into();
 
-        // Collect all blocks with matching notes in the range [block_num, upper_bound]
+        // Collect all blocks with matching notes in the range [block_num, page_end_block]
         let mut blocks_with_notes: BTreeMap<BlockNumber, BTreeMap<NoteId, CommittedNote>> =
             BTreeMap::new();
         for note in self.mock_chain.read().committed_notes().values() {
             let note_block = note.inclusion_proof().location().block_num();
             if note_tags.contains(&note.metadata().tag())
                 && note_block >= block_num
-                && note_block <= upper_bound
+                && note_block <= page_end_block
             {
                 let committed = CommittedNote::new(
                     note.id(),
@@ -346,6 +358,10 @@ impl NodeRpcClient for MockRpcApi {
             }
         }
 
+        // Always include the page-end block (with empty notes if needed) so callers can observe
+        // pagination progress even if no note matched that block.
+        blocks_with_notes.entry(page_end_block).or_default();
+
         let blocks: Vec<NoteSyncBlock> = blocks_with_notes
             .into_iter()
             .map(|(bn, notes)| {
@@ -355,11 +371,7 @@ impl NodeRpcClient for MockRpcApi {
             })
             .collect();
 
-        // `block_to` is the last block actually checked. When `blocks` is empty, fall back to
-        // `upper_bound` to signal that the full range was scanned.
-        let block_to = blocks.last().map_or(upper_bound, |b| b.block_header.block_num());
-
-        Ok(NoteSyncInfo { chain_tip, block_to, blocks })
+        Ok(NoteSyncInfo { chain_tip, block_to: page_end_block, blocks })
     }
 
     async fn sync_chain_mmr(
@@ -615,14 +627,6 @@ impl NodeRpcClient for MockRpcApi {
         Ok(nullifiers)
     }
 
-    /// Returns proofs for all the provided nullifiers.
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        Ok(nullifiers
-            .iter()
-            .map(|nullifier| self.mock_chain.read().nullifier_tree().open(nullifier).into_proof())
-            .collect())
-    }
-
     async fn get_block_by_number(
         &self,
         block_num: BlockNumber,
@@ -644,7 +648,7 @@ impl NodeRpcClient for MockRpcApi {
         let note = self
             .get_available_notes()
             .iter()
-            .find(|note| note.note().is_some_and(|n| n.script().root() == root))
+            .find(|note| note.note().is_some_and(|n| Word::from(n.script().root()) == root))
             .unwrap()
             .clone();
 

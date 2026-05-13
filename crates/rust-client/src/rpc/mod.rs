@@ -57,7 +57,6 @@ use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
-use miden_protocol::crypto::merkle::smt::SmtProof;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 
@@ -229,7 +228,9 @@ pub trait NodeRpcClient: Send + Sync {
             chain_tip = note_sync.chain_tip;
             cursor = note_sync.block_to + 1;
             let range_end = block_to.unwrap_or(chain_tip);
-            let done = note_sync.blocks.is_empty() || cursor >= range_end;
+            // `range_end` is inclusive, so after advancing the cursor, equality means
+            // the final block is still the next page to fetch.
+            let done = note_sync.blocks.is_empty() || cursor > range_end;
             all_blocks.extend(note_sync.blocks);
 
             if done {
@@ -285,10 +286,6 @@ pub trait NodeRpcClient: Send + Sync {
         block_num: BlockNumber,
         block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
-
-    /// Fetches the nullifier proofs corresponding to a list of nullifiers using the
-    /// `/CheckNullifiers` RPC endpoint.
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError>;
 
     /// Fetches the account proof and optionally its details from the node, using the
     /// `GetAccountProof` endpoint.
@@ -406,8 +403,14 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the note script with the specified root.
     ///
+    /// Implementations must verify that the returned script's root matches the requested
+    /// `root` and return [`RpcError::InvalidResponse`] otherwise; callers may rely on this
+    /// invariant.
+    ///
     /// Errors:
     /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
+    /// - [`RpcError::InvalidResponse`] if the node returns a script whose root does not match the
+    ///   requested `root`.
     async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError>;
 
     /// Fetches storage map updates for specified account and storage slots within a block range,
@@ -487,7 +490,6 @@ pub trait NodeRpcClient: Send + Sync {
 #[derive(Debug, Clone, Copy)]
 pub enum RpcEndpoint {
     Status,
-    CheckNullifiers,
     SyncNullifiers,
     GetAccount,
     GetBlockByNumber,
@@ -510,7 +512,6 @@ impl RpcEndpoint {
     pub fn proto_name(&self) -> &'static str {
         match self {
             RpcEndpoint::Status => "Status",
-            RpcEndpoint::CheckNullifiers => "CheckNullifiers",
             RpcEndpoint::SyncNullifiers => "SyncNullifiers",
             RpcEndpoint::GetAccount => "GetAccount",
             RpcEndpoint::GetBlockByNumber => "GetBlockByNumber",
@@ -534,7 +535,6 @@ impl fmt::Display for RpcEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RpcEndpoint::Status => write!(f, "status"),
-            RpcEndpoint::CheckNullifiers => write!(f, "check_nullifiers"),
             RpcEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
             },
