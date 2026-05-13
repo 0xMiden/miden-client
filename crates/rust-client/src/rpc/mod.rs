@@ -230,7 +230,12 @@ pub trait NodeRpcClient: Send + Sync {
             let range_end = block_to.unwrap_or(chain_tip);
             // `range_end` is inclusive, so after advancing the cursor, equality means
             // the final block is still the next page to fetch.
-            let done = note_sync.blocks.is_empty() || cursor > range_end;
+            //
+            // Do NOT check `blocks.is_empty()` here: an empty page just means no
+            // matching notes in that page's block range. The note may exist in a
+            // later page. Early-terminating on empty pages causes intermittent note
+            // discovery failures (see #2175).
+            let done = cursor > range_end;
             all_blocks.extend(note_sync.blocks);
 
             if done {
