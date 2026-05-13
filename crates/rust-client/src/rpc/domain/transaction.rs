@@ -77,48 +77,6 @@ pub struct TransactionInclusion {
     pub erased_output_notes: Vec<NoteHeader>,
 }
 
-// TRANSACTIONS INFO
-// ================================================================================================
-
-/// Represent a list of transaction records that were included in a range of blocks.
-#[derive(Debug, Clone)]
-pub struct TransactionsInfo {
-    /// Current chain tip
-    pub chain_tip: BlockNumber,
-    /// The block number of the last check included in this response.
-    pub block_num: BlockNumber,
-    /// List of transaction records.
-    pub transaction_records: Vec<TransactionRecord>,
-}
-
-impl TryFrom<proto::rpc::SyncTransactionsResponse> for TransactionsInfo {
-    type Error = RpcError;
-
-    fn try_from(value: proto::rpc::SyncTransactionsResponse) -> Result<Self, Self::Error> {
-        let pagination_info = value.pagination_info.ok_or(
-            RpcConversionError::MissingFieldInProtobufRepresentation {
-                entity: "SyncTransactionsResponse",
-                field_name: "pagination_info",
-            },
-        )?;
-
-        let chain_tip = pagination_info.chain_tip.into();
-        let block_num = pagination_info.block_num.into();
-
-        let transaction_records = value
-            .transactions
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<TransactionRecord>, RpcError>>()?;
-
-        Ok(Self {
-            chain_tip,
-            block_num,
-            transaction_records,
-        })
-    }
-}
-
 // TRANSACTION RECORD
 // ================================================================================================
 
