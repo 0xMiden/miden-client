@@ -122,6 +122,7 @@ pub use request::{
     ForeignAccount,
     NoteArgs,
     PaymentNoteDescription,
+    PswapTransactionData,
     SwapTransactionData,
     TransactionRequest,
     TransactionRequestBuilder,

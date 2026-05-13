@@ -19,7 +19,7 @@ use miden_client::auth::{
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::note::{BlockNumber, NoteId};
-use miden_client::rpc::{NodeRpcClient, RpcLimits};
+use miden_client::rpc::NodeRpcClient;
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{
     AccountStorageFilter,
@@ -50,6 +50,7 @@ use miden_client::testing::mock::{MockClient, MockRpcApi};
 use miden_client::transaction::{
     DiscardCause,
     PaymentNoteDescription,
+    PswapTransactionData,
     SwapTransactionData,
     TransactionExecutorError,
     TransactionRequestBuilder,
@@ -80,6 +81,7 @@ use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
 use miden_protocol::note::{
     Note,
     NoteAssets,
+    NoteAttachment,
     NoteFile,
     NoteMetadata,
     NoteRecipient,
@@ -111,12 +113,13 @@ use miden_standards::account::policies::{
     TokenPolicyManager,
 };
 use miden_standards::account::wallets::BasicWallet;
-use miden_standards::note::{NoteConsumptionStatus, P2idNoteStorage, StandardNote};
+use miden_standards::note::{NoteConsumptionStatus, P2idNoteStorage, PswapNote, StandardNote};
 use miden_standards::testing::mock_account::MockAccountExt;
 use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
+use rstest::rstest;
 
 mod batch;
 pub mod store;
@@ -2701,6 +2704,226 @@ async fn partial_output_note_receives_inclusion_proof_after_sync() {
     );
 }
 
+// Verifies that Alice can create a PSWAP note offering ETH for USD, and Bob can fill it. With
+// a full fill (`account_fill_amount == requested_amount`) no remainder is produced; with a
+// partial fill, Bob receives a proportional payout and a remainder PSWAP note is produced
+// carrying the unfilled amounts.
+#[rstest]
+#[case::full_fill(100, 50, 50, 100, None)]
+#[case::partial_fill(100, 50, 25, 50, Some((50, 25)))]
+#[tokio::test]
+async fn pswap_fill_test(
+    #[case] offered_amount: u64,
+    #[case] requested_amount: u64,
+    #[case] account_fill_amount: u64,
+    #[case] expected_payout: u64,
+    #[case] expected_remainder: Option<(u64, u64)>,
+) {
+    let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
+
+    // Setup Alice's wallet and the ETH faucet (offered asset).
+    let (alice_wallet, eth_faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    // Setup Bob's wallet and the USD faucet (requested asset).
+    let (bob_wallet, usd_faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    mint_and_consume(&mut client, alice_wallet.id(), eth_faucet.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    mint_and_consume(&mut client, bob_wallet.id(), usd_faucet.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Step 1: Alice creates a PSWAP note offering ETH for USD.
+    let pswap_data = PswapTransactionData::new(
+        alice_wallet.id(),
+        FungibleAsset::new(eth_faucet.id(), offered_amount).unwrap(),
+        FungibleAsset::new(usd_faucet.id(), requested_amount).unwrap(),
+    );
+
+    let create_request = TransactionRequestBuilder::new()
+        .build_pswap_create(
+            &pswap_data,
+            NoteType::Private,
+            NoteType::Private,
+            NoteAttachment::default(),
+            client.rng(),
+        )
+        .unwrap();
+
+    let pswap_note = create_request.expected_output_own_notes()[0].clone();
+    Box::pin(client.submit_new_transaction(alice_wallet.id(), create_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Alice's ETH balance should decrease by the full offered amount regardless of fill.
+    let alice_account = client.get_account(alice_wallet.id()).await.unwrap().unwrap();
+    assert_eq!(
+        alice_account.vault().get_balance(eth_faucet.id()).unwrap(),
+        MINT_AMOUNT - offered_amount,
+        "Alice's ETH balance should decrease by the offered amount"
+    );
+
+    // Step 2: Bob fills the PSWAP note.
+    let consume_request = TransactionRequestBuilder::new()
+        .build_pswap_consume(&pswap_note, bob_wallet.id(), account_fill_amount, 0)
+        .unwrap();
+
+    Box::pin(client.submit_new_transaction(bob_wallet.id(), consume_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    let bob_account = client.get_account(bob_wallet.id()).await.unwrap().unwrap();
+
+    // Bob spent exactly the fill amount — proves NOTE_ARGS were honored (a wrong layout would
+    // fall back to the script's full-fill default path).
+    assert_eq!(
+        bob_account.vault().get_balance(usd_faucet.id()).unwrap(),
+        MINT_AMOUNT - account_fill_amount,
+        "Bob's USD balance should decrease by exactly the fill amount"
+    );
+
+    // Bob received the proportional payout.
+    assert_eq!(
+        bob_account.vault().get_balance(eth_faucet.id()).unwrap(),
+        expected_payout,
+        "Bob should have received the expected ETH payout"
+    );
+
+    // The remainder note is produced only on partial fills.
+    let all_notes = client.get_input_notes(NoteFilter::All).await.unwrap();
+    let remainder = all_notes.iter().find_map(|record| {
+        let note: Note = record.try_into().ok()?;
+        if note.id() == pswap_note.id() {
+            return None;
+        }
+        PswapNote::try_from(&note).ok()
+    });
+
+    match expected_remainder {
+        Some((rem_offered, rem_requested)) => {
+            let remainder =
+                remainder.expect("remainder PSWAP note should exist after partial fill");
+            assert_eq!(
+                remainder.offered_asset().amount(),
+                rem_offered,
+                "remainder offered amount should reflect the unfilled portion"
+            );
+            assert_eq!(
+                remainder.storage().requested_asset_amount(),
+                rem_requested,
+                "remainder requested amount should reflect the unfilled portion"
+            );
+        },
+        None => {
+            assert!(remainder.is_none(), "no remainder PSWAP note should exist after a full fill");
+        },
+    }
+}
+
+#[tokio::test]
+async fn pswap_cancel_test() {
+    // This test verifies that:
+    // 1. Alice creates a PSWAP note (balance decreases).
+    // 2. Alice cancels the PSWAP note (balance restored).
+
+    let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
+
+    let (alice_wallet, eth_faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    let (_bob_wallet, usd_faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    mint_and_consume(&mut client, alice_wallet.id(), eth_faucet.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Step 1: Alice creates a PSWAP note offering ETH for USD.
+    let offered_amount = 100u64;
+    let requested_amount = 50u64;
+    let pswap_data = PswapTransactionData::new(
+        alice_wallet.id(),
+        FungibleAsset::new(eth_faucet.id(), offered_amount).unwrap(),
+        FungibleAsset::new(usd_faucet.id(), requested_amount).unwrap(),
+    );
+
+    let create_request = TransactionRequestBuilder::new()
+        .build_pswap_create(
+            &pswap_data,
+            NoteType::Private,
+            NoteType::Private,
+            NoteAttachment::default(),
+            client.rng(),
+        )
+        .unwrap();
+
+    let pswap_note = create_request.expected_output_own_notes()[0].clone();
+    Box::pin(client.submit_new_transaction(alice_wallet.id(), create_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Alice's balance decreased after creating the PSWAP note.
+    let alice_account = client.get_account(alice_wallet.id()).await.unwrap().unwrap();
+    assert_eq!(
+        alice_account.vault().get_balance(eth_faucet.id()).unwrap(),
+        MINT_AMOUNT - offered_amount,
+        "Alice's ETH balance should decrease by the offered amount"
+    );
+
+    // Step 2: Alice cancels the PSWAP note.
+    let cancel_request = TransactionRequestBuilder::new()
+        .build_pswap_cancel(pswap_note, alice_wallet.id())
+        .unwrap();
+
+    Box::pin(client.submit_new_transaction(alice_wallet.id(), cancel_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Alice's balance is restored after canceling the PSWAP note.
+    let alice_account = client.get_account(alice_wallet.id()).await.unwrap().unwrap();
+    assert_eq!(
+        alice_account.vault().get_balance(eth_faucet.id()).unwrap(),
+        MINT_AMOUNT,
+        "Alice's ETH balance should be fully restored after canceling the PSWAP note"
+    );
+}
+
 #[tokio::test]
 async fn empty_storage_map() {
     let (mut client, _, keystore) = create_test_client().await;
@@ -3132,62 +3355,6 @@ async fn consume_note_with_custom_script() {
 
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
-}
-
-#[tokio::test]
-async fn add_note_tag_fails_if_note_tag_limit_is_exceeded() {
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
-    let note_tags_limit = RpcLimits::default().note_tags_limit;
-
-    // add note tags until the limit is exceeded
-    for i in 0..note_tags_limit {
-        client.add_note_tag(NoteTag::from(i)).await.unwrap();
-    }
-
-    // try to add a note tag
-    let tag = NoteTag::from(note_tags_limit);
-    let result = client.add_note_tag(tag).await;
-
-    assert!(matches!(result, Err(ClientError::NoteTagsLimitExceeded(_))));
-}
-
-#[tokio::test]
-async fn add_account_fails_if_accounts_limit_is_exceeded() {
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
-
-    // add accounts until the limit is exceeded
-    for i in 0..RpcLimits::default().account_ids_limit {
-        // first 7 bits are used for metadata so we shift by 8 bits to get distinct ids
-        client
-            .add_account(
-                &Account::mock(
-                    (i << 8).into(),
-                    AuthSingleSig::new(
-                        PublicKeyCommitment::from(EMPTY_WORD),
-                        AuthSchemeId::Falcon512Poseidon2,
-                    ),
-                ),
-                false,
-            )
-            .await
-            .unwrap();
-    }
-
-    // try to add an account
-    let result = client
-        .add_account(
-            &Account::mock(
-                (RpcLimits::default().account_ids_limit << 8).into(),
-                AuthSingleSig::new(
-                    PublicKeyCommitment::from(EMPTY_WORD),
-                    AuthSchemeId::Falcon512Poseidon2,
-                ),
-            ),
-            false,
-        )
-        .await;
-
-    assert!(matches!(result, Err(ClientError::AccountsLimitExceeded(_))));
 }
 
 // PAGINATION TESTS

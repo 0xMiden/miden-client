@@ -55,7 +55,6 @@ where
     /// # Errors
     ///
     /// - If an attempt is made to overwrite a note that is currently processing.
-    /// - If the client has reached the note tags limit.
     ///
     /// Note: This operation is atomic. If any note file is invalid or any existing note is in the
     /// processing state, the entire operation fails and no notes are imported.
@@ -128,7 +127,9 @@ where
             imported_note_ids.push(note.id());
             if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) = note.state()
             {
-                self.insert_note_tag(NoteTagRecord::with_note_source(*tag, note.id())).await?;
+                self.store
+                    .add_note_tag(NoteTagRecord::with_note_source(*tag, note.id()))
+                    .await?;
             }
             self.store.upsert_input_notes(&[note]).await?;
         }
@@ -285,7 +286,8 @@ where
                 } else {
                     // If the note is in the future we import it as unverified. We add the note tag
                     // so that the note is verified naturally in the next sync.
-                    self.insert_note_tag(NoteTagRecord::with_note_source(tag, note_record.id()))
+                    self.store
+                        .add_note_tag(NoteTagRecord::with_note_source(tag, note_record.id()))
                         .await?;
                 }
 
@@ -385,7 +387,7 @@ where
 
         let sync_result = self
             .rpc_api
-            .sync_notes_with_details(request_block_num, Some(current_block_num), &tracked_tags)
+            .sync_notes_with_details(request_block_num, current_block_num, &tracked_tags)
             .await
             .map_err(ClientError::RpcError)?;
 

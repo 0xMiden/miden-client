@@ -171,10 +171,6 @@ pub enum ClientError {
     TransactionScriptError(#[source] TransactionScriptError),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
-    #[error("cannot track more note tags: the maximum of {0} tracked tags has been reached")]
-    NoteTagsLimitExceeded(u32),
-    #[error("cannot track more accounts: the maximum of {0} tracked accounts has been reached")]
-    AccountsLimitExceeded(u32),
     #[error("expected full account data for account {0}, but only partial data is available")]
     AccountRecordNotFull(AccountId),
     #[error("expected partial account data for account {0}, but full data was found")]
