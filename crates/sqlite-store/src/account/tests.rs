@@ -1861,6 +1861,7 @@ async fn watch_only_status_survives_state_replacement() -> anyhow::Result<()> {
         .build_existing()?;
     let account_id = account.id();
     store.insert_account(&account, Address::new(account_id)).await?;
+    store.set_account_watch_only(account_id, true).await?;
 
     // Bump the account's nonce and run it through update_account.
     let mut updated = account.clone();
