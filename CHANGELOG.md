@@ -1,6 +1,29 @@
 # Changelog
 
+## 0.14.8 (Unreleased)
+
+### Fixes
+
+* [FIX][rust] `Client::send_private_note` is now durable across transient NTL failures. The relay outbox — a `Vec<NoteInfo>` of private notes whose chain transaction committed but whose transport delivery has not yet succeeded — is persisted under a single `note_transport_outbox` key in the existing `settings` k/v before invoking the transport. On `send_note` success the entry is removed; on failure it stays queued and `Client::sync_state` retries it on every subsequent sync (the receiver dedups by note id). Previously a single transient `send_note` rejection would permanently lose the private note — the chain transaction had already committed, the sender's vault was debited, and the recipient never learned of the note. New `Client::flush_relay_outbox()` lets callers drive retries without a full sync cycle ([#2127](https://github.com/0xMiden/miden-client/pull/2127)).
+
+## 0.14.7 (2026-06-05)
+
+### Enhancements
+
+* [FEATURE][rust] Added `GrpcClient::with_bearer_auth(token)` to attach an `authorization: Bearer <token>` header to every outbound gRPC call, for use behind authenticating gateways. Tokens are validated at connection time and preserved across `set_genesis_commitment` updates ([#2101](https://github.com/0xMiden/miden-client/pull/2101)).
+
+## 0.14.6 (2026-05-05)
+
+### Fixes
+
+* [FIX] When the client submits a network note and it is also tracking the recipient network account, now the `InputNoteReader` detects the consumed note ([#2113](https://github.com/0xMiden/miden-client/pull/2113)).
+* Changed note transport integration tests to validate note ids and avoid matching with existing notes when running against testnet ([#2148](https://github.com/0xMiden/miden-client/pull/2148)).
+
 ## 0.14.5 (2026-04-27)
+
+### Breaking Changes
+
+* [BREAKING][behavior][rust,web] `CodeBuilder::compile_note_script` now expects a library module with a single procedure annotated `@note_script` (e.g. `@note_script\npub proc main\n    ...\nend`) instead of a `begin..end` program. Inherited from `miden-standards` 0.14.5, which switched the underlying call from `assemble_program` to `assemble_library` ([#2128](https://github.com/0xMiden/miden-client/pull/2128)).
 
 ### Enhancements
 
@@ -8,7 +31,7 @@
 
 ### Fixes
 
-* [FIX][rust] `Client::send_private_note` is now durable across transient NTL failures. The relay outbox — a `Vec<NoteInfo>` of private notes whose chain transaction committed but whose transport delivery has not yet succeeded — is persisted under a single `note_transport_outbox` key in the existing `settings` k/v before invoking the transport. On `send_note` success the entry is removed; on failure it stays queued and `Client::sync_state` retries it on every subsequent sync (the receiver dedups by note id). Previously a single transient `send_note` rejection would permanently lose the private note — the chain transaction had already committed, the sender's vault was debited, and the recipient never learned of the note. New `Client::flush_relay_outbox()` lets callers drive retries without a full sync cycle ([#2127](https://github.com/0xMiden/miden-client/pull/2127)).
+* [FIX][web] Stopped the wasm-bindgen-generated array constructors (`NoteArray`, `OutputNoteArray`, `NoteAndArgsArray`, `NoteRecipientArray`, `StorageSlotArray`, `TransactionScriptInputPairArray`, `FeltArray`, `AccountIdArray`, `AccountArray`, `ForeignAccountArray`, `NoteIdAndArgsArray`) from silently moving each input element's underlying Rust value out of the caller's JS handle. The default `pub fn new(elements: Option<Vec<T>>)` path took every element by value via wasm-bindgen's `Vec<T>` ABI: the JS handle's `__wbg_ptr` was left unchanged so the object looked fine, but any subsequent method on it panicked inside WASM with the opaque `"null pointer passed to rust"` error. The auto-generated array exports are now overridden in `js/index.js` with thin wrappers that build the same array via `push(&T)` (which already borrows + clones) so callers can keep using the originals after construction. Same pattern applied to `replaceAt` on the Rust side, which now takes `elem: &T` instead of `elem: T`. Repro: `const note = new Note(...); new NoteArray([note]); note.id();` — used to panic, now succeeds.
 * [FIX][rust] Fixed source manager mismatch panic (`invalid source span: starting byte is out of bounds`) in tests that compiled scripts with a standalone `SourceManager` and then executed them through the client. Test helpers now use `TransactionKernel::assembler_with_source_manager()` and the client's shared source manager ([#2047](https://github.com/0xMiden/miden-client/pull/2047)).
 * [FIX][react] Fixed `initializeSignerAccount` (the external-keystore init path used by `MidenFiSignerProvider`, Para, Turnkey, etc.) throwing `"invalid enum value passed"` on first connect. The code reached for `AuthScheme.AuthEcdsaK256Keccak`, which only exists on the internal wasm-bindgen `AuthScheme` enum, not on the public string-valued `AuthScheme` constant exported from `@miden-sdk/miden-sdk/lazy` — at runtime it resolved to `undefined`, and passing `undefined` to `AccountComponent.createAuthComponentFromCommitment` failed at the wasm boundary. `initializeSignerAccount` now calls `resolveAuthScheme(AuthScheme.ECDSA)`, where `resolveAuthScheme` is a newly-public helper from `@miden-sdk/miden-sdk` that converts the string constants to the numeric wasm-bindgen variant.
 * [FIX][react] `DEFAULTS.AUTH_SCHEME` was being initialized to `AuthScheme.AuthRpoFalcon512` — another nonexistent key on the public `AuthScheme`, silently resolving to `undefined`. Now set to `AuthScheme.Falcon`. The four hooks that read this default (`useCreateWallet`, `useCreateFaucet`, `useImportAccount`, `useSessionAccount`) now pipe the value through `resolveAuthScheme(...)` before handing it to the wasm-bindgen `newWallet` / `newFaucet` / `importPublicAccountFromSeed` calls. The public hook option types stay `authScheme?: AuthScheme`, which now correctly means `"falcon" | "ecdsa"`.

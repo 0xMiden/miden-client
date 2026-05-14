@@ -576,11 +576,11 @@ async fn cli_export_import_account() -> Result<()> {
     for stored_pk_commitment in faucet_pks {
         let matching_secret_key = cli_keystore.get_key_sync(stored_pk_commitment).unwrap();
         assert!(matching_secret_key.is_some());
-        assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
+        assert_eq!(matching_secret_key.unwrap().public_key().to_commitment(), stored_pk_commitment);
 
         let public_key = cli_keystore.get_public_key(stored_pk_commitment).await;
         assert!(public_key.is_some());
-        assert!(public_key.unwrap().to_commitment() == stored_pk_commitment);
+        assert_eq!(public_key.unwrap().to_commitment(), stored_pk_commitment);
     }
 
     let wallet_pks = cli_keystore
@@ -590,11 +590,11 @@ async fn cli_export_import_account() -> Result<()> {
     for stored_pk_commitment in wallet_pks {
         let matching_secret_key = cli_keystore.get_key_sync(stored_pk_commitment).unwrap();
         assert!(matching_secret_key.is_some());
-        assert!(matching_secret_key.unwrap().public_key().to_commitment() == stored_pk_commitment);
+        assert_eq!(matching_secret_key.unwrap().public_key().to_commitment(), stored_pk_commitment);
 
         let public_key = cli_keystore.get_public_key(stored_pk_commitment).await;
         assert!(public_key.is_some());
-        assert!(public_key.unwrap().to_commitment() == stored_pk_commitment);
+        assert_eq!(public_key.unwrap().to_commitment(), stored_pk_commitment);
     }
 
     Ok(())
@@ -711,7 +711,8 @@ async fn debug_mode_outputs_logs() -> Result<()> {
 
     // Create the custom note with a script that will print the stack state
     let note_script = "
-            begin
+            @note_script
+            pub proc main
                 debug.stack
                 assert_eq
             end

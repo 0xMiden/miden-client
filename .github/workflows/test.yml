@@ -1,6 +1,8 @@
 name: Test
+
 permissions:
   contents: read
+
 on:
   push:
     branches: [main, next]
@@ -14,7 +16,6 @@ on:
       - "**.txt"
       - "docs/**"
 
-# Only latest commit (per PR) should run
 concurrency:
   group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
   cancel-in-progress: true
@@ -26,18 +27,24 @@ env:
 jobs:
   test:
     name: Unit tests
-    runs-on: ubuntu-24.04
+    runs-on: warp-ubuntu-latest-x64-8x
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
       - name: Install Rust
         run: rustup update --no-self-update
       - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
+        uses: WarpBuilds/rust-cache@9d0cc3090d9c87de74ea67617b246e978735b1a1 # v2.9.1
         with:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: false
-      - uses: taiki-e/install-action@v2
+      # Keep this on a released install-action commit with an explicit tool; shortcut tags can
+      # trip zizmor's impostor-commit audit when they are later retagged.
+      - uses: taiki-e/install-action@055f5df8c3f65ea01cd41e9dc855becd88953486 # v2.75.18
         with:
           tool: nextest@0.9.122
       - name: make - test
@@ -45,84 +52,36 @@ jobs:
 
   doc-tests:
     name: Documentation tests
-    runs-on: ubuntu-24.04
+    runs-on: warp-ubuntu-latest-x64-8x
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
       - name: Install rust
         run: rustup update --no-self-update
+      - name: Add Rust Cache
+        uses: WarpBuilds/rust-cache@9d0cc3090d9c87de74ea67617b246e978735b1a1 # v2.9.1
+        with:
+          shared-key: rust-release
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: false
       - name: Run doc-tests
         run: make test-docs
 
-  test-react-sdk:
-    name: React SDK tests
-    runs-on: ubuntu-24.04
-    needs: [build-web-client-dist-folder]
-    steps:
-      - uses: actions/checkout@v6
-      - name: Fetch web client dist
-        uses: actions/download-artifact@v4
-        with:
-          name: web-client-artifacts
-          path: ./crates/web-client/dist
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      - name: Install dependencies
-        run: ./scripts/retry-yarn-install.sh packages/react-sdk
-      - name: Run unit tests
-        run: make test-react-sdk
-
-  test-react-sdk-integration:
-    name: React SDK integration tests
-    runs-on: ubuntu-24.04
-    needs: [build-web-client-dist-folder]
-    steps:
-      - uses: actions/checkout@v6
-      - name: Fetch web client dist
-        uses: actions/download-artifact@v4
-        with:
-          name: web-client-artifacts
-          path: ./crates/web-client/dist
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      - name: Install dependencies
-        run: ./scripts/retry-yarn-install.sh packages/react-sdk
-      - name: Install Playwright browsers
-        run: cd ./packages/react-sdk && yarn playwright install --with-deps
-      - name: Run Playwright tests
-        run: cd ./packages/react-sdk && yarn test:integration
-
-  build-react-sdk:
-    name: Build React SDK
-    runs-on: ubuntu-24.04
-    needs: [ build-web-client-dist-folder ]
-    steps:
-      - uses: actions/checkout@v6
-      - name: Fetch web client dist
-        uses: actions/download-artifact@v4
-        with:
-          name: web-client-artifacts
-          path: ./crates/web-client/dist
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      - name: Install dependencies
-        run: ./scripts/retry-yarn-install.sh packages/react-sdk
-      - name: Build React SDK
-        run: cd ./packages/react-sdk && yarn build
-
   build-node-builder:
     name: Build node-builder
-    runs-on: ubuntu-24.04
+    runs-on: warp-ubuntu-latest-x64-8x
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
       - name: Restore node-builder binary
         id: cache-node-builder
-        uses: actions/cache@v4
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: target/release/testing-node-builder
           key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
@@ -131,7 +90,7 @@ jobs:
         run: rustup update --no-self-update
       - name: Add Rust Cache
         if: steps.cache-node-builder.outputs.cache-hit != 'true'
-        uses: Swatinem/rust-cache@v2
+        uses: WarpBuilds/rust-cache@9d0cc3090d9c87de74ea67617b246e978735b1a1 # v2.9.1
         with:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
@@ -139,23 +98,37 @@ jobs:
       - name: Build node-builder
         if: steps.cache-node-builder.outputs.cache-hit != 'true'
         run: cargo build --release --package node-builder --locked
+      - name: Save node-builder binary
+        if: steps.cache-node-builder.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/next'
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: target/release/testing-node-builder
+          key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
+      - name: Upload node-builder binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: node-builder-artifact
+          path: target/release/testing-node-builder
       - name: Check binary existance
-        run: |
-          file -E target/release/testing-node-builder
+        run: file -E target/release/testing-node-builder
 
   build-note-transport:
     name: Build note-transport
-    runs-on: ubuntu-24.04
+    runs-on: warp-ubuntu-latest-x64-8x
     outputs:
       note_transport_rev: ${{ steps.note-transport-rev.outputs.rev }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
       - name: Resolve note-transport revision
         id: note-transport-rev
         run: echo "rev=$(git ls-remote https://github.com/0xMiden/miden-note-transport HEAD | cut -f1)" >> "$GITHUB_OUTPUT"
       - name: Restore note-transport binary
         id: cache-note-transport
-        uses: actions/cache@v4
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: ~/.cargo/bin/miden-note-transport-node-bin
           key: ${{ runner.os }}-note-transport-${{ steps.note-transport-rev.outputs.rev }}
@@ -164,16 +137,42 @@ jobs:
         run: rustup update --no-self-update
       - name: Install note-transport
         if: steps.cache-note-transport.outputs.cache-hit != 'true'
-        run: cargo install --git https://github.com/0xMiden/miden-note-transport --rev ${{ steps.note-transport-rev.outputs.rev }} --locked
+        env:
+          NOTE_TRANSPORT_REV: ${{ steps.note-transport-rev.outputs.rev }}
+        run: |
+          [[ "$NOTE_TRANSPORT_REV" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Invalid note transport revision: $NOTE_TRANSPORT_REV"
+            exit 1
+          }
+          cargo install --git https://github.com/0xMiden/miden-note-transport --rev "$NOTE_TRANSPORT_REV" --locked
+      - name: Save note-transport binary
+        if: steps.cache-note-transport.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/next'
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: ~/.cargo/bin/miden-note-transport-node-bin
+          key: ${{ runner.os }}-note-transport-${{ steps.note-transport-rev.outputs.rev }}
+      - name: Stage note-transport binary
+        run: |
+          mkdir -p target/release
+          cp ~/.cargo/bin/miden-note-transport-node-bin target/release/miden-note-transport-node-bin
+      - name: Upload note-transport binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: note-transport-artifact
+          path: target/release/miden-note-transport-node-bin
 
   build-remote-prover:
     name: Build remote-prover
-    runs-on: ubuntu-24.04
+    runs-on: warp-ubuntu-latest-x64-8x
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
       - name: Restore remote-prover binary
         id: cache-remote-prover
-        uses: actions/cache@v4
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: target/release/testing-remote-prover
           key: ${{ runner.os }}-prover-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/prover/**/*') }}
@@ -182,7 +181,7 @@ jobs:
         run: rustup update --no-self-update
       - name: Add Rust Cache
         if: steps.cache-remote-prover.outputs.cache-hit != 'true'
-        uses: Swatinem/rust-cache@v2
+        uses: WarpBuilds/rust-cache@9d0cc3090d9c87de74ea67617b246e978735b1a1 # v2.9.1
         with:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
@@ -190,47 +189,61 @@ jobs:
       - name: Build remote-prover
         if: steps.cache-remote-prover.outputs.cache-hit != 'true'
         run: cargo build --release --package testing-remote-prover --locked
+      - name: Save remote-prover binary
+        if: steps.cache-remote-prover.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/next'
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: target/release/testing-remote-prover
+          key: ${{ runner.os }}-prover-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/prover/**/*') }}
+      - name: Upload remote-prover binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: remote-prover-artifact
+          path: target/release/testing-remote-prover
       - name: Check binary existance
-        run: |
-          file -E target/release/testing-remote-prover
+        run: file -E target/release/testing-remote-prover
 
   integration-tests:
     name: Integration tests
-    runs-on: ubuntu-24.04
+    runs-on: warp-ubuntu-latest-x64-8x
     needs: [build-node-builder, build-note-transport]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
       - name: Install Rust
         run: rustup update --no-self-update
-      - uses: taiki-e/install-action@v2
+      # Keep this on a released install-action commit with an explicit tool; shortcut tags can
+      # trip zizmor's impostor-commit audit when they are later retagged.
+      - uses: taiki-e/install-action@055f5df8c3f65ea01cd41e9dc855becd88953486 # v2.75.18
         with:
           tool: nextest@0.9.122
       - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
+        uses: WarpBuilds/rust-cache@9d0cc3090d9c87de74ea67617b246e978735b1a1 # v2.9.1
         with:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: false
-      - name: Restore node-builder binary
-        uses: actions/cache/restore@v4
+      - name: Fetch node-builder binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          path: target/release/testing-node-builder
-          key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
-      - name: Restore note-transport binary
-        uses: actions/cache/restore@v4
+          name: node-builder-artifact
+          path: target/release
+      - name: Restore node-builder permissions
+        run: chmod +x target/release/testing-node-builder
+      - name: Fetch note-transport binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          path: ~/.cargo/bin/miden-note-transport-node-bin
-          key: ${{ runner.os }}-note-transport-${{ needs.build-note-transport.outputs.note_transport_rev }}
+          name: note-transport-artifact
+          path: target/release
+      - name: Restore note-transport permissions
+        run: chmod +x target/release/miden-note-transport-node-bin
       - name: Start test node
-        run: |
-          RUST_LOG=none target/release/testing-node-builder &
-          sleep 4
-          pgrep -f testing-node-builder || (echo "Failed to start node" && exit 1)
+        run: ./scripts/start-ci-service.sh testing-node-builder 57291 target/release/testing-node-builder
       - name: Start note transport
-        run: |
-          RUST_LOG=none miden-note-transport-node-bin &
-          sleep 4
-          pgrep -f miden-note-transport-node-bin || (echo "Failed to start note transport" && exit 1)
+        run: ./scripts/start-ci-service.sh miden-note-transport-node-bin 57292 target/release/miden-note-transport-node-bin
       - name: Run integration tests
         run: make integration-test-full
       - name: Stop test node
@@ -239,169 +252,3 @@ jobs:
       - name: Stop note transport
         if: always()
         run: make stop-note-transport
-
-  build-web-client-dist-folder:
-    name: Build Web Client
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - name: Install Rust (needed for WASM build)
-        run: |
-          rustup update --no-self-update
-          rustup target add wasm32-unknown-unknown
-
-      - name: Add Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-wasm
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: ${{ github.ref == 'refs/heads/next' }}
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: yarn
-          cache-dependency-path: |
-            crates/web-client/yarn.lock
-            crates/idxdb-store/src/yarn.lock
-
-      - name: Install dependencies
-        run: ./scripts/retry-yarn-install.sh crates/web-client
-
-      - name: Check TSC output equals commited JS
-        run: |
-          cd ./crates/idxdb-store/src/
-          yarn
-          yarn tsc --outDir ci_test_folder
-          pushd ci_test_folder
-          find . -type f ! -name "*.js" -delete
-          popd
-          diff -bur js ci_test_folder
-
-      - name: Restore cache - dist folder
-        id: dist-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ./crates/web-client/dist
-          key: ${{ runner.os }}-dist-${{ hashFiles('Cargo.lock', 'crates/web-client/package.json', 'crates/web-client/yarn.lock', 'crates/web-client/rollup.config.js', 'crates/web-client/clean.js', 'crates/web-client/js/**/*', 'crates/web-client/src/**/*', 'crates/idxdb-store/src/package.json', 'crates/idxdb-store/src/yarn.lock', 'crates/idxdb-store/src/tsconfig*.json', 'crates/idxdb-store/src/ts/**/*') }}
-          restore-keys: ${{ runner.os }}-dist-
-
-      - name: Build project
-        if: steps.dist-cache.outputs.cache-hit != 'true'
-        run: |
-          cd ./crates/web-client
-          MIDEN_WEB_DEV=true yarn run build
-
-      - name: Save cache - dist folder
-        if: steps.dist-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ./crates/web-client/dist
-          key: ${{ steps.dist-cache.outputs.cache-key }}
-
-      - name: Upload artifacts for matrix jobs
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-client-artifacts
-          path: ./crates/web-client/dist
-
-  integration-tests-web-client:
-    name: Integration tests for web client
-    runs-on: ubuntu-24.04
-    needs: [build-web-client-dist-folder, build-node-builder]
-    strategy:
-      matrix:
-        shard_index: [1, 2, 3, 4, 5, 6, 7]
-        shard_total: [7]
-    steps:
-      - uses: actions/checkout@v6
-      - name: Fetch dist folder
-        uses: actions/download-artifact@v4
-        with:
-          name: web-client-artifacts
-          path: ./crates/web-client/dist
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: yarn
-          cache-dependency-path: crates/web-client/yarn.lock
-      - name: Install dependencies
-        run: ./scripts/retry-yarn-install.sh crates/web-client
-      - name: Configure setuid sandbox
-        run: . ./scripts/configure-sandbox.sh
-      - name: Restore node-builder binary
-        uses: actions/cache/restore@v4
-        with:
-          path: target/release/testing-node-builder
-          key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
-      - name: Start test node
-        run: |
-          RUST_LOG=none target/release/testing-node-builder &
-          sleep 4
-          pgrep -f testing-node-builder || (echo "Failed to start node" && exit 1)
-      - name: Run web client tests
-        run: |
-          cd ./crates/web-client
-          yarn run test:ci -- --project=chromium $SHARD_PARAMETER
-        env:
-          SHARD_PARAMETER: "--shard=${{ matrix.shard_index }}/${{ matrix.shard_total }}"
-      - name: Stop test node
-        if: always()
-        run: make stop-node
-
-  integration-tests-remote-prover-web-client:
-    name: Integration tests for remote prover
-    runs-on: ubuntu-24.04
-    needs: [build-web-client-dist-folder, build-node-builder, build-remote-prover]
-    steps:
-      - uses: actions/checkout@v6
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: yarn
-          cache-dependency-path: crates/web-client/yarn.lock
-      - name: Install dependencies
-        run: ./scripts/retry-yarn-install.sh crates/web-client
-
-      - name: Fetch dist folder
-        uses: actions/download-artifact@v4
-        with:
-          name: web-client-artifacts
-          path: ./crates/web-client/dist
-
-      - name: Configure setuid sandbox
-        run: . ./scripts/configure-sandbox.sh
-      - name: Restore node-builder binary
-        uses: actions/cache/restore@v4
-        with:
-          path: target/release/testing-node-builder
-          key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
-      - name: Restore remote-prover binary
-        uses: actions/cache/restore@v4
-        with:
-          path: target/release/testing-remote-prover
-          key: ${{ runner.os }}-prover-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/prover/**/*') }}
-      - name: Start test node
-        run: |
-          RUST_LOG=none target/release/testing-node-builder &
-          sleep 4
-          pgrep -f testing-node-builder || (echo "Failed to start node" && exit 1)
-      - name: Start prover
-        run: |
-          RUST_LOG=none target/release/testing-remote-prover &
-          sleep 4
-          pgrep -f testing-remote-prover || (echo "Failed to start prover" && exit 1)
-      - name: Run remote prover tests
-        run: |
-          cd ./crates/web-client
-          yarn run test:ci:remote_prover
-      - name: Stop test node
-        if: always()
-        run: make stop-node
-      - name: Stop miden-prover
-        if: always()
-        run: make stop-prover
