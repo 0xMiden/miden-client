@@ -2,7 +2,6 @@ use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use std::fs;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::string::ToString;
@@ -147,8 +146,7 @@ impl KeyIndex {
 // ================================================================================================
 
 /// A filesystem-based keystore that stores keys in separate files and provides transaction
-/// authentication functionality. The public key is hashed and the result is used as the filename
-/// and the contents of the file are the serialized public and secret key.
+/// authentication functionality. The hex-encoded public key commitment is used as the filename.
 ///
 /// Account-to-key mappings are stored in a separate JSON index file.
 #[derive(Debug)]
@@ -335,7 +333,7 @@ impl Keystore for FilesystemKeyStore {
 
 /// Returns the file path that belongs to the public key commitment
 fn key_file_path(keys_directory: &Path, pub_key: PublicKeyCommitment) -> PathBuf {
-    let filename = hash_pub_key(pub_key.into());
+    let filename = Word::from(pub_key).to_hex();
     keys_directory.join(filename)
 }
 
@@ -364,12 +362,4 @@ fn write_secret_key_file(file_path: &Path, key: &AuthSecretKey) -> Result<(), Ke
 
 fn keystore_error(context: &str) -> impl FnOnce(std::io::Error) -> KeyStoreError {
     move |err| KeyStoreError::StorageError(format!("{context}: {err:?}"))
-}
-
-/// Hashes a public key to a string representation.
-fn hash_pub_key(pub_key: Word) -> String {
-    let pub_key = pub_key.to_hex();
-    let mut hasher = DefaultHasher::new();
-    pub_key.hash(&mut hasher);
-    hasher.finish().to_string()
 }
