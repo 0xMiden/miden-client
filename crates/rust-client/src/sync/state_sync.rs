@@ -545,7 +545,7 @@ impl StateSync {
         account_updates: &mut AccountUpdates,
         accounts: &[AccountHeader],
         account_commitment_updates: &[(AccountId, Word)],
-        block_num: BlockNumber,
+        block_from: BlockNumber,
     ) -> Result<(), ClientError> {
         // "Public" here includes both Public and Network accounts, since both have
         // their state stored on-chain and follow the same sync path.
@@ -556,7 +556,7 @@ impl StateSync {
             account_updates,
             account_commitment_updates,
             &public_accounts,
-            block_num,
+            block_from,
         )
         .await?;
 
@@ -585,7 +585,7 @@ impl StateSync {
         account_updates: &mut AccountUpdates,
         commitment_updates: &[(AccountId, Word)],
         current_public_accounts: &[&AccountHeader],
-        block_num: BlockNumber,
+        block_from: BlockNumber,
     ) -> Result<(), ClientError> {
         for (id, commitment) in commitment_updates {
             let Some(local_header) = current_public_accounts
@@ -633,7 +633,7 @@ impl StateSync {
                     // Delta path: build an AccountDelta from incremental updates,
                     // fetching storage slots and vault from the store on demand.
                     let delta = self
-                        .build_account_delta(&details, local_header, block_num, proof_block_num)
+                        .build_account_delta(&details, local_header, block_from, proof_block_num)
                         .await?;
                     account_updates.extend(AccountUpdates::new(
                         vec![PublicAccountUpdate::Delta {
