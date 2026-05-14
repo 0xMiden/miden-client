@@ -14,13 +14,10 @@ use miden_protocol::transaction::{
     TransactionId,
 };
 
-use super::note::{CommittedNote, CommittedNoteMetadata};
+use super::note::CommittedNote;
 use crate::rpc::{RpcConversionError, RpcError, generated as proto};
 
 /// A native asset faucet ID for use in testing scenarios.
-///
-/// The lowest nibble of byte 7 (`0x21`) encodes [`AccountIdVersion::Version1`]; bumped from
-/// `0x20` after the deps bump because version `0` is no longer accepted.
 #[cfg(test)]
 pub const ACCOUNT_ID_NATIVE_ASSET_FAUCET: u128 = 0xab00_0000_0000_cd21_0000_ac00_0000_de00_u128;
 
@@ -202,8 +199,7 @@ fn convert_transaction_header(
     for header in &output_note_headers {
         let note_id = header.id();
         if let Some(proof) = proof_map.remove(&note_id) {
-            let metadata = CommittedNoteMetadata::Full(*header.metadata());
-            committed_output_notes.push(CommittedNote::new(note_id, metadata, proof));
+            committed_output_notes.push(CommittedNote::new(note_id, *header.metadata(), proof));
         } else {
             erased_output_notes.push(*header);
         }

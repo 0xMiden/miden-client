@@ -496,13 +496,6 @@ fn should_add_implicit_token_policy_manager(
         && !has_token_policy_manager
 }
 
-// NOTE(deps-bump): the old `FungibleTokenMetadata` component (a separate metadata-only
-// component) was folded into `FungibleFaucet` itself in miden-standards. The CLI no longer
-// injects a separate metadata component; faucet metadata (name/symbol/decimals/max_supply)
-// must instead be plumbed through `InitStorageData` for the `basic-fungible-faucet` package
-// so the package's storage slots are populated at instantiation. The CLI's init-data wiring
-// for that may need follow-up work.
-
 /// Helper function to create the seed, initialize the account builder, add the given components,
 /// and build the account.
 ///
@@ -535,12 +528,10 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
         load_init_storage_data(init_storage_data_path.as_ref())?;
     debug!("Loaded initialization storage data");
 
-    // If the user provided `[fungible-faucet-metadata]`, the new `FungibleFaucet` component
-    // (which now subsumes the old `FungibleTokenMetadata`) requires every storage slot to be
-    // initialized. Rather than synthesize the schema-driven init entries, we drop the
-    // `basic-fungible-faucet` package and inject a fully-populated component built from the
-    // user's metadata. This preserves the prior UX (one TOML block describes the faucet) while
-    // matching upstream's new component layout.
+    // `FungibleFaucet` requires every storage slot to be initialized. When the user provides
+    // a `[fungible-faucet-metadata]` TOML block, drop the `basic-fungible-faucet` package and
+    // inject a fully-populated component built directly from that metadata, rather than
+    // synthesizing the schema-driven init entries.
     let mut packages = packages;
     let injected_fungible_faucet = if let Some(metadata) = faucet_metadata.as_ref() {
         if drop_basic_fungible_faucet_packages(&mut packages) {
@@ -582,13 +573,6 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
             BurnPolicyConfig::AllowAll,
         ));
     }
-    // NOTE(deps-bump): the old separate `FungibleTokenMetadata` component no longer exists; its
-    // fields now live inside `FungibleFaucet`. We compile the user's high-level
-    // `[fungible-faucet-metadata]` block into `InitStorageData` entries that populate the
-    // `basic-fungible-faucet` package's storage slots, so it isn't reached here as a separate
-    // injection.
-    let _ = &faucet_metadata;
-
     // Add the auth component (either from packages or default Falcon)
     let key_pair = if let Some(auth_component) = auth_component {
         debug!("Adding auth component from package");

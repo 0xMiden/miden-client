@@ -401,13 +401,9 @@ where
                     continue;
                 }
 
-                let metadata = sync_note
-                    .metadata()
-                    .copied()
-                    .expect("metadata should be available after sync_notes_with_details");
                 retrieved_proofs.insert(
                     *sync_note.note_id(),
-                    Some((metadata, sync_note.inclusion_proof().clone())),
+                    Some((*sync_note.metadata(), sync_note.inclusion_proof().clone())),
                 );
             }
         }

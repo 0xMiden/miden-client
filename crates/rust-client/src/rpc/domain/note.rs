@@ -250,33 +250,15 @@ impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for NoteSyncBlock {
 // COMMITTED NOTE
 // ================================================================================================
 
-/// The metadata state of a committed note.
-///
-/// Under the current protocol, sync responses always carry full [`NoteMetadata`] (including
-/// attachment scheme markers and the attachments commitment). The actual attachment **content**
-/// must still be fetched separately via `GetNotesById`, but it is not part of the metadata.
-#[derive(Debug, Clone)]
-pub enum CommittedNoteMetadata {
-    /// Full metadata is available.
-    Full(NoteMetadata),
-}
-
-impl CommittedNoteMetadata {
-    /// Returns the full metadata if available.
-    pub fn metadata(&self) -> Option<&NoteMetadata> {
-        match self {
-            Self::Full(m) => Some(m),
-        }
-    }
-}
-
 /// Represents a committed note, returned as part of a `SyncNotesResponse`.
 #[derive(Debug, Clone)]
 pub struct CommittedNote {
     /// Note ID of the committed note.
     note_id: NoteId,
-    /// Note metadata (currently always full).
-    metadata: CommittedNoteMetadata,
+    /// Note metadata. Sync responses always carry the full [`NoteMetadata`] (header fields plus
+    /// attachment scheme markers and the attachments commitment); attachment **content** is
+    /// fetched separately via `GetNotesById`.
+    metadata: NoteMetadata,
     /// Inclusion proof for the note in the block.
     inclusion_proof: NoteInclusionProof,
 }
@@ -284,7 +266,7 @@ pub struct CommittedNote {
 impl CommittedNote {
     pub fn new(
         note_id: NoteId,
-        metadata: CommittedNoteMetadata,
+        metadata: NoteMetadata,
         inclusion_proof: NoteInclusionProof,
     ) -> Self {
         Self { note_id, metadata, inclusion_proof }
@@ -295,36 +277,20 @@ impl CommittedNote {
     }
 
     pub fn note_type(&self) -> NoteType {
-        match &self.metadata {
-            CommittedNoteMetadata::Full(m) => m.note_type(),
-        }
+        self.metadata.note_type()
     }
 
     pub fn tag(&self) -> NoteTag {
-        match &self.metadata {
-            CommittedNoteMetadata::Full(m) => m.tag(),
-        }
+        self.metadata.tag()
     }
 
     pub fn sender(&self) -> AccountId {
-        match &self.metadata {
-            CommittedNoteMetadata::Full(m) => m.sender(),
-        }
+        self.metadata.sender()
     }
 
     /// Returns the full note metadata.
-    pub fn metadata(&self) -> Option<&NoteMetadata> {
-        self.metadata.metadata()
-    }
-
-    /// Returns the committed note metadata enum.
-    pub fn committed_metadata(&self) -> &CommittedNoteMetadata {
+    pub fn metadata(&self) -> &NoteMetadata {
         &self.metadata
-    }
-
-    /// Overwrites the stored metadata.
-    pub fn set_metadata(&mut self, metadata: NoteMetadata) {
-        self.metadata = CommittedNoteMetadata::Full(metadata);
     }
 
     pub fn inclusion_proof(&self) -> &NoteInclusionProof {
@@ -339,7 +305,7 @@ impl TryFrom<proto::note::NoteSyncRecord> for CommittedNote {
         let proto_metadata = note
             .metadata
             .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.metadata)))?;
-        let metadata = CommittedNoteMetadata::Full(proto_metadata.try_into()?);
+        let metadata: NoteMetadata = proto_metadata.try_into()?;
 
         let proto_inclusion_proof = note.inclusion_proof.ok_or(
             proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.inclusion_proof)),

@@ -1,16 +1,10 @@
 use anyhow::{Context, Result};
+use miden_client::EMPTY_WORD;
 use miden_client::account::{AccountStorageMode, build_wallet_id};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::keystore::Keystore;
-use miden_client::note::{
-    NoteAttachment,
-    NoteAttachmentScheme,
-    NoteAttachments,
-    NoteFile,
-    NoteType,
-    P2idNote,
-};
+use miden_client::note::{NoteFile, NoteType};
 use miden_client::rpc::{AcceptHeaderError, RpcError};
 use miden_client::store::{InputNoteState, NoteFilter};
 use miden_client::testing::common::*;
@@ -20,7 +14,6 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{EMPTY_WORD, Word};
 use rand::RngCore;
 use tracing::info;
 
@@ -613,102 +606,6 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
             "Consume transactions spread across multiple blocks - order verified by block height"
         );
     }
-
-    Ok(())
-}
-
-/// Tests that notes with attachments can be synced and consumed.
-/// 1. Client 1 mints a public P2ID note **with an attachment** targeting client 2's wallet.
-/// 2. Client 2 syncs and discovers the note via `sync_notes`.
-/// 3. The sync triggers a `get_notes_by_id` call to fetch the full metadata.
-/// 4. Client 2 consumes the note, proving the metadata was correctly resolved.
-///
-/// NOTE(deps-bump): the upstream protocol moved attachment content out of `NoteMetadata`. The
-/// client's `InputNoteRecord` / `OutputNoteRecord` currently persist only `NoteDetails` +
-/// `NoteMetadata` (no `NoteAttachments`), so a note with attachments cannot round-trip through
-/// the local store: when the stored record is converted back to a `Note`, the attachments are
-/// empty and `note.commitment()` no longer matches the on-chain commitment, causing
-/// `InputNoteNotInBlock` at consume time. The fix is to persist `NoteAttachments` in the note
-/// records (the RPC sync flow already fetches them via `GetNotesById`); this test is renamed
-/// from `test_*` so the integration-test build script does not auto-register it, and the
-/// original prefix should be restored once the store schema is extended.
-#[allow(dead_code)]
-pub async fn disabled_sync_note_with_attachment(client_config: ClientConfig) -> Result<()> {
-    let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
-    let (mut client_2, keystore_2) = ClientConfig::default()
-        .with_rpc_endpoint(client_config.rpc_endpoint())
-        .into_client()
-        .await?;
-    wait_for_node(&mut client_1).await;
-
-    // Create faucet in client 1
-    let (faucet_account, _) = insert_new_fungible_faucet(
-        &mut client_1,
-        AccountStorageMode::Private,
-        &keystore_1,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
-
-    // Create wallet in client 2
-    let (wallet, ..) = insert_new_wallet(
-        &mut client_2,
-        AccountStorageMode::Private,
-        &keystore_2,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
-
-    client_1.sync_state().await?;
-    client_2.sync_state().await?;
-
-    // Mint a P2ID note with a Word attachment. The non-default attachment triggers
-    // the get_notes_by_id metadata fetch during the receiver's sync.
-    let attachment_scheme = NoteAttachmentScheme::new(42)?;
-    let attachment = NoteAttachment::with_word(attachment_scheme, Word::from([1u32, 2, 3, 4]));
-    let attachments = NoteAttachments::new(vec![attachment])?;
-    let asset = FungibleAsset::new(faucet_account.id(), MINT_AMOUNT)?;
-    let note = P2idNote::create(
-        faucet_account.id(),
-        wallet.id(),
-        vec![asset.into()],
-        NoteType::Public,
-        attachments,
-        client_1.rng(),
-    )?;
-
-    info!(note_id = %note.id(), "Minting P2ID note with attachment");
-    let tx_request =
-        TransactionRequestBuilder::new().own_output_notes(vec![note.clone()]).build()?;
-    execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await?;
-
-    // Client 2 syncs and should discover the note. The sync response will have
-    // attachment_kind != None, so the client must fetch full metadata via get_notes_by_id.
-    info!("Syncing client 2 to discover note with attachment");
-    client_2.sync_state().await?;
-
-    let received_note: InputNote = client_2
-        .get_input_note(note.id())
-        .await?
-        .with_context(|| format!("Note {} not found in client_2 after sync", note.id()))?
-        .try_into()?;
-
-    // NOTE(deps-bump): the upstream protocol moved attachment content out of `NoteMetadata`,
-    // and the client's note records (`InputNoteRecord`, `OutputNoteRecord`) currently store
-    // only `NoteDetails` + `NoteMetadata`, not `NoteAttachments`. As a result, attachments do
-    // not survive the sync → store → read round trip — the reconstructed note has empty
-    // attachments and the `attachment_headers` go back to "absent". The previous assertion
-    // here checked that the scheme marker came through; that check is dropped until the store
-    // is extended to preserve `NoteAttachments`. The remainder of the test (consume + balance
-    // verification) still exercises the sync-and-consume path end-to-end.
-    let _ = attachment_scheme;
-
-    // Consume the note — this will fail if the metadata wasn't properly resolved
-    info!("Consuming note with attachment in client 2");
-    let tx_id = consume_notes(&mut client_2, wallet.id(), &[received_note.note().clone()]).await;
-    wait_for_tx(&mut client_2, tx_id).await?;
-
-    assert_account_has_single_asset(&client_2, wallet.id(), faucet_account.id(), MINT_AMOUNT).await;
 
     Ok(())
 }

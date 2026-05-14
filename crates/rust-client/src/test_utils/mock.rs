@@ -29,7 +29,7 @@ use crate::rpc::domain::account::{
     StorageMapEntry,
 };
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
-use crate::rpc::domain::note::{CommittedNote, CommittedNoteMetadata, FetchedNote, NoteSyncBlock};
+use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncBlock};
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
@@ -326,11 +326,8 @@ impl NodeRpcClient for MockRpcApi {
                 && note_block >= block_from
                 && note_block <= block_to
             {
-                let committed = CommittedNote::new(
-                    note.id(),
-                    CommittedNoteMetadata::Full(*note.metadata()),
-                    note.inclusion_proof().clone(),
-                );
+                let committed =
+                    CommittedNote::new(note.id(), *note.metadata(), note.inclusion_proof().clone());
                 blocks_with_notes.entry(note_block).or_default().insert(note.id(), committed);
             }
         }
@@ -573,7 +570,7 @@ impl NodeRpcClient for MockRpcApi {
         &self,
         prefixes: &[u16],
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         let nullifiers = self
             .mock_chain
@@ -581,11 +578,7 @@ impl NodeRpcClient for MockRpcApi {
             .nullifier_tree()
             .entries()
             .filter_map(|(nullifier, block_num)| {
-                let within_range = if let Some(to_block) = block_to {
-                    block_num >= block_from && block_num <= to_block
-                } else {
-                    block_num >= block_from
-                };
+                let within_range = block_num >= block_from && block_num <= block_to;
 
                 if prefixes.contains(&nullifier.prefix()) && within_range {
                     Some(NullifierUpdate { nullifier, block_num })

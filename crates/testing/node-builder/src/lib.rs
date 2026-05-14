@@ -508,11 +508,9 @@ async fn available_socket_addr() -> Result<SocketAddr> {
 // UTILS (GENESIS ACCOUNTS)
 // ================================================================================================
 
-/// Expected account ID for the test account. Used to verify deterministic generation.
-///
-/// Updated for the deps bump: upstream's account-generation changed (new `FungibleFaucet`
-/// embedding metadata into storage, new policy components, new schema commitments), so the
-/// resulting deterministic ID shifted by one byte vs. the pre-bump pin.
+/// Expected account ID produced by [`TEST_ACCOUNT_SEED`] under the current `FungibleFaucet`
+/// component layout, policy components, and schema commitments. Used to verify deterministic
+/// account generation; update this constant if any input to ID derivation changes.
 const TEST_ACCOUNT_ID: &str = "0x0a0a0a0a0a0a0a110a0a0a0a0a0a0a";
 
 /// Deterministic seed used for the test account to ensure reproducible account IDs.

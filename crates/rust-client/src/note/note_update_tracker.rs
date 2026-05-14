@@ -1,4 +1,4 @@
-use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::collections::BTreeMap;
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
@@ -12,7 +12,6 @@ use miden_tx::utils::serde::{
 };
 
 use crate::ClientError;
-use crate::rpc::RpcError;
 use crate::rpc::domain::note::CommittedNote;
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::store::{InputNoteRecord, OutputNoteRecord};
@@ -192,9 +191,6 @@ pub struct NoteUpdateTracker {
     /// Nullifiers from the same account are in execution order; ordering across different
     /// accounts is not guaranteed.
     nullifier_order: BTreeMap<Nullifier, u32>,
-    /// Account IDs tracked by this client. Used to detect if the consumer of an erased note is
-    /// tracked.
-    tracked_accounts_ids: BTreeSet<AccountId>,
 }
 
 impl NoteUpdateTracker {
@@ -212,13 +208,6 @@ impl NoteUpdateTracker {
         }
 
         tracker
-    }
-
-    /// Sets the accounts tracked by this client.
-    #[must_use]
-    pub fn with_tracked_accounts(mut self, tracked_accounts_ids: BTreeSet<AccountId>) -> Self {
-        self.tracked_accounts_ids = tracked_accounts_ids;
-        self
     }
 
     /// Creates a [`NoteUpdateTracker`] for updates related to transactions.
@@ -337,12 +326,7 @@ impl NoteUpdateTracker {
 
         let is_tracked_as_input_note =
             if let Some(input_note_record) = self.get_input_note_by_id(*committed_note.note_id()) {
-                let metadata = committed_note.metadata().copied().ok_or_else(|| {
-                    ClientError::RpcError(RpcError::ExpectedDataMissing(format!(
-                        "full metadata for committed note {}",
-                        committed_note.note_id()
-                    )))
-                })?;
+                let metadata = *committed_note.metadata();
                 input_note_record.inclusion_proof_received(inclusion_proof.clone(), metadata)?;
                 input_note_record.block_header_received(block_header)?;
 
@@ -378,6 +362,10 @@ impl NoteUpdateTracker {
     /// This handles notes that were erased due to same-batch note erasure: the note was
     /// created and consumed within the same batch, so it never appeared in the block body.
     /// The `block_num` is the block in which the creating transaction was committed.
+    ///
+    /// The consumer account id is not derivable from a [`NoteHeader`] alone: attachment
+    /// content lives on `NoteAttachments`, which the erased-note RPC stream does not deliver.
+    /// Any input record for the erased note is marked consumed with an unknown consumer.
     pub(crate) fn mark_erased_note_as_consumed(
         &mut self,
         note_header: &NoteHeader,
@@ -393,28 +381,11 @@ impl NoteUpdateTracker {
             output_note.nullifier_received(nullifier, block_num)?;
         }
 
-        // The consumer extraction previously read `NetworkAccountTarget` from the metadata's
-        // attachment. After the protocol moved attachment content off `NoteMetadata` and onto
-        // `Note`/`NoteAttachments`, the attachment payload is no longer reachable from a
-        // `NoteHeader` alone. Without the full attachments collection (which the RPC erased-note
-        // stream does not deliver), we can no longer recover the target id here.
-        let consumer_network_account_id: Option<AccountId> = None;
-
-        // Only create an input record when the consumer is a tracked account.
-        if let Some(consumer_id) = consumer_network_account_id {
-            self.try_insert_consumed_input_from_output(note_id, consumer_id, block_num, Some(0))?;
-        }
-
-        // Also mark the corresponding input note if tracked.
         if let Some(input_note_update) = self.input_notes.get_mut(&note_id)
             && !input_note_update.inner().is_consumed()
         {
             let nullifier = input_note_update.inner().nullifier();
-            input_note_update.inner_mut().consumed_externally(
-                nullifier,
-                block_num,
-                consumer_network_account_id,
-            )?;
+            input_note_update.inner_mut().consumed_externally(nullifier, block_num, None)?;
             input_note_update.inner_mut().set_consumed_tx_order(Some(0));
         }
 
@@ -674,7 +645,6 @@ impl Deserializable for NoteUpdateTracker {
             input_notes_by_nullifier,
             output_notes_by_nullifier,
             nullifier_order,
-            tracked_accounts_ids: BTreeSet::new(),
         })
     }
 }
