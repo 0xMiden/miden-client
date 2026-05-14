@@ -864,9 +864,7 @@ impl StateSync {
         // changes between the sync_state and the check_nullifier calls)
         new_nullifiers.retain(|update| update.block_num <= state_sync_update.block_num);
 
-        // Enrich each raw nullifier update with the externally-tracked consumer account, joining
-        // the two sources (sync_nullifiers + tracked transaction inclusions) once at this
-        // boundary so the note tracker sees a single, complete value per consumption event.
+        // Match each nullifier update with the externally-tracked consumer account.
         let consumptions: Vec<NoteConsumption> = new_nullifiers
             .into_iter()
             .map(|update| NoteConsumption {
@@ -895,9 +893,8 @@ impl StateSync {
         Ok(())
     }
 
-    /// Pairs each public note body with the matching inclusion proof from `note_blocks` and
-    /// returns ready-to-store `InputNoteRecord`s keyed by note ID. Notes without a matching
-    /// inclusion proof are dropped.
+    /// Pairs each public note body with the matching inclusion proof from `note_blocks`. Notes
+    /// without a matching inclusion proof are dropped.
     fn build_public_note_records(
         public_notes: BTreeMap<NoteId, Note>,
         note_blocks: &[NoteSyncBlock],
@@ -923,9 +920,8 @@ impl StateSync {
     }
 }
 
-/// For each unique account in the transaction set, returns the `final_state_commitment` from
-/// the transaction with the highest `block_num` — i.e. the canonical post-sync commitment for
-/// that account over the synced range.
+/// For each unique account in the transaction set, returns the `final_state_commitment` from the
+/// transaction with the highest `block_num`.
 fn derive_account_commitments(
     transaction_records: &[RpcTransactionRecord],
 ) -> Vec<(AccountId, Word)> {
