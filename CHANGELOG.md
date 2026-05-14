@@ -16,6 +16,8 @@
 * [BREAKING][rename][rust] `FeeParameters::native_asset_id()` renamed to `fee_faucet_id()`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * [BREAKING][rust] Removed `NodeRpcClient::check_nullifiers`, `RpcEndpoint::CheckNullifiers`, `EndpointError::CheckNullifiers`, and `CheckNullifiersError` after the upstream node dropped the `CheckNullifiers` gRPC method. Use `NodeRpcClient::sync_nullifiers` to retrieve nullifier updates. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * [BREAKING][behavior][cli] `token_symbol_map.toml` requires the `id` field to be a bech32 address; hex `AccountId`s are no longer accepted. Convert existing entries by copying the bech32 address from `account list`. ([#2159](https://github.com/0xMiden/miden-client/pull/2159))
+* Removed limit on accounts and note tags that can be tracked by the client ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
+* [BREAKING] Updated the `sync_notes` and `sync_transactions` to return directly the fetched updates. Removed `TransactionsInfo` and `NoteSyncInfo` structs ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
 
 ### Enhancements
 
