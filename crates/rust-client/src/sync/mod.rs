@@ -77,12 +77,19 @@ mod tag;
 pub use tag::{NoteTagRecord, NoteTagSource};
 
 mod state_sync;
-pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
+pub use state_sync::{
+    AccountSyncHint,
+    NoteUpdateAction,
+    OnNoteReceived,
+    StateSync,
+    StateSyncInput,
+};
 
 mod state_sync_update;
 pub use state_sync_update::{
     AccountUpdates,
     PartialBlockchainUpdates,
+    PublicAccountDelta,
     PublicAccountUpdate,
     StateSyncUpdate,
     TransactionUpdateTracker,
@@ -117,12 +124,8 @@ where
 
         // Build sync state components
         let note_screener = self.note_screener();
-        let state_sync = StateSync::new(
-            self.rpc_api.clone(),
-            Some(self.store.clone()),
-            Arc::new(note_screener),
-            self.tx_discard_delta,
-        );
+        let state_sync =
+            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
         let input = self.build_sync_input().await?;
 
         let mut partial_mmr = self.get_current_partial_mmr().await?;
@@ -183,13 +186,13 @@ where
     /// This includes all tracked account headers, all unique note tags, all unspent input and
     /// output notes, and all uncommitted transactions.
     pub async fn build_sync_input(&self) -> Result<StateSyncInput, ClientError> {
-        let accounts = self
-            .store
-            .get_account_headers()
-            .await?
-            .into_iter()
-            .map(|(header, _status)| header)
-            .collect();
+        let mut accounts = Vec::new();
+        // TODO 2178:
+        // Reduce amount of queries done to the database
+        for (header, _status) in self.store.get_account_headers().await? {
+            let map_slot_names = self.store.get_account_map_slot_names(header.id()).await?;
+            accounts.push(AccountSyncHint { header, map_slot_names });
+        }
 
         let note_tags = self.store.get_unique_note_tags().await?;
 

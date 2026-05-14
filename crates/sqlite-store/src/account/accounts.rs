@@ -45,6 +45,7 @@ use crate::account::helpers::{
     query_account_code,
     query_historical_account_headers,
     query_latest_account_headers,
+    query_map_slot_names,
     query_storage_slots,
     query_storage_values,
     query_vault_assets,
@@ -78,7 +79,7 @@ impl SqliteStore {
     }
 
     pub(crate) fn get_account_header(
-        conn: &mut Connection,
+        conn: &Connection,
         account_id: AccountId,
     ) -> Result<Option<(AccountHeader, AccountStatus)>, StoreError> {
         Ok(query_latest_account_headers(conn, "id = ?", params![account_id.to_hex()])?.pop())
@@ -232,6 +233,15 @@ impl SqliteStore {
     ) -> Result<AccountStorage, StoreError> {
         let slots = query_storage_slots(conn, account_id, filter)?.into_values().collect();
         Ok(AccountStorage::new(slots)?)
+    }
+
+    /// Retrieves the names of all map-typed storage slots for the given account, without loading
+    /// the slot values or map entries.
+    pub fn get_account_map_slot_names(
+        conn: &Connection,
+        account_id: AccountId,
+    ) -> Result<Vec<StorageSlotName>, StoreError> {
+        query_map_slot_names(conn, account_id)
     }
 
     /// Fetches a specific asset from the account's vault without the need of loading the entire
