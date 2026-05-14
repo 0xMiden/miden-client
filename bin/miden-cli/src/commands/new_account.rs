@@ -583,9 +583,7 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     #[cfg(feature = "testing")]
     if offline {
         client.prepare_offline_bootstrap().await?;
-        println!(
-            "Offline mode: RPC switched to mock chain; genesis loaded via ensure_genesis_in_place."
-        );
+        println!("Offline mode enabled for local account creation.");
     }
 
     client.add_account(&account, false).await?;

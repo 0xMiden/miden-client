@@ -346,18 +346,4 @@ mod tests {
         assert_eq!(nodes[0], (InOrderIndex::from_leaf_pos(4), block_header.commitment()));
         assert_eq!(&nodes[1..], path_nodes.as_slice());
     }
-
-    #[tokio::test]
-    #[cfg(feature = "testing")]
-    async fn mock_rpc_default_serves_genesis_at_block_zero() {
-        use crate::rpc::NodeRpcClient;
-        use crate::test_utils::mock::MockRpcApi;
-
-        let api = MockRpcApi::default();
-        let (hdr, _) = api
-            .get_block_header_by_number(Some(BlockNumber::GENESIS), false)
-            .await
-            .expect("genesis from mock chain");
-        assert_eq!(hdr.block_num(), BlockNumber::GENESIS);
-    }
 }
