@@ -3,7 +3,6 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::{Note, NoteHeader, NoteId, NoteInclusionProof, Nullifier};
-use miden_standards::note::NetworkAccountTarget;
 use miden_tx::utils::serde::{
     ByteReader,
     ByteWriter,
@@ -338,7 +337,7 @@ impl NoteUpdateTracker {
 
         let is_tracked_as_input_note =
             if let Some(input_note_record) = self.get_input_note_by_id(*committed_note.note_id()) {
-                let metadata = committed_note.metadata().cloned().ok_or_else(|| {
+                let metadata = committed_note.metadata().copied().ok_or_else(|| {
                     ClientError::RpcError(RpcError::ExpectedDataMissing(format!(
                         "full metadata for committed note {}",
                         committed_note.note_id()
@@ -394,13 +393,12 @@ impl NoteUpdateTracker {
             output_note.nullifier_received(nullifier, block_num)?;
         }
 
-        // Extract the consumer from the `NetworkAccountTarget` attachment, only if the target
-        // is a network account and it is tracked by this client.
-        let consumer_network_account_id =
-            NetworkAccountTarget::try_from(note_header.metadata().attachment())
-                .ok()
-                .map(|t| t.target_id())
-                .filter(|id| self.tracked_accounts_ids.contains(id));
+        // The consumer extraction previously read `NetworkAccountTarget` from the metadata's
+        // attachment. After the protocol moved attachment content off `NoteMetadata` and onto
+        // `Note`/`NoteAttachments`, the attachment payload is no longer reachable from a
+        // `NoteHeader` alone. Without the full attachments collection (which the RPC erased-note
+        // stream does not deliver), we can no longer recover the target id here.
+        let consumer_network_account_id: Option<AccountId> = None;
 
         // Only create an input record when the consumer is a tracked account.
         if let Some(consumer_id) = consumer_network_account_id {

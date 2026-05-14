@@ -6,8 +6,9 @@ use miden_protocol::block::BlockHeader;
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::note::{
     Note,
-    NoteAttachment,
-    NoteAttachmentKind,
+    NoteAttachmentHeader,
+    NoteAttachmentScheme,
+    NoteAttachments,
     NoteDetails,
     NoteHeader,
     NoteId,
@@ -16,6 +17,7 @@ use miden_protocol::note::{
     NoteScript,
     NoteTag,
     NoteType,
+    PartialNoteMetadata,
 };
 use miden_protocol::{MastForest, MastNodeId, Word};
 use miden_tx::utils::serde::Deserializable;
@@ -59,37 +61,96 @@ fn note_type_to_proto(note_type: NoteType) -> i32 {
     proto_note_type as i32
 }
 
+/// Decodes the `attachment_schemes` slice from a proto `NoteMetadata` into the fixed-size header
+/// array expected by [`NoteMetadata::from_parts`]. Trailing absent slots may be omitted on the
+/// wire; we pad with absent headers to reach the protocol's `NoteAttachments::MAX_COUNT`.
+fn attachment_headers_from_proto(
+    schemes: &[u32],
+) -> Result<[NoteAttachmentHeader; NoteAttachments::MAX_COUNT], RpcConversionError> {
+    if schemes.len() > NoteAttachments::MAX_COUNT {
+        return Err(RpcConversionError::InvalidField(alloc::format!(
+            "attachment_schemes length {} exceeds NoteAttachments::MAX_COUNT",
+            schemes.len(),
+        )));
+    }
+    let mut headers = [NoteAttachmentHeader::absent(); NoteAttachments::MAX_COUNT];
+    for (slot, raw) in schemes.iter().enumerate() {
+        if *raw == 0 {
+            continue;
+        }
+        let raw_u16 = u16::try_from(*raw).map_err(|_| {
+            RpcConversionError::InvalidField(alloc::format!(
+                "attachment_schemes[{slot}]={raw} does not fit in u16",
+            ))
+        })?;
+        let scheme = NoteAttachmentScheme::new(raw_u16).map_err(|err| {
+            RpcConversionError::InvalidField(alloc::format!("attachment_schemes[{slot}]: {err}"))
+        })?;
+        headers[slot] = NoteAttachmentHeader::new(scheme);
+    }
+    Ok(headers)
+}
+
+fn attachment_schemes_to_proto(
+    headers: &[NoteAttachmentHeader; NoteAttachments::MAX_COUNT],
+) -> Vec<u32> {
+    // Encode each header as the scheme value, with `0` meaning absent. Trailing absent slots
+    // are stripped to match the wire convention.
+    let mut encoded: Vec<u32> = headers
+        .iter()
+        .map(|h| h.scheme().map_or(0, |s| u32::from(s.as_u16())))
+        .collect();
+    while matches!(encoded.last(), Some(0)) {
+        encoded.pop();
+    }
+    encoded
+}
+
 impl TryFrom<proto::note::NoteMetadata> for NoteMetadata {
     type Error = RpcConversionError;
 
     fn try_from(value: proto::note::NoteMetadata) -> Result<Self, Self::Error> {
+        let partial_metadata: PartialNoteMetadata = (&value).try_into()?;
+        let attachment_headers = attachment_headers_from_proto(&value.attachment_schemes)?;
+        let attachments_commitment = value
+            .attachments_commitment
+            .ok_or_else(|| {
+                proto::note::NoteMetadata::missing_field(stringify!(attachments_commitment))
+            })?
+            .try_into()?;
+
+        Ok(NoteMetadata::from_parts(
+            partial_metadata,
+            attachment_headers,
+            attachments_commitment,
+        ))
+    }
+}
+
+impl TryFrom<&proto::note::NoteMetadata> for PartialNoteMetadata {
+    type Error = RpcConversionError;
+
+    fn try_from(value: &proto::note::NoteMetadata) -> Result<Self, Self::Error> {
         let sender = value
             .sender
+            .clone()
             .ok_or_else(|| proto::note::NoteMetadata::missing_field(stringify!(sender)))?
             .try_into()?;
         let note_type = note_type_from_proto(value.note_type)?;
         let tag = NoteTag::new(value.tag);
 
-        // Deserialize attachment if present
-        let attachment = if value.attachment.is_empty() {
-            NoteAttachment::default()
-        } else {
-            NoteAttachment::read_from_bytes(&value.attachment)
-                .map_err(RpcConversionError::DeserializationError)?
-        };
-
-        Ok(NoteMetadata::new(sender, note_type).with_tag(tag).with_attachment(attachment))
+        Ok(PartialNoteMetadata::new(sender, note_type).with_tag(tag))
     }
 }
 
 impl From<NoteMetadata> for proto::note::NoteMetadata {
     fn from(value: NoteMetadata) -> Self {
-        use miden_tx::utils::serde::Serializable;
         proto::note::NoteMetadata {
             sender: Some(value.sender().into()),
             note_type: note_type_to_proto(value.note_type()),
             tag: value.tag().as_u32(),
-            attachment: value.attachment().to_bytes(),
+            attachment_schemes: attachment_schemes_to_proto(value.attachment_headers()),
+            attachments_commitment: Some(value.attachments_commitment().into()),
         }
     }
 }
@@ -191,23 +252,13 @@ impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for NoteSyncBlock {
 
 /// The metadata state of a committed note.
 ///
-/// The sync response provides header fields (sender, type, tag, attachment kind) but not the
-/// actual attachment data. For notes without attachments, full [`NoteMetadata`] can be
-/// constructed directly. For notes with attachments, only the header fields are available
-/// until the full metadata is fetched via `GetNotesById`.
+/// Under the current protocol, sync responses always carry full [`NoteMetadata`] (including
+/// attachment scheme markers and the attachments commitment). The actual attachment **content**
+/// must still be fetched separately via `GetNotesById`, but it is not part of the metadata.
 #[derive(Debug, Clone)]
 pub enum CommittedNoteMetadata {
-    /// Full metadata is available (no attachment, or attachment was already fetched).
+    /// Full metadata is available.
     Full(NoteMetadata),
-    /// Only the header fields are available; the attachment data has not been fetched yet.
-    // Ideally this would wrap `NoteMetadataHeader` directly, but it lacks a public
-    // constructor in the protocol crate.
-    Header {
-        sender: AccountId,
-        note_type: NoteType,
-        tag: NoteTag,
-        attachment_kind: NoteAttachmentKind,
-    },
 }
 
 impl CommittedNoteMetadata {
@@ -215,23 +266,16 @@ impl CommittedNoteMetadata {
     pub fn metadata(&self) -> Option<&NoteMetadata> {
         match self {
             Self::Full(m) => Some(m),
-            Self::Header { .. } => None,
         }
     }
 }
 
 /// Represents a committed note, returned as part of a `SyncNotesResponse`.
-///
-/// The sync response provides a [`NoteMetadataHeader`](crate::note::NoteMetadataHeader) but not the
-/// actual attachment data. For notes without attachments, full [`NoteMetadata`] is available
-/// immediately. For notes with attachments, the metadata starts as
-/// [`CommittedNoteMetadata::Header`] until the full data is fetched via `GetNotesById`.
 #[derive(Debug, Clone)]
 pub struct CommittedNote {
     /// Note ID of the committed note.
     note_id: NoteId,
-    /// Note metadata — either full or header-only depending on whether the note has an
-    /// attachment that hasn't been fetched yet.
+    /// Note metadata (currently always full).
     metadata: CommittedNoteMetadata,
     /// Inclusion proof for the note in the block.
     inclusion_proof: NoteInclusionProof,
@@ -253,25 +297,22 @@ impl CommittedNote {
     pub fn note_type(&self) -> NoteType {
         match &self.metadata {
             CommittedNoteMetadata::Full(m) => m.note_type(),
-            CommittedNoteMetadata::Header { note_type, .. } => *note_type,
         }
     }
 
     pub fn tag(&self) -> NoteTag {
         match &self.metadata {
             CommittedNoteMetadata::Full(m) => m.tag(),
-            CommittedNoteMetadata::Header { tag, .. } => *tag,
         }
     }
 
     pub fn sender(&self) -> AccountId {
         match &self.metadata {
             CommittedNoteMetadata::Full(m) => m.sender(),
-            CommittedNoteMetadata::Header { sender, .. } => *sender,
         }
     }
 
-    /// Returns the full note metadata, or `None` if only the header is available.
+    /// Returns the full note metadata.
     pub fn metadata(&self) -> Option<&NoteMetadata> {
         self.metadata.metadata()
     }
@@ -281,10 +322,7 @@ impl CommittedNote {
         &self.metadata
     }
 
-    /// Sets the full metadata, promoting from `Header` to `Full`.
-    ///
-    /// Used after fetching attachment data via `GetNotesById` for notes whose sync
-    /// response only included header fields.
+    /// Overwrites the stored metadata.
     pub fn set_metadata(&mut self, metadata: NoteMetadata) {
         self.metadata = CommittedNoteMetadata::Full(metadata);
     }
@@ -298,28 +336,10 @@ impl TryFrom<proto::note::NoteSyncRecord> for CommittedNote {
     type Error = RpcConversionError;
 
     fn try_from(note: proto::note::NoteSyncRecord) -> Result<Self, Self::Error> {
-        let proto_header = note.metadata_header.ok_or(
-            proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.metadata_header)),
-        )?;
-
-        let sender = proto_header
-            .sender
-            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
-                notes.metadata_header.sender
-            )))?
-            .try_into()?;
-        let note_type = note_type_from_proto(proto_header.note_type)?;
-        let tag = NoteTag::new(proto_header.tag);
-        let attachment_kind = u8::try_from(proto_header.attachment_kind)
-            .ok()
-            .and_then(|kind| NoteAttachmentKind::try_from(kind).ok())
-            .unwrap_or_default();
-
-        let metadata = if attachment_kind == NoteAttachmentKind::None {
-            CommittedNoteMetadata::Full(NoteMetadata::new(sender, note_type).with_tag(tag))
-        } else {
-            CommittedNoteMetadata::Header { sender, note_type, tag, attachment_kind }
-        };
+        let proto_metadata = note
+            .metadata
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.metadata)))?;
+        let metadata = CommittedNoteMetadata::Full(proto_metadata.try_into()?);
 
         let proto_inclusion_proof = note.inclusion_proof.ok_or(
             proto::rpc::SyncNotesResponse::missing_field(stringify!(notes.inclusion_proof)),
@@ -399,16 +419,26 @@ impl TryFrom<proto::note::CommittedNote> for FetchedNote {
             .note
             .ok_or_else(|| proto::note::CommittedNote::missing_field(stringify!(note)))?;
 
-        let metadata = note
+        let proto_metadata = note
             .metadata
-            .ok_or_else(|| proto::note::CommittedNote::missing_field(stringify!(note.metadata)))?
-            .try_into()?;
+            .ok_or_else(|| proto::note::CommittedNote::missing_field(stringify!(note.metadata)))?;
+        let metadata: NoteMetadata = proto_metadata.clone().try_into()?;
+        let partial_metadata: PartialNoteMetadata = (&proto_metadata).try_into()?;
 
         if let Some(detail_bytes) = note.details {
             let details = NoteDetails::read_from_bytes(&detail_bytes)?;
             let (assets, recipient) = details.into_parts();
 
-            Ok(FetchedNote::Public(Note::new(assets, metadata, recipient), inclusion_proof))
+            let attachments = if note.attachments.is_empty() {
+                NoteAttachments::empty()
+            } else {
+                NoteAttachments::read_from_bytes(&note.attachments)?
+            };
+
+            Ok(FetchedNote::Public(
+                Note::with_attachments(assets, partial_metadata, recipient, attachments),
+                inclusion_proof,
+            ))
         } else {
             let note_header = NoteHeader::new(note_id, metadata);
             Ok(FetchedNote::Private(note_header, inclusion_proof))

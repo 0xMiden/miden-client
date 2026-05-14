@@ -239,7 +239,7 @@ pub trait NodeRpcClient: Send + Sync {
                     if let Some(note) = block.notes.get_mut(&note_id)
                         && note.metadata().is_none()
                     {
-                        note.set_metadata(fetched_note.metadata().clone());
+                        note.set_metadata(*fetched_note.metadata());
                     }
                 }
 
@@ -343,7 +343,7 @@ pub trait NodeRpcClient: Send + Sync {
         for detail in note_details {
             if let FetchedNote::Public(note, inclusion_proof) = detail {
                 let state = UnverifiedNoteState {
-                    metadata: note.metadata().clone(),
+                    metadata: *note.metadata(),
                     inclusion_proof,
                 }
                 .into();

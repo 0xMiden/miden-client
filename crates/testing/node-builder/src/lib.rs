@@ -16,12 +16,11 @@ use miden_node_block_producer::{
     DEFAULT_MAX_TXS_PER_BATCH,
     DEFAULT_MEMPOOL_TX_CAPACITY,
 };
-use miden_node_ntx_builder::NtxBuilderConfig;
 use miden_node_rpc::Rpc;
 use miden_node_store::{DEFAULT_MAX_CONCURRENT_PROOFS, GenesisState, Store, StoreMode};
 use miden_node_utils::clap::{GrpcOptionsExternal, GrpcOptionsInternal, StorageOptions};
 use miden_node_utils::crypto::get_rpo_random_coin;
-use miden_node_validator::{Validator, ValidatorSigner};
+use miden_ntx_builder::NtxBuilderConfig;
 use miden_protocol::account::auth::{AuthScheme, AuthSecretKey};
 use miden_protocol::account::{
     Account,
@@ -33,17 +32,24 @@ use miden_protocol::account::{
     StorageMap,
     StorageMapKey,
 };
-use miden_protocol::asset::{Asset, FungibleAsset, TokenSymbol};
+use miden_protocol::asset::{Asset, AssetAmount, FungibleAsset, TokenSymbol};
 use miden_protocol::block::FeeParameters;
 use miden_protocol::crypto::dsa::ecdsa_k256_keccak;
 use miden_protocol::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
 use miden_protocol::utils::serde::Serializable;
 use miden_protocol::{ONE, Word};
 use miden_standards::AuthMethod;
+use miden_standards::account::access::AccessControl;
 use miden_standards::account::auth::AuthSingleSig;
-use miden_standards::account::components::basic_wallet_library;
-use miden_standards::account::faucets::create_basic_fungible_faucet;
-use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
+use miden_standards::account::faucets::{FungibleFaucet, TokenName, create_fungible_faucet};
+use miden_standards::account::policies::{
+    BurnPolicyConfig,
+    MintPolicyConfig,
+    PolicyAuthority,
+    TokenPolicyManager,
+};
+use miden_standards::account::wallets::BasicWallet;
+use miden_validator::{Validator, ValidatorSigner};
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
 use tokio::net::TcpListener;
@@ -130,6 +136,7 @@ impl NodeBuilder {
             .try_into()
             .expect("timestamp should fit into u32");
         let validator_signer = ecdsa_k256_keccak::SecretKey::new();
+        let validator_public_key = validator_signer.public_key();
 
         let genesis_state = GenesisState::new(
             [&[account_file.account][..], &test_faucets_and_account[..]].concat(),
@@ -137,13 +144,12 @@ impl NodeBuilder {
                 .unwrap(),
             version,
             timestamp,
-            validator_signer.clone(),
+            validator_public_key,
         );
 
         // Bootstrap the store database
         let genesis_block = genesis_state
-            .into_block()
-            .await
+            .into_block(&validator_signer)
             .with_context(|| "failed to create genesis block")?;
 
         let genesis_header = genesis_block.inner().header().clone();
@@ -152,13 +158,12 @@ impl NodeBuilder {
 
         // Bootstrap the validator database with the genesis block header so that block
         // validation can find the chain tip.
-        let validator_db =
-            miden_node_validator::db::load(self.data_directory.join("validator.sqlite3"))
-                .await
-                .with_context(|| "failed to initialize validator database")?;
+        let validator_db = miden_validator::db::load(self.data_directory.join("validator.sqlite3"))
+            .await
+            .with_context(|| "failed to initialize validator database")?;
         validator_db
             .transact("bootstrap_validator", move |conn| {
-                miden_node_validator::db::upsert_block_header(conn, &genesis_header)
+                miden_validator::db::upsert_block_header(conn, &genesis_header)
             })
             .await
             .with_context(|| "failed to bootstrap validator with genesis block header")?;
@@ -220,7 +225,7 @@ impl NodeBuilder {
             store_ntx_builder_address,
             validator_address,
             self.data_directory.join("ntx-builder.sqlite3"),
-            Some(ntx_builder_listener),
+            ntx_builder_listener,
             &mut join_set,
         );
 
@@ -386,7 +391,7 @@ impl NodeBuilder {
         store_address: SocketAddr,
         validator_address: SocketAddr,
         database_filepath: PathBuf,
-        listener: Option<TcpListener>,
+        listener: TcpListener,
         join_set: &mut JoinSet<Result<()>>,
     ) -> Id {
         let store_url =
@@ -462,12 +467,23 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
 
     let symbol = TokenSymbol::try_from("TST").expect("TST should be a valid token symbol");
     let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
-    let metadata = FungibleTokenMetadata::builder(name, symbol, 12, 1_000_000_000_000).build()?;
-    let account = create_basic_fungible_faucet(
+    let faucet = FungibleFaucet::builder()
+        .name(name)
+        .symbol(symbol)
+        .decimals(12)
+        .max_supply(AssetAmount::new(1_000_000_000_000).unwrap())
+        .build()?;
+    let account = create_fungible_faucet(
         rng.random(),
-        metadata,
+        faucet,
         miden_protocol::account::AccountStorageMode::Public,
         auth_method,
+        AccessControl::AuthControlled,
+        TokenPolicyManager::new(
+            PolicyAuthority::AuthControlled,
+            MintPolicyConfig::AllowAll,
+            BurnPolicyConfig::AllowAll,
+        ),
     )?;
 
     // Force the account nonce to 1.
@@ -493,7 +509,11 @@ async fn available_socket_addr() -> Result<SocketAddr> {
 // ================================================================================================
 
 /// Expected account ID for the test account. Used to verify deterministic generation.
-const TEST_ACCOUNT_ID: &str = "0x0a0a0a0a0a0a0a100a0a0a0a0a0a0a";
+///
+/// Updated for the deps bump: upstream's account-generation changed (new `FungibleFaucet`
+/// embedding metadata into storage, new policy components, new schema commitments), so the
+/// resulting deterministic ID shifted by one byte vs. the pre-bump pin.
+const TEST_ACCOUNT_ID: &str = "0x0a0a0a0a0a0a0a110a0a0a0a0a0a0a";
 
 /// Deterministic seed used for the test account to ensure reproducible account IDs.
 const TEST_ACCOUNT_SEED: [u8; 32] = [0xa; 32];
@@ -551,14 +571,23 @@ fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Res
 
     let symbol = TokenSymbol::new("TKN")?;
     let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
-    let metadata =
-        FungibleTokenMetadata::builder(name, symbol, FAUCET_DECIMALS, u64::from(FAUCET_MAX_SUPPLY))
-            .build()?;
-    let faucet = create_basic_fungible_faucet(
+    let faucet_component = FungibleFaucet::builder()
+        .name(name)
+        .symbol(symbol)
+        .decimals(FAUCET_DECIMALS)
+        .max_supply(AssetAmount::new(u64::from(FAUCET_MAX_SUPPLY)).unwrap())
+        .build()?;
+    let faucet = create_fungible_faucet(
         init_seed,
-        metadata,
+        faucet_component,
         miden_protocol::account::AccountStorageMode::Public,
         auth_scheme,
+        AccessControl::AuthControlled,
+        TokenPolicyManager::new(
+            PolicyAuthority::AuthControlled,
+            MintPolicyConfig::AllowAll,
+            BurnPolicyConfig::AllowAll,
+        ),
     )?;
 
     // Set nonce to ONE to indicate the account is deployed (see generate_genesis_account)
@@ -575,7 +604,7 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
 
     let storage_map = create_large_storage_map();
     let acc_component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![storage_map],
         AccountComponentMetadata::new("miden::testing::basic_wallet", AccountType::all()),
     )

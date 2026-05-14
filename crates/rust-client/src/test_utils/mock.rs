@@ -328,7 +328,7 @@ impl NodeRpcClient for MockRpcApi {
             {
                 let committed = CommittedNote::new(
                     note.id(),
-                    CommittedNoteMetadata::Full(note.metadata().clone()),
+                    CommittedNoteMetadata::Full(*note.metadata()),
                     note.inclusion_proof().clone(),
                 );
                 blocks_with_notes.entry(note_block).or_default().insert(note.id(), committed);
@@ -411,7 +411,7 @@ impl NodeRpcClient for MockRpcApi {
         for note in hit_notes {
             let fetched_note = match note {
                 MockChainNote::Private(note_id, note_metadata, note_inclusion_proof) => {
-                    let note_header = NoteHeader::new(*note_id, note_metadata.clone());
+                    let note_header = NoteHeader::new(*note_id, *note_metadata);
                     FetchedNote::Private(note_header, note_inclusion_proof.clone())
                 },
                 MockChainNote::Public(note, note_inclusion_proof) => {

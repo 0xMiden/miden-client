@@ -83,7 +83,7 @@ impl NoteStateHandler for CommittedNoteState {
 
         Ok(Some(
             ProcessingAuthenticatedNoteState {
-                metadata: self.metadata.clone(),
+                metadata: self.metadata,
                 inclusion_proof: self.inclusion_proof.clone(),
                 block_note_root: self.block_note_root,
                 submission_data,
