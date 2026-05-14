@@ -168,8 +168,7 @@ pub async fn print_executed_transaction<AUTH>(
         for (vault_key, amount) in delta.vault().fungible().iter() {
             let asset = FungibleAsset::new(vault_key.faucet_id(), amount.unsigned_abs())
                 .map_err(CliError::Asset)?;
-            let (faucet_fmt, amount_fmt) =
-                resolver.format_fungible_asset(client, &asset).await?;
+            let (faucet_fmt, amount_fmt) = resolver.format_fungible_asset(client, &asset).await?;
 
             if amount.is_positive() {
                 table.add_row(vec!["Fungible Asset", &faucet_fmt, &format!("+{amount_fmt}")]);
