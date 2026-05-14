@@ -77,9 +77,9 @@ impl<AUTH> Client<AUTH> {
     /// notes have no on-chain details), so calling this method is safe to
     /// retry until the recipient acknowledges.
     ///
-    /// Requires the note to be in [`OutputNoteState::CommittedFull`]: i.e.
-    /// committed on chain AND the store has the full recipient data needed
-    /// to reconstruct the [`Note`].
+    /// Requires the note to be in [`crate::store::OutputNoteState::CommittedFull`]:
+    /// i.e. committed on chain AND the store has the full recipient data
+    /// needed to reconstruct the [`Note`].
     ///
     /// The store distinguishes two committed states. `CommittedFull` carries
     /// the recipient and is what this method needs. `CommittedPartial`
