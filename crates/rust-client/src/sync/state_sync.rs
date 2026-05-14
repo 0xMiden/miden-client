@@ -321,6 +321,26 @@ impl StateSync {
             .await?;
         let chain_tip = chain_mmr_info.block_to;
 
+        // Validate the response covers the range we requested.
+        if chain_mmr_info.block_header.block_num() != chain_mmr_info.block_to {
+            return Err(ClientError::ChainValidationError(format!(
+                "sync_chain_mmr block_header.block_num ({}) does not match block_to ({})",
+                chain_mmr_info.block_header.block_num(),
+                chain_mmr_info.block_to
+            )));
+        }
+        if chain_mmr_info.block_from != current_block_num {
+            return Err(ClientError::ChainValidationError(format!(
+                "sync_chain_mmr block_from mismatch: expected {current_block_num}, got {}",
+                chain_mmr_info.block_from
+            )));
+        }
+        if chain_tip < current_block_num {
+            return Err(ClientError::ChainValidationError(format!(
+                "sync_chain_mmr block_to ({chain_tip}) is behind current block {current_block_num}"
+            )));
+        }
+
         // No progress — already at the tip.
         if chain_tip == current_block_num {
             info!(block_num = %current_block_num, "Already at chain tip, nothing to sync.");
@@ -339,6 +359,16 @@ impl StateSync {
             .rpc_api
             .sync_notes_with_details(current_block_num + 1, chain_tip, note_tags.as_ref())
             .await?;
+
+        // Validate every returned note block falls in (current_block_num, chain_tip].
+        for block in &sync_notes_result.blocks {
+            let block_num = block.block_header.block_num();
+            if block_num <= current_block_num || block_num > chain_tip {
+                return Err(ClientError::ChainValidationError(format!(
+                    "sync_notes returned block {block_num} outside requested range ({current_block_num}, {chain_tip}]"
+                )));
+            }
+        }
 
         let note_count: usize = sync_notes_result.blocks.iter().map(|b| b.notes.len()).sum();
         info!(
@@ -433,14 +463,36 @@ impl StateSync {
             ..
         } = sync_data;
 
-        // Advance the partial MMR: apply delta (up to chain_tip - 1), capture peaks at that
+        // Operate on a clone so any validation failure leaves `current_partial_mmr` untouched.
+        // The clone is committed back at the end of the function once all checks pass.
+        let mut working_mmr = current_partial_mmr.clone();
+
+        // Advance the working MMR: apply delta (up to chain_tip - 1), capture peaks at that
         // forest, then add the chain tip leaf (which the delta excludes due to the
         // one-block lag in block header MMR commitments).
         let mut new_authentication_nodes =
-            current_partial_mmr.apply(mmr_delta).map_err(StoreError::MmrError)?;
-        state_sync_update.partial_blockchain_updates.new_peaks = current_partial_mmr.peaks();
-        new_authentication_nodes
-            .append(&mut current_partial_mmr.add(chain_tip_header.commitment(), false));
+            working_mmr.apply(mmr_delta).map_err(StoreError::MmrError)?;
+        let new_peaks = working_mmr.peaks();
+
+        // Verify that post-delta peaks match the block header's chain commitment.
+        // chain_commitment is the hash of MMR peaks for blocks 0..block_num-1,
+        // which is exactly the state after applying the delta.
+        let peaks_commitment = new_peaks.hash_peaks();
+        if peaks_commitment != chain_tip_header.chain_commitment() {
+            return Err(ClientError::ChainValidationError(format!(
+                "MMR peaks commitment is {:?} and does not match block header chain commitment {:?}",
+                peaks_commitment,
+                chain_tip_header.chain_commitment()
+            )));
+        }
+
+        state_sync_update.partial_blockchain_updates.new_peaks = new_peaks;
+
+        // Note: we add the chain tip leaf to our MMR, but we cannot prove that it is effectively
+        // the chain tip. In the current context of centralized trusted node, we assume it
+        // is valid. Eventually, we will be able to validate that the resulting MMR root is
+        // "canonical".
+        new_authentication_nodes.append(&mut working_mmr.add(chain_tip_header.commitment(), false));
 
         state_sync_update.partial_blockchain_updates.insert(
             chain_tip_header.clone(),
@@ -464,10 +516,10 @@ impl StateSync {
                 let block_pos = block.block_header.block_num().as_usize();
 
                 let nodes_before: BTreeMap<_, _> =
-                    current_partial_mmr.nodes().map(|(k, v)| (*k, *v)).collect();
+                    working_mmr.nodes().map(|(k, v)| (*k, *v)).collect();
 
-                if !current_partial_mmr.is_tracked(block_pos) {
-                    current_partial_mmr
+                if !working_mmr.is_tracked(block_pos) {
+                    working_mmr
                         .track(block_pos, block.block_header.commitment(), &block.mmr_path)
                         .map_err(StoreError::MmrError)?;
                 }
@@ -476,7 +528,7 @@ impl StateSync {
                 // already tracked from the MMR delta, the delta's nodes may not include
                 // the full authentication path needed to reconstruct the PartialMmr
                 // from storage later.
-                let track_auth_nodes: Vec<_> = current_partial_mmr
+                let track_auth_nodes: Vec<_> = working_mmr
                     .nodes()
                     .filter(|(k, _)| !nodes_before.contains_key(k))
                     .map(|(k, v)| (*k, *v))
@@ -489,6 +541,9 @@ impl StateSync {
                 );
             }
         }
+
+        // All MMR checks passed; commit the working MMR back to the caller.
+        *current_partial_mmr = working_mmr;
 
         // Apply transaction and nullifier data.
         state_sync_update.note_updates.extend_nullifiers(nullifiers);

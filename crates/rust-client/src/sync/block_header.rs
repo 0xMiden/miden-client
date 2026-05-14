@@ -188,6 +188,24 @@ pub(crate) fn adjust_merkle_path_for_forest(
     path_nodes
 }
 
+/// Adjusts a Merkle path for the given forest, then calls [`PartialMmr::track`] to verify
+/// and register the block. Returns the authentication nodes produced by the tracking.
+pub(crate) fn track_block_in_mmr(
+    partial_mmr: &mut PartialMmr,
+    block_num: BlockNumber,
+    block_commitment: Word,
+    mmr_path: &MerklePath,
+) -> Result<Vec<(InOrderIndex, Word)>, ClientError> {
+    let path_nodes = adjust_merkle_path_for_forest(mmr_path, block_num, partial_mmr.forest());
+    let adjusted_path = MerklePath::new(path_nodes.iter().map(|(_, n)| *n).collect());
+
+    partial_mmr
+        .track(block_num.as_usize(), block_commitment, &adjusted_path)
+        .map_err(StoreError::MmrError)?;
+
+    Ok(path_nodes)
+}
+
 fn authenticated_block_nodes(
     block_header: &BlockHeader,
     mut path_nodes: Vec<(InOrderIndex, Word)>,
@@ -208,19 +226,12 @@ pub(crate) async fn fetch_block_header(
 ) -> Result<(BlockHeader, Vec<(InOrderIndex, Word)>), ClientError> {
     let (block_header, mmr_proof) = rpc_api.get_block_header_with_proof(block_num).await?;
 
-    // Trim merkle path to keep nodes relevant to our current PartialMmr since the node's MMR
-    // might be of a forest arbitrarily higher
-    let path_nodes = adjust_merkle_path_for_forest(
-        mmr_proof.merkle_path(),
+    let path_nodes = track_block_in_mmr(
+        current_partial_mmr,
         block_num,
-        current_partial_mmr.forest(),
-    );
-
-    let merkle_path = MerklePath::new(path_nodes.iter().map(|(_, n)| *n).collect());
-
-    current_partial_mmr
-        .track(block_num.as_usize(), block_header.commitment(), &merkle_path)
-        .map_err(StoreError::MmrError)?;
+        block_header.commitment(),
+        mmr_proof.merkle_path(),
+    )?;
 
     Ok((block_header, path_nodes))
 }
