@@ -274,8 +274,9 @@ struct FaucetTomlEntry {
 /// Lookup walks three sources in priority order:
 ///
 /// 1. The user's TOML symbol map (bech32 `id`).
-/// 2. The local store cache populated from previous RPC fetches.
-/// 3. A fresh RPC fetch from the network. Successful fetches are written back to the cache.
+/// 2. The client's settings store, populated from previous RPC fetches.
+/// 3. A fresh RPC fetch from the network. Successful fetches are persisted back to the settings
+///    store.
 #[derive(Debug)]
 pub struct FaucetMetadataResolver {
     toml: BTreeMap<String, FaucetTomlEntry>,
@@ -328,8 +329,8 @@ impl FaucetMetadataResolver {
         Ok(Self { toml: parsed })
     }
 
-    /// Looks up `(symbol, decimals)` for a faucet, walking TOML → settings cache → RPC fetch.
-    /// On RPC success, the result is written back to the settings cache.
+    /// Looks up `(symbol, decimals)` for a faucet, walking TOML → settings store → RPC fetch.
+    /// On RPC success, the result is persisted to the settings store.
     pub async fn resolve<AUTH>(
         &self,
         client: &mut Client<AUTH>,
@@ -339,17 +340,17 @@ impl FaucetMetadataResolver {
         if let Some((symbol, decimals)) = self.lookup_toml(&faucet_id) {
             return Ok(Some(FaucetMetadata { symbol, decimals }));
         }
-        let cache_key = faucet_metadata_setting_key(faucet_id);
-        // 2) settings cache
-        if let Some(cached) = client.get_setting::<FaucetMetadata>(cache_key.clone()).await? {
-            return Ok(Some(cached));
+        let setting_key = faucet_metadata_setting_key(faucet_id);
+        // 2) settings store
+        if let Some(stored) = client.get_setting::<FaucetMetadata>(setting_key.clone()).await? {
+            return Ok(Some(stored));
         }
         // 3) RPC fetch
         match client.fetch_remote_token_metadata(faucet_id).await {
             Ok(Some(meta)) => {
-                if let Err(err) = client.set_setting(cache_key, meta.clone()).await {
+                if let Err(err) = client.set_setting(setting_key, meta.clone()).await {
                     tracing::warn!(
-                        "failed to cache faucet metadata for {}: {err}",
+                        "failed to persist faucet metadata for {}: {err}",
                         faucet_id.to_hex(),
                     );
                 }
@@ -434,10 +435,10 @@ impl FaucetMetadataResolver {
     }
 }
 
-/// Settings key prefix under which cached faucet display metadata is stored.
+/// Settings key prefix under which faucet display metadata is persisted.
 const FAUCET_METADATA_SETTING_PREFIX: &str = "faucet_metadata:";
 
-/// Returns the settings-store key under which the cached metadata for `faucet_id` is stored.
+/// Returns the settings-store key under which the metadata for `faucet_id` is persisted.
 fn faucet_metadata_setting_key(faucet_id: AccountId) -> String {
     format!("{FAUCET_METADATA_SETTING_PREFIX}{}", faucet_id.to_hex())
 }

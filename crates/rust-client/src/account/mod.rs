@@ -77,10 +77,10 @@ use miden_tx::utils::serde::{
     Serializable,
 };
 
-/// Cached, display-only metadata for a faucet account.
+/// Display-only metadata for a faucet account, persisted in the client's settings store.
 ///
 /// Populated lazily by the CLI resolver from the on-chain `TokenMetadata` of a public faucet
-/// and persisted in the client's settings store under a `faucet_metadata:<faucet-id>` key.
+/// and persisted under a `faucet_metadata:<faucet-id>` key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FaucetMetadata {
     pub symbol: String,

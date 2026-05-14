@@ -15,7 +15,6 @@ use miden_client::note::{
 use miden_client::store::{InputNoteRecord, NoteFilter as ClientNoteFilter, OutputNoteRecord};
 use miden_client::{Client, ClientError, IdPrefixFetchError, PrettyPrint};
 
-use crate::config::CliConfig;
 use crate::errors::CliError;
 use crate::utils::{load_faucet_metadata_resolver, parse_account_id};
 use crate::{Parser, create_dynamic_table, get_output_note_with_id_prefix};
@@ -260,7 +259,7 @@ async fn show_note<AUTH: Keystore + Sync>(
         Cell::new("Amount").add_attribute(Attribute::Bold),
     ]);
     let resolver = load_faucet_metadata_resolver()?;
-    let network_id = CliConfig::load()?.rpc.endpoint.0.to_network_id();
+    let network_id = client.network_id().await?;
     let assets = assets.iter();
 
     for asset in assets {

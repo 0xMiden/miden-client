@@ -108,7 +108,7 @@ impl AccountCmd {
 
 async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     let accounts = client.get_account_headers().await?;
-    let network_id = CliConfig::load()?.rpc.endpoint.0.to_network_id();
+    let network_id = client.network_id().await?;
 
     let mut table = create_dynamic_table(&["Address", "Type", "Storage Mode", "Nonce", "Status"]);
     for (acc, _acc_seed) in &accounts {
@@ -161,7 +161,7 @@ async fn show_account<AUTH>(
         )))?
     };
 
-    let network_id = rpc_config.endpoint.0.to_network_id();
+    let network_id = client.network_id().await?;
     let token_symbol = if account.id().account_type() == AccountType::FungibleFaucet {
         Some(get_token_metadata_from_account(&account)?.symbol().to_string())
     } else {

@@ -371,7 +371,7 @@ async fn token_symbol_mapping() -> Result<()> {
     Ok(())
 }
 
-/// Exercises the resolver's RPC fetch + cache write-back path end-to-end.
+/// Exercises the resolver's RPC fetch + settings-store write-back path end-to-end.
 ///
 /// Mints from a *public* faucet that is not present in the user's TOML map, then runs
 /// `notes -s <id>` to display the issued note. `notes -s` formats each fungible asset via
@@ -379,17 +379,17 @@ async fn token_symbol_mapping() -> Result<()> {
 /// `Client::fetch_remote_token_metadata`. Asserts:
 /// 1. `notes -s` stdout contains the faucet's symbol ("BTC" — the constant baked into
 ///    `new_faucet_cli`'s init storage data).
-/// 2. After the display, the settings store contains a cached entry for the faucet, proving the
+/// 2. After the display, the settings store contains a persisted entry for the faucet, proving the
 ///    resolver wrote back its RPC result.
 #[tokio::test]
-async fn public_faucet_metadata_is_fetched_and_cached() -> Result<()> {
+async fn public_faucet_metadata_is_fetched_and_persisted() -> Result<()> {
     let (store_path, temp_dir, endpoint) = init_cli();
 
     let wallet_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Public);
     let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Public);
 
     // Deliberately do NOT write a token_symbol_map.toml — the TOML path must miss so the
-    // resolver falls through to the cache and then to RPC.
+    // resolver falls through to the settings store and then to RPC.
 
     sync_cli(&temp_dir);
 
@@ -429,8 +429,8 @@ async fn public_faucet_metadata_is_fetched_and_cached() -> Result<()> {
     sync_until_committed_transaction(&temp_dir);
 
     // Display the note. `notes -s` formats each fungible asset via the resolver; with the
-    // TOML empty and the cache cold, the resolver must hit RPC to get ("BTC", 10) and write
-    // the result back to the local cache.
+    // TOML empty and the settings store cold, the resolver must hit RPC to get ("BTC", 10) and
+    // persist the result back to the settings store.
     let mut show_cmd = cargo_bin_cmd!("miden-client");
     show_cmd.args(["notes", "-s", &note_id]);
     let show_output = show_cmd.current_dir(&temp_dir).output().unwrap();
@@ -450,15 +450,15 @@ async fn public_faucet_metadata_is_fetched_and_cached() -> Result<()> {
     // Assert the resolver wrote the metadata into the settings store.
     let faucet_id = AccountId::from_hex(&fungible_faucet_account_id).unwrap();
     let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
-    let cache_key = format!("faucet_metadata:{}", faucet_id.to_hex());
-    let cached: Option<FaucetMetadata> = client.get_setting(cache_key).await?;
+    let setting_key = format!("faucet_metadata:{}", faucet_id.to_hex());
+    let stored: Option<FaucetMetadata> = client.get_setting(setting_key).await?;
     assert!(
-        cached.is_some(),
-        "expected settings store to contain cached metadata for {fungible_faucet_account_id} after notes -s",
+        stored.is_some(),
+        "expected settings store to contain metadata for {fungible_faucet_account_id} after notes -s",
     );
-    let cached = cached.unwrap();
-    assert_eq!(cached.symbol, "BTC");
-    assert_eq!(cached.decimals, 10);
+    let stored = stored.unwrap();
+    assert_eq!(stored.symbol, "BTC");
+    assert_eq!(stored.decimals, 10);
     Ok(())
 }
 

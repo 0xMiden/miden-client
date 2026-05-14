@@ -592,7 +592,7 @@ async fn execute_transaction<AUTH: Keystore + Sync + 'static>(
     let executed_transaction = transaction_result.executed_transaction().clone();
 
     // Show delta and ask for confirmation
-    let network_id = CliConfig::load()?.rpc.endpoint.0.to_network_id();
+    let network_id = client.network_id().await?;
     print_executed_transaction(client, &executed_transaction, &network_id).await?;
     if !force {
         println!(

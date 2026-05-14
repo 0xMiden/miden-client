@@ -474,6 +474,11 @@ impl<AUTH> Client<AUTH> {
         self.store.identifier()
     }
 
+    /// Returns the network ID of the node the client is connected to.
+    pub async fn network_id(&self) -> Result<address::NetworkId, ClientError> {
+        Ok(self.rpc_api.get_network_id().await?)
+    }
+
     // LIMITS
     // --------------------------------------------------------------------------------------------
 
