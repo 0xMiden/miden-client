@@ -3,7 +3,6 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
-use miden_protocol::account::AccountId;
 use miden_protocol::asset::Asset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{NoteHeader, NoteId, NoteInclusionProof, Nullifier};
@@ -51,30 +50,6 @@ impl From<TransactionId> for proto::transaction::TransactionId {
     fn from(value: TransactionId) -> Self {
         Self { id: Some(value.as_word().into()) }
     }
-}
-
-// TRANSACTION INCLUSION
-// ================================================================================================
-
-/// Represents a transaction that was included in the node at a certain block.
-#[derive(Debug, Clone)]
-pub struct TransactionInclusion {
-    /// The transaction identifier.
-    pub transaction_id: TransactionId,
-    /// The number of the block in which the transaction was included.
-    pub block_num: BlockNumber,
-    /// The account that the transaction was executed against.
-    pub account_id: AccountId,
-    /// The initial account state commitment before the transaction was executed.
-    pub initial_state_commitment: Word,
-    /// The nullifiers of the input notes consumed by this transaction.
-    pub nullifiers: Vec<Nullifier>,
-    /// Output notes committed by this transaction, with inclusion proofs.
-    /// Does not include erased notes.
-    pub output_notes: Vec<CommittedNote>,
-    /// Output notes that were erased by same-batch note erasure.
-    /// Contains the full note header (ID + metadata) from the transaction header.
-    pub erased_output_notes: Vec<NoteHeader>,
 }
 
 // TRANSACTIONS INFO
