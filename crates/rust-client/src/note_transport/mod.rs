@@ -84,41 +84,83 @@ where
     /// To fetch the full history of private notes for the tracked tags, use
     /// [`Client::fetch_all_private_notes`].
     pub async fn fetch_private_notes(&mut self) -> Result<(), ClientError> {
-        // Unique tags
-        let note_tags = self.store.get_unique_note_tags().await?;
-        // Get global cursor
+        let note_tags: Vec<NoteTag> =
+            self.store.get_unique_note_tags().await?.into_iter().collect();
         let cursor = self.store.get_note_transport_cursor().await?;
 
-        self.fetch_transport_notes(cursor, note_tags).await?;
+        let (_, new_cursor) = self.fetch_transport_notes(cursor, &note_tags).await?;
+        self.store.update_note_transport_cursor(new_cursor).await?;
 
         Ok(())
     }
 
-    /// Fetches all notes for tracked note tags.
+    /// Fetches all notes for tracked note tags, draining the server's paginated
+    /// response by looping until the cursor stops advancing.
     ///
-    /// Similar to [`Client::fetch_private_notes`] however does not employ pagination,
-    /// fetching all notes stored in the note transport network for the tracked tags.
-    /// Please prefer using [`Client::fetch_private_notes`] to avoid downloading repeated notes.
+    /// Similar to [`Client::fetch_private_notes`] but ignores the stored
+    /// pagination cursor and re-scans from the beginning. The server-side
+    /// transport caps each response at a fixed batch size; this method issues
+    /// repeated fetch calls until one returns the same cursor it was given
+    /// (i.e. no new notes), so the documented "fetches all notes" semantics
+    /// hold regardless of how large the backlog is. Prefer
+    /// [`Client::fetch_private_notes`] for steady-state syncing to avoid
+    /// re-downloading already-seen notes.
     pub async fn fetch_all_private_notes(&mut self) -> Result<(), ClientError> {
-        let note_tags = self.store.get_unique_note_tags().await?;
+        // Safety cap on a misbehaving server. At 500 notes per batch, 1000
+        // iterations covers 500k notes — well beyond any plausible retention
+        // window — and bounds the worst-case wall-clock at ~50s at 50ms/req.
+        // Hitting this signals a server bug, not an honest backlog.
+        const MAX_ITERATIONS: usize = 1_000;
 
-        self.fetch_transport_notes(NoteTransportCursor::init(), note_tags).await?;
+        let note_tags: Vec<NoteTag> =
+            self.store.get_unique_note_tags().await?.into_iter().collect();
+        // Snapshot the stored cursor up front so we can advance (never regress)
+        // it after the drain. Without this guard, starting the drain at
+        // `init()` and persisting per-batch would clobber a previously
+        // advanced cursor with the small `rcursor` of the first batch.
+        let stored_cursor = self.store.get_note_transport_cursor().await?;
 
-        Ok(())
+        let mut cursor = NoteTransportCursor::init();
+        for _ in 0..MAX_ITERATIONS {
+            let (_, new_cursor) = self.fetch_transport_notes(cursor, &note_tags).await?;
+            // Terminate on any lack of forward progress. A well-behaved server
+            // returns `new_cursor == cursor` when there are no new notes (since
+            // `rcursor = max(cursor, max_seq_returned)`); using `<=` here also
+            // handles implementations that return an `init()` cursor on empty
+            // batches (see the in-tree mock transport).
+            if new_cursor <= cursor {
+                let final_cursor = core::cmp::max(cursor, stored_cursor);
+                self.store.update_note_transport_cursor(final_cursor).await?;
+                return Ok(());
+            }
+            cursor = new_cursor;
+        }
+
+        Err(ClientError::NoteTransportError(NoteTransportError::PaginationDidNotTerminate(
+            MAX_ITERATIONS,
+        )))
     }
 
-    /// Fetch notes from the note transport network for provided note tags
+    /// Fetch one batch of notes from the note transport network for the
+    /// provided tags.
     ///
-    /// Pagination is employed, where only notes after the provided cursor are requested.
-    /// Downloaded notes are imported. Returns the IDs of the imported notes.
-    pub(crate) async fn fetch_transport_notes<I>(
+    /// The server paginates; this method issues one RPC and returns the
+    /// imported note IDs together with the new cursor. The returned cursor
+    /// equals the input cursor when the batch was empty (i.e. no new notes).
+    /// Callers that want to drain the full backlog should loop until
+    /// `new_cursor == cursor` (see [`Client::fetch_all_private_notes`]).
+    /// Callers that do steady-state polling (see [`Client::sync_state`] /
+    /// [`Client::fetch_private_notes`]) should call this once per tick with
+    /// the stored cursor.
+    ///
+    /// Downloaded notes are imported into the local store. Persistence of the
+    /// returned cursor is left to the caller so that drain loops can guard
+    /// against regression of an already-advanced stored cursor.
+    pub(crate) async fn fetch_transport_notes(
         &mut self,
         cursor: NoteTransportCursor,
-        tags: I,
-    ) -> Result<Vec<NoteId>, ClientError>
-    where
-        I: IntoIterator<Item = NoteTag>,
-    {
+        tags: &[NoteTag],
+    ) -> Result<(Vec<NoteId>, NoteTransportCursor), ClientError> {
         // Number of blocks to look back from sync height when scanning for committed notes.
         // Handles the race where a note is committed on-chain just before the NTL delivers
         // its data — without this, check_expected_notes would scan from sync_height forward
@@ -126,11 +168,8 @@ where
         const NOTE_LOOKBACK_BLOCKS: u32 = 20;
 
         let mut notes = Vec::new();
-        // Fetch notes
-        let (note_infos, rcursor) = self
-            .get_note_transport_api()?
-            .fetch_notes(&tags.into_iter().collect::<Vec<_>>(), cursor)
-            .await?;
+        let (note_infos, rcursor) =
+            self.get_note_transport_api()?.fetch_notes(tags, cursor).await?;
         for note_info in &note_infos {
             // e2ee impl hint:
             // for key in self.store.decryption_keys() try
@@ -143,7 +182,6 @@ where
         let after_block_num =
             BlockNumber::from(sync_height.as_u32().saturating_sub(NOTE_LOOKBACK_BLOCKS));
 
-        // Import fetched notes
         let mut note_requests = Vec::with_capacity(notes.len());
         for note in notes {
             let tag = note.metadata().tag();
@@ -156,10 +194,7 @@ where
         }
         let imported_note_ids = self.import_notes(&note_requests).await?;
 
-        // Update cursor (pagination)
-        self.store.update_note_transport_cursor(rcursor).await?;
-
-        Ok(imported_note_ids)
+        Ok((imported_note_ids, rcursor))
     }
 }
 

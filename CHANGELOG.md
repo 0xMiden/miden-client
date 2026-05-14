@@ -34,6 +34,10 @@
 * [FEATURE][web] Added `wordToBigInt()` utility export for losslessly converting a `Word`'s first felt to a `BigInt`. `StorageResult.toString()` is BigInt-backed, and `valueOf()` returns a JS number for values fitting in `Number.MAX_SAFE_INTEGER` and throws `RangeError` for larger u64 values — use `.toBigInt()` for exact access ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][rust,cli] Added partial swap (PSWAP) support: `TransactionRequestBuilder::build_pswap_create` / `build_pswap_consume` / `build_pswap_cancel` and a `miden-client pswap` CLI command (`create`, `consume`, `cancel`) for partially-fillable fungible swaps ([#2162](https://github.com/0xMiden/miden-client/pull/2162)).
 
+### Fixes
+
+* [FIX][rust] `Client::fetch_all_private_notes` now drains the full backlog across multiple server-paginated responses instead of returning after a single batch. Needed once the note-transport server (`0xMiden/note-transport-service#77`) caps each `fetch_notes` response at `FETCH_NOTES_BATCH_SIZE` rows — previously the function silently returned only the first batch, contradicting its documented "fetches all notes" semantics. Companion deterministic regression test (`fetch_all_private_notes_drains_across_batches`) uses a new `MockNoteTransportNode::with_max_batch(n)` constructor to exercise multi-batch drain.
+
 ## 0.14.7 (2026-06-05)
 
 ### Enhancements

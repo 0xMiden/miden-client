@@ -31,11 +31,26 @@ use crate::note_transport::{
 #[derive(Clone)]
 pub struct MockNoteTransportNode {
     notes: BTreeMap<NoteTag, Vec<(NoteInfo, NoteTransportCursor)>>,
+    /// Optional per-response batch cap; if `Some(n)`, `get_notes` returns at
+    /// most `n` entries (total, across all tags) in one call. Used to exercise
+    /// client-side pagination drain loops. `None` = unbounded (legacy behavior).
+    max_batch: Option<usize>,
 }
 
 impl MockNoteTransportNode {
     pub fn new() -> Self {
-        Self { notes: BTreeMap::default() }
+        Self {
+            notes: BTreeMap::default(),
+            max_batch: None,
+        }
+    }
+
+    /// Build a mock that caps each `get_notes` response at `max_batch` entries.
+    pub fn with_max_batch(max_batch: usize) -> Self {
+        Self {
+            notes: BTreeMap::default(),
+            max_batch: Some(max_batch),
+        }
     }
 
     pub fn add_note(&mut self, header: NoteHeader, details_bytes: Vec<u8>) {
@@ -50,8 +65,10 @@ impl MockNoteTransportNode {
         tags: &[NoteTag],
         cursor: NoteTransportCursor,
     ) -> (Vec<NoteInfo>, NoteTransportCursor) {
-        let mut notes = vec![];
-        let mut rcursor = NoteTransportCursor::init();
+        // Start `rcursor` at the input — matches the real server's contract
+        // (`rcursor = max(cursor, max_seq_returned)`), so an empty batch
+        // returns the caller's own cursor rather than `init()`.
+        let mut collected: Vec<(NoteInfo, NoteTransportCursor)> = vec![];
         for tag in tags {
             // Assumes stored notes are ordered by cursor
             let tnotes = self
@@ -67,15 +84,21 @@ impl MockNoteTransportNode {
                 })
                 .map(Vec::from)
                 .unwrap_or_default();
-            rcursor = rcursor.max(
-                tnotes
-                    .iter()
-                    .map(|(_, cursor)| *cursor)
-                    .max()
-                    .unwrap_or(NoteTransportCursor::init()),
-            );
-            notes.extend(tnotes.into_iter().map(|(note, _)| note).collect::<Vec<_>>());
+            collected.extend(tnotes);
         }
+
+        // Deterministic ordering across tags: sort by cursor ascending so the
+        // client sees notes in per-cursor order regardless of tag iteration
+        // order, matching the real server's `ORDER BY seq ASC`.
+        collected.sort_by_key(|(_, c)| *c);
+
+        // Apply the batch cap, if configured.
+        if let Some(max) = self.max_batch {
+            collected.truncate(max);
+        }
+
+        let rcursor = collected.iter().map(|(_, c)| *c).max().unwrap_or(cursor);
+        let notes = collected.into_iter().map(|(n, _)| n).collect();
         (notes, rcursor)
     }
 }
@@ -166,6 +189,6 @@ impl Deserializable for MockNoteTransportNode {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let notes = BTreeMap::<NoteTag, Vec<(NoteInfo, NoteTransportCursor)>>::read_from(source)?;
 
-        Ok(Self { notes })
+        Ok(Self { notes, max_batch: None })
     }
 }
