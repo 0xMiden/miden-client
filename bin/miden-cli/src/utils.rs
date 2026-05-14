@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use miden_client::account::{AccountId, FaucetMetadata};
-use miden_client::address::{Address, AddressId, NetworkId};
+use miden_client::address::{Address, AddressId};
 use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
 use miden_client::transaction::{ExecutedTransaction, InputNote};
 use miden_client::utils::{base_units_to_tokens, tokens_to_base_units};
@@ -105,7 +105,6 @@ pub fn load_faucet_metadata_resolver() -> Result<FaucetMetadataResolver, CliErro
 pub async fn print_executed_transaction<AUTH>(
     client: &mut Client<AUTH>,
     executed_tx: &ExecutedTransaction,
-    network_id: &NetworkId,
 ) -> Result<(), CliError> {
     println!("The transaction will have the following effects:\n");
 
@@ -170,7 +169,7 @@ pub async fn print_executed_transaction<AUTH>(
             let asset = FungibleAsset::new(vault_key.faucet_id(), amount.unsigned_abs())
                 .map_err(CliError::Asset)?;
             let (faucet_fmt, amount_fmt) =
-                resolver.format_fungible_asset(client, &asset, network_id).await?;
+                resolver.format_fungible_asset(client, &asset).await?;
 
             if amount.is_positive() {
                 table.add_row(vec!["Fungible Asset", &faucet_fmt, &format!("+{amount_fmt}")]);
@@ -370,12 +369,12 @@ impl FaucetMetadataResolver {
         &self,
         client: &mut Client<AUTH>,
         asset: &FungibleAsset,
-        network_id: &NetworkId,
     ) -> Result<(String, String), CliError> {
         if let Some(meta) = self.resolve(client, asset.faucet_id()).await? {
             return Ok((meta.symbol, base_units_to_tokens(asset.amount(), meta.decimals)));
         }
-        let address_str = Address::new(asset.faucet_id()).encode(network_id.clone());
+        let network_id = client.network_id().await?;
+        let address_str = Address::new(asset.faucet_id()).encode(network_id);
         Ok((address_str, asset.amount().to_string()))
     }
 

@@ -259,14 +259,13 @@ async fn show_note<AUTH: Keystore + Sync>(
         Cell::new("Amount").add_attribute(Attribute::Bold),
     ]);
     let resolver = load_faucet_metadata_resolver()?;
-    let network_id = client.network_id().await?;
     let assets = assets.iter();
 
     for asset in assets {
         let (asset_type, faucet, amount) = match asset {
             Asset::Fungible(fungible_asset) => {
                 let (faucet, amount) =
-                    resolver.format_fungible_asset(client, fungible_asset, &network_id).await?;
+                    resolver.format_fungible_asset(client, fungible_asset).await?;
                 ("Fungible Asset", faucet, amount)
             },
             Asset::NonFungible(non_fungible_asset) => (
