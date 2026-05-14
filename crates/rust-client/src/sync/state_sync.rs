@@ -257,10 +257,11 @@ impl StateSync {
 
         state_sync_update.block_num = sync_data.chain_tip_header.block_num();
 
+        let new_commitments = derive_account_commitments(&sync_data.transactions);
         self.account_state_sync(
             &mut state_sync_update.account_updates,
             &accounts,
-            &derive_account_commitments(&sync_data.transactions),
+            &new_commitments,
             block_num,
         )
         .await?;
@@ -337,7 +338,7 @@ impl StateSync {
         }))
     }
 
-    /// Fetches transaction records for the given range and account IDs.
+    /// Fetches transaction data for the given range and account IDs.
     async fn fetch_transaction_data(
         &self,
         block_from: BlockNumber,
@@ -489,11 +490,15 @@ impl StateSync {
         state_sync_update
             .note_updates
             .extend_nullifiers(compute_ordered_nullifiers(transactions));
-        self.transaction_state_sync(
-            &mut state_sync_update.transaction_updates,
-            chain_tip_header,
-            transactions,
-        );
+
+        for record in transactions {
+            state_sync_update
+                .transaction_updates
+                .apply_transaction_inclusion(record, u64::from(chain_tip_header.timestamp())); //TODO: Change timestamps from u64 to u32
+        }
+        state_sync_update
+            .transaction_updates
+            .apply_sync_height_update(chain_tip_header.block_num(), self.tx_discard_delta);
 
         for transaction in transactions {
             // Transition tracked output notes to Committed using inclusion proofs from the
@@ -888,28 +893,6 @@ impl StateSync {
         }
 
         Ok(())
-    }
-
-    /// Applies the changes received from the sync response to the transactions tracked by the
-    /// client and updates the `transaction_updates` accordingly.
-    ///
-    /// The transaction updates might include:
-    /// * New transactions that were committed in the block.
-    /// * Transactions that were discarded because they were stale or expired.
-    fn transaction_state_sync(
-        &self,
-        transaction_updates: &mut TransactionUpdateTracker,
-        new_block_header: &BlockHeader,
-        transaction_records: &[RpcTransactionRecord],
-    ) {
-        for record in transaction_records {
-            transaction_updates
-                .apply_transaction_record(record, u64::from(new_block_header.timestamp()));
-            //TODO: Change timestamps from u64 to u32
-        }
-
-        transaction_updates
-            .apply_sync_height_update(new_block_header.block_num(), self.tx_discard_delta);
     }
 
     /// Pairs each public note body with the matching inclusion proof from `note_blocks` and

@@ -216,7 +216,7 @@ impl TransactionUpdateTracker {
 
     /// Applies the necessary state transitions to the [`TransactionUpdateTracker`] when a
     /// transaction is included in a block.
-    pub fn apply_transaction_record(&mut self, record: &RpcTransactionRecord, timestamp: u64) {
+    pub fn apply_transaction_inclusion(&mut self, record: &RpcTransactionRecord, timestamp: u64) {
         let header = &record.transaction_header;
         let account_id = header.account_id();
 

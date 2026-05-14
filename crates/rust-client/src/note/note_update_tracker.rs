@@ -21,12 +21,10 @@ use crate::transaction::{TransactionRecord, TransactionStatus};
 // NOTE CONSUMPTION
 // ================================================================================================
 
-/// A note consumption event observed on chain, identified by its nullifier and enriched with the
-/// externally-tracked consumer account when one is known.
+/// A note consumption event observed on chain.
 ///
-/// The note tracker uses this as a single input to `apply_note_consumption`. The
-/// `external_consumer` is `Some` when the note was consumed by a transaction submitted outside
-/// this client by an account that is tracked locally; it is `None` otherwise.
+/// The `external_consumer` is set when the note was consumed by a transaction submitted outside
+/// this client by an account that is tracked locally.
 pub struct NoteConsumption {
     pub nullifier: Nullifier,
     pub block_num: BlockNumber,
