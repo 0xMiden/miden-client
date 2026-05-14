@@ -147,6 +147,55 @@ async fn transport_duplicate_note_handling() {
     assert_eq!(notes.len(), 1, "should still have 1 note, not duplicated");
 }
 
+/// Verifies that `fetch_all_private_notes` drains notes across multiple
+/// server-paginated batches.
+///
+/// Regression test for the interaction between the transport server's
+/// response-size `LIMIT` and the client's previously-single-shot
+/// `fetch_all_private_notes`. Before the drain loop, a server cap of N per
+/// response meant `fetch_all_private_notes` silently returned only the first
+/// N notes and the rest were invisible until the next paginated sync tick.
+#[tokio::test]
+async fn fetch_all_private_notes_drains_across_batches() {
+    const BATCH_CAP: usize = 3;
+    const TOTAL_NOTES: usize = 10;
+
+    let mock_node = Arc::new(RwLock::new(MockNoteTransportNode::with_max_batch(BATCH_CAP)));
+    let (mut sender, sender_account) = create_test_user_transport(mock_node.clone()).await;
+    let (mut recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
+    let recipient_address = Address::new(recipient_account.id())
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
+
+    // Send TOTAL_NOTES > BATCH_CAP private notes so a single-batch fetch
+    // cannot drain the backlog.
+    for _ in 0..TOTAL_NOTES {
+        let note = P2idNote::create(
+            sender_account.id(),
+            recipient_account.id(),
+            vec![],
+            NoteType::Private,
+            NoteAttachment::default(),
+            sender.rng(),
+        )
+        .unwrap();
+        sender.send_private_note(note, &recipient_address).await.unwrap();
+    }
+
+    // With BATCH_CAP=3 and TOTAL_NOTES=10, a single-shot fetch would return
+    // only 3. The drain loop should issue successive calls until all 10 are
+    // pulled.
+    recipient.fetch_all_private_notes().await.unwrap();
+
+    let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
+    assert_eq!(
+        notes.len(),
+        TOTAL_NOTES,
+        "fetch_all_private_notes must drain across batches; got {} of {}",
+        notes.len(),
+        TOTAL_NOTES
+    );
+}
+
 /// Verifies that an observer whose tracked tags don't match the note's tag receives nothing.
 #[tokio::test]
 async fn transport_fetch_no_matching_tags() {
