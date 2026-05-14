@@ -285,6 +285,7 @@ impl std::fmt::Debug for TestCase {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum TestCategory {
+    Batch,
     Client,
     CustomTransaction,
     Fpi,
@@ -292,6 +293,7 @@ enum TestCategory {
     NetworkTransaction,
     Onchain,
     PassThrough,
+    PswapTransaction,
     SwapTransaction,
     Transport,
 }
@@ -299,6 +301,7 @@ enum TestCategory {
 impl AsRef<str> for TestCategory {
     fn as_ref(&self) -> &str {
         match self {
+            TestCategory::Batch => "batch",
             TestCategory::Client => "client",
             TestCategory::CustomTransaction => "custom_transaction",
             TestCategory::Fpi => "fpi",
@@ -306,6 +309,7 @@ impl AsRef<str> for TestCategory {
             TestCategory::NetworkTransaction => "network_transaction",
             TestCategory::Onchain => "onchain",
             TestCategory::PassThrough => "pass_through",
+            TestCategory::PswapTransaction => "pswap_transaction",
             TestCategory::SwapTransaction => "swap_transaction",
             TestCategory::Transport => "transport",
         }

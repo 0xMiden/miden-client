@@ -59,6 +59,8 @@ The note screener is used to check the consumability of notes by tracked account
 
 It can find the tracked accounts that can consume a note, and whether the note can be consumed at the moment or in the future.
 
+Usage examples for note screening can be found in the [Note screening section](./library.md#note-screening).
+
 ## State Sync component
 
 The state sync component encapsulates the logic for dealing with synchronization of the client state with the network. It repeatedly queries the node with sync state requests until the chain tip is reached. On every requests it updates the provided tracked elements (accounts, notes, transactions, etc.) and returns an updated state at the end which can be used to update the store (this component does not modify the store directly).

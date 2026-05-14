@@ -77,6 +77,8 @@ impl From<&StateSyncUpdate> for SyncSummary {
         SyncSummary::new(
             value.block_num,
             new_public_note_ids,
+            // Populated by Client::sync_state from the Note Transport Layer fetch.
+            Vec::new(),
             committed_note_ids.into_iter().collect(),
             consumed_note_ids.into_iter().collect(),
             value

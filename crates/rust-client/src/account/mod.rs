@@ -164,8 +164,6 @@ impl<AUTH> Client<AUTH> {
     ///   being tracked.
     /// - If `overwrite` is set to `true` and the `account_data` commitment doesn't match the
     ///   network's account commitment.
-    /// - If the client has reached the accounts limit.
-    /// - If the client has reached the note tags limit.
     pub async fn add_account(
         &mut self,
         account: &Account,
@@ -188,10 +186,6 @@ impl<AUTH> Client<AUTH> {
 
         match tracked_account {
             None => {
-                // Check limits since it's a non-tracked account
-                self.check_account_limit().await?;
-                self.check_note_tag_limit().await?;
-
                 let default_address = Address::new(account.id());
 
                 // If the account is not being tracked, insert it into the store regardless of the
@@ -268,7 +262,6 @@ impl<AUTH> Client<AUTH> {
     /// # Errors
     /// - If the account is not found on the network.
     /// - If the address is already being tracked.
-    /// - If the client has reached the note tags limit.
     pub async fn add_address(
         &mut self,
         address: Address,
@@ -295,7 +288,6 @@ impl<AUTH> Client<AUTH> {
                     ));
                 }
 
-                self.check_note_tag_limit().await?;
                 self.store.insert_address(address, account_id).await?;
                 Ok(())
             },

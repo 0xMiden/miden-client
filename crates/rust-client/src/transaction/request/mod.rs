@@ -14,6 +14,7 @@ use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::store::MerkleStore;
 use miden_protocol::errors::{
     AccountError,
+    AssetError,
     AssetVaultError,
     NoteError,
     StorageMapError,
@@ -44,7 +45,12 @@ use miden_tx::utils::serde::{
 use thiserror::Error;
 
 mod builder;
-pub use builder::{PaymentNoteDescription, SwapTransactionData, TransactionRequestBuilder};
+pub use builder::{
+    PaymentNoteDescription,
+    PswapTransactionData,
+    SwapTransactionData,
+    TransactionRequestBuilder,
+};
 
 mod foreign;
 pub use foreign::ForeignAccount;
@@ -488,6 +494,8 @@ pub enum TransactionRequestError {
     AccountInterfaceError(#[from] AccountInterfaceError),
     #[error("account error")]
     AccountError(#[from] AccountError),
+    #[error("asset error")]
+    AssetError(#[from] AssetError),
     #[error("duplicate input note: note {0} was added more than once to the transaction")]
     DuplicateInputNote(NoteId),
     #[error(
@@ -516,8 +524,16 @@ pub enum TransactionRequestError {
     NoteNotFound(String),
     #[error("failed to create note")]
     NoteCreationError(#[from] NoteError),
+    #[error("note failed validation")]
+    NoteValidationError(#[source] NoteError),
+    #[error("note execution failed")]
+    NoteExecutionError(#[source] NoteError),
+    #[error("failed to build note args")]
+    NoteArgError(#[source] NoteError),
     #[error("pay-to-ID note must contain at least one asset to transfer")]
     P2IDNoteWithoutAsset,
+    #[error("PSWAP note can only be cancelled by its creator: expected {expected}, got {actual}")]
+    PswapCancelCreatorMismatch { expected: AccountId, actual: AccountId },
     #[error("error building script")]
     CodeBuilderError(#[from] CodeBuilderError),
     #[error("transaction script template error: {0}")]

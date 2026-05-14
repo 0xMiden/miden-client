@@ -21,6 +21,10 @@ The Miden client enables users to interact with the Miden network. This includes
 
 __Note transport__ The client also supports connectivity with the Miden Note Transport network for the exchange of private notes (end-to-end encryption coming soon).
 
+### Note screening
+
+The Miden client supports screening notes against tracked accounts to determine whether they are relevant and when they can be consumed. Applications can use this to filter input notes and prepare consume transactions before execution. More information can be found in the [Note screening section](./library.md#note-screening).
+
 ### Account generation and tracking
 
 The Miden client provides features for generating and tracking accounts within the Miden rollup ecosystem. Users can create accounts and track their transaction status.
