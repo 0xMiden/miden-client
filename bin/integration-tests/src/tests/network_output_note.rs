@@ -95,9 +95,8 @@ const P2ID_EMITTER_SCRIPT: &str = r#"
     end
 "#;
 
-/// Integration test for issue #1723: a network transaction (NTX) whose input
-/// note, when consumed by the node's NTX builder, emits a public P2ID output
-/// note.
+/// Integration test for a network transaction (NTX) whose input note, when consumed by the node's
+/// NTX builder, emits a public P2ID output note.
 ///
 /// Flow:
 /// 1. Alice (regular wallet, Public storage) creates a network-targeted note carrying the
