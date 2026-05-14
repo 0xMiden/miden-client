@@ -7,10 +7,15 @@ use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{NoteAttachment, NoteDetails, NoteTag, NoteType};
+use miden_client::note_transport::NoteTransportClient;
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::create_test_store_path;
 use miden_client::testing::mock::{MockClient, MockRpcApi};
-use miden_client::testing::note_transport::{MockNoteTransportApi, MockNoteTransportNode};
+use miden_client::testing::note_transport::{
+    FaultyNoteTransportApi,
+    MockNoteTransportApi,
+    MockNoteTransportNode,
+};
 use miden_client::utils::RwLock;
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_protocol::Felt;
@@ -277,15 +282,196 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     );
 }
 
+/// Reproduction + fix-gate for the silent-loss failure mode observed in the
+/// 2026-04-27 stress run.
+///
+/// **Background.** When `Client::send_private_note` is called, the chain
+/// transaction has already committed (sender debited). The relay step calls
+/// `NoteTransportClient::send_note` exactly once. If that call fails, the
+/// payload is discarded — there is no outbox, no retry, no persistence — and
+/// the recipient never learns about the note. The sender's vault stays
+/// debited; the receiver gets nothing.
+///
+/// **What this test asserts.** The recipient must eventually receive the
+/// note even when the sender's first relay attempt fails, as long as the NTL
+/// itself recovers. The test does not constrain the fix's shape: the fix may
+/// (a) retry inline inside `send_private_note`, (b) piggyback retries on
+/// `sync_state`, or (c) expose an explicit `flush_relay_outbox` call. The
+/// polling loop below tolerates all three by alternating sender/recipient
+/// `sync_state` calls until the note arrives or the budget is exhausted.
+///
+/// **Status.** Fails on `origin/main` (commit a2491e02). Passes once any
+/// durable-relay strategy is in place.
+#[tokio::test]
+async fn private_note_relay_recovers_after_transient_ntl_failure() {
+    let mock_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
+
+    // Fail the next send_note attempt, then recover. Models a single transient
+    // NTL hiccup — the failure mode the stress run encountered repeatedly
+    // under load (lock contention, page reloads cancelling in-flight relays).
+    let faulty = Arc::new(FaultyNoteTransportApi::new(mock_node.clone(), 1));
+    let (mut sender, sender_account) =
+        create_test_user_with_transport(faulty.clone() as Arc<dyn NoteTransportClient>).await;
+    let (mut recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
+    let recipient_address = Address::new(recipient_account.id())
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
+
+    let note = P2idNote::create(
+        sender_account.id(),
+        recipient_account.id(),
+        vec![],
+        NoteType::Private,
+        NoteAttachment::default(),
+        sender.rng(),
+    )
+    .unwrap();
+    let note_id = note.id();
+
+    // First relay attempt — the faulty NTL rejects it. We don't assert on the
+    // return value: the fix may make `send_private_note` itself retry and
+    // return Ok, or it may surface the Err and rely on a later retry path.
+    let _ = sender.send_private_note(note, &recipient_address).await;
+
+    // Drive both clients forward. Either the sender's retry path runs inside
+    // sync_state (or as a side effect of fetch_private_notes), or it ran
+    // synchronously inside the send_private_note call. Either way the note
+    // must reach the recipient within a small number of rounds.
+    let mut delivered = false;
+    for _ in 0..5 {
+        let _ = sender.sync_state().await;
+        recipient.sync_state().await.unwrap();
+        let received = recipient.get_input_notes(NoteFilter::All).await.unwrap();
+        if received.iter().any(|n| n.id() == note_id) {
+            delivered = true;
+            break;
+        }
+    }
+
+    assert!(
+        delivered,
+        "BUG (stress-20260427): a single transient NTL failure permanently loses a private \
+         note — sender debited, recipient never learns of it. send_attempts={}",
+        faulty.send_attempts()
+    );
+
+    // Sanity: the fix must actually retry the relay — a single attempt that
+    // succeeded by chance is not durability.
+    assert!(
+        faulty.send_attempts() >= 2,
+        "fix must retry the relay; observed only {} send_note attempt(s)",
+        faulty.send_attempts()
+    );
+}
+
+/// Tightens the durability contract beyond the previous test:
+/// `flush_relay_outbox` is a public, sync_state-independent retry path, the
+/// outbox entry survives a failed `send_private_note` until that retry
+/// succeeds, and a successful retry removes the entry so it isn't re-sent.
+///
+/// Why a separate test from `private_note_relay_recovers_after_transient_ntl_failure`:
+/// that one is intentionally lenient about the recovery mechanism —
+/// inline retry, sync_state-piggyback, or explicit flush all satisfy it.
+/// This one nails down the explicit-flush contract callers depend on
+/// when they want to drain the outbox without paying for a full sync
+/// cycle (e.g. after a connectivity-restored event).
+#[tokio::test]
+async fn flush_relay_outbox_retries_failed_relay_without_full_sync() {
+    let mock_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
+    let faulty = Arc::new(FaultyNoteTransportApi::new(mock_node.clone(), 1));
+    let (mut sender, sender_account) =
+        create_test_user_with_transport(faulty.clone() as Arc<dyn NoteTransportClient>).await;
+    let (mut recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
+    let recipient_address = Address::new(recipient_account.id())
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
+
+    let note = P2idNote::create(
+        sender_account.id(),
+        recipient_account.id(),
+        vec![],
+        NoteType::Private,
+        NoteAttachment::default(),
+        sender.rng(),
+    )
+    .unwrap();
+    let note_id = note.id();
+
+    // 1. First attempt: the faulty NTL rejects, send_private_note surfaces the error. The chain
+    //    side has nothing to roll back here (this test isolates the relay step), so the only
+    //    durability requirement is that the payload survive the failed call.
+    let first_attempt = sender.send_private_note(note, &recipient_address).await;
+    assert!(
+        first_attempt.is_err(),
+        "expected NTL failure on first attempt, got {first_attempt:?}",
+    );
+    assert_eq!(
+        faulty.send_attempts(),
+        1,
+        "send_private_note should have made exactly one transport attempt",
+    );
+
+    // 2. Recipient syncs — nothing to deliver yet because the NTL never got the payload. Pins the
+    //    contract: the sender's outbox is the only surviving copy.
+    recipient.sync_state().await.unwrap();
+    let received = recipient.get_input_notes(NoteFilter::All).await.unwrap();
+    assert!(
+        received.iter().all(|n| n.id() != note_id),
+        "recipient should not yet see the note (NTL was empty after the failed relay)",
+    );
+
+    // 3. Caller drives the retry explicitly — no `sync_state` round-trip. The faulty NTL has used
+    //    up its single rejection (fail_next: 1) so this attempt will succeed.
+    sender.flush_relay_outbox().await.expect("flush_relay_outbox should succeed");
+    assert!(
+        faulty.send_attempts() >= 2,
+        "explicit flush must re-attempt the relay; observed only {} send_note attempt(s)",
+        faulty.send_attempts(),
+    );
+
+    // 4. Recipient syncs and now sees the note — proves the explicit flush actually delivered
+    //    through the NTL, not just dropped the entry.
+    recipient.sync_state().await.unwrap();
+    let received = recipient.get_input_notes(NoteFilter::All).await.unwrap();
+    assert!(
+        received.iter().any(|n| n.id() == note_id),
+        "recipient must receive the note after the explicit flush retried the relay",
+    );
+
+    // 5. A second flush is a no-op: the outbox entry was removed when the retry succeeded. Without
+    //    this property, every sync would re-send every previously-relayed note (the receiver
+    //    dedups, but the wasted NTL traffic is still a regression).
+    let attempts_after_first_flush = faulty.send_attempts();
+    sender.flush_relay_outbox().await.expect("second flush should succeed (no-op)");
+    assert_eq!(
+        faulty.send_attempts(),
+        attempts_after_first_flush,
+        "outbox should be empty after a successful flush; second flush must not re-send",
+    );
+}
+
 // HELPERS
 // ================================================================================================
 
 pub async fn create_test_client_transport(
     mock_node: Arc<RwLock<MockNoteTransportNode>>,
 ) -> (MockClient<FilesystemKeyStore>, FilesystemKeyStore) {
+    create_test_client_with_transport(Arc::new(MockNoteTransportApi::new(mock_node))).await
+}
+
+pub async fn create_test_user_transport(
+    mock_node: Arc<RwLock<MockNoteTransportNode>>,
+) -> (MockClient<FilesystemKeyStore>, Account) {
+    let (mut client, keystore) = Box::pin(create_test_client_transport(mock_node)).await;
+    let account = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
+    (client, account)
+}
+
+pub async fn create_test_client_with_transport(
+    transport: Arc<dyn NoteTransportClient>,
+) -> (MockClient<FilesystemKeyStore>, FilesystemKeyStore) {
     let (builder, _, keystore) = create_test_client_builder().await;
-    let transport_client = MockNoteTransportApi::new(mock_node);
-    let builder_w_transport = builder.note_transport(Arc::new(transport_client));
+    let builder_w_transport = builder.note_transport(transport);
 
     let mut client = builder_w_transport.build().await.unwrap();
     client.ensure_genesis_in_place().await.unwrap();
@@ -293,10 +479,10 @@ pub async fn create_test_client_transport(
     (client, keystore)
 }
 
-pub async fn create_test_user_transport(
-    mock_node: Arc<RwLock<MockNoteTransportNode>>,
+pub async fn create_test_user_with_transport(
+    transport: Arc<dyn NoteTransportClient>,
 ) -> (MockClient<FilesystemKeyStore>, Account) {
-    let (mut client, keystore) = Box::pin(create_test_client_transport(mock_node.clone())).await;
+    let (mut client, keystore) = Box::pin(create_test_client_with_transport(transport)).await;
     let account = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
         .await
         .unwrap();

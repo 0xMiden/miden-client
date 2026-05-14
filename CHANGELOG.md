@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.8 (Unreleased)
+
+### Fixes
+
+* [FIX][rust] `Client::send_private_note` is now durable across transient NTL failures. The relay outbox — a `Vec<NoteInfo>` of private notes whose chain transaction committed but whose transport delivery has not yet succeeded — is persisted under a single `note_transport_outbox` key in the existing `settings` k/v before invoking the transport. On `send_note` success the entry is removed; on failure it stays queued and `Client::sync_state` retries it on every subsequent sync (the receiver dedups by note id). Previously a single transient `send_note` rejection would permanently lose the private note — the chain transaction had already committed, the sender's vault was debited, and the recipient never learned of the note. New `Client::flush_relay_outbox()` lets callers drive retries without a full sync cycle ([#2127](https://github.com/0xMiden/miden-client/pull/2127)).
+
 ## 0.14.7 (2026-06-05)
 
 ### Enhancements
