@@ -179,6 +179,7 @@ pub mod asset {
     };
     pub use miden_protocol::asset::{
         Asset,
+        AssetAmount,
         AssetVault,
         AssetVaultKey,
         AssetWitness,

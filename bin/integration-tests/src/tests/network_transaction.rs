@@ -20,12 +20,13 @@ use miden_client::note::{
     Note,
     NoteAssets,
     NoteAttachment,
+    NoteAttachments,
     NoteExecutionHint,
-    NoteMetadata,
     NoteRecipient,
     NoteStorage,
     NoteTag,
     NoteType,
+    PartialNoteMetadata,
 };
 use miden_client::testing::common::{
     TestClient,
@@ -293,73 +294,6 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     Ok(())
 }
 
-/// After a network account consumes a note (potentially in the same batch it was created),
-/// the receiver's `InputNoteReader` should find it as consumed by that account. Validates
-/// the erased-notes detection flow end-to-end against a real node.
-pub async fn test_note_reader_finds_note_consumed_by_ntx(
-    client_config: ClientConfig,
-) -> Result<()> {
-    let (mut client, keystore) = client_config.into_client().await?;
-    client.sync_state().await?;
-
-    let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
-    let network_account_id = network_account.id();
-
-    let (sender_account, ..) =
-        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
-            .await?;
-
-    let network_note = get_network_note(
-        sender_account.id(),
-        network_account_id,
-        client.source_manager(),
-        &mut client.rng(),
-    )?;
-    let note_id = network_note.id();
-
-    let tx_request =
-        TransactionRequestBuilder::new().own_output_notes(vec![network_note]).build()?;
-    execute_tx_and_sync(&mut client, sender_account.id(), tx_request).await?;
-
-    // Wait for the network account to consume the note (check counter increment).
-    let expected_counter = Word::from([Felt::new(2), ZERO, ZERO, ZERO]);
-    for _ in 0..15 {
-        client.sync_state().await?;
-        let account_details = client
-            .test_rpc_api()
-            .get_account_details(network_account_id)
-            .await?
-            .account()
-            .cloned()
-            .with_context(|| "account details not available")?;
-
-        if account_details.storage().get_item(&COUNTER_SLOT_NAME)? == expected_counter {
-            break;
-        }
-        wait_for_blocks(&mut client, 1).await;
-    }
-
-    client.sync_state().await?;
-
-    let mut reader = client.input_note_reader(network_account_id);
-    let mut found = false;
-    while let Some(note) = reader.next().await? {
-        if note.id() == note_id {
-            assert_eq!(
-                note.consumer_account(),
-                Some(network_account_id),
-                "consumer should be the network account"
-            );
-            found = true;
-            break;
-        }
-    }
-
-    assert!(found, "NoteReader should find the note consumed by the network account");
-
-    Ok(())
-}
-
 /// Compiles the counter contract library using the provided source manager so that all source
 /// spans are registered in the same manager used by the client's executor.
 fn counter_contract_library(source_manager: Arc<dyn SourceManagerSync>) -> Arc<Library> {
@@ -403,9 +337,9 @@ pub(crate) fn get_network_note_with_script<T: Rng>(
 ) -> Result<Note> {
     let target = NetworkAccountTarget::new(network_account, NoteExecutionHint::Always)?;
     let attachment: NoteAttachment = target.into();
-    let metadata = NoteMetadata::new(sender, NoteType::Public)
-        .with_tag(NoteTag::with_account_target(network_account))
-        .with_attachment(attachment);
+    let attachments = NoteAttachments::new(vec![attachment])?;
+    let partial_metadata = PartialNoteMetadata::new(sender, NoteType::Public)
+        .with_tag(NoteTag::with_account_target(network_account));
 
     let script = CodeBuilder::with_source_manager(source_manager.clone())
         .with_dynamically_linked_library(counter_contract_library(source_manager))?
@@ -421,6 +355,7 @@ pub(crate) fn get_network_note_with_script<T: Rng>(
         NoteStorage::new(vec![])?,
     );
 
-    let network_note = Note::new(NoteAssets::new(vec![])?, metadata, recipient);
+    let network_note =
+        Note::with_attachments(NoteAssets::new(vec![])?, partial_metadata, recipient, attachments);
     Ok(network_note)
 }

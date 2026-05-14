@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::vec::Vec;
 
 use anyhow::Context;
-use miden_client::account::component::{AccountComponent, basic_wallet_library};
+use miden_client::account::component::{AccountComponent, BasicWallet};
 use miden_client::account::{
     Account,
     AccountBuilder,
@@ -111,7 +111,7 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
         StorageSlotName::new("miden::testing::sqlite_store::mapB").expect("valid slot name");
 
     let dummy_component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![
             StorageSlot::with_empty_value(value_slot_name.clone()),
             StorageSlot::with_empty_map(map_slot_name.clone()),
@@ -220,7 +220,7 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
         .insert(StorageMapKey::new([ONE, ZERO, ZERO, ZERO].into()), [ONE, ONE, ONE, ONE].into())?;
 
     let dummy_component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![
             StorageSlot::with_value(value_slot_name.clone(), [ZERO, ZERO, ZERO, ONE].into()),
             StorageSlot::with_map(map_slot_name.clone(), dummy_map),
@@ -324,7 +324,7 @@ async fn get_account_storage_item_success() -> anyhow::Result<()> {
     let test_value: [miden_client::Felt; 4] = [ONE, ONE, ONE, ONE];
 
     let dummy_component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_value(value_slot_name.clone(), test_value.into())],
         AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
@@ -357,7 +357,7 @@ async fn get_account_storage_item_not_found() -> anyhow::Result<()> {
         StorageSlotName::new("miden::testing::sqlite_store::value").expect("valid slot name");
 
     let dummy_component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_empty_value(value_slot_name)],
         AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
@@ -398,7 +398,7 @@ async fn get_account_map_item_success() -> anyhow::Result<()> {
     storage_map.insert(test_key, test_value)?;
 
     let dummy_component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_map(map_slot_name.clone(), storage_map)],
         AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
@@ -432,7 +432,7 @@ async fn get_account_map_item_value_slot_error() -> anyhow::Result<()> {
         StorageSlotName::new("miden::testing::sqlite_store::value").expect("valid slot name");
 
     let dummy_component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_empty_value(value_slot_name.clone())],
         AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
@@ -463,7 +463,7 @@ async fn get_account_code() -> anyhow::Result<()> {
     let store = create_test_store().await;
 
     let dummy_component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![],
         AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
@@ -516,7 +516,7 @@ async fn account_reader_nonce_and_status() -> anyhow::Result<()> {
     let store = Arc::new(create_test_store().await);
 
     let dummy_component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![],
         AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
@@ -592,7 +592,7 @@ async fn account_reader_storage_access() -> anyhow::Result<()> {
     let test_value: [miden_client::Felt; 4] = [ONE, ONE, ONE, ONE];
 
     let dummy_component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_value(value_slot_name.clone(), test_value.into())],
         AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
@@ -629,7 +629,7 @@ async fn account_reader_addresses_access() -> anyhow::Result<()> {
     let store = Arc::new(create_test_store().await);
 
     let dummy_component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![],
         AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
@@ -759,7 +759,7 @@ async fn prune_account_history_multiple_accounts() -> anyhow::Result<()> {
 
     // Account B: different seed  to different account. We need a different builder seed.
     let component_b = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_empty_map(map_slot_name_b.clone())],
         AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
@@ -963,7 +963,7 @@ async fn setup_account_with_map(
     }
 
     let component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_map(map_slot_name.clone(), map)],
         AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
@@ -1157,7 +1157,7 @@ async fn undo_account_state_deletes_account_entirely() -> anyhow::Result<()> {
         )?;
     }
     let component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_map(map_slot_name.clone(), map)],
         AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
@@ -1348,7 +1348,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     initial_map.insert(key_c, [Felt::new(300), ZERO, ZERO, ZERO].into())?;
 
     let component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_map(map_slot_name.clone(), initial_map)],
         AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;
@@ -1730,7 +1730,7 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
     initial_map.insert(key_b, [Felt::new(200), ZERO, ZERO, ZERO].into())?;
 
     let component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_map(map_slot_name.clone(), initial_map)],
         AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
     )?;

@@ -3,11 +3,13 @@ use std::sync::Arc;
 use miden_client::note::{
     InputNoteReader,
     NoteAssets,
+    NoteAttachments,
     NoteMetadata,
     NoteRecipient,
     NoteStorage,
     NoteTag,
     NoteType,
+    PartialNoteMetadata,
 };
 use miden_client::store::input_note_states::{
     ConsumedExternalNoteState,
@@ -93,7 +95,9 @@ fn create_consumed_input_note_with_consumer(
     );
     let details = NoteDetails::new(assets, recipient);
 
-    let metadata = NoteMetadata::new(consumer, NoteType::Public).with_tag(NoteTag::from(index));
+    let partial_metadata =
+        PartialNoteMetadata::new(consumer, NoteType::Public).with_tag(NoteTag::from(index));
+    let metadata = NoteMetadata::new(partial_metadata, &NoteAttachments::empty());
 
     let state = ConsumedUnauthenticatedLocalNoteState {
         metadata,

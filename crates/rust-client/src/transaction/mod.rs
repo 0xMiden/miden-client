@@ -631,7 +631,7 @@ where
 
         for note in output_notes {
             if output_note_relevances.contains_key(&note.id()) {
-                let metadata = note.metadata().clone();
+                let metadata = *note.metadata();
                 let tag = metadata.tag();
 
                 new_input_notes.push(InputNoteRecord::new(

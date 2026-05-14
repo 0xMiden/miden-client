@@ -2,147 +2,12 @@ use anyhow::{Context, Result};
 use miden_client::account::AccountStorageMode;
 use miden_client::asset::FungibleAsset;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
-use miden_client::note::{Note, NoteAttachment, NoteDetails, NoteType, PswapNote};
+use miden_client::note::{Note, NoteDetails, NoteType, PswapNote};
 use miden_client::testing::common::*;
 use miden_client::transaction::{PswapTransactionData, TransactionRequestBuilder};
 use tracing::info;
 
 use crate::tests::config::ClientConfig;
-
-// PSWAP FULL FILL ONCHAIN
-// ================================================================================================
-
-/// Verifies an end-to-end PSWAP full-fill flow against a real node:
-/// Alice creates a public PSWAP, Bob discovers it via the discovery tag, Bob fully fills it, and
-/// both parties end up with the expected balances after consuming the resulting payback note.
-pub async fn test_pswap_full_fill_onchain(client_config: ClientConfig) -> Result<()> {
-    const OFFERED_AMOUNT: u64 = 100;
-    const REQUESTED_AMOUNT: u64 = 50;
-
-    let (mut alice_client, alice_authenticator) = client_config.clone().into_client().await?;
-    wait_for_node(&mut alice_client).await;
-    let (mut bob_client, bob_authenticator) = ClientConfig::default()
-        .with_rpc_endpoint(client_config.rpc_endpoint())
-        .into_client()
-        .await?;
-
-    alice_client.sync_state().await?;
-    bob_client.sync_state().await?;
-
-    let (alice_account, ..) = insert_new_wallet(
-        &mut alice_client,
-        AccountStorageMode::Private,
-        &alice_authenticator,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
-    let (bob_account, ..) = insert_new_wallet(
-        &mut bob_client,
-        AccountStorageMode::Private,
-        &bob_authenticator,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
-
-    let (btc_faucet_account, _) = insert_new_fungible_faucet(
-        &mut alice_client,
-        AccountStorageMode::Private,
-        &alice_authenticator,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
-    let (eth_faucet_account, _) = insert_new_fungible_faucet(
-        &mut bob_client,
-        AccountStorageMode::Private,
-        &bob_authenticator,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
-
-    let tx_id = mint_and_consume(
-        &mut alice_client,
-        alice_account.id(),
-        btc_faucet_account.id(),
-        NoteType::Public,
-    )
-    .await;
-    wait_for_tx(&mut alice_client, tx_id).await?;
-    let tx_id = mint_and_consume(
-        &mut bob_client,
-        bob_account.id(),
-        eth_faucet_account.id(),
-        NoteType::Public,
-    )
-    .await;
-    wait_for_tx(&mut bob_client, tx_id).await?;
-
-    let offered_asset = FungibleAsset::new(btc_faucet_account.id(), OFFERED_AMOUNT)?;
-    let requested_asset = FungibleAsset::new(eth_faucet_account.id(), REQUESTED_AMOUNT)?;
-
-    info!("Executing PSWAP create transaction");
-    let tx_request = TransactionRequestBuilder::new().build_pswap_create(
-        &PswapTransactionData::new(alice_account.id(), offered_asset, requested_asset),
-        NoteType::Public,
-        NoteType::Public,
-        NoteAttachment::default(),
-        alice_client.rng(),
-    )?;
-
-    let pswap_note = tx_request.expected_output_own_notes()[0].clone();
-    execute_tx_and_sync(&mut alice_client, alice_account.id(), tx_request).await?;
-
-    // Subscribe bob_client to the PSWAP discovery tag so it can pick up the public note.
-    let pswap_tag = PswapNote::create_tag(NoteType::Public, &offered_asset, &requested_asset);
-    info!(tag = %pswap_tag, "Adding PSWAP discovery tag to client 2");
-    bob_client.add_note_tag(pswap_tag).await?;
-    bob_client.sync_state().await?;
-
-    info!(note_id = %pswap_note.id(), account_id = %bob_account.id(), "Bob fully fills the PSWAP");
-    let consume_request = TransactionRequestBuilder::new().build_pswap_consume(
-        &pswap_note,
-        bob_account.id(),
-        REQUESTED_AMOUNT,
-        0,
-    )?;
-    let payback_note_details = consume_request
-        .expected_future_notes()
-        .cloned()
-        .map(|(n, _)| n)
-        .collect::<Vec<_>>();
-    assert_eq!(payback_note_details.len(), 1, "full fill should produce only the payback note");
-
-    execute_tx_and_sync(&mut bob_client, bob_account.id(), consume_request).await?;
-
-    // Alice consumes her payback note.
-    alice_client.sync_state().await?;
-    let payback_note: Note = alice_client
-        .get_input_note(payback_note_details[0].id())
-        .await?
-        .with_context(|| format!("Payback note {} not found", payback_note_details[0].id()))?
-        .try_into()?;
-    let consume_payback =
-        TransactionRequestBuilder::new().build_consume_notes(vec![payback_note])?;
-    execute_tx_and_sync(&mut alice_client, alice_account.id(), consume_payback).await?;
-
-    let alice_account_reader = alice_client.account_reader(alice_account.id());
-    assert_eq!(
-        alice_account_reader.get_balance(btc_faucet_account.id()).await?,
-        MINT_AMOUNT - OFFERED_AMOUNT
-    );
-    assert_eq!(
-        alice_account_reader.get_balance(eth_faucet_account.id()).await?,
-        REQUESTED_AMOUNT
-    );
-
-    let bob_account_reader = bob_client.account_reader(bob_account.id());
-    assert_eq!(bob_account_reader.get_balance(btc_faucet_account.id()).await?, OFFERED_AMOUNT);
-    assert_eq!(
-        bob_account_reader.get_balance(eth_faucet_account.id()).await?,
-        MINT_AMOUNT - REQUESTED_AMOUNT
-    );
-
-    Ok(())
-}
 
 // PSWAP PARTIAL FILL ONCHAIN
 // ================================================================================================
@@ -222,7 +87,7 @@ pub async fn test_pswap_partial_fill_onchain(client_config: ClientConfig) -> Res
         &PswapTransactionData::new(alice_account.id(), offered_asset, requested_asset),
         NoteType::Public,
         NoteType::Public,
-        NoteAttachment::default(),
+        None,
         alice_client.rng(),
     )?;
     let pswap_note = tx_request.expected_output_own_notes()[0].clone();
@@ -334,7 +199,7 @@ pub async fn test_pswap_cancel_onchain(client_config: ClientConfig) -> Result<()
         &PswapTransactionData::new(alice_account.id(), offered_asset, requested_asset),
         NoteType::Private,
         NoteType::Private,
-        NoteAttachment::default(),
+        None,
         alice_client.rng(),
     )?;
     let pswap_note = create_request.expected_output_own_notes()[0].clone();

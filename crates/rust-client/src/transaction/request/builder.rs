@@ -14,15 +14,16 @@ use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteAttachment,
+    NoteAttachments,
     NoteDetails,
     NoteId,
-    NoteMetadata,
     NoteRecipient,
     NoteScript,
     NoteStorage,
     NoteTag,
     NoteType,
     PartialNote,
+    PartialNoteMetadata,
 };
 use miden_protocol::transaction::TransactionScript;
 use miden_protocol::vm::AdviceMap;
@@ -327,7 +328,7 @@ impl TransactionRequestBuilder {
             target_id,
             vec![asset.into()],
             note_type,
-            NoteAttachment::default(),
+            NoteAttachments::empty(),
             rng,
         )?;
 
@@ -389,7 +390,7 @@ impl TransactionRequestBuilder {
             swap_data.offered_asset(),
             swap_data.requested_asset(),
             note_type,
-            NoteAttachment::default(),
+            NoteAttachments::empty(),
             payback_note_type,
             rng,
         )?;
@@ -426,7 +427,7 @@ impl TransactionRequestBuilder {
                 let note_storage = NoteStorage::new(vec![])?;
                 let recipient = NoteRecipient::new(serial_num, script, note_storage);
                 let note_assets = NoteAssets::new(vec![])?;
-                let metadata = NoteMetadata::new(sender_account_id, NoteType::Public);
+                let metadata = PartialNoteMetadata::new(sender_account_id, NoteType::Public);
                 Ok(Note::new(note_assets, metadata, recipient))
             })
             .collect::<Result<_, NoteError>>()?;
@@ -443,8 +444,8 @@ impl TransactionRequestBuilder {
     /// - `payback_note_type` determines the visibility of the payback note that fillers emit back
     ///   to the creator. Typically [`NoteType::Private`] (cheaper; the fill amount is already
     ///   visible in the executing transaction).
-    /// - `note_attachment` is the attachment for the PSWAP note. Pass [`NoteAttachment::default()`]
-    ///   when there is nothing to attach.
+    /// - `note_attachment` is the optional attachment for the PSWAP note. Pass `None` when there is
+    ///   nothing to attach.
     /// - `rng` is the random number generator used to generate the serial number for the created
     ///   note.
     ///
@@ -454,7 +455,7 @@ impl TransactionRequestBuilder {
         pswap_data: &PswapTransactionData,
         note_type: NoteType,
         payback_note_type: NoteType,
-        note_attachment: NoteAttachment,
+        note_attachment: Option<NoteAttachment>,
         rng: &mut ClientRng,
     ) -> Result<TransactionRequest, TransactionRequestError> {
         let storage = PswapNoteStorage::builder()
@@ -469,7 +470,7 @@ impl TransactionRequestBuilder {
             .serial_number(rng.draw_word())
             .note_type(note_type)
             .offered_asset(pswap_data.offered_asset())
-            .attachment(note_attachment)
+            .maybe_attachment(note_attachment)
             .build()
             .map_err(TransactionRequestError::NoteCreationError)?;
 
@@ -713,7 +714,7 @@ impl PaymentNoteDescription {
                 self.target_account_id,
                 self.assets,
                 note_type,
-                NoteAttachment::default(),
+                NoteAttachments::empty(),
                 rng,
             )
         } else {
@@ -727,7 +728,7 @@ impl PaymentNoteDescription {
                 ),
                 self.assets,
                 note_type,
-                NoteAttachment::default(),
+                NoteAttachments::empty(),
                 rng,
             )
         }

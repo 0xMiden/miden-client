@@ -79,8 +79,9 @@ pub use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteAttachment,
-    NoteAttachmentKind,
+    NoteAttachmentHeader,
     NoteAttachmentScheme,
+    NoteAttachments,
     NoteDetails,
     NoteFile,
     NoteHeader,
@@ -88,7 +89,6 @@ pub use miden_protocol::note::{
     NoteInclusionProof,
     NoteLocation,
     NoteMetadata,
-    NoteMetadataHeader,
     NoteRecipient,
     NoteScript,
     NoteScriptRoot,
@@ -97,6 +97,7 @@ pub use miden_protocol::note::{
     NoteType,
     Nullifier,
     PartialNote,
+    PartialNoteMetadata,
 };
 pub use miden_protocol::transaction::ToInputNoteCommitments;
 pub use miden_standards::note::{

@@ -76,18 +76,24 @@ use miden_protocol::account::{
     StorageSlotContent,
     StorageSlotName,
 };
-use miden_protocol::asset::{Asset, AssetVaultKey, AssetWitness, FungibleAsset, TokenSymbol};
+use miden_protocol::asset::{
+    Asset,
+    AssetAmount,
+    AssetVaultKey,
+    AssetWitness,
+    FungibleAsset,
+    TokenSymbol,
+};
 use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
 use miden_protocol::note::{
     Note,
     NoteAssets,
-    NoteAttachment,
     NoteFile,
-    NoteMetadata,
     NoteRecipient,
     NoteStorage,
     NoteTag,
     NoteType,
+    PartialNoteMetadata,
 };
 use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
@@ -103,9 +109,8 @@ use miden_protocol::transaction::RawOutputNote;
 use miden_protocol::vm::AdviceInputs;
 use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
 use miden_standards::account::AccountBuilderSchemaCommitmentExt;
-use miden_standards::account::faucets::BasicFungibleFaucet;
+use miden_standards::account::faucets::{FungibleFaucet, TokenName};
 use miden_standards::account::interface::AccountInterfaceError;
-use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
 use miden_standards::account::policies::{
     BurnPolicyConfig,
     MintPolicyConfig,
@@ -1002,7 +1007,7 @@ async fn note_without_asset() {
     let serial_num = client.rng().draw_word();
     let recipient = P2idNoteStorage::new(wallet.id()).into_recipient(serial_num);
     let tag = NoteTag::with_account_target(wallet.id());
-    let metadata = NoteMetadata::new(wallet.id(), NoteType::Private).with_tag(tag);
+    let metadata = PartialNoteMetadata::new(wallet.id(), NoteType::Private).with_tag(tag);
     let vault = NoteAssets::new(vec![]).unwrap();
 
     let note = Note::new(vault.clone(), metadata, recipient.clone());
@@ -1017,7 +1022,7 @@ async fn note_without_asset() {
     assert!(transaction.is_ok());
 
     // Create the same transaction for the faucet
-    let metadata = NoteMetadata::new(faucet.id(), NoteType::Private).with_tag(tag);
+    let metadata = PartialNoteMetadata::new(faucet.id(), NoteType::Private).with_tag(tag);
     let note = Note::new(vault, metadata, recipient);
 
     let transaction_request =
@@ -2757,13 +2762,7 @@ async fn pswap_fill_test(
     );
 
     let create_request = TransactionRequestBuilder::new()
-        .build_pswap_create(
-            &pswap_data,
-            NoteType::Private,
-            NoteType::Private,
-            NoteAttachment::default(),
-            client.rng(),
-        )
+        .build_pswap_create(&pswap_data, NoteType::Private, NoteType::Private, None, client.rng())
         .unwrap();
 
     let pswap_note = create_request.expected_output_own_notes()[0].clone();
@@ -2880,13 +2879,7 @@ async fn pswap_cancel_test() {
     );
 
     let create_request = TransactionRequestBuilder::new()
-        .build_pswap_create(
-            &pswap_data,
-            NoteType::Private,
-            NoteType::Private,
-            NoteAttachment::default(),
-            client.rng(),
-        )
+        .build_pswap_create(&pswap_data, NoteType::Private, NoteType::Private, None, client.rng())
         .unwrap();
 
     let pswap_note = create_request.expected_output_own_notes()[0].clone();
@@ -3271,7 +3264,7 @@ async fn consume_note_with_custom_script() {
 
     let note_storage = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
-    let note_metadata = NoteMetadata::new(sender_id, NoteType::Private)
+    let note_metadata = PartialNoteMetadata::new(sender_id, NoteType::Private)
         .with_tag(NoteTag::with_account_target(receiver_id));
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note_recipient = NoteRecipient::new(serial_num, note_script.clone(), note_storage);
@@ -3752,8 +3745,13 @@ async fn insert_new_fungible_faucet(
     let symbol = TokenSymbol::new("TEST").unwrap();
     let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
     let max_supply = 9_999_999_u64;
-    let token_metadata =
-        FungibleTokenMetadata::builder(name, symbol, 10, max_supply).build().unwrap();
+    let faucet = FungibleFaucet::builder()
+        .name(name)
+        .symbol(symbol)
+        .decimals(10)
+        .max_supply(AssetAmount::new(max_supply).unwrap())
+        .build()
+        .unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
@@ -3762,8 +3760,7 @@ async fn insert_new_fungible_faucet(
             pub_key.to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
         ))
-        .with_component(token_metadata)
-        .with_component(BasicFungibleFaucet)
+        .with_component(faucet)
         .with_components(TokenPolicyManager::new(
             PolicyAuthority::AuthControlled,
             MintPolicyConfig::AllowAll,
@@ -3796,8 +3793,13 @@ async fn insert_new_ecdsa_fungible_faucet(
     let symbol = TokenSymbol::new("TEST").unwrap();
     let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
     let max_supply = 9_999_999_u64;
-    let token_metadata =
-        FungibleTokenMetadata::builder(name, symbol, 10, max_supply).build().unwrap();
+    let faucet = FungibleFaucet::builder()
+        .name(name)
+        .symbol(symbol)
+        .decimals(10)
+        .max_supply(AssetAmount::new(max_supply).unwrap())
+        .build()
+        .unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
@@ -3806,8 +3808,7 @@ async fn insert_new_ecdsa_fungible_faucet(
             pub_key.to_commitment(),
             AuthSchemeId::EcdsaK256Keccak,
         ))
-        .with_component(token_metadata)
-        .with_component(BasicFungibleFaucet)
+        .with_component(faucet)
         .with_components(TokenPolicyManager::new(
             PolicyAuthority::AuthControlled,
             MintPolicyConfig::AllowAll,

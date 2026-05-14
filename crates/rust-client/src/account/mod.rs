@@ -100,22 +100,14 @@ pub mod component {
         WordSchema,
     };
     pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
+    pub use miden_standards::account::access::AccessControl;
     pub use miden_standards::account::auth::*;
-    pub use miden_standards::account::components::{
-        basic_fungible_faucet_library,
-        basic_wallet_library,
-        multisig_library,
-        network_fungible_faucet_library,
-        no_auth_library,
-        singlesig_acl_library,
-        singlesig_library,
-    };
     pub use miden_standards::account::faucets::{
-        BasicFungibleFaucet,
-        NetworkFungibleFaucet,
+        FungibleFaucet,
+        FungibleFaucetBuilder,
         TokenMetadata,
+        TokenName,
     };
-    pub use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
     pub use miden_standards::account::policies::{
         BurnAllowAll,
         BurnOwnerOnly,

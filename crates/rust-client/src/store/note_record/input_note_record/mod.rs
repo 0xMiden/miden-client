@@ -89,7 +89,7 @@ impl InputNoteRecord {
 
     /// Returns the note's commitment, if the record contains the [`NoteMetadata`].
     pub fn commitment(&self) -> Option<Word> {
-        self.metadata().map(|m| NoteHeader::new(self.id(), m.clone()).to_commitment())
+        self.metadata().map(|m| NoteHeader::new(self.id(), *m).to_commitment())
     }
 
     /// Returns the note's assets.
@@ -327,12 +327,12 @@ impl Deserializable for InputNoteRecord {
 
 impl From<Note> for InputNoteRecord {
     fn from(value: Note) -> Self {
-        let metadata = value.metadata().clone();
+        let metadata = *value.metadata();
         Self {
             details: value.into(),
             created_at: None,
             state: ExpectedNoteState {
-                metadata: Some(metadata.clone()),
+                metadata: Some(metadata),
                 after_block_num: BlockNumber::from(0),
                 tag: Some(metadata.tag()),
             }
@@ -348,7 +348,7 @@ impl From<InputNote> for InputNoteRecord {
                 details: note.clone().into(),
                 created_at: None,
                 state: UnverifiedNoteState {
-                    metadata: note.metadata().clone(),
+                    metadata: *note.metadata(),
                     inclusion_proof: proof,
                 }
                 .into(),
@@ -366,14 +366,14 @@ impl TryInto<InputNote> for InputNoteRecord {
             (Some(metadata), Some(inclusion_proof)) => Ok(InputNote::authenticated(
                 Note::new(
                     self.details.assets().clone(),
-                    metadata.clone(),
+                    *metadata.partial_metadata(),
                     self.details.recipient().clone(),
                 ),
                 inclusion_proof.clone(),
             )),
             (Some(metadata), None) => Ok(InputNote::unauthenticated(Note::new(
                 self.details.assets().clone(),
-                metadata.clone(),
+                *metadata.partial_metadata(),
                 self.details.recipient().clone(),
             ))),
             _ => Err(NoteRecordError::ConversionError(
@@ -387,10 +387,10 @@ impl TryInto<Note> for InputNoteRecord {
     type Error = NoteRecordError;
 
     fn try_into(self) -> Result<Note, Self::Error> {
-        match self.metadata().cloned() {
+        match self.metadata() {
             Some(metadata) => Ok(Note::new(
                 self.details.assets().clone(),
-                metadata,
+                *metadata.partial_metadata(),
                 self.details.recipient().clone(),
             )),
             None => Err(NoteRecordError::ConversionError(
@@ -404,10 +404,10 @@ impl TryInto<Note> for &InputNoteRecord {
     type Error = NoteRecordError;
 
     fn try_into(self) -> Result<Note, Self::Error> {
-        match self.metadata().cloned() {
+        match self.metadata() {
             Some(metadata) => Ok(Note::new(
                 self.details.assets().clone(),
-                metadata,
+                *metadata.partial_metadata(),
                 self.details.recipient().clone(),
             )),
             None => Err(NoteRecordError::ConversionError(

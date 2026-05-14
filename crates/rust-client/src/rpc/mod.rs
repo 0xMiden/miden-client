@@ -205,26 +205,25 @@ pub trait NodeRpcClient: Send + Sync {
     ) -> Result<Vec<NoteSyncBlock>, RpcError>;
 
     /// Calls [`NodeRpcClient::sync_notes`] for the requested range, then makes a single
-    /// [`NodeRpcClient::get_notes_by_id`] call to:
-    /// - Fill metadata for notes with attachments (whose sync response only had header fields).
-    /// - Fetch full note bodies for public notes (scripts, assets, recipient).
+    /// [`NodeRpcClient::get_notes_by_id`] call to fetch full note bodies (scripts, assets,
+    /// recipient) for public notes.
     ///
-    /// All notes that are public or have missing metadata are fetched (not just the ones the
-    /// client tracks) to avoid revealing which specific notes the client is interested in.
+    /// All public notes in the range are fetched (not just the ones the client tracks) to
+    /// avoid revealing which specific notes the client is interested in.
     ///
-    /// Returns the fully-resolved note blocks and the fetched public note bodies.
+    /// Returns the resolved note blocks and the fetched public note bodies.
     async fn sync_notes_with_details(
         &self,
         block_from: BlockNumber,
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<SyncNotesResult, RpcError> {
-        let mut blocks = self.sync_notes(block_from, block_to, note_tags).await?;
+        let blocks = self.sync_notes(block_from, block_to, note_tags).await?;
 
         let note_ids: Vec<NoteId> = blocks
             .iter()
             .flat_map(|b| b.notes.values())
-            .filter(|n| n.metadata().is_none() || n.note_type() != NoteType::Private)
+            .filter(|n| n.note_type() == NoteType::Public)
             .map(|n| *n.note_id())
             .collect();
 
@@ -234,15 +233,6 @@ pub trait NodeRpcClient: Send + Sync {
             let fetched = self.get_notes_by_id(&note_ids).await?;
 
             for fetched_note in fetched {
-                let note_id = fetched_note.id();
-                for block in &mut blocks {
-                    if let Some(note) = block.notes.get_mut(&note_id)
-                        && note.metadata().is_none()
-                    {
-                        note.set_metadata(fetched_note.metadata().clone());
-                    }
-                }
-
                 if let FetchedNote::Public(note, _) = fetched_note {
                     public_notes.insert(note.id(), note);
                 }
@@ -257,13 +247,14 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// - `prefix` is a list of nullifiers prefixes to search for.
     /// - `block_from`: The starting block number for the range (inclusive).
-    /// - `block_to`: The ending block number for the range (inclusive), or `None` to sync up to the
-    ///   chain tip.
+    /// - `block_to`: The ending block number for the range (inclusive). Callers that want to scan
+    ///   up to the chain tip should resolve it first (e.g. via
+    ///   [`NodeRpcClient::get_block_header_by_number`] with `None`).
     async fn sync_nullifiers(
         &self,
         prefix: &[u16],
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
 
     /// Fetches the account proof and optionally its details from the node, using the
@@ -307,7 +298,9 @@ pub trait NodeRpcClient: Send + Sync {
     ) -> Result<BTreeMap<Nullifier, Option<BlockNumber>>, RpcError> {
         let prefixes: Vec<u16> =
             requested_nullifiers.iter().map(crate::note::Nullifier::prefix).collect();
-        let retrieved_nullifiers = self.sync_nullifiers(&prefixes, block_from, None).await?;
+        let (chain_tip, _) = self.get_block_header_by_number(None, false).await?;
+        let retrieved_nullifiers =
+            self.sync_nullifiers(&prefixes, block_from, chain_tip.block_num()).await?;
 
         let mut nullifiers_height = BTreeMap::new();
         for nullifier in requested_nullifiers {
@@ -343,7 +336,7 @@ pub trait NodeRpcClient: Send + Sync {
         for detail in note_details {
             if let FetchedNote::Public(note, inclusion_proof) = detail {
                 let state = UnverifiedNoteState {
-                    metadata: note.metadata().clone(),
+                    metadata: *note.metadata(),
                     inclusion_proof,
                 }
                 .into();

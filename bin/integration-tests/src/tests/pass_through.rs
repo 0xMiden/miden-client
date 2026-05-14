@@ -23,13 +23,13 @@ use miden_client::note::{
     NoteAssets,
     NoteDetails,
     NoteFile,
-    NoteMetadata,
     NoteRecipient,
     NoteScript,
     NoteStorage,
     NoteTag,
     NoteType,
     P2idNoteStorage,
+    PartialNoteMetadata,
 };
 use miden_client::store::{InputNoteState, TransactionFilter};
 use miden_client::testing::common::*;
@@ -268,8 +268,8 @@ fn create_pass_through_note(
     let serial_num = rng.draw_word();
     let pass_through_recipient = NoteRecipient::new(serial_num, note_script, inputs);
 
-    let metadata =
-        NoteMetadata::new(sender, NoteType::Public).with_tag(NoteTag::with_account_target(target));
+    let metadata = PartialNoteMetadata::new(sender, NoteType::Public)
+        .with_tag(NoteTag::with_account_target(target));
     let note = Note::new(NoteAssets::new(vec![asset])?, metadata, pass_through_recipient);
 
     let pass_through_note_details =
