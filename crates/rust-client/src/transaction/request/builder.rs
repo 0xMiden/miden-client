@@ -298,6 +298,9 @@ impl TransactionRequestBuilder {
     ///
     /// By default, a request rejects any non-standard input-note script. Use this to opt in
     /// scripts the caller has independently verified.
+    ///
+    /// This replaces any previously configured note-script trust policy. Repeated calls do not
+    /// append roots; pass the full set of trusted roots in a single call.
     #[must_use]
     pub fn trusted_input_note_script_roots(
         mut self,
@@ -312,6 +315,9 @@ impl TransactionRequestBuilder {
     /// listed as trusted roots.
     ///
     /// Use this only after the caller has approved the unlisted scripts through their own flow.
+    ///
+    /// This replaces any previously configured note-script trust policy, including trusted root
+    /// allowlists set with [`Self::trusted_input_note_script_roots`].
     #[must_use]
     pub fn allow_unlisted_note_scripts(mut self) -> Self {
         self.note_script_trust_policy = NoteScriptTrustPolicy::AllowUnlistedAfterApproval;

@@ -994,18 +994,22 @@ pub enum TransactionStoreUpdateError {
 // HELPERS
 // ================================================================================================
 
-/// Rejects the first input note whose script root is not allowed by the request policy.
+/// Rejects input notes whose script roots are not allowed by the request policy.
 fn check_input_note_script_trust(
     transaction_request: &TransactionRequest,
 ) -> Result<(), ClientError> {
     let policy = transaction_request.note_script_trust_policy();
-    for note in transaction_request.input_notes() {
-        let script_root = Word::from(note.script().root());
-        if !policy.allows(script_root) {
-            return Err(ClientError::UntrustedNoteScript { script_root, policy: policy.clone() });
-        }
+    let script_roots: BTreeSet<Word> = transaction_request
+        .input_notes()
+        .iter()
+        .map(|note| Word::from(note.script().root()))
+        .filter(|script_root| !policy.allows(*script_root))
+        .collect();
+    if script_roots.is_empty() {
+        Ok(())
+    } else {
+        Err(ClientError::UntrustedNoteScript { script_roots, policy: policy.clone() })
     }
-    Ok(())
 }
 
 /// Output of [`Client::prepare_transaction`]: the data-store-independent state needed to

@@ -4,6 +4,7 @@
 
 use alloc::collections::BTreeSet;
 use alloc::string::ToString;
+use core::fmt;
 
 use miden_protocol::Word;
 use miden_protocol::note::NoteScriptRoot;
@@ -57,6 +58,23 @@ impl NoteScriptTrustPolicy {
             Self::StandardScriptsOnly => is_standard_script(root),
             Self::TrustedScriptRoots(set) => is_standard_script(root) || set.contains(&root),
             Self::AllowUnlistedAfterApproval => true,
+        }
+    }
+}
+
+impl fmt::Display for NoteScriptTrustPolicy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::StandardScriptsOnly => f.write_str("StandardScriptsOnly"),
+            Self::TrustedScriptRoots(set) => {
+                let label = if set.len() == 1 {
+                    "trusted root"
+                } else {
+                    "trusted roots"
+                };
+                write!(f, "TrustedScriptRoots ({} {label})", set.len())
+            },
+            Self::AllowUnlistedAfterApproval => f.write_str("AllowUnlistedAfterApproval"),
         }
     }
 }
