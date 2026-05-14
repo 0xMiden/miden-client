@@ -77,23 +77,32 @@ impl<AUTH> Client<AUTH> {
     /// notes have no on-chain details), so calling this method is safe to
     /// retry until the recipient acknowledges.
     ///
-    /// Requires the note to be committed on chain. Pre-commit records lack
-    /// the recipient data needed for reconstruction; calling this method on
-    /// such a record is a programming error (the by-id flow is the wrong
-    /// tool — the caller already has the [`Note`] in memory).
+    /// Requires the note to be in [`OutputNoteState::CommittedFull`]: i.e.
+    /// committed on chain AND the store has the full recipient data needed
+    /// to reconstruct the [`Note`].
+    ///
+    /// The store distinguishes two committed states. `CommittedFull` carries
+    /// the recipient and is what this method needs. `CommittedPartial`
+    /// carries only the inclusion proof (e.g. on a node that observed the
+    /// note as a third party) and lacks the recipient data, so the [`Note`]
+    /// cannot be reconstructed locally and the note is not resendable
+    /// through this path; the caller would need to supply the [`Note`]
+    /// directly to [`Client::send_private_note`].
     ///
     /// # Errors
     /// - [`ClientError::OutputNoteNotInStore`] if no output note with this ID is tracked locally
     ///   (client likely wasn't the sender).
     /// - [`ClientError::NoteNotFoundOnChain`] if the stored record exists but has not yet been
-    ///   committed on chain.
+    ///   committed on chain (states `ExpectedPartial`, `ExpectedFull`).
+    /// - [`ClientError::NoteRecordConversionError`] if the record is committed but in
+    ///   `CommittedPartial` state (inclusion proof only, no recipient — not reconstructable).
     /// - Any [`NoteTransportError`] from the underlying transport.
     pub async fn send_private_note_by_id(
         &mut self,
         note_id: NoteId,
         address: &Address,
     ) -> Result<(), ClientError> {
-        use crate::store::{NoteFilter, NoteRecordError};
+        use crate::store::{NoteFilter, NoteRecordError, OutputNoteState};
 
         let record = self
             .store
@@ -102,17 +111,25 @@ impl<AUTH> Client<AUTH> {
             .pop()
             .ok_or(ClientError::OutputNoteNotInStore(note_id))?;
 
-        if !record.is_committed() {
-            return Err(ClientError::NoteNotFoundOnChain(note_id));
-        }
-
-        // Defensive: a committed record carries full recipient data by construction,
-        // but unwrap-by-error is preferable to a panic if that invariant ever breaks.
-        let recipient = record.recipient().cloned().ok_or_else(|| {
-            ClientError::NoteRecordConversionError(NoteRecordError::ConversionError(
-                "committed output note is missing recipient data".into(),
-            ))
-        })?;
+        // Discriminate the two committed states. `CommittedFull` is the only
+        // one resendable through this path; `CommittedPartial` is on-chain
+        // but stores only the inclusion proof, so recipient data isn't
+        // available for [`Note`] reconstruction (the local node was a third-
+        // party observer, not the sender that knew the recipient).
+        let recipient = match record.state() {
+            OutputNoteState::CommittedFull { recipient, .. } => recipient.clone(),
+            OutputNoteState::CommittedPartial { .. } => {
+                return Err(ClientError::NoteRecordConversionError(
+                    NoteRecordError::ConversionError(
+                        "output note is committed but stored as CommittedPartial (inclusion \
+                         proof only); recipient data is unavailable so the Note cannot be \
+                         reconstructed for resend"
+                            .into(),
+                    ),
+                ));
+            },
+            _ => return Err(ClientError::NoteNotFoundOnChain(note_id)),
+        };
         let assets = record.assets().clone();
         let metadata = record.metadata().clone();
 
