@@ -582,23 +582,14 @@ impl StateSync {
 
     /// Queries the node for updated public accounts and populates `account_updates`.
     ///
-    /// For each tracked public account whose commitment changed, the flow is:
+    /// For each public account whose commitment changed, an updated snapshot is fetched via
+    /// `get_account_proof`. Callers may supply [`AccountSyncHint::map_slot_names`] to request
+    /// map storage data up-front and avoid a roundtrip; otherwise a second call is issued when
+    /// the account turns out to have map slots.
     ///
-    /// 1. **Initial proof call**: `get_account_proof`. If the caller provided `map_slot_names` in
-    ///    the [`AccountSyncHint`], they are passed as `AllEntries(true)` so the response is
-    ///    self-sufficient. Otherwise the request goes out with empty storage requirements (a
-    ///    discovery call that returns the slot layout but no `map_details`).
-    /// 2. **Dispatch**:
-    ///    - If the vault is oversized OR (after a discovery call) any map turns out to be
-    ///      oversized: use the [`PublicAccountUpdate::Delta`] path (`sync_storage_maps` +
-    ///      `sync_account_vault`).
-    ///    - If hints were provided and nothing is oversized: emit [`PublicAccountUpdate::Full`]
-    ///      directly from the initial response (1 RPC total).
-    ///    - If no hints and no map slots exist: emit [`PublicAccountUpdate::Full`] from the initial
-    ///      response (1 RPC roundtrip).
-    ///    - Otherwise (no hints, has map slots): make a second `get_account_proof` with the
-    ///      discovered slot names as `AllEntries(true)`, then emit [`PublicAccountUpdate::Full`] (2
-    ///      RPCs roundtrips).
+    /// Accounts whose vault or maps are too large to fit in a single response fall back to the
+    /// incremental [`PublicAccountUpdate::Delta`] path, which fetches vault and storage map
+    /// updates over the synced block range.
     async fn sync_public_accounts(
         &self,
         account_updates: &mut AccountUpdates,
@@ -614,93 +605,107 @@ impl StateSync {
                 continue;
             };
 
-            let account_id = local_hint.header.id();
-            let local_header = &local_hint.header;
-            let has_hint = !local_hint.map_slot_names.is_empty();
-
-            // If we have hints, request all map data up-front so the response is self-sufficient.
-            // Otherwise issue a discovery call (empty requirements) to learn the slot layout.
-            let initial_requirements = if has_hint {
-                AccountStorageRequirements::new(
-                    local_hint
-                        .map_slot_names
-                        .iter()
-                        .map(|n| (n.clone(), core::iter::empty::<&StorageMapKey>())),
-                )
-            } else {
-                AccountStorageRequirements::default()
-            };
-
-            let (proof_block_num, proof) = self
-                .rpc_api
-                .get_account_proof(
-                    account_id,
-                    initial_requirements,
-                    AccountStateAt::ChainTip,
-                    None,
-                    Some(EMPTY_WORD),
-                )
-                .await
-                .map_err(ClientError::RpcError)?;
-
-            let Some(details) = proof.into_parts().1 else {
-                // Private account returned — should not happen for public accounts.
-                continue;
-            };
-
-            // Skip if the remote nonce is not newer than what we already have.
-            if details.header.nonce().as_canonical_u64() <= local_header.nonce().as_canonical_u64()
-            {
-                continue;
+            if let Some(public_update) = self.sync_public_account(local_hint, block_num).await? {
+                account_updates.extend(AccountUpdates::new(vec![public_update], Vec::new()));
             }
-
-            let vault_oversized = details.vault_details.too_many_assets;
-            let any_map_oversized =
-                details.storage_details.map_details.iter().any(|m| m.too_many_entries);
-
-            // Map slot names actually present on the account, taken from the response header.
-            let response_map_slots: Vec<StorageSlotName> = details
-                .storage_details
-                .header
-                .slots()
-                .filter(|slot| slot.slot_type() == StorageSlotType::Map)
-                .map(|slot| slot.name().clone())
-                .collect();
-
-            let public_update = if vault_oversized || any_map_oversized {
-                // Some part of the account is oversized — use incremental endpoints.
-                self.build_delta_update(account_id, &details, block_num, proof_block_num)
-                    .await?
-            } else if response_map_slots.is_empty() {
-                // No map slots on the account — the initial response is self-sufficient.
-                let account = Account::try_from(&details).map_err(ClientError::RpcError)?;
-                PublicAccountUpdate::Full(account)
-            } else if has_hint
-                && response_map_slots
-                    .iter()
-                    .all(|name| local_hint.map_slot_names.iter().any(|h| h == name))
-            {
-                // Hints covered every map slot the account actually has — the initial call
-                // already requested all map data, so the response is self-sufficient.
-                let account = Account::try_from(&details).map_err(ClientError::RpcError)?;
-                PublicAccountUpdate::Full(account)
-            } else {
-                // Either no hint, or hint is stale (new map slot appeared since the last
-                // sync). Re-fetch with the actual slot names from the response.
-                self.fetch_full_with_map_data(
-                    account_id,
-                    &details,
-                    &response_map_slots,
-                    block_num,
-                    proof_block_num,
-                )
-                .await?
-            };
-
-            account_updates.extend(AccountUpdates::new(vec![public_update], Vec::new()));
         }
 
         Ok(())
+    }
+
+    /// Fetches an updated snapshot for a single public account.
+    ///
+    /// Returns `Ok(None)` when the response can't be used to produce an update, either the node
+    /// returned no details for a public account, or the remote nonce isn't newer than the local
+    /// one.
+    async fn sync_public_account(
+        &self,
+        local_hint: &AccountSyncHint,
+        block_num: BlockNumber,
+    ) -> Result<Option<PublicAccountUpdate>, ClientError> {
+        let account_id = local_hint.header.id();
+        let local_header = &local_hint.header;
+        let has_hint = !local_hint.map_slot_names.is_empty();
+
+        // If we have hints, request all map data up-front so the response is self-sufficient.
+        // Otherwise issue a discovery call (empty requirements) to learn the slot layout.
+        let initial_requirements = if has_hint {
+            AccountStorageRequirements::new(
+                local_hint
+                    .map_slot_names
+                    .iter()
+                    .map(|n| (n.clone(), core::iter::empty::<&StorageMapKey>())),
+            )
+        } else {
+            AccountStorageRequirements::default()
+        };
+
+        let (proof_block_num, proof) = self
+            .rpc_api
+            .get_account_proof(
+                account_id,
+                initial_requirements,
+                AccountStateAt::ChainTip,
+                None,
+                Some(EMPTY_WORD),
+            )
+            .await
+            .map_err(ClientError::RpcError)?;
+
+        let Some(details) = proof.into_parts().1 else {
+            // Private account returned — should not happen for public accounts.
+            return Ok(None);
+        };
+
+        // Skip if the remote nonce is not newer than what we already have.
+        if details.header.nonce().as_canonical_u64() <= local_header.nonce().as_canonical_u64() {
+            return Ok(None);
+        }
+
+        let vault_oversized = details.vault_details.too_many_assets;
+        let any_map_oversized =
+            details.storage_details.map_details.iter().any(|m| m.too_many_entries);
+
+        // Map slot names actually present on the account, taken from the response header.
+        let response_map_slots: Vec<StorageSlotName> = details
+            .storage_details
+            .header
+            .slots()
+            .filter(|slot| slot.slot_type() == StorageSlotType::Map)
+            .map(|slot| slot.name().clone())
+            .collect();
+
+        let public_update = if vault_oversized || any_map_oversized {
+            // Some part of the account is oversized — use incremental endpoints.
+            self.build_delta_update(account_id, &details, block_num, proof_block_num)
+                .await?
+        } else if response_map_slots.is_empty() {
+            // No map slots on the account — the initial response is self-sufficient.
+            let account = Account::try_from(&details).map_err(ClientError::RpcError)?;
+            PublicAccountUpdate::Full(account)
+        } else if has_hint
+            && response_map_slots
+                .iter()
+                .all(|name| local_hint.map_slot_names.iter().any(|h| h == name))
+        {
+            // Hints covered every map slot the account actually has — the initial call already
+            // requested all map data, so the response is self-sufficient.
+            let account = Account::try_from(&details).map_err(ClientError::RpcError)?;
+            PublicAccountUpdate::Full(account)
+        } else {
+            // Either no hint, or hint is stale (new map slot appeared since the last sync).
+            // Re-fetch with the actual slot names from the response.
+            self.fetch_full_with_map_data(
+                account_id,
+                &details,
+                &response_map_slots,
+                block_num,
+                proof_block_num,
+            )
+            .await?
+        };
+
+        Ok(Some(public_update))
     }
 
     /// Calls `get_account_proof` again with all map slot names requested as `AllEntries(true)`. If
