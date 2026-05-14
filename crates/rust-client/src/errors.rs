@@ -97,6 +97,8 @@ pub enum ClientError {
     DataDeserializationError(#[from] DeserializationError),
     #[error("note with id {0} not found on chain")]
     NoteNotFoundOnChain(NoteId),
+    #[error("output note with id {0} is not tracked in the local store")]
+    OutputNoteNotInStore(NoteId),
     #[error("failed to parse hex string")]
     HexParseError(#[from] HexParseError),
     #[error(
