@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use anyhow::{Result, anyhow};
 use miden_client::account::{AccountId, AccountStorageMode};
-use miden_client::assembly::CodeBuilder;
+use miden_client::assembly::{CodeBuilder, SourceManagerSync};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::crypto::FeltRng;
 use miden_client::note::{
@@ -47,7 +49,8 @@ const P2ID_EMITTER_SCRIPT: &str = r#"
 
     const ERR_STORAGE_LEN="expected 12 note storage items"
 
-    begin
+    @note_script
+    pub proc main
         # drop note arguments
         dropw
 
@@ -130,8 +133,14 @@ pub async fn test_ntx_output_public_note(client_config: ClientConfig) -> Result<
     let bob_recipient = P2idNoteStorage::new(bob.id()).into_recipient(bob_serial_num);
     let expected_output_id = NoteDetails::new(NoteAssets::new(vec![])?, bob_recipient.clone()).id();
 
-    let network_note =
-        build_emitter_network_note(alice.id(), bank.id(), bob.id(), &bob_recipient, client.rng())?;
+    let network_note = build_emitter_network_note(
+        alice.id(),
+        bank.id(),
+        bob.id(),
+        &bob_recipient,
+        client.source_manager(),
+        client.rng(),
+    )?;
 
     let tx_request =
         TransactionRequestBuilder::new().own_output_notes(vec![network_note]).build()?;
@@ -184,6 +193,7 @@ fn build_emitter_network_note(
     network_account: AccountId,
     target: AccountId,
     output_recipient: &NoteRecipient,
+    source_manager: Arc<dyn SourceManagerSync>,
     rng: &mut ClientRng,
 ) -> Result<Note> {
     let target_ntx = NetworkAccountTarget::new(network_account, NoteExecutionHint::Always)?;
@@ -192,8 +202,8 @@ fn build_emitter_network_note(
         .with_tag(NoteTag::with_account_target(network_account))
         .with_attachment(attachment);
 
-    let script = CodeBuilder::new()
-        .with_dynamically_linked_library(counter_contract_library())?
+    let script = CodeBuilder::with_source_manager(source_manager.clone())
+        .with_dynamically_linked_library(counter_contract_library(source_manager))?
         .compile_note_script(P2ID_EMITTER_SCRIPT)?;
 
     let serial_num = output_recipient.serial_num();

@@ -3,12 +3,21 @@ use miden_client::Felt;
 use miden_client::account::component::{
     AccountComponent,
     AccountComponentMetadata,
+    BurnPolicyConfig,
+    FungibleTokenMetadata,
+    MintPolicyConfig,
     NetworkFungibleFaucet,
     Ownable2Step,
-    OwnerControlled,
-    OwnerControlledInitConfig,
+    PolicyAuthority,
+    TokenName,
+    TokenPolicyManager,
 };
-use miden_client::account::{AccountBuilder, AccountStorageMode, AccountType};
+use miden_client::account::{
+    AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
+    AccountStorageMode,
+    AccountType,
+};
 use miden_client::assembly::CodeBuilder;
 use miden_client::asset::{FungibleAsset, TokenSymbol};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
@@ -109,19 +118,25 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
-    let max_supply = Felt::new(9_999_999);
+    let symbol = TokenSymbol::new("MNT").unwrap();
+    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
+    let max_supply: u64 = 9_999_999;
+    let token_metadata = FungibleTokenMetadata::builder(name, symbol, 10, max_supply)
+        .build()
+        .map_err(|e| anyhow!("failed to build fungible token metadata: {e}"))?;
     let faucet = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(AccountStorageMode::Network)
         .with_auth_component(incr_nonce_auth)
-        .with_component(NetworkFungibleFaucet::new(
-            TokenSymbol::new("MNT").unwrap(),
-            10,
-            max_supply,
-        )?)
+        .with_component(token_metadata)
+        .with_component(NetworkFungibleFaucet)
+        .with_components(TokenPolicyManager::new(
+            PolicyAuthority::OwnerControlled,
+            MintPolicyConfig::OwnerOnly,
+            BurnPolicyConfig::AllowAll,
+        ))
         .with_component(Ownable2Step::new(alice.id()))
-        .with_component(OwnerControlled::new(OwnerControlledInitConfig::OwnerOnly))
-        .build()
+        .build_with_schema_commitment()
         .map_err(|e| anyhow!("failed to build network faucet: {e}"))?;
     client.add_account(&faucet, false).await?;
 
@@ -129,7 +144,7 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
     // tx submitted from the faucet itself; without this the node's NTX
     // builder has no knowledge of the faucet and cannot run the MINT note
     // against it.
-    let deploy_script = CodeBuilder::new()
+    let deploy_script = CodeBuilder::with_source_manager(client.source_manager())
         .compile_tx_script(NOOP_TX_SCRIPT)
         .context("failed to compile faucet deploy tx script")?;
     let deploy_tx = TransactionRequestBuilder::new().custom_script(deploy_script).build()?;

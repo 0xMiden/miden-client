@@ -55,7 +55,6 @@ where
     /// # Errors
     ///
     /// - If an attempt is made to overwrite a note that is currently processing.
-    /// - If the client has reached the note tags limit.
     ///
     /// Note: This operation is atomic. If any note file is invalid or any existing note is in the
     /// processing state, the entire operation fails and no notes are imported.
@@ -128,7 +127,9 @@ where
             imported_note_ids.push(note.id());
             if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) = note.state()
             {
-                self.insert_note_tag(NoteTagRecord::with_note_source(*tag, note.id())).await?;
+                self.store
+                    .add_note_tag(NoteTagRecord::with_note_source(*tag, note.id()))
+                    .await?;
             }
             self.store.upsert_input_notes(&[note]).await?;
         }
@@ -147,7 +148,7 @@ where
     /// - If a note doesn't exist on the node.
     /// - If a note exists but is private.
     async fn import_note_records_by_id(
-        &self,
+        &mut self,
         notes: BTreeMap<NoteId, Option<InputNoteRecord>>,
     ) -> Result<BTreeMap<NoteId, Option<InputNoteRecord>>, ClientError> {
         let note_ids = notes.keys().copied().collect::<Vec<_>>();
@@ -214,7 +215,7 @@ where
     /// If the note isn't consumed and it was committed in the past relative to the client, then
     /// the MMR for the relevant block is fetched from the node and stored.
     pub(crate) async fn import_note_records_by_proof(
-        &self,
+        &mut self,
         requested_notes: Vec<(Option<InputNoteRecord>, Note, NoteInclusionProof)>,
     ) -> Result<Vec<Option<InputNoteRecord>>, ClientError> {
         // TODO: iterating twice over requested notes
@@ -270,22 +271,23 @@ where
                     note_record.inclusion_proof_received(inclusion_proof, metadata)?;
 
                 if block_height <= current_block_num {
-                    // FIXME: We should be able to build the mmr only once (outside the for loop).
-                    // For some reason this leads to error, probably related to:
-                    // https://github.com/0xMiden/miden-client/issues/1205
                     // If the note is committed in the past we need to manually fetch the block
                     // header and MMR proof to verify the inclusion proof.
-                    let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
-
+                    //
+                    // Building the MMR outside the loop would fail with BlockHeaderNotFound(0)
+                    // because store will be fresh, which can't happen here.
+                    let mut partial_mmr = self.get_current_partial_mmr().await?;
                     let block_header = self
-                        .get_and_store_authenticated_block(block_height, &mut current_partial_mmr)
+                        .get_and_store_authenticated_block(block_height, &mut partial_mmr)
                         .await?;
+                    self.cache_partial_mmr(partial_mmr).await?;
 
                     note_changed |= note_record.block_header_received(&block_header)?;
                 } else {
                     // If the note is in the future we import it as unverified. We add the note tag
                     // so that the note is verified naturally in the next sync.
-                    self.insert_note_tag(NoteTagRecord::with_note_source(tag, note_record.id()))
+                    self.store
+                        .add_note_tag(NoteTagRecord::with_note_source(tag, note_record.id()))
                         .await?;
                 }
 
@@ -331,16 +333,17 @@ where
 
             match committed_notes_data.remove(&note_record.id()) {
                 Some(Some((metadata, inclusion_proof))) => {
-                    // FIXME: We should be able to build the mmr only once (outside the for loop).
-                    // For some reason this leads to error, probably related to:
-                    // https://github.com/0xMiden/miden-client/issues/1205
-                    let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
+                    // Building the MMR outside the loop would fail with BlockHeaderNotFound(0)
+                    // because store will be fresh, which can't happen here.
+                    let mut partial_mmr = self.get_current_partial_mmr().await?;
                     let block_header = self
                         .get_and_store_authenticated_block(
                             inclusion_proof.location().block_num(),
-                            &mut current_partial_mmr,
+                            &mut partial_mmr,
                         )
                         .await?;
+
+                    self.cache_partial_mmr(partial_mmr).await?;
 
                     let tag = metadata.tag();
                     let note_changed =
@@ -384,7 +387,7 @@ where
 
         let sync_result = self
             .rpc_api
-            .sync_notes_with_details(request_block_num, Some(current_block_num), &tracked_tags)
+            .sync_notes_with_details(request_block_num, current_block_num, &tracked_tags)
             .await
             .map_err(ClientError::RpcError)?;
 
