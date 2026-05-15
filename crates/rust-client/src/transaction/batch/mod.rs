@@ -232,46 +232,21 @@ where
         account_id: AccountId,
         req: TransactionRequest,
     ) -> Result<Self, ClientError> {
-        // 1. Resolve the current in-batch state for this account, lazy-loading from the store on
-        //    first reference.
-        let pre_account = if let Some(account) = self.data_store.current_account(account_id) {
-            account.clone()
-        } else {
-            let record = self
-                .client
-                .store
-                .get_account(account_id)
-                .await?
-                .ok_or(ClientError::AccountDataNotFound(account_id))?;
-            if record.is_locked() {
-                return Err(ClientError::AccountLocked(account_id));
-            }
-            let account: Account = record.try_into()?;
-            self.data_store.insert_account(account_id, account.clone());
-            account
-        };
-
-        // 2. Dedup input notes globally for the batch.
+        // 1. Dedup input notes globally for the batch.
         for note_id in req.input_note_ids() {
             if self.consumed_input_notes.contains(&note_id) {
                 return Err(ClientError::from(BatchBuilderError::DuplicateInputNote(note_id)));
             }
         }
 
-        // 3. Execute against in-batch state, prove.
+        // 2. Execute against in-batch state, prove.
         let tx_result =
-            execute_transaction_for_batch(self.client, &self.data_store, pre_account.clone(), req)
+            execute_transaction_for_batch(self.client, &mut self.data_store, account_id, req)
                 .await?;
         let tx_inputs = tx_result.executed_transaction().tx_inputs().clone();
         let proven_tx = self.client.prove_transaction(&tx_result).await?;
 
-        // 4. Apply delta to the local pre-state and store it back as the new in-batch state.
-        let mut post = pre_account;
-        post.apply_delta(tx_result.executed_transaction().account_delta())
-            .map_err(ClientError::AccountError)?;
-        self.data_store.set_current_account(account_id, post);
-
-        // 5. Record consumed input notes, append PushedTx.
+        // 3. Record consumed input notes, append PushedTx.
         for note in tx_result.consumed_notes().iter() {
             self.consumed_input_notes.insert(note.id());
         }
@@ -284,15 +259,32 @@ where
     }
 }
 
+/// Executes a single transaction, that is part of the batch to be sent to the node.
+/// Transaction is ran as the provided `Account`
 async fn execute_transaction_for_batch<AUTH>(
     client: &Client<AUTH>,
-    data_store: &InMemoryBatchDataStore,
-    account: Account,
+    data_store: &mut InMemoryBatchDataStore,
+    account_id: AccountId,
     transaction_request: TransactionRequest,
 ) -> Result<TransactionResult, ClientError>
 where
     AUTH: TransactionAuthenticator + Sync + 'static,
 {
+    let mut account = if let Some(account) = data_store.get_account(account_id) {
+        account.clone()
+    } else {
+        let record = client
+            .store
+            .get_account(account_id)
+            .await?
+            .ok_or(ClientError::AccountDataNotFound(account_id))?;
+        if record.is_locked() {
+            return Err(ClientError::AccountLocked(account_id));
+        }
+        let account: Account = record.try_into()?;
+        account
+    };
+
     let account_id = account.id();
     let prep = client.prepare_transaction(&account, transaction_request).await?;
 
@@ -305,13 +297,19 @@ where
 
     let mut notes = prep.notes;
     if prep.ignore_invalid_notes {
-        notes = client.get_valid_input_notes(account, notes, prep.tx_args.clone()).await?;
+        notes = client.get_valid_input_notes(&account, notes, prep.tx_args.clone()).await?;
     }
 
     let executed_transaction = client
         .build_executor(data_store)?
         .execute_transaction(account_id, prep.block_num, notes, prep.tx_args)
         .await?;
+
+    // Cache new account state in memory data store
+    account
+        .apply_delta(executed_transaction.account_delta())
+        .map_err(ClientError::AccountError)?;
+    data_store.cache_account(account_id, account);
 
     validate_executed_transaction(&executed_transaction, &prep.output_recipients)?;
     TransactionResult::new(executed_transaction, prep.future_notes)

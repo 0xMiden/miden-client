@@ -37,15 +37,11 @@ impl InMemoryBatchDataStore {
         Self { inner, current_accounts: BTreeMap::new() }
     }
 
-    pub(crate) fn current_account(&self, id: AccountId) -> Option<&Account> {
+    pub(crate) fn get_account(&self, id: AccountId) -> Option<&Account> {
         self.current_accounts.get(&id)
     }
 
-    pub(crate) fn insert_account(&mut self, id: AccountId, account: Account) {
-        self.current_accounts.insert(id, account);
-    }
-
-    pub(crate) fn set_current_account(&mut self, id: AccountId, new_state: Account) {
+    pub(crate) fn cache_account(&mut self, id: AccountId, new_state: Account) {
         self.current_accounts.insert(id, new_state);
     }
 

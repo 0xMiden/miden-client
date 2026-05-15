@@ -81,7 +81,7 @@ use tracing::info;
 
 use super::Client;
 use crate::ClientError;
-use crate::note::{NoteScreener, NoteScreenerError, NoteUpdateTracker};
+use crate::note::{NoteScreenerError, NoteUpdateTracker};
 use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::rpc::{AccountStateAt, GrpcError, NodeRpcClient, RpcError};
 use crate::store::data_store::ClientDataStore;
@@ -274,7 +274,7 @@ where
 
         let mut notes = prep.notes;
         if prep.ignore_invalid_notes {
-            notes = self.get_valid_input_notes(account, notes, prep.tx_args.clone()).await?;
+            notes = self.get_valid_input_notes(&account, notes, prep.tx_args.clone()).await?;
         }
 
         let executed_transaction = self
@@ -620,7 +620,7 @@ where
 
     pub(crate) async fn get_valid_input_notes(
         &self,
-        account: Account,
+        account: &Account,
         mut input_notes: InputNotes<InputNote>,
         tx_args: TransactionArgs,
     ) -> Result<InputNotes<InputNote>, ClientError> {
@@ -809,7 +809,7 @@ where
         let mut new_input_notes = vec![];
         let output_notes: Vec<Note> =
             notes_from_output(executed_tx.output_notes()).cloned().collect();
-        let note_screener = NoteScreener::new(self.store.clone(), self.rpc_api.clone());
+        let note_screener = self.note_screener().clone();
         let output_note_relevances = note_screener.can_consume_batch(&output_notes).await?;
 
         for note in output_notes {

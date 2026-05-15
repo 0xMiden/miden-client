@@ -328,10 +328,10 @@ async fn batch_builder_push_succeeds_when_balance_depends_on_prior_push() {
 /// Verify that submitting an empty batch (no pushes) returns `BatchBuilderError::Empty`.
 #[tokio::test]
 async fn batch_builder_empty_submit_returns_empty_error() {
-    let (mut client, rpc_api, _keystore) = Box::pin(create_test_client()).await;
+    let (client, rpc_api, _keystore) = Box::pin(create_test_client()).await;
 
     // Pick the first tracked account in the mock chain.
-    let account_id = rpc_api
+    let _account_id = rpc_api
         .mock_chain
         .read()
         .proven_blocks()
@@ -340,10 +340,6 @@ async fn batch_builder_empty_submit_returns_empty_error() {
         .next()
         .unwrap()
         .account_id();
-
-    // Register the account with the client store.
-    let account = rpc_api.mock_chain.read().committed_account(account_id).unwrap().clone();
-    client.add_account(&account, false).await.unwrap();
 
     let batch = client.new_transaction_batch();
     assert_eq!(batch.len(), 0);
