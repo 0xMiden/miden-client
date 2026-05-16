@@ -1173,31 +1173,62 @@ impl StateSync {
 
 /// Derives account commitment updates from transaction records.
 ///
-/// For each unique account, takes the `final_state_commitment` from the transaction with the
-/// highest `block_num`. This replicates the old `SyncState` behavior where the node returned
-/// the latest account commitment per account in the synced range.
+/// For each unique account, returns the `final_state_commitment` from the terminal transaction
+/// in the highest-`block_num` group. When multiple transactions for the same account are
+/// committed in the same block they form an execution chain: the `final_state_commitment` of
+/// each transaction is the `initial_state_commitment` of the next. Walking this chain to its
+/// end yields the actual on-chain account state, whereas picking the first-seen transaction
+/// would return an intermediate (and incorrect) commitment.
 fn derive_account_commitment_updates(
     transaction_records: &[RpcTransactionRecord],
 ) -> Vec<(AccountId, Word)> {
-    let mut latest_by_account: BTreeMap<AccountId, &RpcTransactionRecord> = BTreeMap::new();
+    use std::collections::BTreeSet;
 
+    // Group transactions by (account_id, block_num).
+    let mut groups: BTreeMap<(AccountId, BlockNumber), Vec<&RpcTransactionRecord>> =
+        BTreeMap::new();
     for record in transaction_records {
         let account_id = record.transaction_header.account_id();
+        groups.entry((account_id, record.block_num)).or_default().push(record);
+    }
+
+    // For each account pick the highest-block_num group and resolve its terminal state.
+    let mut latest_by_account: BTreeMap<AccountId, (BlockNumber, Word)> = BTreeMap::new();
+
+    for ((account_id, block_num), txs) in &groups {
+        let terminal_state = if txs.len() == 1 {
+            txs[0].transaction_header.final_state_commitment()
+        } else {
+            // The terminal transaction's final_state_commitment is not used as the
+            // initial_state_commitment of any other transaction in the same group.
+            let initial_states: BTreeSet<Word> = txs
+                .iter()
+                .map(|tx| tx.transaction_header.initial_state_commitment())
+                .collect();
+
+            txs.iter()
+                .find(|tx| {
+                    !initial_states.contains(&tx.transaction_header.final_state_commitment())
+                })
+                .map(|tx| tx.transaction_header.final_state_commitment())
+                // Fallback for degenerate input (e.g. a cycle); take the last record seen.
+                .unwrap_or_else(|| txs.last().unwrap().transaction_header.final_state_commitment())
+        };
+
         latest_by_account
-            .entry(account_id)
-            .and_modify(|existing| {
-                if record.block_num > existing.block_num {
-                    *existing = record;
+            .entry(*account_id)
+            .and_modify(|(existing_block, existing_state)| {
+                if *block_num > *existing_block {
+                    *existing_block = *block_num;
+                    *existing_state = terminal_state;
                 }
             })
-            .or_insert(record);
+            .or_insert((*block_num, terminal_state));
     }
 
     latest_by_account
         .into_iter()
-        .map(|(account_id, record)| {
-            (account_id, record.transaction_header.final_state_commitment())
-        })
+        .map(|(account_id, (_, state))| (account_id, state))
         .collect()
 }
 
