@@ -362,7 +362,7 @@ pub async fn test_note_reader_finds_note_consumed_by_ntx(
 
 /// Compiles the counter contract library using the provided source manager so that all source
 /// spans are registered in the same manager used by the client's executor.
-fn counter_contract_library(source_manager: Arc<dyn SourceManagerSync>) -> Arc<Library> {
+pub(crate) fn counter_contract_library(source_manager: Arc<dyn SourceManagerSync>) -> Arc<Library> {
     let assembler = TransactionKernel::assembler_with_source_manager(source_manager.clone());
     let module = Module::parser(ModuleKind::Library)
         .parse_str(
