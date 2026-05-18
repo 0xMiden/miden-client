@@ -46,6 +46,46 @@ fn deploy_help() {
     cmd.assert().success().stdout(contains("Deploy a public wallet"));
 }
 
+/// Tests that the import subcommand help works
+#[test]
+fn import_help() {
+    let mut cmd = cargo_bin_cmd!("miden-bench");
+    cmd.args(["import", "--help"]);
+    cmd.assert().success().stdout(contains("Import an account"));
+}
+
+/// Tests that the export subcommand help works
+#[test]
+fn export_help() {
+    let mut cmd = cargo_bin_cmd!("miden-bench");
+    cmd.args(["export", "--help"]);
+    cmd.assert().success().stdout(contains("Export an account"));
+}
+
+/// Tests that import requires one of --filename / --account-id
+#[test]
+fn import_requires_source() {
+    let mut cmd = cargo_bin_cmd!("miden-bench");
+    cmd.arg("import");
+    cmd.assert().failure();
+}
+
+/// Tests that import rejects --filename and --account-id together
+#[test]
+fn import_rejects_both_sources() {
+    let mut cmd = cargo_bin_cmd!("miden-bench");
+    cmd.args(["import", "--filename", "x.mac", "--account-id", "0x0"]);
+    cmd.assert().failure();
+}
+
+/// Tests that export requires --account-id
+#[test]
+fn export_requires_account_id() {
+    let mut cmd = cargo_bin_cmd!("miden-bench");
+    cmd.arg("export");
+    cmd.assert().failure();
+}
+
 // CLI OPTIONS TESTS
 // ================================================================================================
 
