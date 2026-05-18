@@ -108,9 +108,9 @@ impl AccountCmd {
 
 async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     let accounts = client.get_account_headers().await?;
+    let network_id = client.network_id().await?;
 
-    let mut table =
-        create_dynamic_table(&["Account ID", "Type", "Storage Mode", "Nonce", "Status"]);
+    let mut table = create_dynamic_table(&["Address", "Type", "Storage Mode", "Nonce", "Status"]);
     for (acc, _acc_seed) in &accounts {
         let reader = client.account_reader(acc.id());
         let status = reader.status().await?.to_string();
@@ -121,7 +121,7 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
         };
 
         table.add_row(vec![
-            acc.id().to_hex(),
+            Address::new(acc.id()).encode(network_id.clone()),
             account_type_display_name(acc.id(), token_symbol.as_deref()),
             acc.id().storage_mode().to_string(),
             acc.nonce().as_canonical_u64().to_string(),
@@ -161,7 +161,7 @@ async fn show_account<AUTH>(
         )))?
     };
 
-    let network_id = rpc_config.endpoint.0.to_network_id();
+    let network_id = client.network_id().await?;
     let token_symbol = if account.id().account_type() == AccountType::FungibleFaucet {
         Some(get_token_metadata_from_account(&account)?.symbol().to_string())
     } else {

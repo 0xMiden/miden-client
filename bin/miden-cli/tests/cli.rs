@@ -7,7 +7,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use assert_cmd::Command;
 use assert_cmd::cargo::cargo_bin_cmd;
-use miden_client::account::{AccountId, AccountStorageMode};
+use miden_client::account::{AccountId, AccountStorageMode, FaucetMetadata};
 use miden_client::address::{Address, NetworkId};
 use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
 use miden_client::builder::ClientBuilder;
@@ -321,10 +321,14 @@ async fn token_symbol_mapping() -> Result<()> {
     // Create faucet account
     let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Private);
 
+    // Encode the faucet ID as bech32 using the same NetworkId the CLI derives from its
+    // configured endpoint. The token symbol map's `id` field accepts bech32 only.
+    let faucet_id = AccountId::from_hex(&fungible_faucet_account_id).unwrap();
+    let bech32_id = Address::new(faucet_id).encode(endpoint.to_network_id());
+
     // Create a token symbol mapping file in the MIDEN_DIR directory
     let token_symbol_map_path = temp_dir.join(MIDEN_DIR).join("token_symbol_map.toml");
-    let token_symbol_map_content =
-        format!(r#"BTC = {{ id = "{fungible_faucet_account_id}", decimals = 10 }}"#);
+    let token_symbol_map_content = format!(r#"BTC = {{ id = "{bech32_id}", decimals = 10 }}"#);
     fs::write(&token_symbol_map_path, token_symbol_map_content).unwrap();
 
     sync_cli(&temp_dir);
@@ -364,6 +368,97 @@ async fn token_symbol_mapping() -> Result<()> {
 
     assert_eq!(note.assets().num_assets(), 1);
     assert_eq!(note.assets().iter().next().unwrap().unwrap_fungible().amount(), 100_000);
+    Ok(())
+}
+
+/// Exercises the resolver's RPC fetch + settings-store write-back path end-to-end.
+///
+/// Mints from a *public* faucet that is not present in the user's TOML map, then runs
+/// `notes -s <id>` to display the issued note. `notes -s` formats each fungible asset via
+/// `FaucetMetadataResolver::format_fungible_asset`, which on TOML miss falls through to
+/// `Client::fetch_remote_token_metadata`. Asserts:
+/// 1. `notes -s` stdout contains the faucet's symbol ("BTC" — the constant baked into
+///    `new_faucet_cli`'s init storage data).
+/// 2. After the display, the settings store contains a persisted entry for the faucet, proving the
+///    resolver wrote back its RPC result.
+#[tokio::test]
+async fn public_faucet_metadata_is_fetched_and_persisted() -> Result<()> {
+    let (store_path, temp_dir, endpoint) = init_cli();
+
+    let wallet_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Public);
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Public);
+
+    // Deliberately do NOT write a token_symbol_map.toml — the TOML path must miss so the
+    // resolver falls through to the settings store and then to RPC.
+
+    sync_cli(&temp_dir);
+
+    // Mint from the public faucet to the wallet. The mint stdout itself does NOT route the
+    // asset through the resolver (the faucet's vault delta is empty during a mint), so we
+    // only use this step to obtain a valid note id.
+    let mut mint_cmd = cargo_bin_cmd!("miden-client");
+    mint_cmd.args([
+        "mint",
+        "--target",
+        wallet_account_id.as_str(),
+        "--asset",
+        format!("100::{fungible_faucet_account_id}").as_str(),
+        "-n",
+        "private",
+        "--force",
+    ]);
+
+    let mint_output = mint_cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        mint_output.status.success(),
+        "mint failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&mint_output.stdout),
+        String::from_utf8_lossy(&mint_output.stderr)
+    );
+
+    let note_id = String::from_utf8(mint_output.stdout)
+        .unwrap()
+        .split_whitespace()
+        .skip_while(|&word| word != "Output")
+        .find(|word| word.starts_with("0x"))
+        .unwrap()
+        .to_string();
+
+    // Wait for the mint transaction to commit. A public faucet only becomes visible to
+    // `get_account_details` once it has participated in a committed transaction.
+    sync_until_committed_transaction(&temp_dir);
+
+    // Display the note. `notes -s` formats each fungible asset via the resolver; with the
+    // TOML empty and the settings store cold, the resolver must hit RPC to get ("BTC", 10) and
+    // persist the result back to the settings store.
+    let mut show_cmd = cargo_bin_cmd!("miden-client");
+    show_cmd.args(["notes", "-s", &note_id]);
+    let show_output = show_cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        show_output.status.success(),
+        "notes -s failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&show_output.stdout),
+        String::from_utf8_lossy(&show_output.stderr)
+    );
+
+    let show_stdout = String::from_utf8(show_output.stdout).unwrap();
+    assert!(
+        show_stdout.contains("BTC"),
+        "expected `notes -s` stdout to contain `BTC` (faucet symbol fetched via RPC), got:\n{show_stdout}",
+    );
+
+    // Assert the resolver wrote the metadata into the settings store.
+    let faucet_id = AccountId::from_hex(&fungible_faucet_account_id).unwrap();
+    let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
+    let setting_key = format!("faucet_metadata:{}", faucet_id.to_hex());
+    let stored: Option<FaucetMetadata> = client.get_setting(setting_key).await?;
+    assert!(
+        stored.is_some(),
+        "expected settings store to contain metadata for {fungible_faucet_account_id} after notes -s",
+    );
+    let stored = stored.unwrap();
+    assert_eq!(stored.symbol, "BTC");
+    assert_eq!(stored.decimals, 10);
     Ok(())
 }
 

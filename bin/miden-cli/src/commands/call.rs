@@ -108,7 +108,7 @@ impl CallCmd {
 
         match client.execute_transaction(account_id, tx_request).await {
             Ok(tx_result) => {
-                print_executed_transaction(tx_result.executed_transaction())?;
+                print_executed_transaction(&mut client, tx_result.executed_transaction()).await?;
             },
             Err(e) => {
                 println!("\n(Could not compute state delta: {e})");

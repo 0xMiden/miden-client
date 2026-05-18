@@ -34,6 +34,7 @@
 //!
 //! For more details on accounts, refer to the [Account] documentation.
 
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use miden_protocol::Felt;
@@ -68,11 +69,44 @@ pub use miden_protocol::address::{Address, AddressInterface, AddressType, Networ
 use miden_protocol::asset::AssetVault;
 pub use miden_protocol::errors::{AccountIdError, AddressError, NetworkIdError};
 use miden_protocol::note::NoteTag;
+use miden_tx::utils::serde::{
+    ByteReader,
+    ByteWriter,
+    Deserializable,
+    DeserializationError,
+    Serializable,
+};
+
+/// Display-only metadata for a faucet account, persisted in the client's settings store.
+///
+/// Populated lazily by the CLI resolver from the on-chain `TokenMetadata` of a public faucet
+/// and persisted under a `faucet_metadata:<faucet-id>` key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FaucetMetadata {
+    pub symbol: String,
+    pub decimals: u8,
+}
+
+impl Serializable for FaucetMetadata {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.symbol.write_into(target);
+        target.write_u8(self.decimals);
+    }
+}
+
+impl Deserializable for FaucetMetadata {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let symbol = String::read_from(source)?;
+        let decimals = source.read_u8()?;
+        Ok(Self { symbol, decimals })
+    }
+}
 
 mod account_reader;
 pub use account_reader::AccountReader;
 pub use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::auth::AuthSingleSig;
+use miden_standards::account::faucets::TokenMetadata;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_standards::account::interface::AccountInterfaceExt;
@@ -255,6 +289,40 @@ impl<AUTH> Client<AUTH> {
         };
 
         self.add_account(&account, true).await
+    }
+
+    /// Fetches a public faucet account from the network and extracts its display metadata.
+    ///
+    /// Returns:
+    /// - `Ok(Some(_))` — the account is public and its `TokenMetadata` storage slot decoded.
+    /// - `Ok(None)`    — the account is private, not on chain, or the storage slot does not parse
+    ///   as `TokenMetadata`. Caller should fall back to a raw display.
+    /// - `Err(_)`      — transport-level RPC error.
+    pub async fn fetch_remote_token_metadata(
+        &mut self,
+        faucet_id: AccountId,
+    ) -> Result<Option<FaucetMetadata>, ClientError> {
+        let fetched = match self.rpc_api.get_account_details(faucet_id).await {
+            Ok(fa) => fa,
+            Err(err) => match err.endpoint_error() {
+                Some(EndpointError::GetAccount(
+                    GetAccountError::AccountNotFound | GetAccountError::AccountNotPublic,
+                )) => return Ok(None),
+                _ => return Err(ClientError::RpcError(err)),
+            },
+        };
+        let account = match fetched {
+            FetchedAccount::Private(..) => return Ok(None),
+            FetchedAccount::Public(account, ..) => *account,
+        };
+
+        let Ok(token_metadata) = TokenMetadata::try_from(account.storage()) else {
+            return Ok(None);
+        };
+        Ok(Some(FaucetMetadata {
+            symbol: token_metadata.symbol().to_string(),
+            decimals: token_metadata.decimals(),
+        }))
     }
 
     /// Adds an [`Address`] to the associated [`AccountId`], alongside its derived [`NoteTag`].
