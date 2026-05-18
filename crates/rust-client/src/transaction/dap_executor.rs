@@ -9,7 +9,13 @@
 
 use miden_processor::advice::AdviceInputs;
 use miden_processor::{
-    ExecutionError, ExecutionOptions, ExecutionOutput, FutureMaybeSend, Host, Program, StackInputs,
+    ExecutionError,
+    ExecutionOptions,
+    ExecutionOutput,
+    FutureMaybeSend,
+    Host,
+    Program,
+    StackInputs,
 };
 use miden_tx::ProgramExecutor;
 

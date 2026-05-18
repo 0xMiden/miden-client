@@ -88,7 +88,7 @@ uuid               = { version = "1.10" }
 # support until the required debugger changes are available in a published
 # miden-debug release.
 [patch.crates-io]
-miden-debug = { git = "https://github.com/0xMiden/miden-debug.git", branch = "feature/vscode-dap-plugin" }
+miden-debug = { branch = "feature/vscode-dap-plugin", git = "https://github.com/0xMiden/miden-debug.git" }
 
 # Lints are set to warn for development, which are promoted to errors in CI.
 [workspace.lints.clippy]
