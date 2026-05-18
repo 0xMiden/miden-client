@@ -914,7 +914,13 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     // Consume the note and check the output
     let mut consume_note_cmd = cargo_bin_cmd!("miden-client");
     let note_id = note.id().to_hex();
-    let mut cli_args = vec!["consume-notes", "--account", &wallet_account_id, "--force"];
+    let mut cli_args = vec![
+        "consume-notes",
+        "--account",
+        &wallet_account_id,
+        "--force",
+        "--allow-unlisted-note-scripts",
+    ];
     cli_args.extend_from_slice(vec![note_id.as_str()].as_slice());
     consume_note_cmd.args(&cli_args);
     consume_note_cmd
