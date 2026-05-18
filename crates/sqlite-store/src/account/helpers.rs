@@ -116,21 +116,18 @@ fn query_account_headers_from_table(
         .collect::<Result<Vec<(AccountHeader, AccountStatus)>, StoreError>>()
 }
 
-/// Returns the `watch_only` flag for the given account from `latest_account_headers`.
-///
-/// Returns `false` if the account is not present in the store.
+/// Returns the `watch_only` flag for the given account from `latest_account_headers`, or
+/// `None` if the account is not present.
 pub(crate) fn query_latest_watch_only(
     conn: &Connection,
     account_id: AccountId,
-) -> Result<bool, StoreError> {
+) -> Result<Option<bool>, StoreError> {
     let mut stmt = conn
         .prepare_cached("SELECT watch_only FROM latest_account_headers WHERE id = ?")
         .into_store_error()?;
-    Ok(stmt
-        .query_row(params![account_id.to_hex()], |row| row.get::<_, bool>(0))
+    stmt.query_row(params![account_id.to_hex()], |row| row.get::<_, bool>(0))
         .optional()
-        .into_store_error()?
-        .unwrap_or(false))
+        .into_store_error()
 }
 
 // TODO: this function will probably be refactored to receive more complex where clauses and

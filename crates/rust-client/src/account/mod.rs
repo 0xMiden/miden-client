@@ -351,22 +351,20 @@ impl<AUTH> Client<AUTH> {
         match tracked_account {
             None => Err(ClientError::AccountDataNotFound(account_id)),
             Some(tracked_account) => {
+                self.store.insert_address(address.clone(), account_id).await?;
                 // Watch-only accounts intentionally have no derived note tag registered to avoid
-                // sync state to pull notes for it.
+                // sync state pulling notes for them.
                 if !tracked_account.is_watch_only() {
                     let derived_note_tag: NoteTag = address.to_note_tag();
                     let note_tag_record =
                         NoteTagRecord::with_account_source(derived_note_tag, account_id);
-                    if self.store.get_note_tags().await?.contains(&note_tag_record) {
+                    let added = self.store.add_note_tag(note_tag_record).await?;
+                    if !added {
                         return Err(ClientError::NoteTagDerivedAddressAlreadyTracked(
                             address_bench32,
                             derived_note_tag,
                         ));
                     }
-                    self.store.insert_address(address, account_id).await?;
-                    self.store.add_note_tag(note_tag_record).await?;
-                } else {
-                    self.store.insert_address(address, account_id).await?;
                 }
                 Ok(())
             },

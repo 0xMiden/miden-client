@@ -106,7 +106,8 @@ impl SqliteStore {
             return Ok(None);
         };
 
-        let watch_only = query_latest_watch_only(conn, account_id)?;
+        let watch_only =
+            query_latest_watch_only(conn, account_id)?.expect("latest_account_headers row exists");
 
         let assets = query_vault_assets(conn, account_id)?;
         let vault = AssetVault::new(&assets)?;
@@ -143,7 +144,8 @@ impl SqliteStore {
             return Ok(None);
         };
 
-        let watch_only = query_latest_watch_only(conn, account_id)?;
+        let watch_only = query_latest_watch_only(conn, account_id)?
+            .expect("latest_account_headers row exists: get_account_header just returned it");
 
         // Partial vault retrieval
         let partial_vault = PartialVault::new(header.vault_root());
