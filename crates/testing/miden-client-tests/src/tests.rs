@@ -2589,9 +2589,6 @@ async fn swap_chain_test() {
     assert_eq!(last_wallet_balance, 1);
 }
 
-/// Exercises SWAP with `NoteType::Public` payback. With pre-Phase-2 SWAP this fails because the
-/// consumer cannot produce the public payback recipient without off-band advice; with the new
-/// SWAP standard the payback recipient is derived deterministically and the trade completes.
 #[tokio::test]
 async fn swap_public_payback_test() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
