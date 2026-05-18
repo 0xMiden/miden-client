@@ -545,7 +545,7 @@ impl StateSync {
         account_updates: &mut AccountUpdates,
         accounts: &[AccountHeader],
         account_commitment_updates: &[(AccountId, Word)],
-        block_num: BlockNumber,
+        block_from: BlockNumber,
     ) -> Result<(), ClientError> {
         // "Public" here includes both Public and Network accounts, since both have
         // their state stored on-chain and follow the same sync path.
@@ -556,7 +556,7 @@ impl StateSync {
             account_updates,
             account_commitment_updates,
             &public_accounts,
-            block_num,
+            block_from,
         )
         .await?;
 
@@ -585,7 +585,7 @@ impl StateSync {
         account_updates: &mut AccountUpdates,
         commitment_updates: &[(AccountId, Word)],
         current_public_accounts: &[&AccountHeader],
-        block_num: BlockNumber,
+        block_from: BlockNumber,
     ) -> Result<(), ClientError> {
         for (id, commitment) in commitment_updates {
             let Some(local_header) = current_public_accounts
@@ -633,7 +633,7 @@ impl StateSync {
                     // Delta path: build an AccountDelta from incremental updates,
                     // fetching storage slots and vault from the store on demand.
                     let delta = self
-                        .build_account_delta(&details, local_header, block_num, proof_block_num)
+                        .build_account_delta(&details, local_header, block_from, proof_block_num)
                         .await?;
                     account_updates.extend(AccountUpdates::new(
                         vec![PublicAccountUpdate::Delta {
@@ -803,11 +803,13 @@ impl StateSync {
                 })?;
 
             if map_details.too_many_entries {
-                // Oversized map: fetch delta entries from the sync endpoint.
+                // Oversized map: fetch delta entries from the sync endpoint. The lower bound
+                // is inclusive at the node, so request from `block_from + 1` to skip the
+                // block whose state we already have.
                 if map_delta_cache.is_none() {
                     let map_info = self
                         .rpc_api
-                        .sync_storage_maps(block_from, Some(block_to), account_id)
+                        .sync_storage_maps(block_from + 1, Some(block_to), account_id)
                         .await
                         .map_err(ClientError::RpcError)?;
                     map_delta_cache = Some(map_info.updates);
@@ -948,10 +950,12 @@ impl StateSync {
             store.get_account_vault(account_id).await.map_err(ClientError::StoreError)?;
 
         if details.vault_details.too_many_assets {
-            // Oversized vault: fetch delta from sync endpoint.
+            // Oversized vault: fetch delta from sync endpoint. The lower bound is inclusive
+            // at the node, so request from `block_from + 1` to skip the block whose state
+            // we already have.
             let vault_info = self
                 .rpc_api
-                .sync_account_vault(block_from, Some(block_to), account_id)
+                .sync_account_vault(block_from + 1, Some(block_to), account_id)
                 .await
                 .map_err(ClientError::RpcError)?;
 
