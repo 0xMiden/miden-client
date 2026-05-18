@@ -2596,18 +2596,26 @@ async fn swap_chain_test() {
 async fn swap_public_payback_test() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
 
-    let (wallet_a, faucet_a) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &keystore, RPO_FALCON_SCHEME_ID)
-            .await
-            .unwrap();
+    let (wallet_a, faucet_a) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
     mint_and_consume(&mut client, wallet_a.id(), faucet_a.id(), NoteType::Private).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    let (wallet_b, faucet_b) =
-        setup_wallet_and_faucet(&mut client, AccountStorageMode::Private, &keystore, RPO_FALCON_SCHEME_ID)
-            .await
-            .unwrap();
+    let (wallet_b, faucet_b) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
     mint_and_consume(&mut client, wallet_b.id(), faucet_b.id(), NoteType::Private).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
@@ -2627,15 +2635,18 @@ async fn swap_public_payback_test() {
         .unwrap();
 
     let swap_note = tx_request.expected_output_own_notes()[0].clone();
-    Box::pin(client.submit_new_transaction(wallet_a.id(), tx_request)).await.unwrap();
+    Box::pin(client.submit_new_transaction(wallet_a.id(), tx_request))
+        .await
+        .unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    // wallet_b consumes the swap, producing a public P2ID payback to wallet_a with no off-band data.
-    let tx_request = TransactionRequestBuilder::new()
-        .build_consume_notes(vec![swap_note])
+    // wallet_b consumes the swap, producing a public P2ID payback to wallet_a with no off-band
+    // data.
+    let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![swap_note]).unwrap();
+    Box::pin(client.submit_new_transaction(wallet_b.id(), tx_request))
+        .await
         .unwrap();
-    Box::pin(client.submit_new_transaction(wallet_b.id(), tx_request)).await.unwrap();
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
