@@ -379,6 +379,17 @@ impl Store for SqliteStore {
         .await
     }
 
+    async fn set_account_watch_only(
+        &self,
+        account_id: AccountId,
+        watch_only: bool,
+    ) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::set_account_watch_only(conn, account_id, watch_only)
+        })
+        .await
+    }
+
     async fn get_account_ids(&self) -> Result<Vec<AccountId>, StoreError> {
         self.interact_with_connection(SqliteStore::get_account_ids).await
     }
@@ -533,15 +544,9 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn remove_address(
-        &self,
-        address: Address,
-        account_id: AccountId,
-    ) -> Result<(), StoreError> {
-        self.interact_with_connection(move |conn| {
-            SqliteStore::remove_address(conn, &address, account_id)
-        })
-        .await
+    async fn remove_address(&self, address: Address) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| SqliteStore::remove_address(conn, &address))
+            .await
     }
 
     async fn get_minimal_partial_account(

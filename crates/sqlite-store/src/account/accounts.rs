@@ -31,7 +31,6 @@ use miden_client::store::{
     AccountStorageFilter,
     StoreError,
 };
-use miden_client::sync::NoteTagRecord;
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
 use miden_protocol::account::{AccountStorageHeader, StorageMapWitness, StorageSlotHeader};
@@ -45,12 +44,12 @@ use crate::account::helpers::{
     query_account_code,
     query_historical_account_headers,
     query_latest_account_headers,
+    query_latest_watch_only,
     query_storage_slots,
     query_storage_values,
     query_vault_assets,
 };
 use crate::sql_error::SqlResultExt;
-use crate::sync::{add_note_tag_tx, remove_note_tag_tx};
 use crate::{SqliteStore, column_value_as_u64, insert_sql, subst, u64_to_value};
 
 impl SqliteStore {
@@ -107,6 +106,8 @@ impl SqliteStore {
             return Ok(None);
         };
 
+        let watch_only = query_latest_watch_only(conn, account_id)?;
+
         let assets = query_vault_assets(conn, account_id)?;
         let vault = AssetVault::new(&assets)?;
 
@@ -130,7 +131,7 @@ impl SqliteStore {
         );
 
         let account_data = AccountRecordData::Full(account);
-        Ok(Some(AccountRecord::new(account_data, status)))
+        Ok(Some(AccountRecord::new(account_data, status, watch_only)))
     }
 
     /// Retrieves a minimal partial account record with storage and vault witnesses.
@@ -141,6 +142,8 @@ impl SqliteStore {
         let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
             return Ok(None);
         };
+
+        let watch_only = query_latest_watch_only(conn, account_id)?;
 
         // Partial vault retrieval
         let partial_vault = PartialVault::new(header.vault_root());
@@ -179,7 +182,7 @@ impl SqliteStore {
             status.seed().copied(),
         )?;
         let account_record_data = AccountRecordData::Partial(partial_account);
-        Ok(Some(AccountRecord::new(account_record_data, status)))
+        Ok(Some(AccountRecord::new(account_record_data, status, watch_only)))
     }
 
     pub fn get_foreign_account_code(
@@ -397,11 +400,10 @@ impl SqliteStore {
         address: &Address,
         account_id: AccountId,
     ) -> Result<(), StoreError> {
-        let derived_note_tag = address.to_note_tag();
-        let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account_id);
-
-        add_note_tag_tx(tx, &note_tag_record)?;
-        Self::insert_address_internal(tx, address, account_id)?;
+        const QUERY: &str = insert_sql!(addresses { address, account_id } | REPLACE);
+        let serialized_address = address.to_bytes();
+        tx.execute(QUERY, params![serialized_address, account_id.to_hex(),])
+            .into_store_error()?;
 
         Ok(())
     }
@@ -409,16 +411,33 @@ impl SqliteStore {
     pub(crate) fn remove_address(
         conn: &mut Connection,
         address: &Address,
-        account_id: AccountId,
     ) -> Result<(), StoreError> {
-        let derived_note_tag = address.to_note_tag();
-        let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account_id);
-
         let tx = conn.transaction().into_store_error()?;
-        remove_note_tag_tx(&tx, note_tag_record)?;
-        Self::remove_address_internal(&tx, address)?;
+        let serialized_address = address.to_bytes();
+        const DELETE_QUERY: &str = "DELETE FROM addresses WHERE address = ?";
+        tx.execute(DELETE_QUERY, params![serialized_address]).into_store_error()?;
 
         tx.commit().into_store_error()
+    }
+
+    /// Sets the per-account watch-only flag.
+    ///
+    /// Errors if the account is not present in `latest_account_headers`.
+    pub(crate) fn set_account_watch_only(
+        conn: &mut Connection,
+        account_id: AccountId,
+        watch_only: bool,
+    ) -> Result<(), StoreError> {
+        let updated = conn
+            .execute(
+                "UPDATE latest_account_headers SET watch_only = ? WHERE id = ?",
+                params![watch_only, account_id.to_hex()],
+            )
+            .into_store_error()?;
+        if updated == 0 {
+            return Err(StoreError::AccountDataNotFound(account_id));
+        }
+        Ok(())
     }
 
     /// Inserts an [`AccountCode`].
@@ -727,8 +746,8 @@ impl SqliteStore {
 
     /// Replaces the account state with a completely new one from the network.
     ///
-    /// Replaces the account state entirely: archives old state to historical,
-    /// clears latest, inserts new state to latest only.
+    /// Replaces the account state entirely: archives old state to historical, clears latest,
+    /// inserts new state to latest only. Preserves the `watch_only` flag.
     pub(crate) fn update_account_state(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,
@@ -901,12 +920,26 @@ impl SqliteStore {
     ///
     /// If `old_header` is provided, the old header is archived to the historical table.
     /// For initial inserts (no previous state), pass `None` for `old_header`.
+    ///
+    /// The `watch_only` flag on the latest row is preserved. For fresh inserts, it is set to false.
     fn insert_account_header(
         tx: &Transaction<'_>,
         new_header: &AccountHeader,
         account_seed: Option<Word>,
         old_header: Option<&AccountHeader>,
     ) -> Result<(), StoreError> {
+        // Read the current latest row's preserved-on-replace fields (seed, locked, watch_only).
+        let id_for_lookup = new_header.id().to_hex();
+        let (old_seed, old_locked, old_watch_only): (Option<Vec<u8>>, bool, bool) = tx
+            .query_row(
+                "SELECT account_seed, locked, watch_only FROM latest_account_headers WHERE id = ?",
+                params![&id_for_lookup],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .into_store_error()?
+            .unwrap_or((None, false, false));
+
         // Archive the old header to historical before overwriting latest.
         if let Some(old) = old_header {
             let old_id = old.id().to_hex();
@@ -916,17 +949,6 @@ impl SqliteStore {
             let old_nonce = u64_to_value(old.nonce().as_canonical_u64());
             let old_commitment = old.to_commitment().to_string();
             let replaced_at_nonce = u64_to_value(new_header.nonce().as_canonical_u64());
-
-            // Read the old seed and locked status from latest (if any)
-            let (old_seed, old_locked): (Option<Vec<u8>>, bool) = tx
-                .query_row(
-                    "SELECT account_seed, locked FROM latest_account_headers WHERE id = ?",
-                    params![&old_id],
-                    |row| Ok((row.get(0)?, row.get(1)?)),
-                )
-                .optional()
-                .into_store_error()?
-                .unwrap_or((None, false));
 
             const HISTORICAL_QUERY: &str = insert_sql!(
                 historical_account_headers {
@@ -977,7 +999,8 @@ impl SqliteStore {
                 nonce,
                 account_seed,
                 account_commitment,
-                locked
+                locked,
+                watch_only
             } | REPLACE
         );
 
@@ -992,22 +1015,10 @@ impl SqliteStore {
                 account_seed,
                 commitment,
                 false,
+                old_watch_only,
             ],
         )
         .into_store_error()?;
-
-        Ok(())
-    }
-
-    fn insert_address_internal(
-        tx: &Transaction<'_>,
-        address: &Address,
-        account_id: AccountId,
-    ) -> Result<(), StoreError> {
-        const QUERY: &str = insert_sql!(addresses { address, account_id } | REPLACE);
-        let serialized_address = address.to_bytes();
-        tx.execute(QUERY, params![serialized_address, account_id.to_hex(),])
-            .into_store_error()?;
 
         Ok(())
     }
@@ -1100,14 +1111,5 @@ impl SqliteStore {
 
         tx.commit().into_store_error()?;
         Ok(total_deleted)
-    }
-
-    fn remove_address_internal(tx: &Transaction<'_>, address: &Address) -> Result<(), StoreError> {
-        let serialized_address = address.to_bytes();
-
-        const DELETE_QUERY: &str = "DELETE FROM addresses WHERE address = ?";
-        tx.execute(DELETE_QUERY, params![serialized_address]).into_store_error()?;
-
-        Ok(())
     }
 }

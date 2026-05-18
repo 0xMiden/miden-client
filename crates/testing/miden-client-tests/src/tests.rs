@@ -3078,11 +3078,7 @@ async fn storage_and_vault_proofs() {
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
 
-    client
-        .test_store()
-        .insert_account(&account, Address::new(account.id()))
-        .await
-        .unwrap();
+    client.add_account(&account, false).await.unwrap();
 
     let account_id = account.id();
 
@@ -3238,6 +3234,60 @@ async fn account_add_address_after_creation() {
     // Derived note tag should now be available
     let note_tags = client.get_note_tags().await.unwrap();
     assert!(note_tags.contains(&note_tag_record));
+}
+
+#[tokio::test]
+async fn watch_account_by_id_removes_all_account_note_tags() {
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let account = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+    let account_id = account.id();
+    let rpc_api = MockRpcApi::new(mock_chain_builder.build().unwrap());
+    let arc_rpc_api = Arc::new(rpc_api);
+    let mut rng = rand::rng();
+    let coin_seed: [u64; 4] = rng.random();
+    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
+    let keystore = FilesystemKeyStore::new(temp_dir()).unwrap();
+    let mut client = ClientBuilder::new()
+        .rpc(arc_rpc_api)
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .in_debug_mode(DebugMode::Enabled)
+        .build()
+        .await
+        .unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    client.add_account(&account, false).await.unwrap();
+
+    let default_note_tag_record =
+        NoteTagRecord::with_account_source(Address::new(account_id).to_note_tag(), account_id);
+    let routing_params = RoutingParameters::new(AddressInterface::BasicWallet)
+        .with_note_tag_len(NoteTag::MAX_ACCOUNT_TARGET_TAG_LENGTH)
+        .unwrap();
+    let extra_address = Address::new(account_id).with_routing_parameters(routing_params);
+    let extra_address_note_tag_record =
+        NoteTagRecord::with_account_source(extra_address.to_note_tag(), account_id);
+
+    client.add_address(extra_address, account_id).await.unwrap();
+
+    let note_tags = client.get_note_tags().await.unwrap();
+    assert!(note_tags.contains(&default_note_tag_record));
+    assert!(note_tags.contains(&extra_address_note_tag_record));
+
+    client.watch_account_by_id(account_id).await.unwrap();
+
+    let note_tags = client.get_note_tags().await.unwrap();
+    assert!(
+        !note_tags
+            .iter()
+            .any(|record| record.source == NoteTagSource::Account(account_id)),
+        "watch-only demotion should remove every account-owned note tag"
+    );
+    let account_record = client.test_store().get_account(account_id).await.unwrap().unwrap();
+    assert!(account_record.is_watch_only());
 }
 
 #[tokio::test]
@@ -3964,5 +4014,68 @@ async fn storage_and_vault_proofs_ecdsa() {
 
         assert_eq!(value, map.get(&StorageMapKey::new(MAP_KEY.into())));
         assert_eq!(proof, map.open(&StorageMapKey::new(MAP_KEY.into())));
+    }
+}
+
+#[tokio::test]
+async fn execute_transaction_fails_for_watch_only_account() {
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+    // Build a faucet locally and insert it directly as watch-only via the store. Bypasses the
+    // public `add_account`/`watch_account_by_id` paths so we don't need a mock RPC round-trip.
+    let key_pair = AuthSecretKey::new_falcon512_poseidon2();
+    let auth_component =
+        AuthSingleSig::new(key_pair.public_key().to_commitment(), AuthSchemeId::Falcon512Poseidon2);
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let symbol = TokenSymbol::new("WTCH").unwrap();
+    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
+    let max_supply = 9_999_999_u64;
+    let token_metadata =
+        FungibleTokenMetadata::builder(name, symbol, 10, max_supply).build().unwrap();
+    let faucet = AccountBuilder::new(init_seed)
+        .account_type(AccountType::FungibleFaucet)
+        .storage_mode(AccountStorageMode::Public)
+        .with_auth_component(auth_component)
+        .with_component(token_metadata)
+        .with_component(BasicFungibleFaucet)
+        .with_components(TokenPolicyManager::new(
+            PolicyAuthority::AuthControlled,
+            MintPolicyConfig::AllowAll,
+            BurnPolicyConfig::AllowAll,
+        ))
+        .build_with_schema_commitment()
+        .unwrap();
+    let faucet_id = faucet.id();
+    let address = Address::new(faucet_id);
+
+    client
+        .test_store()
+        .insert_account(&faucet, address)
+        .await
+        .expect("watch-only account should insert via the store");
+    client
+        .test_store()
+        .set_account_watch_only(faucet_id, true)
+        .await
+        .expect("flipping watch_only should succeed");
+
+    let target_account_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(
+            FungibleAsset::new(faucet_id, 1u64).unwrap(),
+            target_account_id,
+            miden_protocol::note::NoteType::Private,
+            client.rng(),
+        )
+        .unwrap();
+
+    let result = Box::pin(client.execute_transaction(faucet_id, tx_request)).await;
+
+    match result {
+        Err(ClientError::AccountIsWatchOnly(id)) => assert_eq!(id, faucet_id),
+        other => panic!("expected AccountIsWatchOnly, got {other:?}"),
     }
 }

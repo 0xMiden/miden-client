@@ -183,9 +183,9 @@ where
 
     /// Open a new [`BatchBuilder`] for the given local `account_id`.
     ///
-    /// Fails with [`ClientError::AccountDataNotFound`] if the account is not
-    /// tracked by the client's store, or [`ClientError::AccountLocked`] if the account is
-    /// locked.
+    /// Fails with [`ClientError::AccountDataNotFound`] if the account is not tracked by
+    /// the client's store, [`ClientError::AccountLocked`] if the account is locked, or
+    /// [`ClientError::AccountIsWatchOnly`] if the account is watch-only.
     pub async fn new_transaction_batch(
         &self,
         account_id: AccountId,
@@ -198,6 +198,9 @@ where
 
         if account_record.is_locked() {
             return Err(ClientError::AccountLocked(account_id));
+        }
+        if account_record.is_watch_only() {
+            return Err(ClientError::AccountIsWatchOnly(account_id));
         }
 
         let initial_account: Account = account_record.try_into()?;
@@ -281,7 +284,19 @@ where
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionResult, ClientError> {
-        let account = self.try_get_account(account_id).await?;
+        // Reject watch-only accounts upfront. Reuses the single `get_account` we'd already
+        // do via `try_get_account`, so this guard is free. The batch path has its own
+        // guard in `new_transaction_batch`.
+        let account_record = self
+            .store
+            .get_account(account_id)
+            .await?
+            .ok_or(ClientError::AccountDataNotFound(account_id))?;
+        if account_record.is_watch_only() {
+            return Err(ClientError::AccountIsWatchOnly(account_id));
+        }
+        let account: Account = account_record.try_into()?;
+
         let prep = self.prepare_transaction(&account, transaction_request).await?;
 
         let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());

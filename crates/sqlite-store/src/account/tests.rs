@@ -1842,3 +1842,41 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
 
     Ok(())
 }
+
+#[tokio::test]
+async fn watch_only_status_survives_state_replacement() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::RegularAccountImmutableCode)
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Poseidon2,
+        ))
+        .with_component(AccountComponent::new(
+            basic_wallet_library(),
+            vec![],
+            AccountComponentMetadata::new("miden::testing::watch_only_replace", AccountType::all()),
+        )?)
+        .build_existing()?;
+    let account_id = account.id();
+    store.insert_account(&account, Address::new(account_id)).await?;
+    store.set_account_watch_only(account_id, true).await?;
+
+    // Bump the account's nonce and run it through update_account.
+    let mut updated = account.clone();
+    let storage_delta = AccountStorageDelta::new();
+    let vault_delta = AccountVaultDelta::from_iters([], []);
+    let delta = AccountDelta::new(account_id, storage_delta, vault_delta, ONE)?;
+    updated.apply_delta(&delta)?;
+
+    store.update_account(&updated).await?;
+
+    let record = store
+        .get_account(account_id)
+        .await?
+        .context("account should still be retrievable after update")?;
+    assert!(record.is_watch_only(), "watch-only status must survive state replacement");
+
+    Ok(())
+}

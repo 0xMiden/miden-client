@@ -6,6 +6,7 @@ use miden_client::keystore::Keystore;
 use miden_client::note::{NoteAttachment, NoteAttachmentScheme, NoteFile, NoteType, P2idNote};
 use miden_client::rpc::{AcceptHeaderError, RpcError};
 use miden_client::store::{InputNoteState, NoteFilter};
+use miden_client::sync::NoteTagSource;
 use miden_client::testing::common::*;
 use miden_client::transaction::{
     InputNote,
@@ -420,6 +421,139 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
         MINT_AMOUNT * 2,
     )
     .await;
+    Ok(())
+}
+
+/// Watch-only flow:
+///   - `client_1` owns the wallet and faucet, executes transactions.
+///   - `client_2` watches the wallet via `watch_account_by_id` (no note tag).
+///   - After `client_1` runs another mint+consume on the wallet, `client_2` should observe (a) the
+///     new account commitment matching `client_1`, (b) no input note record for the mint targeted
+///     at the wallet (no tag → not synced), and (c) no output note record for the consumed note
+///     (watch-only is state-only; note activity is intentionally not surfaced).
+pub async fn test_watch_account_by_id(client_config: ClientConfig) -> Result<()> {
+    let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
+    let (mut client_2, _keystore_2) = ClientConfig::default()
+        .with_rpc_endpoint(client_config.rpc_endpoint())
+        .into_client()
+        .await?;
+    wait_for_node(&mut client_1).await;
+
+    let (faucet_account, _) = insert_new_fungible_faucet(
+        &mut client_1,
+        AccountStorageMode::Public,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+    let (wallet, _) = insert_new_wallet(
+        &mut client_1,
+        AccountStorageMode::Public,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+    let wallet_id = wallet.id();
+    let faucet_id = faucet_account.id();
+
+    // Fill the wallet with an asset so the watched account has non-trivial state.
+    let tx_id = mint_and_consume(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
+    wait_for_tx(&mut client_1, tx_id).await?;
+
+    // client_2 starts watching the wallet in watch-only mode.
+    client_2.watch_account_by_id(wallet_id).await?;
+
+    let initial_source_commitment = client_1.account_reader(wallet_id).commitment().await?;
+    let initial_watched_commitment = client_2.account_reader(wallet_id).commitment().await?;
+    assert_eq!(
+        initial_watched_commitment, initial_source_commitment,
+        "watched account commitment should match source after watch",
+    );
+
+    let watched_record = client_2
+        .test_store()
+        .get_account(wallet_id)
+        .await?
+        .context("watched account should be tracked in client_2's store")?;
+    assert!(watched_record.is_watch_only(), "watched account must be watch-only");
+
+    let tags = client_2.test_store().get_note_tags().await?;
+    assert!(
+        !tags
+            .iter()
+            .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
+        "watch-only account must not register a per-account note tag",
+    );
+
+    // client_1 mints another note targeted at the wallet and consumes it. client_2 should
+    // observe the commitment advance, but NOT pick up either the input note (no tag) or any
+    // output-note record from the consume tx (watch-only = state only).
+    let (tx_id, mint_note) = mint_note(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
+    wait_for_tx(&mut client_1, tx_id).await?;
+    let consume_tx_id =
+        consume_notes(&mut client_1, wallet_id, std::slice::from_ref(&mint_note)).await;
+    wait_for_tx(&mut client_1, consume_tx_id).await?;
+
+    client_2.sync_state().await?;
+
+    let updated_source_commitment = client_1.account_reader(wallet_id).commitment().await?;
+    let updated_watched_commitment = client_2.account_reader(wallet_id).commitment().await?;
+    assert_eq!(
+        updated_watched_commitment, updated_source_commitment,
+        "watched commitment should track source after sync",
+    );
+    assert_ne!(
+        updated_watched_commitment, initial_watched_commitment,
+        "watched account state should have advanced",
+    );
+
+    // Mint output note (targeted at the wallet) must NOT have been synced as an input note.
+    let watched_input_notes = client_2.test_store().get_input_notes(NoteFilter::All).await?;
+    assert!(
+        watched_input_notes.iter().all(|n| n.id() != mint_note.id()),
+        "watch-only client must not have synced notes targeted at the wallet (no note tag)",
+    );
+
+    // No output-note records should have been created for the consume tx either: watch-only
+    // accounts do not surface note activity, only on-chain state.
+    let watched_output_notes = client_2.test_store().get_output_notes(NoteFilter::All).await?;
+    assert!(
+        watched_output_notes.is_empty(),
+        "watch-only client must not surface output notes from followed account txs",
+    );
+
+    // `import_account_by_id` on an account already tracked as watch-only should register the
+    // per-account tag.
+    client_2.import_account_by_id(wallet_id).await?;
+    let record = client_2
+        .test_store()
+        .get_account(wallet_id)
+        .await?
+        .context("account should still be tracked after promotion")?;
+    assert!(!record.is_watch_only(), "import_account_by_id must promote watch-only to full");
+    let tags = client_2.test_store().get_note_tags().await?;
+    assert!(
+        tags.iter()
+            .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
+        "promoting to fully-tracked must register the per-account note tag",
+    );
+
+    // `watch_account_by_id` on an account already tracked should remove the per-account tag.
+    client_2.watch_account_by_id(wallet_id).await?;
+    let record = client_2
+        .test_store()
+        .get_account(wallet_id)
+        .await?
+        .context("account should still be tracked after demotion")?;
+    assert!(record.is_watch_only(), "watch_account_by_id must demote fully-tracked to watch");
+    let tags = client_2.test_store().get_note_tags().await?;
+    assert!(
+        !tags
+            .iter()
+            .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
+        "demoting to watch-only must remove the per-account note tag",
+    );
+
     Ok(())
 }
 

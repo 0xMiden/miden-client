@@ -42,10 +42,13 @@ pub struct AccountRecord {
     account_data: AccountRecordData,
     /// Status of the tracked account.
     status: AccountStatus,
+    /// Whether the account is followed in watch-only mode (no note sync, no transaction
+    /// execution).
+    watch_only: bool,
 }
 
 impl AccountRecord {
-    pub fn new(account_data: AccountRecordData, status: AccountStatus) -> Self {
+    pub fn new(account_data: AccountRecordData, status: AccountStatus, watch_only: bool) -> Self {
         // TODO: remove this?
         #[cfg(debug_assertions)]
         {
@@ -56,11 +59,15 @@ impl AccountRecord {
             debug_assert_eq!(account_seed, status.seed().copied(), "account seed mismatch");
         }
 
-        Self { account_data, status }
+        Self { account_data, status, watch_only }
     }
 
     pub fn is_locked(&self) -> bool {
         self.status.is_locked()
+    }
+
+    pub fn is_watch_only(&self) -> bool {
+        self.watch_only
     }
 
     pub fn nonce(&self) -> Felt {

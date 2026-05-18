@@ -83,7 +83,7 @@ use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::rpc::node::{EndpointError, GetAccountError};
 use crate::store::{AccountStatus, AccountStorageFilter};
-use crate::sync::NoteTagRecord;
+use crate::sync::{NoteTagRecord, NoteTagSource};
 
 pub mod component {
     pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
@@ -169,6 +169,22 @@ impl<AUTH> Client<AUTH> {
         account: &Account,
         overwrite: bool,
     ) -> Result<(), ClientError> {
+        self.add_account_with_watch_only(account, overwrite, false).await
+    }
+
+    /// Same as [`Self::add_account`] but allows specifying whether the account should be tracked
+    /// in watch-only mode.
+    ///
+    /// In watch-only mode, the account is added without registering its derived note tag, so
+    /// notes targeted at it will not be synced. The account's on-chain state (commitment,
+    /// nonce, storage) is still updated by `sync_state`. This is the path used by
+    /// [`Self::watch_account_by_id`].
+    async fn add_account_with_watch_only(
+        &mut self,
+        account: &Account,
+        overwrite: bool,
+        watch_only: bool,
+    ) -> Result<(), ClientError> {
         if account.is_new() {
             if account.seed().is_none() {
                 return Err(ClientError::AddNewAccountWithoutSeed);
@@ -188,17 +204,22 @@ impl<AUTH> Client<AUTH> {
             None => {
                 let default_address = Address::new(account.id());
 
-                // If the account is not being tracked, insert it into the store regardless of the
-                // `overwrite` flag
-                let default_address_note_tag = default_address.to_note_tag();
-                let note_tag_record =
-                    NoteTagRecord::with_account_source(default_address_note_tag, account.id());
-                self.store.add_note_tag(note_tag_record).await?;
-
                 self.store
-                    .insert_account(account, default_address)
+                    .insert_account(account, default_address.clone())
                     .await
-                    .map_err(ClientError::StoreError)
+                    .map_err(ClientError::StoreError)?;
+
+                if watch_only {
+                    self.store.set_account_watch_only(account.id(), true).await?;
+                } else {
+                    // Set the default address note tag so sync pulls notes.
+                    let default_address_note_tag = default_address.to_note_tag();
+                    let note_tag_record =
+                        NoteTagRecord::with_account_source(default_address_note_tag, account.id());
+                    self.store.add_note_tag(note_tag_record).await?;
+                }
+
+                Ok(())
             },
             Some(tracked_account) => {
                 if !overwrite {
@@ -223,7 +244,34 @@ impl<AUTH> Client<AUTH> {
                     }
                 }
 
-                self.store.update_account(account).await.map_err(ClientError::StoreError)
+                self.store.update_account(account).await?;
+
+                let was_watch_only = tracked_account.is_watch_only();
+                if watch_only != was_watch_only {
+                    self.store.set_account_watch_only(account.id(), watch_only).await?;
+                }
+                if watch_only && !was_watch_only {
+                    // Demote full account to watch-only by removing the account note tags.
+                    let account_note_tag_records = self
+                        .store
+                        .get_note_tags()
+                        .await?
+                        .into_iter()
+                        .filter(|record| record.source == NoteTagSource::Account(account.id()));
+                    for note_tag_record in account_note_tag_records {
+                        self.store.remove_note_tag(note_tag_record).await?;
+                    }
+                } else if !watch_only && was_watch_only {
+                    // Promote watch-only account to full by registering the account note tags for
+                    // all registered addresses.
+                    let addresses = self.store.get_addresses_by_account_id(account.id()).await?;
+                    for address in addresses {
+                        let note_tag_record =
+                            NoteTagRecord::with_account_source(address.to_note_tag(), account.id());
+                        self.store.add_note_tag(note_tag_record).await?;
+                    }
+                }
+                Ok(())
             },
         }
     }
@@ -232,11 +280,40 @@ impl<AUTH> Client<AUTH> {
     /// and be tracked by the network, it will be fetched by its ID. If the account was already
     /// being tracked by the client, it's state will be overwritten.
     ///
+    /// To import an account in watch-only mode (state-tracking only, no note sync), use
+    /// [`Self::watch_account_by_id`] instead.
+    ///
     /// # Errors
     /// - If the account is not found on the network.
     /// - If the account is private.
     /// - There was an error sending the request to the network.
     pub async fn import_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
+        let account = self.fetch_public_account(account_id).await?;
+        self.add_account_with_watch_only(&account, true, false).await
+    }
+
+    /// Starts watching an on-chain account in watch-only mode.
+    ///
+    /// Like [`Self::import_account_by_id`], the account is fetched from the network by its ID.
+    /// Unlike `import_account_by_id`, the account is added without registering its derived note
+    /// tag: `sync_state` will keep the account's commitment, nonce and storage up to date but
+    /// will **not** pull notes targeted at it.
+    ///
+    /// If the account is already being tracked, its state is overwritten and it becomes
+    /// watch-only.
+    ///
+    /// # Errors
+    /// - If the account is not found on the network.
+    /// - If the account is private.
+    /// - There was an error sending the request to the network.
+    pub async fn watch_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
+        let account = self.fetch_public_account(account_id).await?;
+        self.add_account_with_watch_only(&account, true, true).await
+    }
+
+    /// Fetches a public [`Account`] from the network, returning a typed error when the account
+    /// doesn't exist on chain or is private.
+    async fn fetch_public_account(&self, account_id: AccountId) -> Result<Account, ClientError> {
         let fetched_account =
             self.rpc_api.get_account_details(account_id).await.map_err(|err| {
                 match err.endpoint_error() {
@@ -247,14 +324,10 @@ impl<AUTH> Client<AUTH> {
                 }
             })?;
 
-        let account = match fetched_account {
-            FetchedAccount::Private(..) => {
-                return Err(ClientError::AccountIsPrivate(account_id));
-            },
-            FetchedAccount::Public(account, ..) => *account,
-        };
-
-        self.add_account(&account, true).await
+        match fetched_account {
+            FetchedAccount::Private(..) => Err(ClientError::AccountIsPrivate(account_id)),
+            FetchedAccount::Public(account, ..) => Ok(*account),
+        }
     }
 
     /// Adds an [`Address`] to the associated [`AccountId`], alongside its derived [`NoteTag`].
@@ -289,6 +362,7 @@ impl<AUTH> Client<AUTH> {
                 }
 
                 self.store.insert_address(address, account_id).await?;
+                self.store.add_note_tag(note_tag_record).await?;
                 Ok(())
             },
         }
@@ -304,7 +378,10 @@ impl<AUTH> Client<AUTH> {
         address: Address,
         account_id: AccountId,
     ) -> Result<(), ClientError> {
-        self.store.remove_address(address, account_id).await?;
+        let derived_note_tag = address.to_note_tag();
+        let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account_id);
+        self.store.remove_address(address).await?;
+        self.store.remove_note_tag(note_tag_record).await?;
         Ok(())
     }
 
