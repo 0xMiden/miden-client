@@ -330,7 +330,8 @@ impl<AUTH> Client<AUTH> {
         }
     }
 
-    /// Adds an [`Address`] to the associated [`AccountId`], alongside its derived [`NoteTag`].
+    /// Adds an [`Address`] to the associated [`AccountId`], alongside its derived [`NoteTag`]. If
+    /// the account is tracked as watch-only, the note tag is not registered.
     ///
     /// # Errors
     /// - If the account is not found on the network.
@@ -349,20 +350,24 @@ impl<AUTH> Client<AUTH> {
         let tracked_account = self.store.get_account(account_id).await?;
         match tracked_account {
             None => Err(ClientError::AccountDataNotFound(account_id)),
-            Some(_tracked_account) => {
-                // Check that the Address is not already tracked
-                let derived_note_tag: NoteTag = address.to_note_tag();
-                let note_tag_record =
-                    NoteTagRecord::with_account_source(derived_note_tag, account_id);
-                if self.store.get_note_tags().await?.contains(&note_tag_record) {
-                    return Err(ClientError::NoteTagDerivedAddressAlreadyTracked(
-                        address_bench32,
-                        derived_note_tag,
-                    ));
+            Some(tracked_account) => {
+                // Watch-only accounts intentionally have no derived note tag registered to avoid
+                // sync state to pull notes for it.
+                if !tracked_account.is_watch_only() {
+                    let derived_note_tag: NoteTag = address.to_note_tag();
+                    let note_tag_record =
+                        NoteTagRecord::with_account_source(derived_note_tag, account_id);
+                    if self.store.get_note_tags().await?.contains(&note_tag_record) {
+                        return Err(ClientError::NoteTagDerivedAddressAlreadyTracked(
+                            address_bench32,
+                            derived_note_tag,
+                        ));
+                    }
+                    self.store.insert_address(address, account_id).await?;
+                    self.store.add_note_tag(note_tag_record).await?;
+                } else {
+                    self.store.insert_address(address, account_id).await?;
                 }
-
-                self.store.insert_address(address, account_id).await?;
-                self.store.add_note_tag(note_tag_record).await?;
                 Ok(())
             },
         }
