@@ -617,6 +617,9 @@ impl SqliteStore {
             > 0;
 
         if old_header_exists {
+            // `watch_only` is not carried in historical_account_headers, so this restore resets
+            // it to the column default (FALSE). This is safe because undo only fires for discarded
+            // local transactions, and watch-only accounts have none.
             tx.execute(
                 "INSERT OR REPLACE INTO latest_account_headers \
                  (id, account_commitment, code_commitment, storage_commitment, \
