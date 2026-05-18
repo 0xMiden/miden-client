@@ -96,11 +96,3 @@ module_name_repetitions     = "allow" # Many triggers, and is a stylistic choice
 must_use_candidate          = "allow" # This marks many fn's which isn't helpful.
 should_panic_without_expect = "allow" # We don't care about the specific panic message.
 # End of pedantic lints.
-
-# Local patch for Phase 2 development (issue #1739). Remove before merging.
-[patch."https://github.com/0xMiden/protocol.git"]
-miden-protocol        = { path = "../protocol/crates/miden-protocol" }
-miden-standards       = { path = "../protocol/crates/miden-standards" }
-miden-testing         = { path = "../protocol/crates/miden-testing" }
-miden-tx              = { path = "../protocol/crates/miden-tx" }
-miden-tx-batch-prover = { path = "../protocol/crates/miden-tx-batch-prover" }

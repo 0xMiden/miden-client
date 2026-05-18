@@ -2963,14 +2963,6 @@ dependencies = [
 [[package]]
 name = "miden-block-prover"
 version = "0.15.0"
-dependencies = [
- "miden-protocol",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "miden-block-prover"
-version = "0.15.0"
 source = "git+https://github.com/0xMiden/protocol.git?branch=next#c6f1ecf9fa49bcebb77deada74e443f07b45c0ba"
 dependencies = [
  "miden-protocol",
@@ -3537,7 +3529,7 @@ dependencies = [
  "indexmap",
  "libsqlite3-sys",
  "miden-agglayer",
- "miden-block-prover 0.15.0 (git+https://github.com/0xMiden/protocol.git?branch=next)",
+ "miden-block-prover",
  "miden-crypto",
  "miden-large-smt-backend-rocksdb",
  "miden-node-db",
@@ -3688,6 +3680,7 @@ dependencies = [
 [[package]]
 name = "miden-protocol"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/protocol.git?branch=next#c6f1ecf9fa49bcebb77deada74e443f07b45c0ba"
 dependencies = [
  "bech32",
  "fs-err",
@@ -3765,6 +3758,7 @@ dependencies = [
 [[package]]
 name = "miden-standards"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/protocol.git?branch=next#c6f1ecf9fa49bcebb77deada74e443f07b45c0ba"
 dependencies = [
  "bon",
  "fs-err",
@@ -3781,10 +3775,11 @@ dependencies = [
 [[package]]
 name = "miden-testing"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/protocol.git?branch=next#c6f1ecf9fa49bcebb77deada74e443f07b45c0ba"
 dependencies = [
  "anyhow",
  "itertools 0.14.0",
- "miden-block-prover 0.15.0",
+ "miden-block-prover",
  "miden-core-lib",
  "miden-crypto",
  "miden-processor",
@@ -3800,6 +3795,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/protocol.git?branch=next#c6f1ecf9fa49bcebb77deada74e443f07b45c0ba"
 dependencies = [
  "miden-processor",
  "miden-protocol",
@@ -3812,6 +3808,7 @@ dependencies = [
 [[package]]
 name = "miden-tx-batch-prover"
 version = "0.15.0"
+source = "git+https://github.com/0xMiden/protocol.git?branch=next#c6f1ecf9fa49bcebb77deada74e443f07b45c0ba"
 dependencies = [
  "miden-protocol",
  "miden-tx",
