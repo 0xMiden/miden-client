@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.9 (2026-05-19)
+
+### Enhancements
+
+* Bumped `miden-vm` workspace dependencies from 0.22.1 to 0.22.4.
+
 ## 0.14.7 (2026-06-05)
 
 ### Enhancements
