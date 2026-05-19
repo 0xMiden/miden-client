@@ -298,3 +298,148 @@ pub async fn test_batch_builder_multiple_accounts(client_config: ClientConfig) -
 
     Ok(())
 }
+
+/// Integration test for the A → B → A interleaved push path.
+///
+/// Pre-mints `MINT_AMOUNT` to both A and B so each has on-chain state. Then submits a
+/// 3-tx batch with pushes in order `A → B`, `B → A`, `A → B`. The middle B push forces
+/// `InMemoryBatchDataStore` to handle a non-A push between two A pushes. The third push must read
+/// A's cached post-push-1 state, not re-fetch from the store, otherwise its `initial_account_state`
+/// would not match the chain produced by push 1 and the node would reject the batch.
+///
+/// Asserts A advances by 2 nonces and B by 1, A's balance reflects two outbound notes,
+/// and B's reflects one outbound note (all output notes remain pending consumption).
+pub async fn test_batch_builder_interleaved_pushes(client_config: ClientConfig) -> Result<()> {
+    let (mut client, authenticator) = client_config.into_client().await?;
+    wait_for_node(&mut client).await;
+
+    let (first_regular_account, second_regular_account, faucet_account_header) =
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await?;
+
+    let account_id_a = first_regular_account.id();
+    let account_id_b = second_regular_account.id();
+    let faucet_account_id = faucet_account_header.id();
+
+    // Pre-batch: fund both A and B on-chain so their first batch-tx deltas are partial.
+    let tx_id_a =
+        mint_and_consume(&mut client, account_id_a, faucet_account_id, NoteType::Private).await;
+    wait_for_tx(&mut client, tx_id_a).await?;
+    let tx_id_b =
+        mint_and_consume(&mut client, account_id_b, faucet_account_id, NoteType::Private).await;
+    wait_for_tx(&mut client, tx_id_b).await?;
+    client.sync_state().await.unwrap();
+
+    let nonce_a_before = client.account_reader(account_id_a).nonce().await?;
+    let nonce_b_before = client.account_reader(account_id_b).nonce().await?;
+    info!(?nonce_a_before, ?nonce_b_before, "Nonces before interleaved batch");
+
+    let asset = FungibleAsset::new(faucet_account_id, TRANSFER_AMOUNT).unwrap();
+
+    let req_a_to_b_first = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentNoteDescription::new(vec![Asset::Fungible(asset)], account_id_a, account_id_b),
+            NoteType::Private,
+            client.rng(),
+        )
+        .unwrap();
+    let req_b_to_a = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentNoteDescription::new(vec![Asset::Fungible(asset)], account_id_b, account_id_a),
+            NoteType::Private,
+            client.rng(),
+        )
+        .unwrap();
+    let req_a_to_b_second = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentNoteDescription::new(vec![Asset::Fungible(asset)], account_id_a, account_id_b),
+            NoteType::Private,
+            client.rng(),
+        )
+        .unwrap();
+
+    info!("Submitting A→B→A interleaved batch");
+
+    let block_num = client
+        .new_transaction_batch()
+        .push(account_id_a, req_a_to_b_first)
+        .await?
+        .push(account_id_b, req_b_to_a)
+        .await?
+        .push(account_id_a, req_a_to_b_second)
+        .await?
+        .submit()
+        .await?;
+
+    info!(block_num = block_num.as_u32(), "Interleaved batch submitted");
+    assert!(block_num.as_u32() > 0, "expected a positive block number");
+
+    // Poll until both accounts have their batch txs committed (A: mint+consume + 2 batch = 3,
+    // B: mint+consume + 1 batch = 2).
+    let mut a_committed = 0;
+    let mut b_committed = 0;
+    for attempt in 0..30 {
+        wait_for_blocks(&mut client, 1).await;
+        client.sync_state().await.unwrap();
+        let all_transactions = client.get_transactions(TransactionFilter::All).await.unwrap();
+        a_committed = all_transactions
+            .iter()
+            .filter(|tx| tx.details.account_id == account_id_a)
+            .filter(|tx| matches!(tx.status, TransactionStatus::Committed { .. }))
+            .count();
+        b_committed = all_transactions
+            .iter()
+            .filter(|tx| tx.details.account_id == account_id_b)
+            .filter(|tx| matches!(tx.status, TransactionStatus::Committed { .. }))
+            .count();
+        info!(attempt, a_committed, b_committed, "polling for interleaved batch txs");
+        if a_committed >= 3 && b_committed >= 2 {
+            break;
+        }
+    }
+    assert!(a_committed >= 3, "expected ≥ 3 committed txs for A, got {a_committed}");
+    assert!(b_committed >= 2, "expected ≥ 2 committed txs for B, got {b_committed}");
+
+    let nonce_a_after = client.account_reader(account_id_a).nonce().await?;
+    let nonce_b_after = client.account_reader(account_id_b).nonce().await?;
+    assert_eq!(
+        nonce_a_after,
+        nonce_a_before + Felt::new(2),
+        "A's nonce should advance by exactly 2 — proves A's cached state was reused on the \
+         third push instead of re-fetched from the store"
+    );
+    assert_eq!(
+        nonce_b_after,
+        nonce_b_before + Felt::new(1),
+        "B's nonce should advance by exactly 1 (one batch tx)"
+    );
+
+    let a_balance = client
+        .account_reader(account_id_a)
+        .get_balance(faucet_account_id)
+        .await
+        .context("failed to find A's balance after batch")?;
+    let b_balance = client
+        .account_reader(account_id_b)
+        .get_balance(faucet_account_id)
+        .await
+        .context("failed to find B's balance after batch")?;
+
+    assert_eq!(
+        a_balance,
+        MINT_AMOUNT - (TRANSFER_AMOUNT * 2),
+        "A's balance should reflect two outbound P2ID notes"
+    );
+    assert_eq!(
+        b_balance,
+        MINT_AMOUNT - TRANSFER_AMOUNT,
+        "B's balance should reflect one outbound P2ID note"
+    );
+
+    Ok(())
+}
