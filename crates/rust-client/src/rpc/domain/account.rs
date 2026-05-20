@@ -28,7 +28,7 @@ use crate::rpc::generated::{self as proto};
 // FETCHED ACCOUNT
 // ================================================================================================
 
-/// Describes the possible responses from the `GetAccoun` endpoint for an account.
+/// Describes the possible responses from the `GetAccount` endpoint for an account.
 #[derive(Debug)]
 pub enum FetchedAccount {
     /// Private accounts are stored off-chain. Only a commitment to the state of the account is
