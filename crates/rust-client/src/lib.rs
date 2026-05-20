@@ -310,6 +310,7 @@ pub use miden_protocol::{
     ZERO,
 };
 pub use miden_remote_prover_client::RemoteTransactionProver;
+pub use miden_standards as standards;
 pub use miden_tx::ExecutionOptions;
 
 /// Provides test utilities for working with accounts and account IDs
