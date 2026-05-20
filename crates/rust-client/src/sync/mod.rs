@@ -190,8 +190,8 @@ where
         // TODO 2178:
         // Reduce amount of queries done to the database
         for (header, _status) in self.store.get_account_headers().await? {
-            let map_slot_names = self.store.get_account_map_slot_names(header.id()).await?;
-            accounts.push(AccountSyncHint { header, map_slot_names });
+            let storage_header = self.store.get_account_storage_header(header.id()).await?;
+            accounts.push(AccountSyncHint { header, storage_header });
         }
 
         let note_tags = self.store.get_unique_note_tags().await?;
