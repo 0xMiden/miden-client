@@ -28,7 +28,7 @@ use crate::rpc::generated::{self as proto};
 // FETCHED ACCOUNT
 // ================================================================================================
 
-/// Describes the possible responses from the `GetAccountDetails` endpoint for an account.
+/// Describes the possible responses from the `GetAccoun` endpoint for an account.
 #[derive(Debug)]
 pub enum FetchedAccount {
     /// Private accounts are stored off-chain. Only a commitment to the state of the account is
@@ -724,7 +724,7 @@ impl TryFrom<proto::rpc::AccountResponse> for AccountProof {
     fn try_from(account_proof: proto::rpc::AccountResponse) -> Result<Self, Self::Error> {
         let Some(witness) = account_proof.witness else {
             return Err(RpcError::ExpectedDataMissing(
-                "GetAccountProof returned an account without witness".to_string(),
+                "GetAccount returned an account without witness".to_string(),
             ));
         };
 

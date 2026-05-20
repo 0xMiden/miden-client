@@ -48,7 +48,11 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use domain::account::{
-    AccountProof, AccountUpdateSummary, FetchedAccount, StorageMapEntries, StorageMapEntry,
+    AccountProof,
+    AccountUpdateSummary,
+    FetchedAccount,
+    StorageMapEntries,
+    StorageMapEntry,
 };
 use domain::note::{FetchedNote, NoteSyncBlock, SyncNotesResult};
 use domain::nullifier::NullifierUpdate;
@@ -239,7 +243,6 @@ pub trait NodeRpcClient: Send + Sync {
 
         // Second call: request entries for every map slot at the same block, so the view is
         // consistent. If there are no maps, the first proof already has what we need.
-        // TODO: can this still return too_many_entries?
         let final_proof = if map_slot_names.is_empty() {
             initial_proof
         } else {
