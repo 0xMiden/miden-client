@@ -22,9 +22,7 @@ use crate::rpc::domain::account::{
     AccountStorageDetails,
     AccountStorageMapDetails,
     AccountStorageRequirements,
-    AccountUpdateSummary,
     AccountVaultDetails,
-    FetchedAccount,
     StorageMapEntries,
     StorageMapEntry,
 };
@@ -460,36 +458,6 @@ impl NodeRpcClient for MockRpcApi {
         let block_num = self.get_chain_tip_block_num();
 
         Ok(block_num)
-    }
-
-    /// Returns the node's tracked account details for the specified account ID.
-    /// Always returns the full account for public accounts.
-    async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        let summary =
-            self.account_commitment_updates
-                .read()
-                .iter()
-                .rev()
-                .find_map(|(block_num, updates)| {
-                    updates.get(&account_id).map(|commitment| AccountUpdateSummary {
-                        commitment: *commitment,
-                        last_block_num: *block_num,
-                    })
-                });
-
-        if let Ok(account) = self.mock_chain.read().committed_account(account_id) {
-            let summary = summary.unwrap_or_else(|| AccountUpdateSummary {
-                commitment: account.to_commitment(),
-                last_block_num: BlockNumber::GENESIS,
-            });
-            Ok(FetchedAccount::new_public(account.clone(), summary))
-        } else if let Some(summary) = summary {
-            Ok(FetchedAccount::new_private(account_id, summary))
-        } else {
-            Err(RpcError::ExpectedDataMissing(format!(
-                "account {account_id} not found in mock commitment updates or mock chain"
-            )))
-        }
     }
 
     /// Returns the account proof for the specified account. The `known_account_code` parameter
