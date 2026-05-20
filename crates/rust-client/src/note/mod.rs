@@ -101,6 +101,8 @@ pub use miden_protocol::note::{
     PartialNoteMetadata,
 };
 pub use miden_protocol::transaction::ToInputNoteCommitments;
+/// Raw access to `miden-standards` note modules for items not curated by `miden-client`.
+pub use miden_standards::note as standards;
 pub use miden_standards::note::{
     NetworkAccountTarget,
     NoteConsumptionStatus,

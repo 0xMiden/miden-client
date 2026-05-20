@@ -310,7 +310,6 @@ pub use miden_protocol::{
     ZERO,
 };
 pub use miden_remote_prover_client::RemoteTransactionProver;
-pub use miden_standards as standards;
 pub use miden_tx::ExecutionOptions;
 
 /// Provides test utilities for working with accounts and account IDs
@@ -319,8 +318,10 @@ pub use miden_tx::ExecutionOptions;
 #[cfg(feature = "testing")]
 pub mod testing {
     pub use miden_protocol::testing::account_id;
+    /// Raw access to `miden-standards` testing modules for items not curated by
+    /// `miden-client`.
+    pub use miden_standards::testing as standards;
     pub use miden_standards::testing::note::NoteBuilder;
-    pub use miden_standards::testing::*;
     pub use miden_testing::*;
 
     pub use crate::test_utils::*;
