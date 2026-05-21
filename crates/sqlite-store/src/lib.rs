@@ -359,12 +359,19 @@ impl Store for SqliteStore {
         &self,
         account: &Account,
         initial_address: Address,
+        watch_only: bool,
     ) -> Result<(), StoreError> {
         let cloned_account = account.clone();
         let smt_forest = self.smt_forest.clone();
 
         self.interact_with_connection(move |conn| {
-            SqliteStore::insert_account(conn, &smt_forest, &cloned_account, &initial_address)
+            SqliteStore::insert_account(
+                conn,
+                &smt_forest,
+                &cloned_account,
+                &initial_address,
+                watch_only,
+            )
         })
         .await
     }
@@ -375,17 +382,6 @@ impl Store for SqliteStore {
 
         self.interact_with_connection(move |conn| {
             SqliteStore::update_account(conn, &smt_forest, &cloned_account)
-        })
-        .await
-    }
-
-    async fn set_account_watch_only(
-        &self,
-        account_id: AccountId,
-        watch_only: bool,
-    ) -> Result<(), StoreError> {
-        self.interact_with_connection(move |conn| {
-            SqliteStore::set_account_watch_only(conn, account_id, watch_only)
         })
         .await
     }

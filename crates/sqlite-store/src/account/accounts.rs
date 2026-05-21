@@ -318,6 +318,7 @@ impl SqliteStore {
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
         account: &Account,
         initial_address: &Address,
+        watch_only: bool,
     ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
 
@@ -328,7 +329,7 @@ impl SqliteStore {
         Self::insert_storage_slots(&tx, account_id, account.storage().slots().iter())?;
 
         Self::insert_assets(&tx, account_id, account.vault().assets())?;
-        Self::insert_account_header(&tx, &account.into(), account.seed(), None)?;
+        Self::insert_account_header(&tx, &account.into(), account.seed(), None, Some(watch_only))?;
 
         Self::insert_address(&tx, initial_address, account.id())?;
 
@@ -422,26 +423,6 @@ impl SqliteStore {
         tx.commit().into_store_error()
     }
 
-    /// Sets the per-account watch-only flag.
-    ///
-    /// Errors if the account is not present in `latest_account_headers`.
-    pub(crate) fn set_account_watch_only(
-        conn: &mut Connection,
-        account_id: AccountId,
-        watch_only: bool,
-    ) -> Result<(), StoreError> {
-        let updated = conn
-            .execute(
-                "UPDATE latest_account_headers SET watch_only = ? WHERE id = ?",
-                params![watch_only, account_id.to_hex()],
-            )
-            .into_store_error()?;
-        if updated == 0 {
-            return Err(StoreError::AccountDataNotFound(account_id));
-        }
-        Ok(())
-    }
-
     /// Inserts an [`AccountCode`].
     pub(crate) fn insert_account_code(
         tx: &Transaction<'_>,
@@ -468,7 +449,7 @@ impl SqliteStore {
         let account_id = final_account_state.id();
 
         // Archive old header and insert the new one
-        Self::insert_account_header(tx, final_account_state, None, Some(init_account_state))?;
+        Self::insert_account_header(tx, final_account_state, None, Some(init_account_state), None)?;
 
         Self::apply_account_vault_delta(
             tx,
@@ -850,7 +831,13 @@ impl SqliteStore {
         .into_store_error()?;
 
         // Insert account header (archives old header to historical)
-        Self::insert_account_header(tx, &new_account_state.into(), None, old_header.as_ref())?;
+        Self::insert_account_header(
+            tx,
+            &new_account_state.into(),
+            None,
+            old_header.as_ref(),
+            None,
+        )?;
 
         Ok(())
     }
@@ -926,12 +913,14 @@ impl SqliteStore {
     /// If `old_header` is provided, the old header is archived to the historical table.
     /// For initial inserts (no previous state), pass `None` for `old_header`.
     ///
-    /// The `watch_only` flag on the latest row is preserved. For fresh inserts, it is set to false.
+    /// If `watch_only_override` is `Some(v)`, the `watch_only` flag is written as `v`.
+    /// Otherwise the current row's value is preserved (and defaults to `false` for fresh inserts).
     fn insert_account_header(
         tx: &Transaction<'_>,
         new_header: &AccountHeader,
         account_seed: Option<Word>,
         old_header: Option<&AccountHeader>,
+        watch_only_override: Option<bool>,
     ) -> Result<(), StoreError> {
         // Read the current latest row's preserved-on-replace fields (seed, locked, watch_only).
         let id_for_lookup = new_header.id().to_hex();
@@ -944,6 +933,7 @@ impl SqliteStore {
             .optional()
             .into_store_error()?
             .unwrap_or((None, false, false));
+        let watch_only = watch_only_override.unwrap_or(old_watch_only);
 
         // Archive the old header to historical before overwriting latest.
         if let Some(old) = old_header {
@@ -1020,7 +1010,7 @@ impl SqliteStore {
                 account_seed,
                 commitment,
                 false,
-                old_watch_only,
+                watch_only,
             ],
         )
         .into_store_error()?;

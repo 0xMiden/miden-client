@@ -205,13 +205,11 @@ impl<AUTH> Client<AUTH> {
                 let default_address = Address::new(account.id());
 
                 self.store
-                    .insert_account(account, default_address.clone())
+                    .insert_account(account, default_address.clone(), watch_only)
                     .await
                     .map_err(ClientError::StoreError)?;
 
-                if watch_only {
-                    self.store.set_account_watch_only(account.id(), true).await?;
-                } else {
+                if !watch_only {
                     // Set the default address note tag so sync pulls notes.
                     let default_address_note_tag = default_address.to_note_tag();
                     let note_tag_record =
