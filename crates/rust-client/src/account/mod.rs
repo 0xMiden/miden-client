@@ -172,11 +172,11 @@ impl<AUTH> Client<AUTH> {
         self.add_account_inner(account, ClientAccountType::Native, overwrite).await
     }
 
-    /// Same as [`Self::add_account`] but allows specifying how the account should be tracked
-    /// (see [`ClientAccountType`]).
+    /// Inserts `account` into the store (or overwrites it if `overwrite` is true) and registers
+    /// the per-account note tag if `client_account_type` is [`ClientAccountType::Native`].
     ///
-    /// When the account is added as [`ClientAccountType::Watched`] no derived note tag is
-    /// registered, so notes targeted at it will not be synced.
+    /// Switching the [`ClientAccountType`] of an already-tracked account is not supported and
+    /// returns [`ClientError::AccountWatchedMismatch`].
     async fn add_account_inner(
         &mut self,
         account: &Account,
