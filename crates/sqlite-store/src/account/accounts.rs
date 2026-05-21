@@ -43,7 +43,6 @@ use rusqlite::{Connection, OptionalExtension, Transaction, named_params, params}
 use crate::account::helpers::{
     query_account_addresses,
     query_account_code,
-    query_client_account_type,
     query_historical_account_headers,
     query_latest_account_headers,
     query_storage_slots,
@@ -74,14 +73,19 @@ impl SqliteStore {
     pub(crate) fn get_account_headers(
         conn: &mut Connection,
     ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
-        query_latest_account_headers(conn, "1=1 ORDER BY id", params![])
+        Ok(query_latest_account_headers(conn, "1=1 ORDER BY id", params![])?
+            .into_iter()
+            .map(|(header, status, _)| (header, status))
+            .collect())
     }
 
     pub(crate) fn get_account_header(
         conn: &mut Connection,
         account_id: AccountId,
     ) -> Result<Option<(AccountHeader, AccountStatus)>, StoreError> {
-        Ok(query_latest_account_headers(conn, "id = ?", params![account_id.to_hex()])?.pop())
+        Ok(query_latest_account_headers(conn, "id = ?", params![account_id.to_hex()])?
+            .pop()
+            .map(|(header, status, _)| (header, status)))
     }
 
     pub(crate) fn get_account_header_by_commitment(
@@ -103,12 +107,11 @@ impl SqliteStore {
         conn: &mut Connection,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
-        let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
+        let Some((header, status, client_account_type)) =
+            query_latest_account_headers(conn, "id = ?", params![account_id.to_hex()])?.pop()
+        else {
             return Ok(None);
         };
-
-        let client_account_type = query_client_account_type(conn, account_id)?
-            .expect("latest_account_headers row exists: get_account_header just returned it");
 
         let assets = query_vault_assets(conn, account_id)?;
         let vault = AssetVault::new(&assets)?;
@@ -141,12 +144,11 @@ impl SqliteStore {
         conn: &mut Connection,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError> {
-        let Some((header, status)) = Self::get_account_header(conn, account_id)? else {
+        let Some((header, status, client_account_type)) =
+            query_latest_account_headers(conn, "id = ?", params![account_id.to_hex()])?.pop()
+        else {
             return Ok(None);
         };
-
-        let client_account_type = query_client_account_type(conn, account_id)?
-            .expect("latest_account_headers row exists: get_account_header just returned it");
 
         // Partial vault retrieval
         let partial_vault = PartialVault::new(header.vault_root());
@@ -300,7 +302,7 @@ impl SqliteStore {
         conn: &mut Connection,
         account_id: AccountId,
     ) -> Result<Option<AccountCode>, StoreError> {
-        let Some((header, _)) =
+        let Some((header, ..)) =
             query_latest_account_headers(conn, "id = ?", params![account_id.to_hex()])?
                 .into_iter()
                 .next()
@@ -762,7 +764,7 @@ impl SqliteStore {
         let old_header = query_latest_account_headers(tx, "id = ?", params![account_id.to_hex()])?
             .into_iter()
             .next()
-            .map(|(header, _)| header);
+            .map(|(header, ..)| header);
 
         // Archive all old entries from latest → historical
         tx.execute(
@@ -863,7 +865,7 @@ impl SqliteStore {
         let init_header = query_latest_account_headers(tx, "id = ?", params![account_id.to_hex()])?
             .into_iter()
             .next()
-            .map(|(header, _)| header)
+            .map(|(header, ..)| header)
             .ok_or(StoreError::AccountDataNotFound(account_id))?;
 
         // Read the fungible assets that will be affected by the delta.
