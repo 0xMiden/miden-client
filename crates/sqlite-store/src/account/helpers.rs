@@ -3,18 +3,11 @@
 use std::collections::BTreeMap;
 
 use miden_client::account::{
-    AccountCode,
-    AccountHeader,
-    AccountId,
-    Address,
-    StorageMap,
-    StorageMapKey,
-    StorageSlot,
-    StorageSlotName,
-    StorageSlotType,
+    AccountCode, AccountHeader, AccountId, Address, StorageMap, StorageMapKey, StorageSlot,
+    StorageSlotName, StorageSlotType,
 };
 use miden_client::asset::Asset;
-use miden_client::store::{AccountStatus, AccountStorageFilter, StoreError};
+use miden_client::store::{AccountStatus, AccountStorageFilter, ClientAccountType, StoreError};
 use miden_client::{Deserializable, Word};
 use rusqlite::{Connection, OptionalExtension, Params, params, params_from_iter};
 
@@ -116,18 +109,26 @@ fn query_account_headers_from_table(
         .collect::<Result<Vec<(AccountHeader, AccountStatus)>, StoreError>>()
 }
 
-/// Returns the `watch_only` flag for the given account from `latest_account_headers`, or
+/// Returns the [`ClientAccountType`] for the given account from `latest_account_headers`, or
 /// `None` if the account is not present.
-pub(crate) fn query_latest_watch_only(
+pub(crate) fn query_client_account_type(
     conn: &Connection,
     account_id: AccountId,
-) -> Result<Option<bool>, StoreError> {
+) -> Result<Option<ClientAccountType>, StoreError> {
     let mut stmt = conn
-        .prepare_cached("SELECT watch_only FROM latest_account_headers WHERE id = ?")
+        .prepare_cached("SELECT watched FROM latest_account_headers WHERE id = ?")
         .into_store_error()?;
-    stmt.query_row(params![account_id.to_hex()], |row| row.get::<_, bool>(0))
+    let watched: Option<bool> = stmt
+        .query_row(params![account_id.to_hex()], |row| row.get::<_, bool>(0))
         .optional()
-        .into_store_error()
+        .into_store_error()?;
+    Ok(watched.map(|w| {
+        if w {
+            ClientAccountType::Watched
+        } else {
+            ClientAccountType::Native
+        }
+    }))
 }
 
 // TODO: this function will probably be refactored to receive more complex where clauses and

@@ -29,7 +29,7 @@ use miden_client::asset::{
     NonFungibleAssetDetails,
 };
 use miden_client::auth::{AuthSchemeId, AuthSingleSig, PublicKeyCommitment};
-use miden_client::store::Store;
+use miden_client::store::{ClientAccountType, Store};
 use miden_client::testing::common::ACCOUNT_ID_REGULAR;
 use miden_client::{EMPTY_WORD, Felt, ONE, ZERO};
 use miden_protocol::account::AccountComponentMetadata;
@@ -131,7 +131,9 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
         .build_with_schema_commitment()?;
 
     let default_address = Address::new(account.id());
-    store.insert_account(&account, default_address, false).await?;
+    store
+        .insert_account(&account, default_address, ClientAccountType::Native)
+        .await?;
 
     let mut storage_delta = AccountStorageDelta::new();
     storage_delta.set_item(value_slot_name.clone(), [ZERO, ZERO, ZERO, ONE].into())?;
@@ -247,7 +249,9 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
         .with_assets(assets.clone())
         .build_existing()?;
     let default_address = Address::new(account.id());
-    store.insert_account(&account, default_address, false).await?;
+    store
+        .insert_account(&account, default_address, ClientAccountType::Native)
+        .await?;
 
     let mut storage_delta = AccountStorageDelta::new();
     storage_delta.set_item(value_slot_name.clone(), EMPTY_WORD)?;
@@ -339,7 +343,9 @@ async fn get_account_storage_item_success() -> anyhow::Result<()> {
         .build_existing()?;
 
     let default_address = Address::new(account.id());
-    store.insert_account(&account, default_address, false).await?;
+    store
+        .insert_account(&account, default_address, ClientAccountType::Native)
+        .await?;
 
     // Test get_account_storage_item
     let result = store.get_account_storage_item(account.id(), value_slot_name).await?;
@@ -372,7 +378,9 @@ async fn get_account_storage_item_not_found() -> anyhow::Result<()> {
         .build_existing()?;
 
     let default_address = Address::new(account.id());
-    store.insert_account(&account, default_address, false).await?;
+    store
+        .insert_account(&account, default_address, ClientAccountType::Native)
+        .await?;
 
     // Test get_account_storage_item with missing slot name
     let missing_name =
@@ -413,7 +421,9 @@ async fn get_account_map_item_success() -> anyhow::Result<()> {
         .build_existing()?;
 
     let default_address = Address::new(account.id());
-    store.insert_account(&account, default_address, false).await?;
+    store
+        .insert_account(&account, default_address, ClientAccountType::Native)
+        .await?;
 
     // Test get_account_map_item
     let (value, _witness) =
@@ -447,7 +457,9 @@ async fn get_account_map_item_value_slot_error() -> anyhow::Result<()> {
         .build_existing()?;
 
     let default_address = Address::new(account.id());
-    store.insert_account(&account, default_address, false).await?;
+    store
+        .insert_account(&account, default_address, ClientAccountType::Native)
+        .await?;
 
     // Test get_account_map_item on a value slot (should error)
     let test_key = StorageMapKey::new([ONE, ZERO, ZERO, ZERO].into());
@@ -478,7 +490,9 @@ async fn get_account_code() -> anyhow::Result<()> {
         .build_existing()?;
 
     let default_address = Address::new(account.id());
-    store.insert_account(&account, default_address, false).await?;
+    store
+        .insert_account(&account, default_address, ClientAccountType::Native)
+        .await?;
 
     let code = store.get_account_code(account.id()).await?;
 
@@ -531,7 +545,9 @@ async fn account_reader_nonce_and_status() -> anyhow::Result<()> {
         .build_with_schema_commitment()?;
 
     let default_address = Address::new(account.id());
-    store.insert_account(&account, default_address, false).await?;
+    store
+        .insert_account(&account, default_address, ClientAccountType::Native)
+        .await?;
 
     // Create an AccountReader
     let reader = AccountReader::new(store.clone(), account.id());
@@ -607,7 +623,9 @@ async fn account_reader_storage_access() -> anyhow::Result<()> {
         .build_existing()?;
 
     let default_address = Address::new(account.id());
-    store.insert_account(&account, default_address, false).await?;
+    store
+        .insert_account(&account, default_address, ClientAccountType::Native)
+        .await?;
 
     // Create an AccountReader
     let reader = AccountReader::new(store.clone(), account.id());
@@ -644,7 +662,9 @@ async fn account_reader_addresses_access() -> anyhow::Result<()> {
         .build_existing()?;
 
     let default_address = Address::new(account.id());
-    store.insert_account(&account, default_address.clone(), false).await?;
+    store
+        .insert_account(&account, default_address.clone(), ClientAccountType::Native)
+        .await?;
 
     // Create an AccountReader
     let reader = AccountReader::new(store.clone(), account.id());
@@ -772,7 +792,9 @@ async fn prune_account_history_multiple_accounts() -> anyhow::Result<()> {
         .with_component(component_b)
         .build_with_schema_commitment()?;
     let b_id = account_b.id();
-    store.insert_account(&account_b, Address::new(account_b.id()), false).await?;
+    store
+        .insert_account(&account_b, Address::new(account_b.id()), ClientAccountType::Native)
+        .await?;
 
     let mut account_b_mut = account_b.clone();
     apply_single_entry_update(&store, &mut account_b_mut, &map_slot_name_b, 1).await?;
@@ -977,7 +999,9 @@ async fn setup_account_with_map(
         .with_component(component)
         .build_with_schema_commitment()?;
 
-    store.insert_account(&account, Address::new(account.id()), false).await?;
+    store
+        .insert_account(&account, Address::new(account.id()), ClientAccountType::Native)
+        .await?;
     Ok(account)
 }
 
@@ -1177,7 +1201,9 @@ async fn undo_account_state_deletes_account_entirely() -> anyhow::Result<()> {
 
     let account_id = account.id();
     let commitment = account.to_commitment();
-    store.insert_account(&account, Address::new(account_id), false).await?;
+    store
+        .insert_account(&account, Address::new(account_id), ClientAccountType::Native)
+        .await?;
 
     // Pre-undo: 1 latest header, 0 historical headers (initial insert has no old state)
     let m = get_storage_metrics(&store).await;
@@ -1364,7 +1390,9 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
         .build_with_schema_commitment()?;
 
     let account_id = account.id();
-    store.insert_account(&account, Address::new(account_id), false).await?;
+    store
+        .insert_account(&account, Address::new(account_id), ClientAccountType::Native)
+        .await?;
 
     // Step 1+2: Apply delta at nonce 1 adding assets X and Y
     let asset_x = FungibleAsset::new(faucet_id, 100)?;
@@ -1715,6 +1743,7 @@ async fn undo_multiple_nonces_at_once() -> anyhow::Result<()> {
 /// 3. Undo nonce 1
 /// 4. Verify C and D are gone from latest, only A and B remain
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()> {
     let store = create_test_store().await;
     let map_slot_name = StorageSlotName::new("test::undo_new::map").expect("valid slot name");
@@ -1745,7 +1774,9 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
         .build_with_schema_commitment()?;
 
     let account_id = account.id();
-    store.insert_account(&account, Address::new(account_id), false).await?;
+    store
+        .insert_account(&account, Address::new(account_id), ClientAccountType::Native)
+        .await?;
 
     // Verify nonce 0 state
     let m = get_storage_metrics(&store).await;
@@ -1844,7 +1875,7 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
 }
 
 #[tokio::test]
-async fn watch_only_status_survives_state_replacement() -> anyhow::Result<()> {
+async fn watched_status_survives_state_replacement() -> anyhow::Result<()> {
     let store = create_test_store().await;
 
     let account = AccountBuilder::new([0; 32])
@@ -1856,11 +1887,13 @@ async fn watch_only_status_survives_state_replacement() -> anyhow::Result<()> {
         .with_component(AccountComponent::new(
             basic_wallet_library(),
             vec![],
-            AccountComponentMetadata::new("miden::testing::watch_only_replace", AccountType::all()),
+            AccountComponentMetadata::new("miden::testing::watched_replace", AccountType::all()),
         )?)
         .build_existing()?;
     let account_id = account.id();
-    store.insert_account(&account, Address::new(account_id), true).await?;
+    store
+        .insert_account(&account, Address::new(account_id), ClientAccountType::Watched)
+        .await?;
 
     // Bump the account's nonce and run it through update_account.
     let mut updated = account.clone();
@@ -1875,7 +1908,7 @@ async fn watch_only_status_survives_state_replacement() -> anyhow::Result<()> {
         .get_account(account_id)
         .await?
         .context("account should still be retrievable after update")?;
-    assert!(record.is_watch_only(), "watch-only status must survive state replacement");
+    assert!(record.is_watched(), "watched status must survive state replacement");
 
     Ok(())
 }

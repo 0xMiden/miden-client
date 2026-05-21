@@ -426,7 +426,7 @@ pub(crate) fn get_network_note_with_script<T: Rng>(
     Ok(network_note)
 }
 
-/// Watch-only flow against a network account:
+/// Watched-account flow against a network account:
 ///   - `client_1` deploys the counter as a network account and emits bump notes.
 ///   - `client_2` watches the network account via `import_watched_account_by_id` (no note tag).
 ///   - The node-driven counter increments are observed by `client_2` after `sync_state`.
@@ -452,7 +452,7 @@ pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<(
         .context("failed to find network account after deployment")?;
     assert_eq!(counter_value, Word::from([Felt::new(1), ZERO, ZERO, ZERO]));
 
-    // client_2 starts watching the network account in watch-only mode.
+    // client_2 starts watching the network account.
     client_2.import_watched_account_by_id(network_account_id).await?;
 
     let watched_record = client_2
@@ -460,14 +460,14 @@ pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<(
         .get_account(network_account_id)
         .await?
         .context("watched network account should be tracked in client_2's store")?;
-    assert!(watched_record.is_watch_only(), "watched network account must be watch-only");
+    assert!(watched_record.is_watched(), "watched network account must be marked as watched");
 
     let tags = client_2.test_store().get_note_tags().await?;
     assert!(
         !tags
             .iter()
             .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == network_account_id)),
-        "watch-only network account must not register a per-account note tag",
+        "watched network account must not register a per-account note tag",
     );
 
     let initial_watched_commitment =

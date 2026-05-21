@@ -7,29 +7,14 @@ use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use miden_client::account::{
-    Account,
-    AccountCode,
-    AccountDelta,
-    AccountHeader,
-    AccountId,
-    AccountStorage,
-    Address,
-    PartialAccount,
-    PartialStorage,
-    PartialStorageMap,
-    StorageMap,
-    StorageMapKey,
-    StorageSlotName,
+    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountStorage, Address,
+    PartialAccount, PartialStorage, PartialStorageMap, StorageMap, StorageMapKey, StorageSlotName,
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset};
 use miden_client::store::{
-    AccountRecord,
-    AccountRecordData,
-    AccountSmtForest,
-    AccountStatus,
-    AccountStorageFilter,
-    StoreError,
+    AccountRecord, AccountRecordData, AccountSmtForest, AccountStatus, AccountStorageFilter,
+    ClientAccountType, StoreError,
 };
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
@@ -40,14 +25,9 @@ use rusqlite::types::Value;
 use rusqlite::{Connection, OptionalExtension, Transaction, named_params, params};
 
 use crate::account::helpers::{
-    query_account_addresses,
-    query_account_code,
-    query_historical_account_headers,
-    query_latest_account_headers,
-    query_latest_watch_only,
-    query_storage_slots,
-    query_storage_values,
-    query_vault_assets,
+    query_account_addresses, query_account_code, query_client_account_type,
+    query_historical_account_headers, query_latest_account_headers, query_storage_slots,
+    query_storage_values, query_vault_assets,
 };
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, column_value_as_u64, insert_sql, subst, u64_to_value};
@@ -106,8 +86,8 @@ impl SqliteStore {
             return Ok(None);
         };
 
-        let watch_only =
-            query_latest_watch_only(conn, account_id)?.expect("latest_account_headers row exists");
+        let client_account_type = query_client_account_type(conn, account_id)?
+            .expect("latest_account_headers row exists: get_account_header just returned it");
 
         let assets = query_vault_assets(conn, account_id)?;
         let vault = AssetVault::new(&assets)?;
@@ -132,7 +112,7 @@ impl SqliteStore {
         );
 
         let account_data = AccountRecordData::Full(account);
-        Ok(Some(AccountRecord::new(account_data, status, watch_only)))
+        Ok(Some(AccountRecord::new(account_data, status, client_account_type)))
     }
 
     /// Retrieves a minimal partial account record with storage and vault witnesses.
@@ -144,7 +124,7 @@ impl SqliteStore {
             return Ok(None);
         };
 
-        let watch_only = query_latest_watch_only(conn, account_id)?
+        let client_account_type = query_client_account_type(conn, account_id)?
             .expect("latest_account_headers row exists: get_account_header just returned it");
 
         // Partial vault retrieval
@@ -184,7 +164,7 @@ impl SqliteStore {
             status.seed().copied(),
         )?;
         let account_record_data = AccountRecordData::Partial(partial_account);
-        Ok(Some(AccountRecord::new(account_record_data, status, watch_only)))
+        Ok(Some(AccountRecord::new(account_record_data, status, client_account_type)))
     }
 
     pub fn get_foreign_account_code(
@@ -318,7 +298,7 @@ impl SqliteStore {
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
         account: &Account,
         initial_address: &Address,
-        watch_only: bool,
+        client_account_type: ClientAccountType,
     ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
 
@@ -329,7 +309,14 @@ impl SqliteStore {
         Self::insert_storage_slots(&tx, account_id, account.storage().slots().iter())?;
 
         Self::insert_assets(&tx, account_id, account.vault().assets())?;
-        Self::insert_account_header(&tx, &account.into(), account.seed(), None, Some(watch_only))?;
+        let watched_type = matches!(client_account_type, ClientAccountType::Watched);
+        Self::insert_account_header(
+            &tx,
+            &account.into(),
+            account.seed(),
+            None,
+            Some(watched_type),
+        )?;
 
         Self::insert_address(&tx, initial_address, account.id())?;
 
@@ -600,9 +587,9 @@ impl SqliteStore {
             > 0;
 
         if old_header_exists {
-            // `watch_only` is not carried in historical_account_headers, so this restore resets
+            // `watched` is not carried in historical_account_headers, so this restore resets
             // it to the column default (FALSE). This is safe because undo only fires for discarded
-            // local transactions, and watch-only accounts have none.
+            // local transactions, and watched accounts have none.
             tx.execute(
                 "INSERT OR REPLACE INTO latest_account_headers \
                  (id, account_commitment, code_commitment, storage_commitment, \
@@ -733,7 +720,7 @@ impl SqliteStore {
     /// Replaces the account state with a completely new one from the network.
     ///
     /// Replaces the account state entirely: archives old state to historical, clears latest,
-    /// inserts new state to latest only. Preserves the `watch_only` flag.
+    /// inserts new state to latest only. Preserves the `watched` flag.
     pub(crate) fn update_account_state(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,
@@ -913,27 +900,27 @@ impl SqliteStore {
     /// If `old_header` is provided, the old header is archived to the historical table.
     /// For initial inserts (no previous state), pass `None` for `old_header`.
     ///
-    /// If `watch_only_override` is `Some(v)`, the `watch_only` flag is written as `v`.
+    /// If `watched_override` is `Some(v)`, the `watched` flag is written as `v`.
     /// Otherwise the current row's value is preserved (and defaults to `false` for fresh inserts).
     fn insert_account_header(
         tx: &Transaction<'_>,
         new_header: &AccountHeader,
         account_seed: Option<Word>,
         old_header: Option<&AccountHeader>,
-        watch_only_override: Option<bool>,
+        watched_override: Option<bool>,
     ) -> Result<(), StoreError> {
-        // Read the current latest row's preserved-on-replace fields (seed, locked, watch_only).
+        // Read the current latest row's preserved-on-replace fields (seed, locked, watched).
         let id_for_lookup = new_header.id().to_hex();
-        let (old_seed, old_locked, old_watch_only): (Option<Vec<u8>>, bool, bool) = tx
+        let (old_seed, old_locked, old_watched): (Option<Vec<u8>>, bool, bool) = tx
             .query_row(
-                "SELECT account_seed, locked, watch_only FROM latest_account_headers WHERE id = ?",
+                "SELECT account_seed, locked, watched FROM latest_account_headers WHERE id = ?",
                 params![&id_for_lookup],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .optional()
             .into_store_error()?
             .unwrap_or((None, false, false));
-        let watch_only = watch_only_override.unwrap_or(old_watch_only);
+        let watched = watched_override.unwrap_or(old_watched);
 
         // Archive the old header to historical before overwriting latest.
         if let Some(old) = old_header {
@@ -995,7 +982,7 @@ impl SqliteStore {
                 account_seed,
                 account_commitment,
                 locked,
-                watch_only
+                watched
             } | REPLACE
         );
 
@@ -1010,7 +997,7 @@ impl SqliteStore {
                 account_seed,
                 commitment,
                 false,
-                watch_only,
+                watched,
             ],
         )
         .into_store_error()?;

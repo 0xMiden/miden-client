@@ -424,13 +424,13 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     Ok(())
 }
 
-/// Watch-only flow:
+/// Watched-account flow:
 ///   - `client_1` owns the wallet and faucet, executes transactions.
 ///   - `client_2` watches the wallet via `import_watched_account_by_id` (no note tag).
 ///   - After `client_1` runs another mint+consume on the wallet, `client_2` should observe (a) the
 ///     new account commitment matching `client_1`, (b) no input note record for the mint targeted
 ///     at the wallet (no tag → not synced), and (c) no output note record for the consumed note
-///     (watch-only is state-only; note activity is intentionally not surfaced).
+///     (watched accounts are state-only; note activity is intentionally not surfaced).
 pub async fn test_import_watched_account_by_id(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
     let (mut client_2, _keystore_2) = ClientConfig::default()
@@ -460,7 +460,7 @@ pub async fn test_import_watched_account_by_id(client_config: ClientConfig) -> R
     let tx_id = mint_and_consume(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
     wait_for_tx(&mut client_1, tx_id).await?;
 
-    // client_2 starts watching the wallet in watch-only mode.
+    // client_2 starts watching the wallet.
     client_2.import_watched_account_by_id(wallet_id).await?;
 
     let initial_source_commitment = client_1.account_reader(wallet_id).commitment().await?;
@@ -475,19 +475,19 @@ pub async fn test_import_watched_account_by_id(client_config: ClientConfig) -> R
         .get_account(wallet_id)
         .await?
         .context("watched account should be tracked in client_2's store")?;
-    assert!(watched_record.is_watch_only(), "watched account must be watch-only");
+    assert!(watched_record.is_watched(), "watched account must be marked as watched");
 
     let tags = client_2.test_store().get_note_tags().await?;
     assert!(
         !tags
             .iter()
             .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
-        "watch-only account must not register a per-account note tag",
+        "watched account must not register a per-account note tag",
     );
 
     // client_1 mints another note targeted at the wallet and consumes it. client_2 should
     // observe the commitment advance, but NOT pick up either the input note (no tag) or any
-    // output-note record from the consume tx (watch-only = state only).
+    // output-note record from the consume tx (watched accounts are state-only).
     let (tx_id, mint_note) = mint_note(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
     wait_for_tx(&mut client_1, tx_id).await?;
     let consume_tx_id =
@@ -511,43 +511,42 @@ pub async fn test_import_watched_account_by_id(client_config: ClientConfig) -> R
     let watched_input_notes = client_2.test_store().get_input_notes(NoteFilter::All).await?;
     assert!(
         watched_input_notes.iter().all(|n| n.id() != mint_note.id()),
-        "watch-only client must not have synced notes targeted at the wallet (no note tag)",
+        "watched client must not have synced notes targeted at the wallet (no note tag)",
     );
 
-    // No output-note records should have been created for the consume tx either: watch-only
+    // No output-note records should have been created for the consume tx either: watched
     // accounts do not surface note activity, only on-chain state.
     let watched_output_notes = client_2.test_store().get_output_notes(NoteFilter::All).await?;
     assert!(
         watched_output_notes.is_empty(),
-        "watch-only client must not surface output notes from followed account txs",
+        "watched client must not surface output notes from followed account txs",
     );
 
-    // Switching an already-tracked watch-only account to native (or vice versa) is not
-    // supported.
+    // Switching an already-tracked watched account to native (or vice versa) is not supported.
     let err = client_2
         .import_account_by_id(wallet_id)
         .await
-        .expect_err("import_account_by_id must reject already-tracked watch-only accounts");
+        .expect_err("import_account_by_id must reject already-tracked watched accounts");
     assert!(
-        matches!(err, ClientError::AccountWatchOnlyMismatch(id) if id == wallet_id),
-        "expected AccountWatchOnlyMismatch, got {err:?}",
+        matches!(err, ClientError::AccountWatchedMismatch(id) if id == wallet_id),
+        "expected AccountWatchedMismatch, got {err:?}",
     );
 
     // Re-importing in the same mode is still a no-op overwrite, and the account stays
-    // watch-only with no per-account tag.
+    // watched with no per-account tag.
     client_2.import_watched_account_by_id(wallet_id).await?;
     let record = client_2
         .test_store()
         .get_account(wallet_id)
         .await?
         .context("account should still be tracked after re-import")?;
-    assert!(record.is_watch_only(), "account must remain watch-only");
+    assert!(record.is_watched(), "account must remain watched");
     let tags = client_2.test_store().get_note_tags().await?;
     assert!(
         !tags
             .iter()
             .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
-        "watch-only account must not have a per-account note tag",
+        "watched account must not have a per-account note tag",
     );
 
     Ok(())

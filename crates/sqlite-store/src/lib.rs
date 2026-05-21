@@ -40,6 +40,7 @@ use miden_client::store::{
     AccountStatus,
     AccountStorageFilter,
     BlockRelevance,
+    ClientAccountType,
     InputNoteRecord,
     NoteFilter,
     OutputNoteRecord,
@@ -359,7 +360,7 @@ impl Store for SqliteStore {
         &self,
         account: &Account,
         initial_address: Address,
-        watch_only: bool,
+        client_account_type: ClientAccountType,
     ) -> Result<(), StoreError> {
         let cloned_account = account.clone();
         let smt_forest = self.smt_forest.clone();
@@ -370,7 +371,7 @@ impl Store for SqliteStore {
                 &smt_forest,
                 &cloned_account,
                 &initial_address,
-                watch_only,
+                client_account_type,
             )
         })
         .await

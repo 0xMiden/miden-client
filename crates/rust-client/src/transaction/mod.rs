@@ -186,7 +186,7 @@ where
     ///
     /// Fails with [`ClientError::AccountDataNotFound`] if the account is not tracked by
     /// the client's store, [`ClientError::AccountLocked`] if the account is locked, or
-    /// [`ClientError::AccountIsWatchOnly`] if the account is watch-only.
+    /// [`ClientError::AccountIsWatched`] if the account is watched.
     pub async fn new_transaction_batch(
         &self,
         account_id: AccountId,
@@ -928,7 +928,7 @@ where
     }
 
     /// Loads an [`AccountRecord`] for an account that must be usable as a transaction's native
-    /// account. Errors out if the account is not tracked or if it is watch-only.
+    /// account. Errors out if the account is not tracked or if it is watched.
     async fn get_native_account_record(
         &self,
         account_id: AccountId,
@@ -938,8 +938,8 @@ where
             .get_account(account_id)
             .await?
             .ok_or(ClientError::AccountDataNotFound(account_id))?;
-        if account_record.is_watch_only() {
-            return Err(ClientError::AccountIsWatchOnly(account_id));
+        if account_record.is_watched() {
+            return Err(ClientError::AccountIsWatched(account_id));
         }
         Ok(account_record)
     }

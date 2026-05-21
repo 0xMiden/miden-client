@@ -68,7 +68,13 @@ mod smt_forest;
 pub use smt_forest::AccountSmtForest;
 
 mod account;
-pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
+pub use account::{
+    AccountRecord,
+    AccountRecordData,
+    AccountStatus,
+    AccountUpdates,
+    ClientAccountType,
+};
 
 pub use crate::sync::PublicAccountUpdate;
 mod note_record;
@@ -358,7 +364,7 @@ pub trait Store: Send + Sync {
         &self,
         account: &Account,
         initial_address: Address,
-        watch_only: bool,
+        client_account_type: ClientAccountType,
     ) -> Result<(), StoreError>;
 
     /// Upserts the account code for a foreign account. This value will be used as a cache of known

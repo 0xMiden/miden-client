@@ -82,7 +82,7 @@ use super::Client;
 use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::rpc::node::{EndpointError, GetAccountError};
-use crate::store::{AccountStatus, AccountStorageFilter};
+use crate::store::{AccountStatus, AccountStorageFilter, ClientAccountType};
 use crate::sync::NoteTagRecord;
 
 pub mod component {
@@ -169,20 +169,18 @@ impl<AUTH> Client<AUTH> {
         account: &Account,
         overwrite: bool,
     ) -> Result<(), ClientError> {
-        self.add_account_inner(account, false, overwrite).await
+        self.add_account_inner(account, ClientAccountType::Native, overwrite).await
     }
 
-    /// Same as [`Self::add_account`] but allows specifying whether the account should be tracked
-    /// in watch-only mode.
+    /// Same as [`Self::add_account`] but allows specifying how the account should be tracked
+    /// (see [`ClientAccountType`]).
     ///
-    /// In watch-only mode, the account is added without registering its derived note tag, so
-    /// notes targeted at it will not be synced. The account's on-chain state (commitment,
-    /// nonce, storage) is still updated by `sync_state`. This is the path used by
-    /// [`Self::import_watched_account_by_id`].
+    /// When the account is added as [`ClientAccountType::Watched`] no derived note tag is
+    /// registered, so notes targeted at it will not be synced.
     async fn add_account_inner(
         &mut self,
         account: &Account,
-        watch_only: bool,
+        client_account_type: ClientAccountType,
         overwrite: bool,
     ) -> Result<(), ClientError> {
         if account.is_new() {
@@ -205,11 +203,11 @@ impl<AUTH> Client<AUTH> {
                 let default_address = Address::new(account.id());
 
                 self.store
-                    .insert_account(account, default_address.clone(), watch_only)
+                    .insert_account(account, default_address.clone(), client_account_type)
                     .await
                     .map_err(ClientError::StoreError)?;
 
-                if !watch_only {
+                if matches!(client_account_type, ClientAccountType::Native) {
                     // Set the default address note tag so sync pulls notes.
                     let default_address_note_tag = default_address.to_note_tag();
                     let note_tag_record =
@@ -225,11 +223,11 @@ impl<AUTH> Client<AUTH> {
                     return Err(ClientError::AccountAlreadyTracked(account.id()));
                 }
 
-                if watch_only != tracked_account.is_watch_only() {
-                    // Switching between watch-only and native after the account is tracked is not
+                if client_account_type != tracked_account.client_account_type() {
+                    // Switching between Watched and Native after the account is tracked is not
                     // supported: the per-account note tag and any client-side state derived from
                     // that mode are set up at insertion time and not migrated on the fly.
-                    return Err(ClientError::AccountWatchOnlyMismatch(account.id()));
+                    return Err(ClientError::AccountWatchedMismatch(account.id()));
                 }
 
                 if tracked_account.nonce().as_canonical_u64() > account.nonce().as_canonical_u64() {
@@ -260,41 +258,41 @@ impl<AUTH> Client<AUTH> {
     /// and be tracked by the network, it will be fetched by its ID. If the account was already
     /// being tracked by the client, its state will be overwritten.
     ///
-    /// To import an account in watch-only mode (state-tracking only, no note sync), use
+    /// To import an account as watched (state-tracking only, no note sync), use
     /// [`Self::import_watched_account_by_id`] instead. Switching an already-tracked account
-    /// between native and watch-only is not supported.
+    /// between Native and Watched is not supported.
     ///
     /// # Errors
     /// - If the account is not found on the network.
     /// - If the account is private.
-    /// - If the account is already tracked as watch-only.
+    /// - If the account is already tracked as watched.
     /// - There was an error sending the request to the network.
     pub async fn import_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
         let account = self.fetch_public_account(account_id).await?;
-        self.add_account_inner(&account, false, true).await
+        self.add_account_inner(&account, ClientAccountType::Native, true).await
     }
 
-    /// Starts watching an on-chain account in watch-only mode.
+    /// Starts watching an on-chain account ([`ClientAccountType::Watched`]).
     ///
     /// Like [`Self::import_account_by_id`], the account is fetched from the network by its ID.
     /// Unlike `import_account_by_id`, the account is added without registering its derived note
     /// tag: `sync_state` will keep the account's commitment, nonce and storage up to date but
     /// will **not** pull notes targeted at it.
     ///
-    /// If the account is already being tracked as watch-only its state is overwritten. Switching
-    /// an already-tracked native account to watch-only is not supported.
+    /// If the account is already being tracked as watched its state is overwritten. Switching an
+    /// already-tracked native account to watched is not supported.
     ///
     /// # Errors
     /// - If the account is not found on the network.
     /// - If the account is private.
-    /// - If the account is already tracked as native (non-watch-only).
+    /// - If the account is already tracked as native.
     /// - There was an error sending the request to the network.
     pub async fn import_watched_account_by_id(
         &mut self,
         account_id: AccountId,
     ) -> Result<(), ClientError> {
         let account = self.fetch_public_account(account_id).await?;
-        self.add_account_inner(&account, true, true).await
+        self.add_account_inner(&account, ClientAccountType::Watched, true).await
     }
 
     /// Fetches a public [`Account`] from the network, returning a typed error when the account
@@ -317,7 +315,7 @@ impl<AUTH> Client<AUTH> {
     }
 
     /// Adds an [`Address`] to the associated [`AccountId`], alongside its derived [`NoteTag`]. If
-    /// the account is tracked as watch-only, the note tag is not registered.
+    /// the account is tracked as watched, the note tag is not registered.
     ///
     /// # Errors
     /// - If the account is not found on the network.
@@ -338,9 +336,9 @@ impl<AUTH> Client<AUTH> {
             None => Err(ClientError::AccountDataNotFound(account_id)),
             Some(tracked_account) => {
                 self.store.insert_address(address.clone(), account_id).await?;
-                // Watch-only accounts intentionally have no derived note tag registered to avoid
-                // sync state pulling notes for them.
-                if !tracked_account.is_watch_only() {
+                // Watched accounts intentionally have no derived note tag registered to avoid sync
+                // state pulling notes for them.
+                if !tracked_account.is_watched() {
                     let derived_note_tag: NoteTag = address.to_note_tag();
                     let note_tag_record =
                         NoteTagRecord::with_account_source(derived_note_tag, account_id);

@@ -28,6 +28,26 @@ impl AccountRecordData {
     }
 }
 
+// CLIENT ACCOUNT TYPE
+// ================================================================================================
+
+/// How the client tracks a given account.
+///
+/// This drives two pieces of behavior:
+///
+/// - **Note sync:** native accounts have their derived note tag registered so `sync_state` pulls
+///   notes targeted at them. Watched accounts do not.
+/// - **Transaction execution:** native accounts can be used as the source of a transaction; watched
+///   accounts cannot, because the client doesn't hold the keys / authority for them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClientAccountType {
+    /// Account is fully owned by this client: notes are synced and transactions can be executed.
+    Native,
+    /// Account state is mirrored from the network for observability only: no note sync, no
+    /// transaction execution.
+    Watched,
+}
+
 // ACCOUNT RECORD
 // ================================================================================================
 
@@ -42,13 +62,16 @@ pub struct AccountRecord {
     account_data: AccountRecordData,
     /// Status of the tracked account.
     status: AccountStatus,
-    /// Whether the account is followed in watch-only mode (no note sync, no transaction
-    /// execution).
-    watch_only: bool,
+    /// How the client tracks this account.
+    client_account_type: ClientAccountType,
 }
 
 impl AccountRecord {
-    pub fn new(account_data: AccountRecordData, status: AccountStatus, watch_only: bool) -> Self {
+    pub fn new(
+        account_data: AccountRecordData,
+        status: AccountStatus,
+        client_account_type: ClientAccountType,
+    ) -> Self {
         // TODO: remove this?
         #[cfg(debug_assertions)]
         {
@@ -59,15 +82,23 @@ impl AccountRecord {
             debug_assert_eq!(account_seed, status.seed().copied(), "account seed mismatch");
         }
 
-        Self { account_data, status, watch_only }
+        Self {
+            account_data,
+            status,
+            client_account_type,
+        }
     }
 
     pub fn is_locked(&self) -> bool {
         self.status.is_locked()
     }
 
-    pub fn is_watch_only(&self) -> bool {
-        self.watch_only
+    pub fn client_account_type(&self) -> ClientAccountType {
+        self.client_account_type
+    }
+
+    pub fn is_watched(&self) -> bool {
+        self.client_account_type == ClientAccountType::Watched
     }
 
     pub fn nonce(&self) -> Felt {

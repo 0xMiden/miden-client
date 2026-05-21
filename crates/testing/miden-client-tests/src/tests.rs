@@ -23,6 +23,7 @@ use miden_client::rpc::NodeRpcClient;
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{
     AccountStorageFilter,
+    ClientAccountType,
     InputNoteRecord,
     InputNoteState,
     NoteFilter,
@@ -3280,15 +3281,15 @@ async fn import_watched_account_by_id_rejects_already_tracked_native_account() {
     let err = client
         .import_watched_account_by_id(account_id)
         .await
-        .expect_err("watch-only import must reject already-tracked native account");
-    assert!(matches!(err, ClientError::AccountWatchOnlyMismatch(id) if id == account_id));
+        .expect_err("watched import must reject already-tracked native account");
+    assert!(matches!(err, ClientError::AccountWatchedMismatch(id) if id == account_id));
 
     // Native tags must still be there and the account must still be native.
     let note_tags = client.get_note_tags().await.unwrap();
     assert!(note_tags.contains(&default_note_tag_record));
     assert!(note_tags.contains(&extra_address_note_tag_record));
     let account_record = client.test_store().get_account(account_id).await.unwrap().unwrap();
-    assert!(!account_record.is_watch_only());
+    assert!(!account_record.is_watched());
 }
 
 #[tokio::test]
@@ -4019,10 +4020,10 @@ async fn storage_and_vault_proofs_ecdsa() {
 }
 
 #[tokio::test]
-async fn execute_transaction_fails_for_watch_only_account() {
+async fn execute_transaction_fails_for_watched_account() {
     let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
-    // Build a faucet locally and insert it directly as watch-only via the store. Bypasses the
+    // Build a faucet locally and insert it directly as watched via the store. Bypasses the
     // public `add_account`/`import_watched_account_by_id` paths so we don't need a mock RPC
     // round-trip.
     let key_pair = AuthSecretKey::new_falcon512_poseidon2();
@@ -4055,9 +4056,9 @@ async fn execute_transaction_fails_for_watch_only_account() {
 
     client
         .test_store()
-        .insert_account(&faucet, address, true)
+        .insert_account(&faucet, address, ClientAccountType::Watched)
         .await
-        .expect("watch-only account should insert via the store");
+        .expect("watched account should insert via the store");
 
     let target_account_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1).unwrap();
     let tx_request = TransactionRequestBuilder::new()
@@ -4072,7 +4073,7 @@ async fn execute_transaction_fails_for_watch_only_account() {
     let result = Box::pin(client.execute_transaction(faucet_id, tx_request)).await;
 
     match result {
-        Err(ClientError::AccountIsWatchOnly(id)) => assert_eq!(id, faucet_id),
-        other => panic!("expected AccountIsWatchOnly, got {other:?}"),
+        Err(ClientError::AccountIsWatched(id)) => assert_eq!(id, faucet_id),
+        other => panic!("expected AccountIsWatched, got {other:?}"),
     }
 }
