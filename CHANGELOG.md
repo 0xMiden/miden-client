@@ -15,7 +15,7 @@
 * [BREAKING][type][rust] `NoteScript::root()` now returns `NoteScriptRoot` instead of `Word`. Use `Word::from(root)` (or `root.into()`) where a `Word` is required. `NoteScriptRoot` is re-exported from `miden_client::note`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * [BREAKING][rename][rust] `FeeParameters::native_asset_id()` renamed to `fee_faucet_id()`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * [BREAKING][rust] Removed `NodeRpcClient::check_nullifiers`, `RpcEndpoint::CheckNullifiers`, `EndpointError::CheckNullifiers`, and `CheckNullifiersError` after the upstream node dropped the `CheckNullifiers` gRPC method. Use `NodeRpcClient::sync_nullifiers` to retrieve nullifier updates. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
-* Added a `Client::watch_account_by_id` method to track an external account state without syncing notes ([#2143](https://github.com/0xMiden/miden-client/pull/2143)).
+* Added a `Client::import_watched_account_by_id` method to track an external account state without syncing notes ([#2143](https://github.com/0xMiden/miden-client/pull/2143)).
 * Removed limit on accounts and note tags that can be tracked by the client ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
 * [BREAKING] Updated the `sync_notes` and `sync_transactions` to return directly the fetched updates. Removed `TransactionsInfo` and `NoteSyncInfo` structs ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
 

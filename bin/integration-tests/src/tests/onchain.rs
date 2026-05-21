@@ -426,12 +426,12 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
 
 /// Watch-only flow:
 ///   - `client_1` owns the wallet and faucet, executes transactions.
-///   - `client_2` watches the wallet via `watch_account_by_id` (no note tag).
+///   - `client_2` watches the wallet via `import_watched_account_by_id` (no note tag).
 ///   - After `client_1` runs another mint+consume on the wallet, `client_2` should observe (a) the
 ///     new account commitment matching `client_1`, (b) no input note record for the mint targeted
 ///     at the wallet (no tag → not synced), and (c) no output note record for the consumed note
 ///     (watch-only is state-only; note activity is intentionally not surfaced).
-pub async fn test_watch_account_by_id(client_config: ClientConfig) -> Result<()> {
+pub async fn test_import_watched_account_by_id(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
     let (mut client_2, _keystore_2) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
@@ -461,7 +461,7 @@ pub async fn test_watch_account_by_id(client_config: ClientConfig) -> Result<()>
     wait_for_tx(&mut client_1, tx_id).await?;
 
     // client_2 starts watching the wallet in watch-only mode.
-    client_2.watch_account_by_id(wallet_id).await?;
+    client_2.import_watched_account_by_id(wallet_id).await?;
 
     let initial_source_commitment = client_1.account_reader(wallet_id).commitment().await?;
     let initial_watched_commitment = client_2.account_reader(wallet_id).commitment().await?;
@@ -538,14 +538,18 @@ pub async fn test_watch_account_by_id(client_config: ClientConfig) -> Result<()>
         "promoting to fully-tracked must register the per-account note tag",
     );
 
-    // `watch_account_by_id` on an account already tracked should remove the per-account tag.
-    client_2.watch_account_by_id(wallet_id).await?;
+    // `import_watched_account_by_id` on an account already tracked should remove the per-account
+    // tag.
+    client_2.import_watched_account_by_id(wallet_id).await?;
     let record = client_2
         .test_store()
         .get_account(wallet_id)
         .await?
         .context("account should still be tracked after demotion")?;
-    assert!(record.is_watch_only(), "watch_account_by_id must demote fully-tracked to watch");
+    assert!(
+        record.is_watch_only(),
+        "import_watched_account_by_id must demote fully-tracked to watch"
+    );
     let tags = client_2.test_store().get_note_tags().await?;
     assert!(
         !tags

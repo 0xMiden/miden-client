@@ -284,9 +284,7 @@ where
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionResult, ClientError> {
-        // Reject watch-only accounts upfront. Reuses the single `get_account` we'd already
-        // do via `try_get_account`, so this guard is free. The batch path has its own
-        // guard in `new_transaction_batch`.
+        // Reject watch-only accounts upfront.
         let account_record = self
             .store
             .get_account(account_id)

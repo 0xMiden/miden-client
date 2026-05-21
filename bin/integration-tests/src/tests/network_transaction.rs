@@ -428,7 +428,7 @@ pub(crate) fn get_network_note_with_script<T: Rng>(
 
 /// Watch-only flow against a network account:
 ///   - `client_1` deploys the counter as a network account and emits bump notes.
-///   - `client_2` watches the network account via `watch_account_by_id` (no note tag).
+///   - `client_2` watches the network account via `import_watched_account_by_id` (no note tag).
 ///   - The node-driven counter increments are observed by `client_2` after `sync_state`.
 pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<()> {
     const BUMP_NOTE_NUMBER: u64 = 3;
@@ -453,7 +453,7 @@ pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<(
     assert_eq!(counter_value, Word::from([Felt::new(1), ZERO, ZERO, ZERO]));
 
     // client_2 starts watching the network account in watch-only mode.
-    client_2.watch_account_by_id(network_account_id).await?;
+    client_2.import_watched_account_by_id(network_account_id).await?;
 
     let watched_record = client_2
         .test_store()

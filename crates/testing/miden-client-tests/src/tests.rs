@@ -3237,7 +3237,7 @@ async fn account_add_address_after_creation() {
 }
 
 #[tokio::test]
-async fn watch_account_by_id_removes_all_account_note_tags() {
+async fn import_watched_account_by_id_removes_all_account_note_tags() {
     let mut mock_chain_builder = MockChainBuilder::new();
     let account = mock_chain_builder
         .add_existing_mock_account(miden_testing::Auth::IncrNonce)
@@ -3277,7 +3277,7 @@ async fn watch_account_by_id_removes_all_account_note_tags() {
     assert!(note_tags.contains(&default_note_tag_record));
     assert!(note_tags.contains(&extra_address_note_tag_record));
 
-    client.watch_account_by_id(account_id).await.unwrap();
+    client.import_watched_account_by_id(account_id).await.unwrap();
 
     let note_tags = client.get_note_tags().await.unwrap();
     assert!(
@@ -4022,7 +4022,8 @@ async fn execute_transaction_fails_for_watch_only_account() {
     let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
 
     // Build a faucet locally and insert it directly as watch-only via the store. Bypasses the
-    // public `add_account`/`watch_account_by_id` paths so we don't need a mock RPC round-trip.
+    // public `add_account`/`import_watched_account_by_id` paths so we don't need a mock RPC
+    // round-trip.
     let key_pair = AuthSecretKey::new_falcon512_poseidon2();
     let auth_component =
         AuthSingleSig::new(key_pair.public_key().to_commitment(), AuthSchemeId::Falcon512Poseidon2);

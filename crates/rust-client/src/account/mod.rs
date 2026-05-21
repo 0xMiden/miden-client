@@ -169,7 +169,7 @@ impl<AUTH> Client<AUTH> {
         account: &Account,
         overwrite: bool,
     ) -> Result<(), ClientError> {
-        self.add_account_with_watch_only(account, overwrite, false).await
+        self.add_account_inner(account, false, overwrite).await
     }
 
     /// Same as [`Self::add_account`] but allows specifying whether the account should be tracked
@@ -178,12 +178,12 @@ impl<AUTH> Client<AUTH> {
     /// In watch-only mode, the account is added without registering its derived note tag, so
     /// notes targeted at it will not be synced. The account's on-chain state (commitment,
     /// nonce, storage) is still updated by `sync_state`. This is the path used by
-    /// [`Self::watch_account_by_id`].
-    async fn add_account_with_watch_only(
+    /// [`Self::import_watched_account_by_id`].
+    async fn add_account_inner(
         &mut self,
         account: &Account,
-        overwrite: bool,
         watch_only: bool,
+        overwrite: bool,
     ) -> Result<(), ClientError> {
         if account.is_new() {
             if account.seed().is_none() {
@@ -281,7 +281,7 @@ impl<AUTH> Client<AUTH> {
     /// being tracked by the client, it's state will be overwritten.
     ///
     /// To import an account in watch-only mode (state-tracking only, no note sync), use
-    /// [`Self::watch_account_by_id`] instead.
+    /// [`Self::import_watched_account_by_id`] instead.
     ///
     /// # Errors
     /// - If the account is not found on the network.
@@ -289,7 +289,7 @@ impl<AUTH> Client<AUTH> {
     /// - There was an error sending the request to the network.
     pub async fn import_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
         let account = self.fetch_public_account(account_id).await?;
-        self.add_account_with_watch_only(&account, true, false).await
+        self.add_account_inner(&account, false, true).await
     }
 
     /// Starts watching an on-chain account in watch-only mode.
@@ -306,9 +306,12 @@ impl<AUTH> Client<AUTH> {
     /// - If the account is not found on the network.
     /// - If the account is private.
     /// - There was an error sending the request to the network.
-    pub async fn watch_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
+    pub async fn import_watched_account_by_id(
+        &mut self,
+        account_id: AccountId,
+    ) -> Result<(), ClientError> {
         let account = self.fetch_public_account(account_id).await?;
-        self.add_account_with_watch_only(&account, true, true).await
+        self.add_account_inner(&account, true, true).await
     }
 
     /// Fetches a public [`Account`] from the network, returning a typed error when the account
