@@ -7,14 +7,30 @@ use std::sync::{Arc, RwLock};
 use std::vec::Vec;
 
 use miden_client::account::{
-    Account, AccountCode, AccountDelta, AccountHeader, AccountId, AccountStorage, Address,
-    PartialAccount, PartialStorage, PartialStorageMap, StorageMap, StorageMapKey, StorageSlotName,
+    Account,
+    AccountCode,
+    AccountDelta,
+    AccountHeader,
+    AccountId,
+    AccountStorage,
+    Address,
+    PartialAccount,
+    PartialStorage,
+    PartialStorageMap,
+    StorageMap,
+    StorageMapKey,
+    StorageSlotName,
     StorageSlotType,
 };
 use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset};
 use miden_client::store::{
-    AccountRecord, AccountRecordData, AccountSmtForest, AccountStatus, AccountStorageFilter,
-    ClientAccountType, StoreError,
+    AccountRecord,
+    AccountRecordData,
+    AccountSmtForest,
+    AccountStatus,
+    AccountStorageFilter,
+    ClientAccountType,
+    StoreError,
 };
 use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{AccountError, Felt, Word};
@@ -25,9 +41,14 @@ use rusqlite::types::Value;
 use rusqlite::{Connection, OptionalExtension, Transaction, named_params, params};
 
 use crate::account::helpers::{
-    query_account_addresses, query_account_code, query_client_account_type,
-    query_historical_account_headers, query_latest_account_headers, query_storage_slots,
-    query_storage_values, query_vault_assets,
+    query_account_addresses,
+    query_account_code,
+    query_client_account_type,
+    query_historical_account_headers,
+    query_latest_account_headers,
+    query_storage_slots,
+    query_storage_values,
+    query_vault_assets,
 };
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, column_value_as_u64, insert_sql, subst, u64_to_value};

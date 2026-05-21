@@ -3,8 +3,15 @@
 use std::collections::BTreeMap;
 
 use miden_client::account::{
-    AccountCode, AccountHeader, AccountId, Address, StorageMap, StorageMapKey, StorageSlot,
-    StorageSlotName, StorageSlotType,
+    AccountCode,
+    AccountHeader,
+    AccountId,
+    Address,
+    StorageMap,
+    StorageMapKey,
+    StorageSlot,
+    StorageSlotName,
+    StorageSlotType,
 };
 use miden_client::asset::Asset;
 use miden_client::store::{AccountStatus, AccountStorageFilter, ClientAccountType, StoreError};
