@@ -267,7 +267,11 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     // 6. Second sync_state: fetch_transport_notes imports the note, then chain sync runs.
     // Without the fix, after_block_num = sync_height, scan misses the note at block 1.
     // With the fix, lookback window catches it.
-    client.sync_state().await.unwrap();
+    let summary = client.sync_state().await.unwrap();
+    assert!(
+        summary.new_private_notes.contains(&private_note.id()),
+        "summary should report the NTL-imported note in new_private_notes"
+    );
 
     // 7. The note should be Committed after the second sync.
     let committed_notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();

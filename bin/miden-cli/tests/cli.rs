@@ -24,6 +24,7 @@ use miden_client::note::{
     NoteTag,
     NoteType,
 };
+use miden_client::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT;
 use miden_client::rpc::Endpoint;
 use miden_client::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
 use miden_client::testing::common::{
@@ -127,6 +128,15 @@ fn silent_initialization_uses_default_values() {
     assert!(
         config_content.contains("keystore"),
         "Should use default keystore directory (relative to config file)"
+    );
+    // Verify note transport defaults to the testnet endpoint
+    assert!(
+        config_content.contains("[note_transport]"),
+        "Silent init should write a [note_transport] section"
+    );
+    assert!(
+        config_content.contains(NOTE_TRANSPORT_TESTNET_ENDPOINT),
+        "Silent init should default note transport to the testnet endpoint"
     );
     // Verify that the paths don't have the .miden prefix in the config
     // (they're relative to the config file location now)
@@ -354,6 +364,42 @@ async fn token_symbol_mapping() -> Result<()> {
 
     assert_eq!(note.assets().num_assets(), 1);
     assert_eq!(note.assets().iter().next().unwrap().unwrap_fungible().amount(), 100_000);
+    Ok(())
+}
+
+// ACCOUNT SHOW TESTS
+// ================================================================================================
+
+/// Runs `account show` against a public account that is NOT tracked by the local client. The
+/// account must be fetched from the node, its token metadata read from the fetched `Account`
+/// storage, and its bech32 address rendered without hitting the client's store.
+#[tokio::test]
+async fn show_untracked_public_account() -> Result<()> {
+    // First client: creates a public fungible faucet and commits it to the node via a mint.
+    let (_store_path_a, temp_dir_a, endpoint) = init_cli();
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir_a, AccountStorageMode::Public);
+    sync_cli(&temp_dir_a);
+
+    mint_cli(
+        &temp_dir_a,
+        &AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap().to_hex(),
+        &fungible_faucet_account_id,
+    );
+    sync_until_committed_transaction(&temp_dir_a);
+
+    // Second client: fresh CLI on the same network, not tracking the faucet.
+    let store_path_b = create_test_store_path();
+    let temp_dir_b = init_cli_with_store_path(&store_path_b, &endpoint);
+
+    let mut show_cmd = cargo_bin_cmd!("miden-client");
+    show_cmd.args(["account", "--show", &fungible_faucet_account_id]);
+    show_cmd
+        .current_dir(&temp_dir_b)
+        .assert()
+        .success()
+        .stdout(contains("Fetching from the network"))
+        .stdout(contains("Fungible faucet (token symbol: BTC)"));
+
     Ok(())
 }
 
@@ -610,6 +656,124 @@ fn cli_empty_commands() {
 
     let mut swam_cmd = cargo_bin_cmd!("miden-client");
     assert_command_fails_but_does_not_panic(swam_cmd.args(["swap"]).current_dir(&temp_dir));
+
+    // pswap with no subcommand should fail
+    let mut pswap_cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(pswap_cmd.args(["pswap"]).current_dir(&temp_dir));
+
+    // pswap create with no args should fail
+    let mut pswap_create_cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        pswap_create_cmd.args(["pswap", "create"]).current_dir(&temp_dir),
+    );
+
+    // pswap consume with no args should fail
+    let mut pswap_consume_cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        pswap_consume_cmd.args(["pswap", "consume"]).current_dir(&temp_dir),
+    );
+
+    // pswap cancel with no args should fail
+    let mut pswap_cancel_cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        pswap_cancel_cmd.args(["pswap", "cancel"]).current_dir(&temp_dir),
+    );
+
+    // unknown subcommand should fail
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(cmd.args(["pswap", "unknown"]).current_dir(&temp_dir));
+}
+
+#[test]
+fn pswap_cli_help_output() {
+    let temp_dir = init_cli().1;
+
+    // `pswap --help` should succeed and list subcommands
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    let output = cmd.args(["pswap", "--help"]).current_dir(&temp_dir).output().unwrap();
+    assert!(output.status.success(), "pswap --help should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("create"), "Help should list 'create' subcommand");
+    assert!(stdout.contains("consume"), "Help should list 'consume' subcommand");
+    assert!(stdout.contains("cancel"), "Help should list 'cancel' subcommand");
+
+    // `pswap create --help` should succeed and show flag names
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    let output = cmd.args(["pswap", "create", "--help"]).current_dir(&temp_dir).output().unwrap();
+    assert!(output.status.success(), "pswap create --help should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("--sender"), "Help should show --sender flag");
+    assert!(stdout.contains("--offered-asset"), "Help should show --offered-asset flag");
+    assert!(stdout.contains("--requested-asset"), "Help should show --requested-asset flag");
+    assert!(stdout.contains("--note-type"), "Help should show --note-type flag");
+
+    // `pswap consume --help` should show --account and --fill-amount
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    let output = cmd
+        .args(["pswap", "consume", "--help"])
+        .current_dir(&temp_dir)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "pswap consume --help should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("--account"), "Help should show --account flag");
+    assert!(stdout.contains("--fill-amount"), "Help should show --fill-amount flag");
+}
+
+#[test]
+fn pswap_cli_invalid_args() {
+    let temp_dir = init_cli().1;
+
+    // Required flags missing (both --offered-asset and --requested-asset are required;
+    // omitting one must fail at clap parse time, before reaching `parse_fungible_asset`).
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        cmd.args([
+            "pswap",
+            "create",
+            "--sender",
+            "0xaabbccdd",
+            "--offered-asset",
+            "100::0x1111111111111111",
+            "--note-type",
+            "public",
+        ])
+        .current_dir(&temp_dir),
+    );
+
+    // Invalid note-type
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        cmd.args([
+            "pswap",
+            "create",
+            "--sender",
+            "0xaabbccdd",
+            "--offered-asset",
+            "100::0x1111111111111111",
+            "--requested-asset",
+            "50::0x2222222222222222",
+            "--note-type",
+            "invalid",
+        ])
+        .current_dir(&temp_dir),
+    );
+
+    // Invalid fill-amount for consume
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        cmd.args([
+            "pswap",
+            "consume",
+            "--account",
+            "0xaabbccdd",
+            "--note",
+            "0xdeadbeef",
+            "--fill-amount",
+            "not_a_number",
+        ])
+        .current_dir(&temp_dir),
+    );
 }
 
 #[tokio::test]

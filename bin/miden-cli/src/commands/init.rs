@@ -191,9 +191,9 @@ impl InitCmd {
         } else {
             // Auto-configure note transport for known networks
             match &self.network {
-                Some(Network::Testnet) => Some(NoteTransportConfig::default()),
+                None | Some(Network::Testnet) => Some(NoteTransportConfig::default()),
                 Some(Network::Devnet) => Some(NoteTransportConfig::devnet()),
-                _ => None,
+                Some(Network::Localhost | Network::Custom(_)) => None,
             }
         };
 

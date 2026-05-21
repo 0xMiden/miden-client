@@ -10,6 +10,8 @@ use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
 use crate::store::{BlockRelevance, StoreError};
+#[cfg(feature = "testing")]
+use crate::test_utils::mock::MockRpcApi;
 use crate::{CachedPartialMmr, Client, ClientError};
 
 /// Network information management methods.
@@ -39,6 +41,28 @@ impl<AUTH> Client<AUTH> {
 
         self.store.insert_block_header(&genesis, false).await?;
         self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+        Ok(())
+    }
+
+    /// Seeds local state for offline account creation and debugging without a real node.
+    ///
+    /// Applies default RPC limits, then either aligns the RPC genesis with an existing stored
+    /// genesis, or replaces the RPC client with [`MockRpcApi`] and runs
+    /// [`Self::ensure_genesis_in_place`] so genesis comes from the mock chain.
+    #[cfg(feature = "testing")]
+    pub async fn prepare_offline_bootstrap(&mut self) -> Result<(), ClientError> {
+        let limits = self.store.get_rpc_limits().await?.unwrap_or_default();
+        self.store.set_rpc_limits(limits).await?;
+        self.rpc_api.set_rpc_limits(limits).await;
+
+        if let Some((genesis, _)) = self.store.get_block_header_by_num(BlockNumber::GENESIS).await?
+        {
+            self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+            return Ok(());
+        }
+
+        *self.test_rpc_api() = Arc::new(MockRpcApi::default());
+        self.ensure_genesis_in_place().await?;
         Ok(())
     }
 
