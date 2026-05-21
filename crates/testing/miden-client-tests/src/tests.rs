@@ -3237,7 +3237,7 @@ async fn account_add_address_after_creation() {
 }
 
 #[tokio::test]
-async fn import_watched_account_by_id_removes_all_account_note_tags() {
+async fn import_watched_account_by_id_rejects_already_tracked_native_account() {
     let mut mock_chain_builder = MockChainBuilder::new();
     let account = mock_chain_builder
         .add_existing_mock_account(miden_testing::Auth::IncrNonce)
@@ -3277,17 +3277,18 @@ async fn import_watched_account_by_id_removes_all_account_note_tags() {
     assert!(note_tags.contains(&default_note_tag_record));
     assert!(note_tags.contains(&extra_address_note_tag_record));
 
-    client.import_watched_account_by_id(account_id).await.unwrap();
+    let err = client
+        .import_watched_account_by_id(account_id)
+        .await
+        .expect_err("watch-only import must reject already-tracked native account");
+    assert!(matches!(err, ClientError::AccountWatchOnlyMismatch(id) if id == account_id));
 
+    // Native tags must still be there and the account must still be native.
     let note_tags = client.get_note_tags().await.unwrap();
-    assert!(
-        !note_tags
-            .iter()
-            .any(|record| record.source == NoteTagSource::Account(account_id)),
-        "watch-only demotion should remove every account-owned note tag"
-    );
+    assert!(note_tags.contains(&default_note_tag_record));
+    assert!(note_tags.contains(&extra_address_note_tag_record));
     let account_record = client.test_store().get_account(account_id).await.unwrap().unwrap();
-    assert!(account_record.is_watch_only());
+    assert!(!account_record.is_watch_only());
 }
 
 #[tokio::test]

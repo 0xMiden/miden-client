@@ -83,7 +83,7 @@ use crate::errors::ClientError;
 use crate::rpc::domain::account::FetchedAccount;
 use crate::rpc::node::{EndpointError, GetAccountError};
 use crate::store::{AccountStatus, AccountStorageFilter};
-use crate::sync::{NoteTagRecord, NoteTagSource};
+use crate::sync::NoteTagRecord;
 
 pub mod component {
     pub const MIDEN_PACKAGE_EXTENSION: &str = "masp";
@@ -227,6 +227,13 @@ impl<AUTH> Client<AUTH> {
                     return Err(ClientError::AccountAlreadyTracked(account.id()));
                 }
 
+                if watch_only != tracked_account.is_watch_only() {
+                    // Switching between watch-only and native after the account is tracked is not
+                    // supported: the per-account note tag and any client-side state derived from
+                    // that mode are set up at insertion time and not migrated on the fly.
+                    return Err(ClientError::AccountWatchOnlyMismatch(account.id()));
+                }
+
                 if tracked_account.nonce().as_canonical_u64() > account.nonce().as_canonical_u64() {
                     // If the new account is older than the one being tracked, return an error
                     return Err(ClientError::AccountNonceTooLow);
@@ -246,31 +253,6 @@ impl<AUTH> Client<AUTH> {
 
                 self.store.update_account(account).await?;
 
-                let was_watch_only = tracked_account.is_watch_only();
-                if watch_only != was_watch_only {
-                    self.store.set_account_watch_only(account.id(), watch_only).await?;
-                }
-                if watch_only && !was_watch_only {
-                    // Demote full account to watch-only by removing the account note tags.
-                    let account_note_tag_records = self
-                        .store
-                        .get_note_tags()
-                        .await?
-                        .into_iter()
-                        .filter(|record| record.source == NoteTagSource::Account(account.id()));
-                    for note_tag_record in account_note_tag_records {
-                        self.store.remove_note_tag(note_tag_record).await?;
-                    }
-                } else if !watch_only && was_watch_only {
-                    // Promote watch-only account to full by registering the account note tags for
-                    // all registered addresses.
-                    let addresses = self.store.get_addresses_by_account_id(account.id()).await?;
-                    for address in addresses {
-                        let note_tag_record =
-                            NoteTagRecord::with_account_source(address.to_note_tag(), account.id());
-                        self.store.add_note_tag(note_tag_record).await?;
-                    }
-                }
                 Ok(())
             },
         }
@@ -278,14 +260,16 @@ impl<AUTH> Client<AUTH> {
 
     /// Imports an account from the network to the client's store. The account needs to be public
     /// and be tracked by the network, it will be fetched by its ID. If the account was already
-    /// being tracked by the client, it's state will be overwritten.
+    /// being tracked by the client, its state will be overwritten.
     ///
     /// To import an account in watch-only mode (state-tracking only, no note sync), use
-    /// [`Self::import_watched_account_by_id`] instead.
+    /// [`Self::import_watched_account_by_id`] instead. Switching an already-tracked account
+    /// between native and watch-only is not supported.
     ///
     /// # Errors
     /// - If the account is not found on the network.
     /// - If the account is private.
+    /// - If the account is already tracked as watch-only.
     /// - There was an error sending the request to the network.
     pub async fn import_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
         let account = self.fetch_public_account(account_id).await?;
@@ -299,12 +283,13 @@ impl<AUTH> Client<AUTH> {
     /// tag: `sync_state` will keep the account's commitment, nonce and storage up to date but
     /// will **not** pull notes targeted at it.
     ///
-    /// If the account is already being tracked, its state is overwritten and it becomes
-    /// watch-only.
+    /// If the account is already being tracked as watch-only its state is overwritten. Switching
+    /// an already-tracked native account to watch-only is not supported.
     ///
     /// # Errors
     /// - If the account is not found on the network.
     /// - If the account is private.
+    /// - If the account is already tracked as native (non-watch-only).
     /// - There was an error sending the request to the network.
     pub async fn import_watched_account_by_id(
         &mut self,

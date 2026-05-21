@@ -93,6 +93,10 @@ pub enum ClientError {
         "account {0} is followed in watch-only mode and cannot be used to execute transactions"
     )]
     AccountIsWatchOnly(AccountId),
+    #[error(
+        "account {0} is already tracked with a different watch-only setting; changing it is not supported"
+    )]
+    AccountWatchOnlyMismatch(AccountId),
     #[error("account with id {0} not found on the network")]
     AccountNotFoundOnChain(AccountId),
     #[error(

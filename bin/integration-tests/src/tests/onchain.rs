@@ -14,7 +14,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{EMPTY_WORD, Word};
+use miden_client::{ClientError, EMPTY_WORD, Word};
 use rand::RngCore;
 use tracing::info;
 
@@ -522,40 +522,32 @@ pub async fn test_import_watched_account_by_id(client_config: ClientConfig) -> R
         "watch-only client must not surface output notes from followed account txs",
     );
 
-    // `import_account_by_id` on an account already tracked as watch-only should register the
-    // per-account tag.
-    client_2.import_account_by_id(wallet_id).await?;
-    let record = client_2
-        .test_store()
-        .get_account(wallet_id)
-        .await?
-        .context("account should still be tracked after promotion")?;
-    assert!(!record.is_watch_only(), "import_account_by_id must promote watch-only to full");
-    let tags = client_2.test_store().get_note_tags().await?;
+    // Switching an already-tracked watch-only account to native (or vice versa) is not
+    // supported.
+    let err = client_2
+        .import_account_by_id(wallet_id)
+        .await
+        .expect_err("import_account_by_id must reject already-tracked watch-only accounts");
     assert!(
-        tags.iter()
-            .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
-        "promoting to fully-tracked must register the per-account note tag",
+        matches!(err, ClientError::AccountWatchOnlyMismatch(id) if id == wallet_id),
+        "expected AccountWatchOnlyMismatch, got {err:?}",
     );
 
-    // `import_watched_account_by_id` on an account already tracked should remove the per-account
-    // tag.
+    // Re-importing in the same mode is still a no-op overwrite, and the account stays
+    // watch-only with no per-account tag.
     client_2.import_watched_account_by_id(wallet_id).await?;
     let record = client_2
         .test_store()
         .get_account(wallet_id)
         .await?
-        .context("account should still be tracked after demotion")?;
-    assert!(
-        record.is_watch_only(),
-        "import_watched_account_by_id must demote fully-tracked to watch"
-    );
+        .context("account should still be tracked after re-import")?;
+    assert!(record.is_watch_only(), "account must remain watch-only");
     let tags = client_2.test_store().get_note_tags().await?;
     assert!(
         !tags
             .iter()
             .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
-        "demoting to watch-only must remove the per-account note tag",
+        "watch-only account must not have a per-account note tag",
     );
 
     Ok(())
