@@ -33,22 +33,33 @@ pub(crate) struct InMemoryBatchDataStore {
 }
 
 impl InMemoryBatchDataStore {
+    /// Wraps the provided [`ClientDataStore`] with an empty in-batch account cache.
     pub(crate) fn new(inner: ClientDataStore) -> Self {
         Self { inner, current_accounts: BTreeMap::new() }
     }
 
+    /// Returns the in-batch account state for `id`, if a transaction earlier in the batch
+    /// has cached one. A return of `None` means subsequent transactions targeting this
+    /// account will see the store's state instead.
     pub(crate) fn get_account(&self, id: AccountId) -> Option<&Account> {
         self.current_accounts.get(&id)
     }
 
+    /// Records the post-execution state of an account so that later transactions in the
+    /// same batch targeting `id` observe the in-batch state. Overwrites any previously
+    /// cached entry for `id`.
     pub(crate) fn cache_account(&mut self, id: AccountId, new_state: Account) {
         self.current_accounts.insert(id, new_state);
     }
 
+    /// Returns the inner [`ClientDataStore`]'s MAST store so callers can load account
+    /// or note code prior to execution.
     pub(crate) fn mast_store(&self) -> Arc<TransactionMastStore> {
         self.inner.mast_store()
     }
 
+    /// Registers foreign account inputs on the inner [`ClientDataStore`] so the executor
+    /// can resolve foreign-procedure invocations during transaction execution.
     pub(crate) fn register_foreign_account_inputs(
         &self,
         foreign_accounts: impl IntoIterator<Item = AccountInputs>,
