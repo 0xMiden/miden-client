@@ -136,6 +136,18 @@ pub trait Store: Send + Sync {
     /// - Inserting the transaction into the store to track.
     async fn apply_transaction(&self, tx_update: TransactionStoreUpdate) -> Result<(), StoreError>;
 
+    /// Applies a batch of [`TransactionStoreUpdate`]s atomically. Semantically equivalent to
+    /// calling [`Store::apply_transaction`] for each update in order, but with an all-or-nothing
+    /// guarantee — on any error no update is visible.
+    ///
+    /// Used by `BatchBuilder::submit` to persist a batch's results. Backends that cannot provide
+    /// true atomicity must document that limitation explicitly in their impl — there is no blanket
+    /// default.
+    async fn apply_transaction_batch(
+        &self,
+        tx_updates: Vec<TransactionStoreUpdate>,
+    ) -> Result<(), StoreError>;
+
     // NOTES
     // --------------------------------------------------------------------------------------------
 

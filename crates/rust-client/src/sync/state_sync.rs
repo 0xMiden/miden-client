@@ -348,7 +348,7 @@ impl StateSync {
         // a consistent forest.
         let sync_notes_result = self
             .rpc_api
-            .sync_notes_with_details(current_block_num, Some(chain_tip), note_tags.as_ref())
+            .sync_notes_with_details(current_block_num + 1, chain_tip, note_tags.as_ref())
             .await?;
 
         let note_count: usize = sync_notes_result.blocks.iter().map(|b| b.notes.len()).sum();
@@ -360,8 +360,9 @@ impl StateSync {
         );
 
         // Step 3: Gather transactions for tracked accounts over the full range.
-        let (account_commitment_updates, transactions, nullifiers) =
-            self.fetch_transaction_data(current_block_num, chain_tip, account_ids).await?;
+        let (account_commitment_updates, transactions, nullifiers) = self
+            .fetch_transaction_data(current_block_num + 1, chain_tip, account_ids)
+            .await?;
 
         Ok(Some(RawStateSyncData {
             mmr_delta: chain_mmr_info.mmr_delta,
@@ -386,12 +387,10 @@ impl StateSync {
             return Ok((vec![], vec![], vec![]));
         }
 
-        let tx_info = self
+        let transaction_records = self
             .rpc_api
-            .sync_transactions(block_from, Some(block_to), account_ids.to_vec())
+            .sync_transactions(block_from, block_to, account_ids.to_vec())
             .await?;
-
-        let transaction_records = tx_info.transaction_records;
 
         let account_updates = derive_account_commitment_updates(&transaction_records);
         let nullifiers = compute_ordered_nullifiers(&transaction_records);
@@ -557,7 +556,7 @@ impl StateSync {
         account_updates: &mut AccountUpdates,
         accounts: &[AccountSyncHint],
         account_commitment_updates: &[(AccountId, Word)],
-        block_num: BlockNumber,
+        block_from: BlockNumber,
     ) -> Result<(), ClientError> {
         // "Public" here includes both Public and Network accounts, since both have
         // their state stored on-chain and follow the same sync path.
@@ -568,7 +567,7 @@ impl StateSync {
             account_updates,
             account_commitment_updates,
             &public_accounts,
-            block_num,
+            block_from,
         )
         .await?;
 
@@ -602,7 +601,7 @@ impl StateSync {
         account_updates: &mut AccountUpdates,
         commitment_updates: &[(AccountId, Word)],
         current_public_accounts: &[&AccountSyncHint],
-        block_num: BlockNumber,
+        block_from: BlockNumber,
     ) -> Result<(), ClientError> {
         for (id, commitment) in commitment_updates {
             let Some(local_hint) = current_public_accounts
@@ -612,7 +611,7 @@ impl StateSync {
                 continue;
             };
 
-            let public_update = self.sync_public_account(local_hint, block_num).await?;
+            let public_update = self.sync_public_account(local_hint, block_from).await?;
             account_updates.extend(AccountUpdates::new(vec![public_update], Vec::new()));
         }
 
@@ -631,7 +630,7 @@ impl StateSync {
     async fn sync_public_account(
         &self,
         local_hint: &AccountSyncHint,
-        block_num: BlockNumber,
+        block_from: BlockNumber,
     ) -> Result<PublicAccountUpdate, ClientError> {
         let account_id = local_hint.header.id();
 
@@ -688,7 +687,7 @@ impl StateSync {
 
         let public_update = if vault_oversized || any_map_oversized {
             // Some part of the account is oversized — use incremental endpoints.
-            self.build_delta_update(account_id, &details, block_num, proof_block_num)
+            self.build_delta_update(account_id, &details, block_from, proof_block_num)
                 .await?
         } else if missing_map_slots.is_empty() {
             // The hint covered every map slot the account actually has, so the initial
@@ -702,7 +701,7 @@ impl StateSync {
                 account_id,
                 details,
                 &missing_map_slots,
-                block_num,
+                block_from,
                 proof_block_num,
             )
             .await?
@@ -783,14 +782,16 @@ impl StateSync {
             .map(|slot| (slot.name().clone(), slot.value()))
             .collect();
 
+        // The lower bound is inclusive at the node, so request from `block_from + 1` to skip
+        // the block whose state we already have.
         let map_info = self
             .rpc_api
-            .sync_storage_maps(block_from, Some(block_to), account_id)
+            .sync_storage_maps(block_from + 1, Some(block_to), account_id)
             .await
             .map_err(ClientError::RpcError)?;
         let vault_info = self
             .rpc_api
-            .sync_account_vault(block_from, Some(block_to), account_id)
+            .sync_account_vault(block_from + 1, Some(block_to), account_id)
             .await
             .map_err(ClientError::RpcError)?;
 
@@ -866,8 +867,7 @@ impl StateSync {
     ) -> Result<(), ClientError> {
         // To receive information about added nullifiers, we reduce them to the higher 16 bits
         // Note that besides filtering by nullifier prefixes, the node also filters by block number
-        // (it only returns nullifiers from current_block_num until
-        // response.block_header.block_num())
+        // (it only returns nullifiers from current_block_num + 1 until state_sync_update.block_num)
 
         // Check for new nullifiers for input notes that were updated
         let nullifiers_tags: Vec<u16> = state_sync_update
@@ -878,7 +878,11 @@ impl StateSync {
 
         let mut new_nullifiers = self
             .rpc_api
-            .sync_nullifiers(&nullifiers_tags, current_block_num, Some(state_sync_update.block_num))
+            .sync_nullifiers(
+                &nullifiers_tags,
+                current_block_num + 1,
+                Some(state_sync_update.block_num),
+            )
             .await?;
 
         // Discard nullifiers that are newer than the current block (this might happen if the block
@@ -1485,17 +1489,19 @@ mod tests {
         let chain_tip = mock_rpc.get_chain_tip_block_num();
 
         // Verify the mock returns notes across multiple blocks.
-        let note_sync =
-            mock_rpc.sync_notes(BlockNumber::from(0u32), None, &note_tags).await.unwrap();
+        let note_blocks = mock_rpc
+            .sync_notes(BlockNumber::from(0u32), chain_tip, &note_tags)
+            .await
+            .unwrap();
         assert!(
-            note_sync.blocks.len() >= 2,
+            note_blocks.len() >= 2,
             "expected notes in multiple blocks, got {}",
-            note_sync.blocks.len()
+            note_blocks.len()
         );
 
         // Collect the block numbers that have notes.
         let note_block_nums: BTreeSet<BlockNumber> =
-            note_sync.blocks.iter().map(|b| b.block_header.block_num()).collect();
+            note_blocks.iter().map(|b| b.block_header.block_num()).collect();
 
         // Test that fetch_sync_data returns note blocks with valid MMR paths that
         // can be used to track blocks in the partial MMR.
@@ -1542,6 +1548,28 @@ mod tests {
                 "block {bn} with notes should be tracked in partial MMR"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn sync_notes_with_details_fetches_inclusive_upper_bound_page() {
+        let (chain, note_tags) = build_chain_with_mint_notes(10).await;
+        let mock_rpc = MockRpcApi::new(chain);
+
+        let result = mock_rpc
+            .sync_notes_with_details(4_u32.into(), 10_u32.into(), &note_tags)
+            .await
+            .expect("sync notes should succeed");
+
+        assert_eq!(
+            result.blocks.last().unwrap().block_header.block_num(),
+            BlockNumber::from(10u32)
+        );
+        assert!(
+            result
+                .blocks
+                .iter()
+                .any(|block| block.block_header.block_num() == BlockNumber::from(9u32))
+        );
     }
 
     /// Tests that erased notes are marked as consumed when a committed transaction

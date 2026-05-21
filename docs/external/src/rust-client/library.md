@@ -140,3 +140,149 @@ client.submit_transaction(transaction_execution_result).await?
 
 You can decide whether you want the note details to be public or private through the `note_type` parameter.
 You may also customize the transaction request with the other `TransactionRequestBuilder` methods. This allows you to run custom code, with custom note arguments and additional output/input notes as well.
+
+## Note screening
+
+### When to use note screening
+
+You can use note screening when you need to decide whether a note is relevant to the accounts tracked by the client. Screening checks whether each tracked account can consume the note now or at a future block.
+
+Screening may run trial transaction executions, so it is not free. Use it when you need consumability information for planning, filtering, or building a consume transaction.
+
+### Use the Client helpers first
+
+For notes already tracked by the client, you should usually start with the helper methods on `Client`. These cover the common case without creating a `NoteScreener` directly.
+
+```rust
+use miden_client::note::NoteConsumptionStatus;
+
+// Return all committed input notes that at least one tracked account may consume.
+let consumable_notes = client.get_consumable_notes(None).await?;
+
+for (note, accounts) in consumable_notes {
+    for (account_id, status) in accounts {
+        if matches!(status, NoteConsumptionStatus::Consumable) {
+            // This account can consume the note at the current sync height.
+            println!("{} can consume {}", account_id, note.id().to_hex());
+        }
+    }
+}
+```
+
+### Obtain a screener
+
+When you need to check notes that are not already covered by the client helpers, you can obtain a screener from the client.
+
+```rust
+// Build a screener configured with the client's store and RPC client.
+let screener = client.note_screener();
+```
+
+You can also pass custom transaction arguments to the screener via `with_transaction_args`. The screener uses them during its trial executions, which lets it evaluate consumability under the same conditions you will use when actually consuming. For example:
+
+```rust
+use std::collections::BTreeMap;
+
+use miden_client::Word;
+use miden_client::note::NoteId;
+use miden_client::transaction::{AdviceMap, TransactionArgs};
+
+// Per-note arguments passed to the note script.
+let note_args: BTreeMap<NoteId, Word> = BTreeMap::from([(note_id, custom_args)]);
+let tx_args = TransactionArgs::new(AdviceMap::default()).with_note_args(note_args);
+
+let screener_with_args = client.note_screener().with_transaction_args(tx_args);
+```
+
+### Check one note
+
+To check one note, call `can_consume`.
+
+```rust
+use miden_client::note::{Note, NoteConsumptionStatus};
+
+// Fetch the input note from the store.
+let input_note_record = client.get_input_note(note_id).await?.unwrap();
+let note: Note = input_note_record.try_into()?;
+
+let account_statuses = screener.can_consume(&note).await?;
+
+for (account_id, status) in account_statuses {
+    match status {
+        NoteConsumptionStatus::Consumable => {
+            // The note can be consumed now by this account.
+            println!("{account_id} can consume {}", note.id().to_hex());
+        },
+        NoteConsumptionStatus::ConsumableAfter(block_number) => {
+            // The note becomes consumable at a later block.
+            println!("{account_id} can consume this note after block {block_number}");
+        },
+        _ => {
+            // Other statuses explain why the note is not immediately consumable.
+            println!("{account_id}: {status:?}");
+        },
+    }
+}
+```
+
+### Check many notes
+
+When you have several notes, use `can_consume_batch` to check them all in one pass.
+
+```rust
+use std::collections::BTreeMap;
+
+use miden_client::note::{Note, NoteConsumability, NoteId};
+use miden_client::store::NoteFilter;
+
+// Fetch committed input notes from the store.
+let input_note_records = client.get_input_notes(NoteFilter::Committed).await?;
+
+let notes: Vec<Note> = input_note_records
+    .iter()
+    .cloned()
+    .map(TryInto::try_into)
+    .collect::<Result<_, _>>()?;
+
+// Check all notes with one executor setup.
+let notes_by_id: BTreeMap<NoteId, Vec<NoteConsumability>> =
+    screener.can_consume_batch(&notes).await?;
+
+for (note_id, account_statuses) in notes_by_id {
+    println!("{} has {} possible consumers", note_id.to_hex(), account_statuses.len());
+}
+```
+
+### Check consumability for one account
+
+If you already know which account will consume the notes, use `check_notes_consumability`. This is useful when planning a multi-note consume transaction for a known account.
+
+```rust
+use miden_client::note::{Note, NoteConsumptionInfo};
+use miden_client::store::NoteFilter;
+
+// Fetch committed input notes from the store.
+let input_note_records = client.get_input_notes(NoteFilter::Committed).await?;
+
+let notes: Vec<Note> = input_note_records
+    .iter()
+    .cloned()
+    .map(TryInto::try_into)
+    .collect::<Result<_, _>>()?;
+
+// Find the largest subset that can execute together for this account.
+let consumption_info: NoteConsumptionInfo = screener
+    .check_notes_consumability(account_id, notes)
+    .await?;
+
+for successful_note in &consumption_info.successful {
+    // These notes can be included together in the consume transaction.
+    println!("can consume {}", successful_note.id().to_hex());
+}
+
+for failed_note in &consumption_info.failed {
+    // Failed notes include the note and the execution error.
+    println!("cannot consume {}: {}", failed_note.note.id().to_hex(), failed_note.error);
+}
+```
+

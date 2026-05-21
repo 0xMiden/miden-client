@@ -206,6 +206,17 @@ impl Store for SqliteStore {
         .await
     }
 
+    async fn apply_transaction_batch(
+        &self,
+        tx_updates: Vec<TransactionStoreUpdate>,
+    ) -> Result<(), StoreError> {
+        let smt_forest = self.smt_forest.clone();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::apply_transaction_batch(conn, &smt_forest, &tx_updates)
+        })
+        .await
+    }
+
     async fn get_input_notes(
         &self,
         filter: NoteFilter,

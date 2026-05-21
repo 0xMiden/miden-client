@@ -32,18 +32,15 @@ use tracing::info;
 use super::domain::account::{
     AccountProof, AccountStorageDetails, AccountStorageRequirements, AccountUpdateSummary,
 };
-use super::domain::{note::FetchedNote, nullifier::NullifierUpdate};
+use super::domain::{note::{FetchedNote, NoteSyncBlock}, nullifier::NullifierUpdate};
 use super::generated::rpc::account_request::AccountDetailRequest;
 use super::generated::rpc::AccountRequest;
-use super::{
-    Endpoint, FetchedAccount, NodeRpcClient, RpcEndpoint, NoteSyncInfo, RpcError,
-    RpcStatusInfo,
-};
+use super::{Endpoint, FetchedAccount, NodeRpcClient, RpcEndpoint, RpcError, RpcStatusInfo};
 use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
-use crate::rpc::domain::transaction::TransactionsInfo;
+use crate::rpc::domain::transaction::TransactionRecord;
 use crate::rpc::errors::node::parse_node_error;
 use crate::rpc::errors::{AcceptHeaderContext, AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::account_request::account_detail_request::storage_map_detail_request::SlotData;
@@ -653,10 +650,10 @@ impl NodeRpcClient for GrpcClient {
 
     async fn sync_chain_mmr(
         &self,
-        block_from: BlockNumber,
+        current_block_height: BlockNumber,
         upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError> {
-        let block_from = block_from.as_u32();
+        let block_from = current_block_height.as_u32();
 
         let upper_bound = Some(upper_bound.into());
 
@@ -822,56 +819,99 @@ impl NodeRpcClient for GrpcClient {
         Ok((block_num, proof))
     }
 
-    /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [`NoteSyncInfo`] from the
-    /// response.
+    /// Sends one or more `SyncNoteRequest`s to the node and merges the responses into a list of
+    /// [`NoteSyncBlock`]s.
+    ///
+    /// Chunks `note_tags` by [`RpcLimits::note_tags_limit`] and paginates each chunk across the
+    /// requested block range.
     async fn sync_notes(
         &self,
-        block_num: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<NoteSyncInfo, RpcError> {
-        let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
+    ) -> Result<Vec<NoteSyncBlock>, RpcError> {
+        if note_tags.is_empty() {
+            return Ok(Vec::new());
+        }
 
-        let block_range = Some(BlockRange {
-            block_from: block_num.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        });
+        let limits = self.get_rpc_limits().await?;
+        let tags: Vec<NoteTag> = note_tags.iter().copied().collect();
 
-        let request = proto::rpc::SyncNotesRequest { block_range, note_tags };
+        // Merge blocks across tag-chunks: a single block can hold notes whose tags fall into
+        // different chunks, so the same block can appear in multiple chunks' responses.
+        let mut merged_blocks: BTreeMap<BlockNumber, NoteSyncBlock> = BTreeMap::new();
 
-        let response = self
-            .call_with_retry(RpcEndpoint::SyncNotes, |mut rpc_api| {
-                let request = request.clone();
-                Box::pin(async move { rpc_api.sync_notes(request).await })
-            })
-            .await?;
+        for chunk in tags.chunks(limits.note_tags_limit as usize) {
+            let proto_tags: Vec<u32> = chunk.iter().map(|&t| t.into()).collect();
+            let mut pagination = BlockPagination::new(block_from, Some(block_to));
 
-        response.into_inner().try_into()
+            loop {
+                let request = proto::rpc::SyncNotesRequest {
+                    block_range: Some(BlockRange {
+                        block_from: pagination.current_block_from().as_u32(),
+                        block_to: pagination.block_to().map(|b| b.as_u32()),
+                    }),
+                    note_tags: proto_tags.clone(),
+                };
+
+                let response = self
+                    .call_with_retry(RpcEndpoint::SyncNotes, |mut rpc_api| {
+                        let request = request.clone();
+                        Box::pin(async move { rpc_api.sync_notes(request).await })
+                    })
+                    .await?
+                    .into_inner();
+
+                let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
+                    "SyncNotesResponse.pagination_info".to_owned(),
+                ))?;
+                let page_chain_tip = BlockNumber::from(page.chain_tip);
+                let page_block_to = BlockNumber::from(page.block_num);
+
+                for proto_block in response.blocks {
+                    let block: NoteSyncBlock = proto_block.try_into()?;
+                    let bn = block.block_header.block_num();
+                    if let Some(existing) = merged_blocks.get_mut(&bn) {
+                        for (id, note) in block.notes {
+                            existing.notes.entry(id).or_insert(note);
+                        }
+                    } else {
+                        merged_blocks.insert(bn, block);
+                    }
+                }
+
+                match pagination.advance(page_block_to, page_chain_tip)? {
+                    PaginationResult::Continue => {},
+                    PaginationResult::Done { .. } => break,
+                }
+            }
+        }
+
+        Ok(merged_blocks.into_values().collect())
     }
 
     async fn sync_nullifiers(
         &self,
         prefixes: &[u16],
-        block_num: BlockNumber,
+        block_from: BlockNumber,
         block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
-        const MAX_ITERATIONS: u32 = 1000; // Safety limit to prevent infinite loops
-
         let limits = self.get_rpc_limits().await?;
         let mut all_nullifiers = BTreeSet::new();
 
         // If the prefixes are too many, we need to chunk them into smaller groups to avoid
         // violating the RPC limit.
-        'chunk_nullifiers: for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
-            let mut current_block_from = block_num.as_u32();
+        for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
+            let proto_prefixes: Vec<u32> = chunk.iter().map(|&x| u32::from(x)).collect();
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
-            for _ in 0..MAX_ITERATIONS {
+            loop {
                 let request = proto::rpc::SyncNullifiersRequest {
-                    nullifiers: chunk.iter().map(|&x| u32::from(x)).collect(),
+                    nullifiers: proto_prefixes.clone(),
                     prefix_len: 16,
                     block_range: Some(BlockRange {
-                        block_from: current_block_from,
-                        block_to: block_to.map(|b| b.as_u32()),
+                        block_from: pagination.current_block_from().as_u32(),
+                        block_to: pagination.block_to().map(|b| b.as_u32()),
                     }),
                 };
 
@@ -880,10 +920,9 @@ impl NodeRpcClient for GrpcClient {
                         let request = request.clone();
                         Box::pin(async move { rpc_api.sync_nullifiers(request).await })
                     })
-                    .await?;
-                let response = response.into_inner();
+                    .await?
+                    .into_inner();
 
-                // Convert nullifiers for this batch
                 let batch_nullifiers = response
                     .nullifiers
                     .iter()
@@ -893,30 +932,15 @@ impl NodeRpcClient for GrpcClient {
 
                 all_nullifiers.extend(batch_nullifiers);
 
-                // Check if we need to fetch more pages
-                if let Some(page) = response.pagination_info {
-                    // Ensure we're making progress to avoid infinite loops
-                    if page.block_num < current_block_from {
-                        return Err(RpcError::PaginationError(
-                            "invalid pagination: block_num went backwards".to_string(),
-                        ));
-                    }
+                let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
+                    "SyncNullifiersResponse.pagination_info".to_owned(),
+                ))?;
 
-                    // Calculate target block as minimum between block_to and chain_tip
-                    let target_block =
-                        block_to.map_or(page.chain_tip, |b| b.as_u32().min(page.chain_tip));
-
-                    if page.block_num >= target_block {
-                        // No pagination info or we've reached/passed the target so we're done
-                        continue 'chunk_nullifiers;
-                    }
-                    current_block_from = page.block_num + 1;
+                match pagination.advance(page.block_num.into(), page.chain_tip.into())? {
+                    PaginationResult::Continue => {},
+                    PaginationResult::Done { .. } => break,
                 }
             }
-            // If we exit the loop, we've hit the iteration limit
-            return Err(RpcError::PaginationError(
-                "too many pagination iterations, possible infinite loop".to_string(),
-            ));
         }
         Ok(all_nullifiers.into_iter().collect::<Vec<_>>())
     }
@@ -1068,29 +1092,63 @@ impl NodeRpcClient for GrpcClient {
         Ok(AccountVaultInfo { chain_tip, block_number, updates })
     }
 
+    /// Sends one or more `SyncTransactions` requests to the node and concatenates the responses
+    /// into a flat list of [`TransactionRecord`]s.
+    ///
+    /// Chunks `account_ids` by [`RpcLimits::account_ids_limit`] and paginates each chunk across the
+    /// requested block range.
     async fn sync_transactions(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_ids: Vec<AccountId>,
-    ) -> Result<TransactionsInfo, RpcError> {
-        let block_range = Some(BlockRange {
-            block_from: block_from.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        });
+    ) -> Result<Vec<TransactionRecord>, RpcError> {
+        if account_ids.is_empty() {
+            return Ok(Vec::new());
+        }
 
-        let account_ids = account_ids.iter().map(|acc_id| (*acc_id).into()).collect();
+        let limits = self.get_rpc_limits().await?;
+        let mut transactions: Vec<TransactionRecord> = Vec::new();
 
-        let request = proto::rpc::SyncTransactionsRequest { block_range, account_ids };
+        for chunk in account_ids.chunks(limits.account_ids_limit as usize) {
+            let proto_account_ids: Vec<_> = chunk.iter().map(|acc_id| (*acc_id).into()).collect();
+            let mut pagination = BlockPagination::new(block_from, Some(block_to));
 
-        let response = self
-            .call_with_retry(RpcEndpoint::SyncTransactions, |mut rpc_api| {
-                let request = request.clone();
-                Box::pin(async move { rpc_api.sync_transactions(request).await })
-            })
-            .await?;
+            loop {
+                let request = proto::rpc::SyncTransactionsRequest {
+                    block_range: Some(BlockRange {
+                        block_from: pagination.current_block_from().as_u32(),
+                        block_to: pagination.block_to().map(|b| b.as_u32()),
+                    }),
+                    account_ids: proto_account_ids.clone(),
+                };
 
-        response.into_inner().try_into()
+                let response = self
+                    .call_with_retry(RpcEndpoint::SyncTransactions, |mut rpc_api| {
+                        let request = request.clone();
+                        Box::pin(async move { rpc_api.sync_transactions(request).await })
+                    })
+                    .await?
+                    .into_inner();
+
+                let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
+                    "SyncTransactionsResponse.pagination_info".to_owned(),
+                ))?;
+                let page_chain_tip = BlockNumber::from(page.chain_tip);
+                let page_block_to = BlockNumber::from(page.block_num);
+
+                for proto_tx in response.transactions {
+                    transactions.push(TransactionRecord::try_from(proto_tx)?);
+                }
+
+                match pagination.advance(page_block_to, page_chain_tip)? {
+                    PaginationResult::Continue => {},
+                    PaginationResult::Done { .. } => break,
+                }
+            }
+        }
+
+        Ok(transactions)
     }
 
     async fn get_network_id(&self) -> Result<NetworkId, RpcError> {

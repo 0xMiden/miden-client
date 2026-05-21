@@ -16,6 +16,8 @@
 * [BREAKING][type][rust] `NoteScript::root()` now returns `NoteScriptRoot` instead of `Word`. Use `Word::from(root)` (or `root.into()`) where a `Word` is required. `NoteScriptRoot` is re-exported from `miden_client::note`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * [BREAKING][rename][rust] `FeeParameters::native_asset_id()` renamed to `fee_faucet_id()`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * [BREAKING][rust] Removed `NodeRpcClient::check_nullifiers`, `RpcEndpoint::CheckNullifiers`, `EndpointError::CheckNullifiers`, and `CheckNullifiersError` after the upstream node dropped the `CheckNullifiers` gRPC method. Use `NodeRpcClient::sync_nullifiers` to retrieve nullifier updates. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
+* Removed limit on accounts and note tags that can be tracked by the client ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
+* [BREAKING] Updated the `sync_notes` and `sync_transactions` to return directly the fetched updates. Removed `TransactionsInfo` and `NoteSyncInfo` structs ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
 
 ### Enhancements
 
@@ -26,10 +28,12 @@
 * [FEATURE][rust,cli,web] Added `get_network_note_status` to `NodeRpcClient` trait for querying the processing status of notes submitted to the network (pending, nullifier-inflight, discarded, nullifier-committed), along with attempt count and error details. Exposed as `miden-client network-note-status <note_id>` CLI command and `RpcClient.getNetworkNoteStatus()` in the web client. ([#1981](https://github.com/0xMiden/miden-client/pull/1981))
 * Remove MMR peaks from the blocks table and store them alongside the sync height in a new `blockchain_checkpoint` table ([#2100](https://github.com/0xMiden/miden-client/pull/2100)).
 * Added `miden-cli call` command for invoking account procedures directly from the CLI ([#1943](https://github.com/0xMiden/miden-client/pull/1943)).
+* [FEATURE][rust,store] Added `BatchBuilder` for stacking multiple transactions against a single local account and submitting them as one proven batch via `SubmitProvenBatch`. Also adds `Store::apply_transaction_batch` (atomic multi-tx apply) with a `SqliteStore` implementation. ([#2109](https://github.com/0xMiden/miden-client/pull/2109))
 * Made `TransactionStoreUpdate` serialization lossless ([#2112](https://github.com/0xMiden/miden-client/pull/2112)).
 * [FEATURE][cli] Added `address encode <ACCOUNT_ID> <INTERFACE> [TAG_LEN]` subcommand that prints the bech32 encoding of an address built from the given fields (useful for producing the input to `address add`). ([#2115](https://github.com/0xMiden/miden-client/pull/2115))
 * [FEATURE][web] Added `StorageView` JS wrapper over WASM `AccountStorage`. `account.storage()` now returns a `StorageView` that makes `getItem()` work intuitively for both Value and StorageMap slots. WASM primitives are unchanged; the raw `AccountStorage` is accessible via `.raw` ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][web] Added `wordToBigInt()` utility export for losslessly converting a `Word`'s first felt to a `BigInt`. `StorageResult.toString()` is BigInt-backed, and `valueOf()` returns a JS number for values fitting in `Number.MAX_SAFE_INTEGER` and throws `RangeError` for larger u64 values — use `.toBigInt()` for exact access ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
+* [FEATURE][rust,cli] Added partial swap (PSWAP) support: `TransactionRequestBuilder::build_pswap_create` / `build_pswap_consume` / `build_pswap_cancel` and a `miden-client pswap` CLI command (`create`, `consume`, `cancel`) for partially-fillable fungible swaps ([#2162](https://github.com/0xMiden/miden-client/pull/2162)).
 
 ## 0.14.7 (2026-06-05)
 
