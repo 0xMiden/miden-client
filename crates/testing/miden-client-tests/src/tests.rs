@@ -621,8 +621,7 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
     partial_mmr.add(genesis.commitment(), true); // track genesis
 
     // Create a StateSync that discards all notes so intermediate blocks are skipped
-    let state_sync =
-        StateSync::new(Arc::new(rpc_api.clone()), None, Arc::new(DiscardAllNotes), None);
+    let state_sync = StateSync::new(Arc::new(rpc_api.clone()), Arc::new(DiscardAllNotes), None);
 
     // Use the note tag from the prebuilt chain (tag 0) so the mock RPC returns
     // blocks step-by-step (block 1, then block 4, then the chain tip) instead of
@@ -674,7 +673,13 @@ async fn sync_state_no_redundant_get_account_calls() {
     use miden_client::async_trait;
     use miden_client::rpc::domain::note::CommittedNote;
     use miden_client::store::InputNoteRecord;
-    use miden_client::sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
+    use miden_client::sync::{
+        AccountSyncHint,
+        NoteUpdateAction,
+        OnNoteReceived,
+        StateSync,
+        StateSyncInput,
+    };
     use miden_protocol::crypto::merkle::mmr::{Forest, MmrPeaks, PartialMmr};
 
     struct DiscardAllNotes;
@@ -716,14 +721,13 @@ async fn sync_state_no_redundant_get_account_calls() {
     let mut partial_mmr = PartialMmr::from_peaks(MmrPeaks::new(Forest::empty(), vec![]).unwrap());
     partial_mmr.add(genesis.commitment(), true);
 
-    let state_sync =
-        StateSync::new(Arc::new(rpc_api.clone()), None, Arc::new(DiscardAllNotes), None);
+    let state_sync = StateSync::new(Arc::new(rpc_api.clone()), Arc::new(DiscardAllNotes), None);
 
     // Use tag 0 to force multiple sync steps (notes exist in blocks 1 and 4)
     let note_tags = BTreeSet::from([NoteTag::new(0)]);
 
     let input = StateSyncInput {
-        accounts: vec![account_header],
+        accounts: vec![AccountSyncHint::from_header(account_header)],
         note_tags,
         input_notes: vec![],
         output_notes: vec![],
@@ -3613,6 +3617,49 @@ async fn sync_large_public_account() {
         usize::try_from(NUM_FAUCETS_LARGE_ACCOUNT).unwrap(),
         "all vault assets should be preserved after sync"
     );
+}
+
+#[tokio::test]
+async fn prepare_offline_bootstrap_inserts_mock_chain_genesis() {
+    use miden_protocol::block::account_tree::AccountTree;
+    use miden_protocol::crypto::merkle::smt::Smt;
+    use miden_protocol::transaction::TransactionKernel;
+
+    let mut rng_seed = rand::rng();
+    let coin_seed: [u64; 4] = rng_seed.random();
+    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
+
+    let reference_rpc = MockRpcApi::default();
+    let (expected_genesis, _) = reference_rpc
+        .get_block_header_by_number(Some(BlockNumber::GENESIS), false)
+        .await
+        .unwrap();
+
+    let keystore_path = temp_dir();
+    let keystore = FilesystemKeyStore::new(keystore_path).unwrap();
+
+    let mut client = ClientBuilder::new()
+        .rpc(Arc::new(MockRpcApi::default()))
+        .sqlite_store(create_test_store_path())
+        .rng(Box::new(rng))
+        .authenticator(Arc::new(keystore))
+        .build()
+        .await
+        .unwrap();
+
+    client.prepare_offline_bootstrap().await.unwrap();
+
+    let (stored_genesis, _) = client
+        .get_block_header_by_num(BlockNumber::GENESIS)
+        .await
+        .unwrap()
+        .expect("genesis should be stored after offline bootstrap");
+
+    assert_eq!(stored_genesis.block_num(), BlockNumber::GENESIS);
+    assert_eq!(stored_genesis.account_root(), expected_genesis.account_root());
+    assert_eq!(stored_genesis.tx_kernel_commitment(), expected_genesis.tx_kernel_commitment());
+    assert_eq!(stored_genesis.account_root(), AccountTree::<Smt>::default().root());
+    assert_eq!(stored_genesis.tx_kernel_commitment(), TransactionKernel.to_commitment());
 }
 
 // HELPERS

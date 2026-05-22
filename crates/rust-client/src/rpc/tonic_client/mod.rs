@@ -896,23 +896,22 @@ impl NodeRpcClient for GrpcClient {
         block_from: BlockNumber,
         block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
-        const MAX_ITERATIONS: u32 = 1000; // Safety limit to prevent infinite loops
-
         let limits = self.get_rpc_limits().await?;
         let mut all_nullifiers = BTreeSet::new();
 
         // If the prefixes are too many, we need to chunk them into smaller groups to avoid
         // violating the RPC limit.
-        'chunk_nullifiers: for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
-            let mut current_block_from = block_from.as_u32();
+        for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
+            let proto_prefixes: Vec<u32> = chunk.iter().map(|&x| u32::from(x)).collect();
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
-            for _ in 0..MAX_ITERATIONS {
+            loop {
                 let request = proto::rpc::SyncNullifiersRequest {
-                    nullifiers: chunk.iter().map(|&x| u32::from(x)).collect(),
+                    nullifiers: proto_prefixes.clone(),
                     prefix_len: 16,
                     block_range: Some(BlockRange {
-                        block_from: current_block_from,
-                        block_to: block_to.map(|b| b.as_u32()),
+                        block_from: pagination.current_block_from().as_u32(),
+                        block_to: pagination.block_to().map(|b| b.as_u32()),
                     }),
                 };
 
@@ -921,10 +920,9 @@ impl NodeRpcClient for GrpcClient {
                         let request = request.clone();
                         Box::pin(async move { rpc_api.sync_nullifiers(request).await })
                     })
-                    .await?;
-                let response = response.into_inner();
+                    .await?
+                    .into_inner();
 
-                // Convert nullifiers for this batch
                 let batch_nullifiers = response
                     .nullifiers
                     .iter()
@@ -934,30 +932,15 @@ impl NodeRpcClient for GrpcClient {
 
                 all_nullifiers.extend(batch_nullifiers);
 
-                // Check if we need to fetch more pages
-                if let Some(page) = response.pagination_info {
-                    // Ensure we're making progress to avoid infinite loops
-                    if page.block_num < current_block_from {
-                        return Err(RpcError::PaginationError(
-                            "invalid pagination: block_num went backwards".to_string(),
-                        ));
-                    }
+                let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
+                    "SyncNullifiersResponse.pagination_info".to_owned(),
+                ))?;
 
-                    // Calculate target block as minimum between block_to and chain_tip
-                    let target_block =
-                        block_to.map_or(page.chain_tip, |b| b.as_u32().min(page.chain_tip));
-
-                    if page.block_num >= target_block {
-                        // No pagination info or we've reached/passed the target so we're done
-                        continue 'chunk_nullifiers;
-                    }
-                    current_block_from = page.block_num + 1;
+                match pagination.advance(page.block_num.into(), page.chain_tip.into())? {
+                    PaginationResult::Continue => {},
+                    PaginationResult::Done { .. } => break,
                 }
             }
-            // If we exit the loop, we've hit the iteration limit
-            return Err(RpcError::PaginationError(
-                "too many pagination iterations, possible infinite loop".to_string(),
-            ));
         }
         Ok(all_nullifiers.into_iter().collect::<Vec<_>>())
     }

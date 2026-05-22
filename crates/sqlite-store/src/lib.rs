@@ -30,7 +30,7 @@ use miden_client::account::{
     StorageMapKey,
     StorageSlotName,
 };
-use miden_client::asset::{Asset, AssetVault, AssetWitness};
+use miden_client::asset::{AccountStorageHeader, Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, NoteTag, Nullifier};
@@ -500,6 +500,16 @@ impl Store for SqliteStore {
     ) -> Result<AccountStorage, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_account_storage(conn, account_id, &filter)
+        })
+        .await
+    }
+
+    async fn get_account_storage_header(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountStorageHeader, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_account_storage_header(conn, account_id)
         })
         .await
     }
