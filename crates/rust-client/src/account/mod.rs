@@ -359,7 +359,11 @@ impl<AUTH> Client<AUTH> {
         let derived_note_tag = address.to_note_tag();
         let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account_id);
         self.store.remove_address(address).await?;
-        self.store.remove_note_tag(note_tag_record).await?;
+        // Remove the note tag if no other address are associated with it.
+        let addresses = self.store.get_addresses_by_account_id(account_id).await?;
+        if addresses.iter().all(|address| address.to_note_tag() != derived_note_tag) {
+            self.store.remove_note_tag(note_tag_record).await?;
+        }
         Ok(())
     }
 
