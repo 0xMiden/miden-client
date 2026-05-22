@@ -75,10 +75,6 @@ pub enum ClientError {
     AddressAlreadyTracked(String),
     #[error("account with id {0} is already being tracked")]
     AccountAlreadyTracked(AccountId),
-    #[error(
-        "address {0} cannot be tracked: its derived note tag {1} is already associated with another tracked address"
-    )]
-    NoteTagDerivedAddressAlreadyTracked(String, NoteTag),
     #[error("account error")]
     AccountError(#[from] AccountError),
     #[error("account {0} is locked because the local state may be out of date with the network")]

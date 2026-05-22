@@ -342,13 +342,7 @@ impl<AUTH> Client<AUTH> {
                     let derived_note_tag: NoteTag = address.to_note_tag();
                     let note_tag_record =
                         NoteTagRecord::with_account_source(derived_note_tag, account_id);
-                    let added = self.store.add_note_tag(note_tag_record).await?;
-                    if !added {
-                        return Err(ClientError::NoteTagDerivedAddressAlreadyTracked(
-                            address_bench32,
-                            derived_note_tag,
-                        ));
-                    }
+                    self.store.add_note_tag(note_tag_record).await?;
                 }
                 Ok(())
             },
