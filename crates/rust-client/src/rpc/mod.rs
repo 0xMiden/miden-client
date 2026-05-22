@@ -48,23 +48,26 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use domain::account::{
+    AccountDetails,
     AccountProof,
     AccountUpdateSummary,
     FetchedAccount,
+    GetAccountProofRequest,
     StorageMapEntries,
     StorageMapEntry,
+    VaultFetch,
 };
 use domain::note::{FetchedNote, NoteSyncBlock, SyncNotesResult};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
-use miden_protocol::account::{Account, AccountCode, AccountId, StorageMapKey, StorageSlotName};
+use miden_protocol::Word;
+use miden_protocol::account::{Account, AccountId, StorageMapKey, StorageSlotName};
 use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
 use miden_protocol::note::{NoteId, NoteScript, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
-use miden_protocol::{EMPTY_WORD, Word};
 
 use crate::rpc::domain::storage_map::StorageMapInfo;
 
@@ -98,8 +101,10 @@ use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
 
 /// Represents the state that we want to retrieve from the network
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum AccountStateAt {
     /// Gets the latest state, for the current chain tip
+    #[default]
     ChainTip,
     /// Gets the state at a specific block number
     Block(BlockNumber),
@@ -196,24 +201,16 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// - `account_id` is the ID of the wanted account.
     ///
-    /// The default implementation builds the full account on top of
-    /// [`NodeRpcClient::get_account_proof`] (which already falls back to
-    /// [`NodeRpcClient::sync_account_vault`] when the response is truncated by `too_many_assets`)
-    /// plus [`NodeRpcClient::sync_storage_maps`] for any storage map flagged with
-    /// `too_many_entries`. Two `/GetAccount` requests are made for public accounts: one to
-    /// discover the storage layout, and a second to request entries for all map slots.
+    /// The default implementation composes [`NodeRpcClient::get_account_proof`] with
+    /// [`NodeRpcClient::resolve_oversize_vault`] / [`NodeRpcClient::resolve_oversize_storage_maps`]
+    /// to materialize the full account state. Two `/GetAccount` requests are made for public
+    /// accounts: one to discover the storage layout, and a second to request entries for all
+    /// map slots.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         // For accounts without public state, only the witness commitment is needed.
         if !account_id.has_public_state() {
-            let (block_number, proof) = self
-                .get_account_proof(
-                    account_id,
-                    AccountStorageRequirements::default(),
-                    AccountStateAt::ChainTip,
-                    None,
-                    None,
-                )
-                .await?;
+            let (block_number, proof) =
+                self.get_account_proof(account_id, GetAccountProofRequest::default()).await?;
             return Ok(FetchedAccount::new_private(
                 account_id,
                 AccountUpdateSummary::new(proof.account_commitment(), block_number),
@@ -224,10 +221,10 @@ pub trait NodeRpcClient: Send + Sync {
         let (block_number, initial_proof) = self
             .get_account_proof(
                 account_id,
-                AccountStorageRequirements::default(),
-                AccountStateAt::ChainTip,
-                None,
-                Some(EMPTY_WORD),
+                GetAccountProofRequest {
+                    vault: VaultFetch::Always,
+                    ..Default::default()
+                },
             )
             .await?;
 
@@ -243,7 +240,7 @@ pub trait NodeRpcClient: Send + Sync {
 
         // Second call: request entries for every map slot at the same block, so the view is
         // consistent. If there are no maps, the first proof already has what we need.
-        let final_proof = if map_slot_names.is_empty() {
+        let mut final_proof = if map_slot_names.is_empty() {
             initial_proof
         } else {
             let empty_keys: Vec<StorageMapKey> = Vec::new();
@@ -253,48 +250,26 @@ pub trait NodeRpcClient: Send + Sync {
             let (_, proof) = self
                 .get_account_proof(
                     account_id,
-                    requirements,
-                    AccountStateAt::Block(block_number),
-                    None,
-                    Some(EMPTY_WORD),
+                    GetAccountProofRequest {
+                        storage: requirements,
+                        at: AccountStateAt::Block(block_number),
+                        vault: VaultFetch::Always,
+                        ..Default::default()
+                    },
                 )
                 .await?;
             proof
         };
 
+        if let Some(details) = final_proof.details_mut() {
+            self.resolve_oversize_vault(account_id, block_number, details).await?;
+            self.resolve_oversize_storage_maps(account_id, block_number, details).await?;
+        }
+
         let summary = AccountUpdateSummary::new(final_proof.account_commitment(), block_number);
-        let mut details = final_proof.into_parts().1.ok_or(RpcError::ExpectedDataMissing(
+        let details = final_proof.into_parts().1.ok_or(RpcError::ExpectedDataMissing(
             "public account returned without details".into(),
         ))?;
-
-        // Resolve any storage maps flagged as too_many_entries via SyncStorageMaps. Vault
-        // truncation is already handled by get_account_proof.
-        let has_oversized_maps =
-            details.storage_details.map_details.iter().any(|m| m.too_many_entries);
-        if has_oversized_maps {
-            let info = self
-                .sync_storage_maps(BlockNumber::from(0), Some(block_number), account_id)
-                .await?;
-            for map_details in &mut details.storage_details.map_details {
-                if !map_details.too_many_entries {
-                    continue;
-                }
-                // The sync endpoint may return multiple updates for the same key across
-                // different blocks. Sort by block so the BTreeMap retains the latest value.
-                let mut sorted: Vec<_> =
-                    info.updates.iter().filter(|u| u.slot_name == map_details.slot_name).collect();
-                sorted.sort_by_key(|u| u.block_num);
-                let entries: Vec<StorageMapEntry> = sorted
-                    .into_iter()
-                    .map(|u| (u.key, u.value))
-                    .collect::<BTreeMap<_, _>>()
-                    .into_iter()
-                    .map(|(key, value)| StorageMapEntry { key, value })
-                    .collect();
-                map_details.too_many_entries = false;
-                map_details.entries = StorageMapEntries::AllEntries(entries);
-            }
-        }
 
         let account = Account::try_from(&details)?;
         Ok(FetchedAccount::new_public(account, summary))
@@ -377,30 +352,81 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches the account proof and optionally its details from the node, using the
     /// `/GetAccount` endpoint.
     ///
-    /// The `account_state` parameter specifies the block number from which to retrieve
-    /// the account proof from (the state of the account at that block).
-    ///
-    /// The `storage_requirements` parameter specifies which storage slots and map keys
-    /// should be included in the response for public accounts.
-    ///
-    /// The `known_account_code` parameter is the known code commitment
-    /// to prevent unnecessary data fetching.
-    ///
-    /// The `known_vault_commitment` parameter controls vault data retrieval:
-    /// - `None`: vault data is not requested.
-    /// - `Some(commitment)`: vault data is returned only if the account's current vault root
-    ///   differs from the provided commitment. Use `EMPTY_WORD` to always fetch.
+    /// `request` carries the storage slots, target block, known code, and vault-fetch policy
+    /// for the call. The response reflects exactly what the node returned — including any
+    /// `too_many_assets` / `too_many_entries` truncation flags. Callers that need full data
+    /// can compose [`NodeRpcClient::resolve_oversize_vault`] and
+    /// [`NodeRpcClient::resolve_oversize_storage_maps`] on the returned proof.
     ///
     /// Returns the block number and the account proof. If the account is not found in
     /// the node, the method will return an error.
     async fn get_account_proof(
         &self,
         account_id: AccountId,
-        storage_requirements: AccountStorageRequirements,
-        account_state: AccountStateAt,
-        known_account_code: Option<AccountCode>,
-        known_vault_commitment: Option<Word>,
+        request: GetAccountProofRequest,
     ) -> Result<(BlockNumber, AccountProof), RpcError>;
+
+    /// Resolves a `too_many_assets` truncation in `details` by querying
+    /// [`NodeRpcClient::sync_account_vault`] over `[0, block_to]`, replacing the asset list,
+    /// and clearing the flag. No-op when the vault isn't truncated.
+    async fn resolve_oversize_vault(
+        &self,
+        account_id: AccountId,
+        block_to: BlockNumber,
+        details: &mut AccountDetails,
+    ) -> Result<(), RpcError> {
+        if !details.vault_details.too_many_assets {
+            return Ok(());
+        }
+        let vault_info = self
+            .sync_account_vault(BlockNumber::from(0), Some(block_to), account_id)
+            .await?;
+        let mut updates = vault_info.updates;
+        updates.sort_by_key(|u| u.block_num);
+        details.vault_details.assets = updates
+            .into_iter()
+            .map(|u| (u.vault_key, u.asset))
+            .collect::<BTreeMap<_, _>>()
+            .into_values()
+            .flatten()
+            .collect();
+        details.vault_details.too_many_assets = false;
+        Ok(())
+    }
+
+    /// Resolves `too_many_entries` truncation per storage map slot by querying
+    /// [`NodeRpcClient::sync_storage_maps`] over `[0, block_to]`, replacing the entries, and
+    /// clearing the flag. No-op when no maps are truncated.
+    async fn resolve_oversize_storage_maps(
+        &self,
+        account_id: AccountId,
+        block_to: BlockNumber,
+        details: &mut AccountDetails,
+    ) -> Result<(), RpcError> {
+        if !details.storage_details.map_details.iter().any(|m| m.too_many_entries) {
+            return Ok(());
+        }
+        let info = self.sync_storage_maps(BlockNumber::from(0), Some(block_to), account_id).await?;
+        for map_details in &mut details.storage_details.map_details {
+            if !map_details.too_many_entries {
+                continue;
+            }
+            // Sort by block so the BTreeMap keeps the latest value per key.
+            let mut sorted: Vec<_> =
+                info.updates.iter().filter(|u| u.slot_name == map_details.slot_name).collect();
+            sorted.sort_by_key(|u| u.block_num);
+            let entries: Vec<StorageMapEntry> = sorted
+                .into_iter()
+                .map(|u| (u.key, u.value))
+                .collect::<BTreeMap<_, _>>()
+                .into_iter()
+                .map(|(key, value)| StorageMapEntry { key, value })
+                .collect();
+            map_details.too_many_entries = false;
+            map_details.entries = StorageMapEntries::AllEntries(entries);
+        }
+        Ok(())
+    }
 
     /// Fetches the commit height where the nullifier was consumed. If the nullifier isn't found,
     /// then `None` is returned.

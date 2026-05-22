@@ -4,6 +4,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use async_trait::async_trait;
+use miden_protocol::Word;
 use miden_protocol::account::{
     Account,
     AccountHeader,
@@ -17,14 +18,18 @@ use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
 use miden_protocol::note::{Note, NoteId, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::InputNoteCommitment;
-use miden_protocol::{EMPTY_WORD, Word};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
 use super::{AccountUpdates, PublicAccountDelta, PublicAccountUpdate, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
-use crate::rpc::domain::account::{AccountDetails, AccountStorageRequirements};
+use crate::rpc::domain::account::{
+    AccountDetails,
+    AccountStorageRequirements,
+    GetAccountProofRequest,
+    VaultFetch,
+};
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
 use crate::rpc::domain::sync::SyncTarget;
 use crate::rpc::domain::transaction::{
@@ -603,10 +608,12 @@ impl StateSync {
         current_public_accounts: &[&AccountSyncHint],
         block_from: BlockNumber,
     ) -> Result<(), ClientError> {
+        let hints_lookup: BTreeMap<AccountId, (&AccountSyncHint, Word)> = current_public_accounts
+            .iter()
+            .map(|hint| (hint.header.id(), (*hint, hint.header.to_commitment())))
+            .collect();
         for (id, commitment) in commitment_updates {
-            let Some(local_hint) = current_public_accounts
-                .iter()
-                .find(|hint| *id == hint.header.id() && *commitment != hint.header.to_commitment())
+            let Some((local_hint, _)) = hints_lookup.get(id).filter(|(_, c)| c != commitment)
             else {
                 continue;
             };
@@ -654,19 +661,16 @@ impl StateSync {
             .rpc_api
             .get_account_proof(
                 account_id,
-                initial_requirements,
-                AccountStateAt::ChainTip,
-                None,
-                Some(EMPTY_WORD),
+                GetAccountProofRequest {
+                    storage: initial_requirements,
+                    vault: VaultFetch::Always,
+                    ..Default::default()
+                },
             )
             .await
             .map_err(ClientError::RpcError)?;
 
         let details = proof.into_details().expect("node returned no details for a public account");
-
-        let vault_oversized = details.vault_details.too_many_assets;
-        let any_map_oversized =
-            details.storage_details.map_details.iter().any(|m| m.too_many_entries);
 
         // Map slot names actually present on the account, taken from the response header.
         let response_map_slots: Vec<StorageSlotName> = details
@@ -685,7 +689,7 @@ impl StateSync {
             .cloned()
             .collect();
 
-        let public_update = if vault_oversized || any_map_oversized {
+        let public_update = if details.is_truncated() {
             // Some part of the account is oversized — use incremental endpoints.
             self.build_delta_update(account_id, &details, block_from, proof_block_num)
                 .await?
@@ -731,10 +735,12 @@ impl StateSync {
             .rpc_api
             .get_account_proof(
                 account_id,
-                storage_requirements,
-                AccountStateAt::Block(block_to),
-                Some(initial_details.code.clone()),
-                Some(EMPTY_WORD),
+                GetAccountProofRequest {
+                    storage: storage_requirements,
+                    at: AccountStateAt::Block(block_to),
+                    known_code: Some(initial_details.code.clone()),
+                    vault: VaultFetch::Always,
+                },
             )
             .await
             .map_err(ClientError::RpcError)?;
@@ -1049,7 +1055,7 @@ mod tests {
         ACCOUNT_ID_REGULAR_NETWORK_ACCOUNT_IMMUTABLE_CODE,
         ACCOUNT_ID_SENDER,
     };
-    use miden_protocol::{Felt, Word};
+    use miden_protocol::{EMPTY_WORD, Felt, Word};
     use miden_standards::code_builder::CodeBuilder;
     use miden_standards::note::{NetworkAccountTarget, NoteExecutionHint};
     use miden_testing::{MockChainBuilder, TxContextInput};

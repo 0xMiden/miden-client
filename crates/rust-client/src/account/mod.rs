@@ -215,7 +215,7 @@ impl<AUTH> Client<AUTH> {
                     // If the tracked account is locked, check that the account commitment matches
                     // the one in the network
                     let network_account_commitment =
-                        self.rpc_api.get_account_details(account.id()).await?.commitment();
+                        self.rpc_api.get_account_details(account.id()).await?.commitment(); // TODO: no need to fetch all account details
                     if network_account_commitment != account.to_commitment() {
                         return Err(ClientError::AccountCommitmentMismatch(
                             network_account_commitment,

@@ -24,7 +24,11 @@ use miden_protocol::{MastForest, Word, ZERO};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
-use crate::rpc::domain::account::{AccountStorageRequirements, StorageMapEntries};
+use crate::rpc::domain::account::{
+    AccountStorageRequirements,
+    GetAccountProofRequest,
+    StorageMapEntries,
+};
 use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::StoreError;
 use crate::transaction::fetch_public_account_inputs;
@@ -156,10 +160,11 @@ impl ClientDataStore {
             .rpc_api
             .get_account_proof(
                 account_id,
-                storage_requirements,
-                AccountStateAt::ChainTip,
-                Some(known_code),
-                None,
+                GetAccountProofRequest {
+                    storage: storage_requirements,
+                    known_code: Some(known_code),
+                    ..Default::default()
+                },
             )
             .await
             .map_err(|err| {

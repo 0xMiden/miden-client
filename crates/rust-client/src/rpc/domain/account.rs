@@ -18,7 +18,7 @@ use miden_tx::utils::serde::{Deserializable, Serializable};
 use thiserror::Error;
 
 use crate::alloc::string::ToString;
-use crate::rpc::RpcError;
+use crate::rpc::{AccountStateAt, RpcError};
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::errors::RpcConversionError;
 use crate::rpc::generated::rpc::account_request::account_detail_request::storage_map_detail_request::{MapKeys, SlotData};
@@ -333,6 +333,21 @@ pub struct AccountDetails {
     pub storage_details: AccountStorageDetails,
     pub code: AccountCode,
     pub vault_details: AccountVaultDetails,
+}
+
+impl AccountDetails {
+    /// Returns `true` if the node truncated any vault assets or storage map entries in this
+    /// response (i.e., `too_many_assets` is set on the vault or `too_many_entries` is set on
+    /// any storage map).
+    ///
+    /// Use this to decide whether a follow-up `sync_account_vault` / `sync_storage_maps` call
+    /// (or [`crate::rpc::NodeRpcClient::resolve_oversize_vault`] /
+    /// [`crate::rpc::NodeRpcClient::resolve_oversize_storage_maps`]) is required to materialize
+    /// the full account state.
+    pub fn is_truncated(&self) -> bool {
+        self.vault_details.too_many_assets
+            || self.storage_details.map_details.iter().any(|m| m.too_many_entries)
+    }
 }
 
 impl TryFrom<&AccountDetails> for Account {
@@ -721,6 +736,15 @@ impl AccountProof {
     pub fn into_details(self) -> Option<AccountDetails> {
         self.state_headers
     }
+
+    /// Mutable accessor for the account details, when present.
+    ///
+    /// Useful for resolving oversized vault or storage data in place via
+    /// [`crate::rpc::NodeRpcClient::resolve_oversize_vault`] and
+    /// [`crate::rpc::NodeRpcClient::resolve_oversize_storage_maps`].
+    pub fn details_mut(&mut self) -> Option<&mut AccountDetails> {
+        self.state_headers.as_mut()
+    }
 }
 
 #[cfg(feature = "tonic")]
@@ -843,6 +867,35 @@ impl Deserializable for AccountStorageRequirements {
     ) -> Result<Self, miden_tx::utils::serde::DeserializationError> {
         Ok(AccountStorageRequirements(source.read()?))
     }
+}
+
+// GET ACCOUNT PROOF REQUEST
+// ================================================================================================
+
+/// Controls whether vault data is included in a `/GetAccount` response.
+#[derive(Clone, Debug, Default)]
+pub enum VaultFetch {
+    /// Do not include vault data in the response.
+    #[default]
+    Skip,
+    /// Always include vault data in the response.
+    Always,
+    /// Include vault data only if the account's current vault root differs from this commitment.
+    IfChangedFrom(Word),
+}
+
+/// Parameters for [`crate::rpc::NodeRpcClient::get_account_proof`].
+#[derive(Clone, Debug, Default)]
+pub struct GetAccountProofRequest {
+    /// Storage slots (and optionally specific keys) to include in the response.
+    pub storage: AccountStorageRequirements,
+    /// Block at which to retrieve the proof.
+    pub at: AccountStateAt,
+    /// Code commitment the client already has. When the on-chain commitment matches, the node
+    /// skips re-sending the code.
+    pub known_code: Option<AccountCode>,
+    /// Vault data retrieval policy.
+    pub vault: VaultFetch,
 }
 
 // ERRORS
