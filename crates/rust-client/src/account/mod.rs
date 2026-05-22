@@ -350,10 +350,7 @@ impl<AUTH> Client<AUTH> {
     }
 
     /// Removes an [`Address`] from the associated [`AccountId`], alongside its derived [`NoteTag`].
-    ///
-    /// # Errors
-    /// - If the account is not found on the network.
-    /// - If the address is not being tracked.
+    /// If no address was tracked for the given account, this is a no-op.
     pub async fn remove_address(
         &mut self,
         address: Address,
