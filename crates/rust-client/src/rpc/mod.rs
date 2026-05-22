@@ -200,8 +200,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// [`NodeRpcClient::get_account_proof`] (which already falls back to
     /// [`NodeRpcClient::sync_account_vault`] when the response is truncated by `too_many_assets`)
     /// plus [`NodeRpcClient::sync_storage_maps`] for any storage map flagged with
-    /// `too_many_entries`. Two `/GetAccount` requests are made for public accounts: one to
-    /// discover the storage layout, and a second to request entries for all map slots.
+    /// `too_many_entries`. Up to two `/GetAccount` requests are made for public accounts: one to
+    /// discover the storage layout, and a second to request entries for all map slots (skipped
+    /// when the account has no storage maps).
+    // TODO: `get_account_proof` always fetches the full vault, and this implementation also
+    // requests every storage map. Not all callers of `get_account_details` need that much data,
+    // so the API should be refactored to let callers express which parts of the account they
+    // actually need and avoid the redundant requests during sync.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         // For accounts without public state, only the witness commitment is needed.
         if !account_id.has_public_state() {
@@ -243,6 +248,8 @@ pub trait NodeRpcClient: Send + Sync {
 
         // Second call: request entries for every map slot at the same block, so the view is
         // consistent. If there are no maps, the first proof already has what we need.
+        // This refetches the full vault as a side effect of `get_account_proof`; kept for
+        // simplicity until the trait grows a way to request storage maps without the vault.
         let final_proof = if map_slot_names.is_empty() {
             initial_proof
         } else {
@@ -273,7 +280,7 @@ pub trait NodeRpcClient: Send + Sync {
             details.storage_details.map_details.iter().any(|m| m.too_many_entries);
         if has_oversized_maps {
             let info = self
-                .sync_storage_maps(BlockNumber::from(0), Some(block_number), account_id)
+                .sync_storage_maps(BlockNumber::GENESIS, Some(block_number), account_id)
                 .await?;
             for map_details in &mut details.storage_details.map_details {
                 if !map_details.too_many_entries {
