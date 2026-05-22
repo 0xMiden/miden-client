@@ -14,7 +14,7 @@ use miden_protocol::errors::{
     TransactionInputError,
     TransactionScriptError,
 };
-use miden_protocol::note::{NoteId, NoteTag};
+use miden_protocol::note::NoteId;
 use miden_standards::account::interface::AccountInterfaceError;
 // RE-EXPORTS
 // ================================================================================================
