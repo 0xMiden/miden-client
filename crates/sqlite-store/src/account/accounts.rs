@@ -346,14 +346,8 @@ impl SqliteStore {
         Self::insert_storage_slots(&tx, account_id, account.storage().slots().iter())?;
 
         Self::insert_assets(&tx, account_id, account.vault().assets())?;
-        let watched_type = matches!(client_account_type, ClientAccountType::Watched);
-        Self::insert_account_header(
-            &tx,
-            &account.into(),
-            account.seed(),
-            None,
-            Some(watched_type),
-        )?;
+        let watched = matches!(client_account_type, ClientAccountType::Watched);
+        Self::insert_new_account_header(&tx, &account.into(), account.seed(), watched)?;
 
         Self::insert_address(&tx, initial_address, account.id())?;
 
@@ -473,7 +467,7 @@ impl SqliteStore {
         let account_id = final_account_state.id();
 
         // Archive old header and insert the new one
-        Self::insert_account_header(tx, final_account_state, None, Some(init_account_state), None)?;
+        Self::replace_account_header(tx, final_account_state, init_account_state)?;
 
         Self::apply_account_vault_delta(
             tx,
@@ -774,11 +768,12 @@ impl SqliteStore {
             new_account_state.storage(),
         )?;
 
-        // Read old header before overwriting
+        // Read old header before overwriting.
         let old_header = query_latest_account_headers(tx, "id = ?", params![account_id.to_hex()])?
             .into_iter()
             .next()
-            .map(|(header, ..)| header);
+            .map(|(header, ..)| header)
+            .ok_or(StoreError::AccountDataNotFound(account_id))?;
 
         // Archive all old entries from latest → historical
         tx.execute(
@@ -854,14 +849,8 @@ impl SqliteStore {
         )
         .into_store_error()?;
 
-        // Insert account header (archives old header to historical)
-        Self::insert_account_header(
-            tx,
-            &new_account_state.into(),
-            None,
-            old_header.as_ref(),
-            None,
-        )?;
+        // Archive the old header to historical and write the new one to latest.
+        Self::replace_account_header(tx, &new_account_state.into(), &old_header)?;
 
         Ok(())
     }
@@ -932,75 +921,17 @@ impl SqliteStore {
     // HELPERS
     // --------------------------------------------------------------------------------------------
 
-    /// Inserts a new account header into the latest table.
+    /// Writes a new row into `latest_account_headers`.
     ///
-    /// If `old_header` is provided, the old header is archived to the historical table.
-    /// For initial inserts (no previous state), pass `None` for `old_header`.
-    ///
-    /// If `watched_override` is `Some(v)`, the `watched` flag is written as `v`.
-    /// Otherwise the current row's value is preserved (and defaults to `false` for fresh inserts).
-    fn insert_account_header(
+    /// Does not archive any previous state, use [`Self::replace_account_header`] when a row
+    /// for this account already exists. If a row does exist it will be overwritten with the
+    /// provided `watched` value and no historical row added.
+    fn insert_new_account_header(
         tx: &Transaction<'_>,
         new_header: &AccountHeader,
         account_seed: Option<Word>,
-        old_header: Option<&AccountHeader>,
-        watched_override: Option<bool>,
+        watched: bool,
     ) -> Result<(), StoreError> {
-        // Read the current latest row's preserved-on-replace fields (seed, locked, watched).
-        let id_for_lookup = new_header.id().to_hex();
-        let (old_seed, old_locked, old_watched): (Option<Vec<u8>>, bool, bool) = tx
-            .query_row(
-                "SELECT account_seed, locked, watched FROM latest_account_headers WHERE id = ?",
-                params![&id_for_lookup],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )
-            .optional()
-            .into_store_error()?
-            .unwrap_or((None, false, false));
-        let watched = watched_override.unwrap_or(old_watched);
-
-        // Archive the old header to historical before overwriting latest.
-        if let Some(old) = old_header {
-            let old_id = old.id().to_hex();
-            let old_code_commitment = old.code_commitment().to_string();
-            let old_storage_commitment = old.storage_commitment().to_string();
-            let old_vault_root = old.vault_root().to_string();
-            let old_nonce = u64_to_value(old.nonce().as_canonical_u64());
-            let old_commitment = old.to_commitment().to_string();
-            let replaced_at_nonce = u64_to_value(new_header.nonce().as_canonical_u64());
-
-            const HISTORICAL_QUERY: &str = insert_sql!(
-                historical_account_headers {
-                    id,
-                    code_commitment,
-                    storage_commitment,
-                    vault_root,
-                    nonce,
-                    account_seed,
-                    account_commitment,
-                    locked,
-                    replaced_at_nonce
-                } | REPLACE
-            );
-
-            tx.execute(
-                HISTORICAL_QUERY,
-                params![
-                    old_id,
-                    old_code_commitment,
-                    old_storage_commitment,
-                    old_vault_root,
-                    old_nonce,
-                    old_seed,
-                    old_commitment,
-                    old_locked,
-                    replaced_at_nonce,
-                ],
-            )
-            .into_store_error()?;
-        }
-
-        // Write the new header to latest.
         let id = new_header.id().to_hex();
         let code_commitment = new_header.code_commitment().to_string();
         let storage_commitment = new_header.storage_commitment().to_string();
@@ -1040,6 +971,74 @@ impl SqliteStore {
         .into_store_error()?;
 
         Ok(())
+    }
+
+    /// Replaces an account's latest header, archiving the previous one to historical.
+    ///
+    /// Preserves the `watched` flag from the existing latest row (mode is a per-account
+    /// property, not per-state). The new latest row is written with `account_seed = NULL`
+    /// and `locked = false`; the previous seed and lock state move into the historical row.
+    fn replace_account_header(
+        tx: &Transaction<'_>,
+        new_header: &AccountHeader,
+        old_header: &AccountHeader,
+    ) -> Result<(), StoreError> {
+        let id_hex = new_header.id().to_hex();
+
+        // `AccountHeader` doesn't carry the seed or per-account flags, so read them from the row
+        // we're about to overwrite: `account_seed`/`locked` get archived into the historical row,
+        // `watched` is carried into the new latest row.
+        let (old_seed, old_locked, old_watched): (Option<Vec<u8>>, bool, bool) = tx
+            .query_row(
+                "SELECT account_seed, locked, watched FROM latest_account_headers WHERE id = ?",
+                params![&id_hex],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .into_store_error()?
+            .unwrap_or((None, false, false));
+
+        // Archive the old header to historical.
+        let old_id = old_header.id().to_hex();
+        let old_code_commitment = old_header.code_commitment().to_string();
+        let old_storage_commitment = old_header.storage_commitment().to_string();
+        let old_vault_root = old_header.vault_root().to_string();
+        let old_nonce = u64_to_value(old_header.nonce().as_canonical_u64());
+        let old_commitment = old_header.to_commitment().to_string();
+        let replaced_at_nonce = u64_to_value(new_header.nonce().as_canonical_u64());
+
+        const HISTORICAL_QUERY: &str = insert_sql!(
+            historical_account_headers {
+                id,
+                code_commitment,
+                storage_commitment,
+                vault_root,
+                nonce,
+                account_seed,
+                account_commitment,
+                locked,
+                replaced_at_nonce
+            } | REPLACE
+        );
+
+        tx.execute(
+            HISTORICAL_QUERY,
+            params![
+                old_id,
+                old_code_commitment,
+                old_storage_commitment,
+                old_vault_root,
+                old_nonce,
+                old_seed,
+                old_commitment,
+                old_locked,
+                replaced_at_nonce,
+            ],
+        )
+        .into_store_error()?;
+
+        // Write the new latest row.
+        Self::insert_new_account_header(tx, new_header, None, old_watched)
     }
 
     /// Prunes historical account states for a single account up to the given nonce.
