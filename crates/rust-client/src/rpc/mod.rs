@@ -57,7 +57,7 @@ use domain::account::{
 use domain::note::{FetchedNote, NoteSyncBlock, SyncNotesResult};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
-use miden_protocol::account::{Account, AccountCode, AccountId, StorageMapKey, StorageSlotName};
+use miden_protocol::account::{Account, AccountCode, AccountId, StorageSlotName};
 use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
@@ -203,10 +203,6 @@ pub trait NodeRpcClient: Send + Sync {
     /// `too_many_entries`. Up to two `/GetAccount` requests are made for public accounts: one to
     /// discover the storage layout, and a second to request entries for all map slots (skipped
     /// when the account has no storage maps).
-    // TODO: `get_account_proof` always fetches the full vault, and this implementation also
-    // requests every storage map. Not all callers of `get_account_details` need that much data,
-    // so the API should be refactored to let callers express which parts of the account they
-    // actually need and avoid the redundant requests during sync.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         // For accounts without public state, only the witness commitment is needed.
         if !account_id.has_public_state() {
@@ -248,15 +244,11 @@ pub trait NodeRpcClient: Send + Sync {
 
         // Second call: request entries for every map slot at the same block, so the view is
         // consistent. If there are no maps, the first proof already has what we need.
-        // This refetches the full vault as a side effect of `get_account_proof`; kept for
-        // simplicity until the trait grows a way to request storage maps without the vault.
+        // TODO: this refetches the full vault and could be avoided
         let final_proof = if map_slot_names.is_empty() {
             initial_proof
         } else {
-            let empty_keys: Vec<StorageMapKey> = Vec::new();
-            let requirements = AccountStorageRequirements::new(
-                map_slot_names.iter().map(|name| (name.clone(), empty_keys.iter())),
-            );
+            let requirements = AccountStorageRequirements::all_entries(&map_slot_names);
             let (_, proof) = self
                 .get_account_proof(
                     account_id,

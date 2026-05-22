@@ -9,7 +9,6 @@ use miden_protocol::account::{
     AccountHeader,
     AccountId,
     AccountStorageHeader,
-    StorageMapKey,
     StorageSlotName,
     StorageSlotType,
 };
@@ -644,11 +643,7 @@ impl StateSync {
 
         // Request all map data we know about up-front so the response is self-sufficient
         // when the on-chain layout hasn't grown since the hint was produced.
-        let initial_requirements = AccountStorageRequirements::new(
-            hinted_map_slots
-                .iter()
-                .map(|n| (n.clone(), core::iter::empty::<&StorageMapKey>())),
-        );
+        let initial_requirements = AccountStorageRequirements::all_entries(&hinted_map_slots);
 
         let (proof_block_num, proof) = self
             .rpc_api
@@ -721,11 +716,7 @@ impl StateSync {
         block_from: BlockNumber,
         block_to: BlockNumber,
     ) -> Result<PublicAccountUpdate, ClientError> {
-        let storage_requirements = AccountStorageRequirements::new(
-            missing_map_slots
-                .iter()
-                .map(|n| (n.clone(), core::iter::empty::<&StorageMapKey>())),
-        );
+        let storage_requirements = AccountStorageRequirements::all_entries(missing_map_slots);
 
         let (_, follow_up_proof) = self
             .rpc_api
