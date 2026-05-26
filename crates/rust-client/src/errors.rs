@@ -14,7 +14,7 @@ use miden_protocol::errors::{
     TransactionInputError,
     TransactionScriptError,
 };
-use miden_protocol::note::{NoteId, NoteTag};
+use miden_protocol::note::NoteId;
 use miden_standards::account::interface::AccountInterfaceError;
 // RE-EXPORTS
 // ================================================================================================
@@ -75,10 +75,6 @@ pub enum ClientError {
     AddressAlreadyTracked(String),
     #[error("account with id {0} is already being tracked")]
     AccountAlreadyTracked(AccountId),
-    #[error(
-        "address {0} cannot be tracked: its derived note tag {1} is already associated with another tracked address"
-    )]
-    NoteTagDerivedAddressAlreadyTracked(String, NoteTag),
     #[error("account error")]
     AccountError(#[from] AccountError),
     #[error("account {0} is locked because the local state may be out of date with the network")]
@@ -89,6 +85,12 @@ pub enum ClientError {
     AccountCommitmentMismatch(Word),
     #[error("account {0} is private and its details cannot be retrieved from the network")]
     AccountIsPrivate(AccountId),
+    #[error("account {0} is watched and cannot be used to execute transactions")]
+    AccountIsWatched(AccountId),
+    #[error(
+        "account {0} is already tracked with a different ClientAccountType; switching between Native and Watched is not supported"
+    )]
+    AccountWatchedMismatch(AccountId),
     #[error("account with id {0} not found on the network")]
     AccountNotFoundOnChain(AccountId),
     #[error(

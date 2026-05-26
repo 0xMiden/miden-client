@@ -27,6 +27,7 @@ use miden_client::note::{
     NoteTag,
     NoteType,
 };
+use miden_client::sync::NoteTagSource;
 use miden_client::testing::common::{
     TestClient,
     execute_tx_and_sync,
@@ -423,4 +424,110 @@ pub(crate) fn get_network_note_with_script<T: Rng>(
 
     let network_note = Note::new(NoteAssets::new(vec![])?, metadata, recipient);
     Ok(network_note)
+}
+
+/// Watched-account flow against a network account:
+///   - `client_1` deploys the counter as a network account and emits bump notes.
+///   - `client_2` watches the network account via `import_watched_account_by_id` (no note tag).
+///   - The node-driven counter increments are observed by `client_2` after `sync_state`.
+pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<()> {
+    const BUMP_NOTE_NUMBER: u64 = 3;
+
+    let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
+    let (mut client_2, _keystore_2) = ClientConfig::default()
+        .with_rpc_endpoint(client_config.rpc_endpoint())
+        .into_client()
+        .await?;
+    client_1.sync_state().await?;
+
+    let network_account =
+        deploy_counter_contract(&mut client_1, AccountStorageMode::Network).await?;
+    let network_account_id = network_account.id();
+
+    // Sanity: counter is 1 after deployment (deploy_counter_contract bumps it once).
+    let counter_value = client_1
+        .account_reader(network_account_id)
+        .get_storage_item(COUNTER_SLOT_NAME.clone())
+        .await
+        .context("failed to find network account after deployment")?;
+    assert_eq!(counter_value, Word::from([Felt::new(1), ZERO, ZERO, ZERO]));
+
+    // client_2 starts watching the network account.
+    client_2.import_watched_account_by_id(network_account_id).await?;
+
+    let watched_record = client_2
+        .test_store()
+        .get_account(network_account_id)
+        .await?
+        .context("watched network account should be tracked in client_2's store")?;
+    assert!(watched_record.is_watched(), "watched network account must be marked as watched");
+
+    let tags = client_2.test_store().get_note_tags().await?;
+    assert!(
+        !tags
+            .iter()
+            .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == network_account_id)),
+        "watched network account must not register a per-account note tag",
+    );
+
+    let initial_watched_commitment =
+        client_2.account_reader(network_account_id).commitment().await?;
+
+    // client_1 emits BUMP_NOTE_NUMBER network notes targeted at the counter; the node will
+    // consume them in subsequent blocks and bump the counter to 1 + BUMP_NOTE_NUMBER.
+    let (native_account, ..) = insert_new_wallet(
+        &mut client_1,
+        AccountStorageMode::Public,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    let source_manager = client_1.source_manager();
+    let mut network_notes = vec![];
+    for _ in 0..BUMP_NOTE_NUMBER {
+        let network_note = get_network_note(
+            native_account.id(),
+            network_account_id,
+            source_manager.clone(),
+            &mut client_1.rng(),
+        )?;
+        network_notes.push(network_note);
+    }
+
+    let tx_request = TransactionRequestBuilder::new().own_output_notes(network_notes).build()?;
+    execute_tx_and_sync(&mut client_1, native_account.id(), tx_request).await?;
+
+    // Poll the watched client until it observes the bumped counter.
+    let expected_counter = Word::from([Felt::new(1 + BUMP_NOTE_NUMBER), ZERO, ZERO, ZERO]);
+    let mut observed = false;
+    for _ in 0..10 {
+        wait_for_blocks(&mut client_1, 1).await;
+        client_2.sync_state().await?;
+        let counter = client_2
+            .account_reader(network_account_id)
+            .get_storage_item(COUNTER_SLOT_NAME.clone())
+            .await?;
+        if counter == expected_counter {
+            observed = true;
+            break;
+        }
+    }
+    assert!(
+        observed,
+        "client_2 should observe the network account state advance via sync_state"
+    );
+
+    let source_commitment = client_1.account_reader(network_account_id).commitment().await?;
+    let watched_commitment = client_2.account_reader(network_account_id).commitment().await?;
+    assert_eq!(
+        watched_commitment, source_commitment,
+        "watched commitment should track source after node-driven bumps",
+    );
+    assert_ne!(
+        watched_commitment, initial_watched_commitment,
+        "watched commitment should have advanced",
+    );
+
+    Ok(())
 }
