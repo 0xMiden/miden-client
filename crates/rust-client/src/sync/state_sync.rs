@@ -667,6 +667,10 @@ impl StateSync {
 
         let details = proof.into_details().expect("node returned no details for a public account");
 
+        let vault_oversized = details.vault_details.too_many_assets;
+        let any_map_oversized =
+            details.storage_details.map_details.iter().any(|m| m.too_many_entries);
+
         // Map slot names actually present on the account, taken from the response header.
         let response_map_slots: Vec<StorageSlotName> = details
             .storage_details
@@ -687,9 +691,7 @@ impl StateSync {
         // TODO: we can handle vault and storage-map oversize independently. Today any oversize
         // routes the whole account through the incremental delta path, which always fetches
         // both `sync_storage_maps` and `sync_account_vault`, even if not needed.
-        let any_oversize = details.vault_details.too_many_assets
-            || details.storage_details.map_details.iter().any(|m| m.too_many_entries);
-        let public_update = if any_oversize {
+        let public_update = if vault_oversized || any_map_oversized {
             // Some part of the account is oversized — use incremental endpoints.
             self.build_delta_update(account_id, &details, block_from, proof_block_num)
                 .await?
