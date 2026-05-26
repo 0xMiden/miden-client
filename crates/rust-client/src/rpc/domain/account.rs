@@ -825,6 +825,13 @@ impl AccountStorageRequirements {
         AccountStorageRequirements(map)
     }
 
+    /// Returns a new `AccountStorageRequirements` that requests all entries for all given slots.
+    pub fn all_entries(slot_names: &[StorageSlotName]) -> Self {
+        AccountStorageRequirements(
+            slot_names.iter().map(|name| (name.clone(), Vec::new())).collect(),
+        )
+    }
+
     pub fn inner(&self) -> &BTreeMap<StorageSlotName, Vec<StorageMapKey>> {
         &self.0
     }

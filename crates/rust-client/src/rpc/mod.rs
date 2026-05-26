@@ -61,7 +61,7 @@ use domain::note::{FetchedNote, NoteSyncBlock, SyncNotesResult};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
-use miden_protocol::account::{Account, AccountId, StorageMapKey, StorageSlotName};
+use miden_protocol::account::{Account, AccountId, StorageSlotName};
 use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
@@ -203,9 +203,9 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// The default implementation composes [`NodeRpcClient::get_account_proof`] with
     /// [`NodeRpcClient::resolve_oversize_vault`] / [`NodeRpcClient::resolve_oversize_storage_maps`]
-    /// to materialize the full account state. Two `/GetAccount` requests are made for public
-    /// accounts: one to discover the storage layout, and a second to request entries for all
-    /// map slots.
+    /// to materialize the full account state. Up to two `/GetAccount` requests are made for
+    /// public accounts: one to discover the storage layout, and a second to request entries for
+    /// all map slots (skipped when the account has no storage maps).
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         // For accounts without public state, only the witness commitment is needed.
         if !account_id.has_public_state() {
@@ -240,13 +240,11 @@ pub trait NodeRpcClient: Send + Sync {
 
         // Second call: request entries for every map slot at the same block, so the view is
         // consistent. If there are no maps, the first proof already has what we need.
+        // TODO: this refetches the full vault and could be avoided
         let mut final_proof = if map_slot_names.is_empty() {
             initial_proof
         } else {
-            let empty_keys: Vec<StorageMapKey> = Vec::new();
-            let requirements = AccountStorageRequirements::new(
-                map_slot_names.iter().map(|name| (name.clone(), empty_keys.iter())),
-            );
+            let requirements = AccountStorageRequirements::all_entries(&map_slot_names);
             let (_, proof) = self
                 .get_account_proof(
                     account_id,
@@ -379,7 +377,7 @@ pub trait NodeRpcClient: Send + Sync {
             return Ok(());
         }
         let vault_info = self
-            .sync_account_vault(BlockNumber::from(0), Some(block_to), account_id)
+            .sync_account_vault(BlockNumber::GENESIS, Some(block_to), account_id)
             .await?;
         let mut updates = vault_info.updates;
         updates.sort_by_key(|u| u.block_num);
@@ -406,7 +404,7 @@ pub trait NodeRpcClient: Send + Sync {
         if !details.storage_details.map_details.iter().any(|m| m.too_many_entries) {
             return Ok(());
         }
-        let info = self.sync_storage_maps(BlockNumber::from(0), Some(block_to), account_id).await?;
+        let info = self.sync_storage_maps(BlockNumber::GENESIS, Some(block_to), account_id).await?;
         for map_details in &mut details.storage_details.map_details {
             if !map_details.too_many_entries {
                 continue;
