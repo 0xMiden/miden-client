@@ -50,6 +50,7 @@ use crate::account::helpers::{
     query_vault_assets,
 };
 use crate::sql_error::SqlResultExt;
+use crate::transaction::with_forest_snapshot;
 use crate::{SqliteStore, column_value_as_u64, insert_sql, subst, u64_to_value};
 
 impl SqliteStore {
@@ -258,17 +259,23 @@ impl SqliteStore {
 
     /// Fetches a specific asset from the account's vault without the need of loading the entire
     /// vault. The witness is retrieved from the [`AccountSmtForest`].
+    ///
+    /// The forest read lock is acquired before the DB read so the DB header and the forest
+    /// observation come from the same `apply_*` epoch: no writer can pop the read root between
+    /// the header fetch and the witness lookup.
     pub(crate) fn get_account_asset(
         conn: &mut Connection,
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
         account_id: AccountId,
         vault_key: AssetVaultKey,
     ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
+        let smt_forest = smt_forest
+            .read()
+            .map_err(|_| StoreError::DatabaseError("smt_forest read lock poisoned".to_string()))?;
         let header = Self::get_account_header(conn, account_id)?
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
-        let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
         match smt_forest.get_asset_and_witness(header.vault_root(), vault_key) {
             Ok((asset, witness)) => Ok(Some((asset, witness))),
             Err(StoreError::MerkleStoreError(MerkleError::UntrackedKey(_))) => Ok(None),
@@ -278,6 +285,10 @@ impl SqliteStore {
 
     /// Retrieves a specific item from the account's storage map without loading the entire storage.
     /// The witness is retrieved from the [`AccountSmtForest`].
+    ///
+    /// The forest read lock is acquired before the DB read so the DB state and the forest
+    /// observation come from the same `apply_*` epoch: no writer can pop the read root between
+    /// the storage-row fetch and the witness lookup.
     pub(crate) fn get_account_map_item(
         conn: &mut Connection,
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
@@ -285,6 +296,9 @@ impl SqliteStore {
         slot_name: StorageSlotName,
         key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
+        let smt_forest = smt_forest
+            .read()
+            .map_err(|_| StoreError::DatabaseError("smt_forest read lock poisoned".to_string()))?;
         let header = Self::get_account_header(conn, account_id)?
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
@@ -297,7 +311,6 @@ impl SqliteStore {
             return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(slot_name)));
         }
 
-        let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
         let witness = smt_forest.get_storage_map_item_witness(map_root, key)?;
         let item = witness.get(key).unwrap_or(miden_client::EMPTY_WORD);
 
@@ -337,30 +350,23 @@ impl SqliteStore {
         initial_address: &Address,
         client_account_type: ClientAccountType,
     ) -> Result<(), StoreError> {
-        let tx = conn.transaction().into_store_error()?;
+        with_forest_snapshot(conn, smt_forest, |tx, smt_forest| {
+            Self::insert_account_code(tx, account.code())?;
 
-        Self::insert_account_code(&tx, account.code())?;
+            let account_id = account.id();
+            Self::insert_storage_slots(tx, account_id, account.storage().slots().iter())?;
+            Self::insert_assets(tx, account_id, account.vault().assets())?;
+            let watched = matches!(client_account_type, ClientAccountType::Watched);
+            Self::insert_new_account_header(tx, &account.into(), account.seed(), watched)?;
+            Self::insert_address(tx, initial_address, account.id())?;
 
-        let account_id = account.id();
-
-        Self::insert_storage_slots(&tx, account_id, account.storage().slots().iter())?;
-
-        Self::insert_assets(&tx, account_id, account.vault().assets())?;
-        let watched = matches!(client_account_type, ClientAccountType::Watched);
-        Self::insert_new_account_header(&tx, &account.into(), account.seed(), watched)?;
-
-        Self::insert_address(&tx, initial_address, account.id())?;
-
-        tx.commit().into_store_error()?;
-
-        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-        smt_forest.insert_and_register_account_state(
-            account.id(),
-            account.vault(),
-            account.storage(),
-        )?;
-
-        Ok(())
+            smt_forest.insert_and_register_account_state(
+                account.id(),
+                account.vault(),
+                account.storage(),
+            )?;
+            Ok(())
+        })
     }
 
     pub(crate) fn update_account(
@@ -391,10 +397,9 @@ impl SqliteStore {
             return Err(StoreError::AccountDataNotFound(new_account_state.id()));
         }
 
-        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-        let tx = conn.transaction().into_store_error()?;
-        Self::update_account_state(&tx, &mut smt_forest, new_account_state)?;
-        tx.commit().into_store_error()
+        with_forest_snapshot(conn, smt_forest, |tx, smt_forest| {
+            Self::update_account_state(tx, smt_forest, new_account_state)
+        })
     }
 
     pub fn upsert_foreign_account_code(
