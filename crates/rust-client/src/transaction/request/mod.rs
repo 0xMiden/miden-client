@@ -253,19 +253,24 @@ impl TransactionRequest {
 
         // Add provided authenticated input notes to the input notes map.
         for authenticated_note_record in authenticated_note_records {
+            // Authenticated note records always carry metadata (their inclusion proof
+            // injected it), so `id()` is `Some`.
+            let authenticated_note_id = authenticated_note_record
+                .id()
+                .expect("authenticated note record carries metadata so id() is Some");
+
             if !authenticated_note_record.is_authenticated() {
                 return Err(TransactionRequestError::InputNoteNotAuthenticated(
-                    authenticated_note_record.id(),
+                    authenticated_note_id,
                 ));
             }
 
             if authenticated_note_record.is_consumed() {
                 return Err(TransactionRequestError::InputNoteAlreadyConsumed(
-                    authenticated_note_record.id(),
+                    authenticated_note_id,
                 ));
             }
 
-            let authenticated_note_id = authenticated_note_record.id();
             input_notes.insert(
                 authenticated_note_id,
                 authenticated_note_record

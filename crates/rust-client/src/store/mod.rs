@@ -44,7 +44,7 @@ use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
 use miden_protocol::errors::AccountError;
-use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::note::{NoteDetailsCommitment, NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::TransactionId;
 use miden_protocol::{Felt, Word};
 use miden_tx::utils::serde::{Deserializable, Serializable};
@@ -758,6 +758,11 @@ pub enum NoteFilter {
     Expected,
     /// Return a list containing any notes that match with the provided [`NoteId`] vector.
     List(Vec<NoteId>),
+    /// Return a list containing any notes whose details commitment matches one of the provided
+    /// [`NoteDetailsCommitment`] vector. Unlike [`NoteFilter::List`], this matches the
+    /// metadata-independent details commitment, so it also resolves metadata-less notes (which
+    /// have a NULL `note_id`).
+    DetailsCommitments(Vec<NoteDetailsCommitment>),
     /// Return a list containing any notes that match the provided [`Nullifier`] vector.
     Nullifiers(Vec<Nullifier>),
     /// Return a list of notes that are currently being processed. This filter doesn't apply to

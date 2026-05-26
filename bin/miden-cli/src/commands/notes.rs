@@ -7,6 +7,7 @@ use miden_client::note::{
     Note,
     NoteConsumability,
     NoteConsumptionStatus,
+    NoteId,
     NoteMetadata,
     NoteStorage,
     StandardNote,
@@ -178,7 +179,9 @@ async fn show_note<AUTH: Keystore + Sync>(
 
     // If we match one note as the input note and another one as the output note return an error
     match (&input_note_record, &output_note_record) {
-        (Some(input_record), Some(output_record)) if input_record.id() != output_record.id() => {
+        (Some(input_record), Some(output_record))
+            if input_record.id() != Some(output_record.id()) =>
+        {
             return Err(CliError::Import(
                 "The specified note ID hex prefix matched with more than one note.".to_string(),
             ));
@@ -390,9 +393,11 @@ where
     let mut table = create_dynamic_table(&["Note ID", "Account ID", "Relevance"]);
 
     for (note, relevances) in notes {
+        // Consumable notes are committed, so they carry metadata and id() is Some.
+        let note_id_hex = note.id().map_or_else(|| "<unknown>".to_string(), |id| id.to_hex());
         for relevance in relevances {
             table.add_row(vec![
-                note.id().to_hex(),
+                note_id_hex.clone(),
                 relevance.0.to_string(),
                 note_consumption_status_type(&relevance.1),
             ]);
@@ -435,9 +440,14 @@ fn note_summary(
     input_note_record: Option<&InputNoteRecord>,
     output_note_record: Option<&OutputNoteRecord>,
 ) -> CliNoteSummary {
+    // Prefer the metadata-aware NoteId; fall back to the input record's stable details
+    // commitment when the input note has no metadata yet (so it lacks a NoteId).
     let note_id = input_note_record
-        .map(InputNoteRecord::id)
-        .or(output_note_record.map(OutputNoteRecord::id))
+        .and_then(InputNoteRecord::id)
+        .or_else(|| output_note_record.map(OutputNoteRecord::id))
+        .or_else(|| {
+            input_note_record.map(|record| NoteId::from_raw(record.details_commitment().as_word()))
+        })
         .expect("One of the two records should be Some");
 
     let assets_commitment_str = input_note_record

@@ -315,10 +315,11 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     let notes = client_2.get_input_notes(NoteFilter::Committed).await?;
 
     //Import the note on the first client so that we can later check its consumer account
-    client_1.import_notes(&[NoteFile::NoteId(notes[0].id())]).await?;
+    let note_id = notes[0].id().expect("committed note has metadata so id() is Some");
+    client_1.import_notes(&[NoteFile::NoteId(note_id)]).await?;
 
     // Consume the note
-    info!(note_id = %notes[0].id(), account_id = %to_account_id, "Consuming note on second client");
+    info!(note_id = %note_id, account_id = %to_account_id, "Consuming note on second client");
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![notes[0].clone().try_into().unwrap()])?;
     execute_tx_and_sync(&mut client_2, to_account_id, tx_request).await?;
@@ -329,9 +330,9 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
 
     // Check that the client doesn't know who consumed the note
     let input_note = client_1
-        .get_input_note(notes[0].id())
+        .get_input_note(note_id)
         .await?
-        .with_context(|| format!("input note {} not found", notes[0].id()))?;
+        .with_context(|| format!("input note {note_id} not found"))?;
     assert!(matches!(input_note.state(), InputNoteState::ConsumedExternal { .. }));
 
     let new_from_account_balance = client_1
@@ -572,7 +573,7 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
 
         assert!(
             a_block <= b_block,
-            "Notes should be ordered by block height: note {} at block {} came before note {} at block {}",
+            "Notes should be ordered by block height: note {:?} at block {} came before note {:?} at block {}",
             a.id(),
             a_block,
             b.id(),
@@ -587,7 +588,7 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
 
     if all_same_block {
         info!("All consume transactions in the same block - verifying tx_order");
-        let reader_note_ids: Vec<_> = reader_notes.iter().map(|n| n.id()).collect();
+        let reader_note_ids: Vec<_> = reader_notes.iter().filter_map(|n| n.id()).collect();
         for (i, note) in minted_notes.iter().enumerate() {
             let pos = reader_note_ids
                 .iter()

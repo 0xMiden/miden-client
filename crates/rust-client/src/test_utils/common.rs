@@ -29,7 +29,6 @@ use crate::account::component::{
     MintPolicyConfig,
     PolicyRegistration,
     TokenPolicyManager,
-    TransferPolicy,
 };
 use crate::account::{AccountBuilder, AccountBuilderSchemaCommitmentExt, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
@@ -137,14 +136,15 @@ pub async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
+    // Only mint/burn policies — registering transfer (send/receive) policies installs asset
+    // callback slots on the faucet, which forces `FungibleAsset` keys to carry
+    // `AssetCallbackFlag::Enabled`. Tests construct assets via `FungibleAsset::new`, which
+    // defaults to `Disabled`, so adding transfer policies makes `mint_and_send` reject the
+    // mint with `ERR_FUNGIBLE_MINT_NOTE_ASSET_NOT_FROM_THIS_FAUCET`.
     let policy_manager = TokenPolicyManager::new()
         .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
         .unwrap()
         .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap()
-        .with_send_policy(TransferPolicy::AllowAll, PolicyRegistration::Active)
-        .unwrap()
-        .with_receive_policy(TransferPolicy::AllowAll, PolicyRegistration::Active)
         .unwrap();
     let account = AccountBuilder::new(init_seed)
         .account_type(visibility)

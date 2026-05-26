@@ -314,8 +314,11 @@ where
         // Verify that none of the authenticated input notes are already consumed.
         for note in &stored_note_records {
             if note.is_consumed() {
+                let id = note.id().expect(
+                    "stored note records reaching this check carry metadata so id() is Some",
+                );
                 return Err(ClientError::TransactionRequestError(
-                    TransactionRequestError::InputNoteAlreadyConsumed(note.id()),
+                    TransactionRequestError::InputNoteAlreadyConsumed(id),
                 ));
             }
         }
@@ -324,7 +327,7 @@ where
         stored_note_records.retain(InputNoteRecord::is_authenticated);
 
         let authenticated_note_ids =
-            stored_note_records.iter().map(InputNoteRecord::id).collect::<Vec<_>>();
+            stored_note_records.iter().filter_map(InputNoteRecord::id).collect::<Vec<_>>();
 
         // Upsert request notes missing from the store so they can be tracked and updated.
         // NOTE: Unauthenticated notes may be stored locally in an unverified/invalid state at
@@ -441,7 +444,7 @@ where
                 if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) =
                     note.state()
                 {
-                    Some(NoteTagRecord::with_note_source(*tag, note.id()))
+                    Some(NoteTagRecord::with_note_source(*tag, note.details_commitment()))
                 } else {
                     None
                 }
@@ -450,7 +453,7 @@ where
 
         new_tags.extend(note_updates.updated_output_notes().map(|note| {
             let note = note.inner();
-            NoteTagRecord::with_note_source(note.metadata().tag(), note.id())
+            NoteTagRecord::with_note_source(note.metadata().tag(), note.details_commitment())
         }));
 
         Ok(TransactionStoreUpdate::new(

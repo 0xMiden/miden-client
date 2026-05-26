@@ -352,7 +352,7 @@ pub async fn disabled_note_reader_finds_note_consumed_by_ntx(
     let mut reader = client.input_note_reader(network_account_id);
     let mut found = false;
     while let Some(note) = reader.next().await? {
-        if note.id() == note_id {
+        if note.id() == Some(note_id) {
             assert_eq!(
                 note.consumer_account(),
                 Some(network_account_id),

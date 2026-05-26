@@ -53,7 +53,6 @@ use miden_standards::account::policies::{
     MintPolicyConfig,
     PolicyRegistration,
     TokenPolicyManager,
-    TransferPolicy,
 };
 use miden_standards::account::wallets::BasicWallet;
 use miden_validator::{Validator, ValidatorSigner};
@@ -562,15 +561,16 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
 }
 
 fn allow_all_policy_manager() -> TokenPolicyManager {
+    // Only mint/burn — registering transfer policies installs asset-callback slots on the
+    // faucet, which forces minted assets to carry `AssetCallbackFlag::Enabled`. Tests build
+    // assets via `FungibleAsset::new`, which defaults to `Disabled`, so adding transfer
+    // policies makes `mint_and_send` reject the mint with
+    // `ERR_FUNGIBLE_MINT_NOTE_ASSET_NOT_FROM_THIS_FAUCET`.
     TokenPolicyManager::new()
         .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
         .expect("allow-all mint policy should register")
         .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
         .expect("allow-all burn policy should register")
-        .with_send_policy(TransferPolicy::AllowAll, PolicyRegistration::Active)
-        .expect("allow-all send policy should register")
-        .with_receive_policy(TransferPolicy::AllowAll, PolicyRegistration::Active)
-        .expect("allow-all receive policy should register")
 }
 
 /// Creates a storage map with many entries for stress-testing storage handling.

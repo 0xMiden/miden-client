@@ -78,12 +78,13 @@ impl InputNoteRecord {
     // ================================================================================================
 
     /// Returns the input note ID, computed by combining the details commitment with the
-    /// note metadata. Requires metadata to be available in the current state.
-    pub fn id(&self) -> NoteId {
-        let metadata = self.metadata().expect(
-            "input note ID requires metadata; metadata-less expected notes are not persisted under protocol 0.15",
-        );
-        NoteId::new(self.details.commitment(), metadata)
+    /// note metadata. Returns `None` when the current state has no metadata (e.g. an
+    /// expected note imported from bare `NoteFile::NoteDetails`, or a note in the
+    /// `ConsumedExternal` state). Use [`Self::details_commitment`] when a stable identifier
+    /// is needed in those cases.
+    pub fn id(&self) -> Option<NoteId> {
+        let metadata = self.metadata()?;
+        Some(NoteId::new(self.details.commitment(), metadata))
     }
 
     /// Returns the commitment to the note's details (recipient + assets), independent of
@@ -239,7 +240,10 @@ impl InputNoteRecord {
         &mut self,
         block_header: &BlockHeader,
     ) -> Result<bool, NoteRecordError> {
-        let new_state = self.state.block_header_received(self.id(), block_header)?;
+        let note_id = self
+            .id()
+            .expect("block_header_received is only called after metadata is populated");
+        let new_state = self.state.block_header_received(note_id, block_header)?;
         if let Some(new_state) = new_state {
             self.state = new_state;
             Ok(true)

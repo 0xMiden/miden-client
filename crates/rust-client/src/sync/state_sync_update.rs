@@ -53,7 +53,7 @@ impl From<&StateSyncUpdate> for SyncSummary {
             .filter_map(|note_update| {
                 let note = note_update.inner();
                 if let NoteUpdateType::Insert = note_update.update_type() {
-                    Some(note.id())
+                    note.id()
                 } else {
                     None
                 }
@@ -65,8 +65,10 @@ impl From<&StateSyncUpdate> for SyncSummary {
             .updated_input_notes()
             .filter_map(|note_update| {
                 let note = note_update.inner();
-                if let NoteUpdateType::Update = note_update.update_type() {
-                    note.is_committed().then_some(note.id())
+                if let NoteUpdateType::Update = note_update.update_type()
+                    && note.is_committed()
+                {
+                    note.id()
                 } else {
                     None
                 }
@@ -81,11 +83,8 @@ impl From<&StateSyncUpdate> for SyncSummary {
             }))
             .collect();
 
-        let consumed_note_ids: BTreeSet<NoteId> = value
-            .note_updates
-            .updated_input_notes()
-            .filter_map(|note| note.inner().is_consumed().then_some(note.inner().id()))
-            .collect();
+        let consumed_note_ids: BTreeSet<NoteId> =
+            value.note_updates.consumed_input_note_ids().collect();
 
         SyncSummary::new(
             value.block_num,

@@ -236,7 +236,7 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
     // Importing a public note before it's committed onchain should fail
     assert_eq!(
         client_2
-            .import_notes(&[NoteFile::NoteId(note.id())])
+            .import_notes(&[NoteFile::NoteId(note.id().unwrap())])
             .await
             .unwrap_err()
             .to_string(),
@@ -250,9 +250,12 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
     let new_sync_data = client_2.sync_state().await.unwrap();
 
     client_2.add_note_tag(note.metadata().unwrap().tag()).await.unwrap();
-    client_2.import_notes(&[NoteFile::NoteId(note.clone().id())]).await.unwrap();
+    client_2
+        .import_notes(&[NoteFile::NoteId(note.clone().id().unwrap())])
+        .await
+        .unwrap();
     client_2.sync_state().await.unwrap();
-    let input_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
+    let input_note = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
     // If imported after execution and syncing then the inclusion proof should be Some
     assert!(input_note.inclusion_proof().is_some(), "Expected inclusion proof to be present");
 
@@ -287,7 +290,7 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
         }])
         .await
         .unwrap();
-    let input_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
+    let input_note = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
 
     // If imported before execution, the note should be imported in `Expected` state
     assert!(matches!(input_note.state(), InputNoteState::Expected { .. }));
@@ -297,7 +300,7 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
 
     // After sync, the imported note should have inclusion proof even if it's not relevant for its
     // accounts.
-    let input_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
+    let input_note = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
     assert!(input_note.inclusion_proof().is_some(), "Expected inclusion proof to be present");
 
     // If inclusion proof is invalid this should panic
@@ -841,7 +844,7 @@ pub async fn test_consume_multiple_expected_notes(client_config: ClientConfig) -
     // Filter notes by ownership
     let expected_notes = all_expected_notes.into_iter();
     let client_notes: Vec<_> = client.get_input_notes(NoteFilter::All).await.unwrap();
-    let client_notes_ids: Vec<_> = client_notes.iter().map(|note| note.id()).collect();
+    let client_notes_ids: Vec<_> = client_notes.iter().filter_map(|note| note.id()).collect();
 
     let (client_owned_notes, unauth_owned_notes): (Vec<_>, Vec<_>) =
         expected_notes.partition(|note| client_notes_ids.contains(&note.id()));
@@ -948,7 +951,7 @@ pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -
 
     // Consume the note with the sender account
 
-    info!(note_id = %note.id(), account_id = %from_account_id, "Consuming note");
+    info!(note_id = %note.id().unwrap(), account_id = %from_account_id, "Consuming note");
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![note.clone().try_into().unwrap()])
         .unwrap();
@@ -962,7 +965,7 @@ pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -
         )])
         .await?;
 
-    let consumed_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
+    let consumed_note = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
     assert!(matches!(consumed_note.state(), InputNoteState::ConsumedExternal { .. }));
     Ok(())
 }
@@ -1015,7 +1018,7 @@ pub async fn test_import_consumed_note_with_id(client_config: ClientConfig) -> R
 
     // Consume the note with the sender account
 
-    info!(note_id = %note.id(), account_id = %from_account_id, "Consuming note");
+    info!(note_id = %note.id().unwrap(), account_id = %from_account_id, "Consuming note");
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![note.clone().try_into().unwrap()])
         .unwrap();
@@ -1023,9 +1026,9 @@ pub async fn test_import_consumed_note_with_id(client_config: ClientConfig) -> R
     client_2.sync_state().await.unwrap();
 
     // Import the consumed note
-    client_2.import_notes(&[NoteFile::NoteId(note.id())]).await.unwrap();
+    client_2.import_notes(&[NoteFile::NoteId(note.id().unwrap())]).await.unwrap();
 
-    let consumed_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
+    let consumed_note = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
     assert!(matches!(consumed_note.state(), InputNoteState::ConsumedExternal { .. }));
     Ok(())
 }
@@ -1085,11 +1088,11 @@ pub async fn test_import_note_with_proof(client_config: ClientConfig) -> Result<
         )])
         .await?;
 
-    let imported_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
+    let imported_note = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
     assert!(matches!(imported_note.state(), InputNoteState::Unverified { .. }));
 
     client_2.sync_state().await.unwrap();
-    let imported_note = client_2.get_input_note(note.id()).await.unwrap().unwrap();
+    let imported_note = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
     assert!(matches!(imported_note.state(), InputNoteState::Committed { .. }));
     Ok(())
 }
@@ -1148,7 +1151,7 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
         .unwrap()
         .clone();
 
-    info!(note_id = %note.id(), account_id = %from_account_id, "Consuming note (without submitting)");
+    info!(note_id = %note.id().unwrap(), account_id = %from_account_id, "Consuming note (without submitting)");
     let tx_request = TransactionRequestBuilder::new()
         .build_consume_notes(vec![note.clone().try_into().unwrap()])
         .unwrap();
@@ -1178,18 +1181,18 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
         "Account hash should change after applying the transaction"
     );
 
-    let note_record = client_1.get_input_note(note.id()).await.unwrap().unwrap();
+    let note_record = client_1.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
     assert!(matches!(note_record.state(), InputNoteState::ProcessingAuthenticated(_)));
 
     // Consume the note in client 2
     execute_tx_and_sync(&mut client_2, to_account_id, tx_request).await?;
 
-    let note_record = client_2.get_input_note(note.id()).await.unwrap().unwrap();
+    let note_record = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
     assert!(matches!(note_record.state(), InputNoteState::ConsumedAuthenticatedLocal(_)));
 
     // After sync the note in client 1 should be consumed externally and the transaction discarded
     client_1.sync_state().await.unwrap();
-    let note_record = client_1.get_input_note(note.id()).await.unwrap().unwrap();
+    let note_record = client_1.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
     assert!(matches!(note_record.state(), InputNoteState::ConsumedExternal(_)));
     let tx_record = client_1
         .get_transactions(TransactionFilter::All)
@@ -1649,8 +1652,8 @@ pub async fn test_ignore_invalid_notes(client_config: ClientConfig) -> Result<()
     // Check that only the valid notes were consumed
     let consumed_notes = client.get_input_notes(NoteFilter::Consumed).await.unwrap();
     assert_eq!(consumed_notes.len(), 2);
-    assert!(consumed_notes.iter().any(|note| note.id() == note_1.id()));
-    assert!(consumed_notes.iter().any(|note| note.id() == note_2.id()));
+    assert!(consumed_notes.iter().any(|note| note.id() == Some(note_1.id())));
+    assert!(consumed_notes.iter().any(|note| note.id() == Some(note_2.id())));
     Ok(())
 }
 

@@ -18,7 +18,7 @@ use miden_client::auth::{
 };
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
-use miden_client::note::{BlockNumber, NoteId};
+use miden_client::note::BlockNumber;
 use miden_client::rpc::NodeRpcClient;
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{
@@ -116,7 +116,6 @@ use miden_standards::account::policies::{
     MintPolicyConfig,
     PolicyRegistration,
     TokenPolicyManager,
-    TransferPolicy,
 };
 use miden_standards::account::wallets::BasicWallet;
 use miden_standards::note::{NoteConsumptionStatus, P2idNoteStorage, PswapNote, StandardNote};
@@ -179,12 +178,14 @@ async fn input_notes_round_trip() {
     let retrieved_notes = client.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(retrieved_notes.len(), 4);
 
-    let chain_notes_commitments: std::collections::HashSet<NoteId> =
-        available_notes.into_iter().map(|n| n.id()).collect();
+    // Compare by details commitment: notes that have been consumed are stored without metadata,
+    // so they have no `NoteId`, but their details commitment is always available.
+    let chain_notes_commitments: std::collections::HashSet<_> =
+        available_notes.iter().map(|n| n.note().unwrap().details_commitment()).collect();
     // compare notes
     assert_eq!(
         chain_notes_commitments,
-        retrieved_notes.iter().map(InputNoteRecord::id).collect()
+        retrieved_notes.iter().map(InputNoteRecord::details_commitment).collect()
     );
 }
 
@@ -206,11 +207,15 @@ async fn get_input_note() {
         .await
         .unwrap();
 
-    // retrieve note from database
-    let retrieved_note = client.get_input_note(original_note.id()).await.unwrap().unwrap();
+    // The note is imported without metadata, so it's retrieved by its details commitment.
+    let retrieved_note = client
+        .get_input_note_by_commitment(original_note.details_commitment())
+        .await
+        .unwrap()
+        .unwrap();
 
     let recorded_note: InputNoteRecord = original_note.into();
-    assert_eq!(recorded_note.id(), retrieved_note.id());
+    assert_eq!(recorded_note.details_commitment(), retrieved_note.details_commitment());
 }
 
 type InsertAccountFuture<'client> =
@@ -900,13 +905,18 @@ async fn import_note_validation() {
         .await
         .unwrap();
 
-    let expected_note = Box::pin(client.get_input_note(expected_note.note().unwrap().id()))
-        .await
-        .unwrap()
-        .unwrap();
+    // The expected note was imported without metadata, so it's retrieved by its details commitment.
+    let expected_note = Box::pin(
+        client.get_input_note_by_commitment(expected_note.note().unwrap().details_commitment()),
+    )
+    .await
+    .unwrap()
+    .unwrap();
 
+    // The consumed note is in `ConsumedExternal` state (no metadata), so it's retrieved by its
+    // details commitment rather than by `NoteId`.
     let consumed_note = client
-        .get_input_note(consumed_note.note().unwrap().id())
+        .get_input_note_by_commitment(consumed_note.note().unwrap().details_commitment())
         .await
         .unwrap()
         .unwrap();
@@ -987,7 +997,9 @@ async fn import_processing_note_returns_error() {
 
     assert!(matches!(
         client
-            .import_notes(&[NoteFile::NoteId(processing_notes[0].id())])
+            .import_notes(&[NoteFile::NoteId(
+                processing_notes[0].id().expect("processing note has metadata so id() is Some")
+            )])
             .await
             .unwrap_err(),
         ClientError::NoteImportError { .. }
@@ -1247,7 +1259,7 @@ async fn p2id_transfer() {
             .await
             .unwrap()
             .into_iter()
-            .any(|tag| tag.source == NoteTagSource::Note(note.id()))
+            .any(|tag| tag.source == NoteTagSource::Note(note.details_commitment()))
     );
 
     mock_rpc_api.prove_block();
@@ -1260,7 +1272,7 @@ async fn p2id_transfer() {
             .await
             .unwrap()
             .into_iter()
-            .any(|tag| tag.source == NoteTagSource::Note(note.id()))
+            .any(|tag| tag.source == NoteTagSource::Note(note.details_commitment()))
     );
 
     // Check that note is committed for the second account to consume
@@ -1325,7 +1337,8 @@ async fn input_note_reader_finds_externally_consumed_notes() {
     let p2id_note = builder
         .add_p2id_note(sender_id, consumer_id, &[asset], NoteType::Public)
         .unwrap();
-    let p2id_note_id = p2id_note.id();
+    let p2id_details_commitment = p2id_note.details_commitment();
+    let p2id_tag = p2id_note.metadata().tag();
 
     let mut chain = builder.build().unwrap();
     // Block 1: makes the note consumable.
@@ -1372,19 +1385,26 @@ async fn input_note_reader_finds_externally_consumed_notes() {
     // Register the consumer account so sync_transactions returns its transactions.
     client.add_account(&consumer, false).await.unwrap();
 
-    // Import the P2ID note as an input note so the client tracks it.
+    // Import the P2ID note as an input note so the client tracks it. The tag lets the import
+    // resolve the note's on-chain commitment (and thus its metadata) so it can later be matched
+    // when the external consumer's nullifier appears during sync.
     let note_file = NoteFile::NoteDetails {
         details: p2id_note.into(),
         after_block_num: BlockNumber::from(0u32),
-        tag: None,
+        tag: Some(p2id_tag),
     };
     client.import_notes(&[note_file]).await.unwrap();
 
     // Sync: the client should discover the note was consumed externally by the tracked account.
     client.sync_state().await.unwrap();
 
-    // The note should be in ConsumedExternal state with consumer_account set.
-    let input_note = client.get_input_note(p2id_note_id).await.unwrap().unwrap();
+    // The note is in ConsumedExternal state (no metadata), so it's retrieved by its details
+    // commitment rather than by `NoteId`.
+    let input_note = client
+        .get_input_note_by_commitment(p2id_details_commitment)
+        .await
+        .unwrap()
+        .unwrap();
     assert!(
         matches!(input_note.state(), InputNoteState::ConsumedExternal(..)),
         "Note should be in ConsumedExternal state, got: {}",
@@ -1408,7 +1428,9 @@ async fn input_note_reader_finds_externally_consumed_notes() {
         1,
         "InputNoteReader should return the externally-consumed note for the tracked consumer",
     );
-    assert_eq!(collected[0].id(), p2id_note_id);
+    // The note is in ConsumedExternal state (no metadata), so id() is None; identify it by
+    // the metadata-independent details commitment instead.
+    assert_eq!(collected[0].details_commitment(), p2id_details_commitment);
     assert_eq!(collected[0].consumer_account(), Some(consumer_id));
 }
 
@@ -3842,14 +3864,12 @@ async fn insert_new_fungible_faucet(
         .max_supply(AssetAmount::new(max_supply).unwrap())
         .build()
         .unwrap();
+    // Only mint/burn policies — see test_utils/common.rs::insert_new_fungible_faucet for the
+    // reason transfer policies are intentionally omitted.
     let policy_manager = TokenPolicyManager::new()
         .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
         .unwrap()
         .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap()
-        .with_send_policy(TransferPolicy::AllowAll, PolicyRegistration::Active)
-        .unwrap()
-        .with_receive_policy(TransferPolicy::AllowAll, PolicyRegistration::Active)
         .unwrap();
 
     let account = AccountBuilder::new(init_seed)
@@ -3894,14 +3914,12 @@ async fn insert_new_ecdsa_fungible_faucet(
         .max_supply(AssetAmount::new(max_supply).unwrap())
         .build()
         .unwrap();
+    // Only mint/burn policies — see test_utils/common.rs::insert_new_fungible_faucet for the
+    // reason transfer policies are intentionally omitted.
     let policy_manager = TokenPolicyManager::new()
         .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
         .unwrap()
         .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap()
-        .with_send_policy(TransferPolicy::AllowAll, PolicyRegistration::Active)
-        .unwrap()
-        .with_receive_policy(TransferPolicy::AllowAll, PolicyRegistration::Active)
         .unwrap();
 
     let account = AccountBuilder::new(init_seed)

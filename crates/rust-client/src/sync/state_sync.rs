@@ -282,7 +282,8 @@ impl StateSync {
                 }
                 .into();
                 let record = InputNoteRecord::new(note.into(), None, state);
-                public_note_records.insert(record.id(), record);
+                let id = record.id().expect("CommittedNoteState carries metadata, so id() is Some");
+                public_note_records.insert(id, record);
             }
         }
 
@@ -1036,6 +1037,7 @@ mod tests {
         NoteAssets,
         NoteAttachment,
         NoteAttachments,
+        NoteDetails,
         NoteHeader,
         NoteMetadata,
         NoteRecipient,
@@ -1049,6 +1051,8 @@ mod tests {
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
         ACCOUNT_ID_SENDER,
     };
+    use miden_protocol::transaction::TransactionArgs;
+    use miden_protocol::vm::AdviceMap;
     use miden_protocol::{Word, ZERO};
     use miden_standards::code_builder::CodeBuilder;
     use miden_standards::note::{NetworkAccountTarget, NoteExecutionHint};
@@ -1336,16 +1340,18 @@ mod tests {
 
         let updated_notes: Vec<_> = update.note_updates.updated_input_notes().collect();
 
-        let find_order = |note_id: NoteId| -> Option<u32> {
+        // These notes are consumed externally, so the records are metadata-less (`id()` is
+        // `None`); match them by the metadata-independent details commitment.
+        let find_order = |details_commitment| -> Option<u32> {
             updated_notes
                 .iter()
-                .find(|n| n.id() == note_id)
+                .find(|n| n.inner().details_commitment() == details_commitment)
                 .and_then(|n| n.consumed_tx_order())
         };
 
-        assert_eq!(find_order(note1.id()), Some(0), "note1 should have tx_order 0");
-        assert_eq!(find_order(note2.id()), Some(1), "note2 should have tx_order 1");
-        assert_eq!(find_order(note3.id()), Some(2), "note3 should have tx_order 2");
+        assert_eq!(find_order(note1.details_commitment()), Some(0), "note1 should have tx_order 0");
+        assert_eq!(find_order(note2.details_commitment()), Some(1), "note2 should have tx_order 1");
+        assert_eq!(find_order(note3.details_commitment()), Some(2), "note3 should have tx_order 2");
 
         // Since there are no uncommitted_transactions, these notes were consumed by a tracked
         // account via external transactions. Verify that consumer_account is populated.
@@ -1420,7 +1426,26 @@ mod tests {
         let _target = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
         let mut chain = builder.build().unwrap();
 
-        let recipient: Word = [0u32, 1, 2, 3].into();
+        // Build a real recipient so its digest has a registered preimage in the advice map;
+        // `mint_and_send` → `output_note::create` emits `NOTE_BEFORE_CREATED_EVENT`, whose host
+        // handler decomposes the recipient digest through the advice map and fails with
+        // `MalformedRecipientData` if the preimage isn't present.
+        let note_script = CodeBuilder::new()
+            .compile_note_script("@note_script\npub proc main\n    nop\nend")
+            .unwrap();
+        let note_recipient = NoteRecipient::new(
+            Word::from([1u32, 2, 3, 4]),
+            note_script,
+            NoteStorage::new(vec![]).unwrap(),
+        );
+        let recipient = note_recipient.digest();
+        // `add_output_note_recipient` populates the advice map with the recipient's preimage
+        // chain (RECIPIENT → [SERIAL_SCRIPT_HASH, STORAGE_COMMITMENT], etc.).
+        let note_details = NoteDetails::new(NoteAssets::new(vec![]).unwrap(), note_recipient);
+        let mut recipient_args = TransactionArgs::new(AdviceMap::default());
+        recipient_args.add_output_note_recipient(&note_details);
+        let recipient_advice = recipient_args.advice_inputs().clone();
+
         let tag = NoteTag::default();
         let mut faucet_account = faucet.clone();
         let mut note_tags = BTreeSet::new();
@@ -1428,25 +1453,32 @@ mod tests {
         for i in 0..num_blocks {
             let amount = 100 + i;
             let source_manager = Arc::new(DefaultSourceManager::default());
+            // Derive the asset key/value in MASM via `create_fungible_asset` (mirroring the
+            // protocol's own faucet tests) so the callback flag matches what `mint_and_send`
+            // derives internally. `add_existing_basic_faucet` registers transfer policies, so
+            // the faucet has callbacks enabled (`push.1`). The new `mint_and_send` signature is
+            // `[ASSET_KEY, ASSET_VALUE, tag, note_type, RECIPIENT, pad(2)]`.
             let tx_script_code = format!(
                 "
                 begin
-                    padw padw push.0
-                    push.{r0}.{r1}.{r2}.{r3}
+                    push.{recipient}
                     push.{note_type}
                     push.{tag}
                     push.{amount}
+                    push.{faucet_id_prefix}
+                    push.{faucet_id_suffix}
+                    push.1
+                    exec.::miden::protocol::asset::create_fungible_asset
                     call.::miden::standards::faucets::fungible::mint_and_send
                     dropw dropw dropw dropw
                 end
                 ",
-                r0 = recipient[0],
-                r1 = recipient[1],
-                r2 = recipient[2],
-                r3 = recipient[3],
+                recipient = recipient,
                 note_type = NoteType::Private as u8,
                 tag = u32::from(tag),
                 amount = amount,
+                faucet_id_prefix = faucet_account.id().prefix().as_felt(),
+                faucet_id_suffix = faucet_account.id().suffix(),
             );
             let tx_script = CodeBuilder::with_source_manager(source_manager.clone())
                 .compile_tx_script(tx_script_code)
@@ -1459,6 +1491,7 @@ mod tests {
                         &[],
                     )
                     .unwrap()
+                    .extend_advice_inputs(recipient_advice.clone())
                     .tx_script(tx_script)
                     .with_source_manager(source_manager)
                     .build()
@@ -1761,7 +1794,7 @@ mod tests {
         let input_note_update = update
             .note_updates
             .updated_input_notes()
-            .find(|n| n.id() == erased_note_id)
+            .find(|n| n.id() == Some(erased_note_id))
             .expect("input note should be created from the erased output note");
 
         let inner = input_note_update.inner();

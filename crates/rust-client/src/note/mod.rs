@@ -41,7 +41,10 @@
 //! // Retrieve an input note by a partial ID match
 //! let note_prefix = "0x70b7ec";
 //! match get_input_note_with_id_prefix(client, note_prefix).await {
-//!     Ok(note) => println!("Found note with matching prefix: {}", note.id().to_hex()),
+//!     Ok(note) => println!(
+//!         "Found note with matching prefix: {}",
+//!         note.id().expect("note matched by ID prefix has an ID").to_hex()
+//!     ),
 //!     Err(err) => println!("Error retrieving note: {err:?}"),
 //! }
 //!
@@ -165,7 +168,8 @@ where
 
         let mut relevant_notes = Vec::new();
         for input_note in committed_notes {
-            let note_id = input_note.id();
+            // Committed notes always have metadata, so id() is `Some`.
+            let Some(note_id) = input_note.id() else { continue };
             let Some(mut account_relevance) = note_relevances.remove(&note_id) else {
                 continue;
             };
@@ -202,6 +206,23 @@ where
         note_id: NoteId,
     ) -> Result<Option<InputNoteRecord>, ClientError> {
         Ok(self.store.get_input_notes(NoteFilter::Unique(note_id)).await?.pop())
+    }
+
+    /// Retrieves the input note given its [`NoteDetailsCommitment`]. Returns `None` if the note is
+    /// not found.
+    ///
+    /// Unlike [`Self::get_input_note`], this resolves notes that have no metadata yet (e.g. notes
+    /// imported as details only, or in a `ConsumedExternal` state), since the details commitment is
+    /// available regardless of metadata.
+    pub async fn get_input_note_by_commitment(
+        &self,
+        details_commitment: NoteDetailsCommitment,
+    ) -> Result<Option<InputNoteRecord>, ClientError> {
+        Ok(self
+            .store
+            .get_input_notes(NoteFilter::DetailsCommitments(vec![details_commitment]))
+            .await?
+            .pop())
     }
 
     // OUTPUT NOTE DATA RETRIEVAL
@@ -266,7 +287,9 @@ where
             IdPrefixFetchError::NoMatch(format!("note ID prefix {note_id_prefix}"))
         })?
         .into_iter()
-        .filter(|note_record| note_record.id().to_hex().starts_with(note_id_prefix))
+        .filter(|note_record| {
+            note_record.id().is_some_and(|id| id.to_hex().starts_with(note_id_prefix))
+        })
         .collect::<Vec<_>>();
 
     if input_note_records.is_empty() {

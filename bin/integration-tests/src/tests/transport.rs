@@ -109,7 +109,7 @@ pub async fn test_transport_note_inclusion_proof_and_consumption(
     let notes = recipient.get_input_notes(NoteFilter::All).await?;
     let received = notes
         .iter()
-        .find(|n| n.id() == note.id())
+        .find(|n| n.id() == Some(note.id()))
         .context("minted note not received by recipient")?;
     assert!(
         matches!(received.state(), InputNoteState::Committed(..)),
@@ -121,7 +121,7 @@ pub async fn test_transport_note_inclusion_proof_and_consumption(
     // Verify consumability
     let consumable = recipient.get_consumable_notes(Some(recipient_account.id())).await?;
     assert!(
-        consumable.iter().any(|(n, _)| n.id() == note.id()),
+        consumable.iter().any(|(n, _)| n.id() == Some(note.id())),
         "minted note should be consumable",
     );
 
@@ -231,7 +231,10 @@ pub async fn test_transport_multiple_notes_different_blocks(
     // Verify all minted notes received and committed
     let input_notes = recipient.get_input_notes(NoteFilter::All).await?;
     let minted_ids: std::collections::HashSet<_> = minted_notes.iter().map(|n| n.id()).collect();
-    let received: Vec<_> = input_notes.iter().filter(|n| minted_ids.contains(&n.id())).collect();
+    let received: Vec<_> = input_notes
+        .iter()
+        .filter(|n| n.id().is_some_and(|id| minted_ids.contains(&id)))
+        .collect();
     assert_eq!(
         received.len(),
         minted_ids.len(),
@@ -263,7 +266,10 @@ pub async fn test_transport_multiple_notes_different_blocks(
 
     // Verify all minted notes are consumable.
     let consumable = recipient.get_consumable_notes(Some(recipient_account.id())).await?;
-    let consumable_minted = consumable.iter().filter(|(n, _)| minted_ids.contains(&n.id())).count();
+    let consumable_minted = consumable
+        .iter()
+        .filter(|(n, _)| n.id().is_some_and(|id| minted_ids.contains(&id)))
+        .count();
     assert_eq!(
         consumable_minted,
         minted_ids.len(),
@@ -365,7 +371,7 @@ pub async fn test_transport_note_not_yet_committed(client_config: ClientConfig) 
     let notes = recipient.get_input_notes(NoteFilter::All).await?;
     let received = notes
         .iter()
-        .find(|n| n.id() == note.id())
+        .find(|n| n.id() == Some(note.id()))
         .context("note not received by recipient via transport")?;
     assert!(
         matches!(received.state(), InputNoteState::Expected(..)),
@@ -377,7 +383,7 @@ pub async fn test_transport_note_not_yet_committed(client_config: ClientConfig) 
     // Our note shouldn't be consumable yet (pre-commit)
     let consumable = recipient.get_consumable_notes(Some(recipient_account.id())).await?;
     assert!(
-        !consumable.iter().any(|(n, _)| n.id() == note.id()),
+        !consumable.iter().any(|(n, _)| n.id() == Some(note.id())),
         "minted note should not be consumable before commit",
     );
 
@@ -392,7 +398,7 @@ pub async fn test_transport_note_not_yet_committed(client_config: ClientConfig) 
     let notes = recipient.get_input_notes(NoteFilter::All).await?;
     let received = notes
         .iter()
-        .find(|n| n.id() == note.id())
+        .find(|n| n.id() == Some(note.id()))
         .context("note not present after post-commit sync")?;
     assert!(
         matches!(received.state(), InputNoteState::Committed(..)),
