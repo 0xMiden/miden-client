@@ -150,15 +150,29 @@ pub async fn deploy_account(
     client.add_account(&account, false).await?;
 
     // Deploy the account by submitting an empty transaction
-    let t = Instant::now();
     println!("Deploying account to network...");
     let tx_request = TransactionRequestBuilder::new().build()?;
+    let deploy_t = Instant::now();
+
+    let t = Instant::now();
     let tx_result = client.execute_transaction(account_id, tx_request).await?;
+    println!("  Execute: {:.2?}", t.elapsed());
+
+    let t = Instant::now();
     let proven_tx = client.prove_transaction(&tx_result).await?;
+    let prove_elapsed = t.elapsed();
     let tx_size = proven_tx.to_bytes().len();
+    println!("  Prove: {:.2?} (tx size: {})", prove_elapsed, format_size(tx_size));
+
+    let t = Instant::now();
     let submission_height = client.submit_proven_transaction(proven_tx, &tx_result).await?;
+    println!("  Submit: {:.2?}", t.elapsed());
+
+    let t = Instant::now();
     client.apply_transaction(&tx_result, submission_height).await?;
-    println!("  Done in {:.2?} (tx size: {})", t.elapsed(), format_size(tx_size));
+    println!("  Apply: {:.2?}", t.elapsed());
+
+    println!("  Total: {:.2?}", deploy_t.elapsed());
 
     // Wait for blocks to ensure deployment is finalized
     let t = Instant::now();

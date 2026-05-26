@@ -5,13 +5,13 @@ use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::hash::rpo::Rpo256;
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, PartialMmr};
-#[cfg(feature = "testing")]
-use miden_protocol::transaction::TransactionKernel;
 use miden_protocol::{Felt, Word};
 use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
 use crate::store::{BlockRelevance, StoreError};
+#[cfg(feature = "testing")]
+use crate::test_utils::mock::MockRpcApi;
 use crate::{CachedPartialMmr, Client, ClientError};
 
 /// Network information management methods.
@@ -44,11 +44,11 @@ impl<AUTH> Client<AUTH> {
         Ok(())
     }
 
-    /// Seeds the local client state needed to create accounts and execute programs without a node.
+    /// Seeds local state for offline account creation and debugging without a real node.
     ///
-    /// This stores default RPC limits and inserts a synthetic genesis header if one is not
-    /// already present in the store. The synthetic header is only intended for local-only
-    /// execution and debugging.
+    /// Applies default RPC limits, then either aligns the RPC genesis with an existing stored
+    /// genesis, or replaces the RPC client with [`MockRpcApi`] and runs
+    /// [`Self::ensure_genesis_in_place`] so genesis comes from the mock chain.
     #[cfg(feature = "testing")]
     pub async fn prepare_offline_bootstrap(&mut self) -> Result<(), ClientError> {
         let limits = self.store.get_rpc_limits().await?.unwrap_or_default();
@@ -61,9 +61,8 @@ impl<AUTH> Client<AUTH> {
             return Ok(());
         }
 
-        let genesis = synthetic_offline_genesis_header();
-        self.store.insert_block_header(&genesis, false).await?;
-        self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+        *self.test_rpc_api() = Arc::new(MockRpcApi::default());
+        self.ensure_genesis_in_place().await?;
         Ok(())
     }
 
@@ -152,11 +151,6 @@ impl<AUTH> Client<AUTH> {
     }
 }
 
-#[cfg(feature = "testing")]
-fn synthetic_offline_genesis_header() -> BlockHeader {
-    BlockHeader::mock(BlockNumber::GENESIS, None, None, &[], TransactionKernel.to_commitment())
-}
-
 // UTILS
 // --------------------------------------------------------------------------------------------
 
@@ -227,18 +221,12 @@ pub(crate) async fn fetch_block_header(
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "testing")]
-    use miden_protocol::block::account_tree::AccountTree;
     use miden_protocol::block::{BlockHeader, BlockNumber};
     use miden_protocol::crypto::merkle::MerklePath;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, Mmr, PartialMmr};
-    #[cfg(feature = "testing")]
-    use miden_protocol::crypto::merkle::smt::Smt;
     use miden_protocol::transaction::TransactionKernel;
     use miden_protocol::{Felt, Word};
 
-    #[cfg(feature = "testing")]
-    use super::synthetic_offline_genesis_header;
     use super::{adjust_merkle_path_for_forest, authenticated_block_nodes};
 
     fn word(n: u64) -> Word {
@@ -364,15 +352,5 @@ mod tests {
 
         assert_eq!(nodes[0], (InOrderIndex::from_leaf_pos(4), block_header.commitment()));
         assert_eq!(&nodes[1..], path_nodes.as_slice());
-    }
-
-    #[test]
-    #[cfg(feature = "testing")]
-    fn synthetic_offline_genesis_header_uses_mock_genesis() {
-        let genesis = synthetic_offline_genesis_header();
-
-        assert_eq!(genesis.block_num(), BlockNumber::GENESIS);
-        assert_eq!(genesis.account_root(), AccountTree::<Smt>::default().root());
-        assert_eq!(genesis.tx_kernel_commitment(), TransactionKernel.to_commitment());
     }
 }

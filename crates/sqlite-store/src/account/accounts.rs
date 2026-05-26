@@ -78,7 +78,7 @@ impl SqliteStore {
     }
 
     pub(crate) fn get_account_header(
-        conn: &mut Connection,
+        conn: &Connection,
         account_id: AccountId,
     ) -> Result<Option<(AccountHeader, AccountStatus)>, StoreError> {
         Ok(query_latest_account_headers(conn, "id = ?", params![account_id.to_hex()])?.pop())
@@ -232,6 +232,20 @@ impl SqliteStore {
     ) -> Result<AccountStorage, StoreError> {
         let slots = query_storage_slots(conn, account_id, filter)?.into_values().collect();
         Ok(AccountStorage::new(slots)?)
+    }
+
+    /// Retrieves the storage header (slot names, types, and current values/roots) for the given
+    /// account, without loading any storage map entries.
+    pub fn get_account_storage_header(
+        conn: &Connection,
+        account_id: AccountId,
+    ) -> Result<AccountStorageHeader, StoreError> {
+        let mut slots: Vec<StorageSlotHeader> = query_storage_values(conn, account_id)?
+            .into_iter()
+            .map(|(name, (slot_type, value))| StorageSlotHeader::new(name, slot_type, value))
+            .collect();
+        slots.sort_by_key(StorageSlotHeader::id);
+        AccountStorageHeader::new(slots).map_err(StoreError::AccountError)
     }
 
     /// Fetches a specific asset from the account's vault without the need of loading the entire

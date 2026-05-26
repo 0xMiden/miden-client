@@ -77,6 +77,10 @@ serve-docs: ## Serves the docs
 test: ## Run tests
 	cargo nextest run --workspace --exclude testing-remote-prover --release --lib $(FEATURES_CLIENT)
 
+.PHONY: test-miden-bench
+test-miden-bench: ## Run miden-bench CLI tests
+	cargo nextest run --package miden-client-bench --release --test=integration
+
 .PHONY: test-docs
 test-docs: ## Run documentation tests
 	cargo test --doc $(FEATURES_CLIENT)
@@ -116,6 +120,10 @@ integration-test: ## Run integration tests
 integration-test-full: ## Run the integration test binary with ignored tests included (requires note transport service)
 	TEST_MIDEN_NOTE_TRANSPORT_URL=$(TEST_MIDEN_NOTE_TRANSPORT_URL) cargo nextest run --workspace --exclude testing-remote-prover --release --test=integration
 	cargo nextest run --workspace --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
+
+.PHONY: integration-test-miden-bench
+integration-test-miden-bench: install-bench ## Run miden-bench smoke tests
+	./scripts/test-miden-bench-smoke.sh
 
 .PHONY: test-dev
 test-dev: ## Run tests with debug assertions enabled via test-dev profile

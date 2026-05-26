@@ -133,7 +133,7 @@ pub async fn expand_storage(
     let total_t = Instant::now();
 
     // Import account if not already present in store
-    let has_account = client.get_account_storage(account_id).await.is_ok();
+    let has_account = client.account_reader(account_id).header().await.is_ok();
     if has_account {
         println!("Using account {account_id} from persistent store");
     } else {

@@ -144,8 +144,8 @@ impl MockRpcApi {
         let mut updates = vec![];
         for block in self.mock_chain.read().proven_blocks() {
             let block_number = block.header().block_num();
-            // Only include blocks in range (block_from, page_end_block]
-            if block_number <= block_from || block_number > page_end_block {
+            // Only include blocks in range [block_from, page_end_block]
+            if block_number < block_from || block_number > page_end_block {
                 continue;
             }
 
@@ -231,7 +231,8 @@ impl MockRpcApi {
         let mut updates = vec![];
         for block in self.mock_chain.read().proven_blocks() {
             let block_number = block.header().block_num();
-            if block_number <= block_from || block_number > page_end_block {
+            // Only include blocks in range [block_from, page_end_block]
+            if block_number < block_from || block_number > page_end_block {
                 continue;
             }
 

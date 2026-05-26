@@ -202,6 +202,17 @@ pub(crate) fn query_storage_slots(
             values_params.push(name.to_string());
             format!("{base_query} AND slot_name = ?2")
         },
+        AccountStorageFilter::SlotNames(names) => {
+            if names.is_empty() {
+                return Ok(BTreeMap::new());
+            }
+            let placeholders =
+                (0..names.len()).map(|i| format!("?{}", i + 2)).collect::<Vec<_>>().join(", ");
+            for name in names {
+                values_params.push(name.to_string());
+            }
+            format!("{base_query} AND slot_name IN ({placeholders})")
+        },
         AccountStorageFilter::Root(root) => {
             values_params.push(root.to_hex());
             format!("{base_query} AND slot_value = ?2")
@@ -227,10 +238,14 @@ pub(crate) fn query_storage_slots(
         })
         .collect::<Result<Vec<(StorageSlotName, Word, StorageSlotType)>, StoreError>>()?;
 
-    // For SlotName filter, also restrict map entries query to avoid loading unneeded maps
-    let map_filter = match filter {
-        AccountStorageFilter::SlotName(name) => Some(name.to_string()),
-        _ => None,
+    // Restrict map entries query by slot name(s) when the filter narrows by name, so we don't
+    // load map entries we'll discard.
+    let map_filter: Option<Vec<String>> = match filter {
+        AccountStorageFilter::SlotName(name) => Some(vec![name.to_string()]),
+        AccountStorageFilter::SlotNames(names) => {
+            Some(names.iter().map(StorageSlotName::to_string).collect())
+        },
+        AccountStorageFilter::All | AccountStorageFilter::Root(_) => None,
     };
 
     let has_map_slots = storage_values.iter().any(|(_, _, t)| *t == StorageSlotType::Map);
@@ -259,16 +274,23 @@ pub(crate) fn query_storage_slots(
 pub(crate) fn query_storage_maps(
     conn: &Connection,
     account_id: AccountId,
-    slot_name_filter: Option<&str>,
+    slot_name_filter: Option<&[String]>,
 ) -> Result<BTreeMap<StorageSlotName, StorageMap>, StoreError> {
     let account_id_hex = account_id.to_hex();
     let base_query =
         "SELECT slot_name, key, value FROM latest_storage_map_entries WHERE account_id = ?1";
     let mut map_params: Vec<String> = vec![account_id_hex];
     let query = match slot_name_filter {
-        Some(name) => {
-            map_params.push(name.to_string());
-            format!("{base_query} AND slot_name = ?2")
+        Some(names) => {
+            if names.is_empty() {
+                return Ok(BTreeMap::new());
+            }
+            let placeholders =
+                (0..names.len()).map(|i| format!("?{}", i + 2)).collect::<Vec<_>>().join(", ");
+            for name in names {
+                map_params.push(name.clone());
+            }
+            format!("{base_query} AND slot_name IN ({placeholders})")
         },
         None => base_query.to_string(),
     };

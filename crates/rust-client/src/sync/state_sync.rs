@@ -6,46 +6,33 @@ use alloc::vec::Vec;
 use async_trait::async_trait;
 use miden_protocol::account::{
     Account,
-    AccountCode,
-    AccountDelta,
     AccountHeader,
     AccountId,
-    AccountStorage,
-    AccountStorageDelta,
-    AccountVaultDelta,
+    AccountStorageHeader,
     StorageMapKey,
-    StorageSlot,
-    StorageSlotContent,
     StorageSlotName,
     StorageSlotType,
 };
-use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
 use miden_protocol::note::{Note, NoteId, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::InputNoteCommitment;
-use miden_protocol::{EMPTY_WORD, Felt, Word};
+use miden_protocol::{EMPTY_WORD, Word};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
-use super::{AccountUpdates, PublicAccountUpdate, StateSyncUpdate};
+use super::{AccountUpdates, PublicAccountDelta, PublicAccountUpdate, StateSyncUpdate};
 use crate::ClientError;
 use crate::note::NoteUpdateTracker;
-use crate::rpc::domain::account::{
-    AccountDetails,
-    AccountStorageMapDetails,
-    AccountStorageRequirements,
-    FetchedAccount,
-};
+use crate::rpc::domain::account::{AccountDetails, AccountStorageRequirements};
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
-use crate::rpc::domain::storage_map::StorageMapUpdate;
 use crate::rpc::domain::sync::SyncTarget;
 use crate::rpc::domain::transaction::{
     TransactionInclusion,
     TransactionRecord as RpcTransactionRecord,
 };
 use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError};
-use crate::store::{AccountStorageFilter, InputNoteRecord, OutputNoteRecord, Store, StoreError};
+use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
 use crate::transaction::TransactionRecord;
 
 // STATE UPDATE DATA
@@ -76,6 +63,37 @@ struct RawStateSyncData {
 // SYNC REQUEST
 // ================================================================================================
 
+/// A tracked account passed into a sync, with an optional hint that lets `StateSync` save
+/// one RPC roundtrip when the account's storage layout is already known to the caller.
+///
+/// Hints are purely an optimization: correctness does not depend on them. If `storage_header`
+/// has no slots, or if it is stale (a new map slot has appeared on-chain since the hint was
+/// produced), `StateSync` transparently falls back to fetching the missing slots and the
+/// account is still synced correctly — just at the cost of one extra roundtrip.
+#[derive(Debug, Clone)]
+pub struct AccountSyncHint {
+    /// The account header.
+    pub header: AccountHeader,
+    /// Local snapshot of the account's storage layout (slot names, types, and current roots
+    /// or values). When this carries up-to-date map slot names, `StateSync` can request all
+    /// map data in a single `get_account_proof` call. If the on-chain layout has new map
+    /// slots, `StateSync` fetches only those missing slots and reuses the already-downloaded
+    /// data for the slots covered here.
+    pub storage_header: AccountStorageHeader,
+}
+
+impl AccountSyncHint {
+    /// Creates a hint with no slot information. `StateSync` will discover the slot layout
+    /// via an extra RPC call.
+    pub fn from_header(header: AccountHeader) -> Self {
+        Self {
+            header,
+            storage_header: AccountStorageHeader::new(Vec::new())
+                .expect("an empty storage header is valid"),
+        }
+    }
+}
+
 /// Bundles the client state needed to perform a sync operation.
 ///
 /// The sync process uses these inputs to:
@@ -89,8 +107,8 @@ struct RawStateSyncData {
 /// Use [`Client::build_sync_input()`](`crate::Client::build_sync_input()`) to build a default input
 /// from the client state, or construct this struct manually for custom sync scenarios.
 pub struct StateSyncInput {
-    /// Account headers to request commitment updates for.
-    pub accounts: Vec<AccountHeader>,
+    /// Tracked accounts (with optional storage layout hints) to follow during the sync.
+    pub accounts: Vec<AccountSyncHint>,
     /// Note tags that the node uses to filter which note inclusions to return.
     pub note_tags: BTreeSet<NoteTag>,
     /// Input notes whose lifecycle should be followed during sync.
@@ -144,10 +162,6 @@ pub trait OnNoteReceived {
 pub struct StateSync {
     /// The RPC client used to communicate with the node.
     rpc_api: Arc<dyn NodeRpcClient>,
-    /// The client's store, used to fetch account storage and vault data on demand during
-    /// delta-based sync of public accounts. When `None`, oversized public accounts fall back
-    /// to `get_account_details` (full sync from block 0).
-    store: Option<Arc<dyn Store>>,
     /// Responsible for checking the relevance of notes and executing the
     /// [`OnNoteReceived`] callback when a new note inclusion is received.
     note_screener: Arc<dyn OnNoteReceived>,
@@ -169,18 +183,15 @@ impl StateSync {
     /// # Arguments
     ///
     /// * `rpc_api` - The RPC client used to communicate with the node.
-    /// * `store` - Optional store for on-demand account data access during delta sync.
     /// * `note_screener` - The note screener used to check the relevance of notes.
     /// * `tx_discard_delta` - Number of blocks after which pending transactions are discarded.
     pub fn new(
         rpc_api: Arc<dyn NodeRpcClient>,
-        store: Option<Arc<dyn Store>>,
         note_screener: Arc<dyn OnNoteReceived>,
         tx_discard_delta: Option<u32>,
     ) -> Self {
         Self {
             rpc_api,
-            store,
             note_screener,
             tx_discard_delta,
             sync_nullifiers: true,
@@ -235,7 +246,8 @@ impl StateSync {
             .into();
 
         let note_tags = Arc::new(note_tags);
-        let account_ids: Vec<AccountId> = accounts.iter().map(AccountHeader::id).collect();
+        let account_ids: Vec<AccountId> = accounts.iter().map(|hint| hint.header.id()).collect();
+        let _tracked_accounts: BTreeSet<AccountId> = account_ids.iter().copied().collect();
 
         let mut state_sync_update = StateSyncUpdate {
             block_num,
@@ -544,29 +556,29 @@ impl StateSync {
     async fn account_state_sync(
         &self,
         account_updates: &mut AccountUpdates,
-        accounts: &[AccountHeader],
+        accounts: &[AccountSyncHint],
         account_commitment_updates: &[(AccountId, Word)],
-        block_num: BlockNumber,
+        block_from: BlockNumber,
     ) -> Result<(), ClientError> {
         // "Public" here includes both Public and Network accounts, since both have
         // their state stored on-chain and follow the same sync path.
         let (public_accounts, private_accounts): (Vec<_>, Vec<_>) =
-            accounts.iter().partition(|a| !a.id().is_private());
+            accounts.iter().partition(|hint| !hint.header.id().is_private());
 
         self.sync_public_accounts(
             account_updates,
             account_commitment_updates,
             &public_accounts,
-            block_num,
+            block_from,
         )
         .await?;
 
         let mismatched_private_accounts = account_commitment_updates
             .iter()
             .filter(|(account_id, digest)| {
-                private_accounts
-                    .iter()
-                    .any(|a| a.id() == *account_id && &a.to_commitment() != digest)
+                private_accounts.iter().any(|hint| {
+                    hint.header.id() == *account_id && &hint.header.to_commitment() != digest
+                })
             })
             .copied()
             .collect::<Vec<_>>();
@@ -578,467 +590,221 @@ impl StateSync {
 
     /// Queries the node for updated public accounts and populates `account_updates`.
     ///
-    /// When a store is available, storage and vault data are fetched on demand to build
-    /// deltas for oversized accounts. Without a store, oversized accounts fall back to
-    /// `get_account_details` (full sync from block 0).
+    /// For each public account whose commitment changed, an updated snapshot is fetched via
+    /// `get_account_proof`. Callers may supply [`AccountSyncHint::map_slot_names`] to request
+    /// map storage data up-front and avoid a roundtrip; otherwise a second call is issued when
+    /// the account turns out to have map slots.
+    ///
+    /// Accounts whose vault or maps are too large to fit in a single response fall back to the
+    /// incremental [`PublicAccountUpdate::Delta`] path, which fetches vault and storage map
+    /// updates over the synced block range.
     async fn sync_public_accounts(
         &self,
         account_updates: &mut AccountUpdates,
         commitment_updates: &[(AccountId, Word)],
-        current_public_accounts: &[&AccountHeader],
-        block_num: BlockNumber,
+        current_public_accounts: &[&AccountSyncHint],
+        block_from: BlockNumber,
     ) -> Result<(), ClientError> {
         for (id, commitment) in commitment_updates {
-            let Some(local_header) = current_public_accounts
+            let Some(local_hint) = current_public_accounts
                 .iter()
-                .find(|acc| *id == acc.id() && *commitment != acc.to_commitment())
+                .find(|hint| *id == hint.header.id() && *commitment != hint.header.to_commitment())
             else {
                 continue;
             };
 
-            let account_id = local_header.id();
-
-            // Build storage requirements and known code from store (if available) to
-            // request all entries for every map slot and avoid re-downloading code.
-            let (storage_requirements, known_code) =
-                self.fetch_local_account_hints(account_id).await;
-
-            let (proof_block_num, proof) = self
-                .rpc_api
-                .get_account_proof(
-                    account_id,
-                    storage_requirements,
-                    AccountStateAt::ChainTip,
-                    known_code,
-                    Some(EMPTY_WORD),
-                )
-                .await
-                .map_err(ClientError::RpcError)?;
-
-            let Some(details) = proof.into_parts().1 else {
-                // Private account returned — should not happen for public accounts.
-                continue;
-            };
-
-            // Skip if the remote nonce is not newer than what we already have.
-            if details.header.nonce().as_canonical_u64() <= local_header.nonce().as_canonical_u64()
-            {
-                continue;
-            }
-
-            let has_oversized_data = details.vault_details.too_many_assets
-                || details.storage_details.map_details.iter().any(|m| m.too_many_entries);
-
-            if has_oversized_data {
-                if self.store.is_some() {
-                    // Delta path: build an AccountDelta from incremental updates,
-                    // fetching storage slots and vault from the store on demand.
-                    let delta = self
-                        .build_account_delta(&details, local_header, block_num, proof_block_num)
-                        .await?;
-                    account_updates.extend(AccountUpdates::new(
-                        vec![PublicAccountUpdate::Delta {
-                            new_header: details.header.clone(),
-                            delta,
-                        }],
-                        Vec::new(),
-                    ));
-                } else {
-                    // No store available — fall back to get_account_details which
-                    // handles oversized data internally (syncing from block 0).
-                    let response = self
-                        .rpc_api
-                        .get_account_details(account_id)
-                        .await
-                        .map_err(ClientError::RpcError)?;
-
-                    match response {
-                        FetchedAccount::Public(account, _) => {
-                            account_updates.extend(AccountUpdates::new(
-                                vec![PublicAccountUpdate::Full(*account)],
-                                Vec::new(),
-                            ));
-                        },
-                        // This should not happen since we only fetch public accounts here.
-                        FetchedAccount::Private(..) => {},
-                    }
-                }
-            } else {
-                // Small account: build directly from the response details.
-                let account = Account::try_from(&details).map_err(ClientError::RpcError)?;
-                account_updates.extend(AccountUpdates::new(
-                    vec![PublicAccountUpdate::Full(account)],
-                    Vec::new(),
-                ));
-            }
+            let public_update = self.sync_public_account(local_hint, block_from).await?;
+            account_updates.extend(AccountUpdates::new(vec![public_update], Vec::new()));
         }
 
         Ok(())
     }
 
-    /// Fetches storage requirements and known code from the store for a given account.
+    /// Fetches an updated snapshot for a single public account.
     ///
-    /// Returns defaults when no store is available.
-    async fn fetch_local_account_hints(
-        &self,
-        account_id: AccountId,
-    ) -> (AccountStorageRequirements, Option<AccountCode>) {
-        let Some(store) = &self.store else {
-            return (AccountStorageRequirements::default(), None);
-        };
-
-        let storage_requirements = store
-            .get_account_storage(account_id, AccountStorageFilter::All)
-            .await
-            .map(|storage| Self::build_storage_requirements(&storage))
-            .unwrap_or_default();
-
-        let known_code = store.get_account_code(account_id).await.ok().flatten();
-
-        (storage_requirements, known_code)
-    }
-
-    /// Builds [`AccountStorageRequirements`] from [`AccountStorage`], requesting all entries for
-    /// every map slot.
-    fn build_storage_requirements(storage: &AccountStorage) -> AccountStorageRequirements {
-        let map_slots = storage.slots().iter().filter_map(|slot: &StorageSlot| {
-            if slot.slot_type() == StorageSlotType::Map {
-                // Passing an empty key list requests all entries for this map slot.
-                Some((slot.name().clone(), core::iter::empty::<&StorageMapKey>()))
-            } else {
-                None
-            }
-        });
-        AccountStorageRequirements::new(map_slots)
-    }
-
-    /// Builds an [`AccountDelta`] from incremental RPC sync data, fetching local account
-    /// data from the store on demand.
-    ///
-    /// For oversized storage maps: fetches delta entries via `sync_storage_maps`.
-    /// For oversized vaults: fetches delta entries via `sync_account_vault`.
-    /// Non-oversized parts are diffed against local data fetched from the store.
+    /// Must only be called when the local commitment for `local_hint` is known to differ from the
+    /// network's, which guarantees the node returns updated details with a newer nonce.
     ///
     /// # Panics
     ///
-    /// Panics if `self.store` is `None`. Callers must check before invoking.
-    #[allow(clippy::too_many_lines)]
-    async fn build_account_delta(
+    /// Panics if the node response omits account details, since that would mean the account is
+    /// not public.
+    async fn sync_public_account(
         &self,
-        details: &AccountDetails,
-        local_header: &AccountHeader,
+        local_hint: &AccountSyncHint,
         block_from: BlockNumber,
-        block_to: BlockNumber,
-    ) -> Result<AccountDelta, ClientError> {
-        let store = self.store.as_ref().expect("store required for delta sync");
-        let account_id = details.header.id();
+    ) -> Result<PublicAccountUpdate, ClientError> {
+        let account_id = local_hint.header.id();
 
-        let storage_delta = self
-            .build_storage_delta(details, account_id, block_from, block_to, store.as_ref())
-            .await?;
+        // Map slot names already known locally via the hint.
+        let hinted_map_slots: Vec<StorageSlotName> = local_hint
+            .storage_header
+            .slots()
+            .filter(|slot| slot.slot_type() == StorageSlotType::Map)
+            .map(|slot| slot.name().clone())
+            .collect();
 
-        let vault_delta = self
-            .build_vault_delta(details, account_id, block_from, block_to, store.as_ref())
-            .await?;
-
-        // --- Nonce delta ---
-        let old_nonce = local_header.nonce().as_canonical_u64();
-        let new_nonce = details.header.nonce().as_canonical_u64();
-        let nonce_delta = Felt::new(new_nonce - old_nonce).map_err(|err| {
-            ClientError::RpcError(RpcError::InvalidResponse(format!("invalid nonce delta: {err}")))
-        })?;
-
-        AccountDelta::new(account_id, storage_delta, vault_delta, nonce_delta).map_err(|err| {
-            ClientError::RpcError(RpcError::InvalidResponse(format!(
-                "failed to construct account delta: {err}"
-            )))
-        })
-    }
-
-    /// Computes the full storage delta (value slots + map slots) for the account.
-    ///
-    /// For value slots, compares the response values against the local store. For map slots,
-    /// oversized maps (`too_many_entries`) fetch incremental delta entries from the sync endpoint
-    /// and deduplicate by key keeping the latest value; non-oversized maps diff the full response
-    /// entries against the local store.
-    async fn build_storage_delta(
-        &self,
-        details: &AccountDetails,
-        account_id: AccountId,
-        block_from: BlockNumber,
-        block_to: BlockNumber,
-        store: &dyn Store,
-    ) -> Result<AccountStorageDelta, ClientError> {
-        let mut storage_delta = AccountStorageDelta::new();
-
-        for slot_header in details.storage_details.header.slots() {
-            if slot_header.slot_type() == StorageSlotType::Value {
-                let local_value = store
-                    .get_account_storage_item(account_id, slot_header.name().clone())
-                    .await
-                    .ok();
-
-                if local_value.as_ref() != Some(&slot_header.value()) {
-                    storage_delta
-                        .set_item(slot_header.name().clone(), slot_header.value())
-                        .map_err(|err| {
-                            ClientError::RpcError(RpcError::InvalidResponse(format!(
-                                "failed to set storage delta item: {err}"
-                            )))
-                        })?;
-                }
-            }
-        }
-
-        let mut map_delta_cache: Option<Vec<StorageMapUpdate>> = None;
-
-        for slot_header in details.storage_details.header.slots() {
-            if slot_header.slot_type() != StorageSlotType::Map {
-                continue;
-            }
-
-            let map_details =
-                details.storage_details.find_map_details(slot_header.name()).ok_or_else(|| {
-                    ClientError::RpcError(RpcError::ExpectedDataMissing(format!(
-                        "slot '{}' is a map but has no map_details in response",
-                        slot_header.name()
-                    )))
-                })?;
-
-            if map_details.too_many_entries {
-                // Oversized map: fetch delta entries from the sync endpoint.
-                if map_delta_cache.is_none() {
-                    let map_info = self
-                        .rpc_api
-                        .sync_storage_maps(block_from, Some(block_to), account_id)
-                        .await
-                        .map_err(ClientError::RpcError)?;
-                    map_delta_cache = Some(map_info.updates);
-                }
-
-                Self::apply_oversized_map_delta(
-                    map_delta_cache.as_deref().unwrap_or_default(),
-                    slot_header.name(),
-                    &mut storage_delta,
-                )?;
-            } else {
-                Self::apply_full_map_delta(
-                    map_details,
-                    slot_header.name(),
-                    account_id,
-                    store,
-                    &mut storage_delta,
-                )
-                .await?;
-            }
-        }
-
-        Ok(storage_delta)
-    }
-
-    /// Applies delta updates from the sync endpoint for an oversized storage map slot.
-    ///
-    /// Filters the cached delta updates to the target slot, sorts by block number, and
-    /// deduplicates by key (keeping the latest value).
-    fn apply_oversized_map_delta(
-        delta_updates: &[StorageMapUpdate],
-        slot_name: &StorageSlotName,
-        storage_delta: &mut AccountStorageDelta,
-    ) -> Result<(), ClientError> {
-        let mut relevant: Vec<_> =
-            delta_updates.iter().filter(|u| u.slot_name == *slot_name).collect();
-        relevant.sort_by_key(|u| u.block_num);
-
-        // Deduplicate: keep latest value per key.
-        let mut seen = BTreeMap::new();
-        for update in relevant {
-            seen.insert(update.key, update.value);
-        }
-
-        for (key, value) in seen {
-            storage_delta.set_map_item(slot_name.clone(), key, value).map_err(|err| {
-                ClientError::RpcError(RpcError::InvalidResponse(format!(
-                    "failed to set storage map delta: {err}"
-                )))
-            })?;
-        }
-
-        Ok(())
-    }
-
-    /// Diffs the full response map entries against the local store for a non-oversized map slot.
-    ///
-    /// Entries present in the response but missing or different locally are added to the delta.
-    /// Entries present locally but absent in the response are set to `Word::default()` (removal).
-    async fn apply_full_map_delta(
-        map_details: &AccountStorageMapDetails,
-        slot_name: &StorageSlotName,
-        account_id: AccountId,
-        store: &dyn Store,
-        storage_delta: &mut AccountStorageDelta,
-    ) -> Result<(), ClientError> {
-        let response_map = map_details
-            .entries
-            .clone()
-            .into_storage_map()
-            .ok_or_else(|| {
-                ClientError::RpcError(RpcError::ExpectedDataMissing(
-                    "expected AllEntries for map, got EntriesWithProofs".into(),
-                ))
-            })?
-            .map_err(|err| {
-                ClientError::RpcError(RpcError::InvalidResponse(format!(
-                    "the rpc api returned a non-valid map entry: {err}"
-                )))
-            })?;
-
-        let local_entries: BTreeMap<StorageMapKey, Word> = store
-            .get_account_storage(account_id, AccountStorageFilter::SlotName(slot_name.clone()))
-            .await
-            .ok()
-            .and_then(|storage| storage.get(slot_name).cloned())
-            .map(|slot| match slot.content() {
-                StorageSlotContent::Map(map) => map.entries().map(|(k, v)| (*k, *v)).collect(),
-                StorageSlotContent::Value(_) => BTreeMap::new(),
-            })
-            .unwrap_or_default();
-
-        let response_entries: BTreeMap<StorageMapKey, Word> =
-            response_map.entries().map(|(k, v)| (*k, *v)).collect();
-
-        // Entries in response but not in local, or with different values.
-        for (key, value) in &response_entries {
-            if local_entries.get(key) != Some(value) {
-                storage_delta.set_map_item(slot_name.clone(), *key, *value).map_err(|err| {
-                    ClientError::RpcError(RpcError::InvalidResponse(format!(
-                        "failed to set storage map delta: {err}"
-                    )))
-                })?;
-            }
-        }
-
-        // Entries in local but removed in response (set to empty word).
-        for key in local_entries.keys() {
-            if !response_entries.contains_key(key) {
-                storage_delta.set_map_item(slot_name.clone(), *key, Word::default()).map_err(
-                    |err| {
-                        ClientError::RpcError(RpcError::InvalidResponse(format!(
-                            "failed to set storage map delta for removal: {err}"
-                        )))
-                    },
-                )?;
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Computes the vault delta between local and remote account state.
-    ///
-    /// For oversized vaults (`too_many_assets`), fetches incremental updates from the sync
-    /// endpoint and replays them on top of the local vault. For non-oversized vaults, diffs
-    /// the full response assets against the local vault.
-    async fn build_vault_delta(
-        &self,
-        details: &AccountDetails,
-        account_id: AccountId,
-        block_from: BlockNumber,
-        block_to: BlockNumber,
-        store: &dyn Store,
-    ) -> Result<AccountVaultDelta, ClientError> {
-        let mut vault_delta = AccountVaultDelta::default();
-        let local_vault =
-            store.get_account_vault(account_id).await.map_err(ClientError::StoreError)?;
-
-        if details.vault_details.too_many_assets {
-            // Oversized vault: fetch delta from sync endpoint.
-            let vault_info = self
-                .rpc_api
-                .sync_account_vault(block_from, Some(block_to), account_id)
-                .await
-                .map_err(ClientError::RpcError)?;
-
-            // Build the final vault state by applying updates to local vault.
-            let mut vault_map: BTreeMap<AssetVaultKey, Asset> =
-                local_vault.assets().map(|asset| (asset.vault_key(), asset)).collect();
-
-            let mut vault_updates = vault_info.updates;
-            vault_updates.sort_by_key(|u| u.block_num);
-
-            for update in vault_updates {
-                match update.asset {
-                    Some(asset) => {
-                        vault_map.insert(update.vault_key, asset);
-                    },
-                    None => {
-                        vault_map.remove(&update.vault_key);
-                    },
-                }
-            }
-
-            Self::compute_vault_delta_from_diff(&local_vault, &vault_map, &mut vault_delta)?;
-        } else {
-            // Non-oversized vault: diff response assets against local.
-            let final_assets: BTreeMap<AssetVaultKey, Asset> = details
-                .vault_details
-                .assets
+        // Request all map data we know about up-front so the response is self-sufficient
+        // when the on-chain layout hasn't grown since the hint was produced.
+        let initial_requirements = AccountStorageRequirements::new(
+            hinted_map_slots
                 .iter()
-                .map(|asset| (asset.vault_key(), *asset))
-                .collect();
+                .map(|n| (n.clone(), core::iter::empty::<&StorageMapKey>())),
+        );
 
-            Self::compute_vault_delta_from_diff(&local_vault, &final_assets, &mut vault_delta)?;
-        }
+        let (proof_block_num, proof) = self
+            .rpc_api
+            .get_account_proof(
+                account_id,
+                initial_requirements,
+                AccountStateAt::ChainTip,
+                None,
+                Some(EMPTY_WORD),
+            )
+            .await
+            .map_err(ClientError::RpcError)?;
 
-        Ok(vault_delta)
+        let details = proof.into_details().expect("node returned no details for a public account");
+
+        let vault_oversized = details.vault_details.too_many_assets;
+        let any_map_oversized =
+            details.storage_details.map_details.iter().any(|m| m.too_many_entries);
+
+        // Map slot names actually present on the account, taken from the response header.
+        let response_map_slots: Vec<StorageSlotName> = details
+            .storage_details
+            .header
+            .slots()
+            .filter(|slot| slot.slot_type() == StorageSlotType::Map)
+            .map(|slot| slot.name().clone())
+            .collect();
+
+        // Slots present on-chain that weren't covered by the hint — we still need to fetch
+        // their entries.
+        let missing_map_slots: Vec<StorageSlotName> = response_map_slots
+            .iter()
+            .filter(|name| !hinted_map_slots.iter().any(|h| h == *name))
+            .cloned()
+            .collect();
+
+        let public_update = if vault_oversized || any_map_oversized {
+            // Some part of the account is oversized — use incremental endpoints.
+            self.build_delta_update(account_id, &details, block_from, proof_block_num)
+                .await?
+        } else if missing_map_slots.is_empty() {
+            // The hint covered every map slot the account actually has, so the initial
+            // response already carries all the map data we need.
+            let account = Account::try_from(&details).map_err(ClientError::RpcError)?;
+            PublicAccountUpdate::Full(account)
+        } else {
+            // Hint is incomplete (new map slots appeared since the last sync). Fetch only the
+            // missing slots and merge their entries into the response we already have.
+            self.fetch_missing_map_data(
+                account_id,
+                details,
+                &missing_map_slots,
+                block_from,
+                proof_block_num,
+            )
+            .await?
+        };
+
+        Ok(public_update)
     }
 
-    /// Computes a vault delta from the difference between a local vault and a final asset map.
-    fn compute_vault_delta_from_diff(
-        local_vault: &AssetVault,
-        final_assets: &BTreeMap<AssetVaultKey, Asset>,
-        vault_delta: &mut AccountVaultDelta,
-    ) -> Result<(), ClientError> {
-        let local_assets: BTreeMap<AssetVaultKey, Asset> =
-            local_vault.assets().map(|a| (a.vault_key(), a)).collect();
+    /// Fetches map data for the slots not covered by the hint and merges them into the entries
+    /// already received in the initial response. Falls back to the
+    /// [`PublicAccountUpdate::Delta`] path if the follow-up response reveals oversized maps.
+    async fn fetch_missing_map_data(
+        &self,
+        account_id: AccountId,
+        mut initial_details: AccountDetails,
+        missing_map_slots: &[StorageSlotName],
+        block_from: BlockNumber,
+        block_to: BlockNumber,
+    ) -> Result<PublicAccountUpdate, ClientError> {
+        let storage_requirements = AccountStorageRequirements::new(
+            missing_map_slots
+                .iter()
+                .map(|n| (n.clone(), core::iter::empty::<&StorageMapKey>())),
+        );
 
-        // Assets in final but not in local -> add. Changed amounts -> remove old, add new.
-        for (key, final_asset) in final_assets {
-            match local_assets.get(key) {
-                None => {
-                    vault_delta.add_asset(*final_asset).map_err(|err| {
-                        ClientError::RpcError(RpcError::InvalidResponse(format!(
-                            "failed to add asset to vault delta: {err}"
-                        )))
-                    })?;
-                },
-                Some(local_asset) if local_asset != final_asset => {
-                    vault_delta.remove_asset(*local_asset).map_err(|err| {
-                        ClientError::RpcError(RpcError::InvalidResponse(format!(
-                            "failed to remove old asset from vault delta: {err}"
-                        )))
-                    })?;
-                    vault_delta.add_asset(*final_asset).map_err(|err| {
-                        ClientError::RpcError(RpcError::InvalidResponse(format!(
-                            "failed to add new asset to vault delta: {err}"
-                        )))
-                    })?;
-                },
-                _ => {}, // No change
-            }
+        let (_, follow_up_proof) = self
+            .rpc_api
+            .get_account_proof(
+                account_id,
+                storage_requirements,
+                AccountStateAt::Block(block_to),
+                Some(initial_details.code.clone()),
+                Some(EMPTY_WORD),
+            )
+            .await
+            .map_err(ClientError::RpcError)?;
+
+        let Some(follow_up_details) = follow_up_proof.into_details() else {
+            return Err(ClientError::RpcError(RpcError::ExpectedDataMissing(
+                "follow-up get_account_proof returned no details for a public account".into(),
+            )));
+        };
+
+        let any_oversized =
+            follow_up_details.storage_details.map_details.iter().any(|m| m.too_many_entries);
+        if any_oversized {
+            return self
+                .build_delta_update(account_id, &initial_details, block_from, block_to)
+                .await;
         }
 
-        // Assets in local but not in final -> remove.
-        for (key, local_asset) in &local_assets {
-            if !final_assets.contains_key(key) {
-                vault_delta.remove_asset(*local_asset).map_err(|err| {
-                    ClientError::RpcError(RpcError::InvalidResponse(format!(
-                        "failed to remove asset from vault delta: {err}"
-                    )))
-                })?;
-            }
-        }
+        // Merge the follow-up map entries into the initial response. The initial response
+        // already carries the storage header (with every slot's root) and the entries for the
+        // hinted slots; we only need to graft on the entries for the slots we just fetched.
+        initial_details
+            .storage_details
+            .map_details
+            .extend(follow_up_details.storage_details.map_details);
 
-        Ok(())
+        let account = Account::try_from(&initial_details).map_err(ClientError::RpcError)?;
+        Ok(PublicAccountUpdate::Full(account))
+    }
+
+    /// Builds a [`PublicAccountUpdate::Delta`] by fetching incremental storage map and vault
+    /// updates over the synced range.
+    async fn build_delta_update(
+        &self,
+        account_id: AccountId,
+        details: &AccountDetails,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
+    ) -> Result<PublicAccountUpdate, ClientError> {
+        let value_slot_updates: Vec<(_, Word)> = details
+            .storage_details
+            .header
+            .slots()
+            .filter(|slot| slot.slot_type() == StorageSlotType::Value)
+            .map(|slot| (slot.name().clone(), slot.value()))
+            .collect();
+
+        // The lower bound is inclusive at the node, so request from `block_from + 1` to skip
+        // the block whose state we already have.
+        let map_info = self
+            .rpc_api
+            .sync_storage_maps(block_from + 1, Some(block_to), account_id)
+            .await
+            .map_err(ClientError::RpcError)?;
+        let vault_info = self
+            .rpc_api
+            .sync_account_vault(block_from + 1, Some(block_to), account_id)
+            .await
+            .map_err(ClientError::RpcError)?;
+
+        Ok(PublicAccountUpdate::Delta(PublicAccountDelta::new(
+            details.header.clone(),
+            block_from,
+            block_to,
+            value_slot_updates,
+            map_info.updates,
+            vault_info.updates,
+        )))
     }
 
     /// Applies the changes received from the sync response to the notes and transactions tracked
@@ -1543,7 +1309,7 @@ mod tests {
 
         let mock_rpc = MockRpcApi::new(chain);
         let state_sync =
-            StateSync::new(Arc::new(mock_rpc.clone()), None, Arc::new(CommitAllScreener), None);
+            StateSync::new(Arc::new(mock_rpc.clone()), Arc::new(CommitAllScreener), None);
 
         let genesis_peaks =
             mock_rpc.get_mmr().peaks_at(Forest::new(1).expect("valid forest")).unwrap();
@@ -1559,7 +1325,7 @@ mod tests {
 
         let account_id = account.id();
         let sync_input = StateSyncInput {
-            accounts: vec![AccountHeader::from(account)],
+            accounts: vec![AccountSyncHint::from_header(AccountHeader::from(account))],
             note_tags,
             input_notes,
             output_notes: vec![],
@@ -1601,8 +1367,7 @@ mod tests {
         mock_rpc.advance_blocks(3);
         let chain_tip_1 = mock_rpc.get_chain_tip_block_num();
 
-        let state_sync =
-            StateSync::new(Arc::new(mock_rpc.clone()), None, Arc::new(MockScreener), None);
+        let state_sync = StateSync::new(Arc::new(mock_rpc.clone()), Arc::new(MockScreener), None);
 
         // Build the initial PartialMmr from genesis (only 1 leaf).
         let genesis_peaks =
@@ -1747,8 +1512,7 @@ mod tests {
 
         // Test that fetch_sync_data returns note blocks with valid MMR paths that
         // can be used to track blocks in the partial MMR.
-        let state_sync =
-            StateSync::new(Arc::new(mock_rpc.clone()), None, Arc::new(MockScreener), None);
+        let state_sync = StateSync::new(Arc::new(mock_rpc.clone()), Arc::new(MockScreener), None);
 
         let genesis_peaks =
             mock_rpc.get_mmr().peaks_at(Forest::new(1).expect("valid forest")).unwrap();
@@ -1962,15 +1726,17 @@ mod tests {
         let network_header =
             AccountHeader::new(network_account_id, ZERO, EMPTY_WORD, EMPTY_WORD, EMPTY_WORD);
 
-        let state_sync =
-            StateSync::new(Arc::new(mock_rpc.clone()), None, Arc::new(MockScreener), None);
+        let state_sync = StateSync::new(Arc::new(mock_rpc.clone()), Arc::new(MockScreener), None);
 
         let genesis_peaks =
             mock_rpc.get_mmr().peaks_at(Forest::new(1).expect("valid forest")).unwrap();
         let mut partial_mmr = PartialMmr::from_peaks(genesis_peaks);
 
         let sync_input = StateSyncInput {
-            accounts: vec![AccountHeader::from(sender_account), network_header],
+            accounts: vec![
+                AccountSyncHint::from_header(AccountHeader::from(sender_account)),
+                AccountSyncHint::from_header(network_header),
+            ],
             note_tags: BTreeSet::new(),
             input_notes: vec![],
             output_notes: vec![output_note],
