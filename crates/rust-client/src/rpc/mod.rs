@@ -52,7 +52,7 @@ use domain::account::{
     AccountProof,
     AccountUpdateSummary,
     FetchedAccount,
-    GetAccountProofRequest,
+    GetAccountRequest,
     StorageMapEntries,
     StorageMapEntry,
     VaultFetch,
@@ -201,7 +201,7 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// - `account_id` is the ID of the wanted account.
     ///
-    /// The default implementation composes [`NodeRpcClient::get_account_proof`] with
+    /// The default implementation composes [`NodeRpcClient::get_account`] with
     /// [`NodeRpcClient::resolve_oversize_vault`] / [`NodeRpcClient::resolve_oversize_storage_maps`]
     /// to materialize the full account state. Up to two `/GetAccount` requests are made for
     /// public accounts: one to discover the storage layout, and a second to request entries for
@@ -210,7 +210,7 @@ pub trait NodeRpcClient: Send + Sync {
         // For accounts without public state, only the witness commitment is needed.
         if !account_id.has_public_state() {
             let (block_number, proof) =
-                self.get_account_proof(account_id, GetAccountProofRequest::default()).await?;
+                self.get_account(account_id, GetAccountRequest::default()).await?;
             return Ok(FetchedAccount::new_private(
                 account_id,
                 AccountUpdateSummary::new(proof.account_commitment(), block_number),
@@ -219,9 +219,9 @@ pub trait NodeRpcClient: Send + Sync {
 
         // First call discovers the storage layout (which slots are maps).
         let (block_number, initial_proof) = self
-            .get_account_proof(
+            .get_account(
                 account_id,
-                GetAccountProofRequest {
+                GetAccountRequest {
                     vault: VaultFetch::Always,
                     ..Default::default()
                 },
@@ -246,9 +246,9 @@ pub trait NodeRpcClient: Send + Sync {
         } else {
             let requirements = AccountStorageRequirements::all_entries(&map_slot_names);
             let (_, proof) = self
-                .get_account_proof(
+                .get_account(
                     account_id,
-                    GetAccountProofRequest {
+                    GetAccountRequest {
                         storage: requirements,
                         at: AccountStateAt::Block(block_number),
                         vault: VaultFetch::Always,
@@ -348,20 +348,21 @@ pub trait NodeRpcClient: Send + Sync {
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
 
     /// Fetches the account proof and optionally its details from the node, using the
-    /// `/GetAccount` endpoint.
+    /// `/GetAccount` endpoint. This is the thinnest layer over the RPC: it makes exactly one
+    /// `/GetAccount` call and returns the response unchanged, including any `too_many_assets`
+    /// / `too_many_entries` truncation flags.
     ///
     /// `request` carries the storage slots, target block, known code, and vault-fetch policy
-    /// for the call. The response reflects exactly what the node returned — including any
-    /// `too_many_assets` / `too_many_entries` truncation flags. Callers that need full data
-    /// can compose [`NodeRpcClient::resolve_oversize_vault`] and
-    /// [`NodeRpcClient::resolve_oversize_storage_maps`] on the returned proof.
+    /// for the call.
+    ///
+    /// For a fully oversize-resolved account, use [`NodeRpcClient::get_account_details`].
     ///
     /// Returns the block number and the account proof. If the account is not found in
     /// the node, the method will return an error.
-    async fn get_account_proof(
+    async fn get_account(
         &self,
         account_id: AccountId,
-        request: GetAccountProofRequest,
+        request: GetAccountRequest,
     ) -> Result<(BlockNumber, AccountProof), RpcError>;
 
     /// Resolves a `too_many_assets` truncation in `details` by querying

@@ -26,7 +26,7 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{AccountProof, GetAccountProofRequest, VaultFetch};
+use super::domain::account::{AccountProof, GetAccountRequest, VaultFetch};
 use super::domain::note::{FetchedNote, NoteSyncBlock};
 use super::domain::nullifier::NullifierUpdate;
 use super::generated::rpc::AccountRequest;
@@ -483,12 +483,12 @@ impl NodeRpcClient for GrpcClient {
     /// - There was an error sending the request to the node.
     /// - The answer had a `None` for one of the expected fields.
     /// - There is an error during storage deserialization.
-    async fn get_account_proof(
+    async fn get_account(
         &self,
         account_id: AccountId,
-        request: GetAccountProofRequest,
+        request: GetAccountRequest,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
-        let GetAccountProofRequest { storage, at, known_code, vault } = request;
+        let GetAccountRequest { storage, at, known_code, vault } = request;
 
         let mut known_codes_by_commitment: BTreeMap<Word, AccountCode> = BTreeMap::new();
         if let Some(account_code) = known_code {

@@ -82,7 +82,7 @@ use tracing::info;
 use super::Client;
 use crate::ClientError;
 use crate::note::{NoteScreenerError, NoteUpdateTracker};
-use crate::rpc::domain::account::{AccountStorageRequirements, GetAccountProofRequest, VaultFetch};
+use crate::rpc::domain::account::{AccountStorageRequirements, GetAccountRequest, VaultFetch};
 use crate::rpc::{AccountStateAt, GrpcError, NodeRpcClient, RpcError};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
@@ -855,9 +855,9 @@ where
                     let account_id = partial_account.id();
                     let (_, account_proof) = self
                         .rpc_api
-                        .get_account_proof(
+                        .get_account(
                             account_id,
-                            GetAccountProofRequest {
+                            GetAccountRequest {
                                 at: AccountStateAt::Block(block_num),
                                 ..Default::default()
                             },
@@ -1119,9 +1119,9 @@ pub(crate) async fn fetch_public_account_inputs(
         });
 
     let (block_num, mut account_proof) = rpc_api
-        .get_account_proof(
+        .get_account(
             account_id,
-            GetAccountProofRequest {
+            GetAccountRequest {
                 storage: storage_requirements.clone(),
                 at: account_state_at,
                 known_code,

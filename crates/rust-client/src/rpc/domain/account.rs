@@ -891,9 +891,9 @@ pub enum VaultFetch {
     IfChangedFrom(Word),
 }
 
-/// Parameters for [`crate::rpc::NodeRpcClient::get_account_proof`].
+/// Parameters for [`crate::rpc::NodeRpcClient::get_account`].
 #[derive(Clone, Debug, Default)]
-pub struct GetAccountProofRequest {
+pub struct GetAccountRequest {
     /// Storage slots (and optionally specific keys) to include in the response.
     pub storage: AccountStorageRequirements,
     /// Block at which to retrieve the proof.

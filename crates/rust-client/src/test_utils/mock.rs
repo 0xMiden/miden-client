@@ -22,7 +22,7 @@ use crate::rpc::domain::account::{
     AccountStorageDetails,
     AccountStorageMapDetails,
     AccountVaultDetails,
-    GetAccountProofRequest,
+    GetAccountRequest,
     StorageMapEntries,
     StorageMapEntry,
 };
@@ -76,9 +76,9 @@ impl MockRpcApi {
         }
     }
 
-    /// Sets the oversize threshold for `get_account_proof`. Any storage map with more
-    /// entries than this threshold, or a vault with more assets, will have the
-    /// `too_many_entries` / `too_many_assets` flags set in the response.
+    /// Sets the oversize threshold for `get_account`. Any storage map with more entries than
+    /// this threshold, or a vault with more assets, will have the `too_many_entries` /
+    /// `too_many_assets` flags set in the response.
     #[must_use]
     pub fn with_oversize_threshold(mut self, threshold: usize) -> Self {
         self.oversize_threshold = threshold;
@@ -464,10 +464,10 @@ impl NodeRpcClient for MockRpcApi {
     /// of the request are ignored in the mock implementation: the latest account code and full
     /// asset list are always returned, and the truncation flags are set when the data exceeds
     /// `oversize_threshold`.
-    async fn get_account_proof(
+    async fn get_account(
         &self,
         account_id: AccountId,
-        request: GetAccountProofRequest,
+        request: GetAccountRequest,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
         let mock_chain = self.mock_chain.read();
 

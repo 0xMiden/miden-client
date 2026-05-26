@@ -26,7 +26,7 @@ use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore}
 use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
 use crate::rpc::domain::account::{
     AccountStorageRequirements,
-    GetAccountProofRequest,
+    GetAccountRequest,
     StorageMapEntries,
 };
 use crate::rpc::{AccountStateAt, NodeRpcClient};
@@ -158,9 +158,9 @@ impl ClientDataStore {
         let storage_requirements = AccountStorageRequirements::new([(slot_name, &[map_key])]);
         let (_, account_proof): (BlockNumber, _) = self
             .rpc_api
-            .get_account_proof(
+            .get_account(
                 account_id,
-                GetAccountProofRequest {
+                GetAccountRequest {
                     storage: storage_requirements,
                     known_code: Some(known_code),
                     ..Default::default()

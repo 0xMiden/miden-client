@@ -26,7 +26,7 @@ use crate::note::NoteUpdateTracker;
 use crate::rpc::domain::account::{
     AccountDetails,
     AccountStorageRequirements,
-    GetAccountProofRequest,
+    GetAccountRequest,
     VaultFetch,
 };
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
@@ -80,9 +80,9 @@ pub struct AccountSyncHint {
     pub header: AccountHeader,
     /// Local snapshot of the account's storage layout (slot names, types, and current roots
     /// or values). When this carries up-to-date map slot names, `StateSync` can request all
-    /// map data in a single `get_account_proof` call. If the on-chain layout has new map
-    /// slots, `StateSync` fetches only those missing slots and reuses the already-downloaded
-    /// data for the slots covered here.
+    /// map data in a single `get_account` call. If the on-chain layout has new map slots,
+    /// `StateSync` fetches only those missing slots and reuses the already-downloaded data
+    /// for the slots covered here.
     pub storage_header: AccountStorageHeader,
 }
 
@@ -593,8 +593,8 @@ impl StateSync {
     /// Queries the node for updated public accounts and populates `account_updates`.
     ///
     /// For each public account whose commitment changed, an updated snapshot is fetched via
-    /// `get_account_proof`. Callers may supply [`AccountSyncHint::map_slot_names`] to request
-    /// map storage data up-front and avoid a roundtrip; otherwise a second call is issued when
+    /// `get_account`. Callers may supply [`AccountSyncHint::map_slot_names`] to request map
+    /// storage data up-front and avoid a roundtrip; otherwise a second call is issued when
     /// the account turns out to have map slots.
     ///
     /// Accounts whose vault or maps are too large to fit in a single response fall back to the
@@ -654,9 +654,9 @@ impl StateSync {
 
         let (proof_block_num, proof) = self
             .rpc_api
-            .get_account_proof(
+            .get_account(
                 account_id,
-                GetAccountProofRequest {
+                GetAccountRequest {
                     storage: initial_requirements,
                     vault: VaultFetch::Always,
                     ..Default::default()
@@ -724,9 +724,9 @@ impl StateSync {
 
         let (_, follow_up_proof) = self
             .rpc_api
-            .get_account_proof(
+            .get_account(
                 account_id,
-                GetAccountProofRequest {
+                GetAccountRequest {
                     storage: storage_requirements,
                     at: AccountStateAt::Block(block_to),
                     known_code: Some(initial_details.code.clone()),
@@ -738,7 +738,7 @@ impl StateSync {
 
         let Some(follow_up_details) = follow_up_proof.into_details() else {
             return Err(ClientError::RpcError(RpcError::ExpectedDataMissing(
-                "follow-up get_account_proof returned no details for a public account".into(),
+                "follow-up get_account returned no details for a public account".into(),
             )));
         };
 
