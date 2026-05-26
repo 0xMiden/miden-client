@@ -785,15 +785,17 @@ impl TryFrom<proto::account::AccountWitness> for AccountWitness {
 // ACCOUNT STORAGE REQUEST
 // ================================================================================================
 
-/// Describes storage slots indices to be requested, as well as a list of keys for each of those
-/// slots.
+/// Per-slot map data to include in a `/GetAccount` response. Slots absent here are omitted
+/// from `map_details` (the storage header still lists every slot).
 ///
-/// Note: If no specific keys are provided for a slot, all entries are requested. Though the
-/// node may respond with `too_many_entries` if the map exceeds the response limit.
+/// - Empty key list: all entries, no proofs. May come back flagged `too_many_entries`.
+/// - Non-empty key list: just those entries, each with its SMT inclusion proof.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AccountStorageRequirements(BTreeMap<StorageSlotName, Vec<StorageMapKey>>);
 
 impl AccountStorageRequirements {
+    /// Requests the specified keys per slot, each returned with an SMT inclusion proof. An
+    /// empty key iterator for a slot behaves like [`Self::all_entries`].
     pub fn new<'a>(
         slots_and_keys: impl IntoIterator<
             Item = (StorageSlotName, impl IntoIterator<Item = &'a StorageMapKey>),
@@ -810,7 +812,8 @@ impl AccountStorageRequirements {
         AccountStorageRequirements(map)
     }
 
-    /// Returns a new `AccountStorageRequirements` that requests all entries for all given slots.
+    /// Requests every entry of each given slot, without proofs. Oversize maps come back
+    /// flagged `too_many_entries`.
     pub fn all_entries(slot_names: &[StorageSlotName]) -> Self {
         AccountStorageRequirements(
             slot_names.iter().map(|name| (name.clone(), Vec::new())).collect(),
@@ -879,7 +882,8 @@ pub enum VaultFetch {
 /// Parameters for [`crate::rpc::NodeRpcClient::get_account`].
 #[derive(Clone, Debug, Default)]
 pub struct GetAccountRequest {
-    /// Storage slots (and optionally specific keys) to include in the response.
+    /// Per-slot map entries to include in the response. The storage header is always
+    /// returned; see [`AccountStorageRequirements`] for the per-slot semantics.
     pub storage: AccountStorageRequirements,
     /// Block at which to retrieve the proof.
     pub at: AccountStateAt,
@@ -896,7 +900,7 @@ impl GetAccountRequest {
     #[must_use]
     pub fn witness_only() -> Self {
         Self {
-            storage: AccountStorageRequirements::default(),
+            storage: AccountStorageRequirements(BTreeMap::new()),
             at: AccountStateAt::ChainTip,
             known_code: None,
             vault: VaultFetch::Skip,

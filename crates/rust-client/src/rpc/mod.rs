@@ -48,14 +48,8 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use domain::account::{
-    AccountDetails,
-    AccountProof,
-    AccountUpdateSummary,
-    FetchedAccount,
-    GetAccountRequest,
-    StorageMapEntries,
-    StorageMapEntry,
-    VaultFetch,
+    AccountDetails, AccountProof, AccountUpdateSummary, FetchedAccount, GetAccountRequest,
+    StorageMapEntries, StorageMapEntry, VaultFetch,
 };
 use domain::note::{FetchedNote, NoteSyncBlock, SyncNotesResult};
 use domain::nullifier::NullifierUpdate;
@@ -348,18 +342,16 @@ pub trait NodeRpcClient: Send + Sync {
         block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
 
-    /// Fetches the account proof and optionally its details from the node, using the
-    /// `/GetAccount` endpoint. This is the thinnest layer over the RPC: it makes exactly one
-    /// `/GetAccount` call and returns the response unchanged, including any `too_many_assets`
-    /// / `too_many_entries` truncation flags.
+    /// Fetches the account from the node, using the `/GetAccount` endpoint.
     ///
-    /// `request` carries the storage slots, target block, known code, and vault-fetch policy
-    /// for the call.
+    /// The response carries an
+    /// [`AccountWitness`](miden_protocol::block::account_tree::AccountWitness) and the target
+    /// block. Public accounts additionally get [`AccountDetails`]; for private accounts the
+    /// other `request` fields are ignored.
     ///
     /// For a fully oversize-resolved account, use [`NodeRpcClient::get_account_details`].
     ///
-    /// Returns the block number and the account proof. If the account is not found in
-    /// the node, the method will return an error.
+    /// Errors if the account isn't found.
     async fn get_account(
         &self,
         account_id: AccountId,
