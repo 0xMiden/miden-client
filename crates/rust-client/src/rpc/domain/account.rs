@@ -716,6 +716,11 @@ impl AccountProof {
     pub fn into_parts(self) -> (AccountWitness, Option<AccountDetails>) {
         (self.account_witness, self.state_headers)
     }
+
+    /// Consumes the proof and returns the account details, if present (public accounts only).
+    pub fn into_details(self) -> Option<AccountDetails> {
+        self.state_headers
+    }
 }
 
 #[cfg(feature = "tonic")]

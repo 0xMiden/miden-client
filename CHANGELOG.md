@@ -10,6 +10,7 @@
 * [BREAKING][rust] `TransactionRequest` now defaults to `NoteScriptTrustPolicy::StandardScriptsOnly` for input-note scripts. Transactions consuming notes with non-standard scripts must explicitly opt in via `TransactionRequestBuilder::trusted_input_note_script_roots(...)` or `::allow_unlisted_note_scripts()`. Previously, missing non-standard input-note scripts could be silently fetched from the node and executed.
 * [BREAKING][rust] `TransactionRequest` binary serialization format changed: a new `note_script_trust_policy` field is appended. Persisted/cached requests from previous versions will fail to deserialize.
 * [BREAKING][param][cli] `address add` now takes `<ACCOUNT_ID> <BECH32_ADDRESS>` instead of `<ACCOUNT_ID> <INTERFACE> [TAG_LEN]`. Use the new `address encode` subcommand to build a bech32 string from `<ACCOUNT_ID> <INTERFACE> [TAG_LEN]`. ([#2115](https://github.com/0xMiden/miden-client/pull/2115))
+* [BREAKING][rust] `StateSync` no longer takes an `Option<Arc<dyn Store>>`. `StateSyncInput::accounts` is now a `Vec<AccountSyncHint>` (header + `AccountStorageHeader`); when hints cover the account's map slots `StateSync` issues a single `get_account_proof` for non-oversized accounts, and when new map slots appear on-chain it only fetches the missing ones. The `Store` trait method `get_account_map_slot_names` was replaced with `get_account_storage_header`. ([#2132](https://github.com/0xMiden/miden-client/pull/2132))
 * [BREAKING][type][rust] `BasicFungibleFaucet` is now a unit struct; token symbol/decimals/max-supply moved to a new `FungibleTokenMetadata` component built via `FungibleTokenMetadata::builder`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * [BREAKING][behavior][cli] `account new-faucet` now requires a `[fungible-faucet-metadata]` block (typed `symbol`, `decimals`, `max_supply`, optional `name`) in the init data file passed via `-i`, replacing the previous `["miden::standards::fungible_faucets::metadata"]` section with stringly-typed values. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * [BREAKING][behavior][all] Note scripts must now use the package-style header `@note_script` + `pub proc main … end` instead of the bare `begin … end`, following the upstream protocol bump. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
@@ -29,13 +30,19 @@
 * [FEATURE][rust,cli,web] Added `get_network_note_status` to `NodeRpcClient` trait for querying the processing status of notes submitted to the network (pending, nullifier-inflight, discarded, nullifier-committed), along with attempt count and error details. Exposed as `miden-client network-note-status <note_id>` CLI command and `RpcClient.getNetworkNoteStatus()` in the web client. ([#1981](https://github.com/0xMiden/miden-client/pull/1981))
 * Remove MMR peaks from the blocks table and store them alongside the sync height in a new `blockchain_checkpoint` table ([#2100](https://github.com/0xMiden/miden-client/pull/2100)).
 * Added `miden-cli call` command for invoking account procedures directly from the CLI ([#1943](https://github.com/0xMiden/miden-client/pull/1943)).
-* [FEATURE][rust,store] Added `BatchBuilder` for stacking multiple transactions against a single local account and submitting them as one proven batch via `SubmitProvenBatch`. Also adds `Store::apply_transaction_batch` (atomic multi-tx apply) with a `SqliteStore` implementation. ([#2109](https://github.com/0xMiden/miden-client/pull/2109))
+* [FEATURE][rust,store] Added `BatchBuilder` for stacking multiple transactions against multiple local accounts and submitting them as one proven batch via `SubmitProvenBatch`. Also adds `Store::apply_transaction_batch` (atomic multi-tx apply) with a `SqliteStore` implementation. ([#2109](https://github.com/0xMiden/miden-client/pull/2109), [#2160](https://github.com/0xMiden/miden-client/issues/2160))
 * Made `TransactionStoreUpdate` serialization lossless ([#2112](https://github.com/0xMiden/miden-client/pull/2112)).
 * [FEATURE][cli] Added `address encode <ACCOUNT_ID> <INTERFACE> [TAG_LEN]` subcommand that prints the bech32 encoding of an address built from the given fields (useful for producing the input to `address add`). ([#2115](https://github.com/0xMiden/miden-client/pull/2115))
 * [FEATURE][web] Added `StorageView` JS wrapper over WASM `AccountStorage`. `account.storage()` now returns a `StorageView` that makes `getItem()` work intuitively for both Value and StorageMap slots. WASM primitives are unchanged; the raw `AccountStorage` is accessible via `.raw` ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][web] Added `wordToBigInt()` utility export for losslessly converting a `Word`'s first felt to a `BigInt`. `StorageResult.toString()` is BigInt-backed, and `valueOf()` returns a JS number for values fitting in `Number.MAX_SAFE_INTEGER` and throws `RangeError` for larger u64 values — use `.toBigInt()` for exact access ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][rust,cli] Added partial swap (PSWAP) support: `TransactionRequestBuilder::build_pswap_create` / `build_pswap_consume` / `build_pswap_cancel` and a `miden-client pswap` CLI command (`create`, `consume`, `cancel`) for partially-fillable fungible swaps ([#2162](https://github.com/0xMiden/miden-client/pull/2162)).
 * [FEATURE][cli] Added `--allow-unlisted-note-scripts` flag to `consume-notes` to consume notes whose scripts are not recognized standards ([#2136](https://github.com/0xMiden/miden-client/pull/2136)).
+
+## 0.14.9 (2026-05-19)
+
+### Enhancements
+
+* Bumped `miden-vm` workspace dependencies from 0.22.1 to 0.22.4.
 
 ## 0.14.7 (2026-06-05)
 
