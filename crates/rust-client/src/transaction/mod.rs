@@ -68,7 +68,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::account::{Account, AccountCode, AccountId};
-use miden_protocol::asset::NonFungibleAsset;
+use miden_protocol::asset::{AssetCallbackFlag, AssetVaultKey, NonFungibleAsset};
 use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
 use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
@@ -610,7 +610,6 @@ where
     ) -> Result<NoteUpdateTracker, TransactionStoreUpdateError> {
         let executed_tx = tx_result.executed_transaction();
         let current_timestamp = self.store.get_current_timestamp();
-        let current_block_num = self.store.get_sync_height().await?;
 
         // New output notes
         let new_output_notes = executed_tx
@@ -647,19 +646,12 @@ where
             }
         }
 
-        // Track future input notes described in the transaction result.
-        new_input_notes.extend(tx_result.future_notes().iter().map(|(note_details, tag)| {
-            InputNoteRecord::new(
-                note_details.clone(),
-                None,
-                ExpectedNoteState {
-                    metadata: None,
-                    after_block_num: current_block_num,
-                    tag: Some(*tag),
-                }
-                .into(),
-            )
-        }));
+        if !tx_result.future_notes().is_empty() {
+            tracing::warn!(
+                future_notes = tx_result.future_notes().len(),
+                "Skipping future-note tracking until the store can persist metadata-less expected notes under protocol 0.15"
+            );
+        }
 
         // Locally consumed notes
         let consumed_note_ids =
@@ -1037,7 +1029,11 @@ fn validate_account_request(
     transaction_request: &TransactionRequest,
     account: &Account,
 ) -> Result<(), ClientError> {
-    if account.is_faucet() {
+    let account_interface = AccountInterface::from_account(account);
+    if account_interface
+        .components()
+        .contains(&AccountComponentInterface::FungibleFaucet)
+    {
         // TODO(SantiagoPittella): Add faucet validations.
         Ok(())
     } else {
@@ -1061,7 +1057,7 @@ fn validate_basic_account_request(
     // Check if the account balance plus incoming assets is greater than or equal to the
     // outgoing fungible assets
     for (faucet_id, amount) in fungible_balance_map {
-        let account_asset_amount = account.vault().get_balance(faucet_id).unwrap_or(0);
+        let account_asset_amount = get_fungible_balance_by_faucet(account, faucet_id)?;
         let incoming_balance = incoming_fungible_balance_map.get(&faucet_id).unwrap_or(&0);
         if account_asset_amount + incoming_balance < amount {
             return Err(ClientError::AssetError(AssetError::FungibleAssetAmountNotSufficient {
@@ -1079,20 +1075,35 @@ fn validate_basic_account_request(
             Ok(false) => {
                 // Check if the non fungible asset is in the incoming assets
                 if !incoming_non_fungible_balance_set.contains(non_fungible) {
-                    return Err(ClientError::AssetError(
-                        AssetError::NonFungibleFaucetIdTypeMismatch(non_fungible.faucet_id()),
+                    return Err(ClientError::TransactionRequestError(
+                        TransactionRequestError::MissingNonFungibleAsset(non_fungible.faucet_id()),
                     ));
                 }
             },
             _ => {
-                return Err(ClientError::AssetError(AssetError::NonFungibleFaucetIdTypeMismatch(
-                    non_fungible.faucet_id(),
-                )));
+                return Err(ClientError::TransactionRequestError(
+                    TransactionRequestError::MissingNonFungibleAsset(non_fungible.faucet_id()),
+                ));
             },
         }
     }
 
     Ok(())
+}
+
+fn get_fungible_balance_by_faucet(
+    account: &Account,
+    faucet_id: AccountId,
+) -> Result<u64, ClientError> {
+    let mut total = 0u64;
+
+    for callback_flag in [AssetCallbackFlag::Disabled, AssetCallbackFlag::Enabled] {
+        let vault_key = AssetVaultKey::new_fungible(faucet_id, callback_flag);
+        let amount = account.vault().get_balance(vault_key).map_err(ClientError::AssetError)?;
+        total = total.saturating_add(u64::from(amount));
+    }
+
+    Ok(total)
 }
 
 /// Fetches a foreign account's proof and details from the network, converts them into

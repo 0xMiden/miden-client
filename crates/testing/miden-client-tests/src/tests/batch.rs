@@ -163,7 +163,8 @@ async fn apply_transaction_batch_rolls_back_on_mid_batch_failure() {
     let mock_chain = chain_builder.build().unwrap();
 
     // Build a client backed by the mock chain.
-    let rng = RandomCoin::new(rand::random::<[u64; 4]>().map(Felt::new).into());
+    let rng =
+        RandomCoin::new(rand::random::<[u64; 4]>().map(|v| Felt::new_unchecked(v >> 1)).into());
     let keystore = FilesystemKeyStore::new(std::env::temp_dir()).unwrap();
     let rpc_api = MockRpcApi::new(mock_chain);
     let mut client = ClientBuilder::new()

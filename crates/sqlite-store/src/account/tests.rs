@@ -52,19 +52,13 @@ async fn account_code_insertion_no_duplicates() -> anyhow::Result<()> {
     let account_component = AccountComponent::new(
         component_code,
         vec![],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
-    let account_code = AccountCode::from_components(
-        &[
-            AuthSingleSig::new(
-                PublicKeyCommitment::from(EMPTY_WORD),
-                AuthSchemeId::Falcon512Poseidon2,
-            )
+    let account_code = AccountCode::from_components(&[
+        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Poseidon2)
             .into(),
-            account_component,
-        ],
-        AccountType::RegularAccountUpdatableCode,
-    )?;
+        account_component,
+    ])?;
 
     store
         .interact_with_connection(move |conn| {
@@ -117,12 +111,12 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
             StorageSlot::with_empty_map(map_slot_name.clone()),
             StorageSlot::with_empty_map(map_slot_b_name.clone()),
         ],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
 
     // Create and insert an account
     let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -148,7 +142,7 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
             NonFungibleAsset::new(&NonFungibleAssetDetails::new(
                 AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET)?,
                 NON_FUNGIBLE_ASSET_DATA.into(),
-            )?)?
+            ))
             .into(),
         ],
         [],
@@ -225,7 +219,7 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
             StorageSlot::with_value(value_slot_name.clone(), [ZERO, ZERO, ZERO, ONE].into()),
             StorageSlot::with_map(map_slot_name.clone(), dummy_map),
         ],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
 
     // Create and insert an account
@@ -234,11 +228,11 @@ async fn apply_account_delta_removals() -> anyhow::Result<()> {
         NonFungibleAsset::new(&NonFungibleAssetDetails::new(
             AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET)?,
             NON_FUNGIBLE_ASSET_DATA.into(),
-        )?)?
+        ))
         .into(),
     ];
     let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -326,11 +320,11 @@ async fn get_account_storage_item_success() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_value(value_slot_name.clone(), test_value.into())],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
 
     let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -359,11 +353,11 @@ async fn get_account_storage_item_not_found() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_empty_value(value_slot_name)],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
 
     let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -400,11 +394,11 @@ async fn get_account_map_item_success() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_map(map_slot_name.clone(), storage_map)],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
 
     let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -434,11 +428,11 @@ async fn get_account_map_item_value_slot_error() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_empty_value(value_slot_name.clone())],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
 
     let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -465,11 +459,11 @@ async fn get_account_code() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
         vec![],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
 
     let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -518,11 +512,11 @@ async fn account_reader_nonce_and_status() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
         vec![],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
 
     let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -594,11 +588,11 @@ async fn account_reader_storage_access() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_value(value_slot_name.clone(), test_value.into())],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
 
     let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -631,11 +625,11 @@ async fn account_reader_addresses_access() -> anyhow::Result<()> {
     let dummy_component = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
         vec![],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
 
     let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -684,7 +678,7 @@ async fn prune_account_history_removes_old_committed_states() -> anyhow::Result<
     // Prune up to nonce 1 (should delete nonce 0 historical entry)
     let deleted = store
         .interact_with_connection(move |conn| {
-            SqliteStore::prune_account_history(conn, account_id, Felt::new(1))
+            SqliteStore::prune_account_history(conn, account_id, Felt::new_unchecked(1))
         })
         .await?;
 
@@ -733,7 +727,7 @@ async fn prune_account_history_noop_with_single_state() -> anyhow::Result<()> {
     // Prune with nonce 0: no historical entries have replaced_at_nonce <= 0
     let deleted = store
         .interact_with_connection(move |conn| {
-            SqliteStore::prune_account_history(conn, account_id, Felt::new(0))
+            SqliteStore::prune_account_history(conn, account_id, Felt::new_unchecked(0))
         })
         .await?;
 
@@ -761,10 +755,10 @@ async fn prune_account_history_multiple_accounts() -> anyhow::Result<()> {
     let component_b = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_empty_map(map_slot_name_b.clone())],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
     let account_b = AccountBuilder::new([1; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -785,12 +779,12 @@ async fn prune_account_history_multiple_accounts() -> anyhow::Result<()> {
     // Prune account A up to nonce 1, account B up to nonce 1
     let deleted_a = store
         .interact_with_connection(move |conn| {
-            SqliteStore::prune_account_history(conn, a_id, Felt::new(1))
+            SqliteStore::prune_account_history(conn, a_id, Felt::new_unchecked(1))
         })
         .await?;
     let deleted_b = store
         .interact_with_connection(move |conn| {
-            SqliteStore::prune_account_history(conn, b_id, Felt::new(1))
+            SqliteStore::prune_account_history(conn, b_id, Felt::new_unchecked(1))
         })
         .await?;
 
@@ -862,7 +856,7 @@ async fn prune_removes_orphaned_account_code() -> anyhow::Result<()> {
     // is deleted, and since no other header references it, the code should be removed.
     let deleted = store
         .interact_with_connection(move |conn| {
-            SqliteStore::prune_account_history(conn, account_id, Felt::new(1))
+            SqliteStore::prune_account_history(conn, account_id, Felt::new_unchecked(1))
         })
         .await?;
     assert!(deleted > 0);
@@ -957,19 +951,19 @@ async fn setup_account_with_map(
     let mut map = StorageMap::new();
     for i in 1..=map_size {
         map.insert(
-            StorageMapKey::new([Felt::new(i), ZERO, ZERO, ZERO].into()),
-            [Felt::new(i * 100), ZERO, ZERO, ZERO].into(),
+            StorageMapKey::new([Felt::new_unchecked(i), ZERO, ZERO, ZERO].into()),
+            [Felt::new_unchecked(i * 100), ZERO, ZERO, ZERO].into(),
         )?;
     }
 
     let component = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_map(map_slot_name.clone(), map)],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
 
     let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -991,15 +985,15 @@ async fn apply_single_entry_update(
     let mut storage_delta = AccountStorageDelta::new();
     storage_delta.set_map_item(
         map_slot_name.clone(),
-        StorageMapKey::new([Felt::new(1), ZERO, ZERO, ZERO].into()),
-        [Felt::new(nonce * 1000), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::new_unchecked(1), ZERO, ZERO, ZERO].into()),
+        [Felt::new_unchecked(nonce * 1000), ZERO, ZERO, ZERO].into(),
     )?;
 
     let delta = AccountDelta::new(
         account.id(),
         storage_delta,
         AccountVaultDelta::from_iters([], []),
-        Felt::new(nonce),
+        Felt::new_unchecked(nonce),
     )?;
 
     let prev_header: AccountHeader = (&*account).into();
@@ -1057,8 +1051,8 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
     let mut storage_delta = AccountStorageDelta::new();
     storage_delta.set_map_item(
         map_slot_name.clone(),
-        StorageMapKey::new([Felt::new(1), ZERO, ZERO, ZERO].into()),
-        [Felt::new(1000), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::new_unchecked(1), ZERO, ZERO, ZERO].into()),
+        [Felt::new_unchecked(1000), ZERO, ZERO, ZERO].into(),
     )?;
     let vault_delta = AccountVaultDelta::from_iters(
         vec![
@@ -1152,18 +1146,18 @@ async fn undo_account_state_deletes_account_entirely() -> anyhow::Result<()> {
     let mut map = StorageMap::new();
     for i in 1..=3u64 {
         map.insert(
-            StorageMapKey::new([Felt::new(i), ZERO, ZERO, ZERO].into()),
-            [Felt::new(i * 100), ZERO, ZERO, ZERO].into(),
+            StorageMapKey::new([Felt::new_unchecked(i), ZERO, ZERO, ZERO].into()),
+            [Felt::new_unchecked(i * 100), ZERO, ZERO, ZERO].into(),
         )?;
     }
     let component = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_map(map_slot_name.clone(), map)],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
 
     let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -1233,8 +1227,8 @@ async fn lock_account_affects_latest_and_historical() -> anyhow::Result<()> {
     let mut storage_delta = AccountStorageDelta::new();
     storage_delta.set_map_item(
         map_slot_name.clone(),
-        StorageMapKey::new([Felt::new(1), ZERO, ZERO, ZERO].into()),
-        [Felt::new(2000), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::new_unchecked(1), ZERO, ZERO, ZERO].into()),
+        [Felt::new_unchecked(2000), ZERO, ZERO, ZERO].into(),
     )?;
     let vault_delta = AccountVaultDelta::from_iters(
         vec![
@@ -1275,7 +1269,13 @@ async fn lock_account_affects_latest_and_historical() -> anyhow::Result<()> {
     assert_eq!(m.historical_account_headers, 1);
 
     // Lock the account with a fake mismatched digest (not matching any historical commitment)
-    let fake_digest = [Felt::new(999), Felt::new(888), Felt::new(777), Felt::new(666)].into();
+    let fake_digest = [
+        Felt::new_unchecked(999),
+        Felt::new_unchecked(888),
+        Felt::new_unchecked(777),
+        Felt::new_unchecked(666),
+    ]
+    .into();
     store
         .interact_with_connection(move |conn| {
             let tx = conn.transaction().into_store_error()?;
@@ -1336,26 +1336,26 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     let nf_faucet_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET)?;
 
     // Build initial map with 3 entries: A (key=1), B (key=2), C (key=3)
-    let key_a = StorageMapKey::new([Felt::new(1), ZERO, ZERO, ZERO].into());
-    let key_c = StorageMapKey::new([Felt::new(3), ZERO, ZERO, ZERO].into());
+    let key_a = StorageMapKey::new([Felt::new_unchecked(1), ZERO, ZERO, ZERO].into());
+    let key_c = StorageMapKey::new([Felt::new_unchecked(3), ZERO, ZERO, ZERO].into());
 
     let mut initial_map = StorageMap::new();
-    initial_map.insert(key_a, [Felt::new(100), ZERO, ZERO, ZERO].into())?;
+    initial_map.insert(key_a, [Felt::new_unchecked(100), ZERO, ZERO, ZERO].into())?;
     initial_map.insert(
-        StorageMapKey::new([Felt::new(2), ZERO, ZERO, ZERO].into()),
-        [Felt::new(200), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::new_unchecked(2), ZERO, ZERO, ZERO].into()),
+        [Felt::new_unchecked(200), ZERO, ZERO, ZERO].into(),
     )?;
-    initial_map.insert(key_c, [Felt::new(300), ZERO, ZERO, ZERO].into())?;
+    initial_map.insert(key_c, [Felt::new_unchecked(300), ZERO, ZERO, ZERO].into())?;
 
     let component = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_map(map_slot_name.clone(), initial_map)],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
 
     // Build with build() at nonce 0: no initial assets
     let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -1371,7 +1371,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     let asset_y = NonFungibleAsset::new(&NonFungibleAssetDetails::new(
         nf_faucet_id,
         NON_FUNGIBLE_ASSET_DATA.into(),
-    )?)?;
+    ));
 
     let vault_delta_1 = AccountVaultDelta::from_iters(vec![asset_x.into(), asset_y.into()], []);
     let delta_1 = AccountDelta::new(account_id, AccountStorageDelta::new(), vault_delta_1, ONE)?;
@@ -1440,11 +1440,11 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     storage_delta_next.set_map_item(
         map_slot_name.clone(),
         key_a,
-        [Felt::new(999), ZERO, ZERO, ZERO].into(),
+        [Felt::new_unchecked(999), ZERO, ZERO, ZERO].into(),
     )?;
 
     let asset_z =
-        NonFungibleAsset::new(&NonFungibleAssetDetails::new(nf_faucet_id, vec![5, 6, 7, 8])?)?;
+        NonFungibleAsset::new(&NonFungibleAssetDetails::new(nf_faucet_id, vec![5, 6, 7, 8]));
     let vault_delta_next = AccountVaultDelta::from_iters(vec![asset_z.into()], []);
 
     let delta_next = AccountDelta::new(account_id, storage_delta_next, vault_delta_next, ONE)?;
@@ -1589,8 +1589,8 @@ async fn undo_multiple_nonces_at_once() -> anyhow::Result<()> {
     let mut storage_delta_1 = AccountStorageDelta::new();
     storage_delta_1.set_map_item(
         map_slot_name.clone(),
-        StorageMapKey::new([Felt::new(1), ZERO, ZERO, ZERO].into()),
-        [Felt::new(1000), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::new_unchecked(1), ZERO, ZERO, ZERO].into()),
+        [Felt::new_unchecked(1000), ZERO, ZERO, ZERO].into(),
     )?;
     let asset_1 = FungibleAsset::new(faucet_id, 100)?;
     let vault_delta_1 = AccountVaultDelta::from_iters(vec![asset_1.into()], []);
@@ -1628,15 +1628,16 @@ async fn undo_multiple_nonces_at_once() -> anyhow::Result<()> {
     let mut storage_delta_2 = AccountStorageDelta::new();
     storage_delta_2.set_map_item(
         map_slot_name.clone(),
-        StorageMapKey::new([Felt::new(2), ZERO, ZERO, ZERO].into()),
-        [Felt::new(2000), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::new_unchecked(2), ZERO, ZERO, ZERO].into()),
+        [Felt::new_unchecked(2000), ZERO, ZERO, ZERO].into(),
     )?;
     let asset_2 = NonFungibleAsset::new(&NonFungibleAssetDetails::new(
         nf_faucet_id,
         NON_FUNGIBLE_ASSET_DATA.into(),
-    )?)?;
+    ));
     let vault_delta_2 = AccountVaultDelta::from_iters(vec![asset_2.into()], []);
-    let delta_2 = AccountDelta::new(account_id, storage_delta_2, vault_delta_2, Felt::new(2))?;
+    let delta_2 =
+        AccountDelta::new(account_id, storage_delta_2, vault_delta_2, Felt::new_unchecked(2))?;
 
     let prev_header_1: AccountHeader = (&account_nonce1).into();
     let mut account_nonce2 = account_nonce1.clone();
@@ -1720,23 +1721,23 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
     let map_slot_name = StorageSlotName::new("test::undo_new::map").expect("valid slot name");
 
     // Build initial map with 2 entries: A (key=1), B (key=2)
-    let key_a = StorageMapKey::new([Felt::new(1), ZERO, ZERO, ZERO].into());
-    let key_b = StorageMapKey::new([Felt::new(2), ZERO, ZERO, ZERO].into());
-    let key_c = StorageMapKey::new([Felt::new(3), ZERO, ZERO, ZERO].into());
-    let key_d = StorageMapKey::new([Felt::new(4), ZERO, ZERO, ZERO].into());
+    let key_a = StorageMapKey::new([Felt::new_unchecked(1), ZERO, ZERO, ZERO].into());
+    let key_b = StorageMapKey::new([Felt::new_unchecked(2), ZERO, ZERO, ZERO].into());
+    let key_c = StorageMapKey::new([Felt::new_unchecked(3), ZERO, ZERO, ZERO].into());
+    let key_d = StorageMapKey::new([Felt::new_unchecked(4), ZERO, ZERO, ZERO].into());
 
     let mut initial_map = StorageMap::new();
-    initial_map.insert(key_a, [Felt::new(100), ZERO, ZERO, ZERO].into())?;
-    initial_map.insert(key_b, [Felt::new(200), ZERO, ZERO, ZERO].into())?;
+    initial_map.insert(key_a, [Felt::new_unchecked(100), ZERO, ZERO, ZERO].into())?;
+    initial_map.insert(key_b, [Felt::new_unchecked(200), ZERO, ZERO, ZERO].into())?;
 
     let component = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
         vec![StorageSlot::with_map(map_slot_name.clone(), initial_map)],
-        AccountComponentMetadata::new("miden::testing::dummy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
 
     let account = AccountBuilder::new([0; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
@@ -1756,12 +1757,12 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
     storage_delta_add.set_map_item(
         map_slot_name.clone(),
         key_c,
-        [Felt::new(300), ZERO, ZERO, ZERO].into(),
+        [Felt::new_unchecked(300), ZERO, ZERO, ZERO].into(),
     )?;
     storage_delta_add.set_map_item(
         map_slot_name.clone(),
         key_d,
-        [Felt::new(400), ZERO, ZERO, ZERO].into(),
+        [Felt::new_unchecked(400), ZERO, ZERO, ZERO].into(),
     )?;
 
     // Also add an asset so the vault root changes (avoids SMT root collision on undo)

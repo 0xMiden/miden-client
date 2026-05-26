@@ -317,7 +317,7 @@ impl GrpcClient {
         &self,
         account_id: AccountId,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
-        let has_public_state = account_id.has_public_state();
+        let has_public_state = account_id.is_public();
         let account_request = {
             AccountRequest {
                 account_id: Some(account_id.into()),
@@ -543,7 +543,7 @@ impl NodeRpcClient for GrpcClient {
         let api_response = self
             .call_with_retry(RpcEndpoint::SubmitProvenTx, |mut rpc_api| {
                 let request = request.clone();
-                Box::pin(async move { rpc_api.submit_proven_transaction(request).await })
+                Box::pin(async move { rpc_api.submit_proven_tx(request).await })
             })
             .await?;
 
@@ -565,7 +565,7 @@ impl NodeRpcClient for GrpcClient {
         let api_response = self
             .call_with_retry(RpcEndpoint::SubmitProvenBatch, |mut rpc_api| {
                 let request = request.clone();
-                Box::pin(async move { rpc_api.submit_proven_batch(request).await })
+                Box::pin(async move { rpc_api.submit_proven_tx_batch(request).await })
             })
             .await?;
 
@@ -606,12 +606,12 @@ impl NodeRpcClient for GrpcClient {
                 .ok_or(RpcError::ExpectedDataMissing("MmrPath".into()))?
                 .try_into()?;
 
+            let forest_size = usize::try_from(forest).expect("u64 should fit in usize");
+            let forest = Forest::new(forest_size).map_err(|_| {
+                RpcError::InvalidResponse(format!("invalid forest size: {forest_size}"))
+            })?;
             Some(MmrProof::new(
-                MmrPath::new(
-                    Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
-                    block_header.block_num().as_usize(),
-                    merkle_path,
-                ),
+                MmrPath::new(forest, block_header.block_num().as_usize(), merkle_path),
                 block_header.commitment(),
             ))
         } else {
@@ -653,11 +653,12 @@ impl NodeRpcClient for GrpcClient {
         current_block_height: BlockNumber,
         upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError> {
-        let block_from = current_block_height.as_u32();
+        let finality_level: proto::rpc::FinalityLevel = upper_bound.into();
 
-        let upper_bound = Some(upper_bound.into());
-
-        let request = proto::rpc::SyncChainMmrRequest { block_from, upper_bound };
+        let request = proto::rpc::SyncChainMmrRequest {
+            current_client_block_height: current_block_height.as_u32(),
+            finality_level: finality_level.into(),
+        };
 
         let response = self
             .call_with_retry(RpcEndpoint::SyncChainMmr, |mut rpc_api| {
@@ -757,7 +758,7 @@ impl NodeRpcClient for GrpcClient {
 
         // Only request details for accounts with public state (Public or Network);
         // include known code commitment for this account when available
-        let account_details = if account_id.has_public_state() {
+        let account_details = if account_id.is_public() {
             Some(AccountDetailRequest {
                 code_commitment: Some(EMPTY_WORD.into()),
                 asset_vault_commitment: known_vault_commitment.map(Into::into),
@@ -798,7 +799,7 @@ impl NodeRpcClient for GrpcClient {
             .into();
 
         // For accounts with public state, details should be present when requested
-        let headers = if account_witness.id().has_public_state() {
+        let headers = if account_witness.id().is_public() {
             let mut details = response
                 .details
                 .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
@@ -1358,15 +1359,13 @@ mod tests {
 
     #[tokio::test]
     async fn set_genesis_commitment_does_nothing_if_the_commitment_is_already_set() {
-        use miden_protocol::Felt;
-
         let endpoint = &Endpoint::devnet();
         let client = GrpcClient::new(endpoint, 10000);
 
         let initial_commitment = Word::default();
         client.set_genesis_commitment(initial_commitment).await.unwrap();
 
-        let new_commitment = Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+        let new_commitment = Word::from([1u32, 2, 3, 4]);
         client.set_genesis_commitment(new_commitment).await.unwrap();
 
         assert_eq!(client.genesis_commitment.read().unwrap(), initial_commitment);

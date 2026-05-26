@@ -170,9 +170,10 @@ impl TryInto<AccountHeader> for proto::account::AccountHeader {
             .ok_or(proto::account::AccountHeader::missing_field(stringify!(code_commitment)))?
             .try_into()?;
 
+        let nonce = Felt::new(nonce).map_err(|_| RpcConversionError::NotAValidFelt)?;
         Ok(AccountHeader::new(
             account_id,
-            Felt::new(nonce),
+            nonce,
             vault_root,
             storage_commitment,
             code_commitment,

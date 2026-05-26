@@ -15,14 +15,12 @@
 //! #   account::{Account, AccountBuilder, AccountBuilderSchemaCommitmentExt, AccountType, component::BasicWallet},
 //! #   crypto::FeltRng
 //! # };
-//! # use miden_protocol::account::AccountStorageMode;
 //! # async fn add_new_account_example<AUTH>(
 //! #     client: &mut miden_client::Client<AUTH>
 //! # ) -> Result<(), miden_client::ClientError> {
 //! #   let random_seed = Default::default();
 //! let account = AccountBuilder::new(random_seed)
-//!     .account_type(AccountType::RegularAccountImmutableCode)
-//!     .storage_mode(AccountStorageMode::Private)
+//!     .account_type(AccountType::Private)
 //!     .with_component(BasicWallet)
 //!     .build_with_schema_commitment()?;
 //!
@@ -38,6 +36,7 @@ use alloc::vec::Vec;
 
 use miden_protocol::Felt;
 use miden_protocol::account::auth::PublicKey;
+pub use miden_protocol::account::delta::AccountUpdateDetails;
 pub use miden_protocol::account::{
     Account,
     AccountBuilder,
@@ -49,17 +48,24 @@ pub use miden_protocol::account::{
     AccountHeader,
     AccountId,
     AccountIdPrefix,
+    AccountIdPrefixV1,
+    AccountIdV1,
+    AccountIdVersion,
+    AccountProcedureRoot,
     AccountStorage,
-    AccountStorageMode,
     AccountType,
     PartialAccount,
     PartialStorage,
     PartialStorageMap,
+    RoleSymbol,
     StorageMap,
+    StorageMapDelta,
     StorageMapKey,
+    StorageMapKeyHash,
     StorageMapWitness,
     StorageSlot,
     StorageSlotContent,
+    StorageSlotDelta,
     StorageSlotId,
     StorageSlotName,
     StorageSlotType,
@@ -71,11 +77,24 @@ use miden_protocol::note::NoteTag;
 
 mod account_reader;
 pub use account_reader::AccountReader;
-pub use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::auth::AuthSingleSig;
+pub use miden_standards::account::metadata::{
+    AccountBuilderSchemaCommitmentExt,
+    AccountSchemaCommitment,
+};
+
+/// Compatibility alias preserved at the client layer after protocol 0.15 collapsed storage mode
+/// into the account type (`Public` / `Private`).
+pub type AccountStorageMode = AccountType;
+
 // RE-EXPORTS
 // ================================================================================================
-pub use miden_standards::account::interface::AccountInterfaceExt;
+pub use miden_standards::account::interface::{
+    AccountComponentInterface,
+    AccountComponentInterfaceExt,
+    AccountInterface,
+    AccountInterfaceExt,
+};
 use miden_standards::account::wallets::BasicWallet;
 
 use super::Client;
@@ -92,31 +111,69 @@ pub mod component {
     pub use miden_protocol::account::component::{
         FeltSchema,
         InitStorageData,
+        InitStorageDataError,
+        MapSlotSchema,
+        SchemaRequirement,
         SchemaType,
+        SchemaTypeError,
         StorageSchema,
         StorageSlotSchema,
         StorageValueName,
+        StorageValueNameError,
         ValueSlotSchema,
         WordSchema,
+        WordValue,
     };
-    pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
-    pub use miden_standards::account::access::AccessControl;
+    pub use miden_protocol::account::{
+        AccountComponent,
+        AccountComponentMetadata,
+        AccountComponentName,
+        AccountProcedureRoot,
+        RoleSymbol,
+    };
+    pub use miden_standards::account::access::{
+        AccessControl,
+        Authority,
+        AuthorityError,
+        Ownable2Step,
+        Ownable2StepError,
+        Pausable,
+        PausableManager,
+        PausableStorage,
+        RoleBasedAccessControl,
+    };
     pub use miden_standards::account::auth::*;
+    pub use miden_standards::account::components::StandardAccountComponent;
     pub use miden_standards::account::faucets::{
+        Description,
+        ExternalLink,
         FungibleFaucet,
         FungibleFaucetBuilder,
+        FungibleFaucetError,
+        LogoURI,
         TokenMetadata,
+        TokenMetadataError,
         TokenName,
+        create_fungible_faucet,
     };
     pub use miden_standards::account::policies::{
+        AllowlistOwnerControlled,
+        AllowlistStorage,
+        BasicAllowlist,
+        BasicBlocklist,
+        BlocklistOwnerControlled,
+        BlocklistStorage,
         BurnAllowAll,
         BurnOwnerOnly,
         BurnPolicyConfig,
         MintAllowAll,
         MintOwnerOnly,
         MintPolicyConfig,
-        PolicyAuthority,
+        PolicyRegistration,
         TokenPolicyManager,
+        TokenPolicyManagerError,
+        TransferAllowAll,
+        TransferPolicy,
     };
     pub use miden_standards::account::wallets::BasicWallet;
 }
@@ -127,11 +184,11 @@ pub mod component {
 /// This section of the [Client] contains methods for:
 ///
 /// - **Account creation:** Use the [`AccountBuilder`] to construct new accounts, specifying account
-///   type, storage mode (public/private), and attaching necessary components (e.g., basic wallet or
-///   fungible faucet). Prefer [`AccountBuilderSchemaCommitmentExt::build_with_schema_commitment`]
-///   so the account includes merged storage schema commitment metadata; use plain
-///   [`AccountBuilder::build`] only when you need to opt out. After creation, accounts can be added
-///   to the client.
+///   visibility (`AccountType::Public` / `AccountType::Private`) and attaching necessary components
+///   (e.g., basic wallet or fungible faucet). Prefer
+///   [`AccountBuilderSchemaCommitmentExt::build_with_schema_commitment`] so the account includes
+///   merged storage schema commitment metadata; use plain [`AccountBuilder::build`] only when you
+///   need to opt out. After creation, accounts can be added to the client.
 ///
 /// - **Account tracking:** Accounts added via the client are persisted to the local store, where
 ///   their state (including nonce, balance, and metadata) is updated upon every synchronization
@@ -425,30 +482,26 @@ impl<AUTH> Client<AUTH> {
 /// - `init_seed`: Initial seed used to create the account. This is the seed passed to
 ///   [`AccountBuilder::new`].
 /// - `public_key`: Public key of the account used for the authentication component.
-/// - `storage_mode`: Storage mode of the account.
-/// - `is_mutable`: Whether the account is mutable or not.
+/// - `account_visibility`: Public/private visibility of the account.
+/// - `is_mutable`: Ignored as of protocol 0.15. The protocol no longer encodes mutability in the
+///   account type, so the client preserves this parameter only for source compatibility.
 ///
 /// # Errors
 /// - If the account cannot be built.
 pub fn build_wallet_id(
     init_seed: [u8; 32],
     public_key: &PublicKey,
-    storage_mode: AccountStorageMode,
+    account_visibility: AccountType,
     is_mutable: bool,
 ) -> Result<AccountId, ClientError> {
-    let account_type = if is_mutable {
-        AccountType::RegularAccountUpdatableCode
-    } else {
-        AccountType::RegularAccountImmutableCode
-    };
+    let _ = is_mutable;
 
     let auth_scheme = public_key.auth_scheme();
     let auth_component: AccountComponent =
         AuthSingleSig::new(public_key.to_commitment(), auth_scheme).into();
 
     let account = AccountBuilder::new(init_seed)
-        .account_type(account_type)
-        .storage_mode(storage_mode)
+        .account_type(account_visibility)
         .with_auth_component(auth_component)
         .with_component(BasicWallet)
         .build_with_schema_commitment()?;
@@ -459,7 +512,6 @@ pub fn build_wallet_id(
 #[cfg(test)]
 mod schema_commitment_tests {
     use miden_protocol::EMPTY_WORD;
-    use miden_protocol::account::AccountStorageMode;
     use miden_protocol::account::auth::AuthSecretKey;
     use miden_standards::account::metadata::AccountSchemaCommitment;
 
@@ -476,8 +528,7 @@ mod schema_commitment_tests {
     fn wallet_build_includes_schema_commitment_metadata_slot() {
         let key = AuthSecretKey::new_falcon512_poseidon2();
         let account = AccountBuilder::new([2u8; 32])
-            .account_type(AccountType::RegularAccountImmutableCode)
-            .storage_mode(AccountStorageMode::Private)
+            .account_type(AccountType::Private)
             .with_auth_component(AuthSingleSig::new(
                 key.public_key().to_commitment(),
                 AuthSchemeId::Falcon512Poseidon2,

@@ -7,6 +7,7 @@ use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteDetails,
+    NoteDetailsCommitment,
     NoteFile,
     NoteId,
     NoteInclusionProof,
@@ -70,7 +71,13 @@ impl OutputNoteRecord {
     }
 
     pub fn id(&self) -> NoteId {
-        NoteId::new(self.recipient_digest, self.assets.commitment())
+        NoteId::new(self.details_commitment(), &self.metadata)
+    }
+
+    /// Returns the commitment to the note's details (recipient + assets), independent of
+    /// note metadata. Use this as a stable identifier when metadata may not be present.
+    pub fn details_commitment(&self) -> NoteDetailsCommitment {
+        NoteDetailsCommitment::from_raw_commitments(self.recipient_digest, self.assets.commitment())
     }
 
     pub fn recipient_digest(&self) -> Word {
@@ -99,12 +106,8 @@ impl OutputNoteRecord {
 
     pub fn nullifier(&self) -> Option<Nullifier> {
         let recipient = self.recipient()?;
-        Some(Nullifier::new(
-            recipient.script().root().into(),
-            recipient.storage().commitment(),
-            self.assets.commitment(),
-            recipient.serial_num(),
-        ))
+        let details = NoteDetails::new(self.assets.clone(), recipient.clone());
+        Some(Nullifier::from_details_and_metadata(&details, &self.metadata))
     }
 
     pub fn expected_height(&self) -> BlockNumber {

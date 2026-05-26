@@ -97,10 +97,10 @@ impl TryFrom<proto::primitives::Digest> for [Felt; 4] {
     fn try_from(value: proto::primitives::Digest) -> Result<Self, Self::Error> {
         if [value.d0, value.d1, value.d2, value.d3].iter().all(|v| *v < Felt::ORDER) {
             Ok([
-                Felt::new(value.d0),
-                Felt::new(value.d1),
-                Felt::new(value.d2),
-                Felt::new(value.d3),
+                Felt::new_unchecked(value.d0),
+                Felt::new_unchecked(value.d1),
+                Felt::new_unchecked(value.d2),
+                Felt::new_unchecked(value.d3),
             ])
         } else {
             Err(RpcConversionError::NotAValidFelt)

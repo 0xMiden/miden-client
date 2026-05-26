@@ -9,7 +9,7 @@ use std::vec::Vec;
 
 use anyhow::{Context, Result};
 use miden_protocol::account::auth::AuthSecretKey;
-use miden_protocol::account::{Account, AccountComponentMetadata, AccountId, AccountStorageMode};
+use miden_protocol::account::{Account, AccountComponentMetadata, AccountId};
 use miden_protocol::asset::{AssetAmount, FungibleAsset, TokenSymbol};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
@@ -27,8 +27,9 @@ use crate::account::component::{
     BurnPolicyConfig,
     FungibleFaucet,
     MintPolicyConfig,
-    PolicyAuthority,
+    PolicyRegistration,
     TokenPolicyManager,
+    TransferPolicy,
 };
 use crate::account::{AccountBuilder, AccountBuilderSchemaCommitmentExt, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
@@ -66,20 +67,20 @@ pub fn create_test_store_path() -> PathBuf {
 /// Inserts a new wallet account into the client and into the keystore.
 pub async fn insert_new_wallet(
     client: &mut TestClient,
-    storage_mode: AccountStorageMode,
+    visibility: AccountType,
     keystore: &FilesystemKeyStore,
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    insert_new_wallet_with_seed(client, storage_mode, keystore, init_seed, auth_scheme).await
+    insert_new_wallet_with_seed(client, visibility, keystore, init_seed, auth_scheme).await
 }
 
 /// Inserts a new wallet account built with the provided seed into the client and into the keystore.
 pub async fn insert_new_wallet_with_seed(
     client: &mut TestClient,
-    storage_mode: AccountStorageMode,
+    visibility: AccountType,
     keystore: &FilesystemKeyStore,
     init_seed: [u8; 32],
     auth_scheme: AuthSchemeId,
@@ -92,8 +93,7 @@ pub async fn insert_new_wallet_with_seed(
     let auth_component = AuthSingleSig::new(key_pair.public_key().to_commitment(), auth_scheme);
 
     let account = AccountBuilder::new(init_seed)
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(storage_mode)
+        .account_type(visibility)
         .with_auth_component(auth_component)
         .with_component(BasicWallet)
         .build_with_schema_commitment()
@@ -103,7 +103,7 @@ pub async fn insert_new_wallet_with_seed(
 
     client.add_account(&account, false).await?;
 
-    info!(account_id = %account.id(), ?storage_mode, "Inserted new wallet");
+    info!(account_id = %account.id(), ?visibility, "Inserted new wallet");
 
     Ok((account, key_pair))
 }
@@ -111,7 +111,7 @@ pub async fn insert_new_wallet_with_seed(
 /// Inserts a new fungible faucet account into the client and into the keystore.
 pub async fn insert_new_fungible_faucet(
     client: &mut TestClient,
-    storage_mode: AccountStorageMode,
+    visibility: AccountType,
     keystore: &FilesystemKeyStore,
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
@@ -137,16 +137,20 @@ pub async fn insert_new_fungible_faucet(
         .build()
         .unwrap();
 
+    let policy_manager = TokenPolicyManager::new()
+        .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
+        .unwrap()
+        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
+        .unwrap()
+        .with_send_policy(TransferPolicy::AllowAll, PolicyRegistration::Active)
+        .unwrap()
+        .with_receive_policy(TransferPolicy::AllowAll, PolicyRegistration::Active)
+        .unwrap();
     let account = AccountBuilder::new(init_seed)
-        .account_type(AccountType::FungibleFaucet)
-        .storage_mode(storage_mode)
+        .account_type(visibility)
         .with_auth_component(auth_component)
         .with_component(faucet)
-        .with_components(TokenPolicyManager::new(
-            PolicyAuthority::AuthControlled,
-            MintPolicyConfig::AllowAll,
-            BurnPolicyConfig::AllowAll,
-        ))
+        .with_components(policy_manager)
         .build_with_schema_commitment()
         .unwrap();
 
@@ -154,7 +158,7 @@ pub async fn insert_new_fungible_faucet(
 
     client.add_account(&account, false).await?;
 
-    info!(account_id = %account.id(), ?storage_mode, "Inserted new fungible faucet");
+    info!(account_id = %account.id(), ?visibility, "Inserted new fungible faucet");
 
     Ok((account, key_pair))
 }
@@ -321,7 +325,7 @@ pub const TRANSFER_AMOUNT: u64 = 59;
 /// Sets up a basic client and returns two basic accounts and a faucet account (in that order).
 pub async fn setup_two_wallets_and_faucet(
     client: &mut TestClient,
-    accounts_storage_mode: AccountStorageMode,
+    account_visibility: AccountType,
     keystore: &FilesystemKeyStore,
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, Account, Account)> {
@@ -346,18 +350,18 @@ pub async fn setup_two_wallets_and_faucet(
 
     // Create faucet account
     let (faucet_account, _) =
-        insert_new_fungible_faucet(client, accounts_storage_mode, keystore, auth_scheme)
+        insert_new_fungible_faucet(client, account_visibility, keystore, auth_scheme)
             .await
             .with_context(|| "failed to insert new fungible faucet account")?;
 
     // Create regular accounts
     let (first_basic_account, ..) =
-        insert_new_wallet(client, accounts_storage_mode, keystore, auth_scheme)
+        insert_new_wallet(client, account_visibility, keystore, auth_scheme)
             .await
             .with_context(|| "failed to insert first basic wallet account")?;
 
     let (second_basic_account, ..) =
-        insert_new_wallet(client, accounts_storage_mode, keystore, auth_scheme)
+        insert_new_wallet(client, account_visibility, keystore, auth_scheme)
             .await
             .with_context(|| "failed to insert second basic wallet account")?;
 
@@ -375,19 +379,18 @@ pub async fn setup_two_wallets_and_faucet(
 /// Sets up a basic client and returns a basic account and a faucet account.
 pub async fn setup_wallet_and_faucet(
     client: &mut TestClient,
-    accounts_storage_mode: AccountStorageMode,
+    account_visibility: AccountType,
     keystore: &FilesystemKeyStore,
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, Account)> {
     let (faucet_account, _) =
-        insert_new_fungible_faucet(client, accounts_storage_mode, keystore, auth_scheme)
+        insert_new_fungible_faucet(client, account_visibility, keystore, auth_scheme)
             .await
             .with_context(|| "failed to insert new fungible faucet account")?;
 
-    let (basic_account, ..) =
-        insert_new_wallet(client, accounts_storage_mode, keystore, auth_scheme)
-            .await
-            .with_context(|| "failed to insert new wallet account")?;
+    let (basic_account, ..) = insert_new_wallet(client, account_visibility, keystore, auth_scheme)
+        .await
+        .with_context(|| "failed to insert new wallet account")?;
 
     Ok((basic_account, faucet_account))
 }
@@ -555,7 +558,7 @@ pub async fn insert_account_with_custom_component(
     client: &mut TestClient,
     custom_code: &str,
     storage_slots: Vec<StorageSlot>,
-    storage_mode: AccountStorageMode,
+    visibility: AccountType,
     keystore: &FilesystemKeyStore,
 ) -> Result<(Account, AuthSecretKey), ClientError> {
     let component_code = CodeBuilder::default()
@@ -564,7 +567,7 @@ pub async fn insert_account_with_custom_component(
     let custom_component = AccountComponent::new(
         component_code,
         storage_slots,
-        AccountComponentMetadata::new("miden::testing::custom_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::custom_component"),
     )
     .map_err(ClientError::AccountError)?;
 
@@ -575,8 +578,7 @@ pub async fn insert_account_with_custom_component(
     let pub_key = key_pair.public_key();
 
     let account = AccountBuilder::new(init_seed)
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(storage_mode)
+        .account_type(visibility)
         .with_auth_component(AuthSingleSig::new(
             pub_key.to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,

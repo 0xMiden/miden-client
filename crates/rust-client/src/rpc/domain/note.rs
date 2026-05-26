@@ -10,6 +10,7 @@ use miden_protocol::note::{
     NoteAttachmentScheme,
     NoteAttachments,
     NoteDetails,
+    NoteDetailsCommitment,
     NoteHeader,
     NoteId,
     NoteInclusionProof,
@@ -159,15 +160,18 @@ impl TryFrom<proto::note::NoteHeader> for NoteHeader {
     type Error = RpcConversionError;
 
     fn try_from(value: proto::note::NoteHeader) -> Result<Self, Self::Error> {
-        let note_id = value
-            .note_id
-            .ok_or(proto::note::NoteHeader::missing_field(stringify!(note_id)))?
+        let details_commitment_word: Word = value
+            .details_commitment
+            .ok_or(proto::note::NoteHeader::missing_field(stringify!(details_commitment)))?
             .try_into()?;
         let metadata = value
             .metadata
             .ok_or(proto::note::NoteHeader::missing_field(stringify!(metadata)))?
             .try_into()?;
-        Ok(NoteHeader::new(note_id, metadata))
+        Ok(NoteHeader::new(
+            NoteDetailsCommitment::from_raw(details_commitment_word),
+            metadata,
+        ))
     }
 }
 
@@ -330,9 +334,9 @@ impl TryFrom<proto::note::NoteSyncRecord> for CommittedNote {
 /// Describes the possible responses from the `GetNotesById` endpoint for a single note.
 #[allow(clippy::large_enum_variant)]
 pub enum FetchedNote {
-    /// Details for a private note only include its [`NoteHeader`] and [`NoteInclusionProof`].
-    /// Other details needed to consume the note are expected to be stored locally, off-chain.
-    Private(NoteHeader, NoteInclusionProof),
+    /// Details for a private note only include its ID, metadata and inclusion proof. Other
+    /// details needed to consume the note are expected to be stored locally, off-chain.
+    Private(NoteId, NoteMetadata, NoteInclusionProof),
     /// Contains the full [`Note`] object alongside its [`NoteInclusionProof`].
     Public(Note, NoteInclusionProof),
 }
@@ -341,16 +345,15 @@ impl FetchedNote {
     /// Returns the note's inclusion details.
     pub fn inclusion_proof(&self) -> &NoteInclusionProof {
         match self {
-            FetchedNote::Private(_, inclusion_proof) | FetchedNote::Public(_, inclusion_proof) => {
-                inclusion_proof
-            },
+            FetchedNote::Private(_, _, inclusion_proof)
+            | FetchedNote::Public(_, inclusion_proof) => inclusion_proof,
         }
     }
 
     /// Returns the note's metadata.
     pub fn metadata(&self) -> &NoteMetadata {
         match self {
-            FetchedNote::Private(header, _) => header.metadata(),
+            FetchedNote::Private(_, metadata, _) => metadata,
             FetchedNote::Public(note, _) => note.metadata(),
         }
     }
@@ -358,7 +361,7 @@ impl FetchedNote {
     /// Returns the note's ID.
     pub fn id(&self) -> NoteId {
         match self {
-            FetchedNote::Private(header, _) => header.id(),
+            FetchedNote::Private(note_id, ..) => *note_id,
             FetchedNote::Public(note, _) => note.id(),
         }
     }
@@ -406,8 +409,7 @@ impl TryFrom<proto::note::CommittedNote> for FetchedNote {
                 inclusion_proof,
             ))
         } else {
-            let note_header = NoteHeader::new(note_id, metadata);
-            Ok(FetchedNote::Private(note_header, inclusion_proof))
+            Ok(FetchedNote::Private(note_id, metadata, inclusion_proof))
         }
     }
 }

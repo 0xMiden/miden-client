@@ -30,7 +30,7 @@ crate-type = ["lib"]
 
 [features]
 dap = ["dep:miden-debug", "dep:miden-processor"]
-default = ["dap", "std"]
+default = ["std"]
 std = [
   "dep:tempfile",
   "dep:tokio",

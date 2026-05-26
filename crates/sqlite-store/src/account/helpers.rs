@@ -52,10 +52,11 @@ pub(crate) fn parse_accounts(
         _ => AccountStatus::Tracked,
     };
 
+    let nonce = miden_client::Felt::new(nonce).expect("stored nonce must be a valid Felt");
     Ok((
         AccountHeader::new(
             AccountId::from_hex(&id).expect("Conversion from stored AccountID should not panic"),
-            miden_client::Felt::new(nonce),
+            nonce,
             Word::try_from(&vault_root)?,
             Word::try_from(&storage_commitment)?,
             Word::try_from(&code_commitment)?,

@@ -170,6 +170,8 @@ pub mod asset {
         FungibleAssetDelta,
         NonFungibleAssetDelta,
         NonFungibleDeltaAction,
+        StorageMapDelta,
+        StorageSlotDelta,
     };
     pub use miden_protocol::account::{
         AccountStorageHeader,
@@ -180,6 +182,10 @@ pub mod asset {
     pub use miden_protocol::asset::{
         Asset,
         AssetAmount,
+        AssetCallbackFlag,
+        AssetCallbacks,
+        AssetComposition,
+        AssetId,
         AssetVault,
         AssetVaultKey,
         AssetWitness,

@@ -62,12 +62,21 @@ where
         &mut self,
         note_files: &[NoteFile],
     ) -> Result<Vec<NoteId>, ClientError> {
+        if note_files
+            .iter()
+            .any(|note_file| matches!(note_file, NoteFile::NoteDetails { .. }))
+        {
+            return Err(ClientError::NoteImportError(
+                "Importing NoteFile::NoteDetails is temporarily unsupported under protocol 0.15 until expected-note persistence is redesigned".to_string(),
+            ));
+        }
+
         let mut note_ids_map = BTreeMap::new();
         for note_file in note_files {
             let id = match &note_file {
                 NoteFile::NoteId(id) => *id,
-                NoteFile::NoteDetails { details, .. } => details.id(),
                 NoteFile::NoteWithProof(note, _) => note.id(),
+                NoteFile::NoteDetails { .. } => unreachable!("handled above"),
             };
             note_ids_map.insert(id, note_file);
         }
@@ -79,7 +88,6 @@ where
             previous_notes.into_iter().map(|note| (note.id(), note)).collect();
 
         let mut requests_by_id = BTreeMap::new();
-        let mut requests_by_details = vec![];
         let mut requests_by_proof = vec![];
 
         for (note_id, note_file) in note_ids_map {
@@ -97,9 +105,7 @@ where
                 NoteFile::NoteId(id) => {
                     requests_by_id.insert(id, previous_note);
                 },
-                NoteFile::NoteDetails { details, after_block_num, tag } => {
-                    requests_by_details.push((previous_note, details, after_block_num, tag));
-                },
+                NoteFile::NoteDetails { .. } => unreachable!("handled above"),
                 NoteFile::NoteWithProof(note, inclusion_proof) => {
                     requests_by_proof.push((previous_note, note, inclusion_proof));
                 },
@@ -110,11 +116,6 @@ where
         if !requests_by_id.is_empty() {
             let notes_by_id = self.import_note_records_by_id(requests_by_id).await?;
             imported_notes.extend(notes_by_id.values().cloned());
-        }
-
-        if !requests_by_details.is_empty() {
-            let notes_by_details = self.import_note_records_by_details(requests_by_details).await?;
-            imported_notes.extend(notes_by_details);
         }
 
         if !requests_by_proof.is_empty() {
@@ -304,73 +305,21 @@ where
 
     /// Builds a note record list from note details. If a note with the same ID was already stored
     /// it is passed via `previous_note` so it can be updated.
-    async fn import_note_records_by_details(
+    #[allow(dead_code, clippy::unused_self, clippy::needless_pass_by_value)]
+    fn import_note_records_by_details(
         &mut self,
         requested_notes: Vec<(Option<InputNoteRecord>, NoteDetails, BlockNumber, Option<NoteTag>)>,
     ) -> Result<Vec<Option<InputNoteRecord>>, ClientError> {
-        let mut lowest_request_block: BlockNumber = u32::MAX.into();
-        let mut note_requests = vec![];
-        for (_, details, after_block_num, tag) in &requested_notes {
-            if let Some(tag) = tag {
-                note_requests.push((details.id(), tag));
-                if after_block_num < &lowest_request_block {
-                    lowest_request_block = *after_block_num;
-                }
-            }
-        }
-        let mut committed_notes_data =
-            self.check_expected_notes(lowest_request_block, note_requests).await?;
-
-        let mut note_records = vec![];
-        for (previous_note, details, after_block_num, tag) in requested_notes {
-            let mut note_record = previous_note.unwrap_or({
-                InputNoteRecord::new(
-                    details,
-                    self.store.get_current_timestamp(),
-                    ExpectedNoteState { metadata: None, after_block_num, tag }.into(),
-                )
-            });
-
-            match committed_notes_data.remove(&note_record.id()) {
-                Some(Some((metadata, inclusion_proof))) => {
-                    // Building the MMR outside the loop would fail with BlockHeaderNotFound(0)
-                    // because store will be fresh, which can't happen here.
-                    let mut partial_mmr = self.get_current_partial_mmr().await?;
-                    let block_header = self
-                        .get_and_store_authenticated_block(
-                            inclusion_proof.location().block_num(),
-                            &mut partial_mmr,
-                        )
-                        .await?;
-
-                    self.cache_partial_mmr(partial_mmr).await?;
-
-                    let tag = metadata.tag();
-                    let note_changed =
-                        note_record.inclusion_proof_received(inclusion_proof, metadata)?;
-
-                    if note_record.block_header_received(&block_header)? | note_changed {
-                        self.store
-                            .remove_note_tag(NoteTagRecord::with_note_source(tag, note_record.id()))
-                            .await?;
-
-                        note_records.push(Some(note_record));
-                    } else {
-                        note_records.push(None);
-                    }
-                },
-                _ => {
-                    note_records.push(Some(note_record));
-                },
-            }
-        }
-
-        Ok(note_records)
+        let _ = requested_notes;
+        Err(ClientError::NoteImportError(
+            "Importing NoteDetails without note metadata is temporarily unsupported under protocol 0.15".to_string(),
+        ))
     }
 
     /// Checks if notes with their given `note_tag` and ID are present in the chain between the
     /// `request_block_num` and the current block. If found it returns their metadata and inclusion
     /// proof.
+    #[allow(dead_code)]
     async fn check_expected_notes(
         &mut self,
         request_block_num: BlockNumber,

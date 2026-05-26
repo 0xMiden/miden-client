@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use miden_client::account::AccountStorageMode;
+use miden_client::account::AccountType;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::testing::common::{execute_tx_and_sync, insert_new_wallet, wait_for_blocks};
 use miden_client::transaction::TransactionRequestBuilder;
@@ -34,7 +34,7 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
     let (foreign_account, proc_root) = deploy_foreign_account(
         &mut client,
         &keystore,
-        AccountStorageMode::Public,
+        AccountType::Public,
         format!(
             r#"
             const MAP_STORAGE_SLOT = word("{MAP_SLOT_NAME}")
@@ -77,18 +77,13 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
     // creation block
     client2.sync_state().await?;
 
-    let target_network_account =
-        deploy_counter_contract(&mut client2, AccountStorageMode::Network).await?;
+    let target_network_account = deploy_counter_contract(&mut client2, AccountType::Public).await?;
 
     client2.sync_state().await?;
 
-    let (sender_account, ..) = insert_new_wallet(
-        &mut client2,
-        AccountStorageMode::Private,
-        &keystore2,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (sender_account, ..) =
+        insert_new_wallet(&mut client2, AccountType::Private, &keystore2, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     let network_fpi_note_script = format!(
         "
@@ -145,7 +140,7 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
 
     assert_eq!(
         updated_network_account.storage().get_item(&COUNTER_SLOT_NAME)?,
-        Word::from([Felt::new(2), ZERO, ZERO, ZERO])
+        Word::from([Felt::new_unchecked(2), ZERO, ZERO, ZERO])
     );
 
     Ok(())

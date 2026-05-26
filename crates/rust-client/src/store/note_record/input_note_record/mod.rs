@@ -7,7 +7,7 @@ use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteDetails,
-    NoteHeader,
+    NoteDetailsCommitment,
     NoteId,
     NoteInclusionProof,
     NoteMetadata,
@@ -77,9 +77,19 @@ impl InputNoteRecord {
     // PUBLIC ACCESSORS
     // ================================================================================================
 
-    /// Returns the input note ID.
+    /// Returns the input note ID, computed by combining the details commitment with the
+    /// note metadata. Requires metadata to be available in the current state.
     pub fn id(&self) -> NoteId {
-        self.details.id()
+        let metadata = self.metadata().expect(
+            "input note ID requires metadata; metadata-less expected notes are not persisted under protocol 0.15",
+        );
+        NoteId::new(self.details.commitment(), metadata)
+    }
+
+    /// Returns the commitment to the note's details (recipient + assets), independent of
+    /// note metadata. Use this as a stable identifier when metadata may not be present.
+    pub fn details_commitment(&self) -> NoteDetailsCommitment {
+        self.details.commitment()
     }
 
     /// Returns the note's recipient.
@@ -89,7 +99,8 @@ impl InputNoteRecord {
 
     /// Returns the note's commitment, if the record contains the [`NoteMetadata`].
     pub fn commitment(&self) -> Option<Word> {
-        self.metadata().map(|m| NoteHeader::new(self.id(), *m).to_commitment())
+        self.metadata()
+            .map(|metadata| NoteId::new(self.details.commitment(), metadata).as_word())
     }
 
     /// Returns the note's assets.
@@ -114,7 +125,10 @@ impl InputNoteRecord {
 
     /// Returns the note nullifier.
     pub fn nullifier(&self) -> Nullifier {
-        self.details.nullifier()
+        let metadata = self.metadata().expect(
+            "input note nullifier requires metadata; metadata-less expected notes are not persisted under protocol 0.15",
+        );
+        Nullifier::from_details_and_metadata(&self.details, metadata)
     }
 
     /// Returns the inclusion proof for the note.

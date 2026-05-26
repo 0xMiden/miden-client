@@ -116,8 +116,7 @@ impl TryFrom<&proto::blockchain::FeeParameters> for FeeParameters {
             .ok_or(proto::blockchain::FeeParameters::missing_field("account_id"))?
             .try_into()?;
 
-        FeeParameters::new(account_id, value.verification_base_fee)
-            .map_err(|_err| RpcConversionError::InvalidField(stringify!(FeeParameter).into()))
+        Ok(FeeParameters::new(account_id, value.verification_base_fee))
     }
 }
 

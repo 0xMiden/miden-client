@@ -99,10 +99,10 @@ Creates a new wallet account.
 
 A basic wallet is comprised of a basic authentication component (for RPO Falcon signature verification), alongside a basic wallet component (for sending and receiving assets).
 
-This command has three optional flags:
+This command has four optional flags:
 
-- `--storage-mode <TYPE>`: Used to select the storage mode of the account (private if not specified). It may receive "private" or "public".
-- `--mutable`: Makes the account code mutable (it's immutable by default).
+- `--storage-mode <TYPE>`: Used to select the account visibility (private if not specified). It may receive "private" or "public".
+- `--mutable`: Accepted for backward compatibility. Protocol 0.15 no longer encodes code mutability in the account ID.
 - `--extra-packages <PACKAGES>`: Specifies a list of file paths for packages holding account components to include in the account. If the packages contain placeholders, the CLI will prompt the user to enter the required data for instantiating storage appropriately.
 - `--init-storage-data-path <INIT_STORAGE_DATA_PATH>`: Specifies an optional file path to a TOML file containing key/value pairs used for initializing storage. Each key should map to a placeholder within the packages' component metadata. The CLI will prompt for any keys that are not present in the file.
 
@@ -116,7 +116,7 @@ An account may be composed of one or more components, each with its own storage 
 
 This command has four flags:
 
-- `--storage-mode <STORAGE_MODE>`: Specifies the storage mode of the account. It accepts either "private" or "public", with "private" as the default.
+- `--storage-mode <STORAGE_MODE>`: Specifies the account visibility. It accepts either "private" or "public", with "private" as the default.
 - `--account-type <ACCOUNT_TYPE>`: Specifies the type of account to create. Accepted values are:
   - `fungible-faucet`
   - `non-fungible-faucet`
@@ -130,11 +130,11 @@ After creating an account with the `new-account` command, the account is stored 
 #### Examples
 
 ```bash
-# Create a new wallet with default settings (private storage, immutable, no extra components)
+# Create a new wallet with default settings (private visibility, no extra components)
 miden-client new-wallet
 
-# Create a new wallet with public storage and a mutable code
-miden-client new-wallet --storage-mode public --mutable
+# Create a new wallet with public visibility
+miden-client new-wallet --storage-mode public
 
 # Create a new wallet that includes custom packages
 miden-client new-wallet --extra-packages packages/custom-package.masp

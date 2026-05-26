@@ -131,7 +131,7 @@ pub async fn test_batch_builder_submits_two_p2id_on_one_account(
     // Check that nonce has advanced by exactly 2.
     let nonce_after = client.account_reader(from_account_id).nonce().await?;
     info!(?nonce_before, ?nonce_after, "Sender nonce after batch");
-    let expected = nonce_before + Felt::new(2);
+    let expected = nonce_before + Felt::new_unchecked(2);
     assert_eq!(
         nonce_after, expected,
         "sender nonce should advance by exactly 2 after a 2-tx batch \

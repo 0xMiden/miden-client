@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
+use miden_client::account::AccountStorageMode;
 use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::keystore::Keystore;
@@ -17,7 +18,6 @@ use miden_protocol::account::{
     AccountBuilder,
     AccountComponent,
     AccountComponentMetadata,
-    AccountStorageMode,
     AccountType,
     StorageMap,
     StorageMapKey,
@@ -208,8 +208,20 @@ async fn lazy_foreign_account_loading() {
     let (mut client, rpc_api, keystore) = Box::pin(create_test_client()).await;
 
     // Setup: Create and deploy a public foreign account with a storage map.
-    let map_key: Word = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)].into();
-    let map_value: Word = [Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)].into();
+    let map_key: Word = [
+        Felt::new_unchecked(15),
+        Felt::new_unchecked(15),
+        Felt::new_unchecked(15),
+        Felt::new_unchecked(15),
+    ]
+    .into();
+    let map_value: Word = [
+        Felt::new_unchecked(9),
+        Felt::new_unchecked(12),
+        Felt::new_unchecked(18),
+        Felt::new_unchecked(30),
+    ]
+    .into();
     let map_slot_name = StorageSlotName::new("miden::testing::fpi::map").unwrap();
 
     let mut storage_map = StorageMap::new();
@@ -234,19 +246,19 @@ async fn lazy_foreign_account_loading() {
     let fpi_component = AccountComponent::new(
         component_code,
         vec![map_slot],
-        AccountComponentMetadata::new("miden::testing::fpi_lazy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::fpi_lazy_component"),
     )
     .unwrap();
     let proc_root = fpi_component.mast_forest().procedure_digests().next().unwrap();
 
     let secret_key = AuthSecretKey::new_falcon512_poseidon2();
     let foreign_account = AccountBuilder::new(Default::default())
+        .account_type(AccountType::Public)
         .with_component(fpi_component)
         .with_auth_component(AuthSingleSig::new(
             secret_key.public_key().to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
         ))
-        .storage_mode(AccountStorageMode::Public)
         .build_with_schema_commitment()
         .unwrap();
     let foreign_account_id = foreign_account.id();

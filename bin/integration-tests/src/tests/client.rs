@@ -469,7 +469,13 @@ pub async fn test_get_account_update(client_config: ClientConfig) -> Result<()> 
     let details2 = rpc_api.get_account_details(basic_wallet_2.id()).await.unwrap();
 
     assert!(matches!(details1, FetchedAccount::Private(_, _)));
-    assert_matches!(details2, FetchedAccount::Public(account, _) if account.vault().get_balance(faucet_account.id()).unwrap() == MINT_AMOUNT);
+    assert_matches!(details2, FetchedAccount::Public(account, _) if {
+        let vault_key = miden_client::asset::AssetVaultKey::new_fungible(
+            faucet_account.id(),
+            miden_client::asset::AssetCallbackFlag::Disabled,
+        );
+        account.vault().get_balance(vault_key).unwrap().as_u64() == MINT_AMOUNT
+    });
     Ok(())
 }
 
@@ -1482,8 +1488,22 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     let mut storage_map = StorageMap::new();
     storage_map.insert(
-        StorageMapKey::new([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)].into()),
-        [Felt::new(1), Felt::new(0), Felt::new(0), Felt::new(0)].into(),
+        StorageMapKey::new(
+            [
+                Felt::new_unchecked(1),
+                Felt::new_unchecked(2),
+                Felt::new_unchecked(3),
+                Felt::new_unchecked(4),
+            ]
+            .into(),
+        ),
+        [
+            Felt::new_unchecked(1),
+            Felt::new_unchecked(0),
+            Felt::new_unchecked(0),
+            Felt::new_unchecked(0),
+        ]
+        .into(),
     )?;
 
     let map_slot_name =
@@ -1680,12 +1700,36 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
 
     let map_slot_name =
         StorageSlotName::new("miden::testing::client::map").expect("valid slot name");
-    let map_key_1 =
-        StorageMapKey::new([Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)].into());
-    let map_value_1 = Word::from([Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)]);
-    let map_key_2 =
-        StorageMapKey::new([Felt::new(20), Felt::new(20), Felt::new(20), Felt::new(20)].into());
-    let map_value_2 = Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+    let map_key_1 = StorageMapKey::new(
+        [
+            Felt::new_unchecked(15),
+            Felt::new_unchecked(15),
+            Felt::new_unchecked(15),
+            Felt::new_unchecked(15),
+        ]
+        .into(),
+    );
+    let map_value_1 = Word::from([
+        Felt::new_unchecked(9),
+        Felt::new_unchecked(12),
+        Felt::new_unchecked(18),
+        Felt::new_unchecked(30),
+    ]);
+    let map_key_2 = StorageMapKey::new(
+        [
+            Felt::new_unchecked(20),
+            Felt::new_unchecked(20),
+            Felt::new_unchecked(20),
+            Felt::new_unchecked(20),
+        ]
+        .into(),
+    );
+    let map_value_2 = Word::from([
+        Felt::new_unchecked(1),
+        Felt::new_unchecked(2),
+        Felt::new_unchecked(3),
+        Felt::new_unchecked(4),
+    ]);
 
     let mut storage_map = StorageMap::new();
     storage_map.insert(map_key_1, map_value_1)?;
@@ -1701,7 +1745,7 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     let component = AccountComponent::new(
         component_code,
         vec![map_slot],
-        AccountComponentMetadata::new("miden::testing::map_key_filtering", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::map_key_filtering"),
     )
     .map_err(|err| anyhow::anyhow!(err))?;
 
@@ -1713,7 +1757,7 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     let account = AccountBuilder::new(Default::default())
         .with_component(component)
         .with_auth_component(auth_component)
-        .storage_mode(AccountStorageMode::Public)
+        .account_type(AccountType::Public)
         .build_with_schema_commitment()
         .context("failed to build account")?;
     let account_id = account.id();
@@ -1887,7 +1931,7 @@ pub async fn test_prune_account_history(client_config: ClientConfig) -> Result<(
     let faucet_before = client.get_account(faucet_id).await?.unwrap();
 
     // Prune faucet history up to nonce 1: should remove old committed states.
-    let deleted = client.prune_account_history(faucet_id, Felt::new(1)).await?;
+    let deleted = client.prune_account_history(faucet_id, Felt::new(1).unwrap()).await?;
     assert!(deleted > 0, "Should have pruned old committed states");
 
     // Account should still be fully readable and unchanged.

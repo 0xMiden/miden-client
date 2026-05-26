@@ -538,7 +538,9 @@ pub trait Store: Send + Sync {
 
         let mut current_partial_mmr = PartialMmr::from_peaks(current_peaks);
         let has_client_notes = has_client_notes.into();
-        current_partial_mmr.add(current_block.commitment(), has_client_notes);
+        current_partial_mmr
+            .add(current_block.commitment(), has_client_notes)
+            .map_err(StoreError::MmrError)?;
 
         // Build tracked_leaves from blocks that have client notes.
         let mut tracked_leaves = self.get_tracked_block_header_numbers().await?;

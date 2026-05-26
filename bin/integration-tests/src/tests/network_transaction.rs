@@ -8,7 +8,6 @@ use miden_client::account::{
     AccountBuilder,
     AccountBuilderSchemaCommitmentExt,
     AccountId,
-    AccountStorageMode,
     AccountType,
     StorageSlot,
     StorageSlotName,
@@ -102,9 +101,9 @@ const INCR_NOTE_SCRIPT_CODE: &str = "
 /// Deploys a counter contract as a network account
 pub(crate) async fn deploy_counter_contract(
     client: &mut TestClient,
-    storage_mode: AccountStorageMode,
+    visibility: AccountType,
 ) -> Result<Account> {
-    let acc = get_counter_contract_account(client, storage_mode).await?;
+    let acc = get_counter_contract_account(client, visibility).await?;
 
     client.add_account(&acc, false).await?;
 
@@ -125,7 +124,7 @@ pub(crate) async fn deploy_counter_contract(
 
 async fn get_counter_contract_account(
     client: &mut TestClient,
-    storage_mode: AccountStorageMode,
+    visibility: AccountType,
 ) -> Result<Account> {
     let counter_slot = StorageSlot::with_empty_value(COUNTER_SLOT_NAME.clone());
     let counter_code = CodeBuilder::default()
@@ -134,7 +133,7 @@ async fn get_counter_contract_account(
     let counter_component = AccountComponent::new(
         counter_code,
         vec![counter_slot],
-        AccountComponentMetadata::new("miden::testing::counter_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::counter_component"),
     )
     .map_err(|err| anyhow::anyhow!(err))
     .context("failed to create counter contract component")?;
@@ -145,7 +144,7 @@ async fn get_counter_contract_account(
     let incr_nonce_auth = AccountComponent::new(
         incr_nonce_auth_code,
         vec![],
-        AccountComponentMetadata::new("miden::testing::incr_nonce_auth", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::incr_nonce_auth"),
     )
     .map_err(|err| anyhow::anyhow!(err))
     .context("failed to create increment nonce auth component")?;
@@ -154,7 +153,7 @@ async fn get_counter_contract_account(
     client.rng().fill_bytes(&mut init_seed);
 
     let account = AccountBuilder::new(init_seed)
-        .storage_mode(storage_mode)
+        .account_type(visibility)
         .with_component(counter_component)
         .with_auth_component(incr_nonce_auth)
         .build_with_schema_commitment()
@@ -171,17 +170,17 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
-    let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
+    let network_account = deploy_counter_contract(&mut client, AccountType::Public).await?;
 
     let counter_value = client
         .account_reader(network_account.id())
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find network account after deployment")?;
-    assert_eq!(counter_value, Word::from([Felt::new(1), ZERO, ZERO, ZERO]));
+    assert_eq!(counter_value, Word::from([Felt::new_unchecked(1), ZERO, ZERO, ZERO]));
 
     let (native_account, ..) =
-        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
+        insert_new_wallet(&mut client, AccountType::Public, &keystore, RPO_FALCON_SCHEME_ID)
             .await?;
 
     let mut network_notes = vec![];
@@ -202,7 +201,8 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
     execute_tx_and_sync(&mut client, native_account.id(), tx_request).await?;
 
     // Wait for the node to consume the network notes in subsequent blocks
-    let expected_counter = Word::from([Felt::new(1 + BUMP_NOTE_NUMBER), ZERO, ZERO, ZERO]);
+    let expected_counter =
+        Word::from([Felt::new_unchecked(1 + BUMP_NOTE_NUMBER), ZERO, ZERO, ZERO]);
     for _ in 0..10 {
         let a = client
             .test_rpc_api()
@@ -235,11 +235,11 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
-    let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
-    let native_account = deploy_counter_contract(&mut client, AccountStorageMode::Public).await?;
+    let network_account = deploy_counter_contract(&mut client, AccountType::Public).await?;
+    let native_account = deploy_counter_contract(&mut client, AccountType::Public).await?;
 
     let wallet =
-        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
+        insert_new_wallet(&mut client, AccountType::Public, &keystore, RPO_FALCON_SCHEME_ID)
             .await?
             .0;
 
@@ -282,7 +282,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find network account after recall test")?;
-    assert_eq!(network_counter, Word::from([Felt::new(1), ZERO, ZERO, ZERO]));
+    assert_eq!(network_counter, Word::from([Felt::new_unchecked(1), ZERO, ZERO, ZERO]));
 
     // The native account should have the incremented value
     let native_counter = client
@@ -290,7 +290,81 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find native account after recall test")?;
-    assert_eq!(native_counter, Word::from([Felt::new(2), ZERO, ZERO, ZERO]));
+    assert_eq!(native_counter, Word::from([Felt::new_unchecked(2), ZERO, ZERO, ZERO]));
+    Ok(())
+}
+
+/// After a network account consumes a note (potentially in the same batch it was created),
+/// the receiver's `InputNoteReader` should find it as consumed by that account. Validates
+/// the erased-notes detection flow end-to-end against a real node.
+///
+/// Disabled because `mark_erased_note_as_consumed` derives the consumer
+/// [`NetworkAccountTarget`] from the note's attachments, but the RPC sync stream only delivers a
+/// bare [`NoteHeader`] for erased notes. The `disabled_` prefix opts the function out of the
+/// integration-test build script registration; re-enable once erased-note attachments are
+/// delivered or the client persists them in [`OutputNoteRecord`].
+#[allow(dead_code)]
+pub async fn disabled_note_reader_finds_note_consumed_by_ntx(
+    client_config: ClientConfig,
+) -> Result<()> {
+    let (mut client, keystore) = client_config.into_client().await?;
+    client.sync_state().await?;
+
+    let network_account = deploy_counter_contract(&mut client, AccountType::Public).await?;
+    let network_account_id = network_account.id();
+
+    let (sender_account, ..) =
+        insert_new_wallet(&mut client, AccountType::Public, &keystore, RPO_FALCON_SCHEME_ID)
+            .await?;
+
+    let network_note = get_network_note(
+        sender_account.id(),
+        network_account_id,
+        client.source_manager(),
+        &mut client.rng(),
+    )?;
+    let note_id = network_note.id();
+
+    let tx_request =
+        TransactionRequestBuilder::new().own_output_notes(vec![network_note]).build()?;
+    execute_tx_and_sync(&mut client, sender_account.id(), tx_request).await?;
+
+    // Wait for the network account to consume the note (check counter increment).
+    let expected_counter = Word::from([Felt::new_unchecked(2), ZERO, ZERO, ZERO]);
+    for _ in 0..15 {
+        client.sync_state().await?;
+        let account_details = client
+            .test_rpc_api()
+            .get_account_details(network_account_id)
+            .await?
+            .account()
+            .cloned()
+            .with_context(|| "account details not available")?;
+
+        if account_details.storage().get_item(&COUNTER_SLOT_NAME)? == expected_counter {
+            break;
+        }
+        wait_for_blocks(&mut client, 1).await;
+    }
+
+    client.sync_state().await?;
+
+    let mut reader = client.input_note_reader(network_account_id);
+    let mut found = false;
+    while let Some(note) = reader.next().await? {
+        if note.id() == note_id {
+            assert_eq!(
+                note.consumer_account(),
+                Some(network_account_id),
+                "consumer should be the network account"
+            );
+            found = true;
+            break;
+        }
+    }
+
+    assert!(found, "NoteReader should find the note consumed by the network account");
+
     Ok(())
 }
 
@@ -346,10 +420,10 @@ pub(crate) fn get_network_note_with_script<T: Rng>(
         .compile_note_script(script)?;
     let recipient = NoteRecipient::new(
         Word::new([
-            Felt::new(rng.random()),
-            Felt::new(rng.random()),
-            Felt::new(rng.random()),
-            Felt::new(rng.random()),
+            Felt::new_unchecked(rng.random()),
+            Felt::new_unchecked(rng.random()),
+            Felt::new_unchecked(rng.random()),
+            Felt::new_unchecked(rng.random()),
         ]),
         script,
         NoteStorage::new(vec![])?,

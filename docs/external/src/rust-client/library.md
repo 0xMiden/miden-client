@@ -76,8 +76,7 @@ The `AccountBuilder` can be used to create a new account with the specified para
 let key_pair = SecretKey::with_rng(client.rng());
 
 let new_account = AccountBuilder::new(init_seed) // Seed should be random for each account
-    .account_type(AccountType::RegularAccountImmutableCode)
-    .storage_mode(AccountStorageMode::Private)
+    .account_type(AccountType::Private)
     .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
     .with_component(BasicWallet)
     .build()?;
@@ -86,7 +85,7 @@ client.add_account(&new_account, false).await?;
 ```
 Once an account is created, it is kept locally and its state is automatically tracked by the client.
 
-To create an public account, you can specify `AccountStorageMode::Public` like so:
+To create a public account, specify `AccountType::Public`:
 
 ```Rust
 let key_pair = SecretKey::with_rng(client.rng());
@@ -94,8 +93,7 @@ let anchor_block = client.get_latest_epoch_block().await.unwrap();
 
 let new_account = AccountBuilder::new(init_seed) // Seed should be random for each account
     .anchor((&anchor_block).try_into().unwrap())
-    .account_type(AccountType::RegularAccountImmutableCode)
-    .storage_mode(AccountStorageMode::Public)
+    .account_type(AccountType::Public)
     .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
     .with_component(BasicWallet)
     .build()?;
@@ -285,4 +283,3 @@ for failed_note in &consumption_info.failed {
     println!("cannot consume {}: {}", failed_note.note.id().to_hex(), failed_note.error);
 }
 ```
-
