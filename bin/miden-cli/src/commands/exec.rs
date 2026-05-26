@@ -133,6 +133,8 @@ impl ExecCmd {
 
             let script_path = PathBuf::from(&self.script_path);
             loop {
+                client.reset_source_manager();
+
                 // Compile from path so source URIs point at the real file on disk (see
                 // the comment in `execute()` above for why this matters for DAP clients).
                 let tx_script = client.code_builder().compile_tx_script(script_path.as_path())?;

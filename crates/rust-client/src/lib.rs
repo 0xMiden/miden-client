@@ -474,6 +474,15 @@ where
     pub fn source_manager(&self) -> Arc<dyn SourceManagerSync> {
         self.source_manager.clone()
     }
+
+    /// Replaces the client's source manager with a fresh, empty one.
+    ///
+    /// Source managers cache files by URI, so loading a path that was loaded before returns
+    /// the original `SourceFile` even if the file on disk has changed. Call this between DAP
+    /// restart iterations to force the next `compile_tx_script(path)` to re-read from disk.
+    pub fn reset_source_manager(&mut self) {
+        self.source_manager = Arc::new(assembly::DefaultSourceManager::default());
+    }
 }
 
 impl<AUTH> Client<AUTH> {
