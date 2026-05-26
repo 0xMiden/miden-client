@@ -684,7 +684,12 @@ impl StateSync {
             .cloned()
             .collect();
 
-        let public_update = if details.is_truncated() {
+        // TODO: we can handle vault and storage-map oversize independently. Today any oversize
+        // routes the whole account through the incremental delta path, which always fetches
+        // both `sync_storage_maps` and `sync_account_vault`, even if not needed.
+        let any_oversize = details.vault_details.too_many_assets
+            || details.storage_details.map_details.iter().any(|m| m.too_many_entries);
+        let public_update = if any_oversize {
             // Some part of the account is oversized — use incremental endpoints.
             self.build_delta_update(account_id, &details, block_from, proof_block_num)
                 .await?

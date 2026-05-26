@@ -335,21 +335,6 @@ pub struct AccountDetails {
     pub vault_details: AccountVaultDetails,
 }
 
-impl AccountDetails {
-    /// Returns `true` if the node truncated any vault assets or storage map entries in this
-    /// response (i.e., `too_many_assets` is set on the vault or `too_many_entries` is set on
-    /// any storage map).
-    ///
-    /// Use this to decide whether a follow-up `sync_account_vault` / `sync_storage_maps` call
-    /// (or [`crate::rpc::NodeRpcClient::resolve_oversize_vault`] /
-    /// [`crate::rpc::NodeRpcClient::resolve_oversize_storage_maps`]) is required to materialize
-    /// the full account state.
-    pub fn is_truncated(&self) -> bool {
-        self.vault_details.too_many_assets
-            || self.storage_details.map_details.iter().any(|m| m.too_many_entries)
-    }
-}
-
 impl TryFrom<&AccountDetails> for Account {
     type Error = RpcError;
 
