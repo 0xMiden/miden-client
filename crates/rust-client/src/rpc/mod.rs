@@ -48,8 +48,14 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use domain::account::{
-    AccountDetails, AccountProof, AccountUpdateSummary, FetchedAccount, GetAccountRequest,
-    StorageMapEntries, StorageMapEntry, VaultFetch,
+    AccountDetails,
+    AccountProof,
+    AccountUpdateSummary,
+    FetchedAccount,
+    GetAccountRequest,
+    StorageMapEntries,
+    StorageMapEntry,
+    VaultFetch,
 };
 use domain::note::{FetchedNote, NoteSyncBlock, SyncNotesResult};
 use domain::nullifier::NullifierUpdate;
@@ -199,8 +205,8 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// Up to two `/GetAccount` requests are made for public accounts: one to discover the storage
     /// layout, and a second to request entries for all map slots.
-    // TODO: once https://github.com/0xMiden/node/issues/2121 gets implemented, we can avoid making two
-    // `/GetAccount` requests.
+    // TODO: once https://github.com/0xMiden/node/issues/2121 gets implemented we can avoid making two
+    // `/GetAccount` requests, and even unify this with `get_account`.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         // For accounts without public state, only the witness commitment is needed.
         if !account_id.has_public_state() {
@@ -358,9 +364,9 @@ pub trait NodeRpcClient: Send + Sync {
         request: GetAccountRequest,
     ) -> Result<(BlockNumber, AccountProof), RpcError>;
 
-    /// Resolves a `too_many_assets` truncation in `details` by querying
-    /// [`NodeRpcClient::sync_account_vault`] over `[0, block_to]`, replacing the asset list,
-    /// and clearing the flag. No-op when the vault isn't truncated.
+    /// Fills in the asset list when the vault came back flagged `too_many_assets`, by
+    /// querying [`NodeRpcClient::sync_account_vault`] over `[GENESIS, block_to]`. No-op when
+    /// the flag isn't set.
     async fn resolve_oversize_vault(
         &self,
         account_id: AccountId,
@@ -386,9 +392,9 @@ pub trait NodeRpcClient: Send + Sync {
         Ok(())
     }
 
-    /// Resolves `too_many_entries` truncation per storage map slot by querying
-    /// [`NodeRpcClient::sync_storage_maps`] over `[0, block_to]`, replacing the entries, and
-    /// clearing the flag. No-op when no maps are truncated.
+    /// Fills in the entries of any storage map flagged `too_many_entries`, by querying
+    /// [`NodeRpcClient::sync_storage_maps`] over `[GENESIS, block_to]`. No-op when no map
+    /// has the flag set.
     async fn resolve_oversize_storage_maps(
         &self,
         account_id: AccountId,
