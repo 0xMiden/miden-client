@@ -1443,7 +1443,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     // Test get_account retrieval (account must be deployed on-chain first)
     let (proof_block_num, account_proof) = client
         .test_rpc_api()
-        .get_account(first_basic_account.id(), GetAccountRequest::default())
+        .get_account(first_basic_account.id(), GetAccountRequest::witness_only())
         .await?;
     assert!(proof_block_num >= first_block_num);
     assert_eq!(account_proof.account_id(), first_basic_account.id());
@@ -1843,7 +1843,7 @@ pub async fn test_get_account_returns_vault_details(client_config: ClientConfig)
     );
 
     // Query 3: VaultFetch::Skip — vault data not requested, node returns empty assets
-    let (_, proof) = rpc.get_account(wallet.id(), GetAccountRequest::default()).await?;
+    let (_, proof) = rpc.get_account(wallet.id(), GetAccountRequest::witness_only()).await?;
 
     let (_, details) = proof.into_parts();
     let details = details.context("expected account details for public account")?;

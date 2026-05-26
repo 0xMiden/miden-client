@@ -890,6 +890,22 @@ pub struct GetAccountRequest {
     pub vault: VaultFetch,
 }
 
+impl GetAccountRequest {
+    /// Request only the witness (account commitment) — no storage entries, no known code,
+    /// no vault data.
+    #[must_use]
+    pub fn witness_only() -> Self {
+        Self::default()
+    }
+
+    /// Sets the target block for this request.
+    #[must_use]
+    pub fn at(mut self, at: AccountStateAt) -> Self {
+        self.at = at;
+        self
+    }
+}
+
 // ERRORS
 // ================================================================================================
 

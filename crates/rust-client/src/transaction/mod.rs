@@ -857,10 +857,7 @@ where
                         .rpc_api
                         .get_account(
                             account_id,
-                            GetAccountRequest {
-                                at: AccountStateAt::Block(block_num),
-                                ..Default::default()
-                            },
+                            GetAccountRequest::witness_only().at(AccountStateAt::Block(block_num)),
                         )
                         .await?;
                     let (witness, _) = account_proof.into_parts();

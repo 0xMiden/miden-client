@@ -197,20 +197,21 @@ pub trait NodeRpcClient: Send + Sync {
         upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError>;
 
-    /// Fetches the current state of an account from the node.
+    /// Fetches the current state of an account from the node. If needed, resolves oversized vault
+    /// and storage map entries to get the full account state by using the `SyncVault` and
+    /// `SyncStorageMap` endpoints.
     ///
     /// - `account_id` is the ID of the wanted account.
     ///
-    /// The default implementation composes [`NodeRpcClient::get_account`] with
-    /// [`NodeRpcClient::resolve_oversize_vault`] / [`NodeRpcClient::resolve_oversize_storage_maps`]
-    /// to materialize the full account state. Up to two `/GetAccount` requests are made for
-    /// public accounts: one to discover the storage layout, and a second to request entries for
-    /// all map slots (skipped when the account has no storage maps).
+    /// Up to two `/GetAccount` requests are made for public accounts: one to discover the storage
+    /// layout, and a second to request entries for all map slots.
+    // TODO: once https://github.com/0xMiden/node/issues/2121 gets implemented, we can avoid making two
+    // `/GetAccount` requests.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         // For accounts without public state, only the witness commitment is needed.
         if !account_id.has_public_state() {
             let (block_number, proof) =
-                self.get_account(account_id, GetAccountRequest::default()).await?;
+                self.get_account(account_id, GetAccountRequest::witness_only()).await?;
             return Ok(FetchedAccount::new_private(
                 account_id,
                 AccountUpdateSummary::new(proof.account_commitment(), block_number),
@@ -265,7 +266,7 @@ pub trait NodeRpcClient: Send + Sync {
         }
 
         let summary = AccountUpdateSummary::new(final_proof.account_commitment(), block_number);
-        let details = final_proof.into_parts().1.ok_or(RpcError::ExpectedDataMissing(
+        let details = final_proof.into_details().ok_or(RpcError::ExpectedDataMissing(
             "public account returned without details".into(),
         ))?;
 
