@@ -983,6 +983,22 @@ impl SqliteStore {
         new_header: &AccountHeader,
         old_header: &AccountHeader,
     ) -> Result<(), StoreError> {
+        if new_header.id() != old_header.id() {
+            return Err(StoreError::DatabaseError(format!(
+                "replace_account_header: account id mismatch (new: {}, old: {})",
+                new_header.id(),
+                old_header.id(),
+            )));
+        }
+        if new_header.nonce().as_canonical_u64() < old_header.nonce().as_canonical_u64() {
+            return Err(StoreError::DatabaseError(format!(
+                "replace_account_header: new nonce {} is less than old nonce {} for account {}",
+                new_header.nonce().as_canonical_u64(),
+                old_header.nonce().as_canonical_u64(),
+                new_header.id(),
+            )));
+        }
+
         let id_hex = new_header.id().to_hex();
 
         // `AccountHeader` doesn't carry the seed or per-account flags, so read them from the row
