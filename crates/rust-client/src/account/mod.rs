@@ -80,7 +80,7 @@ use miden_standards::account::wallets::BasicWallet;
 
 use super::Client;
 use crate::errors::ClientError;
-use crate::rpc::domain::account::FetchedAccount;
+use crate::rpc::domain::account::{FetchedAccount, GetAccountRequest};
 use crate::rpc::node::{EndpointError, GetAccountError};
 use crate::store::{AccountStatus, AccountStorageFilter};
 use crate::sync::NoteTagRecord;
@@ -214,8 +214,12 @@ impl<AUTH> Client<AUTH> {
                 if tracked_account.is_locked() {
                     // If the tracked account is locked, check that the account commitment matches
                     // the one in the network
-                    let network_account_commitment =
-                        self.rpc_api.get_account_details(account.id()).await?.commitment(); // TODO: no need to fetch all account details
+                    let network_account_commitment = self
+                        .rpc_api
+                        .get_account(account.id(), GetAccountRequest::witness_only())
+                        .await?
+                        .1
+                        .account_commitment();
                     if network_account_commitment != account.to_commitment() {
                         return Err(ClientError::AccountCommitmentMismatch(
                             network_account_commitment,

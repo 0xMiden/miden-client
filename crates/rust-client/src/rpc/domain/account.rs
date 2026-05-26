@@ -895,7 +895,12 @@ impl GetAccountRequest {
     /// no vault data.
     #[must_use]
     pub fn witness_only() -> Self {
-        Self::default()
+        Self {
+            storage: AccountStorageRequirements::default(),
+            at: AccountStateAt::ChainTip,
+            known_code: None,
+            vault: VaultFetch::Skip,
+        }
     }
 
     /// Sets the target block for this request.
