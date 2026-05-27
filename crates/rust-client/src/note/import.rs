@@ -15,6 +15,7 @@ use alloc::vec::Vec;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{
     Note,
+    NoteAttachments,
     NoteDetails,
     NoteDetailsCommitment,
     NoteFile,
@@ -285,8 +286,10 @@ where
 
         for (previous_note, note, inclusion_proof) in requested_notes {
             let metadata = *note.metadata();
+            let attachments = note.attachments().clone();
             let mut note_record = previous_note.unwrap_or(InputNoteRecord::new(
                 note.into(),
+                attachments,
                 self.store.get_current_timestamp(),
                 ExpectedNoteState {
                     metadata: Some(metadata),
@@ -370,6 +373,7 @@ where
             let note_record = previous_note.unwrap_or({
                 InputNoteRecord::new(
                     details,
+                    NoteAttachments::empty(),
                     self.store.get_current_timestamp(),
                     ExpectedNoteState { metadata: None, after_block_num, tag }.into(),
                 )

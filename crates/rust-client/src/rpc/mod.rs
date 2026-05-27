@@ -340,7 +340,8 @@ pub trait NodeRpcClient: Send + Sync {
                     inclusion_proof,
                 }
                 .into();
-                let note = InputNoteRecord::new(note.into(), current_timestamp, state);
+                let attachments = note.attachments().clone();
+                let note = InputNoteRecord::new(note.into(), attachments, current_timestamp, state);
 
                 public_notes.push(note);
             }

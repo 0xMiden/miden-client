@@ -369,6 +369,77 @@ pub async fn disabled_note_reader_finds_note_consumed_by_ntx(
     Ok(())
 }
 
+/// Validates end-to-end against a real node that a note created for a network account is consumed
+/// by that account and the client records the consumption.
+///
+/// The network account consumes the note via same-batch erasure, whose RPC stream carries only the
+/// `NoteHeader`. The network-account target lives in the note attachment (not delivered by that
+/// stream), so the consumer is not derivable: the note is recorded as consumed with an unknown
+/// consumer rather than attributed to the network account. The test therefore asserts the note
+/// reaches a consumed state, not the consumer identity.
+pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> Result<()> {
+    let (mut client, keystore) = client_config.into_client().await?;
+    client.sync_state().await?;
+
+    let network_account = deploy_counter_contract(&mut client, AccountType::Public).await?;
+    let network_account_id = network_account.id();
+
+    let (sender_account, ..) =
+        insert_new_wallet(&mut client, AccountType::Public, &keystore, RPO_FALCON_SCHEME_ID)
+            .await?;
+
+    let network_note = get_network_note(
+        sender_account.id(),
+        network_account_id,
+        client.source_manager(),
+        &mut client.rng(),
+    )?;
+    let note_id = network_note.id();
+
+    let tx_request =
+        TransactionRequestBuilder::new().own_output_notes(vec![network_note]).build()?;
+    execute_tx_and_sync(&mut client, sender_account.id(), tx_request).await?;
+
+    // Wait for the network account to consume the note (check counter increment).
+    let expected_counter = Word::from([Felt::new_unchecked(2), ZERO, ZERO, ZERO]);
+    for _ in 0..15 {
+        client.sync_state().await?;
+        let account_details = client
+            .test_rpc_api()
+            .get_account_details(network_account_id)
+            .await?
+            .account()
+            .cloned()
+            .with_context(|| "account details not available")?;
+
+        if account_details.storage().get_item(&COUNTER_SLOT_NAME)? == expected_counter {
+            break;
+        }
+        wait_for_blocks(&mut client, 1).await;
+    }
+
+    // The note is consumed via same-batch erasure, so the consumer is not derivable and the note
+    // is recorded as consumed with an unknown consumer. Poll until the client records it consumed.
+    let mut consumed = false;
+    for _ in 0..10 {
+        client.sync_state().await?;
+        if let Some(record) = client.get_input_note(note_id).await?
+            && record.is_consumed()
+        {
+            consumed = true;
+            break;
+        }
+        wait_for_blocks(&mut client, 1).await;
+    }
+
+    assert!(
+        consumed,
+        "network note should be marked consumed after the network account consumes it"
+    );
+
+    Ok(())
+}
+
 /// Compiles the counter contract library using the provided source manager so that all source
 /// spans are registered in the same manager used by the client's executor.
 fn counter_contract_library(source_manager: Arc<dyn SourceManagerSync>) -> Arc<Library> {

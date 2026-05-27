@@ -281,7 +281,8 @@ impl StateSync {
                     inclusion_proof,
                 }
                 .into();
-                let record = InputNoteRecord::new(note.into(), None, state);
+                let attachments = note.attachments().clone();
+                let record = InputNoteRecord::new(note.into(), attachments, None, state);
                 let id = record.id().expect("CommittedNoteState carries metadata, so id() is Some");
                 public_note_records.insert(id, record);
             }

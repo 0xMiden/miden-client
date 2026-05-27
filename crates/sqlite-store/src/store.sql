@@ -158,6 +158,7 @@ CREATE TABLE input_notes (
     details_commitment TEXT NOT NULL,                       -- commitment to the note details (recipient + assets); stable across the note's lifecycle and independent of metadata
     note_id TEXT NULL,                                      -- the full note id (hash(details_commitment, metadata_commitment)); NULL until metadata is known
     assets BLOB NOT NULL,                                   -- the serialized list of assets
+    attachments BLOB NOT NULL,                              -- the serialized NoteAttachments
     serial_number BLOB NOT NULL,                            -- the serial number of the note
     inputs BLOB NOT NULL,                                   -- the serialized list of note inputs
     script_root TEXT NOT NULL,                              -- the script root of the note, used to join with the notes_scripts table
