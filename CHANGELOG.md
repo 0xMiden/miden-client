@@ -19,6 +19,7 @@
 * Added a `Client::import_watched_account_by_id` method to track an external account state without syncing notes ([#2143](https://github.com/0xMiden/miden-client/pull/2143)).
 * Removed limit on accounts and note tags that can be tracked by the client ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
 * [BREAKING] Updated the `sync_notes` and `sync_transactions` to return directly the fetched updates. Removed `TransactionsInfo` and `NoteSyncInfo` structs ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
+* [BREAKING][rust] `NodeRpcClient::get_note_script_by_root` now returns `Option<NoteScript>` (`None` when the node has no script for the requested root) instead of erroring when the script is absent ([#1840](https://github.com/0xMiden/miden-client/pull/1840)).
 
 ### Enhancements
 
@@ -135,7 +136,7 @@
 * [FEATURE][web] Added `getAccountProof` method to the web client's `RpcClient`, allowing lightweight retrieval of account header, storage slot values, and code via a single RPC call. Refactored the `NodeRpcClient::get_account_proof` signature to allow requesting just private account proofs ([#1794](https://github.com/0xMiden/miden-client/pull/1794), [#1814](https://github.com/0xMiden/miden-client/pull/1814)).
 * Added `getAccountByKeyCommitment` method to `WebClient` for retrieving accounts by public key commitment ([#1729](https://github.com/0xMiden/miden-client/pull/1729)).
 * [BREAKING][removal][web] Removed `addAccountSecretKeyToWebStore`, `getAccountAuthByPubKeyCommitment`, `getPublicKeyCommitmentsOfAccount`, and `getAccountByKeyCommitment` from `WebClient`. Use the new `client.keystore` sub-object instead (e.g. `client.keystore.insert()`, `client.keystore.get()`, `client.keystore.getCommitments()`, `client.keystore.getAccountId()` + `client.getAccount()`). ([#1947](https://github.com/0xMiden/miden-client/pull/1947)).
-* Added automatic registration of note scripts required by network transactions (NTX). The client now checks the node's script registry before submitting a transaction and registers any missing scripts via a separate registration transaction ([#1840](https://github.com/0xMiden/miden-client/pull/1840)).
+* Added automatic registration of note scripts required by network transactions (NTX): the client checks the node's script registry before submitting and registers any missing scripts. Standard note scripts are skipped since the NTX builder resolves them directly ([#1840](https://github.com/0xMiden/miden-client/pull/1840)).
 * Added automatic retry for rate-limited (`ResourceExhausted`) and transiently unavailable RPC calls in `GrpcClient`, with up to 5 attempts and `retry-after` header support ([#1928](https://github.com/0xMiden/miden-client/pull/1928)).
 * Added client methods to prune account history (commitments of previous nonces, alongside its orphaned account code) ([#1886](https://github.com/0xMiden/miden-client/pull/1886)).
 * Changed the sync state to track the consumer account on externally-consumed notes, so the `InputNoteReader` can return notes even if the transaction was not locally executed ([#1973](https://github.com/0xMiden/miden-client/pull/1973)).

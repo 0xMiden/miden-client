@@ -430,10 +430,13 @@ impl DataStore for ClientDataStore {
             }
 
             // Store miss, fetch from the network via RPC.
-            let note_script: NoteScript =
+            let Some(note_script) =
                 rpc_api.get_note_script_by_root(script_root.into()).await.map_err(|err| {
                     DataStoreError::other_with_source("failed to fetch note script via RPC", err)
-                })?;
+                })?
+            else {
+                return Ok(None);
+            };
 
             // Persist for future lookups.
             if let Err(err) = store.upsert_note_scripts(core::slice::from_ref(&note_script)).await {
