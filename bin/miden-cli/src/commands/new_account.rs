@@ -327,12 +327,10 @@ struct FungibleFaucetMetadata {
 /// Builds a fully-populated [`FungibleFaucet`] [`AccountComponent`] from the user-supplied
 /// `[fungible-faucet-metadata]` block.
 ///
-/// In the new `miden-standards` shape, the old separate `FungibleTokenMetadata` component is
-/// embedded in `FungibleFaucet`, and the `basic-fungible-faucet` package's component requires
-/// every storage slot to be initialized. Rather than encode the schema's field-level layout
-/// here, we bypass the package and build the component directly from the high-level metadata
-/// using the typed builder; the resulting component has the same code and storage layout the
-/// package would have produced.
+/// The `basic-fungible-faucet` package's component requires every storage slot to be initialized.
+/// Rather than encode the schema's field-level layout here, we build the component directly from
+/// the high-level metadata using the typed builder; the resulting component has the same code and
+/// storage layout the package would have produced.
 fn build_fungible_faucet_component(
     metadata: &FungibleFaucetMetadata,
 ) -> Result<AccountComponent, CliError> {
@@ -472,8 +470,8 @@ fn separate_auth_components(
 /// - The CLI's built-in `basic-fungible-faucet` package only contributes the faucet component
 ///   itself; it does not include a `TokenPolicyManager`.
 /// - Other faucet creation paths in this repo install a manager configured with `AllowAll` mint and
-///   burn policies explicitly, so the CLI adds the same configuration implicitly here to preserve
-///   behavior and keep the old UX working.
+///   burn policies explicitly, so the CLI adds the same configuration implicitly here to keep
+///   faucet creation consistent across paths.
 ///
 /// What it does:
 /// - only applies to `AccountType::FungibleFaucet`,

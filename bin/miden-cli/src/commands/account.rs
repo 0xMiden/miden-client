@@ -9,11 +9,11 @@ use miden_client::account::{
     StorageSlotContent,
 };
 use miden_client::address::{Address, AddressInterface, NetworkId, RoutingParameters};
-use miden_client::asset::Asset;
+use miden_client::asset::{Asset, TokenSymbol};
 use miden_client::rpc::{GrpcClient, NodeRpcClient};
 use miden_client::transaction::{AccountComponentInterface, AccountInterface};
 use miden_client::utils::base_units_to_tokens;
-use miden_client::{Client, PrettyPrint, ZERO};
+use miden_client::{Client, PrettyPrint, Word, ZERO};
 
 use crate::config::{CliConfig, RpcConfig};
 use crate::errors::CliError;
@@ -114,7 +114,8 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
         let reader = client.account_reader(acc.id());
         let status = reader.status().await?.to_string();
         let token_symbol = if acc.id().account_type() == AccountType::FungibleFaucet {
-            Some(get_faucet_component(&client, acc.id()).await?.symbol().to_string())
+            let (symbol, _decimals) = get_faucet_token_config(&client, acc.id()).await?;
+            Some(symbol.to_string())
         } else {
             None
         };
@@ -162,7 +163,8 @@ async fn show_account<AUTH>(
 
     let network_id = rpc_config.endpoint.0.to_network_id();
     let token_symbol = if account.id().account_type() == AccountType::FungibleFaucet {
-        Some(faucet_component_from_account(&account)?.symbol().to_string())
+        let (symbol, _decimals) = faucet_token_config_from_account(&account)?;
+        Some(symbol.to_string())
     } else {
         None
     };
@@ -178,13 +180,10 @@ async fn show_account<AUTH>(
             let (asset_type, faucet, amount) = match asset {
                 Asset::Fungible(fungible_asset) => {
                     let faucet_id = fungible_asset.faucet_id();
-                    let (faucet, amount) = match get_faucet_component(&client, faucet_id).await {
-                        Ok(faucet_component) => (
-                            faucet_component.symbol().to_string(),
-                            base_units_to_tokens(
-                                fungible_asset.amount(),
-                                faucet_component.decimals(),
-                            ),
+                    let (faucet, amount) = match get_faucet_token_config(&client, faucet_id).await {
+                        Ok((symbol, decimals)) => (
+                            symbol.to_string(),
+                            base_units_to_tokens(fungible_asset.amount(), decimals),
                         ),
                         Err(_) => {
                             (faucet_id.prefix().to_hex(), fungible_asset.amount().to_string())
@@ -289,33 +288,60 @@ fn print_summary_table(account: &Account, network_id: NetworkId, token_symbol: O
     println!("{table}\n");
 }
 
-/// Reads the [`FungibleFaucet`] component from the account's storage.
-///
-/// Fetches the full account through the client (the per-slot `AccountReader` is no longer
-/// sufficient because the new component is reconstructed from multiple storage slots).
+/// Reads a fungible faucet's token config (symbol and decimals) from its single config storage
+/// slot via the [`AccountReader`], which accesses the client's store.
 ///
 /// # Errors
-/// Returns an error if the account is not tracked by the client or its storage does not
-/// represent a fungible faucet.
-async fn get_faucet_component<AUTH>(
+/// Returns an error if the account is not tracked by the client or its config slot can't be parsed.
+async fn get_faucet_token_config<AUTH>(
     client: &Client<AUTH>,
     account_id: AccountId,
-) -> Result<FungibleFaucet, CliError> {
-    let account = client.get_account(account_id).await?.ok_or_else(|| {
-        CliError::Input(format!("account {account_id} not tracked by the client"))
-    })?;
-    faucet_component_from_account(&account)
+) -> Result<(TokenSymbol, u8), CliError> {
+    let word = client
+        .account_reader(account_id)
+        .get_storage_item(FungibleFaucet::token_config_slot().clone())
+        .await
+        .map_err(|err| {
+            CliError::Faucet(
+                err.into(),
+                format!("Failed to read token config for faucet {account_id}"),
+            )
+        })?;
+    parse_token_config(word, account_id)
 }
 
-/// Reads the [`FungibleFaucet`] component directly from an [`Account`]'s storage.
+/// Reads a fungible faucet's token config (symbol and decimals) directly from an already-fetched
+/// [`Account`]'s storage.
 ///
 /// # Errors
-/// Returns an error if the storage does not represent a fungible faucet.
-fn faucet_component_from_account(account: &Account) -> Result<FungibleFaucet, CliError> {
+/// Returns an error if the config slot is missing or can't be parsed.
+fn faucet_token_config_from_account(account: &Account) -> Result<(TokenSymbol, u8), CliError> {
     let account_id = account.id();
-    FungibleFaucet::try_from(account).map_err(|err| {
-        CliError::Faucet(err.into(), format!("Failed to read faucet metadata for {account_id}"))
-    })
+    let word = account.storage().get_item(FungibleFaucet::token_config_slot()).map_err(|err| {
+        CliError::Account(err, format!("Failed to read token config for faucet {account_id}"))
+    })?;
+    parse_token_config(word, account_id)
+}
+
+/// Decodes a fungible faucet's token config word into its token symbol and decimals.
+///
+/// The config word layout is `[token_supply, max_supply, decimals, symbol]`, matching the single
+/// slot written by `FungibleFaucet`.
+fn parse_token_config(word: Word, account_id: AccountId) -> Result<(TokenSymbol, u8), CliError> {
+    let [_token_supply, _max_supply, decimals, symbol] = *word;
+    let symbol = TokenSymbol::try_from(symbol).map_err(|err| {
+        CliError::Faucet(
+            err.into(),
+            format!("Failed to parse token symbol for faucet {account_id}"),
+        )
+    })?;
+    let decimals = u8::try_from(decimals.as_canonical_u64()).map_err(|err| {
+        CliError::Faucet(
+            err.into(),
+            format!("Failed to parse token decimals for faucet {account_id}"),
+        )
+    })?;
+    Ok((symbol, decimals))
 }
 
 /// Returns a display name for the account type. For fungible faucets, the token symbol is
