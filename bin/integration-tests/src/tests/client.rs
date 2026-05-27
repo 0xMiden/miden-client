@@ -1550,7 +1550,8 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .test_rpc_api()
         .get_note_script_by_root(note.script().root().into())
         .await
-        .unwrap();
+        .unwrap()
+        .expect("node should have the note script registered");
     let sync_storage_maps = client
         .test_rpc_api()
         .sync_storage_maps(0.into(), None, account_with_map_item.id())
