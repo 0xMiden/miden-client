@@ -20,8 +20,7 @@ use miden_protocol::block::account_tree::AccountWitness;
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{Forest, MmrPath, MmrProof};
-use miden_protocol::crypto::merkle::smt::SmtProof;
-use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::note::{NoteId, NoteScript, NoteTag};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_protocol::utils::serde::Deserializable;
 use miden_protocol::{EMPTY_WORD, Word};
@@ -33,18 +32,15 @@ use tracing::info;
 use super::domain::account::{
     AccountProof, AccountStorageDetails, AccountStorageRequirements, AccountUpdateSummary,
 };
-use super::domain::{note::FetchedNote, nullifier::NullifierUpdate};
+use super::domain::{note::{FetchedNote, NoteSyncBlock}, nullifier::NullifierUpdate};
 use super::generated::rpc::account_request::AccountDetailRequest;
 use super::generated::rpc::AccountRequest;
-use super::{
-    Endpoint, FetchedAccount, NodeRpcClient, RpcEndpoint, NoteSyncInfo, RpcError,
-    RpcStatusInfo,
-};
+use super::{Endpoint, FetchedAccount, NodeRpcClient, RpcEndpoint, RpcError, RpcStatusInfo};
 use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
-use crate::rpc::domain::transaction::TransactionsInfo;
+use crate::rpc::domain::transaction::TransactionRecord;
 use crate::rpc::errors::node::parse_node_error;
 use crate::rpc::errors::{AcceptHeaderContext, AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::account_request::account_detail_request::storage_map_detail_request::SlotData;
@@ -154,6 +150,10 @@ pub struct GrpcClient {
     max_retries: u32,
     /// Fallback retry interval in milliseconds when no `retry-after` header is present.
     retry_interval_ms: u64,
+    /// Optional bearer token injected as `authorization: Bearer <token>` on every outbound
+    /// gRPC call, alongside the standard `accept` header. Used when talking to an
+    /// authenticating gateway in front of the node.
+    bearer_token: Option<String>,
 }
 
 impl GrpcClient {
@@ -168,6 +168,7 @@ impl GrpcClient {
             limits: RwLock::new(None),
             max_retries: retry::DEFAULT_MAX_RETRIES,
             retry_interval_ms: retry::DEFAULT_RETRY_INTERVAL_MS,
+            bearer_token: None,
         }
     }
 
@@ -187,6 +188,36 @@ impl GrpcClient {
         self
     }
 
+    /// Attaches a `authorization: Bearer <token>` header to every outbound gRPC call made
+    /// by this client, alongside the standard `accept` header.
+    ///
+    /// Intended for connecting to a Miden node through an authenticating gateway
+    /// (e.g. `miden-testnet.eu-central-8.gateway.fm`) that rate-limits unauthenticated
+    /// traffic. Without an auth mechanism on the client side, callers would have no way
+    /// to supply the token the gateway requires.
+    ///
+    /// Calling this method twice overwrites the earlier token.
+    ///
+    /// Validation of the token against
+    /// [`AsciiMetadataValue`](tonic::metadata::AsciiMetadataValue) is deferred to
+    /// connection time (printable ASCII plus tab only — `HeaderValue::from_str` semantics):
+    /// invalid tokens surface as
+    /// [`RpcError::ConnectionError`](crate::rpc::RpcError::ConnectionError) on the first
+    /// request, so CR/LF header-injection attempts are rejected.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use miden_client::rpc::{Endpoint, GrpcClient};
+    /// let endpoint = Endpoint::new("https".into(), "node.example".into(), Some(443));
+    /// let client = GrpcClient::new(&endpoint, 10_000).with_bearer_auth("<api-key>".into());
+    /// ```
+    #[must_use]
+    pub fn with_bearer_auth(mut self, token: String) -> Self {
+        self.bearer_token = Some(token);
+        self
+    }
+
     /// Takes care of establishing the RPC connection if not connected yet. It ensures that the
     /// `rpc_api` field is initialized and returns a write guard to it.
     async fn ensure_connected(&self) -> Result<ApiClient, RpcError> {
@@ -201,9 +232,13 @@ impl GrpcClient {
     /// genesis commitment.
     async fn connect(&self) -> Result<(), RpcError> {
         let genesis_commitment = *self.genesis_commitment.read();
-        let new_client =
-            ApiClient::new_client(self.endpoint.clone(), self.timeout_ms, genesis_commitment)
-                .await?;
+        let new_client = ApiClient::new_client(
+            self.endpoint.clone(),
+            self.timeout_ms,
+            genesis_commitment,
+            self.bearer_token.clone(),
+        )
+        .await?;
         let mut client = self.client.write();
         client.replace(new_client);
 
@@ -254,11 +289,16 @@ impl GrpcClient {
     /// Fetches RPC status without injecting an Accept header.
     ///
     /// This instantiates a separate API client without the Accept interceptor, so it does not
-    /// reuse the primary gRPC client.
+    /// reuse the primary gRPC client. Any caller-supplied
+    /// [`with_bearer_auth`](Self::with_bearer_auth) token is still forwarded so gateway
+    /// authentication keeps working.
     pub async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {
-        let mut rpc_api =
-            ApiClient::new_client_without_accept_header(self.endpoint.clone(), self.timeout_ms)
-                .await?;
+        let mut rpc_api = ApiClient::new_client_without_accept_header(
+            self.endpoint.clone(),
+            self.timeout_ms,
+            self.bearer_token.clone(),
+        )
+        .await?;
         rpc_api
             .status(())
             .await
@@ -610,10 +650,10 @@ impl NodeRpcClient for GrpcClient {
 
     async fn sync_chain_mmr(
         &self,
-        block_from: BlockNumber,
+        current_block_height: BlockNumber,
         upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError> {
-        let block_from = block_from.as_u32();
+        let block_from = current_block_height.as_u32();
 
         let upper_bound = Some(upper_bound.into());
 
@@ -779,56 +819,99 @@ impl NodeRpcClient for GrpcClient {
         Ok((block_num, proof))
     }
 
-    /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [`NoteSyncInfo`] from the
-    /// response.
+    /// Sends one or more `SyncNoteRequest`s to the node and merges the responses into a list of
+    /// [`NoteSyncBlock`]s.
+    ///
+    /// Chunks `note_tags` by [`RpcLimits::note_tags_limit`] and paginates each chunk across the
+    /// requested block range.
     async fn sync_notes(
         &self,
-        block_num: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<NoteSyncInfo, RpcError> {
-        let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
+    ) -> Result<Vec<NoteSyncBlock>, RpcError> {
+        if note_tags.is_empty() {
+            return Ok(Vec::new());
+        }
 
-        let block_range = Some(BlockRange {
-            block_from: block_num.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        });
+        let limits = self.get_rpc_limits().await?;
+        let tags: Vec<NoteTag> = note_tags.iter().copied().collect();
 
-        let request = proto::rpc::SyncNotesRequest { block_range, note_tags };
+        // Merge blocks across tag-chunks: a single block can hold notes whose tags fall into
+        // different chunks, so the same block can appear in multiple chunks' responses.
+        let mut merged_blocks: BTreeMap<BlockNumber, NoteSyncBlock> = BTreeMap::new();
 
-        let response = self
-            .call_with_retry(RpcEndpoint::SyncNotes, |mut rpc_api| {
-                let request = request.clone();
-                Box::pin(async move { rpc_api.sync_notes(request).await })
-            })
-            .await?;
+        for chunk in tags.chunks(limits.note_tags_limit as usize) {
+            let proto_tags: Vec<u32> = chunk.iter().map(|&t| t.into()).collect();
+            let mut pagination = BlockPagination::new(block_from, Some(block_to));
 
-        response.into_inner().try_into()
+            loop {
+                let request = proto::rpc::SyncNotesRequest {
+                    block_range: Some(BlockRange {
+                        block_from: pagination.current_block_from().as_u32(),
+                        block_to: pagination.block_to().map(|b| b.as_u32()),
+                    }),
+                    note_tags: proto_tags.clone(),
+                };
+
+                let response = self
+                    .call_with_retry(RpcEndpoint::SyncNotes, |mut rpc_api| {
+                        let request = request.clone();
+                        Box::pin(async move { rpc_api.sync_notes(request).await })
+                    })
+                    .await?
+                    .into_inner();
+
+                let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
+                    "SyncNotesResponse.pagination_info".to_owned(),
+                ))?;
+                let page_chain_tip = BlockNumber::from(page.chain_tip);
+                let page_block_to = BlockNumber::from(page.block_num);
+
+                for proto_block in response.blocks {
+                    let block: NoteSyncBlock = proto_block.try_into()?;
+                    let bn = block.block_header.block_num();
+                    if let Some(existing) = merged_blocks.get_mut(&bn) {
+                        for (id, note) in block.notes {
+                            existing.notes.entry(id).or_insert(note);
+                        }
+                    } else {
+                        merged_blocks.insert(bn, block);
+                    }
+                }
+
+                match pagination.advance(page_block_to, page_chain_tip)? {
+                    PaginationResult::Continue => {},
+                    PaginationResult::Done { .. } => break,
+                }
+            }
+        }
+
+        Ok(merged_blocks.into_values().collect())
     }
 
     async fn sync_nullifiers(
         &self,
         prefixes: &[u16],
-        block_num: BlockNumber,
+        block_from: BlockNumber,
         block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
-        const MAX_ITERATIONS: u32 = 1000; // Safety limit to prevent infinite loops
-
         let limits = self.get_rpc_limits().await?;
         let mut all_nullifiers = BTreeSet::new();
 
         // If the prefixes are too many, we need to chunk them into smaller groups to avoid
         // violating the RPC limit.
-        'chunk_nullifiers: for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
-            let mut current_block_from = block_num.as_u32();
+        for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
+            let proto_prefixes: Vec<u32> = chunk.iter().map(|&x| u32::from(x)).collect();
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
-            for _ in 0..MAX_ITERATIONS {
+            loop {
                 let request = proto::rpc::SyncNullifiersRequest {
-                    nullifiers: chunk.iter().map(|&x| u32::from(x)).collect(),
+                    nullifiers: proto_prefixes.clone(),
                     prefix_len: 16,
                     block_range: Some(BlockRange {
-                        block_from: current_block_from,
-                        block_to: block_to.map(|b| b.as_u32()),
+                        block_from: pagination.current_block_from().as_u32(),
+                        block_to: pagination.block_to().map(|b| b.as_u32()),
                     }),
                 };
 
@@ -837,10 +920,9 @@ impl NodeRpcClient for GrpcClient {
                         let request = request.clone();
                         Box::pin(async move { rpc_api.sync_nullifiers(request).await })
                     })
-                    .await?;
-                let response = response.into_inner();
+                    .await?
+                    .into_inner();
 
-                // Convert nullifiers for this batch
                 let batch_nullifiers = response
                     .nullifiers
                     .iter()
@@ -850,58 +932,17 @@ impl NodeRpcClient for GrpcClient {
 
                 all_nullifiers.extend(batch_nullifiers);
 
-                // Check if we need to fetch more pages
-                if let Some(page) = response.pagination_info {
-                    // Ensure we're making progress to avoid infinite loops
-                    if page.block_num < current_block_from {
-                        return Err(RpcError::PaginationError(
-                            "invalid pagination: block_num went backwards".to_string(),
-                        ));
-                    }
+                let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
+                    "SyncNullifiersResponse.pagination_info".to_owned(),
+                ))?;
 
-                    // Calculate target block as minimum between block_to and chain_tip
-                    let target_block =
-                        block_to.map_or(page.chain_tip, |b| b.as_u32().min(page.chain_tip));
-
-                    if page.block_num >= target_block {
-                        // No pagination info or we've reached/passed the target so we're done
-                        continue 'chunk_nullifiers;
-                    }
-                    current_block_from = page.block_num + 1;
+                match pagination.advance(page.block_num.into(), page.chain_tip.into())? {
+                    PaginationResult::Continue => {},
+                    PaginationResult::Done { .. } => break,
                 }
             }
-            // If we exit the loop, we've hit the iteration limit
-            return Err(RpcError::PaginationError(
-                "too many pagination iterations, possible infinite loop".to_string(),
-            ));
         }
         Ok(all_nullifiers.into_iter().collect::<Vec<_>>())
-    }
-
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        let limits = self.get_rpc_limits().await?;
-        let mut proofs: Vec<SmtProof> = Vec::with_capacity(nullifiers.len());
-        for chunk in nullifiers.chunks(limits.nullifiers_limit as usize) {
-            let request = proto::rpc::NullifierList {
-                nullifiers: chunk.iter().map(|nul| nul.as_word().into()).collect(),
-            };
-
-            let response = self
-                .call_with_retry(RpcEndpoint::CheckNullifiers, |mut rpc_api| {
-                    let request = request.clone();
-                    Box::pin(async move { rpc_api.check_nullifiers(request).await })
-                })
-                .await?;
-
-            let mut response = response.into_inner();
-            let chunk_proofs = response
-                .proofs
-                .iter_mut()
-                .map(|r| r.to_owned().try_into())
-                .collect::<Result<Vec<SmtProof>, RpcConversionError>>()?;
-            proofs.extend(chunk_proofs);
-        }
-        Ok(proofs)
     }
 
     async fn get_block_by_number(
@@ -944,6 +985,13 @@ impl NodeRpcClient for GrpcClient {
                 .script
                 .ok_or(RpcError::ExpectedDataMissing("GetNoteScriptByRoot.script".to_string()))?,
         )?;
+
+        let fetched_root = note_script.root();
+        if Word::from(fetched_root) != root {
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned note script with root {fetched_root} for requested root {root}",
+            )));
+        }
 
         Ok(note_script)
     }
@@ -1044,29 +1092,63 @@ impl NodeRpcClient for GrpcClient {
         Ok(AccountVaultInfo { chain_tip, block_number, updates })
     }
 
+    /// Sends one or more `SyncTransactions` requests to the node and concatenates the responses
+    /// into a flat list of [`TransactionRecord`]s.
+    ///
+    /// Chunks `account_ids` by [`RpcLimits::account_ids_limit`] and paginates each chunk across the
+    /// requested block range.
     async fn sync_transactions(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_ids: Vec<AccountId>,
-    ) -> Result<TransactionsInfo, RpcError> {
-        let block_range = Some(BlockRange {
-            block_from: block_from.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        });
+    ) -> Result<Vec<TransactionRecord>, RpcError> {
+        if account_ids.is_empty() {
+            return Ok(Vec::new());
+        }
 
-        let account_ids = account_ids.iter().map(|acc_id| (*acc_id).into()).collect();
+        let limits = self.get_rpc_limits().await?;
+        let mut transactions: Vec<TransactionRecord> = Vec::new();
 
-        let request = proto::rpc::SyncTransactionsRequest { block_range, account_ids };
+        for chunk in account_ids.chunks(limits.account_ids_limit as usize) {
+            let proto_account_ids: Vec<_> = chunk.iter().map(|acc_id| (*acc_id).into()).collect();
+            let mut pagination = BlockPagination::new(block_from, Some(block_to));
 
-        let response = self
-            .call_with_retry(RpcEndpoint::SyncTransactions, |mut rpc_api| {
-                let request = request.clone();
-                Box::pin(async move { rpc_api.sync_transactions(request).await })
-            })
-            .await?;
+            loop {
+                let request = proto::rpc::SyncTransactionsRequest {
+                    block_range: Some(BlockRange {
+                        block_from: pagination.current_block_from().as_u32(),
+                        block_to: pagination.block_to().map(|b| b.as_u32()),
+                    }),
+                    account_ids: proto_account_ids.clone(),
+                };
 
-        response.into_inner().try_into()
+                let response = self
+                    .call_with_retry(RpcEndpoint::SyncTransactions, |mut rpc_api| {
+                        let request = request.clone();
+                        Box::pin(async move { rpc_api.sync_transactions(request).await })
+                    })
+                    .await?
+                    .into_inner();
+
+                let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
+                    "SyncTransactionsResponse.pagination_info".to_owned(),
+                ))?;
+                let page_chain_tip = BlockNumber::from(page.chain_tip);
+                let page_block_to = BlockNumber::from(page.block_num);
+
+                for proto_tx in response.transactions {
+                    transactions.push(TransactionRecord::try_from(proto_tx)?);
+                }
+
+                match pagination.advance(page_block_to, page_chain_tip)? {
+                    PaginationResult::Continue => {},
+                    PaginationResult::Done { .. } => break,
+                }
+            }
+        }
+
+        Ok(transactions)
     }
 
     async fn get_network_id(&self) -> Result<NetworkId, RpcError> {
@@ -1166,6 +1248,7 @@ mod tests {
     use miden_protocol::block::BlockNumber;
 
     use super::{BlockPagination, GrpcClient, PaginationResult};
+    use crate::alloc::string::ToString;
     use crate::rpc::{Endpoint, NodeRpcClient, RpcError};
 
     fn assert_send_sync<T: Send + Sync>() {}
@@ -1287,5 +1370,76 @@ mod tests {
 
         assert_eq!(client.genesis_commitment.read().unwrap(), commitment);
         assert!(client.client.read().as_ref().is_some());
+    }
+
+    #[test]
+    fn with_bearer_auth_stores_token() {
+        let endpoint = &Endpoint::devnet();
+        let client = GrpcClient::new(endpoint, 10000).with_bearer_auth("token-one".to_string());
+
+        assert_eq!(client.bearer_token.as_deref(), Some("token-one"));
+    }
+
+    #[test]
+    fn with_bearer_auth_overwrites_on_repeat_call() {
+        let endpoint = &Endpoint::devnet();
+        let client = GrpcClient::new(endpoint, 10000)
+            .with_bearer_auth("token-one".to_string())
+            .with_bearer_auth("token-two".to_string());
+
+        // Second call replaces the first.
+        assert_eq!(client.bearer_token.as_deref(), Some("token-two"));
+    }
+
+    #[tokio::test]
+    async fn with_bearer_auth_surfaces_invalid_ascii_value_at_connect_time() {
+        // Tokens containing control characters are rejected by `AsciiMetadataValue`. The
+        // fluent builder defers the check to connection time, so the error must surface as
+        // a `ConnectionError` on the first request — preventing CR/LF header-injection.
+        let endpoint = &Endpoint::devnet();
+        let client = GrpcClient::new(endpoint, 10000).with_bearer_auth("bad\nvalue".to_string());
+
+        let err = client.connect().await.expect_err("expected invalid token to fail connect");
+        assert!(
+            matches!(err, RpcError::ConnectionError(_)),
+            "expected ConnectionError, got {err:?}",
+        );
+    }
+
+    #[tokio::test]
+    async fn with_bearer_auth_is_preserved_across_set_genesis_commitment() {
+        let endpoint = &Endpoint::devnet();
+        let client = GrpcClient::new(endpoint, 10000).with_bearer_auth("token".to_string());
+        client.connect().await.unwrap();
+
+        client.set_genesis_commitment(Word::default()).await.unwrap();
+
+        // Rebuilding the interceptor after a genesis update must not drop the caller token.
+        assert_eq!(client.bearer_token.as_deref(), Some("token"));
+        assert!(client.client.read().as_ref().is_some());
+    }
+
+    /// Real-network smoke test: hitting the public testnet with a caller-supplied bearer
+    /// token must return a real [`RpcStatusInfo`], proving the header is a valid
+    /// [`AsciiMetadataValue`](tonic::metadata::AsciiMetadataValue) on the wire and that an
+    /// unauthenticated node ignores it cleanly.
+    ///
+    /// `#[ignore]`d by default so offline CI doesn't fail; run with
+    /// `cargo test -- --ignored with_bearer_auth_does_not_break_real_rpc_against_testnet`
+    /// when validating against the real network. The interceptor-level test
+    /// (`api_client::tests::interceptor_injects_bearer_token_onto_request`)
+    /// already proves the header reaches outbound request metadata without needing the
+    /// network.
+    #[tokio::test]
+    #[ignore = "requires network access to public testnet"]
+    async fn with_bearer_auth_does_not_break_real_rpc_against_testnet() {
+        let endpoint = &Endpoint::testnet();
+        let client = GrpcClient::new(endpoint, 10_000).with_bearer_auth("smoke-test".to_string());
+
+        let status = client
+            .get_status_unversioned()
+            .await
+            .expect("testnet status with caller auth header must succeed");
+        assert!(!status.version.is_empty(), "status must include a server version");
     }
 }

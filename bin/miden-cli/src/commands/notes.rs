@@ -13,7 +13,7 @@ use miden_client::note::{
     get_input_note_with_id_prefix,
 };
 use miden_client::store::{InputNoteRecord, NoteFilter as ClientNoteFilter, OutputNoteRecord};
-use miden_client::{Client, ClientError, IdPrefixFetchError, PrettyPrint, Word};
+use miden_client::{Client, ClientError, IdPrefixFetchError, PrettyPrint};
 
 use crate::errors::CliError;
 use crate::utils::{load_faucet_details_map, parse_account_id};
@@ -212,8 +212,8 @@ async fn show_note<AUTH: Keystore + Sync>(
         _ => None,
     };
 
-    if let Some(standard_note_name) = script_root_word.and_then(identify_standard_note) {
-        table.add_row(vec![Cell::new("Standard Note"), Cell::new(standard_note_name)]);
+    if let Some(standard_note) = script_root_word.and_then(StandardNote::from_script_root) {
+        table.add_row(vec![Cell::new("Standard Note"), Cell::new(standard_note.name())]);
     }
 
     table.add_row(vec![Cell::new("Script Root"), Cell::new(script_root)]);
@@ -499,18 +499,5 @@ fn note_summary(
         tag: note_tag_str,
         sender: note_sender_str,
         exportable: output_note_record.is_some(),
-    }
-}
-
-/// Identifies if a note with the given script root is a standard note type.
-/// Returns the name of the standard note type if found, or `None` if not a standard note.
-fn identify_standard_note(script_root: Word) -> Option<&'static str> {
-    match script_root {
-        sr if sr == StandardNote::P2ID.script_root() => Some("P2ID"),
-        sr if sr == StandardNote::P2IDE.script_root() => Some("P2IDE"),
-        sr if sr == StandardNote::SWAP.script_root() => Some("SWAP"),
-        sr if sr == StandardNote::MINT.script_root() => Some("MINT"),
-        sr if sr == StandardNote::BURN.script_root() => Some("BURN"),
-        _ => None,
     }
 }

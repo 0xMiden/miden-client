@@ -73,6 +73,7 @@ use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
 use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
 use miden_protocol::transaction::AccountInputs;
+use miden_protocol::vm::MIN_STACK_DEPTH;
 use miden_protocol::{EMPTY_WORD, Felt, Word};
 use miden_standards::account::interface::AccountInterfaceExt;
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
@@ -80,20 +81,27 @@ use tracing::info;
 
 use super::Client;
 use crate::ClientError;
-use crate::note::NoteUpdateTracker;
+use crate::note::{NoteScreenerError, NoteUpdateTracker};
 use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::rpc::{AccountStateAt, GrpcError, NodeRpcClient, RpcError};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
+    AccountRecord,
     InputNoteRecord,
     InputNoteState,
     NoteFilter,
+    NoteRecordError,
     OutputNoteRecord,
     Store,
+    StoreError,
     TransactionFilter,
 };
 use crate::sync::NoteTagRecord;
+use crate::transaction::batch::InMemoryBatchDataStore;
+
+pub mod batch;
+pub use batch::{BatchBuilder, BatchBuilderError};
 
 mod prover;
 pub use prover::TransactionProver;
@@ -115,6 +123,7 @@ pub use request::{
     ForeignAccount,
     NoteArgs,
     PaymentNoteDescription,
+    PswapTransactionData,
     SwapTransactionData,
     TransactionRequest,
     TransactionRequestBuilder,
@@ -170,6 +179,23 @@ where
         self.store.get_transactions(filter).await.map_err(Into::into)
     }
 
+    // TRANSACTION BATCH
+    // --------------------------------------------------------------------------------------------
+
+    /// Open a new [`BatchBuilder`] for accumulating transactions across one or more local
+    /// accounts.
+    ///
+    /// See [`crate::transaction::batch`] for usage and constraints.
+    pub fn new_transaction_batch(&self) -> BatchBuilder<'_, AUTH> {
+        let inner_data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
+        BatchBuilder {
+            client: self,
+            data_store: InMemoryBatchDataStore::new(inner_data_store),
+            pushed_txs: Vec::new(),
+            consumed_input_notes: BTreeSet::new(),
+        }
+    }
+
     // TRANSACTION
     // --------------------------------------------------------------------------------------------
 
@@ -178,10 +204,6 @@ where
     ///
     /// Uses the client's default prover (configured via
     /// [`crate::builder::ClientBuilder::prover`]).
-    ///
-    /// If the transaction utilizes foreign account data, there is a chance that the client
-    /// doesn't have the required block header in the local database. In these scenarios, a sync to
-    /// the chain tip is performed, and the required block header is retrieved.
     pub async fn submit_new_transaction(
         &mut self,
         account_id: AccountId,
@@ -198,10 +220,6 @@ where
     ///
     /// This is useful for falling back to a different prover (e.g., local) when the default
     /// prover (e.g., remote) fails with a [`ClientError::TransactionProvingError`].
-    ///
-    /// If the transaction utilizes foreign account data, there is a chance that the client
-    /// doesn't have the required block header in the local database. In these scenarios, a sync to
-    /// the chain tip is performed, and the required block header is retrieved.
     pub async fn submit_new_transaction_with_prover(
         &mut self,
         account_id: AccountId,
@@ -234,10 +252,6 @@ where
     /// Creates and executes a transaction specified by the request against the specified account,
     /// but doesn't change the local database.
     ///
-    /// If the transaction utilizes foreign account data, there is a chance that the client doesn't
-    /// have the required block header in the local database. In these scenarios, a sync to
-    /// the chain tip is performed, and the required block header is retrieved.
-    ///
     /// # Errors
     ///
     /// - Returns [`ClientError::MissingOutputRecipients`] if the [`TransactionRequest`] output
@@ -249,8 +263,49 @@ where
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionResult, ClientError> {
-        // Validates the transaction request before executing
-        self.validate_request(account_id, &transaction_request).await?;
+        let account: Account = self.get_native_account_record(account_id).await?.try_into()?;
+
+        let prep = self.prepare_transaction(&account, transaction_request).await?;
+
+        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
+        data_store.register_foreign_account_inputs(prep.foreign_account_inputs.iter().cloned());
+        for fpi_account in &prep.foreign_account_inputs {
+            data_store.mast_store().load_account_code(fpi_account.code());
+        }
+
+        data_store.mast_store().load_account_code(account.code());
+
+        let mut notes = prep.notes;
+        if prep.ignore_invalid_notes {
+            notes = self.get_valid_input_notes(&account, notes, prep.tx_args.clone()).await?;
+        }
+
+        let executed_transaction = self
+            .build_executor(&data_store)?
+            .execute_transaction(account_id, prep.block_num, notes, prep.tx_args)
+            .await?;
+
+        validate_executed_transaction(&executed_transaction, &prep.output_recipients)?;
+        TransactionResult::new(executed_transaction, prep.future_notes)
+    }
+
+    /// Performs the data-store-independent setup shared by `execute_transaction` and
+    /// `execute_transaction_for_batch`: validates the request against the supplied
+    /// `account`, loads/filters input notes, builds the transaction script and args,
+    /// retrieves foreign-account inputs, upserts output note scripts, and computes the
+    /// reference block number.
+    ///
+    /// `account` is the state validation runs against — for a single transaction this is
+    /// the persisted account; inside [`crate::transaction::BatchBuilder::push`] it is the
+    /// in-batch (stacked) state, so balances reflect prior pushes.
+    pub(crate) async fn prepare_transaction(
+        &self,
+        account: &Account,
+        transaction_request: TransactionRequest,
+    ) -> Result<PreparedTransaction, ClientError> {
+        let account_id = account.id();
+        self.validate_recency().await?;
+        validate_account_request(&transaction_request, account)?;
 
         // Retrieve all input notes from the store.
         let mut stored_note_records = self
@@ -273,9 +328,9 @@ where
         let authenticated_note_ids =
             stored_note_records.iter().map(InputNoteRecord::id).collect::<Vec<_>>();
 
-        // Upsert request notes missing from the store so they can be tracked and updated
-        // NOTE: Unauthenticated notes may be stored locally in an unverified/invalid state at this
-        // point. The upsert will replace the state to an InputNoteState::Expected (with
+        // Upsert request notes missing from the store so they can be tracked and updated.
+        // NOTE: Unauthenticated notes may be stored locally in an unverified/invalid state at
+        // this point. The upsert will replace the state to an InputNoteState::Expected (with
         // metadata included).
         let unauthenticated_input_notes = transaction_request
             .input_notes()
@@ -287,7 +342,7 @@ where
 
         self.store.upsert_input_notes(&unauthenticated_input_notes).await?;
 
-        let mut notes = transaction_request.build_input_notes(stored_note_records)?;
+        let notes = transaction_request.build_input_notes(stored_note_records)?;
 
         let output_recipients =
             transaction_request.expected_output_recipients().cloned().collect::<Vec<_>>();
@@ -302,23 +357,13 @@ where
 
         let foreign_accounts = transaction_request.foreign_accounts().clone();
 
-        // Inject state and code of foreign accounts
         let (fpi_block_num, foreign_account_inputs) =
             self.retrieve_foreign_account_inputs(foreign_accounts).await?;
 
         let ignore_invalid_notes = transaction_request.ignore_invalid_input_notes();
 
-        let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
-        data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
-        for fpi_account in &foreign_account_inputs {
-            data_store.mast_store().load_account_code(fpi_account.code());
-        }
-
-        // Upsert note scripts for later retrieval from the client's DataStore
-        let output_note_scripts: Vec<NoteScript> = transaction_request
-            .expected_output_recipients()
-            .map(|n| n.script().clone())
-            .collect();
+        let output_note_scripts: Vec<NoteScript> =
+            output_recipients.iter().map(|r| r.script().clone()).collect();
         self.store.upsert_note_scripts(&output_note_scripts).await?;
 
         let block_num = if let Some(block_num) = fpi_block_num {
@@ -327,37 +372,22 @@ where
             self.store.get_sync_height().await?
         };
 
-        // Load account code into MAST forest store
-        // TODO: Refactor this to get account code only?
-        let account_record = self
-            .store
-            .get_account(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))?;
-        let account: Account = account_record.try_into()?;
-        data_store.mast_store().load_account_code(account.code());
-
-        // Get transaction args
         let tx_args = transaction_request.into_transaction_args(tx_script);
 
-        if ignore_invalid_notes {
-            // Remove invalid notes
-            notes = self.get_valid_input_notes(account, notes, tx_args.clone()).await?;
-        }
-
-        // Execute the transaction and get the witness
-        let executed_transaction = self
-            .build_executor(&data_store)?
-            .execute_transaction(account_id, block_num, notes, tx_args)
-            .await?;
-
-        validate_executed_transaction(&executed_transaction, &output_recipients)?;
-        TransactionResult::new(executed_transaction, future_notes)
+        Ok(PreparedTransaction {
+            notes,
+            output_recipients,
+            future_notes,
+            tx_args,
+            foreign_account_inputs,
+            block_num,
+            ignore_invalid_notes,
+        })
     }
 
     /// Proves the specified transaction using the prover configured for this client.
     pub async fn prove_transaction(
-        &mut self,
+        &self,
         tx_result: &TransactionResult,
     ) -> Result<ProvenTransaction, ClientError> {
         self.prove_transaction_with(tx_result, self.tx_prover.clone()).await
@@ -365,7 +395,7 @@ where
 
     /// Proves the specified transaction using the provided prover.
     pub async fn prove_transaction_with(
-        &mut self,
+        &self,
         tx_result: &TransactionResult,
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<ProvenTransaction, ClientError> {
@@ -402,7 +432,7 @@ where
         &self,
         tx_result: &TransactionResult,
         submission_height: BlockNumber,
-    ) -> Result<TransactionStoreUpdate, ClientError> {
+    ) -> Result<TransactionStoreUpdate, TransactionStoreUpdateError> {
         let note_updates = self.get_note_updates(submission_height, tx_result).await?;
 
         let mut new_tags: Vec<NoteTagRecord> = note_updates
@@ -420,7 +450,6 @@ where
             })
             .collect();
 
-        // Track output note tags so that `sync_notes` discovers their inclusion proofs.
         new_tags.extend(note_updates.updated_output_notes().map(|note| {
             let note = note.inner();
             NoteTagRecord::with_note_source(note.metadata().tag(), note.id())
@@ -477,7 +506,220 @@ where
         tx_script: TransactionScript,
         advice_inputs: AdviceInputs,
         foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
-    ) -> Result<[Felt; 16], ClientError> {
+    ) -> Result<[Felt; MIN_STACK_DEPTH], ClientError> {
+        let (data_store, block_ref) =
+            self.prepare_program_execution(account_id, foreign_accounts).await?;
+
+        Ok(self
+            .build_executor(&data_store)?
+            .execute_tx_view_script(account_id, block_ref, tx_script, advice_inputs)
+            .await?)
+    }
+
+    /// Executes the provided transaction script with a DAP debug adapter listening for
+    /// connections, allowing interactive debugging via any DAP-compatible client.
+    #[cfg(feature = "dap")]
+    pub async fn execute_program_with_dap(
+        &mut self,
+        account_id: AccountId,
+        tx_script: TransactionScript,
+        advice_inputs: AdviceInputs,
+        foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
+    ) -> Result<[Felt; MIN_STACK_DEPTH], ClientError> {
+        let (data_store, block_ref) =
+            self.prepare_program_execution(account_id, foreign_accounts).await?;
+
+        Ok(self
+            .build_dap_executor(&data_store)?
+            .execute_tx_view_script(account_id, block_ref, tx_script, advice_inputs)
+            .await?)
+    }
+
+    // HELPERS
+    // --------------------------------------------------------------------------------------------
+
+    /// Validates that the specified transaction request can be executed by the specified account.
+    ///
+    /// This does't guarantee that the transaction will succeed, but it's useful to avoid submitting
+    /// transactions that are guaranteed to fail. Some of the validations include:
+    /// - That the account has enough balance to cover the outgoing assets.
+    /// - That the client is not too far behind the chain tip.
+    pub async fn validate_request(
+        &self,
+        account_id: AccountId,
+        transaction_request: &TransactionRequest,
+    ) -> Result<(), ClientError> {
+        self.validate_recency().await?;
+        let account = self.try_get_account(account_id).await?;
+        validate_account_request(transaction_request, &account)
+    }
+
+    async fn validate_recency(&self) -> Result<(), ClientError> {
+        if let Some(max_block_number_delta) = self.max_block_number_delta {
+            let current_chain_tip =
+                self.rpc_api.get_block_header_by_number(None, false).await?.0.block_num();
+
+            if current_chain_tip > self.store.get_sync_height().await? + max_block_number_delta {
+                return Err(ClientError::RecencyConditionError(
+                    "The client is too far behind the chain tip to execute the transaction",
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Checks whether the node's `note_scripts` registry already has each of the expected NTX
+    /// scripts. For any script that is missing, creates and submits a registration transaction
+    /// that produces a public note carrying that script.
+    ///
+    /// `account_id` is the account that will execute the registration transaction.
+    ///
+    /// This method is called automatically by [`Self::submit_new_transaction_with_prover`] when the
+    /// [`TransactionRequest`] contains expected NTX scripts. It can also be called directly if
+    /// you want to register scripts ahead of time.
+    pub async fn ensure_ntx_scripts_registered(
+        &mut self,
+        account_id: AccountId,
+        scripts: &[NoteScript],
+        tx_prover: Arc<dyn TransactionProver>,
+    ) -> Result<(), ClientError> {
+        let mut missing_scripts = Vec::new();
+
+        for script in scripts {
+            let script_root = script.root();
+
+            // Check if the node already has this script registered.
+            match self.rpc_api.get_note_script_by_root(script_root.into()).await {
+                Ok(_) => {},
+                Err(RpcError::RequestError { error_kind: GrpcError::NotFound, .. }) => {
+                    missing_scripts.push(script.clone());
+                },
+                Err(other) => {
+                    return Err(ClientError::NtxScriptRegistrationFailed {
+                        script_root: script_root.into(),
+                        source: other,
+                    });
+                },
+            }
+        }
+
+        if missing_scripts.is_empty() {
+            return Ok(());
+        }
+
+        let registration_request = TransactionRequestBuilder::new().build_register_note_scripts(
+            account_id,
+            missing_scripts,
+            self.rng(),
+        )?;
+
+        let tx_result = self.execute_transaction(account_id, registration_request).await?;
+        let proven = self.prove_transaction_with(&tx_result, tx_prover).await?;
+        let submission_height = self.submit_proven_transaction(proven, &tx_result).await?;
+        self.apply_transaction(&tx_result, submission_height).await?;
+
+        Ok(())
+    }
+
+    pub(crate) async fn get_valid_input_notes(
+        &self,
+        account: &Account,
+        mut input_notes: InputNotes<InputNote>,
+        tx_args: TransactionArgs,
+    ) -> Result<InputNotes<InputNote>, ClientError> {
+        loop {
+            let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
+
+            data_store.mast_store().load_account_code(account.code());
+            let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store)?)
+                .check_notes_consumability(
+                    account.id(),
+                    self.store.get_sync_height().await?,
+                    input_notes.iter().map(|n| n.clone().into_note()).collect(),
+                    tx_args.clone(),
+                )
+                .await?;
+
+            if execution.failed().is_empty() {
+                break;
+            }
+
+            let failed_note_ids: BTreeSet<NoteId> =
+                execution.failed().iter().map(|n| n.note().id()).collect();
+            let filtered_input_notes = InputNotes::new(
+                input_notes
+                    .into_iter()
+                    .filter(|note| !failed_note_ids.contains(&note.id()))
+                    .collect(),
+            )
+            .expect("Created from a valid input notes list");
+
+            input_notes = filtered_input_notes;
+        }
+
+        Ok(input_notes)
+    }
+
+    /// Returns foreign account inputs for the required foreign accounts specified by the
+    /// transaction request.
+    ///
+    /// For any [`ForeignAccount::Public`] in `foreign_accounts`, these pieces of data are retrieved
+    /// from the network. For any [`ForeignAccount::Private`] account, inner data is used and only
+    /// a proof of the account's existence on the network is fetched.
+    async fn retrieve_foreign_account_inputs(
+        &self,
+        foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
+    ) -> Result<(Option<BlockNumber>, Vec<AccountInputs>), ClientError> {
+        if foreign_accounts.is_empty() {
+            return Ok((None, Vec::new()));
+        }
+
+        let block_num = self.store.get_sync_height().await?;
+        let mut return_foreign_account_inputs = Vec::with_capacity(foreign_accounts.len());
+
+        for foreign_account in foreign_accounts.into_values() {
+            let foreign_account_inputs = match foreign_account {
+                ForeignAccount::Public(account_id, storage_requirements) => {
+                    fetch_public_account_inputs(
+                        &self.store,
+                        &self.rpc_api,
+                        account_id,
+                        storage_requirements,
+                        AccountStateAt::Block(block_num),
+                    )
+                    .await?
+                },
+                ForeignAccount::Private(partial_account) => {
+                    let account_id = partial_account.id();
+                    let (_, account_proof) = self
+                        .rpc_api
+                        .get_account_proof(
+                            account_id,
+                            AccountStorageRequirements::default(),
+                            AccountStateAt::Block(block_num),
+                            None,
+                            None,
+                        )
+                        .await?;
+                    let (witness, _) = account_proof.into_parts();
+                    AccountInputs::new(partial_account, witness)
+                },
+            };
+
+            return_foreign_account_inputs.push(foreign_account_inputs);
+        }
+
+        Ok((Some(block_num), return_foreign_account_inputs))
+    }
+
+    /// Prepares the data store and block reference for program execution.
+    ///
+    /// This is shared setup for both `execute_program` and `execute_program_with_dap`.
+    async fn prepare_program_execution(
+        &mut self,
+        account_id: AccountId,
+        foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
+    ) -> Result<(ClientDataStore, BlockNumber), ClientError> {
         let (fpi_block_number, foreign_account_inputs) =
             self.retrieve_foreign_account_inputs(foreign_accounts).await?;
 
@@ -506,29 +748,69 @@ where
             data_store.mast_store().load_account_code(fpi_account.code());
         }
 
-        Ok(self
-            .build_executor(&data_store)?
-            .execute_tx_view_script(account_id, block_ref, tx_script, advice_inputs)
-            .await?)
+        Ok((data_store, block_ref))
     }
 
-    // HELPERS
-    // --------------------------------------------------------------------------------------------
+    /// Creates a transaction executor configured with the client's runtime options,
+    /// authenticator, and source manager.
+    pub(crate) fn build_executor<'store, 'auth, STORE: DataStore + Sync>(
+        &'auth self,
+        data_store: &'store STORE,
+    ) -> Result<TransactionExecutor<'store, 'auth, STORE, AUTH>, TransactionExecutorError> {
+        let mut executor = TransactionExecutor::new(data_store)
+            .with_options(self.exec_options)?
+            .with_source_manager(self.source_manager.clone());
+        if let Some(authenticator) = self.authenticator.as_deref() {
+            executor = executor.with_authenticator(authenticator);
+        }
+        Ok(executor)
+    }
 
-    /// Compiles the note updates needed to be applied to the store after executing a
+    /// Loads an [`AccountRecord`] for an account that must be usable as a transaction's native
+    /// account. Errors out if the account is not tracked or if it is watched.
+    async fn get_native_account_record(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountRecord, ClientError> {
+        let account_record = self
+            .store
+            .get_account(account_id)
+            .await?
+            .ok_or(ClientError::AccountDataNotFound(account_id))?;
+        if account_record.is_watched() {
+            return Err(ClientError::AccountIsWatched(account_id));
+        }
+        Ok(account_record)
+    }
+
+    /// Creates a transaction executor configured for DAP (Debug Adapter Protocol) debugging.
+    #[cfg(feature = "dap")]
+    pub(crate) fn build_dap_executor<'store, 'auth, STORE: DataStore + Sync>(
+        &'auth self,
+        data_store: &'store STORE,
+    ) -> Result<
+        TransactionExecutor<'store, 'auth, STORE, AUTH, DapProgramExecutor>,
+        TransactionExecutorError,
+    > {
+        Ok(self.build_executor(data_store)?.with_program_executor::<DapProgramExecutor>())
+    }
+
+    /// Loads the account and constructs an [`AccountInterface`] from it.
+    pub(crate) async fn get_account_interface(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountInterface, ClientError> {
+        let account = self.try_get_account(account_id).await?;
+        Ok(AccountInterface::from_account(&account))
+    }
+
+    /// Returns [`NoteUpdateTracker`] containing the note updates generated by an executed
     /// transaction.
-    ///
-    /// These updates include:
-    /// - New output notes.
-    /// - New input notes (only if they are relevant to the client).
-    /// - Input notes that could be created as outputs of future transactions (e.g., a SWAP payback
-    ///   note).
-    /// - Updated input notes that were consumed locally.
     async fn get_note_updates(
         &self,
         submission_height: BlockNumber,
         tx_result: &TransactionResult,
-    ) -> Result<NoteUpdateTracker, ClientError> {
+    ) -> Result<NoteUpdateTracker, TransactionStoreUpdateError> {
         let executed_tx = tx_result.executed_transaction();
         let current_timestamp = self.store.get_current_timestamp();
         let current_block_num = self.store.get_sync_height().await?;
@@ -545,9 +827,9 @@ where
 
         // New relevant input notes
         let mut new_input_notes = vec![];
-        let output_notes =
-            notes_from_output(executed_tx.output_notes()).cloned().collect::<Vec<_>>();
-        let note_screener = self.note_screener();
+        let output_notes: Vec<Note> =
+            notes_from_output(executed_tx.output_notes()).cloned().collect();
+        let note_screener = self.note_screener().clone();
         let output_note_relevances = note_screener.can_consume_batch(&output_notes).await?;
 
         for note in output_notes {
@@ -586,7 +868,8 @@ where
         let consumed_note_ids =
             executed_tx.tx_inputs().input_notes().iter().map(InputNote::id).collect();
 
-        let consumed_notes = self.get_input_notes(NoteFilter::List(consumed_note_ids)).await?;
+        let consumed_notes =
+            self.store.get_input_notes(NoteFilter::List(consumed_note_ids)).await?;
 
         let mut updated_input_notes = vec![];
 
@@ -606,215 +889,63 @@ where
             new_output_notes,
         ))
     }
+}
 
-    /// Validates that the specified transaction request can be executed by the specified account.
-    ///
-    /// This does't guarantee that the transaction will succeed, but it's useful to avoid submitting
-    /// transactions that are guaranteed to fail. Some of the validations include:
-    /// - That the account has enough balance to cover the outgoing assets.
-    /// - That the client is not too far behind the chain tip.
-    pub async fn validate_request(
-        &mut self,
-        account_id: AccountId,
-        transaction_request: &TransactionRequest,
-    ) -> Result<(), ClientError> {
-        if let Some(max_block_number_delta) = self.max_block_number_delta {
-            let current_chain_tip =
-                self.rpc_api.get_block_header_by_number(None, false).await?.0.block_num();
+/// Adapts [`miden_debug::DapExecutor`] (which exposes `new` + `execute_async`) to
+/// [`miden_tx::ProgramExecutor`]. `miden-debug` does not depend on `miden-tx`, so the impl
+/// must live here.
+#[cfg(feature = "dap")]
+pub(crate) struct DapProgramExecutor(miden_debug::DapExecutor);
 
-            if current_chain_tip > self.store.get_sync_height().await? + max_block_number_delta {
-                return Err(ClientError::RecencyConditionError(
-                    "The client is too far behind the chain tip to execute the transaction",
-                ));
-            }
-        }
-
-        let account = self.try_get_account(account_id).await?;
-        if account.is_faucet() {
-            // TODO(SantiagoPittella): Add faucet validations.
-            Ok(())
-        } else {
-            validate_basic_account_request(transaction_request, &account)
-        }
+#[cfg(feature = "dap")]
+impl miden_tx::ProgramExecutor for DapProgramExecutor {
+    fn new(
+        stack_inputs: miden_processor::StackInputs,
+        advice_inputs: miden_processor::advice::AdviceInputs,
+        options: miden_processor::ExecutionOptions,
+    ) -> Self {
+        Self(miden_debug::DapExecutor::new(stack_inputs, advice_inputs, options))
     }
 
-    /// Checks whether the node's `note_scripts` registry already has each of the expected NTX
-    /// scripts. For any script that is missing, creates and submits a registration transaction
-    /// that produces a public note carrying that script.
-    ///
-    /// `account_id` is the account that will execute the registration transaction.
-    ///
-    /// This method is called automatically by [`Self::submit_new_transaction_with_prover`] when the
-    /// [`TransactionRequest`] contains expected NTX scripts. It can also be called directly if
-    /// you want to register scripts ahead of time.
-    pub async fn ensure_ntx_scripts_registered(
-        &mut self,
-        account_id: AccountId,
-        scripts: &[NoteScript],
-        tx_prover: Arc<dyn TransactionProver>,
-    ) -> Result<(), ClientError> {
-        let mut missing_scripts = Vec::new();
-
-        for script in scripts {
-            let script_root = script.root();
-
-            // Check if the node already has this script registered.
-            match self.rpc_api.get_note_script_by_root(script_root).await {
-                Ok(_) => {},
-                Err(RpcError::RequestError { error_kind: GrpcError::NotFound, .. }) => {
-                    missing_scripts.push(script.clone());
-                },
-                Err(other) => {
-                    return Err(ClientError::NtxScriptRegistrationFailed {
-                        script_root,
-                        source: other,
-                    });
-                },
-            }
-        }
-
-        if missing_scripts.is_empty() {
-            return Ok(());
-        }
-
-        let registration_request = TransactionRequestBuilder::new().build_register_note_scripts(
-            account_id,
-            missing_scripts,
-            self.rng(),
-        )?;
-
-        let tx_result = self.execute_transaction(account_id, registration_request).await?;
-        let proven = self.prove_transaction_with(&tx_result, tx_prover).await?;
-        let submission_height = self.submit_proven_transaction(proven, &tx_result).await?;
-        self.apply_transaction(&tx_result, submission_height).await?;
-
-        Ok(())
+    fn execute<H: miden_processor::Host + Send>(
+        self,
+        program: &miden_processor::Program,
+        host: &mut H,
+    ) -> impl miden_processor::FutureMaybeSend<
+        Result<miden_processor::ExecutionOutput, miden_processor::ExecutionError>,
+    > {
+        self.0.execute_async(program, host)
     }
+}
 
-    /// Filters out invalid or non-consumable input notes by simulating
-    /// note consumption and removing any that fail validation.
-    async fn get_valid_input_notes(
-        &self,
-        account: Account,
-        mut input_notes: InputNotes<InputNote>,
-        tx_args: TransactionArgs,
-    ) -> Result<InputNotes<InputNote>, ClientError> {
-        loop {
-            let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
+// TRANSACTION STORE UPDATE ERROR
+// ================================================================================================
 
-            data_store.mast_store().load_account_code(account.code());
-            let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store)?)
-                .check_notes_consumability(
-                    account.id(),
-                    self.store.get_sync_height().await?,
-                    input_notes.iter().map(|n| n.clone().into_note()).collect(),
-                    tx_args.clone(),
-                )
-                .await?;
-
-            if execution.failed.is_empty() {
-                break;
-            }
-
-            let failed_note_ids: BTreeSet<NoteId> =
-                execution.failed.iter().map(|n| n.note.id()).collect();
-            let filtered_input_notes = InputNotes::new(
-                input_notes
-                    .into_iter()
-                    .filter(|note| !failed_note_ids.contains(&note.id()))
-                    .collect(),
-            )
-            .expect("Created from a valid input notes list");
-
-            input_notes = filtered_input_notes;
-        }
-
-        Ok(input_notes)
-    }
-
-    /// Retrieves the account interface for the specified account.
-    pub(crate) async fn get_account_interface(
-        &self,
-        account_id: AccountId,
-    ) -> Result<AccountInterface, ClientError> {
-        let account = self.try_get_account(account_id).await?;
-        Ok(AccountInterface::from_account(&account))
-    }
-
-    /// Returns foreign account inputs for the required foreign accounts specified by the
-    /// transaction request.
-    ///
-    /// For any [`ForeignAccount::Public`] in `foreign_accounts`, these pieces of data are retrieved
-    /// from the network. For any [`ForeignAccount::Private`] account, inner data is used and only
-    /// a proof of the account's existence on the network is fetched.
-    ///
-    /// Account data is retrieved for the node's current chain tip, so we need to check whether we
-    /// currently have the corresponding block header data. Otherwise, we additionally need to
-    /// retrieve it, this implies a state sync call which may update the client in other ways.
-    async fn retrieve_foreign_account_inputs(
-        &mut self,
-        foreign_accounts: BTreeMap<AccountId, ForeignAccount>,
-    ) -> Result<(Option<BlockNumber>, Vec<AccountInputs>), ClientError> {
-        if foreign_accounts.is_empty() {
-            return Ok((None, Vec::new()));
-        }
-
-        let block_num = self.get_sync_height().await?;
-        let mut return_foreign_account_inputs = Vec::with_capacity(foreign_accounts.len());
-
-        for foreign_account in foreign_accounts.into_values() {
-            let foreign_account_inputs = match foreign_account {
-                ForeignAccount::Public(account_id, storage_requirements) => {
-                    fetch_public_account_inputs(
-                        &self.store,
-                        &self.rpc_api,
-                        account_id,
-                        storage_requirements,
-                        AccountStateAt::Block(block_num),
-                    )
-                    .await?
-                },
-                ForeignAccount::Private(partial_account) => {
-                    let account_id = partial_account.id();
-                    let (_, account_proof) = self
-                        .rpc_api
-                        .get_account_proof(
-                            account_id,
-                            AccountStorageRequirements::default(),
-                            AccountStateAt::Block(block_num),
-                            None,
-                            None,
-                        )
-                        .await?;
-                    let (witness, _) = account_proof.into_parts();
-                    AccountInputs::new(partial_account, witness)
-                },
-            };
-
-            return_foreign_account_inputs.push(foreign_account_inputs);
-        }
-
-        Ok((Some(block_num), return_foreign_account_inputs))
-    }
-
-    /// Creates a transaction executor configured with the client's runtime options,
-    /// authenticator, and source manager.
-    pub(crate) fn build_executor<'store, 'auth, STORE: DataStore + Sync>(
-        &'auth self,
-        data_store: &'store STORE,
-    ) -> Result<TransactionExecutor<'store, 'auth, STORE, AUTH>, TransactionExecutorError> {
-        let mut executor = TransactionExecutor::new(data_store).with_options(self.exec_options)?;
-        if let Some(authenticator) = self.authenticator.as_deref() {
-            executor = executor.with_authenticator(authenticator);
-        }
-        executor = executor.with_source_manager(self.source_manager.clone());
-
-        Ok(executor)
-    }
+/// Error returned by [`Client::get_transaction_store_update`] when building the store update
+/// for a submitted transaction fails.
+#[derive(Debug, thiserror::Error)]
+pub enum TransactionStoreUpdateError {
+    #[error("store error")]
+    Store(#[from] StoreError),
+    #[error("note screener error")]
+    NoteScreener(#[from] NoteScreenerError),
+    #[error("note record error")]
+    NoteRecord(#[from] NoteRecordError),
 }
 
 // HELPERS
 // ================================================================================================
+
+/// Data-store-independent state produced during transaction preparation.
+pub(crate) struct PreparedTransaction {
+    pub(crate) notes: InputNotes<InputNote>,
+    pub(crate) output_recipients: Vec<NoteRecipient>,
+    pub(crate) future_notes: Vec<(NoteDetails, NoteTag)>,
+    pub(crate) tx_args: TransactionArgs,
+    pub(crate) foreign_account_inputs: Vec<AccountInputs>,
+    pub(crate) block_num: BlockNumber,
+    pub(crate) ignore_invalid_notes: bool,
+}
 
 /// Helper to get the account outgoing assets.
 ///
@@ -845,6 +976,21 @@ fn get_outgoing_assets(
     let outgoing_assets = output_notes_assets.values().flat_map(|note_assets| note_assets.iter());
 
     request::collect_assets(outgoing_assets)
+}
+
+/// Validates a transaction request against the supplied `account`. Faucets are currently
+/// skipped; for non-faucets, defers to [`validate_basic_account_request`] for asset-balance
+/// checks.
+pub(super) fn validate_account_request(
+    transaction_request: &TransactionRequest,
+    account: &Account,
+) -> Result<(), ClientError> {
+    if account.is_faucet() {
+        // TODO(SantiagoPittella): Add faucet validations.
+        Ok(())
+    } else {
+        validate_basic_account_request(transaction_request, account)
+    }
 }
 
 /// Ensures a transaction request is compatible with the current account state,
@@ -958,7 +1104,7 @@ pub fn notes_from_output(output_notes: &RawOutputNotes) -> impl Iterator<Item = 
 
 /// Validates that the executed transaction's output recipients match what was expected in the
 /// transaction request.
-fn validate_executed_transaction(
+pub(crate) fn validate_executed_transaction(
     executed_transaction: &ExecutedTransaction,
     expected_output_recipients: &[NoteRecipient],
 ) -> Result<(), ClientError> {

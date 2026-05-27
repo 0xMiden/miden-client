@@ -19,10 +19,11 @@ use miden_client::auth::{
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::note::{BlockNumber, NoteId};
-use miden_client::rpc::{NodeRpcClient, RpcLimits};
+use miden_client::rpc::NodeRpcClient;
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{
     AccountStorageFilter,
+    ClientAccountType,
     InputNoteRecord,
     InputNoteState,
     NoteFilter,
@@ -50,13 +51,14 @@ use miden_client::testing::mock::{MockClient, MockRpcApi};
 use miden_client::transaction::{
     DiscardCause,
     PaymentNoteDescription,
+    PswapTransactionData,
     SwapTransactionData,
     TransactionExecutorError,
     TransactionRequestBuilder,
     TransactionRequestError,
     TransactionStatus,
 };
-use miden_client::utils::Serializable;
+use miden_client::utils::{Deserializable, Serializable};
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_protocol::account::{
@@ -80,6 +82,7 @@ use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
 use miden_protocol::note::{
     Note,
     NoteAssets,
+    NoteAttachment,
     NoteFile,
     NoteMetadata,
     NoteRecipient,
@@ -103,14 +106,21 @@ use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
 use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::faucets::BasicFungibleFaucet;
 use miden_standards::account::interface::AccountInterfaceError;
-use miden_standards::account::mint_policies::AuthControlled;
+use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
+use miden_standards::account::policies::{
+    BurnPolicyConfig,
+    MintPolicyConfig,
+    PolicyAuthority,
+    TokenPolicyManager,
+};
 use miden_standards::account::wallets::BasicWallet;
-use miden_standards::note::{NoteConsumptionStatus, P2idNoteStorage, StandardNote};
+use miden_standards::note::{NoteConsumptionStatus, P2idNoteStorage, PswapNote, StandardNote};
 use miden_standards::testing::mock_account::MockAccountExt;
 use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
+use rstest::rstest;
 
 mod batch;
 pub mod store;
@@ -323,7 +333,7 @@ async fn account_code() {
 
     let account_code_bytes = account_code.to_bytes();
 
-    let reconstructed_code = AccountCode::from_bytes(&account_code_bytes).unwrap();
+    let reconstructed_code = AccountCode::read_from_bytes(&account_code_bytes).unwrap();
     assert_eq!(*account_code, reconstructed_code);
 
     client.add_account(&account, false).await.unwrap();
@@ -439,6 +449,8 @@ async fn sync_state_mmr() {
     // verify that the latest block number has been updated
     assert_eq!(client.get_sync_height().await.unwrap(), rpc_api.get_chain_tip_block_num());
 
+    assert!(!client.test_has_cached_partial_mmr());
+
     // verify that we inserted the latest block into the DB via the client
     let latest_block = client.get_sync_height().await.unwrap();
     assert_eq!(sync_details.block_num, latest_block);
@@ -457,23 +469,115 @@ async fn sync_state_mmr() {
     let partial_mmr = client.test_store().get_current_partial_mmr().await.unwrap();
     assert!(partial_mmr.forest().num_leaves() >= 6);
     assert!(partial_mmr.open(0).unwrap().is_none());
+    // Block 1 holds the only unspent public note, so its leaf stays tracked.
     assert!(partial_mmr.open(1).unwrap().is_some());
     assert!(partial_mmr.open(2).unwrap().is_none());
     assert!(partial_mmr.open(3).unwrap().is_none());
-    assert!(partial_mmr.open(4).unwrap().is_some());
+    // Block 4's notes are all consumed externally, so pruning untracks its leaf.
+    assert!(partial_mmr.open(4).unwrap().is_none());
     assert!(partial_mmr.open(5).unwrap().is_none());
 
-    // // Ensure the proofs are valid
+    // Ensure the proof for the remaining tracked leaf is valid
     let mmr_proof = partial_mmr.open(1).unwrap().unwrap();
     let (block_1, _) = rpc_api.get_block_header_by_number(Some(1.into()), false).await.unwrap();
     partial_mmr.peaks().verify(block_1.commitment(), mmr_proof).unwrap();
 
-    let mmr_proof = partial_mmr.open(4).unwrap().unwrap();
-    let (block_4, _) = rpc_api.get_block_header_by_number(Some(4.into()), false).await.unwrap();
-    partial_mmr.peaks().verify(block_4.commitment(), mmr_proof).unwrap();
+    // Only block 1 remains tracked after pruning; block 4 was untracked because all its
+    // notes are already consumed externally.
+    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 1);
+}
 
-    // the blocks for both notes should be stored as they are relevant for the client's accounts
-    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 2);
+#[tokio::test]
+async fn sync_state_mmr_with_in_memory_cache() {
+    let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
+    let mut client = builder.cache_partial_mmr_in_memory(true).build().await.unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
+
+    // First sync populates the cache.
+    client.sync_state().await.unwrap();
+    assert!(client.test_has_cached_partial_mmr());
+
+    // Advance the chain and sync again to mutate the cached MMR.
+    rpc_api.advance_blocks(2);
+    client.sync_state().await.unwrap();
+
+    // Cache must agree with the store.
+    let cached = client.get_current_partial_mmr().await.unwrap();
+    let stored = client.test_store().get_current_partial_mmr().await.unwrap();
+    assert_eq!(cached.peaks(), stored.peaks());
+    assert_eq!(cached.forest(), stored.forest());
+}
+
+/// Verifies the `get_current_partial_mmr` rebuild path: when the cache fingerprint diverges
+/// from the store (here, by untracking a block directly via the store and bypassing
+/// `cache_partial_mmr`), the next read must detect the divergence and return the rebuilt
+/// store-backed MMR rather than the stale cache.
+#[tokio::test]
+async fn stale_cached_partial_mmr_is_rebuilt_from_store() {
+    let (builder, rpc_api, keystore) = Box::pin(create_test_client_builder()).await;
+    let mut client = builder.cache_partial_mmr_in_memory(true).build().await.unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+    insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
+        .await
+        .unwrap();
+
+    // Import the mock chain's public notes so a block becomes tracked after sync.
+    let notes: Vec<Note> = rpc_api
+        .get_public_available_notes()
+        .into_iter()
+        .filter_map(|n| n.note().cloned())
+        .collect();
+    for note in &notes {
+        client
+            .import_notes(&[NoteFile::NoteDetails {
+                details: note.clone().into(),
+                after_block_num: 0.into(),
+                tag: Some(note.metadata().tag()),
+            }])
+            .await
+            .unwrap();
+    }
+    client.sync_state().await.unwrap();
+    assert!(client.test_has_cached_partial_mmr());
+
+    // Pick any tracked block. The mock chain has an unspent public note in block 1,
+    // so the tracked set is non-empty after the sync above.
+    let tracked: Vec<usize> = client
+        .test_store()
+        .get_tracked_block_header_numbers()
+        .await
+        .unwrap()
+        .into_iter()
+        .collect();
+    let to_untrack = BlockNumber::from(u32::try_from(tracked[0]).unwrap());
+
+    // Confirm the cache currently sees the leaf as tracked.
+    let cached_before = client.get_current_partial_mmr().await.unwrap();
+    assert!(cached_before.open(to_untrack.as_usize()).unwrap().is_some());
+
+    // Mutate the store directly to untrack the block. This bypasses `cache_partial_mmr`,
+    // so the cached fingerprint stays stale.
+    client
+        .test_store()
+        .untrack_and_prune_irrelevant_blocks(&[to_untrack], &[])
+        .await
+        .unwrap();
+
+    // The freshness check must detect the tracked-set divergence and rebuild from the
+    // store. A blind cache hit would still report the leaf as tracked.
+    let after = client.get_current_partial_mmr().await.unwrap();
+    let stored = client.test_store().get_current_partial_mmr().await.unwrap();
+
+    assert_eq!(after.peaks(), stored.peaks());
+    assert_eq!(after.forest(), stored.forest());
+    assert!(
+        after.open(to_untrack.as_usize()).unwrap().is_none(),
+        "stale cache returned: rebuild path did not fire",
+    );
 }
 
 /// Tests that MMR authentication nodes are persisted even when `include_block` is false
@@ -517,8 +621,7 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
     partial_mmr.add(genesis.commitment(), true); // track genesis
 
     // Create a StateSync that discards all notes so intermediate blocks are skipped
-    let state_sync =
-        StateSync::new(Arc::new(rpc_api.clone()), None, Arc::new(DiscardAllNotes), None);
+    let state_sync = StateSync::new(Arc::new(rpc_api.clone()), Arc::new(DiscardAllNotes), None);
 
     // Use the note tag from the prebuilt chain (tag 0) so the mock RPC returns
     // blocks step-by-step (block 1, then block 4, then the chain tip) instead of
@@ -543,18 +646,22 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
     // Blocks 1 and 4 had matching note tags but the screener discarded them,
     // so `include_block` was false for those steps.
     assert_eq!(
-        state_sync_update.block_updates.block_headers().count(),
+        state_sync_update.partial_blockchain_updates.block_headers().count(),
         1,
         "expected only the chain tip block header to be stored"
     );
-    let (tip_header, ..) = state_sync_update.block_updates.block_headers().next().unwrap();
+    let (tip_header, ..) =
+        state_sync_update.partial_blockchain_updates.block_headers().next().unwrap();
     assert_eq!(tip_header.block_num(), rpc_api.get_chain_tip_block_num());
 
     // Authentication nodes must be non-empty: they include nodes produced by applying
     // the MMR delta and adding the chain tip leaf. These nodes are needed for the
     // tracked genesis leaf's Merkle proof path, which changes as the tree grows.
     assert!(
-        !state_sync_update.block_updates.new_authentication_nodes().is_empty(),
+        !state_sync_update
+            .partial_blockchain_updates
+            .new_authentication_nodes()
+            .is_empty(),
         "expected authentication nodes from intermediate (skipped) blocks to be persisted"
     );
 }
@@ -566,7 +673,13 @@ async fn sync_state_no_redundant_get_account_calls() {
     use miden_client::async_trait;
     use miden_client::rpc::domain::note::CommittedNote;
     use miden_client::store::InputNoteRecord;
-    use miden_client::sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
+    use miden_client::sync::{
+        AccountSyncHint,
+        NoteUpdateAction,
+        OnNoteReceived,
+        StateSync,
+        StateSyncInput,
+    };
     use miden_protocol::crypto::merkle::mmr::{Forest, MmrPeaks, PartialMmr};
 
     struct DiscardAllNotes;
@@ -608,14 +721,13 @@ async fn sync_state_no_redundant_get_account_calls() {
     let mut partial_mmr = PartialMmr::from_peaks(MmrPeaks::new(Forest::empty(), vec![]).unwrap());
     partial_mmr.add(genesis.commitment(), true);
 
-    let state_sync =
-        StateSync::new(Arc::new(rpc_api.clone()), None, Arc::new(DiscardAllNotes), None);
+    let state_sync = StateSync::new(Arc::new(rpc_api.clone()), Arc::new(DiscardAllNotes), None);
 
     // Use tag 0 to force multiple sync steps (notes exist in blocks 1 and 4)
     let note_tags = BTreeSet::from([NoteTag::new(0)]);
 
     let input = StateSyncInput {
-        accounts: vec![account_header],
+        accounts: vec![AccountSyncHint::from_header(account_header)],
         note_tags,
         input_notes: vec![],
         output_notes: vec![],
@@ -658,7 +770,9 @@ async fn sync_state_tags() {
 
     // as we are syncing with tags, the response should contain blocks for both notes
     assert_eq!(client.get_input_notes(NoteFilter::All).await.unwrap().len(), 2);
-    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 2);
+    // Only the public note is unspent; the private note is consumed externally, so its
+    // block is pruned immediately after sync.
+    assert_eq!(client.test_store().get_tracked_block_headers().await.unwrap().len(), 1);
 }
 
 #[tokio::test]
@@ -1290,6 +1404,154 @@ async fn input_note_reader_finds_externally_consumed_notes() {
     );
     assert_eq!(collected[0].id(), p2id_note_id);
     assert_eq!(collected[0].consumer_account(), Some(consumer_id));
+}
+
+/// Builds a chain with two blocks relevant to a tracked account (blocks 1 and 4) and a client
+/// synced up to block 4 with `prune_interval` configured. Returns the consuming pieces needed to
+/// make block 4 irrelevant on demand.
+async fn setup_prunable_block_scenario(
+    prune_interval: Option<u32>,
+) -> (MockClient<FilesystemKeyStore>, MockRpcApi, AccountId, Note) {
+    let mut builder = MockChainBuilder::new();
+    let mock_account = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
+
+    let note_first =
+        NoteBuilder::new(mock_account.id(), RandomCoin::new([0, 0, 0, 0].map(Felt::new).into()))
+            .note_type(NoteType::Public)
+            .tag(NoteTag::new(0).into())
+            .build()
+            .unwrap();
+    let note_second =
+        NoteBuilder::new(mock_account.id(), RandomCoin::new([0, 0, 0, 1].map(Felt::new).into()))
+            .note_type(NoteType::Public)
+            .tag(NoteTag::new(0).into())
+            .build()
+            .unwrap();
+
+    let spawn_note_1 = builder.add_spawn_note(std::slice::from_ref(&note_first)).unwrap();
+    let spawn_note_2 = builder.add_spawn_note(std::slice::from_ref(&note_second)).unwrap();
+
+    let mut chain = builder.build().unwrap();
+
+    // Block 1: create the first unspent note (keeps block 1 permanently relevant).
+    let tx = Box::pin(
+        chain
+            .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note_1])
+            .unwrap()
+            .extend_expected_output_notes(vec![RawOutputNote::Full(note_first)])
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    chain.add_pending_executed_transaction(&tx).unwrap();
+    chain.prove_next_block().unwrap();
+
+    // Blocks 2 and 3: advance the chain without changing tracked notes.
+    chain.prove_next_block().unwrap();
+    chain.prove_next_block().unwrap();
+
+    // Block 4: create the second note, which the caller will later consume to make block 4
+    // irrelevant.
+    let tx = Box::pin(
+        chain
+            .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note_2])
+            .unwrap()
+            .extend_expected_output_notes(vec![RawOutputNote::Full(note_second.clone())])
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    chain.add_pending_executed_transaction(&tx).unwrap();
+    chain.prove_next_block().unwrap();
+
+    let rng = RandomCoin::new(rand::random::<[u64; 4]>().map(Felt::new).into());
+    let keystore = FilesystemKeyStore::new(std::env::temp_dir()).unwrap();
+    let mock_rpc = MockRpcApi::new(chain);
+
+    let mut client = ClientBuilder::new()
+        .rpc(Arc::new(mock_rpc.clone()))
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_discard_delta(None)
+        .irrelevant_block_prune_interval(prune_interval)
+        .build()
+        .await
+        .unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+    client.add_note_tag(NoteTag::new(0)).await.unwrap();
+
+    client.sync_state().await.unwrap();
+    assert_eq!(
+        client.test_store().get_tracked_block_headers().await.unwrap().len(),
+        2,
+        "setup precondition: two relevant blocks tracked",
+    );
+
+    (client, mock_rpc, mock_account.id(), note_second)
+}
+
+/// Consumes `note` against `account_id` on the mocked chain and proves the resulting block, so the
+/// block that originally carried the note becomes irrelevant from the client's perspective.
+async fn consume_note_and_prove(mock_rpc: &MockRpcApi, account_id: AccountId, note: Note) {
+    let tx = {
+        let tx_context = mock_rpc
+            .mock_chain
+            .write()
+            .build_tx_context(TxContextInput::AccountId(account_id), &[], &[note])
+            .unwrap()
+            .build()
+            .unwrap();
+        Box::pin(tx_context.execute()).await.unwrap()
+    };
+    mock_rpc.mock_chain.write().add_pending_executed_transaction(&tx).unwrap();
+    mock_rpc.prove_block();
+}
+
+#[tokio::test]
+async fn irrelevant_block_pruning_respects_sync_interval() {
+    let (mut client, mock_rpc, account_id, note_second) =
+        setup_prunable_block_scenario(Some(2)).await;
+
+    consume_note_and_prove(&mock_rpc, account_id, note_second).await;
+
+    client.sync_state().await.unwrap();
+    assert_eq!(
+        client.test_store().get_tracked_block_headers().await.unwrap().len(),
+        2,
+        "pruning should be deferred until the configured sync interval elapses",
+    );
+
+    mock_rpc.prove_block();
+    client.sync_state().await.unwrap();
+    assert_eq!(
+        client.test_store().get_tracked_block_headers().await.unwrap().len(),
+        1,
+        "the irrelevant block should be pruned once the sync interval is reached",
+    );
+}
+
+#[tokio::test]
+async fn irrelevant_block_pruning_disabled_when_interval_is_none() {
+    let (mut client, mock_rpc, account_id, note_second) = setup_prunable_block_scenario(None).await;
+
+    consume_note_and_prove(&mock_rpc, account_id, note_second).await;
+
+    // With pruning disabled, both tracked blocks must remain across repeated syncs.
+    for _ in 0..5 {
+        mock_rpc.prove_block();
+        client.sync_state().await.unwrap();
+        assert_eq!(
+            client.test_store().get_tracked_block_headers().await.unwrap().len(),
+            2,
+            "no pruning should occur when the prune interval is None",
+        );
+    }
 }
 
 #[tokio::test]
@@ -2163,7 +2425,7 @@ async fn missing_recipient_digest() {
         .unwrap_err();
 
     if let ClientError::MissingOutputRecipients(digests) = error {
-        assert!(digests == vec![dummy_recipient_digest]);
+        assert_eq!(digests, vec![dummy_recipient_digest]);
     }
 }
 
@@ -2447,6 +2709,226 @@ async fn partial_output_note_receives_inclusion_proof_after_sync() {
     );
 }
 
+// Verifies that Alice can create a PSWAP note offering ETH for USD, and Bob can fill it. With
+// a full fill (`account_fill_amount == requested_amount`) no remainder is produced; with a
+// partial fill, Bob receives a proportional payout and a remainder PSWAP note is produced
+// carrying the unfilled amounts.
+#[rstest]
+#[case::full_fill(100, 50, 50, 100, None)]
+#[case::partial_fill(100, 50, 25, 50, Some((50, 25)))]
+#[tokio::test]
+async fn pswap_fill_test(
+    #[case] offered_amount: u64,
+    #[case] requested_amount: u64,
+    #[case] account_fill_amount: u64,
+    #[case] expected_payout: u64,
+    #[case] expected_remainder: Option<(u64, u64)>,
+) {
+    let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
+
+    // Setup Alice's wallet and the ETH faucet (offered asset).
+    let (alice_wallet, eth_faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    // Setup Bob's wallet and the USD faucet (requested asset).
+    let (bob_wallet, usd_faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    mint_and_consume(&mut client, alice_wallet.id(), eth_faucet.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    mint_and_consume(&mut client, bob_wallet.id(), usd_faucet.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Step 1: Alice creates a PSWAP note offering ETH for USD.
+    let pswap_data = PswapTransactionData::new(
+        alice_wallet.id(),
+        FungibleAsset::new(eth_faucet.id(), offered_amount).unwrap(),
+        FungibleAsset::new(usd_faucet.id(), requested_amount).unwrap(),
+    );
+
+    let create_request = TransactionRequestBuilder::new()
+        .build_pswap_create(
+            &pswap_data,
+            NoteType::Private,
+            NoteType::Private,
+            NoteAttachment::default(),
+            client.rng(),
+        )
+        .unwrap();
+
+    let pswap_note = create_request.expected_output_own_notes()[0].clone();
+    Box::pin(client.submit_new_transaction(alice_wallet.id(), create_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Alice's ETH balance should decrease by the full offered amount regardless of fill.
+    let alice_account = client.get_account(alice_wallet.id()).await.unwrap().unwrap();
+    assert_eq!(
+        alice_account.vault().get_balance(eth_faucet.id()).unwrap(),
+        MINT_AMOUNT - offered_amount,
+        "Alice's ETH balance should decrease by the offered amount"
+    );
+
+    // Step 2: Bob fills the PSWAP note.
+    let consume_request = TransactionRequestBuilder::new()
+        .build_pswap_consume(&pswap_note, bob_wallet.id(), account_fill_amount, 0)
+        .unwrap();
+
+    Box::pin(client.submit_new_transaction(bob_wallet.id(), consume_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    let bob_account = client.get_account(bob_wallet.id()).await.unwrap().unwrap();
+
+    // Bob spent exactly the fill amount — proves NOTE_ARGS were honored (a wrong layout would
+    // fall back to the script's full-fill default path).
+    assert_eq!(
+        bob_account.vault().get_balance(usd_faucet.id()).unwrap(),
+        MINT_AMOUNT - account_fill_amount,
+        "Bob's USD balance should decrease by exactly the fill amount"
+    );
+
+    // Bob received the proportional payout.
+    assert_eq!(
+        bob_account.vault().get_balance(eth_faucet.id()).unwrap(),
+        expected_payout,
+        "Bob should have received the expected ETH payout"
+    );
+
+    // The remainder note is produced only on partial fills.
+    let all_notes = client.get_input_notes(NoteFilter::All).await.unwrap();
+    let remainder = all_notes.iter().find_map(|record| {
+        let note: Note = record.try_into().ok()?;
+        if note.id() == pswap_note.id() {
+            return None;
+        }
+        PswapNote::try_from(&note).ok()
+    });
+
+    match expected_remainder {
+        Some((rem_offered, rem_requested)) => {
+            let remainder =
+                remainder.expect("remainder PSWAP note should exist after partial fill");
+            assert_eq!(
+                remainder.offered_asset().amount(),
+                rem_offered,
+                "remainder offered amount should reflect the unfilled portion"
+            );
+            assert_eq!(
+                remainder.storage().requested_asset_amount(),
+                rem_requested,
+                "remainder requested amount should reflect the unfilled portion"
+            );
+        },
+        None => {
+            assert!(remainder.is_none(), "no remainder PSWAP note should exist after a full fill");
+        },
+    }
+}
+
+#[tokio::test]
+async fn pswap_cancel_test() {
+    // This test verifies that:
+    // 1. Alice creates a PSWAP note (balance decreases).
+    // 2. Alice cancels the PSWAP note (balance restored).
+
+    let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
+
+    let (alice_wallet, eth_faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    let (_bob_wallet, usd_faucet) = setup_wallet_and_faucet(
+        &mut client,
+        AccountStorageMode::Private,
+        &keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    mint_and_consume(&mut client, alice_wallet.id(), eth_faucet.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Step 1: Alice creates a PSWAP note offering ETH for USD.
+    let offered_amount = 100u64;
+    let requested_amount = 50u64;
+    let pswap_data = PswapTransactionData::new(
+        alice_wallet.id(),
+        FungibleAsset::new(eth_faucet.id(), offered_amount).unwrap(),
+        FungibleAsset::new(usd_faucet.id(), requested_amount).unwrap(),
+    );
+
+    let create_request = TransactionRequestBuilder::new()
+        .build_pswap_create(
+            &pswap_data,
+            NoteType::Private,
+            NoteType::Private,
+            NoteAttachment::default(),
+            client.rng(),
+        )
+        .unwrap();
+
+    let pswap_note = create_request.expected_output_own_notes()[0].clone();
+    Box::pin(client.submit_new_transaction(alice_wallet.id(), create_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Alice's balance decreased after creating the PSWAP note.
+    let alice_account = client.get_account(alice_wallet.id()).await.unwrap().unwrap();
+    assert_eq!(
+        alice_account.vault().get_balance(eth_faucet.id()).unwrap(),
+        MINT_AMOUNT - offered_amount,
+        "Alice's ETH balance should decrease by the offered amount"
+    );
+
+    // Step 2: Alice cancels the PSWAP note.
+    let cancel_request = TransactionRequestBuilder::new()
+        .build_pswap_cancel(pswap_note, alice_wallet.id())
+        .unwrap();
+
+    Box::pin(client.submit_new_transaction(alice_wallet.id(), cancel_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Verify Alice's balance is restored after canceling the PSWAP note.
+    let alice_account = client.get_account(alice_wallet.id()).await.unwrap().unwrap();
+    assert_eq!(
+        alice_account.vault().get_balance(eth_faucet.id()).unwrap(),
+        MINT_AMOUNT,
+        "Alice's ETH balance should be fully restored after canceling the PSWAP note"
+    );
+}
+
 #[tokio::test]
 async fn empty_storage_map() {
     let (mut client, _, keystore) = create_test_client().await;
@@ -2601,11 +3083,7 @@ async fn storage_and_vault_proofs() {
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
 
-    client
-        .test_store()
-        .insert_account(&account, Address::new(account.id()))
-        .await
-        .unwrap();
+    client.add_account(&account, false).await.unwrap();
 
     let account_id = account.id();
 
@@ -2734,33 +3212,89 @@ async fn account_add_address_after_creation() {
 
     client.add_account(&account, false).await.unwrap();
 
-    let unspecified_default_address = Address::new(account.id());
+    let default_address = Address::new(account.id());
 
-    // The default unspecified address cannot be added
-    // as it is already present after account creation
-    assert!(client.add_address(unspecified_default_address, account.id()).await.is_err());
+    // The address cannot be added again as it is already present after account creation
+    assert!(client.add_address(default_address.clone(), account.id()).await.is_err());
 
-    // The basic wallet address cannot be added
-    // as it is already present after account creation
+    // An address with different routing parameters can be added
     let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
     let basic_wallet_address = Address::new(account.id()).with_routing_parameters(routing_params);
-    assert!(client.add_address(basic_wallet_address.clone(), account.id()).await.is_err());
+    assert!(client.add_address(basic_wallet_address.clone(), account.id()).await.is_ok());
 
-    // We can remove the basic wallet address
-    assert!(client.remove_address(basic_wallet_address.clone(), account.id()).await.is_ok());
-
-    // Derived note tag should also be removed
-    let derived_note_tag = basic_wallet_address.to_note_tag();
+    // We can remove the default address and the note tag is still present
+    assert!(client.remove_address(default_address.clone(), account.id()).await.is_ok());
+    let derived_note_tag = default_address.to_note_tag();
     let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account.id());
+    let note_tags = client.get_note_tags().await.unwrap();
+    assert!(note_tags.contains(&note_tag_record));
+
+    // If we remove all addresses, note tag should be removed
+    assert!(client.remove_address(basic_wallet_address.clone(), account.id()).await.is_ok());
     let note_tags = client.get_note_tags().await.unwrap();
     assert!(!note_tags.contains(&note_tag_record));
 
     // Then add it again
-    assert!(client.add_address(basic_wallet_address, account.id()).await.is_ok());
+    assert!(client.add_address(default_address, account.id()).await.is_ok());
 
     // Derived note tag should now be available
     let note_tags = client.get_note_tags().await.unwrap();
     assert!(note_tags.contains(&note_tag_record));
+}
+
+#[tokio::test]
+async fn import_watched_account_by_id_rejects_already_tracked_native_account() {
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let account = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+    let account_id = account.id();
+    let rpc_api = MockRpcApi::new(mock_chain_builder.build().unwrap());
+    let arc_rpc_api = Arc::new(rpc_api);
+    let mut rng = rand::rng();
+    let coin_seed: [u64; 4] = rng.random();
+    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
+    let keystore = FilesystemKeyStore::new(temp_dir()).unwrap();
+    let mut client = ClientBuilder::new()
+        .rpc(arc_rpc_api)
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .in_debug_mode(DebugMode::Enabled)
+        .build()
+        .await
+        .unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    client.add_account(&account, false).await.unwrap();
+
+    let default_note_tag_record =
+        NoteTagRecord::with_account_source(Address::new(account_id).to_note_tag(), account_id);
+    let routing_params = RoutingParameters::new(AddressInterface::BasicWallet)
+        .with_note_tag_len(NoteTag::MAX_ACCOUNT_TARGET_TAG_LENGTH)
+        .unwrap();
+    let extra_address = Address::new(account_id).with_routing_parameters(routing_params);
+    let extra_address_note_tag_record =
+        NoteTagRecord::with_account_source(extra_address.to_note_tag(), account_id);
+
+    client.add_address(extra_address, account_id).await.unwrap();
+
+    let note_tags = client.get_note_tags().await.unwrap();
+    assert!(note_tags.contains(&default_note_tag_record));
+    assert!(note_tags.contains(&extra_address_note_tag_record));
+
+    let err = client
+        .import_watched_account_by_id(account_id)
+        .await
+        .expect_err("watched import must reject already-tracked native account");
+    assert!(matches!(err, ClientError::AccountWatchedMismatch(id) if id == account_id));
+
+    // Native tags must still be there and the account must still be native.
+    let note_tags = client.get_note_tags().await.unwrap();
+    assert!(note_tags.contains(&default_note_tag_record));
+    assert!(note_tags.contains(&extra_address_note_tag_record));
+    let account_record = client.test_store().get_account(account_id).await.unwrap().unwrap();
+    assert!(!account_record.is_watched());
 }
 
 #[tokio::test]
@@ -2785,7 +3319,8 @@ async fn consume_note_with_custom_script() {
     client.sync_state().await.unwrap();
 
     let custom_note_script = "
-        begin
+        @note_script
+        pub proc main
             nop
         end
     ";
@@ -2800,7 +3335,7 @@ async fn consume_note_with_custom_script() {
     let custom_note = Note::new(note_assets, note_metadata, note_recipient);
 
     // At this point, the note script should no be stored locally
-    assert!(client.test_store().get_note_script(note_script.root()).await.is_err());
+    assert!(client.test_store().get_note_script(note_script.root().into()).await.is_err());
 
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![custom_note.clone()])
@@ -2811,7 +3346,8 @@ async fn consume_note_with_custom_script() {
     client.sync_state().await.unwrap();
 
     // At this point, the note script should be stored locally
-    let stored_script = client.test_store().get_note_script(note_script.root()).await.unwrap();
+    let stored_script =
+        client.test_store().get_note_script(note_script.root().into()).await.unwrap();
     assert_eq!(stored_script.root().to_hex(), note_script.root().to_hex());
 
     // Consume note
@@ -2826,62 +3362,6 @@ async fn consume_note_with_custom_script() {
 
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
-}
-
-#[tokio::test]
-async fn add_note_tag_fails_if_note_tag_limit_is_exceeded() {
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
-    let note_tags_limit = RpcLimits::default().note_tags_limit;
-
-    // add note tags until the limit is exceeded
-    for i in 0..note_tags_limit {
-        client.add_note_tag(NoteTag::from(i)).await.unwrap();
-    }
-
-    // try to add a note tag
-    let tag = NoteTag::from(note_tags_limit);
-    let result = client.add_note_tag(tag).await;
-
-    assert!(matches!(result, Err(ClientError::NoteTagsLimitExceeded(_))));
-}
-
-#[tokio::test]
-async fn add_account_fails_if_accounts_limit_is_exceeded() {
-    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
-
-    // add accounts until the limit is exceeded
-    for i in 0..RpcLimits::default().account_ids_limit {
-        // first 7 bits are used for metadata so we shift by 8 bits to get distinct ids
-        client
-            .add_account(
-                &Account::mock(
-                    (i << 8).into(),
-                    AuthSingleSig::new(
-                        PublicKeyCommitment::from(EMPTY_WORD),
-                        AuthSchemeId::Falcon512Poseidon2,
-                    ),
-                ),
-                false,
-            )
-            .await
-            .unwrap();
-    }
-
-    // try to add an account
-    let result = client
-        .add_account(
-            &Account::mock(
-                (RpcLimits::default().account_ids_limit << 8).into(),
-                AuthSingleSig::new(
-                    PublicKeyCommitment::from(EMPTY_WORD),
-                    AuthSchemeId::Falcon512Poseidon2,
-                ),
-            ),
-            false,
-        )
-        .await;
-
-    assert!(matches!(result, Err(ClientError::AccountsLimitExceeded(_))));
 }
 
 // PAGINATION TESTS
@@ -3139,6 +3619,49 @@ async fn sync_large_public_account() {
     );
 }
 
+#[tokio::test]
+async fn prepare_offline_bootstrap_inserts_mock_chain_genesis() {
+    use miden_protocol::block::account_tree::AccountTree;
+    use miden_protocol::crypto::merkle::smt::Smt;
+    use miden_protocol::transaction::TransactionKernel;
+
+    let mut rng_seed = rand::rng();
+    let coin_seed: [u64; 4] = rng_seed.random();
+    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
+
+    let reference_rpc = MockRpcApi::default();
+    let (expected_genesis, _) = reference_rpc
+        .get_block_header_by_number(Some(BlockNumber::GENESIS), false)
+        .await
+        .unwrap();
+
+    let keystore_path = temp_dir();
+    let keystore = FilesystemKeyStore::new(keystore_path).unwrap();
+
+    let mut client = ClientBuilder::new()
+        .rpc(Arc::new(MockRpcApi::default()))
+        .sqlite_store(create_test_store_path())
+        .rng(Box::new(rng))
+        .authenticator(Arc::new(keystore))
+        .build()
+        .await
+        .unwrap();
+
+    client.prepare_offline_bootstrap().await.unwrap();
+
+    let (stored_genesis, _) = client
+        .get_block_header_by_num(BlockNumber::GENESIS)
+        .await
+        .unwrap()
+        .expect("genesis should be stored after offline bootstrap");
+
+    assert_eq!(stored_genesis.block_num(), BlockNumber::GENESIS);
+    assert_eq!(stored_genesis.account_root(), expected_genesis.account_root());
+    assert_eq!(stored_genesis.tx_kernel_commitment(), expected_genesis.tx_kernel_commitment());
+    assert_eq!(stored_genesis.account_root(), AccountTree::<Smt>::default().root());
+    assert_eq!(stored_genesis.tx_kernel_commitment(), TransactionKernel.to_commitment());
+}
+
 // HELPERS
 // ================================================================================================
 
@@ -3327,7 +3850,10 @@ async fn insert_new_fungible_faucet(
     client.rng().fill_bytes(&mut init_seed);
 
     let symbol = TokenSymbol::new("TEST").unwrap();
-    let max_supply = Felt::new(9_999_999_u64);
+    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
+    let max_supply = 9_999_999_u64;
+    let token_metadata =
+        FungibleTokenMetadata::builder(name, symbol, 10, max_supply).build().unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
@@ -3336,8 +3862,13 @@ async fn insert_new_fungible_faucet(
             pub_key.to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
         ))
-        .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
-        .with_component(AuthControlled::allow_all())
+        .with_component(token_metadata)
+        .with_component(BasicFungibleFaucet)
+        .with_components(TokenPolicyManager::new(
+            PolicyAuthority::AuthControlled,
+            MintPolicyConfig::AllowAll,
+            BurnPolicyConfig::AllowAll,
+        ))
         .build_with_schema_commitment()
         .unwrap();
 
@@ -3363,7 +3894,10 @@ async fn insert_new_ecdsa_fungible_faucet(
     client.rng().fill_bytes(&mut init_seed);
 
     let symbol = TokenSymbol::new("TEST").unwrap();
-    let max_supply = Felt::new(9_999_999_u64);
+    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
+    let max_supply = 9_999_999_u64;
+    let token_metadata =
+        FungibleTokenMetadata::builder(name, symbol, 10, max_supply).build().unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
@@ -3372,8 +3906,13 @@ async fn insert_new_ecdsa_fungible_faucet(
             pub_key.to_commitment(),
             AuthSchemeId::EcdsaK256Keccak,
         ))
-        .with_component(BasicFungibleFaucet::new(symbol, 10, max_supply).unwrap())
-        .with_component(AuthControlled::allow_all())
+        .with_component(token_metadata)
+        .with_component(BasicFungibleFaucet)
+        .with_components(TokenPolicyManager::new(
+            PolicyAuthority::AuthControlled,
+            MintPolicyConfig::AllowAll,
+            BurnPolicyConfig::AllowAll,
+        ))
         .build_with_schema_commitment()
         .unwrap();
 
@@ -3525,5 +4064,64 @@ async fn storage_and_vault_proofs_ecdsa() {
 
         assert_eq!(value, map.get(&StorageMapKey::new(MAP_KEY.into())));
         assert_eq!(proof, map.open(&StorageMapKey::new(MAP_KEY.into())));
+    }
+}
+
+#[tokio::test]
+async fn execute_transaction_fails_for_watched_account() {
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+    // Build a faucet locally and insert it directly as watched via the store. Bypasses the
+    // public `add_account`/`import_watched_account_by_id` paths so we don't need a mock RPC
+    // round-trip.
+    let key_pair = AuthSecretKey::new_falcon512_poseidon2();
+    let auth_component =
+        AuthSingleSig::new(key_pair.public_key().to_commitment(), AuthSchemeId::Falcon512Poseidon2);
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let symbol = TokenSymbol::new("WTCH").unwrap();
+    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
+    let max_supply = 9_999_999_u64;
+    let token_metadata =
+        FungibleTokenMetadata::builder(name, symbol, 10, max_supply).build().unwrap();
+    let faucet = AccountBuilder::new(init_seed)
+        .account_type(AccountType::FungibleFaucet)
+        .storage_mode(AccountStorageMode::Public)
+        .with_auth_component(auth_component)
+        .with_component(token_metadata)
+        .with_component(BasicFungibleFaucet)
+        .with_components(TokenPolicyManager::new(
+            PolicyAuthority::AuthControlled,
+            MintPolicyConfig::AllowAll,
+            BurnPolicyConfig::AllowAll,
+        ))
+        .build_with_schema_commitment()
+        .unwrap();
+    let faucet_id = faucet.id();
+    let address = Address::new(faucet_id);
+
+    client
+        .test_store()
+        .insert_account(&faucet, address, ClientAccountType::Watched)
+        .await
+        .expect("watched account should insert via the store");
+
+    let target_account_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(
+            FungibleAsset::new(faucet_id, 1u64).unwrap(),
+            target_account_id,
+            miden_protocol::note::NoteType::Private,
+            client.rng(),
+        )
+        .unwrap();
+
+    let result = Box::pin(client.execute_transaction(faucet_id, tx_request)).await;
+
+    match result {
+        Err(ClientError::AccountIsWatched(id)) => assert_eq!(id, faucet_id),
+        other => panic!("expected AccountIsWatched, got {other:?}"),
     }
 }

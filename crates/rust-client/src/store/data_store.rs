@@ -15,9 +15,9 @@ use miden_protocol::account::{
 };
 use miden_protocol::asset::{AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::crypto::merkle::mmr::{InOrderIndex, PartialMmr};
+use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks, PartialMmr};
 use miden_protocol::crypto::merkle::{MerkleError, MerklePath};
-use miden_protocol::note::NoteScript;
+use miden_protocol::note::{NoteScript, NoteScriptRoot};
 use miden_protocol::transaction::{AccountInputs, PartialBlockchain};
 use miden_protocol::vm::FutureMaybeSend;
 use miden_protocol::{MastForest, Word, ZERO};
@@ -235,6 +235,8 @@ impl DataStore for ClientDataStore {
         account_id: AccountId,
         mut block_refs: BTreeSet<BlockNumber>,
     ) -> Result<(PartialAccount, BlockHeader, PartialBlockchain), DataStoreError> {
+        let current_peaks = self.store.get_current_blockchain_peaks().await?;
+
         // Pop last block, used as reference (it does not need to be authenticated manually)
         let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("block set is empty"))?;
 
@@ -282,8 +284,11 @@ impl DataStore for ClientDataStore {
             .map(|(header, _has_notes)| header)
             .collect();
 
+        // TODO: the client stores only the peaks of the MMR at the current sync height, so we are
+        // not actually following the block_ref here. If the block_ref != current_sync_height, this
+        // would return an invalid partial blockchain.
         let partial_mmr =
-            build_partial_mmr_with_paths(&self.store, ref_block.as_u32(), &block_headers).await?;
+            build_partial_mmr_with_paths(&self.store, current_peaks, &block_headers).await?;
 
         let partial_blockchain =
             PartialBlockchain::new(partial_mmr, block_headers).map_err(|err| {
@@ -406,14 +411,14 @@ impl DataStore for ClientDataStore {
     /// fetching it from the RPC if not available locally.
     fn get_note_script(
         &self,
-        script_root: Word,
+        script_root: NoteScriptRoot,
     ) -> impl FutureMaybeSend<Result<Option<NoteScript>, DataStoreError>> {
         let store = self.store.clone();
         let rpc_api = self.rpc_api.clone();
 
         async move {
             // Fast path: check the local store first.
-            match store.get_note_script(script_root).await {
+            match store.get_note_script(script_root.into()).await {
                 Ok(note_script) => return Ok(Some(note_script)),
                 Err(StoreError::NoteScriptNotFound(_)) => {},
                 Err(err) => {
@@ -426,7 +431,7 @@ impl DataStore for ClientDataStore {
 
             // Store miss, fetch from the network via RPC.
             let note_script: NoteScript =
-                rpc_api.get_note_script_by_root(script_root).await.map_err(|err| {
+                rpc_api.get_note_script_by_root(script_root.into()).await.map_err(|err| {
                     DataStoreError::other_with_source("failed to fetch note script via RPC", err)
                 })?;
 
@@ -455,23 +460,17 @@ impl MastForestStore for ClientDataStore {
 // HELPER FUNCTIONS
 // ================================================================================================
 
-/// Builds a [`PartialMmr`] with a specified forest number and a list of blocks that should be
-/// authenticated.
+/// Builds a [`PartialMmr`] from the given peaks and a list of blocks that should be
+/// authenticated against them.
 ///
-/// `authenticated_blocks` cannot contain `forest`. For authenticating the last block we have,
-/// the kernel extends the MMR which is why it's not needed here.
-async fn build_partial_mmr_with_paths(
+/// `authenticated_blocks` must not contain the block whose forest matches `peaks`. For that
+/// block the kernel extends the MMR itself, so an authentication path is not needed.
+pub(crate) async fn build_partial_mmr_with_paths(
     store: &alloc::sync::Arc<dyn Store>,
-    forest: u32,
+    peaks: MmrPeaks,
     authenticated_blocks: &[BlockHeader],
 ) -> Result<PartialMmr, DataStoreError> {
-    let mut partial_mmr: PartialMmr = {
-        let current_peaks = store
-            .get_partial_blockchain_peaks_by_block_num(BlockNumber::from(forest))
-            .await?;
-
-        PartialMmr::from_peaks(current_peaks)
-    };
+    let mut partial_mmr: PartialMmr = PartialMmr::from_peaks(peaks);
 
     let block_nums: Vec<BlockNumber> =
         authenticated_blocks.iter().map(BlockHeader::block_num).collect();

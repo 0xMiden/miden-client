@@ -14,7 +14,7 @@ use miden_client::account::{
     StorageSlotType,
 };
 use miden_client::asset::Asset;
-use miden_client::store::{AccountStatus, AccountStorageFilter, StoreError};
+use miden_client::store::{AccountStatus, AccountStorageFilter, ClientAccountType, StoreError};
 use miden_client::{Deserializable, Word};
 use rusqlite::{Connection, Params, params, params_from_iter};
 
@@ -64,12 +64,55 @@ pub(crate) fn parse_accounts(
     ))
 }
 
+/// Fetches rows from `latest_account_headers`. Each row includes the [`ClientAccountType`],
+/// which `historical_account_headers` doesn't carry — that's why this query lives separately
+/// from [`query_historical_account_headers`].
 pub(crate) fn query_latest_account_headers(
     conn: &Connection,
     where_clause: &str,
     params: impl Params,
-) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
-    query_account_headers_from_table(conn, "latest_account_headers", where_clause, params)
+) -> Result<Vec<(AccountHeader, AccountStatus, ClientAccountType)>, StoreError> {
+    let query = format!(
+        "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked, watched \
+         FROM latest_account_headers WHERE {where_clause}"
+    );
+    conn.prepare(&query)
+        .into_store_error()?
+        .query_map(params, |row| {
+            let id: String = row.get(0)?;
+            let nonce: u64 = column_value_as_u64(row, 1)?;
+            let vault_root: String = row.get(2)?;
+            let storage_commitment: String = row.get(3)?;
+            let code_commitment: String = row.get(4)?;
+            let account_seed: Option<Vec<u8>> = row.get(5)?;
+            let locked: bool = row.get(6)?;
+            let watched: bool = row.get(7)?;
+
+            Ok((
+                SerializedHeaderData {
+                    id,
+                    nonce,
+                    vault_root,
+                    storage_commitment,
+                    code_commitment,
+                    account_seed,
+                    locked,
+                },
+                watched,
+            ))
+        })
+        .into_store_error()?
+        .map(|result| {
+            let (parts, watched) = result.into_store_error()?;
+            let (header, status) = parse_accounts(parts)?;
+            let client_type = if watched {
+                ClientAccountType::Watched
+            } else {
+                ClientAccountType::Native
+            };
+            Ok((header, status, client_type))
+        })
+        .collect::<Result<Vec<_>, StoreError>>()
 }
 
 pub(crate) fn query_historical_account_headers(
@@ -77,18 +120,9 @@ pub(crate) fn query_historical_account_headers(
     where_clause: &str,
     params: impl Params,
 ) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
-    query_account_headers_from_table(conn, "historical_account_headers", where_clause, params)
-}
-
-fn query_account_headers_from_table(
-    conn: &Connection,
-    table: &str,
-    where_clause: &str,
-    params: impl Params,
-) -> Result<Vec<(AccountHeader, AccountStatus)>, StoreError> {
     let query = format!(
         "SELECT id, nonce, vault_root, storage_commitment, code_commitment, account_seed, locked \
-         FROM {table} WHERE {where_clause}"
+         FROM historical_account_headers WHERE {where_clause}"
     );
     conn.prepare(&query)
         .into_store_error()?
@@ -133,7 +167,7 @@ pub(crate) fn query_account_code(
         .into_store_error()?
         .map(|result| {
             let bytes: Vec<u8> = result.into_store_error()?;
-            Ok(AccountCode::from_bytes(&bytes)?)
+            Ok(AccountCode::read_from_bytes(&bytes)?)
         })
         .next()
         .transpose()
@@ -201,6 +235,17 @@ pub(crate) fn query_storage_slots(
             values_params.push(name.to_string());
             format!("{base_query} AND slot_name = ?2")
         },
+        AccountStorageFilter::SlotNames(names) => {
+            if names.is_empty() {
+                return Ok(BTreeMap::new());
+            }
+            let placeholders =
+                (0..names.len()).map(|i| format!("?{}", i + 2)).collect::<Vec<_>>().join(", ");
+            for name in names {
+                values_params.push(name.to_string());
+            }
+            format!("{base_query} AND slot_name IN ({placeholders})")
+        },
         AccountStorageFilter::Root(root) => {
             values_params.push(root.to_hex());
             format!("{base_query} AND slot_value = ?2")
@@ -226,10 +271,14 @@ pub(crate) fn query_storage_slots(
         })
         .collect::<Result<Vec<(StorageSlotName, Word, StorageSlotType)>, StoreError>>()?;
 
-    // For SlotName filter, also restrict map entries query to avoid loading unneeded maps
-    let map_filter = match filter {
-        AccountStorageFilter::SlotName(name) => Some(name.to_string()),
-        _ => None,
+    // Restrict map entries query by slot name(s) when the filter narrows by name, so we don't
+    // load map entries we'll discard.
+    let map_filter: Option<Vec<String>> = match filter {
+        AccountStorageFilter::SlotName(name) => Some(vec![name.to_string()]),
+        AccountStorageFilter::SlotNames(names) => {
+            Some(names.iter().map(StorageSlotName::to_string).collect())
+        },
+        AccountStorageFilter::All | AccountStorageFilter::Root(_) => None,
     };
 
     let has_map_slots = storage_values.iter().any(|(_, _, t)| *t == StorageSlotType::Map);
@@ -258,16 +307,23 @@ pub(crate) fn query_storage_slots(
 pub(crate) fn query_storage_maps(
     conn: &Connection,
     account_id: AccountId,
-    slot_name_filter: Option<&str>,
+    slot_name_filter: Option<&[String]>,
 ) -> Result<BTreeMap<StorageSlotName, StorageMap>, StoreError> {
     let account_id_hex = account_id.to_hex();
     let base_query =
         "SELECT slot_name, key, value FROM latest_storage_map_entries WHERE account_id = ?1";
     let mut map_params: Vec<String> = vec![account_id_hex];
     let query = match slot_name_filter {
-        Some(name) => {
-            map_params.push(name.to_string());
-            format!("{base_query} AND slot_name = ?2")
+        Some(names) => {
+            if names.is_empty() {
+                return Ok(BTreeMap::new());
+            }
+            let placeholders =
+                (0..names.len()).map(|i| format!("?{}", i + 2)).collect::<Vec<_>>().join(", ");
+            for name in names {
+                map_params.push(name.clone());
+            }
+            format!("{base_query} AND slot_name IN ({placeholders})")
         },
         None => base_query.to_string(),
     };

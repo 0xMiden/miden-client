@@ -1,7 +1,7 @@
 use std::sync::{Arc, LazyLock};
 use std::vec;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use miden_client::account::component::{AccountComponent, AccountComponentMetadata};
 use miden_client::account::{
     Account,
@@ -13,7 +13,7 @@ use miden_client::account::{
     StorageSlot,
     StorageSlotName,
 };
-use miden_client::assembly::{CodeBuilder, Library};
+use miden_client::assembly::{CodeBuilder, Library, Module, ModuleKind, Path, SourceManagerSync};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{
     NetworkAccountTarget,
@@ -27,6 +27,7 @@ use miden_client::note::{
     NoteTag,
     NoteType,
 };
+use miden_client::sync::NoteTagSource;
 use miden_client::testing::common::{
     TestClient,
     execute_tx_and_sync,
@@ -34,7 +35,7 @@ use miden_client::testing::common::{
     wait_for_blocks,
     wait_for_tx,
 };
-use miden_client::transaction::TransactionRequestBuilder;
+use miden_client::transaction::{TransactionKernel, TransactionRequestBuilder};
 use miden_client::{Felt, Word, ZERO};
 use rand::{Rng, RngCore};
 
@@ -90,6 +91,14 @@ const INCR_SCRIPT_CODE: &str = "
     end
 ";
 
+const INCR_NOTE_SCRIPT_CODE: &str = "
+    use external_contract::counter_contract
+    @note_script
+    pub proc main
+        call.counter_contract::increment_count
+    end
+";
+
 /// Deploys a counter contract as a network account
 pub(crate) async fn deploy_counter_contract(
     client: &mut TestClient,
@@ -99,8 +108,9 @@ pub(crate) async fn deploy_counter_contract(
 
     client.add_account(&acc, false).await?;
 
-    let mut script_builder = CodeBuilder::new();
-    script_builder.link_dynamic_library(&counter_contract_library())?;
+    let source_manager = client.source_manager();
+    let mut script_builder = CodeBuilder::with_source_manager(source_manager.clone());
+    script_builder.link_dynamic_library(&counter_contract_library(source_manager))?;
     let tx_script = script_builder.compile_tx_script(INCR_SCRIPT_CODE)?;
 
     // Build a transaction request with the custom script
@@ -176,9 +186,14 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
 
     let mut network_notes = vec![];
 
+    let source_manager = client.source_manager();
     for _ in 0..BUMP_NOTE_NUMBER {
-        let network_note =
-            get_network_note(native_account.id(), network_account.id(), &mut client.rng())?;
+        let network_note = get_network_note(
+            native_account.id(),
+            network_account.id(),
+            source_manager.clone(),
+            &mut client.rng(),
+        )?;
         network_notes.push(network_note);
     }
 
@@ -228,7 +243,12 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
             .await?
             .0;
 
-    let network_note = get_network_note(wallet.id(), network_account.id(), &mut client.rng())?;
+    let network_note = get_network_note(
+        wallet.id(),
+        network_account.id(),
+        client.source_manager(),
+        &mut client.rng(),
+    )?;
     // Prepare both transactions
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![network_note.clone()])
@@ -274,31 +294,112 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     Ok(())
 }
 
-// Initialize the Basic Fungible Faucet library only once.
-static COUNTER_CONTRACT_LIBRARY: LazyLock<Arc<Library>> = LazyLock::new(|| {
-    let code = CodeBuilder::default()
-        .compile_component_code("external_contract::counter_contract", COUNTER_CONTRACT)
-        .expect("failed to compile counter contract library");
-    Arc::new(code.into_library())
-});
+/// After a network account consumes a note (potentially in the same batch it was created),
+/// the receiver's `InputNoteReader` should find it as consumed by that account. Validates
+/// the erased-notes detection flow end-to-end against a real node.
+pub async fn test_note_reader_finds_note_consumed_by_ntx(
+    client_config: ClientConfig,
+) -> Result<()> {
+    let (mut client, keystore) = client_config.into_client().await?;
+    client.sync_state().await?;
 
-/// Returns the Basic Fungible Faucet Library.
-fn counter_contract_library() -> Arc<Library> {
-    COUNTER_CONTRACT_LIBRARY.clone()
+    let network_account = deploy_counter_contract(&mut client, AccountStorageMode::Network).await?;
+    let network_account_id = network_account.id();
+
+    let (sender_account, ..) =
+        insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore, RPO_FALCON_SCHEME_ID)
+            .await?;
+
+    let network_note = get_network_note(
+        sender_account.id(),
+        network_account_id,
+        client.source_manager(),
+        &mut client.rng(),
+    )?;
+    let note_id = network_note.id();
+
+    let tx_request =
+        TransactionRequestBuilder::new().own_output_notes(vec![network_note]).build()?;
+    execute_tx_and_sync(&mut client, sender_account.id(), tx_request).await?;
+
+    // Wait for the network account to consume the note (check counter increment).
+    let expected_counter = Word::from([Felt::new(2), ZERO, ZERO, ZERO]);
+    for _ in 0..15 {
+        client.sync_state().await?;
+        let account_details = client
+            .test_rpc_api()
+            .get_account_details(network_account_id)
+            .await?
+            .account()
+            .cloned()
+            .with_context(|| "account details not available")?;
+
+        if account_details.storage().get_item(&COUNTER_SLOT_NAME)? == expected_counter {
+            break;
+        }
+        wait_for_blocks(&mut client, 1).await;
+    }
+
+    client.sync_state().await?;
+
+    let mut reader = client.input_note_reader(network_account_id);
+    let mut found = false;
+    while let Some(note) = reader.next().await? {
+        if note.id() == note_id {
+            assert_eq!(
+                note.consumer_account(),
+                Some(network_account_id),
+                "consumer should be the network account"
+            );
+            found = true;
+            break;
+        }
+    }
+
+    assert!(found, "NoteReader should find the note consumed by the network account");
+
+    Ok(())
+}
+
+/// Compiles the counter contract library using the provided source manager so that all source
+/// spans are registered in the same manager used by the client's executor.
+fn counter_contract_library(source_manager: Arc<dyn SourceManagerSync>) -> Arc<Library> {
+    let assembler = TransactionKernel::assembler_with_source_manager(source_manager.clone());
+    let module = Module::parser(ModuleKind::Library)
+        .parse_str(
+            Path::new("external_contract::counter_contract"),
+            COUNTER_CONTRACT,
+            source_manager.clone(),
+        )
+        .map_err(|err| anyhow!(err))
+        .unwrap();
+    assembler
+        .clone()
+        .assemble_library([module])
+        .map_err(|err| anyhow!(err))
+        .unwrap()
 }
 
 fn get_network_note<T: Rng>(
     sender: AccountId,
     network_account: AccountId,
+    source_manager: Arc<dyn SourceManagerSync>,
     rng: &mut T,
 ) -> Result<Note> {
-    get_network_note_with_script(sender, network_account, INCR_SCRIPT_CODE, rng)
+    get_network_note_with_script(
+        sender,
+        network_account,
+        INCR_NOTE_SCRIPT_CODE,
+        source_manager,
+        rng,
+    )
 }
 
 pub(crate) fn get_network_note_with_script<T: Rng>(
     sender: AccountId,
     network_account: AccountId,
     script: &str,
+    source_manager: Arc<dyn SourceManagerSync>,
     rng: &mut T,
 ) -> Result<Note> {
     let target = NetworkAccountTarget::new(network_account, NoteExecutionHint::Always)?;
@@ -307,8 +408,8 @@ pub(crate) fn get_network_note_with_script<T: Rng>(
         .with_tag(NoteTag::with_account_target(network_account))
         .with_attachment(attachment);
 
-    let script = CodeBuilder::new()
-        .with_dynamically_linked_library(counter_contract_library())?
+    let script = CodeBuilder::with_source_manager(source_manager.clone())
+        .with_dynamically_linked_library(counter_contract_library(source_manager))?
         .compile_note_script(script)?;
     let recipient = NoteRecipient::new(
         Word::new([
@@ -323,4 +424,110 @@ pub(crate) fn get_network_note_with_script<T: Rng>(
 
     let network_note = Note::new(NoteAssets::new(vec![])?, metadata, recipient);
     Ok(network_note)
+}
+
+/// Watched-account flow against a network account:
+///   - `client_1` deploys the counter as a network account and emits bump notes.
+///   - `client_2` watches the network account via `import_watched_account_by_id` (no note tag).
+///   - The node-driven counter increments are observed by `client_2` after `sync_state`.
+pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<()> {
+    const BUMP_NOTE_NUMBER: u64 = 3;
+
+    let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
+    let (mut client_2, _keystore_2) = ClientConfig::default()
+        .with_rpc_endpoint(client_config.rpc_endpoint())
+        .into_client()
+        .await?;
+    client_1.sync_state().await?;
+
+    let network_account =
+        deploy_counter_contract(&mut client_1, AccountStorageMode::Network).await?;
+    let network_account_id = network_account.id();
+
+    // Sanity: counter is 1 after deployment (deploy_counter_contract bumps it once).
+    let counter_value = client_1
+        .account_reader(network_account_id)
+        .get_storage_item(COUNTER_SLOT_NAME.clone())
+        .await
+        .context("failed to find network account after deployment")?;
+    assert_eq!(counter_value, Word::from([Felt::new(1), ZERO, ZERO, ZERO]));
+
+    // client_2 starts watching the network account.
+    client_2.import_watched_account_by_id(network_account_id).await?;
+
+    let watched_record = client_2
+        .test_store()
+        .get_account(network_account_id)
+        .await?
+        .context("watched network account should be tracked in client_2's store")?;
+    assert!(watched_record.is_watched(), "watched network account must be marked as watched");
+
+    let tags = client_2.test_store().get_note_tags().await?;
+    assert!(
+        !tags
+            .iter()
+            .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == network_account_id)),
+        "watched network account must not register a per-account note tag",
+    );
+
+    let initial_watched_commitment =
+        client_2.account_reader(network_account_id).commitment().await?;
+
+    // client_1 emits BUMP_NOTE_NUMBER network notes targeted at the counter; the node will
+    // consume them in subsequent blocks and bump the counter to 1 + BUMP_NOTE_NUMBER.
+    let (native_account, ..) = insert_new_wallet(
+        &mut client_1,
+        AccountStorageMode::Public,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    let source_manager = client_1.source_manager();
+    let mut network_notes = vec![];
+    for _ in 0..BUMP_NOTE_NUMBER {
+        let network_note = get_network_note(
+            native_account.id(),
+            network_account_id,
+            source_manager.clone(),
+            &mut client_1.rng(),
+        )?;
+        network_notes.push(network_note);
+    }
+
+    let tx_request = TransactionRequestBuilder::new().own_output_notes(network_notes).build()?;
+    execute_tx_and_sync(&mut client_1, native_account.id(), tx_request).await?;
+
+    // Poll the watched client until it observes the bumped counter.
+    let expected_counter = Word::from([Felt::new(1 + BUMP_NOTE_NUMBER), ZERO, ZERO, ZERO]);
+    let mut observed = false;
+    for _ in 0..10 {
+        wait_for_blocks(&mut client_1, 1).await;
+        client_2.sync_state().await?;
+        let counter = client_2
+            .account_reader(network_account_id)
+            .get_storage_item(COUNTER_SLOT_NAME.clone())
+            .await?;
+        if counter == expected_counter {
+            observed = true;
+            break;
+        }
+    }
+    assert!(
+        observed,
+        "client_2 should observe the network account state advance via sync_state"
+    );
+
+    let source_commitment = client_1.account_reader(network_account_id).commitment().await?;
+    let watched_commitment = client_2.account_reader(network_account_id).commitment().await?;
+    assert_eq!(
+        watched_commitment, source_commitment,
+        "watched commitment should track source after node-driven bumps",
+    );
+    assert_ne!(
+        watched_commitment, initial_watched_commitment,
+        "watched commitment should have advanced",
+    );
+
+    Ok(())
 }

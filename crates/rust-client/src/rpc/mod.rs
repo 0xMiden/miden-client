@@ -48,7 +48,7 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use domain::account::{AccountProof, FetchedAccount};
-use domain::note::{FetchedNote, NoteSyncInfo, SyncNotesResult};
+use domain::note::{FetchedNote, NoteSyncBlock};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
@@ -57,8 +57,7 @@ use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
-use miden_protocol::crypto::merkle::smt::SmtProof;
-use miden_protocol::note::{NoteId, NoteScript, NoteTag, NoteType, Nullifier};
+use miden_protocol::note::{Note, NoteId, NoteScript, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 
 use crate::rpc::domain::storage_map::StorageMapInfo;
@@ -88,7 +87,7 @@ pub use tonic_client::GrpcClient;
 
 use crate::rpc::domain::account::AccountStorageRequirements;
 use crate::rpc::domain::account_vault::AccountVaultInfo;
-use crate::rpc::domain::transaction::TransactionsInfo;
+use crate::rpc::domain::transaction::TransactionRecord;
 use crate::store::InputNoteRecord;
 use crate::store::input_note_states::UnverifiedNoteState;
 
@@ -176,14 +175,14 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the MMR delta for a given block range using the `/SyncChainMmr` RPC endpoint.
     ///
-    /// - `block_from` is the last block number already present in the caller's MMR.
+    /// - `current_block_height` is the last block number already present in the caller's MMR.
     /// - `upper_bound` determines the upper bound of the sync range. Can be a specific block number
     ///   (`BlockNumber`), or a chain tip finality level: `CommittedChainTip` syncs up to the latest
     ///   committed block (the chain tip), while `ProvenChainTip` syncs up to the latest proven
     ///   block which may be behind the committed tip.
     async fn sync_chain_mmr(
         &self,
-        block_from: BlockNumber,
+        current_block_height: BlockNumber,
         upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError>;
 
@@ -193,52 +192,44 @@ pub trait NodeRpcClient: Send + Sync {
     /// - `account_id` is the ID of the wanted account.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError>;
 
-    /// Fetches the notes related to the specified tags using the `/SyncNotes` RPC endpoint.
+    /// Fetches notes related to the specified tags using the `/SyncNotes` RPC endpoint,
+    /// paginating over the full block range and returning, in block-number order, every block in
+    /// that range that contains at least one note matching the requested tags.
     ///
-    /// - `block_num` is the last block number known by the client.
-    /// - `note_tags` is a list of tags used to filter the notes the client is interested in.
+    /// - `block_from`: The starting block number for the range (inclusive).
+    /// - `block_to`: The ending block number for the range (inclusive).
+    /// - `note_tags` is the set of tags used to filter the notes the client is interested in.
+    ///
+    /// Notes with attachments will have header-only metadata after this call; use
+    /// [`NodeRpcClient::sync_notes_with_details`] to also resolve their full metadata and
+    /// fetch public note bodies in a single follow-up call.
     async fn sync_notes(
         &self,
-        block_num: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<NoteSyncInfo, RpcError>;
+    ) -> Result<Vec<NoteSyncBlock>, RpcError>;
 
-    /// Paginates [`NodeRpcClient::sync_notes`] over the full block range, then makes a single
+    /// Calls [`NodeRpcClient::sync_notes`] and then makes a single
     /// [`NodeRpcClient::get_notes_by_id`] call to:
-    /// - Fill metadata for notes with attachments (whose sync response only had header fields).
-    /// - Fetch full note bodies for public notes (scripts, assets, recipient).
+    /// - Fill metadata on any [`CommittedNote`](domain::note::CommittedNote) whose sync response
+    ///   only included header fields.
+    /// - Collect full bodies for every public note in the sync range.
     ///
     /// All notes that are public or have missing metadata are fetched (not just the ones the
     /// client tracks) to avoid revealing which specific notes the client is interested in.
     ///
-    /// Returns the chain tip, the fully-resolved note blocks, and the fetched note details.
+    /// Returns the resolved note blocks paired with a map of public note bodies keyed by
+    /// note ID.
     async fn sync_notes_with_details(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<SyncNotesResult, RpcError> {
-        let mut all_blocks = Vec::new();
-        let mut cursor = block_from;
-        let mut chain_tip;
+    ) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, Note>), RpcError> {
+        let mut blocks = self.sync_notes(block_from, block_to, note_tags).await?;
 
-        loop {
-            let note_sync = self.sync_notes(cursor, block_to, note_tags).await?;
-
-            chain_tip = note_sync.chain_tip;
-            cursor = note_sync.block_to + 1;
-            let range_end = block_to.unwrap_or(chain_tip);
-            let done = note_sync.blocks.is_empty() || cursor >= range_end;
-            all_blocks.extend(note_sync.blocks);
-
-            if done {
-                break;
-            }
-        }
-
-        // Single get_notes_by_id call for all notes that are public or missing metadata.
-        let note_ids: Vec<NoteId> = all_blocks
+        let note_ids: Vec<NoteId> = blocks
             .iter()
             .flat_map(|b| b.notes.values())
             .filter(|n| n.metadata().is_none() || n.note_type() != NoteType::Private)
@@ -251,9 +242,8 @@ pub trait NodeRpcClient: Send + Sync {
             let fetched = self.get_notes_by_id(&note_ids).await?;
 
             for fetched_note in fetched {
-                // Fill metadata on committed notes that were missing it.
                 let note_id = fetched_note.id();
-                for block in &mut all_blocks {
+                for block in &mut blocks {
                     if let Some(note) = block.notes.get_mut(&note_id)
                         && note.metadata().is_none()
                     {
@@ -261,34 +251,28 @@ pub trait NodeRpcClient: Send + Sync {
                     }
                 }
 
-                // Collect full note bodies for public notes.
                 if let FetchedNote::Public(note, _) = fetched_note {
                     public_notes.insert(note.id(), note);
                 }
             }
         }
 
-        Ok(SyncNotesResult { blocks: all_blocks, public_notes })
+        Ok((blocks, public_notes))
     }
 
     /// Fetches the nullifiers corresponding to a list of prefixes using the
     /// `/SyncNullifiers` RPC endpoint.
     ///
     /// - `prefix` is a list of nullifiers prefixes to search for.
-    /// - `block_num` is the block number to start the search from. Nullifiers created in this block
-    ///   or the following blocks will be included.
-    /// - `block_to` is the optional block number to stop the search at. If not provided, syncs up
-    ///   to the network chain tip.
+    /// - `block_from`: The starting block number for the range (inclusive).
+    /// - `block_to`: The ending block number for the range (inclusive), or `None` to sync up to the
+    ///   chain tip.
     async fn sync_nullifiers(
         &self,
         prefix: &[u16],
-        block_num: BlockNumber,
+        block_from: BlockNumber,
         block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
-
-    /// Fetches the nullifier proofs corresponding to a list of nullifiers using the
-    /// `/CheckNullifiers` RPC endpoint.
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError>;
 
     /// Fetches the account proof and optionally its details from the node, using the
     /// `GetAccountProof` endpoint.
@@ -320,7 +304,7 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the commit height where the nullifier was consumed. If the nullifier isn't found,
     /// then `None` is returned.
-    /// The `block_num` parameter is the block number to start the search from.
+    /// The `block_num` parameter is the block number to start the search from (inclusive).
     ///
     /// The default implementation of this method uses
     /// [`NodeRpcClient::sync_nullifiers`].
@@ -406,15 +390,22 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the note script with the specified root.
     ///
+    /// Implementations must verify that the returned script's root matches the requested
+    /// `root` and return [`RpcError::InvalidResponse`] otherwise; callers may rely on this
+    /// invariant.
+    ///
     /// Errors:
     /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
+    /// - [`RpcError::InvalidResponse`] if the node returns a script whose root does not match the
+    ///   requested `root`.
     async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError>;
 
     /// Fetches storage map updates for specified account and storage slots within a block range,
     /// using the `/SyncStorageMaps` RPC endpoint.
     ///
-    /// - `block_from`: The starting block number for the range.
-    /// - `block_to`: The ending block number for the range.
+    /// - `block_from`: The starting block number for the range (inclusive).
+    /// - `block_to`: The ending block number for the range (inclusive). If `None`, syncs up to the
+    ///   chain tip.
     /// - `account_id`: The account ID for which to fetch storage map updates.
     async fn sync_storage_maps(
         &self,
@@ -426,8 +417,9 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches account vault updates for specified account within a block range,
     /// using the `/SyncAccountVault` RPC endpoint.
     ///
-    /// - `block_from`: The starting block number for the range.
-    /// - `block_to`: The ending block number for the range.
+    /// - `block_from`: The starting block number for the range (inclusive).
+    /// - `block_to`: The ending block number for the range (inclusive). If `None`, syncs up to the
+    ///   chain tip.
     /// - `account_id`: The account ID for which to fetch storage map updates.
     async fn sync_account_vault(
         &self,
@@ -436,18 +428,18 @@ pub trait NodeRpcClient: Send + Sync {
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError>;
 
-    /// Fetches transactions records for specific accounts within a block range.
-    /// Using the `/SyncTransactions` RPC endpoint.
+    /// Fetches transaction records for specific accounts within a block range using the
+    /// `/SyncTransactions` RPC endpoint.
     ///
-    /// - `block_from`: The starting block number for the range.
-    /// - `block_to`: The ending block number for the range.
-    /// - `account_ids`: The account IDs for which to fetch storage map updates.
+    /// - `block_from`: The starting block number for the range (inclusive).
+    /// - `block_to`: The ending block number for the range (inclusive).
+    /// - `account_ids`: The account IDs for which to fetch transactions.
     async fn sync_transactions(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_ids: Vec<AccountId>,
-    ) -> Result<TransactionsInfo, RpcError>;
+    ) -> Result<Vec<TransactionRecord>, RpcError>;
 
     /// Fetches the network ID of the node.
     /// Errors:
@@ -487,7 +479,6 @@ pub trait NodeRpcClient: Send + Sync {
 #[derive(Debug, Clone, Copy)]
 pub enum RpcEndpoint {
     Status,
-    CheckNullifiers,
     SyncNullifiers,
     GetAccount,
     GetBlockByNumber,
@@ -510,7 +501,6 @@ impl RpcEndpoint {
     pub fn proto_name(&self) -> &'static str {
         match self {
             RpcEndpoint::Status => "Status",
-            RpcEndpoint::CheckNullifiers => "CheckNullifiers",
             RpcEndpoint::SyncNullifiers => "SyncNullifiers",
             RpcEndpoint::GetAccount => "GetAccount",
             RpcEndpoint::GetBlockByNumber => "GetBlockByNumber",
@@ -534,7 +524,6 @@ impl fmt::Display for RpcEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RpcEndpoint::Status => write!(f, "status"),
-            RpcEndpoint::CheckNullifiers => write!(f, "check_nullifiers"),
             RpcEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
             },

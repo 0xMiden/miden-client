@@ -14,20 +14,21 @@ The Miden client is still under heavy development and the project can be conside
 
 ## Overview
 
-The Miden client currently consists of three components:
+The Miden client currently consists of two components:
 
 - `miden-client` library, which can be used by other project to programmatically interact with the Miden rollup. You can find more information about the library in the [Rust client Library](./crates/rust-client/README.md) section.
 - `miden-client-cli`, which is a wrapper around the library exposing its functionality via a simple command-line interface (CLI). You can find more information about the CLI in the [Miden client CLI](./bin/miden-cli/README.md) section.
-- `@miden-sdk/miden-sdk` (web client), which is a browser-focused SDK for interacting with the Miden rollup from web applications. You can find more information about the web client in the [Web Client README](./crates/web-client/README.md) section.
+
+The browser-focused SDK (`@miden-sdk/miden-sdk`, the React hooks library `@miden-sdk/react`, and the `@miden-sdk/vite-plugin`) lives in a dedicated repository at [0xMiden/web-sdk](https://github.com/0xMiden/web-sdk).
 
 The client's main responsibility is to maintain a partial view of the blockchain which allows for locally executing and proving transactions. It keeps a local store of various entities that periodically get updated by syncing with the node.
 
 For more info check:
 
-- [Getting started](https://0xMiden.github.io/miden-docs/miden-client/get-started/prerequisites.html)
-- [CLI Reference](https://0xMiden.github.io/miden-docs/miden-client/cli-reference.html)
-- [Configuration](https://0xMiden.github.io/miden-docs/miden-client/cli-config.html)
-- [Online Documentation](https://0xMiden.github.io/miden-docs/miden-client/index.html)
+- [Getting started](https://docs.miden.xyz/builder/tools/clients/rust-client/get-started/)
+- [CLI Reference](https://docs.miden.xyz/builder/tools/clients/rust-client/cli/)
+- [Configuration](https://docs.miden.xyz/builder/tools/clients/rust-client/cli/cli-config)
+- [Online Documentation](https://docs.miden.xyz/builder/tools/clients/)
 
 ## Workspace structure
 

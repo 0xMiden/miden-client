@@ -96,7 +96,8 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
         use external_contract::counter_contract
         use miden::core::sys
 
-        begin
+        @note_script
+        pub proc main
             # push the hash of the `get_fpi_map_item` account procedure
             push.{proc_root}
 
@@ -122,6 +123,7 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
         sender_account.id(),
         target_network_account.id(),
         &network_fpi_note_script,
+        client2.source_manager(),
         &mut client2.rng(),
     )?;
 

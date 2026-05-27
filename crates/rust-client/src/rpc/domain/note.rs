@@ -1,8 +1,7 @@
 use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
 
 use miden_protocol::account::AccountId;
-use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::block::BlockHeader;
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::note::{
     Note,
@@ -39,6 +38,26 @@ impl TryFrom<proto::note::NoteId> for NoteId {
     }
 }
 
+fn note_type_from_proto(raw: i32) -> Result<NoteType, RpcConversionError> {
+    let proto_note_type = proto::note::NoteType::try_from(raw)
+        .map_err(|_| RpcConversionError::InvalidField(alloc::format!("note_type={raw}")))?;
+    match proto_note_type {
+        proto::note::NoteType::Public => Ok(NoteType::Public),
+        proto::note::NoteType::Private => Ok(NoteType::Private),
+        proto::note::NoteType::Unspecified => {
+            Err(RpcConversionError::InvalidField("note_type=NOTE_TYPE_UNSPECIFIED".into()))
+        },
+    }
+}
+
+fn note_type_to_proto(note_type: NoteType) -> i32 {
+    let proto_note_type = match note_type {
+        NoteType::Public => proto::note::NoteType::Public,
+        NoteType::Private => proto::note::NoteType::Private,
+    };
+    proto_note_type as i32
+}
+
 impl TryFrom<proto::note::NoteMetadata> for NoteMetadata {
     type Error = RpcConversionError;
 
@@ -47,8 +66,7 @@ impl TryFrom<proto::note::NoteMetadata> for NoteMetadata {
             .sender
             .ok_or_else(|| proto::note::NoteMetadata::missing_field(stringify!(sender)))?
             .try_into()?;
-        let note_type =
-            NoteType::try_from(u64::try_from(value.note_type).expect("invalid note type"))?;
+        let note_type = note_type_from_proto(value.note_type)?;
         let tag = NoteTag::new(value.tag);
 
         // Deserialize attachment if present
@@ -68,7 +86,7 @@ impl From<NoteMetadata> for proto::note::NoteMetadata {
         use miden_tx::utils::serde::Serializable;
         proto::note::NoteMetadata {
             sender: Some(value.sender().into()),
-            note_type: value.note_type() as i32,
+            note_type: note_type_to_proto(value.note_type()),
             tag: value.tag().as_u32(),
             attachment: value.attachment().to_bytes(),
         }
@@ -125,80 +143,32 @@ pub struct NoteSyncBlock {
     pub notes: BTreeMap<NoteId, CommittedNote>,
 }
 
-/// Represents a `SyncNotesResponse` with fields converted into domain types.
-///
-/// The response may contain multiple blocks with matching notes. When `blocks` is empty,
-/// no notes matched in the scanned range.
-#[derive(Debug)]
-pub struct NoteSyncInfo {
-    /// Number of the latest block in the chain when the response was generated.
-    pub chain_tip: BlockNumber,
-    /// The last block the node checked. Used as a cursor for pagination: if less than the
-    /// requested range end (or chain tip), the client should continue from this block.
-    pub block_to: BlockNumber,
-    /// Blocks containing matching notes, ordered by block number ascending.
-    /// May be empty if no notes matched in the range.
-    pub blocks: Vec<NoteSyncBlock>,
-}
-
-/// Result of [`NodeRpcClient::sync_notes_with_details`](crate::rpc::NodeRpcClient::sync_notes_with_details).
-///
-/// Contains fully-resolved note blocks (all metadata filled) and full note bodies for
-/// public notes. The block data and public note bodies are separated to avoid duplication:
-/// blocks carry metadata + inclusion proofs, while `public_notes` carries the note content
-/// (scripts, assets, recipient) keyed by note ID.
-pub struct SyncNotesResult {
-    /// Blocks containing matching notes with fully-resolved metadata.
-    /// After pagination is fully resolved, the last block is the range-end block
-    /// (chain tip when `block_to` is `None`), even if it contained no matching notes.
-    pub blocks: Vec<NoteSyncBlock>,
-    /// Full note bodies for public notes, keyed by note ID.
-    pub public_notes: BTreeMap<NoteId, Note>,
-}
-
-impl TryFrom<proto::rpc::SyncNotesResponse> for NoteSyncInfo {
+impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for NoteSyncBlock {
     type Error = RpcError;
 
-    fn try_from(value: proto::rpc::SyncNotesResponse) -> Result<Self, Self::Error> {
-        let pagination_info = value
-            .pagination_info
-            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(pagination_info)))?;
+    fn try_from(
+        block: proto::rpc::sync_notes_response::NoteSyncBlock,
+    ) -> Result<Self, Self::Error> {
+        let block_header = block
+            .block_header
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(blocks.block_header)))?
+            .try_into()?;
 
-        let chain_tip = BlockNumber::from(pagination_info.chain_tip);
-        let block_to = BlockNumber::from(pagination_info.block_num);
+        let mmr_path = block
+            .mmr_path
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(blocks.mmr_path)))?
+            .try_into()?;
 
-        let blocks = value
-            .blocks
+        let notes: BTreeMap<NoteId, CommittedNote> = block
+            .notes
             .into_iter()
-            .map(|block| {
-                let block_header = block
-                    .block_header
-                    .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
-                        blocks.block_header
-                    )))?
-                    .try_into()?;
-
-                let mmr_path = block
-                    .mmr_path
-                    .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(
-                        blocks.mmr_path
-                    )))?
-                    .try_into()?;
-
-                let notes: BTreeMap<NoteId, CommittedNote> = block
-                    .notes
-                    .into_iter()
-                    .map(|n| {
-                        let note = CommittedNote::try_from(n)?;
-                        Ok((*note.note_id(), note))
-                    })
-                    .collect::<Result<_, RpcConversionError>>()?;
-
-                Ok(NoteSyncBlock { block_header, mmr_path, notes })
+            .map(|n| {
+                let note = CommittedNote::try_from(n)?;
+                Ok((*note.note_id(), note))
             })
-            .collect::<Result<Vec<_>, RpcError>>()?;
+            .collect::<Result<_, RpcConversionError>>()?;
 
-        Ok(NoteSyncInfo { chain_tip, block_to, blocks })
+        Ok(NoteSyncBlock { block_header, mmr_path, notes })
     }
 }
 
@@ -324,8 +294,7 @@ impl TryFrom<proto::note::NoteSyncRecord> for CommittedNote {
                 notes.metadata_header.sender
             )))?
             .try_into()?;
-        let note_type =
-            NoteType::try_from(u64::try_from(proto_header.note_type).expect("invalid note type"))?;
+        let note_type = note_type_from_proto(proto_header.note_type)?;
         let tag = NoteTag::new(proto_header.tag);
         let attachment_kind = u8::try_from(proto_header.attachment_kind)
             .ok()

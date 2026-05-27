@@ -1,15 +1,18 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_protocol::Word;
 use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::hash::rpo::Rpo256;
 use miden_protocol::crypto::merkle::MerklePath;
-use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
+use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, PartialMmr};
+use miden_protocol::{Felt, Word};
 use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
 use crate::store::{BlockRelevance, StoreError};
-use crate::{Client, ClientError};
+#[cfg(feature = "testing")]
+use crate::test_utils::mock::MockRpcApi;
+use crate::{CachedPartialMmr, Client, ClientError};
 
 /// Network information management methods.
 impl<AUTH> Client<AUTH> {
@@ -36,16 +39,80 @@ impl<AUTH> Client<AUTH> {
             .get_block_header_by_number(Some(BlockNumber::GENESIS), false)
             .await?;
 
-        let blank_mmr_peaks = MmrPeaks::new(Forest::empty(), vec![])
-            .expect("Blank MmrPeaks should not fail to instantiate");
-        self.store.insert_block_header(&genesis, blank_mmr_peaks, false).await?;
+        self.store.insert_block_header(&genesis, false).await?;
         self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         Ok(())
     }
 
-    /// Fetches from the store the current view of the chain's [`PartialMmr`].
+    /// Seeds local state for offline account creation and debugging without a real node.
+    ///
+    /// Applies default RPC limits, then either aligns the RPC genesis with an existing stored
+    /// genesis, or replaces the RPC client with [`MockRpcApi`] and runs
+    /// [`Self::ensure_genesis_in_place`] so genesis comes from the mock chain.
+    #[cfg(feature = "testing")]
+    pub async fn prepare_offline_bootstrap(&mut self) -> Result<(), ClientError> {
+        let limits = self.store.get_rpc_limits().await?.unwrap_or_default();
+        self.store.set_rpc_limits(limits).await?;
+        self.rpc_api.set_rpc_limits(limits).await;
+
+        if let Some((genesis, _)) = self.store.get_block_header_by_num(BlockNumber::GENESIS).await?
+        {
+            self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+            return Ok(());
+        }
+
+        *self.test_rpc_api() = Arc::new(MockRpcApi::default());
+        self.ensure_genesis_in_place().await?;
+        Ok(())
+    }
+
+    /// Returns the cached [`PartialMmr`] if in-memory caching is enabled and its fingerprint
+    /// matches the current store state, otherwise rebuilds from the store.
     pub async fn get_current_partial_mmr(&self) -> Result<PartialMmr, ClientError> {
+        if self.cache_partial_mmr_in_memory
+            && let Some(ref cached) = self.partial_mmr
+            && cached.store_peaks_hash == self.current_store_peaks_hash().await?
+            && cached.tracked_blocks_hash == self.current_tracked_blocks_hash().await?
+        {
+            return Ok(cached.mmr.clone());
+        }
         self.store.get_current_partial_mmr().await.map_err(Into::into)
+    }
+
+    /// Stores the MMR in the cache if in-memory caching is enabled, capturing the current store
+    /// fingerprint. Must run after any store mutation that may have changed the sync-height peaks
+    /// or the tracked block set.
+    pub(crate) async fn cache_partial_mmr(&mut self, mmr: PartialMmr) -> Result<(), ClientError> {
+        if !self.cache_partial_mmr_in_memory {
+            return Ok(());
+        }
+
+        let store_peaks_hash = self.current_store_peaks_hash().await?;
+        let tracked_blocks_hash = self.current_tracked_blocks_hash().await?;
+        self.partial_mmr = Some(CachedPartialMmr {
+            store_peaks_hash,
+            tracked_blocks_hash,
+            mmr,
+        });
+        Ok(())
+    }
+
+    /// Hashes the store's peaks at the current sync height. Used as the cache freshness
+    /// fingerprint.
+    async fn current_store_peaks_hash(&self) -> Result<Word, ClientError> {
+        Ok(self.store.get_current_blockchain_peaks().await?.hash_peaks())
+    }
+
+    /// Hashes the store's tracked block numbers (sorted). Used as the cache freshness
+    /// fingerprint to detect tracked-set drift without rebuilding the MMR.
+    async fn current_tracked_blocks_hash(&self) -> Result<Word, ClientError> {
+        // BTreeSet iterates in sorted order, so the hash is deterministic.
+        let tracked = self.store.get_tracked_block_header_numbers().await?;
+        let elements: Vec<Felt> = tracked
+            .iter()
+            .map(|&n| Felt::from(u32::try_from(n).expect("block number fits in u32")))
+            .collect();
+        Ok(Rpo256::hash_elements(&elements))
     }
 
     // HELPERS
@@ -77,9 +144,7 @@ impl<AUTH> Client<AUTH> {
         let tracked_nodes = authenticated_block_nodes(&block_header, path_nodes);
 
         // Insert header and MMR nodes
-        self.store
-            .insert_block_header(&block_header, current_partial_mmr.peaks(), true)
-            .await?;
+        self.store.insert_block_header(&block_header, true).await?;
         self.store.insert_partial_blockchain_nodes(&tracked_nodes).await?;
 
         Ok(block_header)

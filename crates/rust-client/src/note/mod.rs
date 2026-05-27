@@ -46,7 +46,7 @@
 //! }
 //!
 //! // Compile the note script
-//! let script_src = "begin push.9 push.12 add end";
+//! let script_src = "@note_script\npub proc main\n    push.9 push.12 add\nend";
 //! let note_script = client.code_builder().compile_note_script(script_src)?;
 //! println!("Compiled note script successfully.");
 //!
@@ -91,6 +91,7 @@ pub use miden_protocol::note::{
     NoteMetadataHeader,
     NoteRecipient,
     NoteScript,
+    NoteScriptRoot,
     NoteStorage,
     NoteTag,
     NoteType,
@@ -104,6 +105,7 @@ pub use miden_standards::note::{
     NoteExecutionHint,
     P2idNote,
     P2idNoteStorage,
+    PswapNote,
     StandardNote,
     SwapNote,
 };
@@ -112,6 +114,7 @@ pub use note_reader::InputNoteReader;
 pub use note_screener::{NoteConsumability, NoteScreener, NoteScreenerError};
 pub use note_update_tracker::{
     InputNoteUpdate,
+    NoteConsumption,
     NoteUpdateTracker,
     NoteUpdateType,
     OutputNoteUpdate,
