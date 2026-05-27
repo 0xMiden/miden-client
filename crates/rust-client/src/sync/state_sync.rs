@@ -965,9 +965,10 @@ fn derive_account_commitments(
                 .find(|tx| {
                     !initial_states.contains(&tx.transaction_header.final_state_commitment())
                 })
-                .map(|tx| tx.transaction_header.final_state_commitment())
                 // Fallback for degenerate input (e.g. a cycle); take the last record seen.
-                .unwrap_or_else(|| txs.last().unwrap().transaction_header.final_state_commitment())
+                .unwrap_or_else(|| txs.last().unwrap())
+                .transaction_header
+                .final_state_commitment()
         };
 
         latest_by_account
