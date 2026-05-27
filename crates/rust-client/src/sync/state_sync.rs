@@ -951,38 +951,42 @@ fn group_txs_by_account_block(
 /// Same-block transactions for the same account form an execution chain: each tx's
 /// `final_state_commitment` is the next tx's `initial_state_commitment`. This finds the chain
 /// start and walks forward, yielding each tx in execution order.
-///
-/// # Panics
-///
-/// Panics if `txs` is non-empty but no chain start exists (cyclic input). Cycles are
-/// impossible in legitimate node responses — every transaction changes account state, so
-/// `initial_state_commitment` and `final_state_commitment` can never both be equal across
-/// the same chain.
 fn walk_execution_chain<'a>(
     txs: &'a [&'a RpcTransactionRecord],
 ) -> impl Iterator<Item = &'a RpcTransactionRecord> + 'a {
-    let final_states: BTreeSet<Word> =
-        txs.iter().map(|tx| tx.transaction_header.final_state_commitment()).collect();
+    let (self_loops, chained): (Vec<&RpcTransactionRecord>, Vec<&RpcTransactionRecord>) =
+        txs.iter().copied().partition(|tx| {
+            tx.transaction_header.initial_state_commitment()
+                == tx.transaction_header.final_state_commitment()
+        });
 
-    let mut init_to_tx: BTreeMap<Word, &RpcTransactionRecord> = txs
+    let final_states: BTreeSet<Word> = chained
+        .iter()
+        .map(|tx| tx.transaction_header.final_state_commitment())
+        .collect();
+
+    let mut init_to_tx: BTreeMap<Word, &RpcTransactionRecord> = chained
         .iter()
         .map(|tx| (tx.transaction_header.initial_state_commitment(), *tx))
         .collect();
 
-    let start = txs
+    let start = chained
         .iter()
         .find(|tx| !final_states.contains(&tx.transaction_header.initial_state_commitment()))
         .copied();
 
-    assert!(start.is_some() || txs.is_empty(), "cannot walk cyclic execution chain");
+    assert!(start.is_some() || chained.is_empty(), "cannot walk cyclic execution chain");
 
     let mut current =
         start.and_then(|tx| init_to_tx.remove(&tx.transaction_header.initial_state_commitment()));
+    let mut self_loops_iter = self_loops.into_iter();
 
     core::iter::from_fn(move || {
-        let tx = current?;
-        current = init_to_tx.remove(&tx.transaction_header.final_state_commitment());
-        Some(tx)
+        if let Some(tx) = current {
+            current = init_to_tx.remove(&tx.transaction_header.final_state_commitment());
+            return Some(tx);
+        }
+        self_loops_iter.next()
     })
 }
 
@@ -996,7 +1000,7 @@ fn derive_account_commitments(
     for ((account_id, block_num), txs) in &group_txs_by_account_block(transaction_records) {
         let terminal_state = walk_execution_chain(txs)
             .last()
-            .expect("group is non-empty by construction; walk_execution_chain panics on cycles")
+            .expect("account must have a final state")
             .transaction_header
             .final_state_commitment();
 
