@@ -136,11 +136,10 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
 
     // Submit both requests as a single proven batch via the node's `SubmitProvenBatch` path.
     let block_num = client
-        .new_transaction_batch(from_account_id)
+        .new_transaction_batch()
+        .push(from_account_id, tx_request_1)
         .await?
-        .push(tx_request_1)
-        .await?
-        .push(tx_request_2)
+        .push(from_account_id, tx_request_2)
         .await?
         .submit()
         .await?;
@@ -1549,7 +1548,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .block_num();
     let node_nullifier = client
         .test_rpc_api()
-        .sync_nullifiers(&[nullifier.prefix()], 0.into(), chain_tip)
+        .sync_nullifiers(&[nullifier.prefix()], 0.into(), Some(chain_tip))
         .await
         .unwrap()
         .pop()

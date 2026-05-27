@@ -1,4 +1,4 @@
-use alloc::collections::BTreeSet;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -23,48 +23,43 @@ use crate::store::data_store::ClientDataStore;
 // IN-MEMORY BATCH DATA STORE
 // ================================================================================================
 
-/// A [`DataStore`] scoped to a single batch on one local account. Wraps an inner
-/// [`ClientDataStore`] and, for the batch's account, substitutes the
-/// current in-batch account state (produced by the most recent successful push)
-/// in place of the state read from the store. All other reads remain unchanged.
+/// A [`DataStore`] that lets a [`crate::transaction::BatchBuilder`] stack in-memory account
+/// states for any number of local accounts. For each account registered in
+/// `current_accounts`, the executor sees the in-batch state instead of the stale store state.
+/// All other reads pass through to the inner [`ClientDataStore`].
 pub(crate) struct InMemoryBatchDataStore {
     inner: ClientDataStore,
-    batch_account_id: AccountId,
-    current_account: Account,
+    current_accounts: BTreeMap<AccountId, Account>,
 }
 
 impl InMemoryBatchDataStore {
-    pub(crate) fn new(
-        inner: ClientDataStore,
-        batch_account_id: AccountId,
-        initial_account: Account,
-    ) -> Self {
-        Self {
-            inner,
-            batch_account_id,
-            current_account: initial_account,
-        }
+    /// Wraps the provided [`ClientDataStore`] with an empty in-batch account cache.
+    pub(crate) fn new(inner: ClientDataStore) -> Self {
+        Self { inner, current_accounts: BTreeMap::new() }
     }
 
-    /// Replace the current account state. Called by `BatchBuilder::push` after
-    /// a successful execute+prove to expose the post-tx state to the next push.
-    pub(crate) fn set_current_account(&mut self, new_state: Account) {
-        self.current_account = new_state;
+    /// Returns the in-batch account state for `id`, if a transaction earlier in the batch
+    /// has cached one. A return of `None` means subsequent transactions targeting this
+    /// account will see the store's state instead.
+    pub(crate) fn get_account(&self, id: AccountId) -> Option<&Account> {
+        self.current_accounts.get(&id)
     }
 
-    /// Returns a reference to the current in-batch account state.
-    pub(crate) fn current_account(&self) -> &Account {
-        &self.current_account
+    /// Records the post-execution state of an account so that later transactions in the
+    /// same batch targeting `id` observe the in-batch state. Overwrites any previously
+    /// cached entry for `id`.
+    pub(crate) fn cache_account(&mut self, id: AccountId, new_state: Account) {
+        self.current_accounts.insert(id, new_state);
     }
 
-    /// Returns the inner [`ClientDataStore`]'s MAST forest store. Used by `BatchBuilder::push`
-    /// to load account and foreign-account code before execution.
+    /// Returns the inner [`ClientDataStore`]'s MAST store so callers can load account
+    /// or note code prior to execution.
     pub(crate) fn mast_store(&self) -> Arc<TransactionMastStore> {
         self.inner.mast_store()
     }
 
-    /// Registers foreign account inputs on the inner [`ClientDataStore`] so that the executor
-    /// can find them during batch-level transaction execution.
+    /// Registers foreign account inputs on the inner [`ClientDataStore`] so the executor
+    /// can resolve foreign-procedure invocations during transaction execution.
     pub(crate) fn register_foreign_account_inputs(
         &self,
         foreign_accounts: impl IntoIterator<Item = AccountInputs>,
@@ -85,8 +80,8 @@ impl DataStore for InMemoryBatchDataStore {
         let (mut partial_account, block_header, partial_blockchain) =
             self.inner.get_transaction_inputs(account_id, ref_blocks).await?;
 
-        if account_id == self.batch_account_id {
-            partial_account = PartialAccount::from(&self.current_account);
+        if let Some(account) = self.current_accounts.get(&account_id) {
+            partial_account = PartialAccount::from(account);
         }
 
         Ok((partial_account, block_header, partial_blockchain))
@@ -98,12 +93,8 @@ impl DataStore for InMemoryBatchDataStore {
         vault_root: Word,
         vault_keys: BTreeSet<AssetVaultKey>,
     ) -> Result<Vec<AssetWitness>, DataStoreError> {
-        if account_id == self.batch_account_id {
-            // Serve witnesses directly from the in-batch account state, as inner store's
-            // vault may be stale relative to updates made by previous pushes in this batch,
-            // which would cause a vault root mismatch when the executor compares the root
-            // exposed by the substituted PartialAccount against what the store returns.
-            let vault = self.current_account.vault();
+        if let Some(account) = self.current_accounts.get(&account_id) {
+            let vault = account.vault();
             let in_batch_root = vault.root();
             if in_batch_root != vault_root {
                 return Err(DataStoreError::other(format!(
@@ -123,11 +114,8 @@ impl DataStore for InMemoryBatchDataStore {
         map_root: Word,
         map_key: StorageMapKey,
     ) -> Result<StorageMapWitness, DataStoreError> {
-        if account_id == self.batch_account_id {
-            // Serve witnesses directly from the in-batch account state. If a previous push in
-            // this batch mutated a storage map, the inner store's view of that map is stale
-            // relative to `self.current_account`, so we must open against the in-batch state.
-            for slot in self.current_account.storage().slots() {
+        if let Some(account) = self.current_accounts.get(&account_id) {
+            for slot in account.storage().slots() {
                 if let StorageSlotContent::Map(map) = slot.content()
                     && map.root() == map_root
                 {

@@ -609,7 +609,7 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     #[cfg(feature = "testing")]
     if offline {
         client.prepare_offline_bootstrap().await?;
-        println!("Offline mode seeded default RPC limits and a synthetic genesis header.");
+        println!("Offline mode enabled for local account creation.");
     }
 
     client.add_account(&account, false).await?;

@@ -36,6 +36,7 @@ CREATE TABLE latest_account_headers (
     nonce BIGINT NOT NULL,                   -- account nonce
     account_seed BLOB NULL,                  -- seed used to generate the ID; NULL for non-new accounts
     locked BOOLEAN NOT NULL,                 -- whether the account is locked
+    watched BOOLEAN NOT NULL DEFAULT FALSE, -- Whether the account is tracked in watch mode
     PRIMARY KEY (id),
     FOREIGN KEY (code_commitment) REFERENCES account_code(commitment)
 );

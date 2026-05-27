@@ -144,8 +144,8 @@ impl MockRpcApi {
         let mut updates = vec![];
         for block in self.mock_chain.read().proven_blocks() {
             let block_number = block.header().block_num();
-            // Only include blocks in range (block_from, page_end_block]
-            if block_number <= block_from || block_number > page_end_block {
+            // Only include blocks in range [block_from, page_end_block]
+            if block_number < block_from || block_number > page_end_block {
                 continue;
             }
 
@@ -231,7 +231,8 @@ impl MockRpcApi {
         let mut updates = vec![];
         for block in self.mock_chain.read().proven_blocks() {
             let block_number = block.header().block_num();
-            if block_number <= block_from || block_number > page_end_block {
+            // Only include blocks in range [block_from, page_end_block]
+            if block_number < block_from || block_number > page_end_block {
                 continue;
             }
 
@@ -570,7 +571,7 @@ impl NodeRpcClient for MockRpcApi {
         &self,
         prefixes: &[u16],
         block_from: BlockNumber,
-        block_to: BlockNumber,
+        block_to: Option<BlockNumber>,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         let nullifiers = self
             .mock_chain
@@ -578,7 +579,11 @@ impl NodeRpcClient for MockRpcApi {
             .nullifier_tree()
             .entries()
             .filter_map(|(nullifier, block_num)| {
-                let within_range = block_num >= block_from && block_num <= block_to;
+                let within_range = if let Some(to_block) = block_to {
+                    block_num >= block_from && block_num <= to_block
+                } else {
+                    block_num >= block_from
+                };
 
                 if prefixes.contains(&nullifier.prefix()) && within_range {
                     Some(NullifierUpdate { nullifier, block_num })

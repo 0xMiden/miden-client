@@ -23,6 +23,7 @@ use miden_client::rpc::NodeRpcClient;
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{
     AccountStorageFilter,
+    ClientAccountType,
     InputNoteRecord,
     InputNoteState,
     NoteFilter,
@@ -625,8 +626,7 @@ async fn sync_persists_auth_nodes_for_skipped_blocks() {
     partial_mmr.add(genesis.commitment(), true); // track genesis
 
     // Create a StateSync that discards all notes so intermediate blocks are skipped
-    let state_sync =
-        StateSync::new(Arc::new(rpc_api.clone()), None, Arc::new(DiscardAllNotes), None);
+    let state_sync = StateSync::new(Arc::new(rpc_api.clone()), Arc::new(DiscardAllNotes), None);
 
     // Use the note tag from the prebuilt chain (tag 0) so the mock RPC returns
     // blocks step-by-step (block 1, then block 4, then the chain tip) instead of
@@ -678,7 +678,13 @@ async fn sync_state_no_redundant_get_account_calls() {
     use miden_client::async_trait;
     use miden_client::rpc::domain::note::CommittedNote;
     use miden_client::store::InputNoteRecord;
-    use miden_client::sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
+    use miden_client::sync::{
+        AccountSyncHint,
+        NoteUpdateAction,
+        OnNoteReceived,
+        StateSync,
+        StateSyncInput,
+    };
     use miden_protocol::crypto::merkle::mmr::{Forest, MmrPeaks, PartialMmr};
 
     struct DiscardAllNotes;
@@ -720,14 +726,13 @@ async fn sync_state_no_redundant_get_account_calls() {
     let mut partial_mmr = PartialMmr::from_peaks(MmrPeaks::new(Forest::empty(), vec![]).unwrap());
     partial_mmr.add(genesis.commitment(), true);
 
-    let state_sync =
-        StateSync::new(Arc::new(rpc_api.clone()), None, Arc::new(DiscardAllNotes), None);
+    let state_sync = StateSync::new(Arc::new(rpc_api.clone()), Arc::new(DiscardAllNotes), None);
 
     // Use tag 0 to force multiple sync steps (notes exist in blocks 1 and 4)
     let note_tags = BTreeSet::from([NoteTag::new(0)]);
 
     let input = StateSyncInput {
-        accounts: vec![account_header],
+        accounts: vec![AccountSyncHint::from_header(account_header)],
         note_tags,
         input_notes: vec![],
         output_notes: vec![],
@@ -3071,11 +3076,7 @@ async fn storage_and_vault_proofs() {
 
     keystore.add_key(&key_pair, account.id()).await.unwrap();
 
-    client
-        .test_store()
-        .insert_account(&account, Address::new(account.id()))
-        .await
-        .unwrap();
+    client.add_account(&account, false).await.unwrap();
 
     let account_id = account.id();
 
@@ -3204,33 +3205,89 @@ async fn account_add_address_after_creation() {
 
     client.add_account(&account, false).await.unwrap();
 
-    let unspecified_default_address = Address::new(account.id());
+    let default_address = Address::new(account.id());
 
-    // The default unspecified address cannot be added
-    // as it is already present after account creation
-    assert!(client.add_address(unspecified_default_address, account.id()).await.is_err());
+    // The address cannot be added again as it is already present after account creation
+    assert!(client.add_address(default_address.clone(), account.id()).await.is_err());
 
-    // The basic wallet address cannot be added
-    // as it is already present after account creation
+    // An address with different routing parameters can be added
     let routing_params = RoutingParameters::new(AddressInterface::BasicWallet);
     let basic_wallet_address = Address::new(account.id()).with_routing_parameters(routing_params);
-    assert!(client.add_address(basic_wallet_address.clone(), account.id()).await.is_err());
+    assert!(client.add_address(basic_wallet_address.clone(), account.id()).await.is_ok());
 
-    // We can remove the basic wallet address
-    assert!(client.remove_address(basic_wallet_address.clone(), account.id()).await.is_ok());
-
-    // Derived note tag should also be removed
-    let derived_note_tag = basic_wallet_address.to_note_tag();
+    // We can remove the default address and the note tag is still present
+    assert!(client.remove_address(default_address.clone(), account.id()).await.is_ok());
+    let derived_note_tag = default_address.to_note_tag();
     let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account.id());
+    let note_tags = client.get_note_tags().await.unwrap();
+    assert!(note_tags.contains(&note_tag_record));
+
+    // If we remove all addresses, note tag should be removed
+    assert!(client.remove_address(basic_wallet_address.clone(), account.id()).await.is_ok());
     let note_tags = client.get_note_tags().await.unwrap();
     assert!(!note_tags.contains(&note_tag_record));
 
     // Then add it again
-    assert!(client.add_address(basic_wallet_address, account.id()).await.is_ok());
+    assert!(client.add_address(default_address, account.id()).await.is_ok());
 
     // Derived note tag should now be available
     let note_tags = client.get_note_tags().await.unwrap();
     assert!(note_tags.contains(&note_tag_record));
+}
+
+#[tokio::test]
+async fn import_watched_account_by_id_rejects_already_tracked_native_account() {
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let account = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+    let account_id = account.id();
+    let rpc_api = MockRpcApi::new(mock_chain_builder.build().unwrap());
+    let arc_rpc_api = Arc::new(rpc_api);
+    let mut rng = rand::rng();
+    let coin_seed: [u64; 4] = rng.random();
+    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
+    let keystore = FilesystemKeyStore::new(temp_dir()).unwrap();
+    let mut client = ClientBuilder::new()
+        .rpc(arc_rpc_api)
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .in_debug_mode(DebugMode::Enabled)
+        .build()
+        .await
+        .unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    client.add_account(&account, false).await.unwrap();
+
+    let default_note_tag_record =
+        NoteTagRecord::with_account_source(Address::new(account_id).to_note_tag(), account_id);
+    let routing_params = RoutingParameters::new(AddressInterface::BasicWallet)
+        .with_note_tag_len(NoteTag::MAX_ACCOUNT_TARGET_TAG_LENGTH)
+        .unwrap();
+    let extra_address = Address::new(account_id).with_routing_parameters(routing_params);
+    let extra_address_note_tag_record =
+        NoteTagRecord::with_account_source(extra_address.to_note_tag(), account_id);
+
+    client.add_address(extra_address, account_id).await.unwrap();
+
+    let note_tags = client.get_note_tags().await.unwrap();
+    assert!(note_tags.contains(&default_note_tag_record));
+    assert!(note_tags.contains(&extra_address_note_tag_record));
+
+    let err = client
+        .import_watched_account_by_id(account_id)
+        .await
+        .expect_err("watched import must reject already-tracked native account");
+    assert!(matches!(err, ClientError::AccountWatchedMismatch(id) if id == account_id));
+
+    // Native tags must still be there and the account must still be native.
+    let note_tags = client.get_note_tags().await.unwrap();
+    assert!(note_tags.contains(&default_note_tag_record));
+    assert!(note_tags.contains(&extra_address_note_tag_record));
+    let account_record = client.test_store().get_account(account_id).await.unwrap().unwrap();
+    assert!(!account_record.is_watched());
 }
 
 #[tokio::test]
@@ -3553,6 +3610,49 @@ async fn sync_large_public_account() {
         usize::try_from(NUM_FAUCETS_LARGE_ACCOUNT).unwrap(),
         "all vault assets should be preserved after sync"
     );
+}
+
+#[tokio::test]
+async fn prepare_offline_bootstrap_inserts_mock_chain_genesis() {
+    use miden_protocol::block::account_tree::AccountTree;
+    use miden_protocol::crypto::merkle::smt::Smt;
+    use miden_protocol::transaction::TransactionKernel;
+
+    let mut rng_seed = rand::rng();
+    let coin_seed: [u64; 4] = rng_seed.random();
+    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
+
+    let reference_rpc = MockRpcApi::default();
+    let (expected_genesis, _) = reference_rpc
+        .get_block_header_by_number(Some(BlockNumber::GENESIS), false)
+        .await
+        .unwrap();
+
+    let keystore_path = temp_dir();
+    let keystore = FilesystemKeyStore::new(keystore_path).unwrap();
+
+    let mut client = ClientBuilder::new()
+        .rpc(Arc::new(MockRpcApi::default()))
+        .sqlite_store(create_test_store_path())
+        .rng(Box::new(rng))
+        .authenticator(Arc::new(keystore))
+        .build()
+        .await
+        .unwrap();
+
+    client.prepare_offline_bootstrap().await.unwrap();
+
+    let (stored_genesis, _) = client
+        .get_block_header_by_num(BlockNumber::GENESIS)
+        .await
+        .unwrap()
+        .expect("genesis should be stored after offline bootstrap");
+
+    assert_eq!(stored_genesis.block_num(), BlockNumber::GENESIS);
+    assert_eq!(stored_genesis.account_root(), expected_genesis.account_root());
+    assert_eq!(stored_genesis.tx_kernel_commitment(), expected_genesis.tx_kernel_commitment());
+    assert_eq!(stored_genesis.account_root(), AccountTree::<Smt>::default().root());
+    assert_eq!(stored_genesis.tx_kernel_commitment(), TransactionKernel.to_commitment());
 }
 
 // HELPERS
@@ -3965,5 +4065,68 @@ async fn storage_and_vault_proofs_ecdsa() {
 
         assert_eq!(value, map.get(&StorageMapKey::new(MAP_KEY.into())));
         assert_eq!(proof, map.open(&StorageMapKey::new(MAP_KEY.into())));
+    }
+}
+
+#[tokio::test]
+async fn execute_transaction_fails_for_watched_account() {
+    let (mut client, _rpc_api, _) = Box::pin(create_test_client()).await;
+
+    // Build a faucet locally and insert it directly as watched via the store. Bypasses the
+    // public `add_account`/`import_watched_account_by_id` paths so we don't need a mock RPC
+    // round-trip.
+    let key_pair = AuthSecretKey::new_falcon512_poseidon2();
+    let auth_component =
+        AuthSingleSig::new(key_pair.public_key().to_commitment(), AuthSchemeId::Falcon512Poseidon2);
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let symbol = TokenSymbol::new("WTCH").unwrap();
+    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
+    let max_supply = 9_999_999_u64;
+    let faucet_component = FungibleFaucet::builder()
+        .name(name)
+        .symbol(symbol)
+        .decimals(10)
+        .max_supply(AssetAmount::new(max_supply).unwrap())
+        .build()
+        .unwrap();
+    let faucet = AccountBuilder::new(init_seed)
+        .account_type(AccountType::FungibleFaucet)
+        .storage_mode(AccountStorageMode::Public)
+        .with_auth_component(auth_component)
+        .with_component(faucet_component)
+        .with_components(TokenPolicyManager::new(
+            PolicyAuthority::AuthControlled,
+            MintPolicyConfig::AllowAll,
+            BurnPolicyConfig::AllowAll,
+        ))
+        .build_with_schema_commitment()
+        .unwrap();
+    let faucet_id = faucet.id();
+    let address = Address::new(faucet_id);
+
+    client
+        .test_store()
+        .insert_account(&faucet, address, ClientAccountType::Watched)
+        .await
+        .expect("watched account should insert via the store");
+
+    let target_account_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(
+            FungibleAsset::new(faucet_id, 1u64).unwrap(),
+            target_account_id,
+            miden_protocol::note::NoteType::Private,
+            client.rng(),
+        )
+        .unwrap();
+
+    let result = Box::pin(client.execute_transaction(faucet_id, tx_request)).await;
+
+    match result {
+        Err(ClientError::AccountIsWatched(id)) => assert_eq!(id, faucet_id),
+        other => panic!("expected AccountIsWatched, got {other:?}"),
     }
 }

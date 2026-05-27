@@ -32,6 +32,7 @@ use miden_protocol::account::{
     AccountHeader,
     AccountId,
     AccountStorage,
+    AccountStorageHeader,
     StorageMapKey,
     StorageMapWitness,
     StorageSlot,
@@ -68,7 +69,13 @@ mod smt_forest;
 pub use smt_forest::AccountSmtForest;
 
 mod account;
-pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
+pub use account::{
+    AccountRecord,
+    AccountRecordData,
+    AccountStatus,
+    AccountUpdates,
+    ClientAccountType,
+};
 
 pub use crate::sync::PublicAccountUpdate;
 mod note_record;
@@ -347,9 +354,9 @@ pub trait Store: Send + Sync {
         account_id: AccountId,
     ) -> Result<Option<AccountCode>, StoreError>;
 
-    /// Inserts an [`Account`] to the store.
-    /// Receives an [`Address`] as the initial address to associate with the account. This address
-    /// will be tracked for incoming notes and its derived note tag will be monitored.
+    /// Inserts an [`Account`] to the store, alongside its initial [`Address`].
+    ///
+    /// Tag registration is the caller's responsibility — see [`Self::add_note_tag`].
     ///
     /// # Errors
     ///
@@ -358,6 +365,7 @@ pub trait Store: Send + Sync {
         &self,
         account: &Account,
         initial_address: Address,
+        client_account_type: ClientAccountType,
     ) -> Result<(), StoreError>;
 
     /// Upserts the account code for a foreign account. This value will be used as a cache of known
@@ -387,19 +395,19 @@ pub trait Store: Send + Sync {
     /// Returns a `StoreError::AccountDataNotFound` if there is no account for the provided ID.
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError>;
 
-    /// Adds an [`Address`] to an [`Account`], alongside its derived note tag.
+    /// Adds an [`Address`] to an [`Account`].
+    ///
+    /// Tag registration is the caller's responsibility — see [`Self::add_note_tag`].
     async fn insert_address(
         &self,
         address: Address,
         account_id: AccountId,
     ) -> Result<(), StoreError>;
 
-    /// Removes an [`Address`] from an [`Account`], alongside its derived note tag.
-    async fn remove_address(
-        &self,
-        address: Address,
-        account_id: AccountId,
-    ) -> Result<(), StoreError>;
+    /// Removes an [`Address`].
+    ///
+    /// Tag removal is the caller's responsibility — see [`Self::remove_note_tag`].
+    async fn remove_address(&self, address: Address) -> Result<(), StoreError>;
 
     // SETTINGS
     // --------------------------------------------------------------------------------------------
@@ -597,6 +605,21 @@ pub trait Store: Send + Sync {
         account_id: AccountId,
         filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError>;
+
+    /// Returns the storage header (slot names, types, and current values/roots) for the given
+    /// account.
+    ///
+    /// This is a lightweight read used by `Client::build_sync_input` to populate
+    /// `AccountSyncHint`s without paying the cost of reading every map entry. The default
+    /// implementation falls back to `get_account_storage`; backends are encouraged to override
+    /// it with a focused query.
+    async fn get_account_storage_header(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountStorageHeader, StoreError> {
+        let storage = self.get_account_storage(account_id, AccountStorageFilter::All).await?;
+        Ok(AccountStorageHeader::from(&storage))
+    }
 
     /// Retrieves a storage slot value by name.
     ///
@@ -799,4 +822,8 @@ pub enum AccountStorageFilter {
     Root(Word),
     /// Return an [`AccountStorage`] with a single slot that matches the provided slot name.
     SlotName(StorageSlotName),
+    /// Return an [`AccountStorage`] containing only the slots whose names are in the provided
+    /// list. Useful to avoid loading the full storage when only a known subset of slots is needed
+    /// (e.g. when applying a delta to a large account).
+    SlotNames(Vec<StorageSlotName>),
 }
