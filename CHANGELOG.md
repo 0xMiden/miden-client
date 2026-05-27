@@ -18,6 +18,7 @@
 * [BREAKING][rust] Removed `NodeRpcClient::check_nullifiers`, `RpcEndpoint::CheckNullifiers`, `EndpointError::CheckNullifiers`, and `CheckNullifiersError` after the upstream node dropped the `CheckNullifiers` gRPC method. Use `NodeRpcClient::sync_nullifiers` to retrieve nullifier updates. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * Removed limit on accounts and note tags that can be tracked by the client ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
 * [BREAKING] Updated the `sync_notes` and `sync_transactions` to return directly the fetched updates. Removed `TransactionsInfo` and `NoteSyncInfo` structs ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
+* [BREAKING] Reworked the `GetAccount` surface on `NodeRpcClient`: replaced `get_account_proof` with `get_account(account_id, GetAccountRequest)` and added `resolve_oversize_vault` / `resolve_oversize_storage_maps` helpers. `GetAccountRequest` bundles the previous positional args ([#2202](https://github.com/0xMiden/miden-client/pull/2202)).
 
 ### Enhancements
 
