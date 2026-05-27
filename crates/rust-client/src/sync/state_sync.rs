@@ -933,12 +933,11 @@ impl StateSync {
     }
 }
 
-/// For each unique account, returns the `final_state_commitment` from the terminal transaction
-/// in the highest-`block_num` group. When multiple transactions for the same account are
-/// committed in the same block they form an execution chain: the `final_state_commitment` of
-/// each transaction is the `initial_state_commitment` of the next. Walking this chain to its
-/// end yields the actual on-chain account state, whereas picking the first-seen transaction
-/// would return an intermediate (and incorrect) commitment.
+/// For each unique account, returns the `final_state_commitment` from the final transaction in the
+/// highest `block_num` group. When multiple transactions for the same account are committed in the
+/// same block they form an execution chain: the `final_state_commitment` of each transaction is the
+/// `initial_state_commitment` of the next. Walking this chain to its end yields the final account
+/// commitment.
 fn derive_account_commitments(
     transaction_records: &[RpcTransactionRecord],
 ) -> Vec<(AccountId, Word)> {
@@ -959,10 +958,8 @@ fn derive_account_commitments(
         } else {
             // The terminal transaction's final_state_commitment is not used as the
             // initial_state_commitment of any other transaction in the same group.
-            let initial_states: BTreeSet<Word> = txs
-                .iter()
-                .map(|tx| tx.transaction_header.initial_state_commitment())
-                .collect();
+            let initial_states: BTreeSet<Word> =
+                txs.iter().map(|tx| tx.transaction_header.initial_state_commitment()).collect();
 
             txs.iter()
                 .find(|tx| {
@@ -1068,15 +1065,19 @@ mod tests {
     };
     use miden_protocol::testing::account_id::{
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
         ACCOUNT_ID_REGULAR_NETWORK_ACCOUNT_IMMUTABLE_CODE,
+        ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
         ACCOUNT_ID_SENDER,
     };
-    use miden_protocol::{Felt, Word};
+    use miden_protocol::transaction::{InputNotes, TransactionHeader};
+    use miden_protocol::{Felt, Word, ZERO};
     use miden_standards::code_builder::CodeBuilder;
     use miden_standards::note::{NetworkAccountTarget, NoteExecutionHint};
     use miden_testing::{MockChainBuilder, TxContextInput};
 
     use super::*;
+    use crate::rpc::domain::transaction::ACCOUNT_ID_NATIVE_ASSET_FAUCET;
     use crate::store::{OutputNoteRecord, OutputNoteState};
     use crate::test_utils::mock::MockRpcApi;
 
@@ -1104,6 +1105,10 @@ mod tests {
         }
     }
 
+    fn word(n: u64) -> miden_protocol::Word {
+        [Felt::new(n), ZERO, ZERO, ZERO].into()
+    }
+
     // COMPUTE NULLIFIER TX ORDER TESTS
     // --------------------------------------------------------------------------------------------
 
@@ -1114,16 +1119,12 @@ mod tests {
         use miden_protocol::block::BlockNumber;
         use miden_protocol::note::Nullifier;
         use miden_protocol::transaction::{InputNoteCommitment, InputNotes, TransactionHeader};
-        use miden_protocol::{Felt, ZERO};
 
+        use super::word;
         use crate::rpc::domain::transaction::{
             ACCOUNT_ID_NATIVE_ASSET_FAUCET,
             TransactionRecord as RpcTransactionRecord,
         };
-
-        fn word(n: u64) -> miden_protocol::Word {
-            [Felt::new(n), ZERO, ZERO, ZERO].into()
-        }
 
         fn make_rpc_tx(
             init_state: u64,
@@ -1245,6 +1246,63 @@ mod tests {
             let result = super::super::compute_ordered_nullifiers(&[]);
             assert!(result.is_empty());
         }
+    }
+
+    // DERIVE ACCOUNT COMMITMENTS TESTS
+    // --------------------------------------------------------------------------------------------
+
+    /// `derive_account_commitments` must walk the execution chain to get the final commitment when
+    /// several transactions for the same account land in the same block.
+    ///
+    /// Test scenario:
+    /// - Account A, block 5: chain 1 - 2 - 3 (older group; must be dominated by block 6).
+    /// - Account A, block 6: chain 3 - 4 - 5 (final state = 5).
+    /// - Account B, block 6: single tx 10 - 20 (final state = 20).
+    #[test]
+    fn derive_account_commitments_walks_chains_per_account() {
+        let fee =
+            FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("valid"), 0u64)
+                .unwrap();
+        let make_tx = |account: AccountId, init_state: u64, final_state: u64, block_num: u32| {
+            RpcTransactionRecord {
+                block_num: BlockNumber::from(block_num),
+                transaction_header: TransactionHeader::new(
+                    account,
+                    word(init_state),
+                    word(final_state),
+                    InputNotes::new_unchecked(vec![]),
+                    vec![],
+                    fee,
+                ),
+                output_notes: vec![],
+                erased_output_notes: vec![],
+            }
+        };
+
+        let account_a: AccountId =
+            ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE.try_into().unwrap();
+        let account_b: AccountId = ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap();
+
+        let tx_a_b5_1 = make_tx(account_a, 1, 2, 5);
+        let tx_a_b5_2 = make_tx(account_a, 2, 3, 5);
+        let tx_a_b6_1 = make_tx(account_a, 3, 4, 6);
+        let tx_a_b6_2 = make_tx(account_a, 4, 5, 6);
+        let tx_b_b6 = make_tx(account_b, 10, 20, 6);
+
+        // Insert transactions not ordered by execution order.
+        let result = super::derive_account_commitments(&[
+            tx_a_b6_1, tx_b_b6, tx_a_b5_2, tx_a_b6_2, tx_a_b5_1,
+        ]);
+
+        assert_eq!(result.len(), 2, "one entry per account");
+        assert!(
+            result.contains(&(account_a, word(5))),
+            "account A: must walk block 6's chain, not return block 5 or an intermediate",
+        );
+        assert!(
+            result.contains(&(account_b, word(20))),
+            "account B: must be resolved independently of account A",
+        );
     }
 
     // CONSUMED NOTE ORDERING INTEGRATION TESTS

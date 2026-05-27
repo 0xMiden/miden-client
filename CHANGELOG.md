@@ -4,7 +4,7 @@
 
 ### Fixes
 
-* [FIX][rust] Fixed `derive_account_commitment_updates` returning an intermediate account commitment when multiple transactions for the same account are committed in the same block. The function previously kept the first-encountered transaction for equal `block_num` values, but same-block transactions form an execution chain linked by `initial_state_commitment`/`final_state_commitment`. The fix walks this chain to its terminal node (the transaction whose `final_state_commitment` is not another transaction's `initial_state_commitment` in the same block), mirroring the chain-linking logic already used in `compute_ordered_nullifiers`.
+* [FIX] Fixed `derive_account_commitments` to return the final account commitment when multiple transactions for the same account are committed in the same block ([#2164](https://github.com/0xMiden/miden-client/pull/2164)).
 
 ### Changes
 
