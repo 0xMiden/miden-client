@@ -1694,7 +1694,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2359,7 +2359,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.3",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -3129,9 +3129,9 @@ dependencies = [
 
 [[package]]
 name = "miden-core"
-version = "0.23.1"
+version = "0.23.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2315cc7abb7abee25889de16739685f584215dc0e4c77f873e7054d0e234712"
+checksum = "4bed17ecc11e59874f4d23a4488f2fc6ea971247b8596ce395300e37e770f4f6"
 dependencies = [
  "derive_more",
  "log",
@@ -3223,9 +3223,9 @@ dependencies = [
 
 [[package]]
 name = "miden-debug"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d22b4e15271958d3202cb4ebda4abfcb37db6e74ec833562f974dd7a6e3c2017"
+checksum = "4c581bad965d49515f04ca370b4a20e8987f8c6051e39ac290a3128844e602ac"
 dependencies = [
  "clap",
  "compact_str",
@@ -3256,9 +3256,9 @@ dependencies = [
 
 [[package]]
 name = "miden-debug-engine"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6178358b1db3c27362d34185631d5936d1fcc2fdad95b016d2a3c9648757f015"
+checksum = "67dd805d5456e0c00c8d89bd9ce16105f55a55ca3bee8b67459e554588d0dbb2"
 dependencies = [
  "clap",
  "glob",
@@ -5390,7 +5390,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6029,7 +6029,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7107,7 +7107,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

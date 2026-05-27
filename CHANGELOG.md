@@ -24,6 +24,7 @@
 * [BREAKING] `TransactionRequestBuilder::build_pswap_create` now takes `note_attachment: Option<NoteAttachment>` instead of `NoteAttachment`. Pass `None` when there is nothing to attach (previously `NoteAttachment::default()`). ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
 * [BREAKING] `account list`, `account show`, and `account new-faucet` now read and build the new `FungibleFaucet` component (multi-slot) instead of the standalone `TokenMetadata` storage item. Faucet accounts created with the previous component layout are no longer recognized; new faucets are constructed via `FungibleFaucet::builder` rather than the `basic-fungible-faucet` package. ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
 * [BREAKING] Note attachments are no longer carried on the note-transport wire format (only `NoteHeader` + serialized `NoteDetails`). ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
+* [BREAKING][param][rust,store] `InputNoteRecord` now carries note attachments: `InputNoteRecord::new` takes an additional `NoteAttachments` argument, and input notes persist their attachments in the store (new `attachments` column on the `input_notes` table). (#TBD)
 
 ### Enhancements
 
@@ -40,6 +41,10 @@
 * [FEATURE][web] Added `StorageView` JS wrapper over WASM `AccountStorage`. `account.storage()` now returns a `StorageView` that makes `getItem()` work intuitively for both Value and StorageMap slots. WASM primitives are unchanged; the raw `AccountStorage` is accessible via `.raw` ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][web] Added `wordToBigInt()` utility export for losslessly converting a `Word`'s first felt to a `BigInt`. `StorageResult.toString()` is BigInt-backed, and `valueOf()` returns a JS number for values fitting in `Number.MAX_SAFE_INTEGER` and throws `RangeError` for larger u64 values — use `.toBigInt()` for exact access ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][rust,cli] Added partial swap (PSWAP) support: `TransactionRequestBuilder::build_pswap_create` / `build_pswap_consume` / `build_pswap_cancel` and a `miden-client pswap` CLI command (`create`, `consume`, `cancel`) for partially-fillable fungible swaps ([#2162](https://github.com/0xMiden/miden-client/pull/2162)).
+
+### Fixes
+
+* [FIX][rust] Fixed the `dap` feature build by bumping `miden-debug`/`miden-debug-engine` to 0.8.1 and `miden-core` to 0.23.2, aligning the debugger crates with the `miden-core` APIs they call. (#TBD)
 
 ## 0.14.9 (2026-05-19)
 
