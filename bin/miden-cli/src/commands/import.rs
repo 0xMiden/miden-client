@@ -48,9 +48,6 @@ impl ImportCmd {
 
                 println!("Successfully imported account {account_id}");
 
-                // Under protocol 0.15 the AccountId no longer encodes wallet-vs-faucet;
-                // probe the fungible-faucet token-config slot to decide whether to set this
-                // import as the default. If the slot is absent it's treated as a wallet.
                 let reader = client.account_reader(account_id);
                 let is_faucet = reader
                     .get_storage_item(

@@ -134,13 +134,9 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     let payback_commitment = expected_payback_note_details[0].commitment();
     info!(payback_commitment = %payback_commitment.to_hex(), account_id = %account_a.id(), "Consuming swap payback note on client 1");
 
-    // The NoteId now depends on metadata, but the expected_payback_note_details only carries
-    // the details (no metadata). Look up the input note by its stable details commitment.
     let note = client1
-        .get_input_notes(NoteFilter::All)
+        .get_input_note_by_commitment(payback_commitment)
         .await?
-        .into_iter()
-        .find(|n| n.details_commitment() == payback_commitment)
         .expect("payback note should be present after sync")
         .try_into()?;
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;
@@ -295,13 +291,9 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     let payback_commitment = expected_payback_note_details[0].commitment();
     info!(payback_commitment = %payback_commitment.to_hex(), account_id = %account_a.id(), "Consuming swap payback note on client 1");
 
-    // The NoteId now depends on metadata, but the expected_payback_note_details only carries
-    // the details (no metadata). Look up the input note by its stable details commitment.
     let note = client1
-        .get_input_notes(NoteFilter::All)
+        .get_input_note_by_commitment(payback_commitment)
         .await?
-        .into_iter()
-        .find(|n| n.details_commitment() == payback_commitment)
         .expect("payback note should be present after sync")
         .try_into()?;
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;

@@ -129,10 +129,8 @@ pub async fn disabled_pswap_full_fill_onchain(client_config: ClientConfig) -> Re
     alice_client.sync_state().await?;
     let payback_commitment = payback_note_details[0].commitment();
     let payback_note: Note = alice_client
-        .get_input_notes(NoteFilter::All)
+        .get_input_note_by_commitment(payback_commitment)
         .await?
-        .into_iter()
-        .find(|n| n.details_commitment() == payback_commitment)
         .with_context(|| format!("Payback note {} not found", payback_commitment.to_hex()))?
         .try_into()?;
     let consume_payback =
@@ -279,13 +277,12 @@ pub async fn test_pswap_partial_fill_onchain(client_config: ClientConfig) -> Res
     );
 
     // Locate the remainder PSWAP note among Bob's tracked input notes and verify its amounts.
-    // NoteId now depends on metadata, so match by the metadata-independent details commitment.
-    let bob_input_notes = bob_client.get_input_notes(NoteFilter::All).await?;
+    let commitments = future_notes.iter().map(|details| details.commitment()).collect();
+    let bob_input_notes =
+        bob_client.get_input_notes(NoteFilter::DetailsCommitments(commitments)).await?;
     let mut remainder_pswap = None;
-    for details in &future_notes {
-        let commitment = details.commitment();
-        if let Some(record) = bob_input_notes.iter().find(|n| n.details_commitment() == commitment)
-            && let Ok(note) = TryInto::<Note>::try_into(record.clone())
+    for record in &bob_input_notes {
+        if let Ok(note) = TryInto::<Note>::try_into(record.clone())
             && let Ok(parsed) = PswapNote::try_from(&note)
         {
             remainder_pswap = Some(parsed);

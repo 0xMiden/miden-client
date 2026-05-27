@@ -44,7 +44,7 @@ use crate::{CliKeyStore, client_binary_name};
 // ================================================================================================
 
 /// Mirror enum for the protocol's public/private account visibility, which is encoded in
-/// [`AccountType`] under protocol 0.15.
+/// [`AccountType`].
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum CliAccountVisibility {
     Private,
@@ -60,10 +60,9 @@ impl From<CliAccountVisibility> for AccountType {
     }
 }
 
-/// Mirror enum for the CLI's notion of "account kind". Under protocol 0.15 the on-chain
-/// `AccountType` no longer encodes wallet-vs-faucet — that's decided purely by which
-/// components are attached — so this CLI-level enum drives component selection rather than
-/// mapping 1:1 to a protocol type.
+/// Mirror enum for the CLI's notion of "account kind". Wallet-vs-faucet is determined by which
+/// components are attached, not by the protocol `AccountType`, so this enum drives component
+/// selection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum CliAccountType {
     FungibleFaucet,
@@ -95,8 +94,8 @@ pub struct NewWalletCmd {
     /// The flag remains `--storage-mode` for CLI compatibility.
     #[arg(value_enum, short, long = "storage-mode", default_value_t = CliAccountVisibility::Private)]
     pub visibility: CliAccountVisibility,
-    /// Accepted for backward compatibility. Protocol 0.15 no longer encodes account-code
-    /// mutability in the account ID.
+    /// Accepted for backward compatibility; account-code mutability is not encoded in the
+    /// account ID.
     #[arg(short, long)]
     pub mutable: bool,
     /// Optional list of paths specifying additional components in the form of
@@ -134,8 +133,7 @@ impl NewWalletCmd {
             .chain(self.extra_packages.clone())
             .collect();
 
-        // Protocol 0.15 no longer encodes wallet-mutability in the account ID, so `mutable`
-        // is preserved for source compatibility but does not change the on-chain type.
+        // `mutable` is accepted for CLI compatibility but has no effect on the account.
         let _ = self.mutable;
         let kind = CliAccountType::RegularAccountImmutableCode;
 

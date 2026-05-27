@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use miden_client::account::{AccountStorageMode, Address};
+use miden_client::account::AccountStorageMode;
 use miden_client::assembly::{CodeBuilder, Module, ModuleKind, Path, SourceManagerSync};
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, PublicKeyCommitment};
 use miden_client::keystore::Keystore;
@@ -347,11 +347,7 @@ async fn build_three_slot_account(
 
     let account_id = account.id();
     keystore.add_key(&key_pair, account_id).await.unwrap();
-    client
-        .test_store()
-        .insert_account(&account, Address::new(account_id))
-        .await
-        .unwrap();
+    client.add_account(&account, false).await.unwrap();
 
     account_id
 }

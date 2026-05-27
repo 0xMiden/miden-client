@@ -13,6 +13,7 @@ use miden_client::note::{
 };
 use miden_client::rpc::{AcceptHeaderError, RpcError};
 use miden_client::store::{InputNoteState, NoteFilter};
+use miden_client::sync::NoteTagSource;
 use miden_client::testing::common::*;
 use miden_client::transaction::{
     InputNote,
@@ -20,7 +21,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{EMPTY_WORD, Word};
+use miden_client::{ClientError, EMPTY_WORD, Word};
 use rand::RngCore;
 use tracing::info;
 
@@ -431,6 +432,134 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     Ok(())
 }
 
+/// Watched-account flow:
+///   - `client_1` owns the wallet and faucet, executes transactions.
+///   - `client_2` watches the wallet via `import_watched_account_by_id` (no note tag).
+///   - After `client_1` runs another mint+consume on the wallet, `client_2` should observe (a) the
+///     new account commitment matching `client_1`, (b) no input note record for the mint targeted
+///     at the wallet (no tag → not synced), and (c) no output note record for the consumed note
+///     (watched accounts are state-only; note activity is intentionally not surfaced).
+pub async fn test_import_watched_account_by_id(client_config: ClientConfig) -> Result<()> {
+    let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
+    let (mut client_2, _keystore_2) = ClientConfig::default()
+        .with_rpc_endpoint(client_config.rpc_endpoint())
+        .into_client()
+        .await?;
+    wait_for_node(&mut client_1).await;
+
+    let (faucet_account, _) = insert_new_fungible_faucet(
+        &mut client_1,
+        AccountStorageMode::Public,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+    let (wallet, _) = insert_new_wallet(
+        &mut client_1,
+        AccountStorageMode::Public,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+    let wallet_id = wallet.id();
+    let faucet_id = faucet_account.id();
+
+    // Fill the wallet with an asset so the watched account has non-trivial state.
+    let tx_id = mint_and_consume(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
+    wait_for_tx(&mut client_1, tx_id).await?;
+
+    // client_2 starts watching the wallet.
+    client_2.import_watched_account_by_id(wallet_id).await?;
+
+    let initial_source_commitment = client_1.account_reader(wallet_id).commitment().await?;
+    let initial_watched_commitment = client_2.account_reader(wallet_id).commitment().await?;
+    assert_eq!(
+        initial_watched_commitment, initial_source_commitment,
+        "watched account commitment should match source after watch",
+    );
+
+    let watched_record = client_2
+        .test_store()
+        .get_account(wallet_id)
+        .await?
+        .context("watched account should be tracked in client_2's store")?;
+    assert!(watched_record.is_watched(), "watched account must be marked as watched");
+
+    let tags = client_2.test_store().get_note_tags().await?;
+    assert!(
+        !tags
+            .iter()
+            .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
+        "watched account must not register a per-account note tag",
+    );
+
+    // client_1 mints another note targeted at the wallet and consumes it. client_2 should
+    // observe the commitment advance, but NOT pick up either the input note (no tag) or any
+    // output-note record from the consume tx (watched accounts are state-only).
+    let (tx_id, mint_note) = mint_note(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
+    wait_for_tx(&mut client_1, tx_id).await?;
+    let consume_tx_id =
+        consume_notes(&mut client_1, wallet_id, std::slice::from_ref(&mint_note)).await;
+    wait_for_tx(&mut client_1, consume_tx_id).await?;
+
+    client_2.sync_state().await?;
+
+    let updated_source_commitment = client_1.account_reader(wallet_id).commitment().await?;
+    let updated_watched_commitment = client_2.account_reader(wallet_id).commitment().await?;
+    assert_eq!(
+        updated_watched_commitment, updated_source_commitment,
+        "watched commitment should track source after sync",
+    );
+    assert_ne!(
+        updated_watched_commitment, initial_watched_commitment,
+        "watched account state should have advanced",
+    );
+
+    // Mint output note (targeted at the wallet) must NOT have been synced as an input note.
+    let watched_input_notes = client_2.test_store().get_input_notes(NoteFilter::All).await?;
+    assert!(
+        watched_input_notes.iter().all(|n| n.id() != mint_note.id()),
+        "watched client must not have synced notes targeted at the wallet (no note tag)",
+    );
+
+    // No output-note records should have been created for the consume tx either: watched
+    // accounts do not surface note activity, only on-chain state.
+    let watched_output_notes = client_2.test_store().get_output_notes(NoteFilter::All).await?;
+    assert!(
+        watched_output_notes.is_empty(),
+        "watched client must not surface output notes from followed account txs",
+    );
+
+    // Switching an already-tracked watched account to native (or vice versa) is not supported.
+    let err = client_2
+        .import_account_by_id(wallet_id)
+        .await
+        .expect_err("import_account_by_id must reject already-tracked watched accounts");
+    assert!(
+        matches!(err, ClientError::AccountWatchedMismatch(id) if id == wallet_id),
+        "expected AccountWatchedMismatch, got {err:?}",
+    );
+
+    // Re-importing in the same mode is still a no-op overwrite, and the account stays
+    // watched with no per-account tag.
+    client_2.import_watched_account_by_id(wallet_id).await?;
+    let record = client_2
+        .test_store()
+        .get_account(wallet_id)
+        .await?
+        .context("account should still be tracked after re-import")?;
+    assert!(record.is_watched(), "account must remain watched");
+    let tags = client_2.test_store().get_note_tags().await?;
+    assert!(
+        !tags
+            .iter()
+            .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
+        "watched account must not have a per-account note tag",
+    );
+
+    Ok(())
+}
+
 pub async fn test_incorrect_genesis(client_config: ClientConfig) -> Result<()> {
     let (builder, _) = client_config.into_client_builder().await?;
     let mut client = builder.build().await?;
@@ -618,19 +747,19 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
     Ok(())
 }
 
-/// Tests that notes with attachments can be synced and consumed.
+/// Intended coverage for syncing and consuming notes with attachments.
 /// 1. Client 1 mints a public P2ID note **with an attachment** targeting client 2's wallet.
 /// 2. Client 2 syncs and discovers the note via `sync_notes`.
-/// 3. The sync triggers a `get_notes_by_id` call to fetch the full metadata.
-/// 4. Client 2 consumes the note, proving the metadata was correctly resolved.
+/// 3. The sync triggers a `get_notes_by_id` call to fetch the public note body.
+/// 4. Client 2 attempts to consume the note, which currently exposes the round-trip issue below.
 ///
-/// Disabled because `InputNoteRecord` / `OutputNoteRecord` persist only [`NoteDetails`] +
-/// [`NoteMetadata`] (no [`NoteAttachments`]). A note with attachments cannot round-trip through
-/// the local store — the reconstructed note has empty attachments, its commitment no longer
-/// matches the on-chain commitment, and consumption fails with `InputNoteNotInBlock`. Re-enable
-/// once note records persist [`NoteAttachments`] (the RPC sync flow already fetches them via
-/// `GetNotesById`). The `disabled_` prefix opts the function out of the integration-test build
-/// script registration.
+/// Disabled because `InputNoteRecord` / `OutputNoteRecord` persist [`NoteDetails`] +
+/// [`NoteMetadata`], but not the [`NoteAttachments`] content. The stored metadata still carries
+/// attachment headers and the attachment commitment, but `InputNoteRecord -> Note` currently
+/// rebuilds the note with empty attachments, so its commitment no longer matches the on-chain
+/// commitment and consumption fails with `InputNoteNotInBlock`. Re-enable once note records persist
+/// [`NoteAttachments`] (the RPC sync flow already fetches them via `GetNotesById`). The
+/// `disabled_` prefix opts the function out of the integration-test build script registration.
 #[allow(dead_code)]
 pub async fn disabled_sync_note_with_attachment(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
@@ -661,8 +790,8 @@ pub async fn disabled_sync_note_with_attachment(client_config: ClientConfig) -> 
     client_1.sync_state().await?;
     client_2.sync_state().await?;
 
-    // Mint a P2ID note with a Word attachment. The non-default attachment triggers
-    // the get_notes_by_id metadata fetch during the receiver's sync.
+    // Mint a P2ID note with a Word attachment. The public note is fetched via get_notes_by_id
+    // during the receiver's sync.
     let attachment_scheme = NoteAttachmentScheme::new(42)?;
     let attachment = NoteAttachment::with_word(attachment_scheme, Word::from([1u32, 2, 3, 4]));
     let attachments = NoteAttachments::new(vec![attachment])?;
@@ -681,23 +810,24 @@ pub async fn disabled_sync_note_with_attachment(client_config: ClientConfig) -> 
         TransactionRequestBuilder::new().own_output_notes(vec![note.clone()]).build()?;
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await?;
 
-    // Client 2 syncs and should discover the note. The sync response will have
-    // attachment_kind != None, so the client must fetch full metadata via get_notes_by_id.
+    // Client 2 syncs and should discover the note. The sync response carries full metadata,
+    // while get_notes_by_id fetches the public note body, including attachment content.
     info!("Syncing client 2 to discover note with attachment");
     client_2.sync_state().await?;
 
-    let received_note: InputNote = client_2
+    let received_note_record = client_2
         .get_input_note(note.id())
         .await?
-        .with_context(|| format!("Note {} not found in client_2 after sync", note.id()))?
-        .try_into()?;
+        .with_context(|| format!("Note {} not found in client_2 after sync", note.id()))?;
+    assert_eq!(
+        received_note_record.metadata().unwrap().attachment_headers()[0].scheme(),
+        Some(attachment_scheme),
+    );
 
-    // Attachments do not survive the sync → store → read round trip because note records
-    // persist only `NoteDetails` + `NoteMetadata`. The reconstructed note's
-    // `attachment_headers` therefore report "absent" rather than the originally minted scheme
-    // marker. The consume + balance verification below still exercises the sync-and-consume
-    // path end-to-end.
-    let _ = attachment_scheme;
+    // The stored record retains the attachment metadata above. What does not survive is the
+    // attachment content, so converting the record back into a `Note` rebuilds it with empty
+    // attachments and loses the original attachment commitment.
+    let received_note: InputNote = received_note_record.try_into()?;
 
     // Consume the note — this will fail if the metadata wasn't properly resolved
     info!("Consuming note with attachment in client 2");

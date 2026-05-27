@@ -190,9 +190,8 @@ impl OutputNoteUpdate {
 pub struct NoteUpdateTracker {
     /// A map of new and updated input note records to be upserted in the store.
     input_notes: BTreeMap<NoteId, InputNoteUpdate>,
-    /// Metadata-less `Expected` notes (e.g. imported as `NoteDetails`), keyed by details
-    /// commitment since they have no `NoteId` yet. They move to `input_notes` once a committed
-    /// note supplies their metadata.
+    /// Metadata-less notes keyed by details commitment (they have no `NoteId` yet); moved to
+    /// `input_notes` once a committed note supplies their metadata.
     expected_input_notes: BTreeMap<NoteDetailsCommitment, InputNoteUpdate>,
     /// A map of updated output note records to be upserted in the store.
     output_notes: BTreeMap<NoteId, OutputNoteUpdate>,

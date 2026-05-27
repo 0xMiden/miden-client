@@ -64,7 +64,7 @@ where
         note_files: &[NoteFile],
     ) -> Result<Vec<NoteId>, ClientError> {
         // Deduplicate the incoming files, keying detail-carrying ones by their details commitment
-        // (wrapped as a `NoteId`) since they may have no metadata-aware id.
+        // (wrapped as a `NoteId`) since they may have no `NoteId` of their own.
         let mut note_files_map = BTreeMap::new();
         for note_file in note_files {
             let key = match note_file {

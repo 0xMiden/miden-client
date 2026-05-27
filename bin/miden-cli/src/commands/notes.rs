@@ -440,8 +440,8 @@ fn note_summary(
     input_note_record: Option<&InputNoteRecord>,
     output_note_record: Option<&OutputNoteRecord>,
 ) -> CliNoteSummary {
-    // Prefer the metadata-aware NoteId; fall back to the input record's stable details
-    // commitment when the input note has no metadata yet (so it lacks a NoteId).
+    // Use the NoteId when available; metadata-less input notes have none, so fall back to the
+    // details commitment.
     let note_id = input_note_record
         .and_then(InputNoteRecord::id)
         .or_else(|| output_note_record.map(OutputNoteRecord::id))

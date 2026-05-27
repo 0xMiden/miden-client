@@ -304,9 +304,8 @@ fn faucet_component_from_account(account: &Account) -> Result<FungibleFaucet, Cl
 /// Returns a display name for the account. If `token_symbol` is provided the account is
 /// rendered as a fungible faucet (the symbol is appended); otherwise it's labelled "Regular".
 ///
-/// Under protocol 0.15 the on-chain `AccountType` only encodes account visibility
-/// (`public` / `private`), so faucet-vs-wallet has to be inferred by the caller from the
-/// attached components.
+/// The on-chain `AccountType` only encodes account visibility (`public` / `private`), so
+/// faucet-vs-wallet has to be inferred by the caller from the attached components.
 fn account_type_display_name(_account_id: AccountId, token_symbol: Option<&str>) -> String {
     if let Some(symbol) = token_symbol {
         format!("Fungible faucet (token symbol: {symbol})")

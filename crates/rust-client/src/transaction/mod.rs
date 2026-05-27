@@ -87,6 +87,7 @@ use crate::rpc::{AccountStateAt, GrpcError, NodeRpcClient, RpcError};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
+    AccountRecord,
     InputNoteRecord,
     InputNoteState,
     NoteFilter,
@@ -262,7 +263,8 @@ where
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionResult, ClientError> {
-        let account = self.try_get_account(account_id).await?;
+        let account: Account = self.get_native_account_record(account_id).await?.try_into()?;
+
         let prep = self.prepare_transaction(&account, transaction_request).await?;
 
         let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
@@ -765,6 +767,23 @@ where
             executor = executor.with_authenticator(authenticator);
         }
         Ok(executor)
+    }
+
+    /// Loads an [`AccountRecord`] for an account that must be usable as a transaction's native
+    /// account. Errors out if the account is not tracked or if it is watched.
+    async fn get_native_account_record(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountRecord, ClientError> {
+        let account_record = self
+            .store
+            .get_account(account_id)
+            .await?
+            .ok_or(ClientError::AccountDataNotFound(account_id))?;
+        if account_record.is_watched() {
+            return Err(ClientError::AccountIsWatched(account_id));
+        }
+        Ok(account_record)
     }
 
     /// Creates a transaction executor configured for DAP (Debug Adapter Protocol) debugging.

@@ -1340,8 +1340,6 @@ mod tests {
 
         let updated_notes: Vec<_> = update.note_updates.updated_input_notes().collect();
 
-        // These notes are consumed externally, so the records are metadata-less (`id()` is
-        // `None`); match them by the metadata-independent details commitment.
         let find_order = |details_commitment| -> Option<u32> {
             updated_notes
                 .iter()

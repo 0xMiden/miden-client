@@ -255,7 +255,7 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
         .await
         .unwrap();
     client_2.sync_state().await.unwrap();
-    let input_note = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
+    let input_note = client_2.get_input_note(note.id().unwrap()).await?.unwrap();
     // If imported after execution and syncing then the inclusion proof should be Some
     assert!(input_note.inclusion_proof().is_some(), "Expected inclusion proof to be present");
 
@@ -290,7 +290,7 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
         }])
         .await
         .unwrap();
-    let input_note = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
+    let input_note = client_2.get_input_note(note.id().unwrap()).await?.unwrap();
 
     // If imported before execution, the note should be imported in `Expected` state
     assert!(matches!(input_note.state(), InputNoteState::Expected { .. }));
@@ -300,7 +300,7 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
 
     // After sync, the imported note should have inclusion proof even if it's not relevant for its
     // accounts.
-    let input_note = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
+    let input_note = client_2.get_input_note(note.id().unwrap()).await?.unwrap();
     assert!(input_note.inclusion_proof().is_some(), "Expected inclusion proof to be present");
 
     // If inclusion proof is invalid this should panic
@@ -357,7 +357,7 @@ pub async fn test_import_expected_note_uncommitted(client_config: ClientConfig) 
         }])
         .await?[0];
 
-    let imported_note = client_2.get_input_note(imported_note_id).await.unwrap().unwrap();
+    let imported_note = client_2.get_input_note(imported_note_id).await?.unwrap();
 
     assert!(matches!(imported_note.state(), InputNoteState::Expected { .. }));
     Ok(())
@@ -404,7 +404,7 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
         }])
         .await?[0];
 
-    let imported_note = client_2.get_input_note(note_id).await.unwrap().unwrap();
+    let imported_note = client_2.get_input_note(note_id).await?.unwrap();
 
     assert!(matches!(imported_note.state(), InputNoteState::Expected { .. }));
 
@@ -422,10 +422,10 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
             .is_empty()
     );
 
-    let imported_note = client_2.get_input_note(note_id).await.unwrap().unwrap();
+    let imported_note = client_2.get_input_note(note_id).await?.unwrap();
 
     // Get the note status in client 1
-    let client_1_note = client_1.get_input_note(note_id).await.unwrap().unwrap();
+    let client_1_note = client_1.get_input_note(note_id).await?.unwrap();
 
     assert_eq!(imported_note.state(), client_1_note.state());
     assert!(matches!(imported_note.state(), InputNoteState::Committed { .. }));
@@ -472,11 +472,11 @@ pub async fn test_get_account_update(client_config: ClientConfig) -> Result<()> 
 
     assert!(matches!(details1, FetchedAccount::Private(_, _)));
     assert_matches!(details2, FetchedAccount::Public(account, _) if {
-        let vault_key = miden_client::asset::AssetVaultKey::new_fungible(
-            faucet_account.id(),
-            miden_client::asset::AssetCallbackFlag::Disabled,
-        );
-        account.vault().get_balance(vault_key).unwrap().as_u64() == MINT_AMOUNT
+        account.vault().assets().any(|asset| matches!(
+            asset,
+            miden_client::asset::Asset::Fungible(fa)
+                if fa.faucet_id() == faucet_account.id() && fa.amount().as_u64() == MINT_AMOUNT
+        ))
     });
     Ok(())
 }
@@ -965,7 +965,7 @@ pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -
         )])
         .await?;
 
-    let consumed_note = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
+    let consumed_note = client_2.get_input_note(note.id().unwrap()).await?.unwrap();
     assert!(matches!(consumed_note.state(), InputNoteState::ConsumedExternal { .. }));
     Ok(())
 }
@@ -1028,7 +1028,7 @@ pub async fn test_import_consumed_note_with_id(client_config: ClientConfig) -> R
     // Import the consumed note
     client_2.import_notes(&[NoteFile::NoteId(note.id().unwrap())]).await.unwrap();
 
-    let consumed_note = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
+    let consumed_note = client_2.get_input_note(note.id().unwrap()).await?.unwrap();
     assert!(matches!(consumed_note.state(), InputNoteState::ConsumedExternal { .. }));
     Ok(())
 }
@@ -1088,11 +1088,11 @@ pub async fn test_import_note_with_proof(client_config: ClientConfig) -> Result<
         )])
         .await?;
 
-    let imported_note = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
+    let imported_note = client_2.get_input_note(note.id().unwrap()).await?.unwrap();
     assert!(matches!(imported_note.state(), InputNoteState::Unverified { .. }));
 
     client_2.sync_state().await.unwrap();
-    let imported_note = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
+    let imported_note = client_2.get_input_note(note.id().unwrap()).await?.unwrap();
     assert!(matches!(imported_note.state(), InputNoteState::Committed { .. }));
     Ok(())
 }
@@ -1181,18 +1181,18 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
         "Account hash should change after applying the transaction"
     );
 
-    let note_record = client_1.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
+    let note_record = client_1.get_input_note(note.id().unwrap()).await?.unwrap();
     assert!(matches!(note_record.state(), InputNoteState::ProcessingAuthenticated(_)));
 
     // Consume the note in client 2
     execute_tx_and_sync(&mut client_2, to_account_id, tx_request).await?;
 
-    let note_record = client_2.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
+    let note_record = client_2.get_input_note(note.id().unwrap()).await?.unwrap();
     assert!(matches!(note_record.state(), InputNoteState::ConsumedAuthenticatedLocal(_)));
 
     // After sync the note in client 1 should be consumed externally and the transaction discarded
     client_1.sync_state().await.unwrap();
-    let note_record = client_1.get_input_note(note.id().unwrap()).await.unwrap().unwrap();
+    let note_record = client_1.get_input_note(note.id().unwrap()).await?.unwrap();
     assert!(matches!(note_record.state(), InputNoteState::ConsumedExternal(_)));
     let tx_record = client_1
         .get_transactions(TransactionFilter::All)
@@ -1562,16 +1562,10 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     let nullifier = note.nullifier();
 
-    let chain_tip = client
-        .test_rpc_api()
-        .get_block_header_by_number(None, false)
-        .await
-        .unwrap()
-        .0
-        .block_num();
+    let sync_height = client.get_sync_height().await?;
     let node_nullifier = client
         .test_rpc_api()
-        .sync_nullifiers(&[nullifier.prefix()], 0.into(), chain_tip)
+        .sync_nullifiers(&[nullifier.prefix()], 0.into(), sync_height)
         .await
         .unwrap()
         .pop()
@@ -1593,7 +1587,7 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .unwrap();
     let transactions = client
         .test_rpc_api()
-        .sync_transactions(0.into(), chain_tip, vec![first_basic_account.id()])
+        .sync_transactions(0.into(), sync_height, vec![first_basic_account.id()])
         .await
         .unwrap();
 
@@ -1933,7 +1927,7 @@ pub async fn test_prune_account_history(client_config: ClientConfig) -> Result<(
     let faucet_before = client.get_account(faucet_id).await?.unwrap();
 
     // Prune faucet history up to nonce 1: should remove old committed states.
-    let deleted = client.prune_account_history(faucet_id, Felt::new(1).unwrap()).await?;
+    let deleted = client.prune_account_history(faucet_id, Felt::new_unchecked(1)).await?;
     assert!(deleted > 0, "Should have pruned old committed states");
 
     // Account should still be fully readable and unchanged.

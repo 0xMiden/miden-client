@@ -396,9 +396,9 @@ fn parse_input_note(
 /// Serialize the provided input note into database compatible types.
 fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
     let details_commitment = note.details_commitment().to_hex();
-    // `note_id` and `nullifier` are metadata-aware under protocol 0.15, so they're only
-    // available when the record currently carries metadata. The store columns are NULL-able
-    // and get populated once the metadata arrives (e.g. via sync / inclusion proof).
+    // `note_id` and `nullifier` require metadata, so they're only available when the record
+    // carries it. The columns are NULL-able and get populated once metadata arrives (via
+    // sync / inclusion proof).
     let id = note.id().map(|id| id.as_word().to_string());
     let nullifier = note.metadata().map(|metadata| {
         miden_client::note::Nullifier::from_details_and_metadata(note.details(), metadata).to_hex()
