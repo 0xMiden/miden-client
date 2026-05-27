@@ -81,8 +81,9 @@ use tracing::info;
 
 use super::Client;
 use crate::ClientError;
-use crate::note::{NoteScreenerError, NoteUpdateTracker};
+use crate::note::{NoteScreenerError, NoteUpdateTracker, StandardNote};
 use crate::rpc::domain::account::AccountStorageRequirements;
+use crate::rpc::node::{EndpointError, GetNoteScriptByRootError};
 use crate::rpc::{AccountStateAt, GrpcError, NodeRpcClient, RpcError};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
@@ -574,6 +575,9 @@ where
     ///
     /// `account_id` is the account that will execute the registration transaction.
     ///
+    /// Standard note scripts are skipped — the NTX builder resolves those directly, so they
+    /// never need registering. A missing non-standard script is registered, not an error.
+    ///
     /// This method is called automatically by [`Self::submit_new_transaction_with_prover`] when the
     /// [`TransactionRequest`] contains expected NTX scripts. It can also be called directly if
     /// you want to register scripts ahead of time.
@@ -586,12 +590,17 @@ where
         let mut missing_scripts = Vec::new();
 
         for script in scripts {
+            // Standard scripts are resolved by the NTX builder directly; no registration needed.
+            if StandardNote::from_script(script).is_some() {
+                continue;
+            }
+
             let script_root = script.root();
 
-            // Check if the node already has this script registered.
+            // Missing scripts are queued for registration; only unexpected errors abort.
             match self.rpc_api.get_note_script_by_root(script_root.into()).await {
                 Ok(_) => {},
-                Err(RpcError::RequestError { error_kind: GrpcError::NotFound, .. }) => {
+                Err(err) if is_note_script_not_found(&err) => {
                     missing_scripts.push(script.clone());
                 },
                 Err(other) => {
@@ -947,6 +956,16 @@ pub(crate) struct PreparedTransaction {
     pub(crate) ignore_invalid_notes: bool,
 }
 
+/// Returns `true` when the node has no script for the requested root, signalled either as a gRPC
+/// `NotFound` status or a typed [`GetNoteScriptByRootError::ScriptNotFound`].
+fn is_note_script_not_found(err: &RpcError) -> bool {
+    matches!(err, RpcError::RequestError { error_kind: GrpcError::NotFound, .. })
+        || matches!(
+            err.endpoint_error(),
+            Some(EndpointError::GetNoteScriptByRoot(GetNoteScriptByRootError::ScriptNotFound))
+        )
+}
+
 /// Helper to get the account outgoing assets.
 ///
 /// Any outgoing assets resulting from executing note scripts but not present in expected output
@@ -1127,4 +1146,38 @@ pub(crate) fn validate_executed_transaction(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        EndpointError,
+        GetNoteScriptByRootError,
+        GrpcError,
+        RpcError,
+        is_note_script_not_found,
+    };
+    use crate::rpc::RpcEndpoint;
+
+    fn error(kind: GrpcError, endpoint_error: Option<EndpointError>) -> RpcError {
+        RpcError::RequestError {
+            endpoint: RpcEndpoint::GetNoteScriptByRoot,
+            error_kind: kind,
+            endpoint_error,
+            source: None,
+        }
+    }
+
+    #[test]
+    fn detects_missing_note_script() {
+        let not_found =
+            EndpointError::GetNoteScriptByRoot(GetNoteScriptByRootError::ScriptNotFound);
+
+        // Reported either as a gRPC `NotFound` status or the typed `ScriptNotFound` error.
+        assert!(is_note_script_not_found(&error(GrpcError::NotFound, None)));
+        assert!(is_note_script_not_found(&error(GrpcError::Internal, Some(not_found))));
+
+        // Any other error is not a missing script.
+        assert!(!is_note_script_not_found(&error(GrpcError::Internal, None)));
+    }
 }
