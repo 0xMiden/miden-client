@@ -56,7 +56,7 @@ fn create_consumed_external_input_note(
         consumed_tx_order: None,
     };
 
-    InputNoteRecord::new(details, Some(0), state.into())
+    InputNoteRecord::new(details, NoteAttachments::empty(), Some(0), state.into())
 }
 
 /// Helper to create an expected (non-consumed) input note.
@@ -76,7 +76,7 @@ fn create_expected_input_note(index: u32) -> InputNoteRecord {
         tag: None,
     };
 
-    InputNoteRecord::new(details, Some(0), state.into())
+    InputNoteRecord::new(details, NoteAttachments::empty(), Some(0), state.into())
 }
 
 /// Helper to create a consumed-unauthenticated-local input note with a specific consumer.
@@ -110,7 +110,7 @@ fn create_consumed_input_note_with_consumer(
         consumed_tx_order: Some(consumed_tx_order),
     };
 
-    InputNoteRecord::new(details, Some(0), state.into())
+    InputNoteRecord::new(details, NoteAttachments::empty(), Some(0), state.into())
 }
 
 // INPUT NOTE READER TESTS

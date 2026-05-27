@@ -71,7 +71,15 @@ use miden_protocol::account::{Account, AccountCode, AccountId};
 use miden_protocol::asset::NonFungibleAsset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
-use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
+use miden_protocol::note::{
+    Note,
+    NoteAttachments,
+    NoteDetails,
+    NoteId,
+    NoteRecipient,
+    NoteScript,
+    NoteTag,
+};
 use miden_protocol::transaction::AccountInputs;
 use miden_protocol::vm::MIN_STACK_DEPTH;
 use miden_protocol::{EMPTY_WORD, Felt, Word};
@@ -633,9 +641,11 @@ where
             if output_note_relevances.contains_key(&note.id()) {
                 let metadata = *note.metadata();
                 let tag = metadata.tag();
+                let attachments = note.attachments().clone();
 
                 new_input_notes.push(InputNoteRecord::new(
                     note.into(),
+                    attachments,
                     current_timestamp,
                     ExpectedNoteState {
                         metadata: Some(metadata),
@@ -651,6 +661,7 @@ where
         new_input_notes.extend(tx_result.future_notes().iter().map(|(note_details, tag)| {
             InputNoteRecord::new(
                 note_details.clone(),
+                NoteAttachments::empty(),
                 None,
                 ExpectedNoteState {
                     metadata: None,
