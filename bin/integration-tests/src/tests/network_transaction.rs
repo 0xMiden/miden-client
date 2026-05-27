@@ -449,8 +449,7 @@ pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<(
         .await?;
     client_1.sync_state().await?;
 
-    let network_account =
-        deploy_counter_contract(&mut client_1, AccountStorageMode::Network).await?;
+    let network_account = deploy_counter_contract(&mut client_1, AccountType::Public).await?;
     let network_account_id = network_account.id();
 
     // Sanity: counter is 1 after deployment (deploy_counter_contract bumps it once).
@@ -459,7 +458,7 @@ pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<(
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find network account after deployment")?;
-    assert_eq!(counter_value, Word::from([Felt::new(1), ZERO, ZERO, ZERO]));
+    assert_eq!(counter_value, Word::from([Felt::new_unchecked(1), ZERO, ZERO, ZERO]));
 
     // client_2 starts watching the network account.
     client_2.import_watched_account_by_id(network_account_id).await?;
@@ -484,13 +483,9 @@ pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<(
 
     // client_1 emits BUMP_NOTE_NUMBER network notes targeted at the counter; the node will
     // consume them in subsequent blocks and bump the counter to 1 + BUMP_NOTE_NUMBER.
-    let (native_account, ..) = insert_new_wallet(
-        &mut client_1,
-        AccountStorageMode::Public,
-        &keystore_1,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (native_account, ..) =
+        insert_new_wallet(&mut client_1, AccountType::Public, &keystore_1, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     let source_manager = client_1.source_manager();
     let mut network_notes = vec![];
@@ -508,7 +503,8 @@ pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<(
     execute_tx_and_sync(&mut client_1, native_account.id(), tx_request).await?;
 
     // Poll the watched client until it observes the bumped counter.
-    let expected_counter = Word::from([Felt::new(1 + BUMP_NOTE_NUMBER), ZERO, ZERO, ZERO]);
+    let expected_counter =
+        Word::from([Felt::new_unchecked(1 + BUMP_NOTE_NUMBER), ZERO, ZERO, ZERO]);
     let mut observed = false;
     for _ in 0..10 {
         wait_for_blocks(&mut client_1, 1).await;

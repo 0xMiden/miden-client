@@ -3302,7 +3302,7 @@ async fn import_watched_account_by_id_rejects_already_tracked_native_account() {
     let arc_rpc_api = Arc::new(rpc_api);
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
-    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
+    let rng = RandomCoin::new(coin_seed.map(|v| Felt::new_unchecked(v >> 1)).into());
     let keystore = FilesystemKeyStore::new(temp_dir()).unwrap();
     let mut client = ClientBuilder::new()
         .rpc(arc_rpc_api)
@@ -4157,19 +4157,23 @@ async fn execute_transaction_fails_for_watched_account() {
     let symbol = TokenSymbol::new("WTCH").unwrap();
     let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
     let max_supply = 9_999_999_u64;
-    let token_metadata =
-        FungibleTokenMetadata::builder(name, symbol, 10, max_supply).build().unwrap();
+    let token = FungibleFaucet::builder()
+        .name(name)
+        .symbol(symbol)
+        .decimals(10)
+        .max_supply(AssetAmount::new(max_supply).unwrap())
+        .build()
+        .unwrap();
+    let policy_manager = TokenPolicyManager::new()
+        .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
+        .unwrap()
+        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
+        .unwrap();
     let faucet = AccountBuilder::new(init_seed)
-        .account_type(AccountType::FungibleFaucet)
-        .storage_mode(AccountStorageMode::Public)
+        .account_type(AccountType::Public)
         .with_auth_component(auth_component)
-        .with_component(token_metadata)
-        .with_component(BasicFungibleFaucet)
-        .with_components(TokenPolicyManager::new(
-            PolicyAuthority::AuthControlled,
-            MintPolicyConfig::AllowAll,
-            BurnPolicyConfig::AllowAll,
-        ))
+        .with_component(token)
+        .with_components(policy_manager)
         .build_with_schema_commitment()
         .unwrap();
     let faucet_id = faucet.id();

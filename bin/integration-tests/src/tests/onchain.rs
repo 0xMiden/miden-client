@@ -518,7 +518,7 @@ pub async fn test_import_watched_account_by_id(client_config: ClientConfig) -> R
     // Mint output note (targeted at the wallet) must NOT have been synced as an input note.
     let watched_input_notes = client_2.test_store().get_input_notes(NoteFilter::All).await?;
     assert!(
-        watched_input_notes.iter().all(|n| n.id() != mint_note.id()),
+        watched_input_notes.iter().all(|n| n.id() != Some(mint_note.id())),
         "watched client must not have synced notes targeted at the wallet (no note tag)",
     );
 

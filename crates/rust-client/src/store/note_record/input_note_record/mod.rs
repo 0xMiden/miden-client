@@ -126,9 +126,9 @@ impl InputNoteRecord {
 
     /// Returns the note nullifier.
     pub fn nullifier(&self) -> Nullifier {
-        let metadata = self
-            .metadata()
-            .expect("input note nullifier requires metadata; metadata-less notes have no nullifier");
+        let metadata = self.metadata().expect(
+            "input note nullifier requires metadata; metadata-less notes have no nullifier",
+        );
         Nullifier::from_details_and_metadata(&self.details, metadata)
     }
 

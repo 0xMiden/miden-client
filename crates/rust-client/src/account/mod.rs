@@ -542,8 +542,8 @@ impl<AUTH> Client<AUTH> {
 ///   [`AccountBuilder::new`].
 /// - `public_key`: Public key of the account used for the authentication component.
 /// - `account_visibility`: Public/private visibility of the account.
-/// - `is_mutable`: Ignored. Mutability is not encoded in the account type; this parameter is
-///   kept only for source compatibility.
+/// - `is_mutable`: Ignored. Mutability is not encoded in the account type; this parameter is kept
+///   only for source compatibility.
 ///
 /// # Errors
 /// - If the account cannot be built.
