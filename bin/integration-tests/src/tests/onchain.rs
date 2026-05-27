@@ -598,6 +598,14 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
 
     client.sync_state().await?;
 
+    // Pre-batch: put the wallet on-chain so the wallet's first batch-tx delta is partial, not
+    // full-state — the batch apply path rejects full-state deltas.
+    let bootstrap_tx_id =
+        mint_and_consume(&mut client, wallet_account.id(), faucet_account.id(), NoteType::Private)
+            .await;
+    wait_for_tx(&mut client, bootstrap_tx_id).await?;
+    client.sync_state().await?;
+
     // Mint 3 notes, each in a separate transaction.
     let mut minted_notes = Vec::new();
     for i in 0..3 {
