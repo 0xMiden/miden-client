@@ -952,7 +952,12 @@ fn group_txs_by_account_block(
 /// `final_state_commitment` is the next tx's `initial_state_commitment`. This finds the chain
 /// start and walks forward, yielding each tx in execution order.
 ///
-/// Returns an empty iterator on cyclic input.
+/// # Panics
+///
+/// Panics if `txs` is non-empty but no chain start exists (cyclic input). Cycles are
+/// impossible in legitimate node responses — every transaction changes account state, so
+/// `initial_state_commitment` and `final_state_commitment` can never both be equal across
+/// the same chain.
 fn walk_execution_chain<'a>(
     txs: &'a [&'a RpcTransactionRecord],
 ) -> impl Iterator<Item = &'a RpcTransactionRecord> + 'a {
@@ -968,6 +973,8 @@ fn walk_execution_chain<'a>(
         .iter()
         .find(|tx| !final_states.contains(&tx.transaction_header.initial_state_commitment()))
         .copied();
+
+    assert!(start.is_some() || txs.is_empty(), "cannot walk cyclic execution chain");
 
     let mut current =
         start.and_then(|tx| init_to_tx.remove(&tx.transaction_header.initial_state_commitment()));
@@ -987,12 +994,9 @@ fn derive_account_commitments(
     let mut latest_by_account: BTreeMap<AccountId, (BlockNumber, Word)> = BTreeMap::new();
 
     for ((account_id, block_num), txs) in &group_txs_by_account_block(transaction_records) {
-        // Walk the chain and take the last tx's final_state_commitment. Fallback to the last record
-        // seen on degenerate (cyclic) input.
         let terminal_state = walk_execution_chain(txs)
             .last()
-            .or_else(|| txs.last().copied())
-            .expect("group is non-empty by construction")
+            .expect("group is non-empty by construction; walk_execution_chain panics on cycles")
             .transaction_header
             .final_state_commitment();
 
