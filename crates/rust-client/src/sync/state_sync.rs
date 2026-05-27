@@ -933,43 +933,68 @@ impl StateSync {
     }
 }
 
-/// For each unique account, returns the `final_state_commitment` from the final transaction in the
-/// highest `block_num` group. When multiple transactions for the same account are committed in the
-/// same block they form an execution chain: the `final_state_commitment` of each transaction is the
-/// `initial_state_commitment` of the next. Walking this chain to its end yields the final account
-/// commitment.
-fn derive_account_commitments(
+/// Groups transaction records by `(account_id, block_num)`.
+fn group_txs_by_account_block(
     transaction_records: &[RpcTransactionRecord],
-) -> Vec<(AccountId, Word)> {
-    // Group transactions by (account_id, block_num).
+) -> BTreeMap<(AccountId, BlockNumber), Vec<&RpcTransactionRecord>> {
     let mut groups: BTreeMap<(AccountId, BlockNumber), Vec<&RpcTransactionRecord>> =
         BTreeMap::new();
     for record in transaction_records {
         let account_id = record.transaction_header.account_id();
         groups.entry((account_id, record.block_num)).or_default().push(record);
     }
+    groups
+}
 
-    // For each account pick the highest-block_num group and resolve its terminal state.
+/// Walks a group of transaction records in execution order.
+///
+/// Same-block transactions for the same account form an execution chain: each tx's
+/// `final_state_commitment` is the next tx's `initial_state_commitment`. This finds the chain
+/// start and walks forward, yielding each tx in execution order.
+///
+/// Returns an empty iterator on cyclic input.
+fn walk_execution_chain<'a>(
+    txs: &'a [&'a RpcTransactionRecord],
+) -> impl Iterator<Item = &'a RpcTransactionRecord> + 'a {
+    let final_states: BTreeSet<Word> =
+        txs.iter().map(|tx| tx.transaction_header.final_state_commitment()).collect();
+
+    let mut init_to_tx: BTreeMap<Word, &RpcTransactionRecord> = txs
+        .iter()
+        .map(|tx| (tx.transaction_header.initial_state_commitment(), *tx))
+        .collect();
+
+    let start = txs
+        .iter()
+        .find(|tx| !final_states.contains(&tx.transaction_header.initial_state_commitment()))
+        .copied();
+
+    let mut current =
+        start.and_then(|tx| init_to_tx.remove(&tx.transaction_header.initial_state_commitment()));
+
+    core::iter::from_fn(move || {
+        let tx = current?;
+        current = init_to_tx.remove(&tx.transaction_header.final_state_commitment());
+        Some(tx)
+    })
+}
+
+/// For each unique account, returns the `final_state_commitment` from the final transaction with
+/// the highest `block_num`.
+fn derive_account_commitments(
+    transaction_records: &[RpcTransactionRecord],
+) -> Vec<(AccountId, Word)> {
     let mut latest_by_account: BTreeMap<AccountId, (BlockNumber, Word)> = BTreeMap::new();
 
-    for ((account_id, block_num), txs) in &groups {
-        let terminal_state = if txs.len() == 1 {
-            txs[0].transaction_header.final_state_commitment()
-        } else {
-            // The terminal transaction's final_state_commitment is not used as the
-            // initial_state_commitment of any other transaction in the same group.
-            let initial_states: BTreeSet<Word> =
-                txs.iter().map(|tx| tx.transaction_header.initial_state_commitment()).collect();
-
-            txs.iter()
-                .find(|tx| {
-                    !initial_states.contains(&tx.transaction_header.final_state_commitment())
-                })
-                // Fallback for degenerate input (e.g. a cycle); take the last record seen.
-                .unwrap_or_else(|| txs.last().unwrap())
-                .transaction_header
-                .final_state_commitment()
-        };
+    for ((account_id, block_num), txs) in &group_txs_by_account_block(transaction_records) {
+        // Walk the chain and take the last tx's final_state_commitment. Fallback to the last record
+        // seen on degenerate (cyclic) input.
+        let terminal_state = walk_execution_chain(txs)
+            .last()
+            .or_else(|| txs.last().copied())
+            .expect("group is non-empty by construction")
+            .transaction_header
+            .final_state_commitment();
 
         latest_by_account
             .entry(*account_id)
@@ -995,47 +1020,13 @@ fn derive_account_commitments(
 /// input note nullifiers in execution order. Nullifiers from the same account are in execution
 /// order; ordering across different accounts is arbitrary.
 fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> Vec<Nullifier> {
-    // Group transactions by (account_id, block_num).
-    let mut groups: BTreeMap<(AccountId, BlockNumber), Vec<&RpcTransactionRecord>> =
-        BTreeMap::new();
-
-    for record in transaction_records {
-        let account_id = record.transaction_header.account_id();
-        groups.entry((account_id, record.block_num)).or_default().push(record);
-    }
-
     let mut result = Vec::new();
 
-    for txs in groups.values() {
-        // Build a lookup from initial_state_commitment -> transaction record.
-        let mut init_to_tx: BTreeMap<Word, &RpcTransactionRecord> = txs
-            .iter()
-            .map(|tx| (tx.transaction_header.initial_state_commitment(), *tx))
-            .collect();
-
-        // Build a set of all final states to find the chain start.
-        let final_states: BTreeSet<Word> =
-            txs.iter().map(|tx| tx.transaction_header.final_state_commitment()).collect();
-
-        // Find the chain start: the tx whose initial_state_commitment is not any other tx's
-        // final_state_commitment.
-        let chain_start = txs
-            .iter()
-            .find(|tx| !final_states.contains(&tx.transaction_header.initial_state_commitment()));
-
-        let Some(start_tx) = chain_start else {
-            continue;
-        };
-
-        // Walk the chain from start, removing each step from the map.
-        let mut current =
-            init_to_tx.remove(&start_tx.transaction_header.initial_state_commitment());
-
-        while let Some(tx) = current {
+    for txs in group_txs_by_account_block(transaction_records).values() {
+        for tx in walk_execution_chain(txs) {
             for commitment in tx.transaction_header.input_notes().iter() {
                 result.push(commitment.nullifier());
             }
-            current = init_to_tx.remove(&tx.transaction_header.final_state_commitment());
         }
     }
 
