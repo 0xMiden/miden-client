@@ -241,7 +241,6 @@ pub trait NodeRpcClient: Send + Sync {
 
         // Second call: request entries for every map slot at the same block, so the view is
         // consistent. If there are no maps, the first proof already has what we need.
-        // TODO: this refetches the full vault and could be avoided
         let mut final_proof = if map_slot_names.is_empty() {
             initial_proof
         } else {
