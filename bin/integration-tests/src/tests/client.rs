@@ -138,11 +138,10 @@ pub async fn test_multiple_tx_on_same_block(client_config: ClientConfig) -> Resu
 
     // Submit both requests as a single proven batch via the node's `SubmitProvenBatch` path.
     let block_num = client
-        .new_transaction_batch(from_account_id)
+        .new_transaction_batch()
+        .push(from_account_id, tx_request_1)
         .await?
-        .push(tx_request_1)
-        .await?
-        .push(tx_request_2)
+        .push(from_account_id, tx_request_2)
         .await?
         .submit()
         .await?;
@@ -1547,7 +1546,8 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .test_rpc_api()
         .get_note_script_by_root(note.script().root().into())
         .await
-        .unwrap();
+        .unwrap()
+        .expect("node should have the note script registered");
     let sync_storage_maps = client
         .test_rpc_api()
         .sync_storage_maps(0.into(), None, account_with_map_item.id())
