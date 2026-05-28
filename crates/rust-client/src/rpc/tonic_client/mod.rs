@@ -499,7 +499,7 @@ impl NodeRpcClient for GrpcClient {
         response.into_inner().try_into()
     }
 
-    /// Sends a `/GetAccount` request to the Miden node, and extracts the [`AccountProof`]
+    /// Sends a `GetAccount` request to the Miden node, and extracts the [`AccountProof`]
     /// from the response, as well as the block number that it was retrieved for.
     ///
     /// # Errors

@@ -374,7 +374,7 @@ pub trait NodeRpcClient: Send + Sync {
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
 
     /// Fetches the account proof and optionally its details from the node, using the
-    /// `/GetAccount` endpoint.
+    /// `GetAccount` endpoint.
     ///
     /// The `account_state` parameter specifies the block number from which to retrieve
     /// the account proof from (the state of the account at that block).
