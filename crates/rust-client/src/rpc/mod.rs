@@ -271,20 +271,21 @@ pub trait NodeRpcClient: Send + Sync {
         let has_oversized_maps =
             details.storage_details.map_details.iter().any(|m| m.too_many_entries);
         if has_oversized_maps {
-            let info = self
+            let mut updates = self
                 .sync_storage_maps(BlockNumber::GENESIS, Some(block_number), account_id)
-                .await?;
+                .await?
+                .updates;
+            // The sync endpoint may return multiple updates for the same key across different
+            // blocks. Sorting by block once (a stable sort preserves this order within each slot's
+            // subset) lets the per-slot BTreeMap below retain each key's latest value.
+            updates.sort_by_key(|u| u.block_num);
             for map_details in &mut details.storage_details.map_details {
                 if !map_details.too_many_entries {
                     continue;
                 }
-                // The sync endpoint may return multiple updates for the same key across
-                // different blocks. Sort by block so the BTreeMap retains the latest value.
-                let mut sorted: Vec<_> =
-                    info.updates.iter().filter(|u| u.slot_name == map_details.slot_name).collect();
-                sorted.sort_by_key(|u| u.block_num);
-                let entries: Vec<StorageMapEntry> = sorted
-                    .into_iter()
+                let entries: Vec<StorageMapEntry> = updates
+                    .iter()
+                    .filter(|u| u.slot_name == map_details.slot_name)
                     .map(|u| (u.key, u.value))
                     .collect::<BTreeMap<_, _>>()
                     .into_iter()
