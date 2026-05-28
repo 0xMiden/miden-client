@@ -100,7 +100,7 @@ pub mod component {
         WordSchema,
     };
     pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
-    pub use miden_standards::account::access::AccessControl;
+    pub use miden_standards::account::access::{AccessControl, Ownable2Step};
     pub use miden_standards::account::auth::*;
     pub use miden_standards::account::faucets::{
         FungibleFaucet,
