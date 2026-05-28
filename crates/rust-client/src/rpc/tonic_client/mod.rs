@@ -740,7 +740,7 @@ impl NodeRpcClient for GrpcClient {
         Ok(block)
     }
 
-    async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError> {
+    async fn get_note_script_by_root(&self, root: Word) -> Result<Option<NoteScript>, RpcError> {
         let request = proto::note::NoteScriptRoot { root: Some(root.into()) };
 
         let response = self
@@ -749,12 +749,11 @@ impl NodeRpcClient for GrpcClient {
             })
             .await?;
 
-        let response = response.into_inner();
-        let note_script = NoteScript::try_from(
-            response
-                .script
-                .ok_or(RpcError::ExpectedDataMissing("GetNoteScriptByRoot.script".to_string()))?,
-        )?;
+        // The node returns an empty payload when it has no script registered for the root.
+        let Some(script) = response.into_inner().script else {
+            return Ok(None);
+        };
+        let note_script = NoteScript::try_from(script)?;
 
         let fetched_root = note_script.root();
         if Word::from(fetched_root) != root {
@@ -763,7 +762,7 @@ impl NodeRpcClient for GrpcClient {
             )));
         }
 
-        Ok(note_script)
+        Ok(Some(note_script))
     }
 
     async fn sync_storage_maps(

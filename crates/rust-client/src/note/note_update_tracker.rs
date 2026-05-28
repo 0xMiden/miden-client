@@ -15,9 +15,23 @@ use miden_tx::utils::serde::{
 use crate::ClientError;
 use crate::rpc::RpcError;
 use crate::rpc::domain::note::CommittedNote;
-use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::store::{InputNoteRecord, OutputNoteRecord};
 use crate::transaction::{TransactionRecord, TransactionStatus};
+
+// NOTE CONSUMPTION
+// ================================================================================================
+
+/// A note consumption event observed on chain.
+pub struct NoteConsumption {
+    /// The nullifier of the consumed note.
+    pub nullifier: Nullifier,
+    /// The block number at which the note consumption was registered on chain.
+    pub block_num: BlockNumber,
+    /// The account ID of the consumer of the note. Will be set if the note was consumed by a
+    /// transaction submitted outside this client by an account that is tracked locally.
+    /// Otherwise, it will be `None`.
+    pub external_consumer: Option<AccountId>,
+}
 
 // NOTE UPDATE
 // ================================================================================================
@@ -480,14 +494,14 @@ impl NoteUpdateTracker {
     /// If the note is tracked as an output but not as an input (e.g. the client tracks both the
     /// sender and the consumer), a new input record is created from the output details so the
     /// consumption surfaces through `InputNoteReader`.
-    pub(crate) fn apply_nullifiers_state_transitions<'a>(
+    pub(crate) fn apply_note_consumption<'a>(
         &mut self,
-        nullifier_update: &NullifierUpdate,
+        consumption: &NoteConsumption,
         mut committed_transactions: impl Iterator<Item = &'a TransactionRecord>,
-        external_consumer_account: Option<AccountId>,
     ) -> Result<(), ClientError> {
-        let nullifier = nullifier_update.nullifier;
-        let block_num = nullifier_update.block_num;
+        let nullifier = consumption.nullifier;
+        let block_num = consumption.block_num;
+        let external_consumer = consumption.external_consumer;
         let order = self.get_nullifier_order(nullifier);
         let input_present = self.input_notes_by_nullifier.contains_key(&nullifier);
 
@@ -505,11 +519,11 @@ impl NoteUpdateTracker {
                 }
             } else {
                 // The note was consumed by a transaction not submitted by this client.
-                // If the consuming account is tracked, external_consumer_account will be Some.
+                // If the consuming account is tracked, external_consumer will be Some.
                 input_note_update.inner_mut().consumed_externally(
                     nullifier,
                     block_num,
-                    external_consumer_account,
+                    external_consumer,
                 )?;
             }
             input_note_update.inner_mut().set_consumed_tx_order(order);
@@ -520,7 +534,7 @@ impl NoteUpdateTracker {
         }
 
         if !input_present
-            && let Some(consumer) = external_consumer_account
+            && let Some(consumer) = external_consumer
             && let Some(note_id) = self.output_notes_by_nullifier.get(&nullifier).copied()
         {
             self.try_insert_consumed_input_from_output(note_id, consumer, block_num, order)?;

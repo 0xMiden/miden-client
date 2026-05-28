@@ -54,7 +54,7 @@ use domain::account::{
     StorageMapEntries,
     StorageMapEntry,
 };
-use domain::note::{FetchedNote, NoteSyncBlock, SyncNotesResult};
+use domain::note::{FetchedNote, NoteSyncBlock};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::account::{Account, AccountCode, AccountId, StorageSlotName};
@@ -62,7 +62,7 @@ use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
-use miden_protocol::note::{NoteId, NoteScript, NoteTag, NoteType, Nullifier};
+use miden_protocol::note::{Note, NoteId, NoteScript, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_protocol::{EMPTY_WORD, Word};
 
@@ -300,11 +300,17 @@ pub trait NodeRpcClient: Send + Sync {
         Ok(FetchedAccount::new_public(account, summary))
     }
 
-    /// Fetches the notes related to the specified tags using the `/SyncNotes` RPC endpoint.
+    /// Fetches notes related to the specified tags using the `/SyncNotes` RPC endpoint,
+    /// paginating over the full block range and returning, in block-number order, every block in
+    /// that range that contains at least one note matching the requested tags.
     ///
     /// - `block_from`: The starting block number for the range (inclusive).
     /// - `block_to`: The ending block number for the range (inclusive).
     /// - `note_tags` is the set of tags used to filter the notes the client is interested in.
+    ///
+    /// Notes with attachments will have header-only metadata after this call; use
+    /// [`NodeRpcClient::sync_notes_with_details`] to also resolve their full metadata and
+    /// fetch public note bodies in a single follow-up call.
     async fn sync_notes(
         &self,
         block_from: BlockNumber,
@@ -312,21 +318,23 @@ pub trait NodeRpcClient: Send + Sync {
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<Vec<NoteSyncBlock>, RpcError>;
 
-    /// Calls [`NodeRpcClient::sync_notes`] for the requested range, then makes a single
+    /// Calls [`NodeRpcClient::sync_notes`] and then makes a single
     /// [`NodeRpcClient::get_notes_by_id`] call to:
-    /// - Fill metadata for notes with attachments (whose sync response only had header fields).
-    /// - Fetch full note bodies for public notes (scripts, assets, recipient).
+    /// - Fill metadata on any [`CommittedNote`](domain::note::CommittedNote) whose sync response
+    ///   only included header fields.
+    /// - Collect full bodies for every public note in the sync range.
     ///
     /// All notes that are public or have missing metadata are fetched (not just the ones the
     /// client tracks) to avoid revealing which specific notes the client is interested in.
     ///
-    /// Returns the fully-resolved note blocks and the fetched public note bodies.
+    /// Returns the resolved note blocks paired with a map of public note bodies keyed by
+    /// note ID.
     async fn sync_notes_with_details(
         &self,
         block_from: BlockNumber,
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<SyncNotesResult, RpcError> {
+    ) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, Note>), RpcError> {
         let mut blocks = self.sync_notes(block_from, block_to, note_tags).await?;
 
         let note_ids: Vec<NoteId> = blocks
@@ -357,7 +365,7 @@ pub trait NodeRpcClient: Send + Sync {
             }
         }
 
-        Ok(SyncNotesResult { blocks, public_notes })
+        Ok((blocks, public_notes))
     }
 
     /// Fetches the nullifiers corresponding to a list of prefixes using the
@@ -488,17 +496,16 @@ pub trait NodeRpcClient: Send + Sync {
         notes.into_iter().next().ok_or(RpcError::NoteNotFound(note_id))
     }
 
-    /// Fetches the note script with the specified root.
+    /// Fetches the note script with the specified root, returning `None` if the node has no script
+    /// registered for that root.
     ///
-    /// Implementations must verify that the returned script's root matches the requested
-    /// `root` and return [`RpcError::InvalidResponse`] otherwise; callers may rely on this
-    /// invariant.
+    /// Implementations must verify that a returned script's root matches the requested `root` and
+    /// return [`RpcError::InvalidResponse`] otherwise; callers may rely on this invariant.
     ///
     /// Errors:
-    /// - [`RpcError::ExpectedDataMissing`] if the note with the specified root is not found.
     /// - [`RpcError::InvalidResponse`] if the node returns a script whose root does not match the
     ///   requested `root`.
-    async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError>;
+    async fn get_note_script_by_root(&self, root: Word) -> Result<Option<NoteScript>, RpcError>;
 
     /// Fetches storage map updates for specified account and storage slots within a block range,
     /// using the `/SyncStorageMaps` RPC endpoint.

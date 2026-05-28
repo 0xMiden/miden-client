@@ -203,6 +203,46 @@ jobs:
       - name: Check binary existance
         run: file -E target/release/testing-remote-prover
 
+  miden-bench:
+    name: miden-bench smoke tests
+    runs-on: warp-ubuntu-latest-x64-8x
+    needs: [build-node-builder]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Cleanup large tools for build space
+        uses: ./.github/actions/cleanup-runner
+      - name: Install Rust
+        run: rustup update --no-self-update
+      # Keep this on a released install-action commit with an explicit tool; shortcut tags can
+      # trip zizmor's impostor-commit audit when they are later retagged.
+      - uses: taiki-e/install-action@055f5df8c3f65ea01cd41e9dc855becd88953486 # v2.75.18
+        with:
+          tool: nextest@0.9.122
+      - name: Add Rust Cache
+        uses: WarpBuilds/rust-cache@9d0cc3090d9c87de74ea67617b246e978735b1a1 # v2.9.1
+        with:
+          shared-key: rust-release
+          prefix-key: ${{ env.RUST_CACHE_KEY }}
+          save-if: false
+      - name: Run miden-bench CLI tests
+        run: make test-miden-bench
+      - name: Fetch node-builder binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: node-builder-artifact
+          path: target/release
+      - name: Restore node-builder permissions
+        run: chmod +x target/release/testing-node-builder
+      - name: Start test node
+        run: ./scripts/start-ci-service.sh testing-node-builder 57291 target/release/testing-node-builder
+      - name: Run miden-bench smoke tests
+        run: make integration-test-miden-bench
+      - name: Stop test node
+        if: always()
+        run: make stop-node
+
   integration-tests:
     name: Integration tests
     runs-on: warp-ubuntu-latest-x64-8x

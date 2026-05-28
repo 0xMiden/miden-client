@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use miden_client::account::AccountStorageMode;
@@ -116,11 +117,10 @@ async fn batch_builder_submits_two_txs_on_one_account() {
 
     let block_num = Box::pin(async {
         client
-            .new_transaction_batch(account_id)
+            .new_transaction_batch()
+            .push(account_id, req1)
             .await?
-            .push(req1)
-            .await?
-            .push(req2)
+            .push(account_id, req2)
             .await?
             .submit()
             .await
@@ -311,11 +311,10 @@ async fn batch_builder_push_succeeds_when_balance_depends_on_prior_push() {
 
     let block_num = Box::pin(async {
         client
-            .new_transaction_batch(from_account_id)
+            .new_transaction_batch()
+            .push(from_account_id, push1)
             .await?
-            .push(push1)
-            .await?
-            .push(push2)
+            .push(from_account_id, push2)
             .await?
             .submit()
             .await
@@ -329,10 +328,10 @@ async fn batch_builder_push_succeeds_when_balance_depends_on_prior_push() {
 /// Verify that submitting an empty batch (no pushes) returns `BatchBuilderError::Empty`.
 #[tokio::test]
 async fn batch_builder_empty_submit_returns_empty_error() {
-    let (mut client, rpc_api, _keystore) = Box::pin(create_test_client()).await;
+    let (client, rpc_api, _keystore) = Box::pin(create_test_client()).await;
 
     // Pick the first tracked account in the mock chain.
-    let account_id = rpc_api
+    let _account_id = rpc_api
         .mock_chain
         .read()
         .proven_blocks()
@@ -342,11 +341,7 @@ async fn batch_builder_empty_submit_returns_empty_error() {
         .unwrap()
         .account_id();
 
-    // Register the account with the client store.
-    let account = rpc_api.mock_chain.read().committed_account(account_id).unwrap().clone();
-    client.add_account(&account, false).await.unwrap();
-
-    let batch = client.new_transaction_batch(account_id).await.unwrap();
+    let batch = client.new_transaction_batch();
     assert_eq!(batch.len(), 0);
     assert!(batch.is_empty());
 
@@ -400,11 +395,10 @@ async fn batch_builder_push_rejects_duplicate_input_note() {
     // First push must succeed; second must fail with DuplicateInputNote(note_id).
     let result = Box::pin(async {
         client
-            .new_transaction_batch(from_account_id)
+            .new_transaction_batch()
+            .push(from_account_id, req1)
             .await?
-            .push(req1)
-            .await?
-            .push(req2)
+            .push(from_account_id, req2)
             .await
     })
     .await;
@@ -422,10 +416,79 @@ async fn batch_builder_push_rejects_duplicate_input_note() {
     }
 }
 
-/// Verify that opening a batch for an account that's not tracked by the client's store
+/// Build a 2-account batch (1 tx per account, both pushing trivial no-op `TransactionRequests`)
+/// and verify both transactions reach the local store and the returned block number matches
+/// the mock chain's tip.
+#[tokio::test]
+async fn batch_builder_submits_txs_across_multiple_accounts() {
+    // Build a fresh mock chain with two existing IncrNonce accounts so we can execute a
+    // trivial transaction against each without needing signing keys.
+    let mut chain_builder = MockChainBuilder::new();
+    let account_a = chain_builder.add_existing_mock_account(Auth::IncrNonce).unwrap();
+    let account_b = chain_builder.add_existing_mock_account(Auth::IncrNonce).unwrap();
+    let account_id_a = account_a.id();
+    let account_id_b = account_b.id();
+    let mock_chain = chain_builder.build().unwrap();
+
+    let rng = RandomCoin::new(rand::random::<[u64; 4]>().map(Felt::new).into());
+    let keystore = FilesystemKeyStore::new(std::env::temp_dir()).unwrap();
+    let rpc_api = MockRpcApi::new(mock_chain);
+    let mut client = ClientBuilder::new()
+        .rpc(Arc::new(rpc_api.clone()))
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_discard_delta(None)
+        .build()
+        .await
+        .unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    // Register both accounts with the client.
+    client.add_account(&account_a, false).await.unwrap();
+    client.add_account(&account_b, false).await.unwrap();
+
+    client.sync_state().await.unwrap();
+
+    let req_a = TransactionRequestBuilder::new().build().unwrap();
+    let req_b = TransactionRequestBuilder::new().build().unwrap();
+
+    let block_num = Box::pin(async {
+        client
+            .new_transaction_batch()
+            .push(account_id_a, req_a)
+            .await?
+            .push(account_id_b, req_b)
+            .await?
+            .submit()
+            .await
+    })
+    .await
+    .expect("multi-account batch submit should succeed");
+
+    let expected_tip = rpc_api.get_chain_tip_block_num();
+    assert_eq!(block_num, expected_tip);
+
+    let transactions = client
+        .get_transactions(TransactionFilter::All)
+        .await
+        .expect("transactions fetched");
+    assert!(
+        transactions.len() >= 2,
+        "expected >= 2 transactions in the store after a 2-account batch, got {}",
+        transactions.len()
+    );
+
+    let touched: BTreeSet<_> = transactions.iter().map(|tx| tx.details.account_id).collect();
+    assert!(touched.contains(&account_id_a), "tx for account A not recorded");
+    assert!(touched.contains(&account_id_b), "tx for account B not recorded");
+}
+
+/// Verify that pushing a transaction for an account that's not tracked by the client's store
 /// fails with `ClientError::AccountDataNotFound`.
 #[tokio::test]
-async fn new_transaction_batch_unknown_account_returns_account_data_not_found() {
+async fn batch_builder_push_for_unknown_account_returns_error() {
     let (client, rpc_api, _keystore) = Box::pin(create_test_client()).await;
 
     // Pick an account that EXISTS on the mock chain but is NOT registered with the client
@@ -440,7 +503,10 @@ async fn new_transaction_batch_unknown_account_returns_account_data_not_found() 
         .unwrap()
         .account_id();
 
-    match client.new_transaction_batch(account_id).await {
+    // Build a no-op request; we never get to submission — the push itself must fail.
+    let req = TransactionRequestBuilder::new().build().unwrap();
+
+    match client.new_transaction_batch().push(account_id, req).await {
         Err(ClientError::AccountDataNotFound(id)) => {
             assert_eq!(id, account_id, "AccountDataNotFound should carry the requested id");
         },
@@ -449,6 +515,158 @@ async fn new_transaction_batch_unknown_account_returns_account_data_not_found() 
         },
         Ok(_) => {
             panic!("expected ClientError::AccountDataNotFound({account_id}), got Ok(_)")
+        },
+    }
+}
+
+/// A tx in the batch can consume a note produced by an earlier tx in the same batch when
+/// each tx targets a different account. The expected output note is extracted from the
+/// producer's `TransactionRequest::expected_output_own_notes` before pushing.
+#[tokio::test]
+async fn batch_builder_cross_account_note_flow() {
+    let (mut client, rpc_api, authenticator) = Box::pin(create_test_client()).await;
+
+    let (first_regular_account, second_regular_account, faucet_account_header) =
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
+
+    let account_id_a = first_regular_account.id();
+    let account_id_b = second_regular_account.id();
+    let faucet_account_id = faucet_account_header.id();
+
+    // Pre-batch: get both A and B on-chain (each with MINT_AMOUNT) so their first batch-tx
+    // deltas are partial, not full-state — the batch apply path requires partial deltas.
+    mint_and_consume(&mut client, account_id_a, faucet_account_id, NoteType::Private).await;
+    rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+    mint_and_consume(&mut client, account_id_b, faucet_account_id, NoteType::Private).await;
+    rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // tx1 (account A): send MINT_AMOUNT to B via P2ID. Pre-extract the note we expect to
+    // create so tx2 can consume it.
+    let asset = FungibleAsset::new(faucet_account_id, MINT_AMOUNT).unwrap();
+    let req_send = TransactionRequestBuilder::new()
+        .build_pay_to_id(
+            PaymentNoteDescription::new(vec![Asset::Fungible(asset)], account_id_a, account_id_b),
+            NoteType::Private,
+            client.rng(),
+        )
+        .unwrap();
+    let in_batch_note = req_send
+        .expected_output_own_notes()
+        .pop()
+        .expect("pay_to_id should produce exactly one note");
+
+    // tx2 (account B): consume the just-created note.
+    let req_consume = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![in_batch_note])
+        .unwrap();
+
+    let block_num = Box::pin(async {
+        client
+            .new_transaction_batch()
+            .push(account_id_a, req_send)
+            .await?
+            .push(account_id_b, req_consume)
+            .await?
+            .submit()
+            .await
+    })
+    .await
+    .expect("cross-account in-batch note flow should succeed");
+
+    assert!(block_num.as_u32() > 0, "expected a positive block number");
+
+    let transactions = client
+        .get_transactions(TransactionFilter::All)
+        .await
+        .expect("transactions fetched");
+    let touched: BTreeSet<_> = transactions.iter().map(|tx| tx.details.account_id).collect();
+    assert!(touched.contains(&account_id_a), "send tx not recorded");
+    assert!(touched.contains(&account_id_b), "consume tx not recorded");
+
+    // After the batch: A sent its MINT_AMOUNT → 0. B started with MINT_AMOUNT (pre-batch
+    // mint above) and received another MINT_AMOUNT from A → 2 * MINT_AMOUNT.
+    let a_balance = client
+        .account_reader(account_id_a)
+        .get_balance(faucet_account_id)
+        .await
+        .unwrap();
+    let b_balance = client
+        .account_reader(account_id_b)
+        .get_balance(faucet_account_id)
+        .await
+        .unwrap();
+    assert_eq!(a_balance, 0, "A should have sent all its balance");
+    assert_eq!(b_balance, 2 * MINT_AMOUNT, "B should hold its prior MINT_AMOUNT + A's transfer");
+}
+
+/// The duplicate-input-note check is global to the batch: a note consumed by `tx_a` (account A)
+/// cannot also appear as an input to `tx_b` (account B). Second push fails with
+/// `DuplicateInputNote(note_id)`.
+#[tokio::test]
+async fn batch_builder_dedup_rejects_duplicate_input_note_across_accounts() {
+    let (mut client, rpc_api, authenticator) = Box::pin(create_test_client()).await;
+
+    let (first_regular_account, second_regular_account, faucet_account_header) =
+        setup_two_wallets_and_faucet(
+            &mut client,
+            AccountStorageMode::Private,
+            &authenticator,
+            RPO_FALCON_SCHEME_ID,
+        )
+        .await
+        .unwrap();
+
+    let account_id_a = first_regular_account.id();
+    let account_id_b = second_regular_account.id();
+    let faucet_account_id = faucet_account_header.id();
+
+    // Get account A on-chain so its first batch-tx delta is partial, not full-state.
+    mint_and_consume(&mut client, account_id_a, faucet_account_id, NoteType::Private).await;
+    rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    // Mint a single shared note (created with A's recipient, but we'll try to feed the same
+    // note to both pushes).
+    let (_mint_tx_id, note) =
+        mint_note(&mut client, account_id_a, faucet_account_id, NoteType::Private).await;
+    rpc_api.prove_block();
+    client.sync_state().await.unwrap();
+
+    let note_id = note.id();
+
+    let req_a = TransactionRequestBuilder::new()
+        .build_consume_notes(vec![note.clone()])
+        .unwrap();
+    let req_b = TransactionRequestBuilder::new().build_consume_notes(vec![note]).unwrap();
+
+    let result = Box::pin(async {
+        client
+            .new_transaction_batch()
+            .push(account_id_a, req_a)
+            .await?
+            .push(account_id_b, req_b)
+            .await
+    })
+    .await;
+
+    match result {
+        Err(ClientError::BatchBuilder(BatchBuilderError::DuplicateInputNote(id))) => {
+            assert_eq!(id, note_id, "DuplicateInputNote should carry the duplicated note id");
+        },
+        Err(other) => {
+            panic!("expected BatchBuilderError::DuplicateInputNote({note_id}), got {other:?}")
+        },
+        Ok(_) => {
+            panic!("expected BatchBuilderError::DuplicateInputNote({note_id}), got Ok(_)")
         },
     }
 }
