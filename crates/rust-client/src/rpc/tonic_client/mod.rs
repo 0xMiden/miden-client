@@ -576,6 +576,7 @@ impl NodeRpcClient for GrpcClient {
 
             if details.vault_details.too_many_assets {
                 details.vault_details.assets = self.fetch_full_vault(account_id, block_num).await?;
+                details.vault_details.too_many_assets = false;
             }
 
             Some(details)
