@@ -5,23 +5,31 @@ use std::io::Write;
 use std::net::SocketAddr;
 use std::num::{NonZeroU32, NonZeroU64};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ::rand::{Rng, random};
 use anyhow::{Context, Result};
 use miden_node_block_producer::{
     BlockProducer,
+    BlockProducerApi,
     DEFAULT_MAX_BATCHES_PER_BLOCK,
     DEFAULT_MAX_TXS_PER_BATCH,
     DEFAULT_MEMPOOL_TX_CAPACITY,
 };
-use miden_node_rpc::Rpc;
+use miden_node_proto::clients::{
+    Builder as GrpcClientBuilder,
+    GrpcClient,
+    NtxBuilderClient,
+    ValidatorClient,
+};
+use miden_node_rpc::{NetworkTxAuth, Rpc, RpcMode};
+use miden_node_store::state::State;
 use miden_node_store::{
-    DEFAULT_MAX_CONCURRENT_PROOFS,
+    ApplyBlockError,
     DatabaseOptions,
     GenesisState,
     Store,
-    StoreMode,
     default_sqlite_connection_pool_size,
 };
 use miden_node_utils::clap::{GrpcOptionsExternal, GrpcOptionsInternal, StorageOptions};
@@ -60,12 +68,14 @@ use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
+use tonic::metadata::AsciiMetadataValue;
 use url::Url;
 
 pub const DEFAULT_BLOCK_INTERVAL: u64 = 5_000;
 pub const DEFAULT_BATCH_INTERVAL: u64 = 2_000;
 pub const DEFAULT_RPC_PORT: u16 = 57_291;
 pub const GENESIS_ACCOUNT_FILE: &str = "account.mac";
+const NTX_AUTH_HEADER_VALUE: &str = "miden-client-testing-node-ntx";
 
 /// Builder for configuring and starting a Miden node with all components.
 pub struct NodeBuilder {
@@ -157,7 +167,8 @@ impl NodeBuilder {
             .into_block(&validator_signing_key)
             .with_context(|| "failed to create genesis block")?;
 
-        let genesis_header = genesis_block.inner().header().clone();
+        let signed_genesis_block = genesis_block.inner().clone();
+        let genesis_header = signed_genesis_block.header().clone();
         Store::bootstrap(genesis_block, &self.data_directory)
             .with_context(|| "failed to bootstrap store")?;
 
@@ -173,27 +184,12 @@ impl NodeBuilder {
             .await
             .with_context(|| "failed to bootstrap validator with genesis block header")?;
 
-        // Start listening on all gRPC urls so that inter-component connections can be created
-        // before each component is fully started up.
         let grpc_rpc = TcpListener::bind(format!("127.0.0.1:{}", self.rpc_port))
             .await
             .with_context(|| "failed to bind to RPC gRPC endpoint")?;
         let rpc_address = grpc_rpc
             .local_addr()
             .with_context(|| "failed to retrieve the RPC gRPC address")?;
-        let store_rpc_listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .with_context(|| "failed to bind to store RPC gRPC endpoint")?;
-        let store_block_producer_listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .with_context(|| "failed to bind to store block-producer gRPC endpoint")?;
-
-        let store_rpc_address = store_rpc_listener
-            .local_addr()
-            .with_context(|| "failed to retrieve the store's RPC gRPC address")?;
-        let store_block_producer_address = store_block_producer_listener
-            .local_addr()
-            .with_context(|| "failed to retrieve the store's block-producer gRPC address")?;
 
         let ntx_builder_listener = TcpListener::bind("127.0.0.1:0")
             .await
@@ -202,35 +198,43 @@ impl NodeBuilder {
             .local_addr()
             .with_context(|| "failed to retrieve the ntx-builder gRPC address")?;
 
-        let block_producer_address = available_socket_addr()
-            .await
-            .with_context(|| "failed to bind to block-producer gRPC endpoint")?;
-
         let validator_address = available_socket_addr()
             .await
             .with_context(|| "failed to bind to validator gRPC endpoint")?;
 
         // Start components
 
-        let store_handle = Self::start_store(
-            self.data_directory.clone(),
-            store_rpc_listener,
-            store_block_producer_listener,
-        );
+        let sqlite_connection_pool_size = default_sqlite_connection_pool_size();
+        let ntx_builder_database_filepath = self.data_directory.join("ntx-builder.sqlite3");
+        miden_ntx_builder::bootstrap(ntx_builder_database_filepath.clone(), &signed_genesis_block)
+            .await
+            .context("failed to bootstrap ntx-builder database")?;
+
+        let (termination_ask, termination_signal) = tokio::sync::mpsc::channel(1);
+        let (store, _proven_tip) = State::load_with_database_options(
+            &self.data_directory,
+            StorageOptions::default(),
+            DatabaseOptions {
+                connection_pool_size: sqlite_connection_pool_size,
+            },
+            termination_ask,
+        )
+        .await
+        .context("failed to load store state")?;
+        let store = Arc::new(store);
+        let store_handle = Self::start_store_termination_task(termination_signal);
+        let ntx_auth_header = AsciiMetadataValue::from_static(NTX_AUTH_HEADER_VALUE);
 
         let ntx_builder_handle = Self::start_ntx_builder(
             rpc_address,
-            self.data_directory.join("ntx-builder.sqlite3"),
+            ntx_builder_database_filepath,
             ntx_builder_listener,
+            ntx_auth_header.clone(),
         );
 
-        let block_producer_handle = self.start_block_producer(
-            block_producer_address,
-            store_block_producer_address,
-            validator_address,
-        );
+        let (block_producer_api, block_producer_handle) =
+            self.start_block_producer(Arc::clone(&store), validator_address).await?;
 
-        let sqlite_connection_pool_size = default_sqlite_connection_pool_size();
         let validator_handle = tokio::spawn({
             let data_directory = self.data_directory.clone();
             async move {
@@ -248,31 +252,24 @@ impl NodeBuilder {
         });
 
         let rpc_handle = tokio::spawn(async move {
-            let store_url = Url::parse(&format!("http://{store_rpc_address}"))
-                .context("Failed to parse URL")?;
-            let block_producer_url = Some(
-                Url::parse(&format!("http://{block_producer_address}"))
-                    .context("Failed to parse URL")?,
-            );
             let validator_url = Url::parse(&format!("http://{validator_address}"))
                 .context("Failed to parse URL")?;
-
-            let ntx_builder_url = Some(
-                Url::parse(&format!("http://{ntx_builder_address}"))
-                    .context("Failed to parse URL")?,
-            );
+            let validator: ValidatorClient = grpc_client(validator_url);
+            let ntx_builder_url = Url::parse(&format!("http://{ntx_builder_address}"))
+                .context("Failed to parse URL")?;
+            let ntx_builder: Option<NtxBuilderClient> = Some(grpc_client(ntx_builder_url));
 
             Rpc {
                 listener: grpc_rpc,
-                store_url,
-                block_producer_url,
-                validator_url,
-                ntx_builder_url,
+                store,
+                mode: RpcMode::sequencer(block_producer_api, validator),
+                ntx_builder,
                 grpc_options: GrpcOptionsExternal {
                     burst_size: NonZeroU32::new(10_000).unwrap(),
                     replenish_n_per_second_per_ip: NonZeroU64::new(10_000).unwrap(),
                     ..GrpcOptionsExternal::default()
                 },
+                network_tx_auth: Some(NetworkTxAuth(ntx_auth_header)),
             }
             .serve()
             .await
@@ -291,63 +288,49 @@ impl NodeBuilder {
         })
     }
 
-    // Start store and return the task handle. The store endpoint is available after loading
-    // completes.
-    fn start_store(
-        data_directory: PathBuf,
-        rpc_listener: TcpListener,
-        block_producer_listener: TcpListener,
+    fn start_store_termination_task(
+        mut termination_signal: tokio::sync::mpsc::Receiver<ApplyBlockError>,
     ) -> JoinHandle<Result<()>> {
         tokio::spawn(async move {
-            Store {
-                data_directory,
-                rpc_listener,
-                mode: StoreMode::BlockProducer {
-                    block_producer_listener,
-                    block_prover_url: None,
-                    max_concurrent_proofs: DEFAULT_MAX_CONCURRENT_PROOFS,
-                },
-                database_options: DatabaseOptions::default(),
-                storage_options: StorageOptions::default(),
-                grpc_options: GrpcOptionsInternal::default(),
+            if let Some(err) = termination_signal.recv().await {
+                return Err(anyhow::anyhow!("store received termination signal").context(err));
             }
-            .serve()
-            .await
-            .context("failed while serving store component")
+
+            std::future::pending::<Result<()>>().await
         })
     }
 
-    /// Start block-producer and return the task handle. The block-producer's endpoint is
-    /// available after loading completes.
-    fn start_block_producer(
+    /// Start block-producer and return its in-process API and runtime task.
+    async fn start_block_producer(
         &self,
-        block_producer_address: SocketAddr,
-        store_address: SocketAddr,
+        store: Arc<State>,
         validator_address: SocketAddr,
-    ) -> JoinHandle<Result<()>> {
+    ) -> Result<(BlockProducerApi, JoinHandle<Result<()>>)> {
         let batch_interval = self.batch_interval;
         let block_interval = self.block_interval;
-        tokio::spawn(async move {
-            let store_url =
-                Url::parse(&format!("http://{store_address}")).context("Failed to parse URL")?;
-            let validator_url = Url::parse(&format!("http://{validator_address}"))
-                .context("Failed to parse URL")?;
-            BlockProducer {
-                block_producer_address,
-                store_url,
-                grpc_options: GrpcOptionsInternal::default(),
-                batch_prover_url: None,
-                validator_url,
-                batch_interval,
-                block_interval,
-                max_txs_per_batch: DEFAULT_MAX_TXS_PER_BATCH,
-                max_batches_per_block: DEFAULT_MAX_BATCHES_PER_BLOCK,
-                mempool_tx_capacity: DEFAULT_MEMPOOL_TX_CAPACITY,
-            }
-            .serve()
+        let validator_url =
+            Url::parse(&format!("http://{validator_address}")).context("Failed to parse URL")?;
+        let block_producer = BlockProducer {
+            store,
+            batch_prover_url: None,
+            validator_url,
+            batch_interval,
+            block_interval,
+            max_txs_per_batch: DEFAULT_MAX_TXS_PER_BATCH,
+            max_batches_per_block: DEFAULT_MAX_BATCHES_PER_BLOCK,
+            mempool_tx_capacity: DEFAULT_MEMPOOL_TX_CAPACITY,
+        };
+
+        let runtime = block_producer
+            .start()
             .await
-            .context("failed while serving block-producer component")
-        })
+            .context("failed while starting block-producer component")?;
+        let api = runtime.api();
+        let handle = tokio::spawn(async move {
+            runtime.wait().await.context("failed while serving block-producer component")
+        });
+
+        Ok((api, handle))
     }
 
     /// Start ntx-builder and return the task handle.
@@ -355,6 +338,7 @@ impl NodeBuilder {
         rpc_address: SocketAddr,
         database_filepath: PathBuf,
         listener: TcpListener,
+        rpc_auth_header: AsciiMetadataValue,
     ) -> JoinHandle<Result<()>> {
         tokio::spawn(async move {
             let rpc_url =
@@ -362,6 +346,7 @@ impl NodeBuilder {
 
             NtxBuilderConfig::new(rpc_url, database_filepath)
                 .with_max_cycles(1 << 18)
+                .with_rpc_auth_header(rpc_auth_header)
                 .build()
                 .await
                 .context("failed to build ntx builder")?
@@ -440,6 +425,16 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
 async fn available_socket_addr() -> Result<SocketAddr> {
     let listener = TcpListener::bind("127.0.0.1:0").await.context("failed to bind to endpoint")?;
     listener.local_addr().context("failed to retrieve the address")
+}
+
+fn grpc_client<T: GrpcClient>(url: Url) -> T {
+    GrpcClientBuilder::new(url)
+        .without_tls()
+        .without_timeout()
+        .without_metadata_version()
+        .without_metadata_genesis()
+        .with_otel_context_injection()
+        .connect_lazy::<T>()
 }
 
 // UTILS (GENESIS ACCOUNTS)

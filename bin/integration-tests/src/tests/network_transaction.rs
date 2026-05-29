@@ -166,12 +166,9 @@ async fn get_counter_contract_account(
 // TESTS
 // ================================================================================================
 
-/// Disabled because network transaction processing is currently turned off in the test node, so
-/// the network account never consumes the emitted notes and the counter is never bumped. The
-/// `disabled_` prefix opts the function out of the integration-test build script registration;
-/// re-enable once the node processes network transactions again.
-#[allow(dead_code)]
-pub async fn disabled_counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
+/// Deploys a counter contract as a network account, emits bump notes, and verifies the network
+/// account consumes them and the counter is bumped.
+pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
     const BUMP_NOTE_NUMBER: u64 = 5;
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
@@ -303,14 +300,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
 /// After a network account consumes a note (potentially in the same batch it was created),
 /// the receiver's `InputNoteReader` should find it as consumed by that account. Validates
 /// the erased-notes detection flow end-to-end against a real node.
-///
-/// Disabled because `mark_erased_note_as_consumed` derives the consumer
-/// [`NetworkAccountTarget`] from the note's attachments, but the RPC sync stream only delivers a
-/// bare [`NoteHeader`] for erased notes. The `disabled_` prefix opts the function out of the
-/// integration-test build script registration; re-enable once erased-note attachments are
-/// delivered or the client persists them in [`OutputNoteRecord`].
-#[allow(dead_code)]
-pub async fn disabled_note_reader_finds_note_consumed_by_ntx(
+pub async fn test_note_reader_finds_note_consumed_by_ntx(
     client_config: ClientConfig,
 ) -> Result<()> {
     let (mut client, keystore) = client_config.into_client().await?;
@@ -382,13 +372,7 @@ pub async fn disabled_note_reader_finds_note_consumed_by_ntx(
 /// stream), so the consumer is not derivable: the note is recorded as consumed with an unknown
 /// consumer rather than attributed to the network account. The test therefore asserts the note
 /// reaches a consumed state, not the consumer identity.
-///
-/// Disabled because network transaction processing is currently turned off in the test node, so
-/// the network account never consumes the note. The `disabled_` prefix opts the function out of
-/// the integration-test build script registration; re-enable once the node processes network
-/// transactions again.
-#[allow(dead_code)]
-pub async fn disabled_network_note_consumed_by_ntx(client_config: ClientConfig) -> Result<()> {
+pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
@@ -524,13 +508,7 @@ pub(crate) fn get_network_note_with_script<T: Rng>(
 ///   - `client_1` deploys the counter as a network account and emits bump notes.
 ///   - `client_2` watches the network account via `import_watched_account_by_id` (no note tag).
 ///   - The node-driven counter increments are observed by `client_2` after `sync_state`.
-///
-/// Disabled because network transaction processing is currently turned off in the test node, so
-/// the watched network account's state never advances. The `disabled_` prefix opts the function
-/// out of the integration-test build script registration; re-enable once the node processes
-/// network transactions again.
-#[allow(dead_code)]
-pub async fn disabled_watch_network_account(client_config: ClientConfig) -> Result<()> {
+pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<()> {
     const BUMP_NOTE_NUMBER: u64 = 3;
 
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;

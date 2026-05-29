@@ -82,9 +82,9 @@ use miden_protocol::note::{
 };
 use miden_protocol::transaction::AccountInputs;
 use miden_protocol::vm::MIN_STACK_DEPTH;
-use miden_protocol::{EMPTY_WORD, Felt, Word};
+use miden_protocol::{EMPTY_WORD, Felt, MIN_PROOF_SECURITY_LEVEL, Word};
 use miden_standards::account::interface::AccountInterfaceExt;
-use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
+use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor, TransactionVerifier};
 use tracing::info;
 
 use super::Client;
@@ -427,6 +427,15 @@ where
         proven_transaction: ProvenTransaction,
         transaction_inputs: impl Into<TransactionInputs>,
     ) -> Result<BlockNumber, ClientError> {
+        info!("Verifying transaction proof...");
+        TransactionVerifier::new(MIN_PROOF_SECURITY_LEVEL)
+            .verify(&proven_transaction)
+            .map_err(|source| ClientError::TransactionVerificationError {
+                transaction_id: proven_transaction.id(),
+                source,
+            })?;
+        info!("Transaction proof verified.");
+
         info!("Submitting transaction to the network...");
         let block_num = self
             .rpc_api

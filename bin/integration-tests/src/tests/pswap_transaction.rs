@@ -17,17 +17,10 @@ use crate::tests::config::ClientConfig;
 /// Alice creates a public PSWAP, Bob discovers it via the discovery tag, Bob fully fills it, and
 /// both parties end up with the expected balances after consuming the resulting payback note.
 ///
-/// Disabled because the PSWAP consume MASM emits a payback note with a word-sized attachment
-/// (see `add_word_attachment` in `standards/notes/pswap.masm`). Alice fetches that payback
-/// note via sync and consumes it, but note records persist only `NoteDetails` + `NoteMetadata`
-/// (no `NoteAttachments`), so the locally reconstructed payback note loses its attachment,
-/// its commitment no longer matches the on-chain commitment, and consumption fails with
-/// `InputNoteNotInBlock`. The partial-fill and cancel tests don't consume the payback locally,
-/// so they still pass. The `disabled_` prefix opts the function out of the integration-test
-/// build script registration; re-enable once `InputNoteRecord` / `OutputNoteRecord` persist
-/// `NoteAttachments`.
-#[allow(dead_code)]
-pub async fn disabled_pswap_full_fill_onchain(client_config: ClientConfig) -> Result<()> {
+/// The PSWAP consume MASM emits a payback note with a word-sized attachment (see
+/// `add_word_attachment` in `standards/notes/pswap.masm`); Alice fetches that payback note via sync
+/// and consumes it.
+pub async fn test_pswap_full_fill_onchain(client_config: ClientConfig) -> Result<()> {
     const OFFERED_AMOUNT: u64 = 100;
     const REQUESTED_AMOUNT: u64 = 50;
 

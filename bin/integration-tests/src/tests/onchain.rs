@@ -749,21 +749,12 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
     Ok(())
 }
 
-/// Intended coverage for syncing and consuming notes with attachments.
+/// Verifies syncing and consuming notes with attachments.
 /// 1. Client 1 mints a public P2ID note **with an attachment** targeting client 2's wallet.
 /// 2. Client 2 syncs and discovers the note via `sync_notes`.
 /// 3. The sync triggers a `get_notes_by_id` call to fetch the public note body.
-/// 4. Client 2 attempts to consume the note, which currently exposes the round-trip issue below.
-///
-/// Disabled because `InputNoteRecord` / `OutputNoteRecord` persist [`NoteDetails`] +
-/// [`NoteMetadata`], but not the [`NoteAttachments`] content. The stored metadata still carries
-/// attachment headers and the attachment commitment, but `InputNoteRecord -> Note` currently
-/// rebuilds the note with empty attachments, so its commitment no longer matches the on-chain
-/// commitment and consumption fails with `InputNoteNotInBlock`. Re-enable once note records persist
-/// [`NoteAttachments`] (the RPC sync flow already fetches them via `GetNotesById`). The
-/// `disabled_` prefix opts the function out of the integration-test build script registration.
-#[allow(dead_code)]
-pub async fn disabled_sync_note_with_attachment(client_config: ClientConfig) -> Result<()> {
+/// 4. Client 2 consumes the note.
+pub async fn test_sync_note_with_attachment(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
     let (mut client_2, keystore_2) = ClientConfig::default()
         .with_rpc_endpoint(client_config.rpc_endpoint())
