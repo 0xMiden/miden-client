@@ -933,30 +933,91 @@ impl StateSync {
     }
 }
 
-/// For each unique account in the transaction set, returns the `final_state_commitment` from the
-/// transaction with the highest `block_num`.
+/// Groups transaction records by `(account_id, block_num)`.
+fn group_txs_by_account_block(
+    transaction_records: &[RpcTransactionRecord],
+) -> BTreeMap<(AccountId, BlockNumber), Vec<&RpcTransactionRecord>> {
+    let mut groups: BTreeMap<(AccountId, BlockNumber), Vec<&RpcTransactionRecord>> =
+        BTreeMap::new();
+    for record in transaction_records {
+        let account_id = record.transaction_header.account_id();
+        groups.entry((account_id, record.block_num)).or_default().push(record);
+    }
+    groups
+}
+
+/// Walks a group of transaction records in execution order.
+///
+/// Same-block transactions for the same account form an execution chain: each tx's
+/// `final_state_commitment` is the next tx's `initial_state_commitment`. This finds the chain
+/// start and walks forward, yielding each tx in execution order.
+fn walk_execution_chain<'a>(
+    txs: &'a [&'a RpcTransactionRecord],
+) -> impl Iterator<Item = &'a RpcTransactionRecord> + 'a {
+    let (self_loops, chained): (Vec<&RpcTransactionRecord>, Vec<&RpcTransactionRecord>) =
+        txs.iter().copied().partition(|tx| {
+            tx.transaction_header.initial_state_commitment()
+                == tx.transaction_header.final_state_commitment()
+        });
+
+    let final_states: BTreeSet<Word> = chained
+        .iter()
+        .map(|tx| tx.transaction_header.final_state_commitment())
+        .collect();
+
+    let mut init_to_tx: BTreeMap<Word, &RpcTransactionRecord> = chained
+        .iter()
+        .map(|tx| (tx.transaction_header.initial_state_commitment(), *tx))
+        .collect();
+
+    let start = chained
+        .iter()
+        .find(|tx| !final_states.contains(&tx.transaction_header.initial_state_commitment()))
+        .copied();
+
+    assert!(start.is_some() || chained.is_empty(), "cannot walk cyclic execution chain");
+
+    let mut current =
+        start.and_then(|tx| init_to_tx.remove(&tx.transaction_header.initial_state_commitment()));
+    let mut self_loops_iter = self_loops.into_iter();
+
+    core::iter::from_fn(move || {
+        if let Some(tx) = current {
+            current = init_to_tx.remove(&tx.transaction_header.final_state_commitment());
+            return Some(tx);
+        }
+        self_loops_iter.next()
+    })
+}
+
+/// For each unique account, returns the `final_state_commitment` from the final transaction with
+/// the highest `block_num`.
 fn derive_account_commitments(
     transaction_records: &[RpcTransactionRecord],
 ) -> Vec<(AccountId, Word)> {
-    let mut latest_by_account: BTreeMap<AccountId, &RpcTransactionRecord> = BTreeMap::new();
+    let mut latest_by_account: BTreeMap<AccountId, (BlockNumber, Word)> = BTreeMap::new();
 
-    for record in transaction_records {
-        let account_id = record.transaction_header.account_id();
+    for ((account_id, block_num), txs) in &group_txs_by_account_block(transaction_records) {
+        let terminal_state = walk_execution_chain(txs)
+            .last()
+            .expect("account must have a final state")
+            .transaction_header
+            .final_state_commitment();
+
         latest_by_account
-            .entry(account_id)
-            .and_modify(|existing| {
-                if record.block_num > existing.block_num {
-                    *existing = record;
+            .entry(*account_id)
+            .and_modify(|(existing_block, existing_state)| {
+                if *block_num > *existing_block {
+                    *existing_block = *block_num;
+                    *existing_state = terminal_state;
                 }
             })
-            .or_insert(record);
+            .or_insert((*block_num, terminal_state));
     }
 
     latest_by_account
         .into_iter()
-        .map(|(account_id, record)| {
-            (account_id, record.transaction_header.final_state_commitment())
-        })
+        .map(|(account_id, (_, state))| (account_id, state))
         .collect()
 }
 
@@ -967,47 +1028,13 @@ fn derive_account_commitments(
 /// input note nullifiers in execution order. Nullifiers from the same account are in execution
 /// order; ordering across different accounts is arbitrary.
 fn compute_ordered_nullifiers(transaction_records: &[RpcTransactionRecord]) -> Vec<Nullifier> {
-    // Group transactions by (account_id, block_num).
-    let mut groups: BTreeMap<(AccountId, BlockNumber), Vec<&RpcTransactionRecord>> =
-        BTreeMap::new();
-
-    for record in transaction_records {
-        let account_id = record.transaction_header.account_id();
-        groups.entry((account_id, record.block_num)).or_default().push(record);
-    }
-
     let mut result = Vec::new();
 
-    for txs in groups.values() {
-        // Build a lookup from initial_state_commitment -> transaction record.
-        let mut init_to_tx: BTreeMap<Word, &RpcTransactionRecord> = txs
-            .iter()
-            .map(|tx| (tx.transaction_header.initial_state_commitment(), *tx))
-            .collect();
-
-        // Build a set of all final states to find the chain start.
-        let final_states: BTreeSet<Word> =
-            txs.iter().map(|tx| tx.transaction_header.final_state_commitment()).collect();
-
-        // Find the chain start: the tx whose initial_state_commitment is not any other tx's
-        // final_state_commitment.
-        let chain_start = txs
-            .iter()
-            .find(|tx| !final_states.contains(&tx.transaction_header.initial_state_commitment()));
-
-        let Some(start_tx) = chain_start else {
-            continue;
-        };
-
-        // Walk the chain from start, removing each step from the map.
-        let mut current =
-            init_to_tx.remove(&start_tx.transaction_header.initial_state_commitment());
-
-        while let Some(tx) = current {
+    for txs in group_txs_by_account_block(transaction_records).values() {
+        for tx in walk_execution_chain(txs) {
             for commitment in tx.transaction_header.input_notes().iter() {
                 result.push(commitment.nullifier());
             }
-            current = init_to_tx.remove(&tx.transaction_header.final_state_commitment());
         }
     }
 
@@ -1038,15 +1065,19 @@ mod tests {
     };
     use miden_protocol::testing::account_id::{
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
         ACCOUNT_ID_REGULAR_NETWORK_ACCOUNT_IMMUTABLE_CODE,
+        ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
         ACCOUNT_ID_SENDER,
     };
-    use miden_protocol::{Felt, Word};
+    use miden_protocol::transaction::{InputNotes, TransactionHeader};
+    use miden_protocol::{Felt, Word, ZERO};
     use miden_standards::code_builder::CodeBuilder;
     use miden_standards::note::{NetworkAccountTarget, NoteExecutionHint};
     use miden_testing::{MockChainBuilder, TxContextInput};
 
     use super::*;
+    use crate::rpc::domain::transaction::ACCOUNT_ID_NATIVE_ASSET_FAUCET;
     use crate::store::{OutputNoteRecord, OutputNoteState};
     use crate::test_utils::mock::MockRpcApi;
 
@@ -1074,6 +1105,10 @@ mod tests {
         }
     }
 
+    fn word(n: u64) -> miden_protocol::Word {
+        [Felt::new(n), ZERO, ZERO, ZERO].into()
+    }
+
     // COMPUTE NULLIFIER TX ORDER TESTS
     // --------------------------------------------------------------------------------------------
 
@@ -1084,16 +1119,12 @@ mod tests {
         use miden_protocol::block::BlockNumber;
         use miden_protocol::note::Nullifier;
         use miden_protocol::transaction::{InputNoteCommitment, InputNotes, TransactionHeader};
-        use miden_protocol::{Felt, ZERO};
 
+        use super::word;
         use crate::rpc::domain::transaction::{
             ACCOUNT_ID_NATIVE_ASSET_FAUCET,
             TransactionRecord as RpcTransactionRecord,
         };
-
-        fn word(n: u64) -> miden_protocol::Word {
-            [Felt::new(n), ZERO, ZERO, ZERO].into()
-        }
 
         fn make_rpc_tx(
             init_state: u64,
@@ -1215,6 +1246,63 @@ mod tests {
             let result = super::super::compute_ordered_nullifiers(&[]);
             assert!(result.is_empty());
         }
+    }
+
+    // DERIVE ACCOUNT COMMITMENTS TESTS
+    // --------------------------------------------------------------------------------------------
+
+    /// `derive_account_commitments` must walk the execution chain to get the final commitment when
+    /// several transactions for the same account land in the same block.
+    ///
+    /// Test scenario:
+    /// - Account A, block 5: chain 1 - 2 - 3 (older group; must be dominated by block 6).
+    /// - Account A, block 6: chain 3 - 4 - 5 (final state = 5).
+    /// - Account B, block 6: single tx 10 - 20 (final state = 20).
+    #[test]
+    fn derive_account_commitments_walks_chains_per_account() {
+        let fee =
+            FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("valid"), 0u64)
+                .unwrap();
+        let make_tx = |account: AccountId, init_state: u64, final_state: u64, block_num: u32| {
+            RpcTransactionRecord {
+                block_num: BlockNumber::from(block_num),
+                transaction_header: TransactionHeader::new(
+                    account,
+                    word(init_state),
+                    word(final_state),
+                    InputNotes::new_unchecked(vec![]),
+                    vec![],
+                    fee,
+                ),
+                output_notes: vec![],
+                erased_output_notes: vec![],
+            }
+        };
+
+        let account_a: AccountId =
+            ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE.try_into().unwrap();
+        let account_b: AccountId = ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap();
+
+        let tx_a_b5_1 = make_tx(account_a, 1, 2, 5);
+        let tx_a_b5_2 = make_tx(account_a, 2, 3, 5);
+        let tx_a_b6_1 = make_tx(account_a, 3, 4, 6);
+        let tx_a_b6_2 = make_tx(account_a, 4, 5, 6);
+        let tx_b_b6 = make_tx(account_b, 10, 20, 6);
+
+        // Insert transactions not ordered by execution order.
+        let result = super::derive_account_commitments(&[
+            tx_a_b6_1, tx_b_b6, tx_a_b5_2, tx_a_b6_2, tx_a_b5_1,
+        ]);
+
+        assert_eq!(result.len(), 2, "one entry per account");
+        assert!(
+            result.contains(&(account_a, word(5))),
+            "account A: must walk block 6's chain, not return block 5 or an intermediate",
+        );
+        assert!(
+            result.contains(&(account_b, word(20))),
+            "account B: must be resolved independently of account A",
+        );
     }
 
     // CONSUMED NOTE ORDERING INTEGRATION TESTS

@@ -100,6 +100,8 @@ pub use miden_protocol::note::{
 };
 pub use miden_protocol::transaction::ToInputNoteCommitments;
 pub use miden_standards::note::{
+    MintNote,
+    MintNoteStorage,
     NetworkAccountTarget,
     NoteConsumptionStatus,
     NoteExecutionHint,
