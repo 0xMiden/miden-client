@@ -138,6 +138,11 @@ impl SqliteStore {
     /// Applies a transaction's store update within the provided rusqlite transaction.
     /// Does NOT commit — caller is responsible for commit/rollback.
     ///
+    /// `smt_forest` must be a working snapshot (such as the clone handed out by
+    /// [`with_forest_snapshot`]), never the live forest: this stages root mutations into it
+    /// and provides no rollback of its own, relying on the caller to discard the snapshot on
+    /// error.
+    ///
     /// Pre-reads (fungible assets and storage map roots) are performed via the transaction so
     /// that each call sees writes made by prior calls within the same outer transaction.
     pub(crate) fn apply_transaction_in_txn(
@@ -223,7 +228,7 @@ impl SqliteStore {
 ///
 /// Cost: the clone is `AccountSmtForest::clone()`, which deep-clones the entire
 /// `SmtForest` (every tracked SMT plus root refcounts). This is O(forest size) per call
-/// and runs on every transaction apply and sync round — acceptable today but worth
+/// and runs on every transaction apply and sync round - acceptable today but worth
 /// revisiting (e.g. an inverse-op journal) if the forest grows large.
 pub(crate) fn with_forest_snapshot<F, T>(
     conn: &mut Connection,

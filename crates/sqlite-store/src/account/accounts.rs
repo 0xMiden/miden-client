@@ -259,16 +259,14 @@ impl SqliteStore {
 
     /// Fetches a specific asset from the account's vault without the need of loading the entire
     /// vault. The witness is retrieved from the [`AccountSmtForest`].
-    ///
-    /// The forest read lock is acquired before the DB read so the DB header and the forest
-    /// observation come from the same `apply_*` epoch: no writer can pop the read root between
-    /// the header fetch and the witness lookup.
     pub(crate) fn get_account_asset(
         conn: &mut Connection,
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
         account_id: AccountId,
         vault_key: AssetVaultKey,
     ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
+        // Acquire forest lock before getting header in order to avoid unwanted concurrent writes to
+        // it.
         let smt_forest = smt_forest
             .read()
             .map_err(|_| StoreError::DatabaseError("smt_forest read lock poisoned".to_string()))?;
@@ -285,10 +283,6 @@ impl SqliteStore {
 
     /// Retrieves a specific item from the account's storage map without loading the entire storage.
     /// The witness is retrieved from the [`AccountSmtForest`].
-    ///
-    /// The forest read lock is acquired before the DB read so the DB state and the forest
-    /// observation come from the same `apply_*` epoch: no writer can pop the read root between
-    /// the storage-row fetch and the witness lookup.
     pub(crate) fn get_account_map_item(
         conn: &mut Connection,
         smt_forest: &Arc<RwLock<AccountSmtForest>>,
@@ -296,6 +290,8 @@ impl SqliteStore {
         slot_name: StorageSlotName,
         key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
+        // Acquire forest lock before getting header in order to avoid unwanted concurrent writes to
+        // it.
         let smt_forest = smt_forest
             .read()
             .map_err(|_| StoreError::DatabaseError("smt_forest read lock poisoned".to_string()))?;

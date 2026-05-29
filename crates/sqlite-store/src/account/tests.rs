@@ -1981,10 +1981,7 @@ async fn with_forest_snapshot_leaves_forest_unchanged_on_error() -> anyhow::Resu
     assert!(matches!(outcome, Err(StoreError::DatabaseError(_))));
 
     let forest_after = forest_arc.read().expect("read lock").clone();
-    assert_eq!(
-        forest_after, forest_before,
-        "forest must be unchanged after a failed closure"
-    );
+    assert_eq!(forest_after, forest_before, "forest must be unchanged after a failed closure");
 
     // The DB transaction was rolled back too — account state is still at nonce 0.
     let (header, _) = store
