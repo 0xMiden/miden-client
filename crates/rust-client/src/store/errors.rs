@@ -7,6 +7,7 @@ use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::mmr::MmrError;
 use miden_protocol::crypto::merkle::smt::SmtProofError;
 use miden_protocol::errors::{
+    AccountDeltaError,
     AccountError,
     AccountIdError,
     AddressError,
@@ -39,6 +40,8 @@ pub enum StoreError {
     AccountCodeDataNotFound(Word),
     #[error("account data wasn't found for account id {0}")]
     AccountDataNotFound(AccountId),
+    #[error("account delta error")]
+    AccountDeltaError(#[from] AccountDeltaError),
     #[error("account error")]
     AccountError(#[from] AccountError),
     #[error("address error")]

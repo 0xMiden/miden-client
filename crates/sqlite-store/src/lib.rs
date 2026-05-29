@@ -30,7 +30,7 @@ use miden_client::account::{
     StorageMapKey,
     StorageSlotName,
 };
-use miden_client::asset::{Asset, AssetVault, AssetWitness};
+use miden_client::asset::{AccountStorageHeader, Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, NoteTag, Nullifier};
@@ -40,6 +40,7 @@ use miden_client::store::{
     AccountStatus,
     AccountStorageFilter,
     BlockRelevance,
+    ClientAccountType,
     InputNoteRecord,
     NoteFilter,
     OutputNoteRecord,
@@ -359,12 +360,19 @@ impl Store for SqliteStore {
         &self,
         account: &Account,
         initial_address: Address,
+        client_account_type: ClientAccountType,
     ) -> Result<(), StoreError> {
         let cloned_account = account.clone();
         let smt_forest = self.smt_forest.clone();
 
         self.interact_with_connection(move |conn| {
-            SqliteStore::insert_account(conn, &smt_forest, &cloned_account, &initial_address)
+            SqliteStore::insert_account(
+                conn,
+                &smt_forest,
+                &cloned_account,
+                &initial_address,
+                client_account_type,
+            )
         })
         .await
     }
@@ -496,6 +504,16 @@ impl Store for SqliteStore {
         .await
     }
 
+    async fn get_account_storage_header(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountStorageHeader, StoreError> {
+        self.interact_with_connection(move |conn| {
+            SqliteStore::get_account_storage_header(conn, account_id)
+        })
+        .await
+    }
+
     async fn get_account_map_item(
         &self,
         account_id: AccountId,
@@ -533,15 +551,9 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn remove_address(
-        &self,
-        address: Address,
-        account_id: AccountId,
-    ) -> Result<(), StoreError> {
-        self.interact_with_connection(move |conn| {
-            SqliteStore::remove_address(conn, &address, account_id)
-        })
-        .await
+    async fn remove_address(&self, address: Address) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| SqliteStore::remove_address(conn, &address))
+            .await
     }
 
     async fn get_minimal_partial_account(

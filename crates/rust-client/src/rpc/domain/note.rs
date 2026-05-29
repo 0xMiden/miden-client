@@ -1,5 +1,4 @@
 use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockHeader;
@@ -142,19 +141,6 @@ pub struct NoteSyncBlock {
     pub mmr_path: MerklePath,
     /// Notes matching the requested tags in this block, keyed by note ID.
     pub notes: BTreeMap<NoteId, CommittedNote>,
-}
-
-/// Result of [`NodeRpcClient::sync_notes_with_details`](crate::rpc::NodeRpcClient::sync_notes_with_details).
-///
-/// Contains fully-resolved note blocks (all metadata filled) and full note bodies for
-/// public notes. The block data and public note bodies are separated to avoid duplication:
-/// blocks carry metadata + inclusion proofs, while `public_notes` carries the note content
-/// (scripts, assets, recipient) keyed by note ID.
-pub struct SyncNotesResult {
-    /// Blocks containing matching notes with fully-resolved metadata.
-    pub blocks: Vec<NoteSyncBlock>,
-    /// Full note bodies for public notes, keyed by note ID.
-    pub public_notes: BTreeMap<NoteId, Note>,
 }
 
 impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for NoteSyncBlock {

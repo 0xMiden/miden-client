@@ -144,8 +144,8 @@ impl MockRpcApi {
         let mut updates = vec![];
         for block in self.mock_chain.read().proven_blocks() {
             let block_number = block.header().block_num();
-            // Only include blocks in range (block_from, page_end_block]
-            if block_number <= block_from || block_number > page_end_block {
+            // Only include blocks in range [block_from, page_end_block]
+            if block_number < block_from || block_number > page_end_block {
                 continue;
             }
 
@@ -231,7 +231,8 @@ impl MockRpcApi {
         let mut updates = vec![];
         for block in self.mock_chain.read().proven_blocks() {
             let block_number = block.header().block_num();
-            if block_number <= block_from || block_number > page_end_block {
+            // Only include blocks in range [block_from, page_end_block]
+            if block_number < block_from || block_number > page_end_block {
                 continue;
             }
 
@@ -615,15 +616,15 @@ impl NodeRpcClient for MockRpcApi {
         Ok(block)
     }
 
-    async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError> {
-        let note = self
+    async fn get_note_script_by_root(&self, root: Word) -> Result<Option<NoteScript>, RpcError> {
+        let script = self
             .get_available_notes()
             .iter()
-            .find(|note| note.note().is_some_and(|n| Word::from(n.script().root()) == root))
-            .unwrap()
-            .clone();
+            .filter_map(|note| note.note())
+            .find(|n| Word::from(n.script().root()) == root)
+            .map(|n| n.script().clone());
 
-        Ok(note.note().unwrap().script().clone())
+        Ok(script)
     }
 
     async fn sync_storage_maps(
