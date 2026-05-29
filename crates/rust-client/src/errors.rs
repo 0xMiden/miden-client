@@ -167,10 +167,11 @@ pub enum ClientError {
         source: RpcError,
     },
     #[error(
-        "transaction {} was accepted by the node at block {} but the local store update failed. \
-         The pending store update is attached and can be re-applied later via \
-         `apply_transaction_update`; resubmitting the same transaction will be rejected because \
-         the nullifiers are already consumed by the mempool-accepted copy.",
+        "transaction {} was accepted into the node's mempool at block {} but the local store \
+         update failed. The pending store update is attached and can be re-applied later via \
+         `apply_transaction_update`. Resubmitting the same transaction will be rejected if the \
+         original is still in the mempool or has been finalized in a block, because the \
+         account (and network) state has already been mutated by the accepted copy.",
         pending_update.executed_transaction().id(),
         pending_update.submission_height()
     )]
@@ -247,12 +248,13 @@ impl From<&ClientError> for Option<ErrorHint> {
                 let submission_height = pending_update.submission_height();
                 Some(ErrorHint {
                     message: format!(
-                        "Transaction {tx_id} was accepted by the node at block \
+                        "Transaction {tx_id} was accepted into the node's mempool at block \
                          {submission_height} but the local store update failed. The pending \
                          update is attached to this error as `pending_update`; you can re-apply \
                          it later via `Client::apply_transaction_update`. Do NOT resubmit the \
-                         same transaction: its nullifiers are already consumed by the \
-                         mempool-accepted copy, so the node will reject the retry."
+                         same transaction: if the original is still in the mempool or has been \
+                         finalized in a block, the account (and network) state has already been \
+                         mutated by the accepted copy, so the node will reject the retry."
                     ),
                     docs_url: Some(TROUBLESHOOTING_DOC),
                 })
