@@ -299,7 +299,7 @@ impl<AUTH> Client<AUTH> {
     ///   as `TokenMetadata`. Caller should fall back to a raw display.
     /// - `Err(_)`      — transport-level RPC error.
     pub async fn fetch_remote_token_metadata(
-        &mut self,
+        &self,
         faucet_id: AccountId,
     ) -> Result<Option<FaucetMetadata>, ClientError> {
         let fetched = match self.rpc_api.get_account_details(faucet_id).await {

@@ -18,7 +18,7 @@ use miden_client::{Client, PrettyPrint, Word, ZERO};
 
 use crate::config::{CliConfig, RpcConfig};
 use crate::errors::CliError;
-use crate::utils::parse_account_id;
+use crate::utils::{load_faucet_metadata_resolver, parse_account_id};
 use crate::{client_binary_name, create_dynamic_table};
 
 pub const DEFAULT_ACCOUNT_ID_KEY: &str = "default_account_id";
@@ -59,7 +59,7 @@ impl AccountCmd {
                 ..
             } => {
                 let account_id = parse_account_id(&client, id).await?;
-                show_account(client, account_id, &cli_config.rpc, self.with_code).await?;
+                show_account(&mut client, account_id, &cli_config.rpc, self.with_code).await?;
             },
             AccountCmd {
                 list: false,
@@ -137,7 +137,7 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
 // ================================================================================================
 
 async fn show_account<AUTH>(
-    client: Client<AUTH>,
+    client: &mut Client<AUTH>,
     account_id: AccountId,
     rpc_config: &RpcConfig,
     with_code: bool,
@@ -167,11 +167,12 @@ async fn show_account<AUTH>(
     } else {
         None
     };
-    print_summary_table(&account, network_id, token_symbol.as_deref());
+    print_summary_table(&account, network_id.clone(), token_symbol.as_deref());
 
     // Vault Table
     {
         let assets = account.vault().assets();
+        let resolver = load_faucet_metadata_resolver()?;
         println!("Assets: ");
 
         let mut table = create_dynamic_table(&["Asset Type", "Faucet", "Amount"]);
@@ -179,25 +180,26 @@ async fn show_account<AUTH>(
             let (asset_type, faucet, amount) = match asset {
                 Asset::Fungible(fungible_asset) => {
                     let faucet_id = fungible_asset.faucet_id();
-                    let reader = client.account_reader(faucet_id);
-                    let (faucet, amount) = match get_token_metadata(&reader, faucet_id).await {
-                        Ok(metadata) => (
-                            metadata.symbol().to_string(),
-                            base_units_to_tokens(fungible_asset.amount(), metadata.decimals()),
-                        ),
-                        Err(_) => {
-                            (faucet_id.prefix().to_hex(), fungible_asset.amount().to_string())
-                        },
-                    };
-                    ("Fungible Asset", faucet, amount)
+                    let metadata = resolver.resolve(client, faucet_id).await?.ok_or_else(|| {
+                        CliError::Input(format!(
+                            "Unable to fetch account {account_id} from the network"
+                        ))
+                    })?;
+                    (
+                        "Fungible Asset",
+                        metadata.symbol,
+                        base_units_to_tokens(fungible_asset.amount(), metadata.decimals),
+                    )
                 },
                 Asset::NonFungible(non_fungible_asset) => {
                     // TODO: Display non-fungible assets more clearly.
-                    (
-                        "Non Fungible Asset",
-                        non_fungible_asset.faucet_id().prefix().to_hex(),
-                        1.0.to_string(),
-                    )
+                    let faucet_id = non_fungible_asset.faucet_id();
+                    let metadata = resolver.resolve(client, faucet_id).await?.ok_or_else(|| {
+                        CliError::Input(format!(
+                            "Unable to fetch account {account_id} from the network"
+                        ))
+                    })?;
+                    ("Non Fungible Asset", metadata.symbol, 1.0.to_string())
                 },
             };
             table.add_row(vec![asset_type, &faucet, &amount.clone()]);
