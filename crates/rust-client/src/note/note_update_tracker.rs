@@ -177,10 +177,9 @@ impl OutputNoteUpdate {
     fn inner_mut(&mut self) -> &mut OutputNoteRecord {
         self.update_type = match self.update_type {
             NoteUpdateType::None | NoteUpdateType::Update => NoteUpdateType::Update,
-            NoteUpdateType::Insert => NoteUpdateType::Insert,
             // Output notes are never assigned `InsertCommitted` (it is input-note specific), but
             // the match must be exhaustive; treat it as an insert.
-            NoteUpdateType::InsertCommitted => NoteUpdateType::Insert,
+            NoteUpdateType::Insert | NoteUpdateType::InsertCommitted => NoteUpdateType::Insert,
         };
 
         &mut self.note
@@ -665,11 +664,12 @@ impl NoteUpdateTracker {
         }
         let update = match update_type {
             NoteUpdateType::None => OutputNoteUpdate::new_none(note),
-            NoteUpdateType::Insert => OutputNoteUpdate::new_insert(note),
             NoteUpdateType::Update => OutputNoteUpdate::new_update(note),
             // Output notes are never assigned `InsertCommitted`; treat it as an insert for
             // exhaustiveness.
-            NoteUpdateType::InsertCommitted => OutputNoteUpdate::new_insert(note),
+            NoteUpdateType::Insert | NoteUpdateType::InsertCommitted => {
+                OutputNoteUpdate::new_insert(note)
+            },
         };
         self.output_notes.insert(note_id, update);
     }

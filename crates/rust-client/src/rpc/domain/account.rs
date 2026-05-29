@@ -238,6 +238,8 @@ impl proto::rpc::account_response::AccountDetails {
         known_account_codes: &BTreeMap<Word, AccountCode>,
         storage_requirements: &AccountStorageRequirements,
     ) -> Result<AccountDetails, crate::rpc::RpcError> {
+        use miden_protocol::account::StorageMapKeyHash;
+
         use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
 
@@ -260,8 +262,6 @@ impl proto::rpc::account_response::AccountDetails {
         // Validate that the returned proofs match the originally requested keys.
         // The node returns hashed SMT keys, so we hash the raw keys and check
         // they are present in the corresponding proofs.
-        use miden_protocol::account::StorageMapKeyHash;
-
         for map_detail in &storage_details.map_details {
             let requested_keys = storage_requirements
                 .inner()
