@@ -427,15 +427,6 @@ where
         proven_transaction: ProvenTransaction,
         transaction_inputs: impl Into<TransactionInputs>,
     ) -> Result<BlockNumber, ClientError> {
-        info!("Verifying transaction proof...");
-        TransactionVerifier::new(MIN_PROOF_SECURITY_LEVEL)
-            .verify(&proven_transaction)
-            .map_err(|source| ClientError::TransactionVerificationError {
-                transaction_id: proven_transaction.id(),
-                source,
-            })?;
-        info!("Transaction proof verified.");
-
         info!("Submitting transaction to the network...");
         let block_num = self
             .rpc_api

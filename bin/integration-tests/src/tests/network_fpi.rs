@@ -77,14 +77,6 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
     // creation block
     client2.sync_state().await?;
 
-    let target_network_account = deploy_counter_contract(&mut client2, AccountType::Public).await?;
-
-    client2.sync_state().await?;
-
-    let (sender_account, ..) =
-        insert_new_wallet(&mut client2, AccountType::Private, &keystore2, RPO_FALCON_SCHEME_ID)
-            .await?;
-
     let network_fpi_note_script = format!(
         "
         use miden::protocol::tx
@@ -113,6 +105,21 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
         account_id_prefix = foreign_account_id.prefix().as_u64(),
         account_id_suffix = foreign_account_id.suffix(),
     );
+
+    // The counter account is deployed as a network account that allowlists the FPI note script, so
+    // the node routes the note to it and runs the network transaction.
+    let target_network_account = deploy_counter_contract(
+        &mut client2,
+        AccountType::Public,
+        &[network_fpi_note_script.as_str()],
+    )
+    .await?;
+
+    client2.sync_state().await?;
+
+    let (sender_account, ..) =
+        insert_new_wallet(&mut client2, AccountType::Private, &keystore2, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     let network_note = get_network_note_with_script(
         sender_account.id(),
