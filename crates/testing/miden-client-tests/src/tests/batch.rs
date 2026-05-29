@@ -147,17 +147,6 @@ async fn batch_builder_submits_two_txs_on_one_account() {
 /// in-memory `AccountSmtForest`: if any per-tx update in the batch fails, no earlier update
 /// is persisted, and a follow-up `Store::update_account` on the affected account still
 /// works.
-///
-/// Setup: build a 2-account mock chain, create a client backed by it, register only account A
-/// with the client. Both accounts have committed state on the mock chain, so we can execute
-/// a valid transaction against each. Because B was never added to the client's store, its
-/// roots aren't in the store's `AccountSmtForest`, so `apply_account_delta` fails for B's
-/// update with `StoreError::AccountDataNotFound`. The test asserts that A's earlier update
-/// was rolled back (no transactions in the store, A's commitment unchanged) and then calls
-/// `update_account` for A: this path runs `replace_roots`, which asserts that no staged
-/// updates are pending for the account. Without the forest rollback the failed batch would
-/// leave A's old roots in `pending_old_roots`, and the `replace_roots` assertion would
-/// panic; with the rollback the forest is clean and the call succeeds.
 #[tokio::test]
 async fn apply_transaction_batch_rolls_back_on_mid_batch_failure() {
     // Build a fresh mock chain with two existing accounts.
@@ -189,7 +178,7 @@ async fn apply_transaction_batch_rolls_back_on_mid_batch_failure() {
     client.add_account(&account_a, false).await.unwrap();
 
     // Execute a trivial transaction against A and another against B, both via the mock chain.
-    // Both produce valid `ExecutedTransaction`s — the failure happens only at store-apply time.
+    // Both produce valid `ExecutedTransaction`s; the failure happens only at store-apply time.
     // Build each `TxContext` in its own statement so the mock-chain read guard is dropped
     // before `.execute().await` is reached (otherwise clippy flags await_holding_lock).
     let tx_ctx_a = rpc_api

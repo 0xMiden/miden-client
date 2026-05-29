@@ -218,18 +218,14 @@ impl SqliteStore {
     }
 }
 
-/// Runs `f` inside a SQL transaction with the SMT forest write lock held, mutating a
-/// working clone of the forest and only swapping it into the live `RwLock` after the SQL
-/// commit succeeds.
+/// Runs `f` inside a SQL transaction with the forest write lock held, mutating a working
+/// clone and swapping it into the live `RwLock` only after the SQL commit succeeds. This
+/// keeps the `AccountSmtForest` and the `SQLite` store atomic: on any error (`?` from `f`
+/// or commit failure) the live forest is untouched, since all mutations target the clone.
 ///
-/// Guarantees that the in-memory `AccountSmtForest` stays in sync with the `SQLite` store:
-/// either both are advanced atomically, or neither is. On any error path (`?` from `f`,
-/// commit failure) the live forest is untouched because mutations target the clone.
-///
-/// Cost: the clone is `AccountSmtForest::clone()`, which deep-clones the entire
-/// `SmtForest` (every tracked SMT plus root refcounts). This is O(forest size) per call
-/// and runs on every transaction apply and sync round - acceptable today but worth
-/// revisiting (e.g. an inverse-op journal) if the forest grows large.
+/// Cost: `AccountSmtForest::clone()` deep-clones the whole `SmtForest` (every tracked SMT
+/// plus root refcounts), so this is O(forest size) per call. Acceptable now; revisit (e.g.
+/// an inverse-op journal) if the forest grows large.
 pub(crate) fn with_forest_snapshot<F, T>(
     conn: &mut Connection,
     smt_forest: &Arc<RwLock<AccountSmtForest>>,

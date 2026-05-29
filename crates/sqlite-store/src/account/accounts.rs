@@ -265,8 +265,7 @@ impl SqliteStore {
         account_id: AccountId,
         vault_key: AssetVaultKey,
     ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
-        // Acquire forest lock before getting header in order to avoid unwanted concurrent writes to
-        // it.
+        // Acquire forest lock before getting header in order to avoid concurrent writes to it.
         let smt_forest = smt_forest
             .read()
             .map_err(|_| StoreError::DatabaseError("smt_forest read lock poisoned".to_string()))?;
@@ -290,8 +289,7 @@ impl SqliteStore {
         slot_name: StorageSlotName,
         key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
-        // Acquire forest lock before getting header in order to avoid unwanted concurrent writes to
-        // it.
+        // Acquire forest lock before getting header in order to avoid concurrent writes to it.
         let smt_forest = smt_forest
             .read()
             .map_err(|_| StoreError::DatabaseError("smt_forest read lock poisoned".to_string()))?;
