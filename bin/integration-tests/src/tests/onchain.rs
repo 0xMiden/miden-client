@@ -1,9 +1,18 @@
+use std::collections::BTreeMap;
+
 use anyhow::{Context, Result};
 use miden_client::account::{AccountStorageMode, build_wallet_id};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::keystore::Keystore;
-use miden_client::note::{NoteAttachment, NoteAttachmentScheme, NoteFile, NoteType, P2idNote};
+use miden_client::note::{
+    BlockNumber,
+    NoteAttachment,
+    NoteAttachmentScheme,
+    NoteFile,
+    NoteType,
+    P2idNote,
+};
 use miden_client::rpc::{AcceptHeaderError, RpcError};
 use miden_client::store::{InputNoteState, NoteFilter, TransactionFilter};
 use miden_client::sync::NoteTagSource;
@@ -627,30 +636,39 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
         info!(note_id = %note.id(), index = i, "Pushing consume tx into batch");
         batch = batch.push(wallet_account.id(), tx_request).await?;
     }
-    let block_num = batch.submit().await?;
-    info!(block_num = block_num.as_u32(), "Submitted 3-tx consume batch");
+    let submission_tip = batch.submit().await?;
+    info!(submission_tip = submission_tip.as_u32(), "Submitted 3-tx consume batch");
 
-    // wait until the client syncs to the block height of the submitted batch
-    let sync_height = client.get_sync_height().await?;
-    if sync_height < block_num {
-        wait_for_blocks(&mut client, block_num.as_u32() - sync_height.as_u32()).await;
+    // Sync until the three consume txs are committed, then capture their batch block.
+    let mut batch_block = None;
+    for _ in 0..15 {
+        client.sync_state().await?;
+
+        let mut txs_per_block: BTreeMap<BlockNumber, usize> = BTreeMap::new();
+        for tx in client.get_transactions(TransactionFilter::All).await? {
+            if tx.details.account_id != wallet_account.id() {
+                continue;
+            }
+            if let TransactionStatus::Committed { block_number, .. } = tx.status {
+                *txs_per_block.entry(block_number).or_default() += 1;
+            }
+        }
+
+        if let Some((&block, _)) = txs_per_block.iter().find(|&(_, &count)| count == 3) {
+            batch_block = Some(block);
+            break;
+        }
+
+        wait_for_blocks(&mut client, 1).await;
     }
-
-    // All 3 batch txs must be committed in exactly `block_num` — this is the same-block
-    // guarantee the batch provides by construction.
-    let wallet_txs_in_block = client
-        .get_transactions(TransactionFilter::All)
-        .await?
-        .into_iter()
-        .filter(|t| t.details.account_id == wallet_account.id())
-        .filter(|t| matches!(t.status, TransactionStatus::Committed { block_number, .. } if block_number == block_num))
-        .count();
-    assert_eq!(
-        wallet_txs_in_block, 3,
-        "expected exactly 3 wallet txs committed in block {block_num}, got {wallet_txs_in_block}",
+    let batch_block =
+        batch_block.with_context(|| "3 consume txs were not committed in the same block")?;
+    info!(
+        batch_block = batch_block.as_u32(),
+        "All 3 consume txs committed in the same block"
     );
 
-    // Verify all 3 notes are consumed.
+    // Verify all 3 notes are marked as consumed.
     let consumed_notes = client.get_input_notes(NoteFilter::Consumed).await?;
     assert!(
         consumed_notes.len() >= 3,
