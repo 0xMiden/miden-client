@@ -3,6 +3,7 @@ use miden_client::account::AccountType;
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{Note, NoteDetails, NoteFile, NoteType, SwapNote};
+use miden_client::store::NoteFilter;
 use miden_client::testing::common::*;
 use miden_client::transaction::{SwapTransactionData, TransactionRequestBuilder};
 use tracing::info;
@@ -134,8 +135,9 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     info!(payback_commitment = %payback_commitment.to_hex(), account_id = %account_a.id(), "Consuming swap payback note on client 1");
 
     let note = client1
-        .get_input_note_by_commitment(payback_commitment)
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![payback_commitment]))
         .await?
+        .pop()
         .expect("payback note should be present after sync")
         .try_into()?;
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;
@@ -291,8 +293,9 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     info!(payback_commitment = %payback_commitment.to_hex(), account_id = %account_a.id(), "Consuming swap payback note on client 1");
 
     let note = client1
-        .get_input_note_by_commitment(payback_commitment)
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![payback_commitment]))
         .await?
+        .pop()
         .expect("payback note should be present after sync")
         .try_into()?;
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;

@@ -292,8 +292,11 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
         .unwrap();
     // Look up by details commitment: an `Expected` note has no metadata yet, so its `note_id`
     // is unset and it cannot be resolved via `get_input_note`.
-    let input_note =
-        client_2.get_input_note_by_commitment(note.details_commitment()).await?.unwrap();
+    let input_note = client_2
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![note.details_commitment()]))
+        .await?
+        .pop()
+        .unwrap();
 
     // If imported before execution, the note should be imported in `Expected` state
     assert!(matches!(input_note.state(), InputNoteState::Expected { .. }));
@@ -303,8 +306,11 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
 
     // After sync, the imported note should have inclusion proof even if it's not relevant for its
     // accounts.
-    let input_note =
-        client_2.get_input_note_by_commitment(note.details_commitment()).await?.unwrap();
+    let input_note = client_2
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![note.details_commitment()]))
+        .await?
+        .pop()
+        .unwrap();
     assert!(input_note.inclusion_proof().is_some(), "Expected inclusion proof to be present");
 
     // If inclusion proof is invalid this should panic
@@ -361,7 +367,11 @@ pub async fn test_import_expected_note_uncommitted(client_config: ClientConfig) 
         }])
         .await?[0];
 
-    let imported_note = client_2.get_input_note_by_commitment(imported_commitment).await?.unwrap();
+    let imported_note = client_2
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![imported_commitment]))
+        .await?
+        .pop()
+        .unwrap();
 
     assert!(matches!(imported_note.state(), InputNoteState::Expected { .. }));
     Ok(())
@@ -408,7 +418,11 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
         }])
         .await?[0];
 
-    let imported_note = client_2.get_input_note_by_commitment(commitment).await?.unwrap();
+    let imported_note = client_2
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![commitment]))
+        .await?
+        .pop()
+        .unwrap();
 
     assert!(matches!(imported_note.state(), InputNoteState::Expected { .. }));
 
@@ -426,10 +440,18 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
             .is_empty()
     );
 
-    let imported_note = client_2.get_input_note_by_commitment(commitment).await?.unwrap();
+    let imported_note = client_2
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![commitment]))
+        .await?
+        .pop()
+        .unwrap();
 
     // Get the note status in client 1
-    let client_1_note = client_1.get_input_note_by_commitment(commitment).await?.unwrap();
+    let client_1_note = client_1
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![commitment]))
+        .await?
+        .pop()
+        .unwrap();
 
     assert_eq!(imported_note.state(), client_1_note.state());
     assert!(matches!(imported_note.state(), InputNoteState::Committed { .. }));
@@ -970,8 +992,11 @@ pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -
         .await?;
 
     // A `ConsumedExternal` note has no metadata, so look it up by its details commitment.
-    let consumed_note =
-        client_2.get_input_note_by_commitment(note.details_commitment()).await?.unwrap();
+    let consumed_note = client_2
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![note.details_commitment()]))
+        .await?
+        .pop()
+        .unwrap();
     assert!(matches!(consumed_note.state(), InputNoteState::ConsumedExternal { .. }));
     Ok(())
 }
@@ -1035,8 +1060,11 @@ pub async fn test_import_consumed_note_with_id(client_config: ClientConfig) -> R
     client_2.import_notes(&[NoteFile::NoteId(note.id().unwrap())]).await.unwrap();
 
     // A `ConsumedExternal` note has no metadata, so look it up by its details commitment.
-    let consumed_note =
-        client_2.get_input_note_by_commitment(note.details_commitment()).await?.unwrap();
+    let consumed_note = client_2
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![note.details_commitment()]))
+        .await?
+        .pop()
+        .unwrap();
     assert!(matches!(consumed_note.state(), InputNoteState::ConsumedExternal { .. }));
     Ok(())
 }
@@ -1201,8 +1229,11 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
     // After sync the note in client 1 should be consumed externally and the transaction discarded.
     // `ConsumedExternal` has no metadata, so look the note up by its details commitment.
     client_1.sync_state().await.unwrap();
-    let note_record =
-        client_1.get_input_note_by_commitment(note.details_commitment()).await?.unwrap();
+    let note_record = client_1
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![note.details_commitment()]))
+        .await?
+        .pop()
+        .unwrap();
     assert!(matches!(note_record.state(), InputNoteState::ConsumedExternal(_)));
     let tx_record = client_1
         .get_transactions(TransactionFilter::All)

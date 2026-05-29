@@ -122,8 +122,9 @@ pub async fn test_pswap_full_fill_onchain(client_config: ClientConfig) -> Result
     alice_client.sync_state().await?;
     let payback_commitment = payback_note_details[0].commitment();
     let payback_note: Note = alice_client
-        .get_input_note_by_commitment(payback_commitment)
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![payback_commitment]))
         .await?
+        .pop()
         .with_context(|| format!("Payback note {} not found", payback_commitment.to_hex()))?
         .try_into()?;
     let consume_payback =

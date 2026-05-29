@@ -75,6 +75,8 @@ pub const DEFAULT_BLOCK_INTERVAL: u64 = 5_000;
 pub const DEFAULT_BATCH_INTERVAL: u64 = 2_000;
 pub const DEFAULT_RPC_PORT: u16 = 57_291;
 pub const GENESIS_ACCOUNT_FILE: &str = "account.mac";
+/// Arbitrary shared secret authenticating ntx-builder RPC calls. The value is unconstrained;
+/// the ntx-builder (client) and the RPC server (validator) only need to agree on it.
 const NTX_AUTH_HEADER_VALUE: &str = "miden-client-testing-node-ntx";
 
 /// Builder for configuring and starting a Miden node with all components.

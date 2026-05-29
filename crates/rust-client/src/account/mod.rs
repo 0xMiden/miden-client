@@ -542,8 +542,6 @@ impl<AUTH> Client<AUTH> {
 ///   [`AccountBuilder::new`].
 /// - `public_key`: Public key of the account used for the authentication component.
 /// - `account_visibility`: Public/private visibility of the account.
-/// - `is_mutable`: Ignored. Mutability is not encoded in the account type; this parameter is kept
-///   only for source compatibility.
 ///
 /// # Errors
 /// - If the account cannot be built.
@@ -551,10 +549,7 @@ pub fn build_wallet_id(
     init_seed: [u8; 32],
     public_key: &PublicKey,
     account_visibility: AccountType,
-    is_mutable: bool,
 ) -> Result<AccountId, ClientError> {
-    let _ = is_mutable;
-
     let auth_scheme = public_key.auth_scheme();
     let auth_component: AccountComponent =
         AuthSingleSig::new(public_key.to_commitment(), auth_scheme).into();

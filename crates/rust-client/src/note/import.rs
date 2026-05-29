@@ -67,81 +67,67 @@ where
         &mut self,
         note_files: &[NoteFile],
     ) -> Result<Vec<NoteDetailsCommitment>, ClientError> {
-        // Deduplicate the incoming files, keying detail-carrying ones by their details commitment
-        // (wrapped as a `NoteId`) since they may have no `NoteId` of their own.
-        let mut note_files_map = BTreeMap::new();
+        // Deduplicate the incoming files, keeping note IDs and details commitments in separate
+        // collections. `NoteFile::NoteId` entries are keyed by their note ID; detail-carrying
+        // entries (`NoteDetails`/`NoteWithProof`) are keyed by their details commitment, since
+        // they may have no note ID of their own.
+        let mut ids = BTreeSet::new();
+        let mut files_by_commitment = BTreeMap::new();
         for note_file in note_files {
-            let key = match note_file {
-                NoteFile::NoteId(id) => *id,
-                NoteFile::NoteDetails { details, .. } => {
-                    NoteId::from_raw(details.commitment().as_word())
-                },
-                NoteFile::NoteWithProof(note, _) => note.id(),
-            };
-            note_files_map.insert(key, note_file.clone());
-        }
-
-        // Resolve previously stored versions: by id for `NoteFile::NoteId`, by details commitment
-        // otherwise (which also matches metadata-less records, whose `note_id` is NULL).
-        let mut lookup_ids = Vec::new();
-        let mut lookup_commitments = Vec::new();
-        for note_file in note_files_map.values() {
             match note_file {
-                NoteFile::NoteId(id) => lookup_ids.push(*id),
+                NoteFile::NoteId(id) => {
+                    ids.insert(*id);
+                },
                 NoteFile::NoteDetails { details, .. } => {
-                    lookup_commitments.push(details.commitment());
+                    files_by_commitment.insert(details.commitment(), note_file.clone());
                 },
                 NoteFile::NoteWithProof(note, _) => {
-                    lookup_commitments.push(note.details_commitment());
+                    files_by_commitment.insert(note.details_commitment(), note_file.clone());
                 },
             }
         }
 
+        // Resolve previously stored versions: by id for `NoteFile::NoteId`, by details commitment
+        // otherwise (which also matches metadata-less records, whose `note_id` is NULL).
         let previous_by_id: BTreeMap<NoteId, InputNoteRecord> = self
-            .get_input_notes(NoteFilter::List(lookup_ids))
+            .get_input_notes(NoteFilter::List(ids.iter().copied().collect()))
             .await?
             .into_iter()
             .filter_map(|note| note.id().map(|id| (id, note)))
             .collect();
         let previous_by_commitment: BTreeMap<NoteDetailsCommitment, InputNoteRecord> = self
-            .get_input_notes(NoteFilter::DetailsCommitments(lookup_commitments))
+            .get_input_notes(NoteFilter::DetailsCommitments(
+                files_by_commitment.keys().copied().collect(),
+            ))
             .await?
             .into_iter()
             .map(|note| (note.details_commitment(), note))
             .collect();
 
+        // Pair each deduplicated file with its previously stored version (if any), bucketed by
+        // variant. A note that is currently being processed can't be overwritten.
         let mut requests_by_id = BTreeMap::new();
         let mut requests_by_details = vec![];
         let mut requests_by_proof = vec![];
 
-        for (key, note_file) in note_files_map {
-            let previous_note = match &note_file {
-                NoteFile::NoteId(id) => previous_by_id.get(id).cloned(),
-                NoteFile::NoteDetails { details, .. } => {
-                    previous_by_commitment.get(&details.commitment()).cloned()
-                },
-                NoteFile::NoteWithProof(note, _) => {
-                    previous_by_commitment.get(&note.details_commitment()).cloned()
-                },
-            };
+        for id in ids {
+            let previous_note = previous_by_id.get(&id).cloned();
+            ensure_not_processing(previous_note.as_ref())?;
+            requests_by_id.insert(id, previous_note);
+        }
 
-            // If the note is already in the store and is in the state processing we return an
-            // error.
-            if let Some(true) = previous_note.as_ref().map(InputNoteRecord::is_processing) {
-                return Err(ClientError::NoteImportError(format!(
-                    "Can't overwrite note with id {key} as it's currently being processed",
-                )));
-            }
-
+        for (commitment, note_file) in files_by_commitment {
+            let previous_note = previous_by_commitment.get(&commitment).cloned();
+            ensure_not_processing(previous_note.as_ref())?;
             match note_file {
-                NoteFile::NoteId(id) => {
-                    requests_by_id.insert(id, previous_note);
-                },
                 NoteFile::NoteDetails { details, after_block_num, tag } => {
                     requests_by_details.push((previous_note, details, after_block_num, tag));
                 },
                 NoteFile::NoteWithProof(note, inclusion_proof) => {
                     requests_by_proof.push((previous_note, note, inclusion_proof));
+                },
+                NoteFile::NoteId(_) => {
+                    unreachable!("files_by_commitment only holds detail-carrying note files")
                 },
             }
         }
@@ -469,4 +455,21 @@ where
 
         Ok(retrieved_proofs)
     }
+}
+
+// HELPERS
+// ================================================================================================
+
+/// Returns an error if the already-stored note is currently being processed by a local
+/// transaction, since an in-flight note can't be overwritten by an import.
+fn ensure_not_processing(previous_note: Option<&InputNoteRecord>) -> Result<(), ClientError> {
+    if let Some(note) = previous_note
+        && note.is_processing()
+    {
+        return Err(ClientError::NoteImportError(format!(
+            "Can't overwrite note with details commitment {} as it's currently being processed",
+            note.details_commitment().to_hex(),
+        )));
+    }
+    Ok(())
 }

@@ -33,6 +33,7 @@ use miden_client::note::{
     NoteType,
     PartialNoteMetadata,
 };
+use miden_client::store::NoteFilter;
 use miden_client::sync::NoteTagSource;
 use miden_client::testing::common::{
     TestClient,
@@ -107,16 +108,18 @@ const INCR_NOTE_SCRIPT_CODE: &str = "
 
 /// Deploys a counter contract account and bumps its counter once via a transaction script.
 ///
-/// `allowed_note_scripts` holds the note-script sources the account should accept as a network
+/// `allowed_note_script_roots` holds the note-script roots the account should accept as a network
 /// account. When non-empty, the account is built with the standardized note-script allowlist slot
-/// (containing each script's root), which is what makes the node treat it as a network account and
-/// route matching notes to it. Passing an empty slice produces an ordinary public account.
-pub(crate) async fn deploy_counter_contract(
+/// (containing each root), which is what makes the node treat it as a network account and route
+/// matching notes to it. Passing an empty slice produces an ordinary public account. Roots are
+/// compiled by callers (see [`note_script_root`]) so the account allowlists exactly the scripts the
+/// notes it is expected to consume carry.
+pub(crate) async fn deploy_network_counter_contract(
     client: &mut TestClient,
     account_type: AccountType,
-    allowed_note_scripts: &[&str],
+    allowed_note_script_roots: &[NoteScriptRoot],
 ) -> Result<Account> {
-    let acc = get_counter_contract_account(client, account_type, allowed_note_scripts).await?;
+    let acc = get_counter_contract_account(client, account_type, allowed_note_script_roots).await?;
 
     client.add_account(&acc, false).await?;
 
@@ -138,7 +141,7 @@ pub(crate) async fn deploy_counter_contract(
 async fn get_counter_contract_account(
     client: &mut TestClient,
     account_type: AccountType,
-    allowed_note_scripts: &[&str],
+    allowed_note_script_roots: &[NoteScriptRoot],
 ) -> Result<Account> {
     let counter_slot = StorageSlot::with_empty_value(COUNTER_SLOT_NAME.clone());
     let counter_code = CodeBuilder::default()
@@ -154,15 +157,11 @@ async fn get_counter_contract_account(
 
     // A network account is identified by the standardized note-script allowlist slot in its
     // storage, and the node only routes notes whose script root is allowlisted. Carry the slot on
-    // the auth component (mirroring `AuthNetworkAccount`) while keeping the permissive nonce auth so
-    // the deploy-time tx-script bump still authorizes.
+    // the auth component (mirroring `AuthNetworkAccount`) while keeping the permissive nonce auth
+    // so the deploy-time tx-script bump still authorizes.
     let mut auth_slots = vec![];
-    if !allowed_note_scripts.is_empty() {
-        let source_manager = client.source_manager();
-        let roots = allowed_note_scripts
-            .iter()
-            .map(|script| note_script_root(script, source_manager.clone()))
-            .collect::<Result<BTreeSet<NoteScriptRoot>>>()?;
+    if !allowed_note_script_roots.is_empty() {
+        let roots = allowed_note_script_roots.iter().copied().collect::<BTreeSet<NoteScriptRoot>>();
         let allowlist = NetworkAccountNoteAllowlist::new(roots)
             .map_err(|err| anyhow::anyhow!(err))
             .context("failed to build network account note-script allowlist")?;
@@ -203,8 +202,10 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
+    let incr_note_root = note_script_root(INCR_NOTE_SCRIPT_CODE, client.source_manager())?;
     let network_account =
-        deploy_counter_contract(&mut client, AccountType::Public, &[INCR_NOTE_SCRIPT_CODE]).await?;
+        deploy_network_counter_contract(&mut client, AccountType::Public, &[incr_note_root])
+            .await?;
 
     let counter_value = client
         .account_reader(network_account.id())
@@ -269,11 +270,14 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
+    let incr_note_root = note_script_root(INCR_NOTE_SCRIPT_CODE, client.source_manager())?;
     let network_account =
-        deploy_counter_contract(&mut client, AccountType::Public, &[INCR_NOTE_SCRIPT_CODE]).await?;
+        deploy_network_counter_contract(&mut client, AccountType::Public, &[incr_note_root])
+            .await?;
     // The native account consumes the note via a user-submitted transaction, so it must stay an
     // ordinary public account: the node rejects user transactions against network accounts.
-    let native_account = deploy_counter_contract(&mut client, AccountType::Public, &[]).await?;
+    let native_account =
+        deploy_network_counter_contract(&mut client, AccountType::Public, &[]).await?;
 
     let wallet =
         insert_new_wallet(&mut client, AccountType::Public, &keystore, RPO_FALCON_SCHEME_ID)
@@ -340,8 +344,10 @@ pub async fn test_note_reader_finds_note_consumed_by_ntx(
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
+    let incr_note_root = note_script_root(INCR_NOTE_SCRIPT_CODE, client.source_manager())?;
     let network_account =
-        deploy_counter_contract(&mut client, AccountType::Public, &[INCR_NOTE_SCRIPT_CODE]).await?;
+        deploy_network_counter_contract(&mut client, AccountType::Public, &[incr_note_root])
+            .await?;
     let network_account_id = network_account.id();
 
     let (sender_account, ..) =
@@ -411,8 +417,10 @@ pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> R
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
+    let incr_note_root = note_script_root(INCR_NOTE_SCRIPT_CODE, client.source_manager())?;
     let network_account =
-        deploy_counter_contract(&mut client, AccountType::Public, &[INCR_NOTE_SCRIPT_CODE]).await?;
+        deploy_network_counter_contract(&mut client, AccountType::Public, &[incr_note_root])
+            .await?;
     let network_account_id = network_account.id();
 
     let (sender_account, ..) =
@@ -457,7 +465,10 @@ pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> R
     let mut consumed = false;
     for _ in 0..10 {
         client.sync_state().await?;
-        if let Some(record) = client.get_input_note_by_commitment(details_commitment).await?
+        if let Some(record) = client
+            .get_input_notes(NoteFilter::DetailsCommitments(vec![details_commitment]))
+            .await?
+            .pop()
             && record.is_consumed()
         {
             consumed = true;
@@ -497,7 +508,7 @@ fn counter_contract_library(source_manager: Arc<dyn SourceManagerSync>) -> Arc<L
 /// root, used to populate a network account's note-script allowlist. The root must match the note
 /// the account is expected to consume, so this compiles the script exactly as
 /// [`get_network_note_with_script`] does.
-fn note_script_root(
+pub(crate) fn note_script_root(
     script: &str,
     source_manager: Arc<dyn SourceManagerSync>,
 ) -> Result<NoteScriptRoot> {
@@ -568,8 +579,9 @@ pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<(
         .await?;
     client_1.sync_state().await?;
 
+    let incr_note_root = note_script_root(INCR_NOTE_SCRIPT_CODE, client_1.source_manager())?;
     let network_account =
-        deploy_counter_contract(&mut client_1, AccountType::Public, &[INCR_NOTE_SCRIPT_CODE])
+        deploy_network_counter_contract(&mut client_1, AccountType::Public, &[incr_note_root])
             .await?;
     let network_account_id = network_account.id();
 

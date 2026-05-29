@@ -289,10 +289,6 @@ enum TestCategory {
     Client,
     CustomTransaction,
     Fpi,
-    // Constructed by the generated test registry only when `network_fpi.rs` has registered
-    // (`test_*`) functions; its tests are currently disabled (network transactions are off in the
-    // test node), so the generated code never references this variant.
-    #[allow(dead_code)]
     NetworkFpi,
     NetworkTransaction,
     Onchain,

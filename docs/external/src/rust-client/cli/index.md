@@ -99,10 +99,9 @@ Creates a new wallet account.
 
 A basic wallet is comprised of a basic authentication component (for RPO Falcon signature verification), alongside a basic wallet component (for sending and receiving assets).
 
-This command has four optional flags:
+This command has three optional flags:
 
-- `--storage-mode <TYPE>`: Used to select the account visibility (private if not specified). It may receive "private" or "public".
-- `--mutable`: Accepted for backward compatibility. Protocol 0.15 no longer encodes code mutability in the account ID.
+- `-t, --account-type <ACCOUNT_TYPE>`: Used to select the account visibility (private if not specified). It may receive "private" or "public". This is the only thing the protocol's `AccountType` encodes.
 - `--extra-packages <PACKAGES>`: Specifies a list of file paths for packages holding account components to include in the account. If the packages contain placeholders, the CLI will prompt the user to enter the required data for instantiating storage appropriately.
 - `--init-storage-data-path <INIT_STORAGE_DATA_PATH>`: Specifies an optional file path to a TOML file containing key/value pairs used for initializing storage. Each key should map to a placeholder within the packages' component metadata. The CLI will prompt for any keys that are not present in the file.
 
@@ -116,9 +115,9 @@ An account may be composed of one or more components, each with its own storage 
 
 This command has four flags:
 
-- `-t, --storage-mode <STORAGE_MODE>`: Specifies the account visibility. It accepts either "private" or "public", with "private" as the default. This is the only thing the protocol's `AccountType` encodes.
+- `-t, --account-type <ACCOUNT_TYPE>`: Specifies the account visibility. It accepts either "private" or "public", with "private" as the default. This is the only thing the protocol's `AccountType` encodes.
 
-There is no `--account-type` / `--faucet` flag: faucet-vs-regular is derived from the packages. If any package contributes the `FungibleFaucet` component, the resulting account is treated as a fungible faucet and an implicit `TokenPolicyManager` is installed when one is not already provided. The previous `--account-type` flag (with values `fungible-faucet`, `non-fungible-faucet`, `regular-account-immutable-code`, `regular-account-updatable-code`) has been removed: the protocol no longer encodes non-fungible-faucet as a distinct kind, and code mutability is no longer encoded in the account ID.
+There is no `--faucet` flag: faucet-vs-regular is derived from the packages. If any package contributes the `FungibleFaucet` component, the resulting account is treated as a fungible faucet and an implicit `TokenPolicyManager` is installed when one is not already provided. `--account-type` now only selects visibility; its previous values (`fungible-faucet`, `non-fungible-faucet`, `regular-account-immutable-code`, `regular-account-updatable-code`) have been removed, as the protocol no longer encodes non-fungible-faucet as a distinct kind and code mutability is no longer encoded in the account ID.
 - `--packages <PACKAGES>`: Specifies a list of file paths for packages holding account components to include in the account. If the packages contain placeholders, the CLI will prompt the user to enter the required data for instantiating storage appropriately.
 - `--init-storage-data-path <INIT_STORAGE_DATA_PATH>`: Specifies an optional file path to a TOML file containing key/value pairs used for initializing storage. Each key should map to a placeholder within the packages' component metadata. The CLI will prompt for any keys that are not present in the file.
 

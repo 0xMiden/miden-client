@@ -1,7 +1,13 @@
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, presets};
 use miden_client::account::component::FungibleFaucet;
-use miden_client::account::{Account, AccountId, AccountInterfaceExt, StorageSlotContent};
+use miden_client::account::{
+    Account,
+    AccountCode,
+    AccountId,
+    AccountInterfaceExt,
+    StorageSlotContent,
+};
 use miden_client::address::{Address, AddressInterface, NetworkId, RoutingParameters};
 use miden_client::asset::Asset;
 use miden_client::rpc::{GrpcClient, NodeRpcClient};
@@ -312,6 +318,17 @@ fn account_type_display_name(_account_id: AccountId, token_symbol: Option<&str>)
     } else {
         "Regular".to_string()
     }
+}
+
+/// Returns `true` if the account code exposes the [`BasicWallet`] component interface.
+///
+/// Takes the [`AccountCode`] rather than the full [`Account`] so callers can avoid loading the
+/// account's vault and storage just to inspect its interface.
+pub(crate) fn account_code_has_basic_wallet(account_id: AccountId, code: &AccountCode) -> bool {
+    AccountInterface::from_code(account_id, Vec::new(), code)
+        .components()
+        .iter()
+        .any(|c| matches!(c, AccountComponentInterface::BasicWallet))
 }
 
 /// Sets the provided account ID as the default account in the client's store, if not set already.

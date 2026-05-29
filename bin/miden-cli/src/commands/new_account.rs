@@ -43,19 +43,18 @@ use crate::{CliKeyStore, client_binary_name};
 // CLI TYPES
 // ================================================================================================
 
-/// Mirror enum for the protocol's public/private account visibility, which is encoded in
-/// [`AccountType`].
+/// Mirror enum for the protocol's public/private [`AccountType`].
 #[derive(Debug, Clone, Copy, ValueEnum)]
-pub enum CliAccountVisibility {
+pub enum CliAccountType {
     Private,
     Public,
 }
 
-impl From<CliAccountVisibility> for AccountType {
-    fn from(cli_mode: CliAccountVisibility) -> Self {
-        match cli_mode {
-            CliAccountVisibility::Private => AccountType::Private,
-            CliAccountVisibility::Public => AccountType::Public,
+impl From<CliAccountType> for AccountType {
+    fn from(cli_account_type: CliAccountType) -> Self {
+        match cli_account_type {
+            CliAccountType::Private => AccountType::Private,
+            CliAccountType::Public => AccountType::Public,
         }
     }
 }
@@ -70,14 +69,9 @@ impl From<CliAccountVisibility> for AccountType {
 /// a list of component template files.
 #[derive(Debug, Parser, Clone)]
 pub struct NewWalletCmd {
-    /// Account visibility (`private` or `public`). The long flag is `--storage-mode`;
-    /// the field is named `visibility` internally to reflect what it controls.
-    #[arg(value_enum, short = 't', long = "storage-mode", default_value_t = CliAccountVisibility::Private)]
-    pub visibility: CliAccountVisibility,
-    /// Accepted for backward compatibility; account-code mutability is not encoded in the
-    /// account ID.
-    #[arg(short, long)]
-    pub mutable: bool,
+    /// Account type (`private` or `public`).
+    #[arg(value_enum, short = 't', long = "account-type", default_value_t = CliAccountType::Private)]
+    pub account_type: CliAccountType,
     /// Optional list of paths specifying additional components in the form of
     /// packages to add to the account.
     #[arg(short, long)]
@@ -113,14 +107,10 @@ impl NewWalletCmd {
             .chain(self.extra_packages.clone())
             .collect();
 
-        // `mutable` is accepted for CLI compatibility but has no effect on the account —
-        // code mutability is not encoded in the protocol's `AccountType`.
-        let _ = self.mutable;
-
         let new_account = create_client_account(
             &mut client,
             &keystore,
-            self.visibility.into(),
+            self.account_type.into(),
             &package_paths,
             self.init_storage_data_path.clone(),
             self.deploy,
@@ -178,10 +168,9 @@ impl NewWalletCmd {
 /// ```
 #[derive(Debug, Parser, Clone)]
 pub struct NewAccountCmd {
-    /// Account visibility (`private` or `public`). The long flag is `--storage-mode`;
-    /// the field is named `visibility` internally to reflect what it controls.
-    #[arg(value_enum, short = 't', long = "storage-mode", default_value_t = CliAccountVisibility::Private)]
-    pub visibility: CliAccountVisibility,
+    /// Account type (`private` or `public`).
+    #[arg(value_enum, short = 't', long = "account-type", default_value_t = CliAccountType::Private)]
+    pub account_type: CliAccountType,
     /// List of files specifying package files used to create account components for the
     /// account. If any package contributes a `FungibleFaucet` component, the resulting account
     /// is treated as a fungible faucet (and an implicit `TokenPolicyManager` is installed when
@@ -217,7 +206,7 @@ impl NewAccountCmd {
         let new_account = create_client_account(
             &mut client,
             &keystore,
-            self.visibility.into(),
+            self.account_type.into(),
             &self.packages,
             self.init_storage_data_path.clone(),
             self.deploy,
@@ -479,7 +468,7 @@ fn should_add_implicit_token_policy_manager(regular_components: &[AccountCompone
 async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
-    visibility: AccountType,
+    account_type: AccountType,
     package_paths: &[PathBuf],
     init_storage_data_path: Option<PathBuf>,
     deploy: bool,
@@ -522,7 +511,7 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let mut builder = AccountBuilder::new(init_seed).account_type(visibility);
+    let mut builder = AccountBuilder::new(init_seed).account_type(account_type);
 
     // Process packages and separate auth components from regular components
     let account_components = process_packages(packages, &init_storage_data)?;

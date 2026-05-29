@@ -8,8 +8,9 @@ use miden_client::{Felt, Word, ZERO};
 use super::fpi::{FPI_STORAGE_VALUE, MAP_KEY, MAP_SLOT_NAME, deploy_foreign_account};
 use super::network_transaction::{
     COUNTER_SLOT_NAME,
-    deploy_counter_contract,
+    deploy_network_counter_contract,
     get_network_note_with_script,
+    note_script_root,
 };
 use crate::tests::config::ClientConfig;
 
@@ -108,10 +109,12 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
 
     // The counter account is deployed as a network account that allowlists the FPI note script, so
     // the node routes the note to it and runs the network transaction.
-    let target_network_account = deploy_counter_contract(
+    let network_fpi_note_root =
+        note_script_root(&network_fpi_note_script, client2.source_manager())?;
+    let target_network_account = deploy_network_counter_contract(
         &mut client2,
         AccountType::Public,
-        &[network_fpi_note_script.as_str()],
+        &[network_fpi_note_root],
     )
     .await?;
 

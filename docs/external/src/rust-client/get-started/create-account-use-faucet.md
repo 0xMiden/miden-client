@@ -30,10 +30,10 @@ Check the [Miden client documentation](https://docs.miden.xyz/builder/tools/clie
 
 ## Create a new Miden account
 
-1. Create a new account of type `mutable` using the following command:
+1. Create a new wallet account using the following command:
 
    ```sh
-   miden-client new-wallet --mutable
+   miden-client new-wallet
    ```
 
 2. List all created accounts by running the following command:

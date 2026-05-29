@@ -333,8 +333,9 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     // metadata, so look it up by its details commitment rather than its note ID.
     let details_commitment = notes[0].details_commitment();
     let input_note = client_1
-        .get_input_note_by_commitment(details_commitment)
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![details_commitment]))
         .await?
+        .pop()
         .with_context(|| format!("input note {note_id} not found"))?;
     assert!(matches!(input_note.state(), InputNoteState::ConsumedExternal { .. }));
 
@@ -398,7 +399,7 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
 
     // Import the public account by id
     let built_wallet_id =
-        build_wallet_id(user_seed, &secret_key.public_key(), AccountStorageMode::Public, false)?;
+        build_wallet_id(user_seed, &secret_key.public_key(), AccountStorageMode::Public)?;
     assert_eq!(built_wallet_id, first_regular_account.id());
     client_2.import_account_by_id(built_wallet_id).await?;
     keystore_2.add_key(&secret_key, built_wallet_id).await?;

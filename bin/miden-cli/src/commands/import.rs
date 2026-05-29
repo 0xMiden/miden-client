@@ -9,7 +9,7 @@ use miden_client::utils::Deserializable;
 use miden_client::{Client, ClientError};
 use tracing::info;
 
-use crate::commands::account::set_default_account_if_unset;
+use crate::commands::account::{account_code_has_basic_wallet, set_default_account_if_unset};
 use crate::errors::CliError;
 use crate::{FilesystemKeyStore, Parser};
 
@@ -53,15 +53,11 @@ impl ImportCmd {
 
                 println!("Successfully imported account {account_id}");
 
-                let reader = client.account_reader(account_id);
-                let is_faucet = reader
-                    .get_storage_item(
-                        miden_client::account::component::FungibleFaucet::token_config_slot()
-                            .clone(),
-                    )
-                    .await
-                    .is_ok();
-                if !is_faucet {
+                // Only basic wallets are eligible to become the default account; faucets and
+                // other account kinds are skipped.
+                if let Some(code) = client.get_account_code(account_id).await?
+                    && account_code_has_basic_wallet(account_id, &code)
+                {
                     set_default_account_if_unset(&mut client, account_id).await?;
                 }
             }

@@ -86,7 +86,6 @@ pub use miden_protocol::note::{
     NoteAttachmentScheme,
     NoteAttachments,
     NoteDetails,
-    NoteDetailsCommitment,
     NoteFile,
     NoteHeader,
     NoteId,
@@ -206,23 +205,6 @@ where
         note_id: NoteId,
     ) -> Result<Option<InputNoteRecord>, ClientError> {
         Ok(self.store.get_input_notes(NoteFilter::Unique(note_id)).await?.pop())
-    }
-
-    /// Retrieves the input note given its [`NoteDetailsCommitment`]. Returns `None` if the note is
-    /// not found.
-    ///
-    /// Unlike [`Self::get_input_note`], this resolves notes that have no metadata yet (e.g. notes
-    /// imported as details only, or in a `ConsumedExternal` state), since the details commitment is
-    /// available regardless of metadata.
-    pub async fn get_input_note_by_commitment(
-        &self,
-        details_commitment: NoteDetailsCommitment,
-    ) -> Result<Option<InputNoteRecord>, ClientError> {
-        Ok(self
-            .store
-            .get_input_notes(NoteFilter::DetailsCommitments(vec![details_commitment]))
-            .await?
-            .pop())
     }
 
     // OUTPUT NOTE DATA RETRIEVAL
