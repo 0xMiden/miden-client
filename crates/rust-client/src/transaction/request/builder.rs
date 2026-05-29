@@ -284,6 +284,8 @@ impl TransactionRequestBuilder {
     /// executing the main transaction. For any script not yet registered, the client
     /// automatically creates and submits a separate registration transaction (a public note
     /// carrying that script) so the node's registry is populated before the NTX executes.
+    ///
+    /// Standard note scripts are ignored here — the NTX builder resolves them directly.
     #[must_use]
     pub fn expected_ntx_scripts(mut self, scripts: Vec<NoteScript>) -> Self {
         self.expected_ntx_scripts = scripts;
