@@ -118,15 +118,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
     let transaction_request = TransactionRequestBuilder::new()
         .input_notes(note_args_map)
         .custom_script(tx_script)
-        .script_arg(
-            [
-                Felt::new_unchecked(4),
-                Felt::new_unchecked(3),
-                Felt::new_unchecked(2),
-                Felt::new_unchecked(1),
-            ]
-            .into(),
-        )
+        .script_arg([Felt::from(4u32), Felt::from(3u32), Felt::from(2u32), Felt::from(1u32)].into())
         .extend_advice_map(advice_map)
         .build()?;
 

@@ -39,6 +39,11 @@ pub enum NoteUpdateType {
     Insert = 1,
     /// Indicates that the note was already tracked and should be updated.
     Update = 2,
+    /// Indicates that a previously-tracked metadata-less (`Expected`) note has just been committed.
+    /// It must be persisted as a full-row insert (like [`Self::Insert`]) so its now-known `note_id`
+    /// and `nullifier` columns are written, but for reporting it is a *committed* tracked note —
+    /// not a newly-discovered one — so it is summarized under committed notes, not new notes.
+    InsertCommitted = 3,
 }
 
 impl TryFrom<u8> for NoteUpdateType {
@@ -49,6 +54,7 @@ impl TryFrom<u8> for NoteUpdateType {
             0 => Ok(NoteUpdateType::None),
             1 => Ok(NoteUpdateType::Insert),
             2 => Ok(NoteUpdateType::Update),
+            3 => Ok(NoteUpdateType::InsertCommitted),
             other => Err(other),
         }
     }
@@ -85,17 +91,27 @@ impl InputNoteUpdate {
         }
     }
 
+    /// Creates a new [`InputNoteUpdate`] for a previously-tracked expected note that has just been
+    /// committed (see [`NoteUpdateType::InsertCommitted`]).
+    fn new_insert_committed(note: InputNoteRecord) -> Self {
+        Self {
+            note,
+            update_type: NoteUpdateType::InsertCommitted,
+        }
+    }
+
     /// Returns a reference the inner note record.
     pub fn inner(&self) -> &InputNoteRecord {
         &self.note
     }
 
     /// Returns a mutable reference to the inner note record. If the update type is `None` or
-    /// `Update`, it will be set to `Update`.
+    /// `Update`, it will be set to `Update`; insert-typed updates keep their type.
     fn inner_mut(&mut self) -> &mut InputNoteRecord {
         self.update_type = match self.update_type {
             NoteUpdateType::None | NoteUpdateType::Update => NoteUpdateType::Update,
             NoteUpdateType::Insert => NoteUpdateType::Insert,
+            NoteUpdateType::InsertCommitted => NoteUpdateType::InsertCommitted,
         };
 
         &mut self.note
@@ -162,6 +178,9 @@ impl OutputNoteUpdate {
         self.update_type = match self.update_type {
             NoteUpdateType::None | NoteUpdateType::Update => NoteUpdateType::Update,
             NoteUpdateType::Insert => NoteUpdateType::Insert,
+            // Output notes are never assigned `InsertCommitted` (it is input-note specific), but
+            // the match must be exhaustive; treat it as an insert.
+            NoteUpdateType::InsertCommitted => NoteUpdateType::Insert,
         };
 
         &mut self.note
@@ -259,10 +278,23 @@ impl NoteUpdateTracker {
     /// This may include:
     /// - New notes that have been created that should be inserted.
     /// - Existing tracked notes that should be updated.
+    ///
+    /// Metadata-less expected notes (e.g. future notes created by a transaction, such as swap
+    /// payback notes) are included as well: they have no `NoteId` yet but must still be persisted
+    /// and have their tags registered. The `update_type` filter ensures notes merely loaded as
+    /// already-tracked context (`NoteUpdateType::None`) are not re-emitted.
     pub fn updated_input_notes(&self) -> impl Iterator<Item = &InputNoteUpdate> {
-        self.input_notes.values().filter(|note| {
-            matches!(note.update_type, NoteUpdateType::Insert | NoteUpdateType::Update)
-        })
+        self.input_notes
+            .values()
+            .chain(self.expected_input_notes.values())
+            .filter(|note| {
+                matches!(
+                    note.update_type,
+                    NoteUpdateType::Insert
+                        | NoteUpdateType::Update
+                        | NoteUpdateType::InsertCommitted
+                )
+            })
     }
 
     /// Returns the ids of updated input notes that are now consumed, by tracking key. Consumed
@@ -272,8 +304,12 @@ impl NoteUpdateTracker {
         self.input_notes
             .iter()
             .filter(|(_, update)| {
-                matches!(update.update_type, NoteUpdateType::Insert | NoteUpdateType::Update)
-                    && update.inner().is_consumed()
+                matches!(
+                    update.update_type,
+                    NoteUpdateType::Insert
+                        | NoteUpdateType::Update
+                        | NoteUpdateType::InsertCommitted
+                ) && update.inner().is_consumed()
             })
             .map(|(note_id, _)| *note_id)
     }
@@ -370,11 +406,13 @@ impl NoteUpdateTracker {
                 record.inclusion_proof_received(inclusion_proof.clone(), metadata)?;
                 record.block_header_received(block_header)?;
 
-                // `Insert` so the now-known `note_id`/`nullifier` columns are persisted; re-key by
-                // the now-available id.
+                // `InsertCommitted` so the now-known `note_id`/`nullifier` columns are persisted
+                // (a full-row insert), while still being reported as a committed tracked note
+                // rather than a newly-discovered one. Re-key by the now-available id.
                 let nullifier = record.nullifier();
                 self.input_notes_by_nullifier.insert(nullifier, note_id);
-                self.input_notes.insert(note_id, InputNoteUpdate::new_insert(update.note));
+                self.input_notes
+                    .insert(note_id, InputNoteUpdate::new_insert_committed(update.note));
 
                 true
             } else {
@@ -602,6 +640,7 @@ impl NoteUpdateTracker {
             NoteUpdateType::None => InputNoteUpdate::new_none(note),
             NoteUpdateType::Insert => InputNoteUpdate::new_insert(note),
             NoteUpdateType::Update => InputNoteUpdate::new_update(note),
+            NoteUpdateType::InsertCommitted => InputNoteUpdate::new_insert_committed(note),
         };
 
         if let Some(note_id) = update.inner().id() {
@@ -628,6 +667,9 @@ impl NoteUpdateTracker {
             NoteUpdateType::None => OutputNoteUpdate::new_none(note),
             NoteUpdateType::Insert => OutputNoteUpdate::new_insert(note),
             NoteUpdateType::Update => OutputNoteUpdate::new_update(note),
+            // Output notes are never assigned `InsertCommitted`; treat it as an insert for
+            // exhaustiveness.
+            NoteUpdateType::InsertCommitted => OutputNoteUpdate::new_insert(note),
         };
         self.output_notes.insert(note_id, update);
     }

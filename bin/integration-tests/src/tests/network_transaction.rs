@@ -166,7 +166,12 @@ async fn get_counter_contract_account(
 // TESTS
 // ================================================================================================
 
-pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
+/// Disabled because network transaction processing is currently turned off in the test node, so
+/// the network account never consumes the emitted notes and the counter is never bumped. The
+/// `disabled_` prefix opts the function out of the integration-test build script registration;
+/// re-enable once the node processes network transactions again.
+#[allow(dead_code)]
+pub async fn disabled_counter_contract_ntx(client_config: ClientConfig) -> Result<()> {
     const BUMP_NOTE_NUMBER: u64 = 5;
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
@@ -178,7 +183,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find network account after deployment")?;
-    assert_eq!(counter_value, Word::from([Felt::new_unchecked(1), ZERO, ZERO, ZERO]));
+    assert_eq!(counter_value, Word::from([Felt::from(1u32), ZERO, ZERO, ZERO]));
 
     let (native_account, ..) =
         insert_new_wallet(&mut client, AccountType::Public, &keystore, RPO_FALCON_SCHEME_ID)
@@ -283,7 +288,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find network account after recall test")?;
-    assert_eq!(network_counter, Word::from([Felt::new_unchecked(1), ZERO, ZERO, ZERO]));
+    assert_eq!(network_counter, Word::from([Felt::from(1u32), ZERO, ZERO, ZERO]));
 
     // The native account should have the incremented value
     let native_counter = client
@@ -291,7 +296,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find native account after recall test")?;
-    assert_eq!(native_counter, Word::from([Felt::new_unchecked(2), ZERO, ZERO, ZERO]));
+    assert_eq!(native_counter, Word::from([Felt::from(2u32), ZERO, ZERO, ZERO]));
     Ok(())
 }
 
@@ -331,7 +336,7 @@ pub async fn disabled_note_reader_finds_note_consumed_by_ntx(
     execute_tx_and_sync(&mut client, sender_account.id(), tx_request).await?;
 
     // Wait for the network account to consume the note (check counter increment).
-    let expected_counter = Word::from([Felt::new_unchecked(2), ZERO, ZERO, ZERO]);
+    let expected_counter = Word::from([Felt::from(2u32), ZERO, ZERO, ZERO]);
     for _ in 0..15 {
         client.sync_state().await?;
         let account_details = client
@@ -377,7 +382,13 @@ pub async fn disabled_note_reader_finds_note_consumed_by_ntx(
 /// stream), so the consumer is not derivable: the note is recorded as consumed with an unknown
 /// consumer rather than attributed to the network account. The test therefore asserts the note
 /// reaches a consumed state, not the consumer identity.
-pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> Result<()> {
+///
+/// Disabled because network transaction processing is currently turned off in the test node, so
+/// the network account never consumes the note. The `disabled_` prefix opts the function out of
+/// the integration-test build script registration; re-enable once the node processes network
+/// transactions again.
+#[allow(dead_code)]
+pub async fn disabled_network_note_consumed_by_ntx(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
@@ -394,14 +405,17 @@ pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> R
         client.source_manager(),
         &mut client.rng(),
     )?;
-    let note_id = network_note.id();
+    // Captured before `network_note` is moved into the request below: once the network account
+    // consumes it the note is `ConsumedExternal` (no metadata), so it can only be resolved by its
+    // details commitment, not its note ID.
+    let details_commitment = network_note.details_commitment();
 
     let tx_request =
         TransactionRequestBuilder::new().own_output_notes(vec![network_note]).build()?;
     execute_tx_and_sync(&mut client, sender_account.id(), tx_request).await?;
 
     // Wait for the network account to consume the note (check counter increment).
-    let expected_counter = Word::from([Felt::new_unchecked(2), ZERO, ZERO, ZERO]);
+    let expected_counter = Word::from([Felt::from(2u32), ZERO, ZERO, ZERO]);
     for _ in 0..15 {
         client.sync_state().await?;
         let account_details = client
@@ -423,7 +437,7 @@ pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> R
     let mut consumed = false;
     for _ in 0..10 {
         client.sync_state().await?;
-        if let Some(record) = client.get_input_note(note_id).await?
+        if let Some(record) = client.get_input_note_by_commitment(details_commitment).await?
             && record.is_consumed()
         {
             consumed = true;
@@ -510,7 +524,13 @@ pub(crate) fn get_network_note_with_script<T: Rng>(
 ///   - `client_1` deploys the counter as a network account and emits bump notes.
 ///   - `client_2` watches the network account via `import_watched_account_by_id` (no note tag).
 ///   - The node-driven counter increments are observed by `client_2` after `sync_state`.
-pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<()> {
+///
+/// Disabled because network transaction processing is currently turned off in the test node, so
+/// the watched network account's state never advances. The `disabled_` prefix opts the function
+/// out of the integration-test build script registration; re-enable once the node processes
+/// network transactions again.
+#[allow(dead_code)]
+pub async fn disabled_watch_network_account(client_config: ClientConfig) -> Result<()> {
     const BUMP_NOTE_NUMBER: u64 = 3;
 
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
@@ -529,7 +549,7 @@ pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<(
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find network account after deployment")?;
-    assert_eq!(counter_value, Word::from([Felt::new_unchecked(1), ZERO, ZERO, ZERO]));
+    assert_eq!(counter_value, Word::from([Felt::from(1u32), ZERO, ZERO, ZERO]));
 
     // client_2 starts watching the network account.
     client_2.import_watched_account_by_id(network_account_id).await?;

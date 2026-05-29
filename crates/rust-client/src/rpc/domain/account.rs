@@ -260,6 +260,8 @@ impl proto::rpc::account_response::AccountDetails {
         // Validate that the returned proofs match the originally requested keys.
         // The node returns hashed SMT keys, so we hash the raw keys and check
         // they are present in the corresponding proofs.
+        use miden_protocol::account::StorageMapKeyHash;
+
         for map_detail in &storage_details.map_details {
             let requested_keys = storage_requirements
                 .inner()
@@ -277,8 +279,8 @@ impl proto::rpc::account_response::AccountDetails {
                     )));
                 }
                 for (proof, raw_key) in proofs.iter().zip(requested_keys.iter()) {
-                    let hashed_key = raw_key.hash().as_word();
-                    if proof.get(&hashed_key).is_none() {
+                    let hashed_key: StorageMapKeyHash = raw_key.hash();
+                    if proof.get(&Word::from(hashed_key)).is_none() {
                         return Err(RpcError::InvalidResponse(format!(
                             "proof for storage map key {} does not match the requested key",
                             raw_key.to_hex(),

@@ -60,25 +60,6 @@ impl From<CliAccountVisibility> for AccountType {
     }
 }
 
-/// Mirror enum for the CLI's notion of "account kind". Wallet-vs-faucet is determined by which
-/// components are attached, not by the protocol `AccountType`, so this enum drives component
-/// selection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-pub enum CliAccountType {
-    FungibleFaucet,
-    NonFungibleFaucet,
-    RegularAccountImmutableCode,
-    RegularAccountUpdatableCode,
-}
-
-impl CliAccountType {
-    /// Whether this kind represents a fungible faucet (which requires the `FungibleFaucet`
-    /// component and an implicit token policy manager).
-    pub fn is_fungible_faucet(self) -> bool {
-        matches!(self, CliAccountType::FungibleFaucet)
-    }
-}
-
 // NEW WALLET
 // ================================================================================================
 
@@ -89,10 +70,9 @@ impl CliAccountType {
 /// a list of component template files.
 #[derive(Debug, Parser, Clone)]
 pub struct NewWalletCmd {
-    /// Account visibility (`private` or `public`).
-    ///
-    /// The flag remains `--storage-mode` for CLI compatibility.
-    #[arg(value_enum, short, long = "storage-mode", default_value_t = CliAccountVisibility::Private)]
+    /// Account visibility (`private` or `public`). The long flag is `--storage-mode`;
+    /// the field is named `visibility` internally to reflect what it controls.
+    #[arg(value_enum, short = 't', long = "storage-mode", default_value_t = CliAccountVisibility::Private)]
     pub visibility: CliAccountVisibility,
     /// Accepted for backward compatibility; account-code mutability is not encoded in the
     /// account ID.
@@ -133,14 +113,13 @@ impl NewWalletCmd {
             .chain(self.extra_packages.clone())
             .collect();
 
-        // `mutable` is accepted for CLI compatibility but has no effect on the account.
+        // `mutable` is accepted for CLI compatibility but has no effect on the account —
+        // code mutability is not encoded in the protocol's `AccountType`.
         let _ = self.mutable;
-        let kind = CliAccountType::RegularAccountImmutableCode;
 
         let new_account = create_client_account(
             &mut client,
             &keystore,
-            kind,
             self.visibility.into(),
             &package_paths,
             self.init_storage_data_path.clone(),
@@ -182,27 +161,31 @@ impl NewWalletCmd {
 ///
 /// # Examples
 ///
-/// Create an account with default Falcon auth:
+/// Create a regular account with default Falcon auth:
 /// ```bash
-/// miden-client new-account --account-type regular-account-immutable-code -p basic-wallet
+/// miden-client new-account -p basic-wallet
 /// ```
 ///
-/// Create an account with a custom auth component (e.g., NoAuth):
+/// Create a public account with a custom auth component (e.g., NoAuth):
 /// ```bash
-/// miden-client new-account --account-type regular-account-immutable-code -p auth/no-auth -p basic-wallet
+/// miden-client new-account -t public -p auth/no-auth -p basic-wallet
+/// ```
+///
+/// Create a fungible faucet account (faucet-ness is derived from the `FungibleFaucet` component
+/// contributed by the package, so no extra flag is needed):
+/// ```bash
+/// miden-client new-account -p basic-fungible-faucet -i init_data.toml
 /// ```
 #[derive(Debug, Parser, Clone)]
 pub struct NewAccountCmd {
-    /// Account visibility (`private` or `public`).
-    ///
-    /// The flag remains `--storage-mode` for CLI compatibility.
-    #[arg(value_enum, short, long = "storage-mode", default_value_t = CliAccountVisibility::Private)]
+    /// Account visibility (`private` or `public`). The long flag is `--storage-mode`;
+    /// the field is named `visibility` internally to reflect what it controls.
+    #[arg(value_enum, short = 't', long = "storage-mode", default_value_t = CliAccountVisibility::Private)]
     pub visibility: CliAccountVisibility,
-    /// Account type to create.
-    #[arg(long, value_enum)]
-    pub account_type: CliAccountType,
     /// List of files specifying package files used to create account components for the
-    /// account.
+    /// account. If any package contributes a `FungibleFaucet` component, the resulting account
+    /// is treated as a fungible faucet (and an implicit `TokenPolicyManager` is installed when
+    /// not already provided).
     #[arg(short, long)]
     pub packages: Vec<PathBuf>,
     /// Optional file path to a TOML file containing a list of key/values used for initializing
@@ -234,7 +217,6 @@ impl NewAccountCmd {
         let new_account = create_client_account(
             &mut client,
             &keystore,
-            self.account_type,
             self.visibility.into(),
             &self.packages,
             self.init_storage_data_path.clone(),
@@ -475,14 +457,11 @@ fn separate_auth_components(
 ///   behavior and keep the old UX working.
 ///
 /// What it does:
-/// - only applies to `CliAccountType::FungibleFaucet`,
-/// - only triggers when `BasicFungibleFaucet` is present,
-/// - and skips injection if a `TokenPolicyManager` component is already present so user-provided
-///   policy configurations are not duplicated or overridden.
-fn should_add_implicit_token_policy_manager(
-    kind: CliAccountType,
-    regular_components: &[AccountComponent],
-) -> bool {
+/// - triggers when `BasicFungibleFaucet` is present in the resulting components (this is also the
+///   signal that says "this account is a faucet" — no separate flag needed),
+/// - skips injection if a `TokenPolicyManager` component is already present so user-provided policy
+///   configurations are not duplicated or overridden.
+fn should_add_implicit_token_policy_manager(regular_components: &[AccountComponent]) -> bool {
     let has_basic_fungible_faucet = regular_components
         .iter()
         .any(|component| component.metadata().name() == FungibleFaucet::NAME);
@@ -490,7 +469,7 @@ fn should_add_implicit_token_policy_manager(
         .iter()
         .any(|component| component.metadata().name() == TokenPolicyManager::NAME);
 
-    kind.is_fungible_faucet() && has_basic_fungible_faucet && !has_token_policy_manager
+    has_basic_fungible_faucet && !has_token_policy_manager
 }
 
 /// Helper function to create the seed, initialize the account builder, add the given components,
@@ -500,7 +479,6 @@ fn should_add_implicit_token_policy_manager(
 async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     client: &mut Client<AUTH>,
     keystore: &CliKeyStore,
-    kind: CliAccountType,
     visibility: AccountType,
     package_paths: &[PathBuf],
     init_storage_data_path: Option<PathBuf>,
@@ -560,7 +538,7 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     // Faucet accounts require a token policy manager component. The CLI's standard
     // `basic-fungible-faucet` package only provides the faucet component itself, so add the
     // default `allow_all` policy manager implicitly.
-    if should_add_implicit_token_policy_manager(kind, &regular_components) {
+    if should_add_implicit_token_policy_manager(&regular_components) {
         debug!("Adding implicit TokenPolicyManager component for fungible faucet");
         let policy_manager = TokenPolicyManager::new()
             .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
@@ -744,10 +722,7 @@ mod tests {
     fn implicit_token_policy_manager_is_added_for_basic_faucet_accounts() {
         let regular_components = vec![test_fungible_faucet_component()];
 
-        assert!(should_add_implicit_token_policy_manager(
-            CliAccountType::FungibleFaucet,
-            &regular_components
-        ));
+        assert!(should_add_implicit_token_policy_manager(&regular_components));
     }
 
     #[test]
@@ -760,19 +735,13 @@ mod tests {
             .unwrap();
         regular_components.extend(policy_manager);
 
-        assert!(!should_add_implicit_token_policy_manager(
-            CliAccountType::FungibleFaucet,
-            &regular_components
-        ));
+        assert!(!should_add_implicit_token_policy_manager(&regular_components));
     }
 
     #[test]
     fn implicit_token_policy_manager_is_not_added_for_non_faucet_accounts() {
         let regular_components = vec![AccountComponent::from(BasicWallet)];
 
-        assert!(!should_add_implicit_token_policy_manager(
-            CliAccountType::RegularAccountImmutableCode,
-            &regular_components
-        ));
+        assert!(!should_add_implicit_token_policy_manager(&regular_components));
     }
 }

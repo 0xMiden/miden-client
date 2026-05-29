@@ -725,7 +725,7 @@ async fn sync_state_no_redundant_get_account_calls() {
     // This ensures every sync step's reported commitment differs from our local header,
     // which would trigger a fetch in every step without the fix.
     let account_header =
-        AccountHeader::new(account_id, Felt::new_unchecked(0), EMPTY_WORD, EMPTY_WORD, EMPTY_WORD);
+        AccountHeader::new(account_id, Felt::from(0u32), EMPTY_WORD, EMPTY_WORD, EMPTY_WORD);
 
     // Build a PartialMmr starting from genesis
     let genesis = rpc_api.get_block_header_by_number(Some(0.into()), false).await.unwrap().0;
@@ -1114,7 +1114,7 @@ async fn execute_program() {
     .await
     .unwrap();
 
-    let mut expected_stack = [Felt::new_unchecked(0); 16];
+    let mut expected_stack = [Felt::from(0u32); 16];
     for (i, element) in expected_stack.iter_mut().enumerate() {
         *element = Felt::new_unchecked(i as u64);
     }
@@ -3073,13 +3073,7 @@ async fn storage_and_vault_proofs() {
     storage_map
         .insert(
             StorageMapKey::new(MAP_KEY.into()),
-            [
-                Felt::new_unchecked(0),
-                Felt::new_unchecked(0),
-                Felt::new_unchecked(0),
-                Felt::new_unchecked(1),
-            ]
-            .into(),
+            [Felt::from(0u32), Felt::from(0u32), Felt::from(0u32), Felt::from(1u32)].into(),
         )
         .unwrap();
 
@@ -3553,9 +3547,9 @@ async fn sync_large_public_account() {
                 .map(|i| {
                     let w = Word::from([
                         Felt::new_unchecked(i),
-                        Felt::new_unchecked(0),
-                        Felt::new_unchecked(0),
-                        Felt::new_unchecked(0),
+                        Felt::from(0u32),
+                        Felt::from(0u32),
+                        Felt::from(0u32),
                     ]);
                     (StorageMapKey::new(w), w)
                 })
@@ -4004,13 +3998,7 @@ async fn storage_and_vault_proofs_ecdsa() {
     storage_map
         .insert(
             StorageMapKey::new(MAP_KEY.into()),
-            [
-                Felt::new_unchecked(0),
-                Felt::new_unchecked(0),
-                Felt::new_unchecked(0),
-                Felt::new_unchecked(1),
-            ]
-            .into(),
+            [Felt::from(0u32), Felt::from(0u32), Felt::from(0u32), Felt::from(1u32)].into(),
         )
         .unwrap();
 

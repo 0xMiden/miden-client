@@ -698,7 +698,7 @@ async fn prune_account_history_removes_old_committed_states() -> anyhow::Result<
     // Prune up to nonce 1 (should delete nonce 0 historical entry)
     let deleted = store
         .interact_with_connection(move |conn| {
-            SqliteStore::prune_account_history(conn, account_id, Felt::new_unchecked(1))
+            SqliteStore::prune_account_history(conn, account_id, Felt::from(1u32))
         })
         .await?;
 
@@ -747,7 +747,7 @@ async fn prune_account_history_noop_with_single_state() -> anyhow::Result<()> {
     // Prune with nonce 0: no historical entries have replaced_at_nonce <= 0
     let deleted = store
         .interact_with_connection(move |conn| {
-            SqliteStore::prune_account_history(conn, account_id, Felt::new_unchecked(0))
+            SqliteStore::prune_account_history(conn, account_id, Felt::from(0u32))
         })
         .await?;
 
@@ -801,12 +801,12 @@ async fn prune_account_history_multiple_accounts() -> anyhow::Result<()> {
     // Prune account A up to nonce 1, account B up to nonce 1
     let deleted_a = store
         .interact_with_connection(move |conn| {
-            SqliteStore::prune_account_history(conn, a_id, Felt::new_unchecked(1))
+            SqliteStore::prune_account_history(conn, a_id, Felt::from(1u32))
         })
         .await?;
     let deleted_b = store
         .interact_with_connection(move |conn| {
-            SqliteStore::prune_account_history(conn, b_id, Felt::new_unchecked(1))
+            SqliteStore::prune_account_history(conn, b_id, Felt::from(1u32))
         })
         .await?;
 
@@ -878,7 +878,7 @@ async fn prune_removes_orphaned_account_code() -> anyhow::Result<()> {
     // is deleted, and since no other header references it, the code should be removed.
     let deleted = store
         .interact_with_connection(move |conn| {
-            SqliteStore::prune_account_history(conn, account_id, Felt::new_unchecked(1))
+            SqliteStore::prune_account_history(conn, account_id, Felt::from(1u32))
         })
         .await?;
     assert!(deleted > 0);
@@ -1009,7 +1009,7 @@ async fn apply_single_entry_update(
     let mut storage_delta = AccountStorageDelta::new();
     storage_delta.set_map_item(
         map_slot_name.clone(),
-        StorageMapKey::new([Felt::new_unchecked(1), ZERO, ZERO, ZERO].into()),
+        StorageMapKey::new([Felt::from(1u32), ZERO, ZERO, ZERO].into()),
         [Felt::new_unchecked(nonce * 1000), ZERO, ZERO, ZERO].into(),
     )?;
 
@@ -1075,8 +1075,8 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
     let mut storage_delta = AccountStorageDelta::new();
     storage_delta.set_map_item(
         map_slot_name.clone(),
-        StorageMapKey::new([Felt::new_unchecked(1), ZERO, ZERO, ZERO].into()),
-        [Felt::new_unchecked(1000), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::from(1u32), ZERO, ZERO, ZERO].into()),
+        [Felt::from(1000u32), ZERO, ZERO, ZERO].into(),
     )?;
     let vault_delta = AccountVaultDelta::from_iters(
         vec![
@@ -1253,8 +1253,8 @@ async fn lock_account_affects_latest_and_historical() -> anyhow::Result<()> {
     let mut storage_delta = AccountStorageDelta::new();
     storage_delta.set_map_item(
         map_slot_name.clone(),
-        StorageMapKey::new([Felt::new_unchecked(1), ZERO, ZERO, ZERO].into()),
-        [Felt::new_unchecked(2000), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::from(1u32), ZERO, ZERO, ZERO].into()),
+        [Felt::from(2000u32), ZERO, ZERO, ZERO].into(),
     )?;
     let vault_delta = AccountVaultDelta::from_iters(
         vec![
@@ -1295,13 +1295,8 @@ async fn lock_account_affects_latest_and_historical() -> anyhow::Result<()> {
     assert_eq!(m.historical_account_headers, 1);
 
     // Lock the account with a fake mismatched digest (not matching any historical commitment)
-    let fake_digest = [
-        Felt::new_unchecked(999),
-        Felt::new_unchecked(888),
-        Felt::new_unchecked(777),
-        Felt::new_unchecked(666),
-    ]
-    .into();
+    let fake_digest =
+        [Felt::from(999u32), Felt::from(888u32), Felt::from(777u32), Felt::from(666u32)].into();
     store
         .interact_with_connection(move |conn| {
             let tx = conn.transaction().into_store_error()?;
@@ -1362,16 +1357,16 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     let nf_faucet_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET)?;
 
     // Build initial map with 3 entries: A (key=1), B (key=2), C (key=3)
-    let key_a = StorageMapKey::new([Felt::new_unchecked(1), ZERO, ZERO, ZERO].into());
-    let key_c = StorageMapKey::new([Felt::new_unchecked(3), ZERO, ZERO, ZERO].into());
+    let key_a = StorageMapKey::new([Felt::from(1u32), ZERO, ZERO, ZERO].into());
+    let key_c = StorageMapKey::new([Felt::from(3u32), ZERO, ZERO, ZERO].into());
 
     let mut initial_map = StorageMap::new();
-    initial_map.insert(key_a, [Felt::new_unchecked(100), ZERO, ZERO, ZERO].into())?;
+    initial_map.insert(key_a, [Felt::from(100u32), ZERO, ZERO, ZERO].into())?;
     initial_map.insert(
-        StorageMapKey::new([Felt::new_unchecked(2), ZERO, ZERO, ZERO].into()),
-        [Felt::new_unchecked(200), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::from(2u32), ZERO, ZERO, ZERO].into()),
+        [Felt::from(200u32), ZERO, ZERO, ZERO].into(),
     )?;
-    initial_map.insert(key_c, [Felt::new_unchecked(300), ZERO, ZERO, ZERO].into())?;
+    initial_map.insert(key_c, [Felt::from(300u32), ZERO, ZERO, ZERO].into())?;
 
     let component = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
@@ -1468,7 +1463,7 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     storage_delta_next.set_map_item(
         map_slot_name.clone(),
         key_a,
-        [Felt::new_unchecked(999), ZERO, ZERO, ZERO].into(),
+        [Felt::from(999u32), ZERO, ZERO, ZERO].into(),
     )?;
 
     let asset_z =
@@ -1617,8 +1612,8 @@ async fn undo_multiple_nonces_at_once() -> anyhow::Result<()> {
     let mut storage_delta_1 = AccountStorageDelta::new();
     storage_delta_1.set_map_item(
         map_slot_name.clone(),
-        StorageMapKey::new([Felt::new_unchecked(1), ZERO, ZERO, ZERO].into()),
-        [Felt::new_unchecked(1000), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::from(1u32), ZERO, ZERO, ZERO].into()),
+        [Felt::from(1000u32), ZERO, ZERO, ZERO].into(),
     )?;
     let asset_1 = FungibleAsset::new(faucet_id, 100)?;
     let vault_delta_1 = AccountVaultDelta::from_iters(vec![asset_1.into()], []);
@@ -1656,16 +1651,15 @@ async fn undo_multiple_nonces_at_once() -> anyhow::Result<()> {
     let mut storage_delta_2 = AccountStorageDelta::new();
     storage_delta_2.set_map_item(
         map_slot_name.clone(),
-        StorageMapKey::new([Felt::new_unchecked(2), ZERO, ZERO, ZERO].into()),
-        [Felt::new_unchecked(2000), ZERO, ZERO, ZERO].into(),
+        StorageMapKey::new([Felt::from(2u32), ZERO, ZERO, ZERO].into()),
+        [Felt::from(2000u32), ZERO, ZERO, ZERO].into(),
     )?;
     let asset_2 = NonFungibleAsset::new(&NonFungibleAssetDetails::new(
         nf_faucet_id,
         NON_FUNGIBLE_ASSET_DATA.into(),
     ));
     let vault_delta_2 = AccountVaultDelta::from_iters(vec![asset_2.into()], []);
-    let delta_2 =
-        AccountDelta::new(account_id, storage_delta_2, vault_delta_2, Felt::new_unchecked(2))?;
+    let delta_2 = AccountDelta::new(account_id, storage_delta_2, vault_delta_2, Felt::from(2u32))?;
 
     let prev_header_1: AccountHeader = (&account_nonce1).into();
     let mut account_nonce2 = account_nonce1.clone();
@@ -1750,14 +1744,14 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
     let map_slot_name = StorageSlotName::new("test::undo_new::map").expect("valid slot name");
 
     // Build initial map with 2 entries: A (key=1), B (key=2)
-    let key_a = StorageMapKey::new([Felt::new_unchecked(1), ZERO, ZERO, ZERO].into());
-    let key_b = StorageMapKey::new([Felt::new_unchecked(2), ZERO, ZERO, ZERO].into());
-    let key_c = StorageMapKey::new([Felt::new_unchecked(3), ZERO, ZERO, ZERO].into());
-    let key_d = StorageMapKey::new([Felt::new_unchecked(4), ZERO, ZERO, ZERO].into());
+    let key_a = StorageMapKey::new([Felt::from(1u32), ZERO, ZERO, ZERO].into());
+    let key_b = StorageMapKey::new([Felt::from(2u32), ZERO, ZERO, ZERO].into());
+    let key_c = StorageMapKey::new([Felt::from(3u32), ZERO, ZERO, ZERO].into());
+    let key_d = StorageMapKey::new([Felt::from(4u32), ZERO, ZERO, ZERO].into());
 
     let mut initial_map = StorageMap::new();
-    initial_map.insert(key_a, [Felt::new_unchecked(100), ZERO, ZERO, ZERO].into())?;
-    initial_map.insert(key_b, [Felt::new_unchecked(200), ZERO, ZERO, ZERO].into())?;
+    initial_map.insert(key_a, [Felt::from(100u32), ZERO, ZERO, ZERO].into())?;
+    initial_map.insert(key_b, [Felt::from(200u32), ZERO, ZERO, ZERO].into())?;
 
     let component = AccountComponent::new(
         BasicWallet::code().as_library().clone(),
@@ -1788,12 +1782,12 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
     storage_delta_add.set_map_item(
         map_slot_name.clone(),
         key_c,
-        [Felt::new_unchecked(300), ZERO, ZERO, ZERO].into(),
+        [Felt::from(300u32), ZERO, ZERO, ZERO].into(),
     )?;
     storage_delta_add.set_map_item(
         map_slot_name.clone(),
         key_d,
-        [Felt::new_unchecked(400), ZERO, ZERO, ZERO].into(),
+        [Felt::from(400u32), ZERO, ZERO, ZERO].into(),
     )?;
 
     // Also add an asset so the vault root changes (avoids SMT root collision on undo)

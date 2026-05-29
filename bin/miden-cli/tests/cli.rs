@@ -1109,7 +1109,7 @@ async fn new_wallet_with_deploy_flag() -> Result<()> {
     sync_cli(&temp_dir);
 
     let mut create_wallet_cmd = cargo_bin_cmd!("miden-client");
-    create_wallet_cmd.args(["new-wallet", "-s", "public", "--deploy"]);
+    create_wallet_cmd.args(["new-wallet", "-t", "public", "--deploy"]);
 
     let output = create_wallet_cmd.current_dir(&temp_dir).output().unwrap();
     assert!(
@@ -1343,10 +1343,8 @@ fn new_faucet_cli(cli_path: &Path, visibility: AccountStorageMode) -> String {
 
     create_faucet_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         visibility.to_string().as_str(),
-        "--account-type",
-        "fungible-faucet",
         "-p",
         "basic-fungible-faucet",
         "-i",
@@ -1369,7 +1367,7 @@ fn new_faucet_cli(cli_path: &Path, visibility: AccountStorageMode) -> String {
 /// Creates a new wallet account using the CLI given by `cli_path`.
 fn new_wallet_cli(cli_path: &Path, visibility: AccountStorageMode) -> String {
     let mut create_wallet_cmd = cargo_bin_cmd!("miden-client");
-    create_wallet_cmd.args(["new-wallet", "-s", visibility.to_string().as_str()]);
+    create_wallet_cmd.args(["new-wallet", "-t", visibility.to_string().as_str()]);
 
     let output = create_wallet_cmd.current_dir(cli_path).output().unwrap();
     assert!(
@@ -1676,9 +1674,7 @@ fn setup_call_test_account() -> (PathBuf, String, PathBuf) {
     let mut create_cmd = cargo_bin_cmd!("miden-client");
     create_cmd.args([
         "new-account",
-        "--account-type",
-        "regular-account-immutable-code",
-        "-s",
+        "-t",
         "public",
         "-p",
         "auth/no-auth",
@@ -1838,10 +1834,8 @@ fn create_account_with_no_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",
@@ -1885,10 +1879,8 @@ fn create_account_with_multisig_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",
@@ -1923,10 +1915,8 @@ fn create_account_with_acl_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",
@@ -1954,10 +1944,8 @@ fn create_account_with_ecdsa_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",

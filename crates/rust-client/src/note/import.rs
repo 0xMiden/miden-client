@@ -44,7 +44,10 @@ where
     /// Imports a batch of new input notes into the client's store. The information stored depends
     /// on the type of note files provided. If the notes existed previously, it will be updated
     /// with the new information. The tags specified by the `NoteFile`s will start being
-    /// tracked. Returns the IDs of notes that were successfully imported or updated.
+    /// tracked. Returns the details commitments of notes that were successfully imported or
+    /// updated. The details commitment is used (rather than the note ID) because notes imported
+    /// without metadata — e.g. from [`NoteFile::NoteDetails`] in an `Expected` state — have no
+    /// note ID yet, whereas the details commitment is always available.
     ///
     /// - If the note files are [`NoteFile::NoteId`], the notes are fetched from the node and stored
     ///   in the client's store. If the note is private or doesn't exist, an error is returned.
@@ -63,7 +66,7 @@ where
     pub async fn import_notes(
         &mut self,
         note_files: &[NoteFile],
-    ) -> Result<Vec<NoteId>, ClientError> {
+    ) -> Result<Vec<NoteDetailsCommitment>, ClientError> {
         // Deduplicate the incoming files, keying detail-carrying ones by their details commitment
         // (wrapped as a `NoteId`) since they may have no `NoteId` of their own.
         let mut note_files_map = BTreeMap::new();
@@ -146,7 +149,7 @@ where
         let mut imported_notes = vec![];
         if !requests_by_id.is_empty() {
             let notes_by_id = self.import_note_records_by_id(requests_by_id).await?;
-            imported_notes.extend(notes_by_id.values().cloned());
+            imported_notes.extend(notes_by_id);
         }
 
         if !requests_by_details.is_empty() {
@@ -159,29 +162,31 @@ where
             imported_notes.extend(notes_by_proof);
         }
 
-        let mut imported_note_ids = Vec::with_capacity(imported_notes.len());
+        let mut imported_commitments = Vec::with_capacity(imported_notes.len());
         for note in imported_notes.into_iter().flatten() {
-            if let Some(id) = note.id() {
-                imported_note_ids.push(id);
-            }
+            let details_commitment = note.details_commitment();
             if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) = note.state()
             {
                 self.store
-                    .add_note_tag(NoteTagRecord::with_note_source(*tag, note.details_commitment()))
+                    .add_note_tag(NoteTagRecord::with_note_source(*tag, details_commitment))
                     .await?;
             }
             self.store.upsert_input_notes(&[note]).await?;
+            imported_commitments.push(details_commitment);
         }
 
-        Ok(imported_note_ids)
+        Ok(imported_commitments)
     }
 
     // HELPERS
     // ================================================================================================
 
-    /// Builds a note record map from the note IDs. If a note with the same ID was already stored it
+    /// Builds note records from the note IDs. If a note with the same ID was already stored it
     /// is passed via `previous_note` so it can be updated. The note information is fetched from
     /// the node and stored in the client's store.
+    ///
+    /// The returned records are not keyed by [`NoteId`] because a note that the node reports as
+    /// already consumed becomes a metadata-less `ConsumedExternal` record with no `NoteId`.
     ///
     /// # Errors:
     /// - If a note doesn't exist on the node.
@@ -189,7 +194,7 @@ where
     async fn import_note_records_by_id(
         &mut self,
         notes: BTreeMap<NoteId, Option<InputNoteRecord>>,
-    ) -> Result<BTreeMap<NoteId, Option<InputNoteRecord>>, ClientError> {
+    ) -> Result<Vec<Option<InputNoteRecord>>, ClientError> {
         let note_ids = notes.keys().copied().collect::<Vec<_>>();
 
         let fetched_notes =
@@ -202,7 +207,7 @@ where
             return Err(ClientError::NoteImportError("No notes fetched from node".to_string()));
         }
 
-        let mut note_records = BTreeMap::new();
+        let mut note_records = Vec::new();
         let mut notes_to_request = vec![];
         for fetched_note in fetched_notes {
             let note_id = fetched_note.id();
@@ -218,9 +223,9 @@ where
                 {
                     self.store.remove_note_tag((&previous_note).try_into()?).await?;
 
-                    note_records.insert(note_id, Some(previous_note));
+                    note_records.push(Some(previous_note));
                 } else {
-                    note_records.insert(note_id, None);
+                    note_records.push(None);
                 }
             } else {
                 let fetched_note = match fetched_note {
@@ -239,12 +244,7 @@ where
 
         if !notes_to_request.is_empty() {
             let note_records_by_proof = self.import_note_records_by_proof(notes_to_request).await?;
-            for note_record in note_records_by_proof.iter().flatten().cloned() {
-                let id = note_record.id().expect(
-                    "import_note_records_by_proof returns records that have metadata via the inclusion proof",
-                );
-                note_records.insert(id, Some(note_record));
-            }
+            note_records.extend(note_records_by_proof);
         }
         Ok(note_records)
     }

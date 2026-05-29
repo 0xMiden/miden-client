@@ -220,7 +220,7 @@ async fn prune_account_history_with_pending_transaction() {
     // Prune up to nonce 1 while tx2 is still pending.
     // This should remove nonce-0 historical entries but must preserve nonce-1 entries
     // (which tx2's undo would need if the transaction were discarded).
-    let deleted = client.prune_account_history(faucet_id, Felt::new_unchecked(1)).await.unwrap();
+    let deleted = client.prune_account_history(faucet_id, Felt::from(1u32)).await.unwrap();
     assert!(deleted > 0, "Should have pruned nonce-0 historical entries");
 
     // Now commit tx2, this must succeed
@@ -288,33 +288,15 @@ async fn build_three_slot_account(
 
     let slot_a = StorageSlot::with_value(
         a_name,
-        [
-            Felt::new_unchecked(1),
-            Felt::new_unchecked(0),
-            Felt::new_unchecked(0),
-            Felt::new_unchecked(0),
-        ]
-        .into(),
+        [Felt::from(1u32), Felt::from(0u32), Felt::from(0u32), Felt::from(0u32)].into(),
     );
     let slot_b = StorageSlot::with_value(
         b_name,
-        [
-            Felt::new_unchecked(2),
-            Felt::new_unchecked(0),
-            Felt::new_unchecked(0),
-            Felt::new_unchecked(0),
-        ]
-        .into(),
+        [Felt::from(2u32), Felt::from(0u32), Felt::from(0u32), Felt::from(0u32)].into(),
     );
     let slot_c = StorageSlot::with_value(
         c_name,
-        [
-            Felt::new_unchecked(3),
-            Felt::new_unchecked(0),
-            Felt::new_unchecked(0),
-            Felt::new_unchecked(0),
-        ]
-        .into(),
+        [Felt::from(3u32), Felt::from(0u32), Felt::from(0u32), Felt::from(0u32)].into(),
     );
 
     let component_code = CodeBuilder::default()
@@ -428,7 +410,7 @@ async fn prune_preserves_unmodified_storage_slots() {
     // Slot C was NEVER modified, so it has no entry in historical tables.
 
     // Prune old history up to nonce 1
-    let deleted = client.prune_account_history(account_id, Felt::new_unchecked(1)).await.unwrap();
+    let deleted = client.prune_account_history(account_id, Felt::from(1u32)).await.unwrap();
     assert!(deleted > 0, "Should have pruned old committed states");
 
     // Verify all slot values are correct after pruning
@@ -446,27 +428,12 @@ async fn prune_preserves_unmodified_storage_slots() {
     let actual_b = storage.get(&b_name).expect("slot B should exist").value();
     let actual_c = storage.get(&c_name).expect("slot C should exist").value();
 
-    let final_a: Word = [
-        Felt::new_unchecked(10),
-        Felt::new_unchecked(0),
-        Felt::new_unchecked(0),
-        Felt::new_unchecked(0),
-    ]
-    .into();
-    let final_b: Word = [
-        Felt::new_unchecked(20),
-        Felt::new_unchecked(0),
-        Felt::new_unchecked(0),
-        Felt::new_unchecked(0),
-    ]
-    .into();
-    let final_c: Word = [
-        Felt::new_unchecked(3),
-        Felt::new_unchecked(0),
-        Felt::new_unchecked(0),
-        Felt::new_unchecked(0),
-    ]
-    .into();
+    let final_a: Word =
+        [Felt::from(10u32), Felt::from(0u32), Felt::from(0u32), Felt::from(0u32)].into();
+    let final_b: Word =
+        [Felt::from(20u32), Felt::from(0u32), Felt::from(0u32), Felt::from(0u32)].into();
+    let final_c: Word =
+        [Felt::from(3u32), Felt::from(0u32), Felt::from(0u32), Felt::from(0u32)].into();
 
     assert_eq!(actual_a, final_a, "Slot A should be updated to 10");
     assert_eq!(actual_b, final_b, "Slot B should be updated to 20");

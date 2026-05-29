@@ -329,9 +329,11 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     info!("Syncing state on first client");
     client_1.sync_state().await?;
 
-    // Check that the client doesn't know who consumed the note
+    // Check that the client doesn't know who consumed the note. A `ConsumedExternal` note has no
+    // metadata, so look it up by its details commitment rather than its note ID.
+    let details_commitment = notes[0].details_commitment();
     let input_note = client_1
-        .get_input_note(note_id)
+        .get_input_note_by_commitment(details_commitment)
         .await?
         .with_context(|| format!("input note {note_id} not found"))?;
     assert!(matches!(input_note.state(), InputNoteState::ConsumedExternal { .. }));

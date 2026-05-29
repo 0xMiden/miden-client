@@ -16,7 +16,7 @@ use crate::tests::config::ClientConfig;
 // TESTS
 // ================================================================================================
 
-/// This test essentially combines the `test_counter_contract_ntx` network transaction test and
+/// This test essentially combines the `disabled_counter_contract_ntx` network transaction test and
 /// `test_fpi_execute_program` fpi test in attempt to create a network transaction which performs
 /// the FPI.
 ///
@@ -27,7 +27,13 @@ use crate::tests::config::ClientConfig;
 /// the FPI, which obtains the map value from the foreign account. In order to check whether the FPI
 /// was successful (note script was executed successfully), note script updates the counter of the
 /// network (counter) account.
-pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
+///
+/// Disabled because network transaction processing is currently turned off in the test node, so
+/// the FPI-driven counter increment never happens. The `disabled_` prefix opts the function out of
+/// the integration-test build script registration; re-enable once the node processes network
+/// transactions again.
+#[allow(dead_code)]
+pub async fn disabled_network_fpi(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.clone().into_client().await?;
     client.sync_state().await?;
 
@@ -140,7 +146,7 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
 
     assert_eq!(
         updated_network_account.storage().get_item(&COUNTER_SLOT_NAME)?,
-        Word::from([Felt::new_unchecked(2), ZERO, ZERO, ZERO])
+        Word::from([Felt::from(2u32), ZERO, ZERO, ZERO])
     );
 
     Ok(())

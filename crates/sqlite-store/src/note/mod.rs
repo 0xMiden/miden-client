@@ -559,7 +559,9 @@ pub(crate) fn apply_note_updates_tx(
 
     for input_note in note_updates.updated_input_notes() {
         match input_note.update_type() {
-            NoteUpdateType::Insert => {
+            // `InsertCommitted` is a previously-expected note that just gained its metadata, so it
+            // needs a full-row insert (to write `note_id`/`nullifier`), same as `Insert`.
+            NoteUpdateType::Insert | NoteUpdateType::InsertCommitted => {
                 let serialized = serialize_input_note(input_note.inner());
                 scripts.insert(serialized.script_root.clone(), serialized.script.clone());
                 input_inserts.push(serialized);
@@ -581,7 +583,9 @@ pub(crate) fn apply_note_updates_tx(
 
     for output_note in note_updates.updated_output_notes() {
         match output_note.update_type() {
-            NoteUpdateType::Insert => {
+            // Output notes are never assigned `InsertCommitted`, but it is insert-like for
+            // exhaustiveness.
+            NoteUpdateType::Insert | NoteUpdateType::InsertCommitted => {
                 output_inserts.push(serialize_output_note(output_note.inner()));
             },
             NoteUpdateType::Update => {

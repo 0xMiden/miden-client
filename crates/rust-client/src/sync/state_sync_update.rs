@@ -65,8 +65,13 @@ impl From<&StateSyncUpdate> for SyncSummary {
             .updated_input_notes()
             .filter_map(|note_update| {
                 let note = note_update.inner();
-                if let NoteUpdateType::Update = note_update.update_type()
-                    && note.is_committed()
+                // `InsertCommitted` is a previously-tracked expected note that just committed, so
+                // it counts as committed (not as a newly-discovered note) even though it is
+                // persisted via a full-row insert.
+                if matches!(
+                    note_update.update_type(),
+                    NoteUpdateType::Update | NoteUpdateType::InsertCommitted
+                ) && note.is_committed()
                 {
                     note.id()
                 } else {

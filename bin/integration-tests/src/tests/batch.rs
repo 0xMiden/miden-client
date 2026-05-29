@@ -130,7 +130,7 @@ pub async fn test_batch_builder_submits_two_p2id_on_one_account(
     // Check that nonce has advanced by exactly 2.
     let nonce_after = client.account_reader(from_account_id).nonce().await?;
     info!(?nonce_before, ?nonce_after, "Sender nonce after batch");
-    let expected = nonce_before + Felt::new_unchecked(2);
+    let expected = nonce_before + Felt::from(2u32);
     assert_eq!(
         nonce_after, expected,
         "sender nonce should advance by exactly 2 after a 2-tx batch \
@@ -265,12 +265,12 @@ pub async fn test_batch_builder_multiple_accounts(client_config: ClientConfig) -
     let nonce_b_after = client.account_reader(account_id_b).nonce().await?;
     assert_eq!(
         nonce_a_after,
-        nonce_a_before + Felt::new_unchecked(1),
+        nonce_a_before + Felt::from(1u32),
         "A's nonce should advance by exactly 1 (one batch tx)"
     );
     assert_eq!(
         nonce_b_after,
-        nonce_b_before + Felt::new_unchecked(1),
+        nonce_b_before + Felt::from(1u32),
         "B's nonce should advance by exactly 1 (one batch tx)"
     );
 
@@ -409,13 +409,13 @@ pub async fn test_batch_builder_interleaved_pushes(client_config: ClientConfig) 
     let nonce_b_after = client.account_reader(account_id_b).nonce().await?;
     assert_eq!(
         nonce_a_after,
-        nonce_a_before + Felt::new_unchecked(2),
+        nonce_a_before + Felt::from(2u32),
         "A's nonce should advance by exactly 2 — proves A's cached state was reused on the \
          third push instead of re-fetched from the store"
     );
     assert_eq!(
         nonce_b_after,
-        nonce_b_before + Felt::new_unchecked(1),
+        nonce_b_before + Felt::from(1u32),
         "B's nonce should advance by exactly 1 (one batch tx)"
     );
 

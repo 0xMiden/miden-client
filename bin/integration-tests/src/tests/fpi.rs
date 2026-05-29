@@ -283,13 +283,8 @@ pub async fn test_lazy_fpi_loading(client_config: ClientConfig) -> Result<()> {
     wait_for_node(&mut client).await;
 
     // Create a simple foreign account with a constant-returning procedure.
-    let constant_value: Word = [
-        Felt::new_unchecked(9),
-        Felt::new_unchecked(12),
-        Felt::new_unchecked(18),
-        Felt::new_unchecked(30),
-    ]
-    .into();
+    let constant_value: Word =
+        [Felt::from(9u32), Felt::from(12u32), Felt::from(18u32), Felt::from(30u32)].into();
 
     let (foreign_account, proc_root) = deploy_foreign_account(
         &mut client,

@@ -208,20 +208,10 @@ async fn lazy_foreign_account_loading() {
     let (mut client, rpc_api, keystore) = Box::pin(create_test_client()).await;
 
     // Setup: Create and deploy a public foreign account with a storage map.
-    let map_key: Word = [
-        Felt::new_unchecked(15),
-        Felt::new_unchecked(15),
-        Felt::new_unchecked(15),
-        Felt::new_unchecked(15),
-    ]
-    .into();
-    let map_value: Word = [
-        Felt::new_unchecked(9),
-        Felt::new_unchecked(12),
-        Felt::new_unchecked(18),
-        Felt::new_unchecked(30),
-    ]
-    .into();
+    let map_key: Word =
+        [Felt::from(15u32), Felt::from(15u32), Felt::from(15u32), Felt::from(15u32)].into();
+    let map_value: Word =
+        [Felt::from(9u32), Felt::from(12u32), Felt::from(18u32), Felt::from(30u32)].into();
     let map_slot_name = StorageSlotName::new("miden::testing::fpi::map").unwrap();
 
     let mut storage_map = StorageMap::new();

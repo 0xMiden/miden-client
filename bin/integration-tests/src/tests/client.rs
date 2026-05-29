@@ -290,7 +290,10 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
         }])
         .await
         .unwrap();
-    let input_note = client_2.get_input_note(note.id().unwrap()).await?.unwrap();
+    // Look up by details commitment: an `Expected` note has no metadata yet, so its `note_id`
+    // is unset and it cannot be resolved via `get_input_note`.
+    let input_note =
+        client_2.get_input_note_by_commitment(note.details_commitment()).await?.unwrap();
 
     // If imported before execution, the note should be imported in `Expected` state
     assert!(matches!(input_note.state(), InputNoteState::Expected { .. }));
@@ -300,7 +303,8 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
 
     // After sync, the imported note should have inclusion proof even if it's not relevant for its
     // accounts.
-    let input_note = client_2.get_input_note(note.id().unwrap()).await?.unwrap();
+    let input_note =
+        client_2.get_input_note_by_commitment(note.details_commitment()).await?.unwrap();
     assert!(input_note.inclusion_proof().is_some(), "Expected inclusion proof to be present");
 
     // If inclusion proof is invalid this should panic
@@ -349,7 +353,7 @@ pub async fn test_import_expected_note_uncommitted(client_config: ClientConfig) 
     client_2.sync_state().await.unwrap();
 
     // If the verification is requested before execution then the import should fail
-    let imported_note_id = client_2
+    let imported_commitment = client_2
         .import_notes(&[NoteFile::NoteDetails {
             details: note.into(),
             after_block_num: 0.into(),
@@ -357,7 +361,7 @@ pub async fn test_import_expected_note_uncommitted(client_config: ClientConfig) 
         }])
         .await?[0];
 
-    let imported_note = client_2.get_input_note(imported_note_id).await?.unwrap();
+    let imported_note = client_2.get_input_note_by_commitment(imported_commitment).await?.unwrap();
 
     assert!(matches!(imported_note.state(), InputNoteState::Expected { .. }));
     Ok(())
@@ -396,7 +400,7 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await?;
 
     // importing the note before client_2 is synced will result in a note with `Expected` state
-    let note_id = client_2
+    let commitment = client_2
         .import_notes(&[NoteFile::NoteDetails {
             details: note.clone().into(),
             after_block_num: block_height_before,
@@ -404,7 +408,7 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
         }])
         .await?[0];
 
-    let imported_note = client_2.get_input_note(note_id).await?.unwrap();
+    let imported_note = client_2.get_input_note_by_commitment(commitment).await?.unwrap();
 
     assert!(matches!(imported_note.state(), InputNoteState::Expected { .. }));
 
@@ -422,10 +426,10 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
             .is_empty()
     );
 
-    let imported_note = client_2.get_input_note(note_id).await?.unwrap();
+    let imported_note = client_2.get_input_note_by_commitment(commitment).await?.unwrap();
 
     // Get the note status in client 1
-    let client_1_note = client_1.get_input_note(note_id).await?.unwrap();
+    let client_1_note = client_1.get_input_note_by_commitment(commitment).await?.unwrap();
 
     assert_eq!(imported_note.state(), client_1_note.state());
     assert!(matches!(imported_note.state(), InputNoteState::Committed { .. }));
@@ -965,7 +969,9 @@ pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -
         )])
         .await?;
 
-    let consumed_note = client_2.get_input_note(note.id().unwrap()).await?.unwrap();
+    // A `ConsumedExternal` note has no metadata, so look it up by its details commitment.
+    let consumed_note =
+        client_2.get_input_note_by_commitment(note.details_commitment()).await?.unwrap();
     assert!(matches!(consumed_note.state(), InputNoteState::ConsumedExternal { .. }));
     Ok(())
 }
@@ -1028,7 +1034,9 @@ pub async fn test_import_consumed_note_with_id(client_config: ClientConfig) -> R
     // Import the consumed note
     client_2.import_notes(&[NoteFile::NoteId(note.id().unwrap())]).await.unwrap();
 
-    let consumed_note = client_2.get_input_note(note.id().unwrap()).await?.unwrap();
+    // A `ConsumedExternal` note has no metadata, so look it up by its details commitment.
+    let consumed_note =
+        client_2.get_input_note_by_commitment(note.details_commitment()).await?.unwrap();
     assert!(matches!(consumed_note.state(), InputNoteState::ConsumedExternal { .. }));
     Ok(())
 }
@@ -1190,9 +1198,11 @@ pub async fn test_discarded_transaction(client_config: ClientConfig) -> Result<(
     let note_record = client_2.get_input_note(note.id().unwrap()).await?.unwrap();
     assert!(matches!(note_record.state(), InputNoteState::ConsumedAuthenticatedLocal(_)));
 
-    // After sync the note in client 1 should be consumed externally and the transaction discarded
+    // After sync the note in client 1 should be consumed externally and the transaction discarded.
+    // `ConsumedExternal` has no metadata, so look the note up by its details commitment.
     client_1.sync_state().await.unwrap();
-    let note_record = client_1.get_input_note(note.id().unwrap()).await?.unwrap();
+    let note_record =
+        client_1.get_input_note_by_commitment(note.details_commitment()).await?.unwrap();
     assert!(matches!(note_record.state(), InputNoteState::ConsumedExternal(_)));
     let tx_record = client_1
         .get_transactions(TransactionFilter::All)
@@ -1491,21 +1501,9 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
     let mut storage_map = StorageMap::new();
     storage_map.insert(
         StorageMapKey::new(
-            [
-                Felt::new_unchecked(1),
-                Felt::new_unchecked(2),
-                Felt::new_unchecked(3),
-                Felt::new_unchecked(4),
-            ]
-            .into(),
+            [Felt::from(1u32), Felt::from(2u32), Felt::from(3u32), Felt::from(4u32)].into(),
         ),
-        [
-            Felt::new_unchecked(1),
-            Felt::new_unchecked(0),
-            Felt::new_unchecked(0),
-            Felt::new_unchecked(0),
-        ]
-        .into(),
+        [Felt::from(1u32), Felt::from(0u32), Felt::from(0u32), Felt::from(0u32)].into(),
     )?;
 
     let map_slot_name =
@@ -1697,35 +1695,15 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     let map_slot_name =
         StorageSlotName::new("miden::testing::client::map").expect("valid slot name");
     let map_key_1 = StorageMapKey::new(
-        [
-            Felt::new_unchecked(15),
-            Felt::new_unchecked(15),
-            Felt::new_unchecked(15),
-            Felt::new_unchecked(15),
-        ]
-        .into(),
+        [Felt::from(15u32), Felt::from(15u32), Felt::from(15u32), Felt::from(15u32)].into(),
     );
-    let map_value_1 = Word::from([
-        Felt::new_unchecked(9),
-        Felt::new_unchecked(12),
-        Felt::new_unchecked(18),
-        Felt::new_unchecked(30),
-    ]);
+    let map_value_1 =
+        Word::from([Felt::from(9u32), Felt::from(12u32), Felt::from(18u32), Felt::from(30u32)]);
     let map_key_2 = StorageMapKey::new(
-        [
-            Felt::new_unchecked(20),
-            Felt::new_unchecked(20),
-            Felt::new_unchecked(20),
-            Felt::new_unchecked(20),
-        ]
-        .into(),
+        [Felt::from(20u32), Felt::from(20u32), Felt::from(20u32), Felt::from(20u32)].into(),
     );
-    let map_value_2 = Word::from([
-        Felt::new_unchecked(1),
-        Felt::new_unchecked(2),
-        Felt::new_unchecked(3),
-        Felt::new_unchecked(4),
-    ]);
+    let map_value_2 =
+        Word::from([Felt::from(1u32), Felt::from(2u32), Felt::from(3u32), Felt::from(4u32)]);
 
     let mut storage_map = StorageMap::new();
     storage_map.insert(map_key_1, map_value_1)?;
@@ -1927,7 +1905,7 @@ pub async fn test_prune_account_history(client_config: ClientConfig) -> Result<(
     let faucet_before = client.get_account(faucet_id).await?.unwrap();
 
     // Prune faucet history up to nonce 1: should remove old committed states.
-    let deleted = client.prune_account_history(faucet_id, Felt::new_unchecked(1)).await?;
+    let deleted = client.prune_account_history(faucet_id, Felt::from(1u32)).await?;
     assert!(deleted > 0, "Should have pruned old committed states");
 
     // Account should still be fully readable and unchanged.
