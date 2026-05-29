@@ -79,6 +79,7 @@ pub use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteAttachment,
+    NoteAttachmentContent,
     NoteAttachmentHeader,
     NoteAttachmentScheme,
     NoteAttachments,
@@ -100,6 +101,8 @@ pub use miden_protocol::note::{
     PartialNoteMetadata,
 };
 pub use miden_protocol::transaction::ToInputNoteCommitments;
+/// Raw access to `miden-standards` note modules for items not curated by `miden-client`.
+pub use miden_standards::note as standards;
 pub use miden_standards::note::{
     MintNote,
     MintNoteStorage,
@@ -108,6 +111,8 @@ pub use miden_standards::note::{
     NoteExecutionHint,
     P2idNote,
     P2idNoteStorage,
+    P2ideNote,
+    P2ideNoteStorage,
     PswapNote,
     StandardNote,
     SwapNote,

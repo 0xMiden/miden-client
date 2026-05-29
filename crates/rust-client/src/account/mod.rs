@@ -71,6 +71,8 @@ use miden_protocol::note::NoteTag;
 
 mod account_reader;
 pub use account_reader::AccountReader;
+/// Raw access to `miden-standards` account modules for items not curated by `miden-client`.
+pub use miden_standards::account as standards;
 pub use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::auth::AuthSingleSig;
 // RE-EXPORTS
