@@ -1674,6 +1674,7 @@ mod tests {
             metadata,
             OutputNoteState::ExpectedFull { recipient },
             BlockNumber::from(1u32),
+            NoteAttachments::default(),
         );
         let note_id = output_note.id();
         let note_header = NoteHeader::new(note_id, metadata);
@@ -1773,6 +1774,7 @@ mod tests {
             metadata,
             OutputNoteState::ExpectedFull { recipient },
             BlockNumber::from(1u32),
+            NoteAttachments::default(),
         );
         let erased_note_id = output_note.id();
         let erased_note_header = NoteHeader::new(erased_note_id, metadata);

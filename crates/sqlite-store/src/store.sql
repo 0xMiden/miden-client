@@ -187,6 +187,7 @@ CREATE TABLE output_notes (
 --     script_commitment TEXT NULL,
     state_discriminant UNSIGNED INT NOT NULL,               -- state discriminant of the note, used to query by state
     state BLOB NOT NULL,                                    -- serialized note state
+    attachments BLOB NOT NULL,
 
     PRIMARY KEY (note_id)
 ) WITHOUT ROWID;

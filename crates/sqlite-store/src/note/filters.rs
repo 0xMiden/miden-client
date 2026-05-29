@@ -16,7 +16,8 @@ pub(super) fn note_filter_to_query_output_notes(filter: &NoteFilter) -> (String,
                     note.assets,
                     note.metadata,
                     note.expected_height,
-                    note.state
+                    note.state,
+                    note.attachments
                     from output_notes AS note";
 
     let (condition, params) = note_filter_output_notes_condition(filter);
