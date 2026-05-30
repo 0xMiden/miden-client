@@ -89,9 +89,9 @@ use tracing::info;
 
 use super::Client;
 use crate::ClientError;
-use crate::note::{NoteScreenerError, NoteUpdateTracker};
+use crate::note::{NoteScreenerError, NoteUpdateTracker, StandardNote};
 use crate::rpc::domain::account::AccountStorageRequirements;
-use crate::rpc::{AccountStateAt, GrpcError, NodeRpcClient, RpcError};
+use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
@@ -585,6 +585,9 @@ where
     ///
     /// `account_id` is the account that will execute the registration transaction.
     ///
+    /// Standard note scripts are skipped — the NTX builder resolves those directly, so they
+    /// never need registering. A missing non-standard script is registered, not an error.
+    ///
     /// This method is called automatically by [`Self::submit_new_transaction_with_prover`] when the
     /// [`TransactionRequest`] contains expected NTX scripts. It can also be called directly if
     /// you want to register scripts ahead of time.
@@ -597,18 +600,21 @@ where
         let mut missing_scripts = Vec::new();
 
         for script in scripts {
+            // Standard scripts are resolved by the NTX builder directly; no registration needed.
+            if StandardNote::from_script(script).is_some() {
+                continue;
+            }
+
             let script_root = script.root();
 
-            // Check if the node already has this script registered.
+            // Scripts the node doesn't have are queued for registration; only RPC errors abort.
             match self.rpc_api.get_note_script_by_root(script_root.into()).await {
-                Ok(_) => {},
-                Err(RpcError::RequestError { error_kind: GrpcError::NotFound, .. }) => {
-                    missing_scripts.push(script.clone());
-                },
-                Err(other) => {
+                Ok(Some(_)) => {},
+                Ok(None) => missing_scripts.push(script.clone()),
+                Err(source) => {
                     return Err(ClientError::NtxScriptRegistrationFailed {
                         script_root: script_root.into(),
-                        source: other,
+                        source,
                     });
                 },
             }

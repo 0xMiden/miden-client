@@ -4,43 +4,27 @@ use std::vec;
 
 use anyhow::{Context, Result, anyhow};
 use miden_client::account::component::{
-    AccountComponent,
-    AccountComponentMetadata,
-    NetworkAccountNoteAllowlist,
+    AccessControl, AccountComponent, AccountComponentMetadata, BurnPolicyConfig, FungibleFaucet,
+    MintPolicyConfig, NetworkAccountNoteAllowlist, PausableManager, PolicyRegistration, TokenName,
+    TokenPolicyManager,
 };
 use miden_client::account::{
-    Account,
-    AccountBuilder,
-    AccountBuilderSchemaCommitmentExt,
-    AccountId,
-    AccountType,
-    StorageSlot,
-    StorageSlotName,
+    Account, AccountBuilder, AccountBuilderSchemaCommitmentExt, AccountId, AccountType,
+    StorageSlot, StorageSlotName,
 };
 use miden_client::assembly::{CodeBuilder, Library, Module, ModuleKind, Path, SourceManagerSync};
+use miden_client::asset::{AssetAmount, FungibleAsset, TokenSymbol};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
+use miden_client::crypto::FeltRng;
 use miden_client::note::{
-    NetworkAccountTarget,
-    Note,
-    NoteAssets,
-    NoteAttachment,
-    NoteAttachments,
-    NoteExecutionHint,
-    NoteRecipient,
-    NoteScriptRoot,
-    NoteStorage,
-    NoteTag,
-    NoteType,
-    PartialNoteMetadata,
+    MintNote, MintNoteStorage, NetworkAccountTarget, Note, NoteAssets, NoteAttachment,
+    NoteAttachments, NoteExecutionHint, NoteRecipient, NoteScriptRoot, NoteStorage, NoteTag,
+    NoteType, P2idNoteStorage, PartialNoteMetadata,
 };
-use miden_client::store::NoteFilter;
+use miden_client::store::{InputNoteState, NoteFilter};
 use miden_client::sync::NoteTagSource;
 use miden_client::testing::common::{
-    TestClient,
-    execute_tx_and_sync,
-    insert_new_wallet,
-    wait_for_blocks,
-    wait_for_tx,
+    TestClient, execute_tx_and_sync, insert_new_wallet, wait_for_blocks, wait_for_tx,
 };
 use miden_client::transaction::{TransactionKernel, TransactionRequestBuilder};
 use miden_client::{Felt, Word, ZERO};
@@ -103,6 +87,15 @@ const INCR_NOTE_SCRIPT_CODE: &str = "
     @note_script
     pub proc main
         call.counter_contract::increment_count
+    end
+";
+
+// Minimal no-op tx script: the faucet's `INCR_NONCE_AUTH_CODE` auth procedure already increments
+// the nonce, so the script itself only needs to satisfy the builder's requirement that some user
+// code runs.
+const NOOP_TX_SCRIPT: &str = "
+    begin
+        push.0 drop
     end
 ";
 
@@ -488,9 +481,124 @@ pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> R
     Ok(())
 }
 
+/// End-to-end integration test for the standard MINT note -> network faucet -> public P2ID output
+/// note flow.
+pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> Result<()> {
+    let (mut client, keystore) = client_config.clone().into_client().await?;
+    let (mut client_2, keystore_2) = ClientConfig::default()
+        .with_rpc_endpoint(client_config.rpc_endpoint())
+        .into_client()
+        .await?;
+
+    let (alice, ..) =
+        insert_new_wallet(&mut client, AccountType::Public, &keystore, RPO_FALCON_SCHEME_ID)
+            .await?;
+    let (bob, ..) =
+        insert_new_wallet(&mut client_2, AccountType::Public, &keystore_2, RPO_FALCON_SCHEME_ID)
+            .await?;
+
+    // The faucet needs the standardized network-account allowlist slot so the node routes MINT
+    // notes to it, while still allowing this test to submit the initial deploy transaction.
+    let allowed_roots = [MintNote::script_root()].into_iter().collect::<BTreeSet<_>>();
+    let allowlist = NetworkAccountNoteAllowlist::new(allowed_roots)
+        .map_err(|err| anyhow!("failed to build faucet note-script allowlist: {err}"))?;
+    let incr_nonce_auth_code = CodeBuilder::default()
+        .compile_component_code("miden::testing::incr_nonce_auth", INCR_NONCE_AUTH_CODE)
+        .context("failed to compile incr-nonce auth component")?;
+    let incr_nonce_auth = AccountComponent::new(
+        incr_nonce_auth_code,
+        vec![allowlist.into_storage_slot()],
+        AccountComponentMetadata::new("miden::testing::incr_nonce_auth"),
+    )
+    .map_err(|e| anyhow!("failed to create incr-nonce auth component: {e}"))?;
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+    let symbol = TokenSymbol::new("MNT")?;
+    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
+    let faucet_component = FungibleFaucet::builder()
+        .name(name)
+        .symbol(symbol)
+        .decimals(10)
+        .max_supply(AssetAmount::new(9_999_999)?)
+        .build()
+        .map_err(|e| anyhow!("failed to build fungible faucet component: {e}"))?;
+    let policy_manager = TokenPolicyManager::new()
+        .with_mint_policy(MintPolicyConfig::OwnerOnly, PolicyRegistration::Active)?
+        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)?;
+    let faucet = AccountBuilder::new(init_seed)
+        .account_type(AccountType::Public)
+        .with_auth_component(incr_nonce_auth)
+        .with_component(faucet_component)
+        .with_components(AccessControl::Ownable2Step { owner: alice.id() })
+        .with_components(policy_manager)
+        .with_component(PausableManager)
+        .build_with_schema_commitment()
+        .map_err(|e| anyhow!("failed to build network faucet: {e}"))?;
+    client.add_account(&faucet, false).await?;
+
+    let deploy_script = CodeBuilder::with_source_manager(client.source_manager())
+        .compile_tx_script(NOOP_TX_SCRIPT)
+        .context("failed to compile faucet deploy tx script")?;
+    let deploy_tx = TransactionRequestBuilder::new().custom_script(deploy_script).build()?;
+    let deploy_tx_id = client.submit_new_transaction(faucet.id(), deploy_tx).await?;
+    wait_for_tx(&mut client, deploy_tx_id).await?;
+
+    // Build the standard MINT note. Precompute Bob's P2ID recipient and details commitment so we
+    // can poll for the emitted public note on client_2.
+    let serial_num = client.rng().draw_word();
+    let bob_recipient = P2idNoteStorage::new(bob.id()).into_recipient(serial_num);
+    let expected_asset = FungibleAsset::new(faucet.id(), 100)?;
+    let expected_assets = NoteAssets::new(vec![expected_asset.into()])?;
+    let expected_output_commitment = Note::with_attachments(
+        expected_assets,
+        PartialNoteMetadata::new(faucet.id(), NoteType::Public)
+            .with_tag(NoteTag::with_account_target(bob.id())),
+        bob_recipient.clone(),
+        NoteAttachments::default(),
+    )
+    .details_commitment();
+
+    let mint_storage = MintNoteStorage::new_public(
+        bob_recipient,
+        expected_asset,
+        NoteTag::with_account_target(bob.id()).into(),
+    )?;
+
+    let target_ntx = NetworkAccountTarget::new(faucet.id(), NoteExecutionHint::Always)?;
+    let mint_note = MintNote::create(
+        faucet.id(),
+        alice.id(),
+        mint_storage,
+        NoteAttachments::new(vec![target_ntx.into()])?,
+        client.rng(),
+    )?;
+
+    let mint_tx = TransactionRequestBuilder::new().own_output_notes(vec![mint_note]).build()?;
+    execute_tx_and_sync(&mut client, alice.id(), mint_tx).await?;
+
+    for _ in 0..15 {
+        wait_for_blocks(&mut client, 1).await;
+
+        client_2.sync_state().await?;
+        if let Some(rec) = client_2
+            .get_input_notes(NoteFilter::DetailsCommitments(vec![expected_output_commitment]))
+            .await?
+            .pop()
+            && matches!(rec.state(), InputNoteState::Committed { .. })
+        {
+            return Ok(());
+        }
+    }
+
+    Err(anyhow!(
+        "timed out waiting for committed P2ID note {expected_output_commitment:?} emitted by network faucet"
+    ))
+}
+
 /// Compiles the counter contract library using the provided source manager so that all source
 /// spans are registered in the same manager used by the client's executor.
-fn counter_contract_library(source_manager: Arc<dyn SourceManagerSync>) -> Arc<Library> {
+pub(crate) fn counter_contract_library(source_manager: Arc<dyn SourceManagerSync>) -> Arc<Library> {
     let assembler = TransactionKernel::assembler_with_source_manager(source_manager.clone());
     let module = Module::parser(ModuleKind::Library)
         .parse_str(

@@ -38,37 +38,12 @@ use miden_protocol::Felt;
 use miden_protocol::account::auth::PublicKey;
 pub use miden_protocol::account::delta::AccountUpdateDetails;
 pub use miden_protocol::account::{
-    Account,
-    AccountBuilder,
-    AccountCode,
-    AccountComponent,
-    AccountComponentCode,
-    AccountDelta,
-    AccountFile,
-    AccountHeader,
-    AccountId,
-    AccountIdPrefix,
-    AccountIdPrefixV1,
-    AccountIdV1,
-    AccountIdVersion,
-    AccountProcedureRoot,
-    AccountStorage,
-    AccountType,
-    PartialAccount,
-    PartialStorage,
-    PartialStorageMap,
-    RoleSymbol,
-    StorageMap,
-    StorageMapDelta,
-    StorageMapKey,
-    StorageMapKeyHash,
-    StorageMapWitness,
-    StorageSlot,
-    StorageSlotContent,
-    StorageSlotDelta,
-    StorageSlotId,
-    StorageSlotName,
-    StorageSlotType,
+    Account, AccountBuilder, AccountCode, AccountComponent, AccountComponentCode, AccountDelta,
+    AccountFile, AccountHeader, AccountId, AccountIdPrefix, AccountIdPrefixV1, AccountIdV1,
+    AccountIdVersion, AccountProcedureRoot, AccountStorage, AccountType, PartialAccount,
+    PartialStorage, PartialStorageMap, RoleSymbol, StorageMap, StorageMapDelta, StorageMapKey,
+    StorageMapKeyHash, StorageMapWitness, StorageSlot, StorageSlotContent, StorageSlotDelta,
+    StorageSlotId, StorageSlotName, StorageSlotType,
 };
 pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
 use miden_protocol::asset::AssetVault;
@@ -79,8 +54,7 @@ mod account_reader;
 pub use account_reader::AccountReader;
 use miden_standards::account::auth::AuthSingleSig;
 pub use miden_standards::account::metadata::{
-    AccountBuilderSchemaCommitmentExt,
-    AccountSchemaCommitment,
+    AccountBuilderSchemaCommitmentExt, AccountSchemaCommitment,
 };
 
 /// Client-layer alias for [`AccountType`] (`Public` / `Private`), which encodes account
@@ -90,10 +64,7 @@ pub type AccountStorageMode = AccountType;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_standards::account::interface::{
-    AccountComponentInterface,
-    AccountComponentInterfaceExt,
-    AccountInterface,
-    AccountInterfaceExt,
+    AccountComponentInterface, AccountComponentInterfaceExt, AccountInterface, AccountInterfaceExt,
 };
 use miden_standards::account::wallets::BasicWallet;
 
@@ -109,71 +80,29 @@ pub mod component {
 
     pub use miden_protocol::account::auth::*;
     pub use miden_protocol::account::component::{
-        FeltSchema,
-        InitStorageData,
-        InitStorageDataError,
-        MapSlotSchema,
-        SchemaRequirement,
-        SchemaType,
-        SchemaTypeError,
-        StorageSchema,
-        StorageSlotSchema,
-        StorageValueName,
-        StorageValueNameError,
-        ValueSlotSchema,
-        WordSchema,
-        WordValue,
+        FeltSchema, InitStorageData, InitStorageDataError, MapSlotSchema, SchemaRequirement,
+        SchemaType, SchemaTypeError, StorageSchema, StorageSlotSchema, StorageValueName,
+        StorageValueNameError, ValueSlotSchema, WordSchema, WordValue,
     };
     pub use miden_protocol::account::{
-        AccountComponent,
-        AccountComponentMetadata,
-        AccountComponentName,
-        AccountProcedureRoot,
+        AccountComponent, AccountComponentMetadata, AccountComponentName, AccountProcedureRoot,
         RoleSymbol,
     };
     pub use miden_standards::account::access::{
-        AccessControl,
-        Authority,
-        AuthorityError,
-        Ownable2Step,
-        Ownable2StepError,
-        Pausable,
-        PausableManager,
-        PausableStorage,
-        RoleBasedAccessControl,
+        AccessControl, Authority, AuthorityError, Ownable2Step, Ownable2StepError, Pausable,
+        PausableManager, PausableStorage, RoleBasedAccessControl,
     };
     pub use miden_standards::account::auth::*;
     pub use miden_standards::account::components::StandardAccountComponent;
     pub use miden_standards::account::faucets::{
-        Description,
-        ExternalLink,
-        FungibleFaucet,
-        FungibleFaucetBuilder,
-        FungibleFaucetError,
-        LogoURI,
-        TokenMetadata,
-        TokenMetadataError,
-        TokenName,
-        create_fungible_faucet,
+        Description, ExternalLink, FungibleFaucet, FungibleFaucetBuilder, FungibleFaucetError,
+        LogoURI, TokenMetadata, TokenMetadataError, TokenName, create_fungible_faucet,
     };
     pub use miden_standards::account::policies::{
-        AllowlistOwnerControlled,
-        AllowlistStorage,
-        BasicAllowlist,
-        BasicBlocklist,
-        BlocklistOwnerControlled,
-        BlocklistStorage,
-        BurnAllowAll,
-        BurnOwnerOnly,
-        BurnPolicyConfig,
-        MintAllowAll,
-        MintOwnerOnly,
-        MintPolicyConfig,
-        PolicyRegistration,
-        TokenPolicyManager,
-        TokenPolicyManagerError,
-        TransferAllowAll,
-        TransferPolicy,
+        AllowlistOwnerControlled, AllowlistStorage, BasicAllowlist, BasicBlocklist,
+        BlocklistOwnerControlled, BlocklistStorage, BurnAllowAll, BurnOwnerOnly, BurnPolicyConfig,
+        MintAllowAll, MintOwnerOnly, MintPolicyConfig, PolicyRegistration, TokenPolicyManager,
+        TokenPolicyManagerError, TransferAllowAll, TransferPolicy,
     };
     pub use miden_standards::account::wallets::BasicWallet;
 }
@@ -570,11 +499,7 @@ mod schema_commitment_tests {
     use miden_standards::account::metadata::AccountSchemaCommitment;
 
     use super::{
-        AccountBuilder,
-        AccountBuilderSchemaCommitmentExt,
-        AccountType,
-        AuthSingleSig,
-        BasicWallet,
+        AccountBuilder, AccountBuilderSchemaCommitmentExt, AccountType, AuthSingleSig, BasicWallet,
     };
     use crate::auth::AuthSchemeId;
 
