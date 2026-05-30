@@ -82,9 +82,9 @@ use miden_protocol::note::{
 };
 use miden_protocol::transaction::AccountInputs;
 use miden_protocol::vm::MIN_STACK_DEPTH;
-use miden_protocol::{EMPTY_WORD, Felt, MIN_PROOF_SECURITY_LEVEL, Word};
+use miden_protocol::{EMPTY_WORD, Felt, Word};
 use miden_standards::account::interface::AccountInterfaceExt;
-use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor, TransactionVerifier};
+use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
 
 use super::Client;

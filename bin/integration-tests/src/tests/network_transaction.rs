@@ -360,7 +360,10 @@ pub async fn test_note_reader_finds_note_consumed_by_ntx(
         client.source_manager(),
         &mut client.rng(),
     )?;
-    let note_id = network_note.id();
+    // Captured before `network_note` is moved into the request below: once the network account
+    // consumes it the note is `ConsumedExternal` (no metadata), so `InputNoteRecord::id` is `None`
+    // and the note can only be matched by its stable details commitment.
+    let details_commitment = network_note.details_commitment();
 
     let tx_request =
         TransactionRequestBuilder::new().own_output_notes(vec![network_note]).build()?;
@@ -389,7 +392,7 @@ pub async fn test_note_reader_finds_note_consumed_by_ntx(
     let mut reader = client.input_note_reader(network_account_id);
     let mut found = false;
     while let Some(note) = reader.next().await? {
-        if note.id() == Some(note_id) {
+        if note.details_commitment() == details_commitment {
             assert_eq!(
                 note.consumer_account(),
                 Some(network_account_id),
