@@ -1,7 +1,7 @@
 //! Decodes felts into a structured string using debug type info.
 
 use alloc::format;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use miden_mast_package::debug_info::{
@@ -13,10 +13,18 @@ use miden_mast_package::debug_info::{
 use miden_protocol::account::AccountId;
 use miden_protocol::{Felt, Word};
 
-use super::introspect::{is_account_id_type, wit_short_name};
+use super::introspect::{
+    field_name,
+    is_account_id_type,
+    is_anonymous,
+    is_word_type,
+    type_name_raw,
+    wit_type_name,
+};
 
-/// `None` if `idx` has no static size (e.g. dynamic arrays, `Unknown`).
-pub(super) fn felts_for_type(types: &DebugTypesSection, idx: DebugTypeIdx) -> Option<usize> {
+/// How many felts a value of type `idx` takes on the stack. The decoder reads exactly this many
+/// to render the result. `None` when the count isn't known statically (dynamic arrays, `Unknown`).
+pub(super) fn stack_felt_count(types: &DebugTypesSection, idx: DebugTypeIdx) -> Option<usize> {
     let ty = types.types.get(idx.as_u32() as usize)?;
     match ty {
         DebugTypeInfo::Primitive(p) => Some(match p {
@@ -25,13 +33,22 @@ pub(super) fn felts_for_type(types: &DebugTypesSection, idx: DebugTypeIdx) -> Op
             _ => 1,
         }),
         DebugTypeInfo::Array { element_type_idx, count } => {
-            let elem = felts_for_type(types, *element_type_idx)?;
-            count.map(|n| elem * n as usize)
+            let element_felts = stack_felt_count(types, *element_type_idx)?;
+            count.map(|n| element_felts * n as usize)
         },
-        DebugTypeInfo::Struct { fields, .. } => {
+        DebugTypeInfo::Struct { name_idx, fields, .. } => {
+            // `decode_value` reads an `account-id` as 2 felts, so report 2 here regardless of its
+            // fields.
+            let name = type_name_raw(types, *name_idx);
+            if is_account_id_type(name) {
+                return Some(2);
+            }
+            if is_word_type(name) {
+                return Some(4);
+            }
             let mut total = 0;
             for f in fields {
-                total += felts_for_type(types, f.type_idx)?;
+                total += stack_felt_count(types, f.type_idx)?;
             }
             Some(total)
         },
@@ -51,10 +68,15 @@ pub(super) fn decode_value<'a>(
     match ty {
         DebugTypeInfo::Primitive(p) => decode_primitive(felts, *p),
         DebugTypeInfo::Struct { name_idx, fields, .. } => {
-            let full = types.strings.get(*name_idx as usize).map_or("", AsRef::as_ref);
-            let short = wit_short_name(full);
+            let full = type_name_raw(types, *name_idx);
+            let short = wit_type_name(full);
             if is_account_id_type(full)
                 && let Some((rendered, rest)) = decode_account_id(felts)
+            {
+                return Some((rendered, rest));
+            }
+            if is_word_type(full)
+                && let Some((rendered, rest)) = decode_word(felts)
             {
                 return Some((rendered, rest));
             }
@@ -65,10 +87,7 @@ pub(super) fn decode_value<'a>(
             let mut cursor = felts;
             let mut rendered = Vec::with_capacity(fields.len());
             for f in fields {
-                let fname = types
-                    .strings
-                    .get(f.name_idx as usize)
-                    .map_or_else(|| format!("f{}", f.name_idx), |s| s.as_ref().to_string());
+                let fname = field_name(types, f.name_idx);
                 let (fv, rest) = decode_value(cursor, types, f.type_idx)?;
                 rendered.push(format!("{fname}={fv}"));
                 cursor = rest;
@@ -95,6 +114,8 @@ pub(super) fn decode_value<'a>(
 fn decode_primitive(felts: &[Felt], p: DebugPrimitiveType) -> Option<(String, &[Felt])> {
     match p {
         DebugPrimitiveType::Void => Some((String::from("()"), felts)),
+        // Compiler-built packages emit `word` as a struct (see `is_word_type`); this arm fires
+        // only for a core `Word`. `decode_word` reuses it.
         DebugPrimitiveType::Word => {
             if felts.len() < 4 {
                 return None;
@@ -142,9 +163,15 @@ fn decode_account_id(felts: &[Felt]) -> Option<(String, &[Felt])> {
     Some((format!("account-id({})", id.to_hex()), rest))
 }
 
+/// Renders a WIT `word` struct (4 felts) as `word(0x..)`, mirroring the `Word` primitive.
+fn decode_word(felts: &[Felt]) -> Option<(String, &[Felt])> {
+    let (hex, rest) = decode_primitive(felts, DebugPrimitiveType::Word)?;
+    Some((format!("word({hex})"), rest))
+}
+
 /// `name(body)` for named structs; `{body}` for anonymous or unnamed ones.
 fn wrap_struct(short: &str, body: &str) -> String {
-    if short.is_empty() || short == "<anonymous>" {
+    if is_anonymous(short) {
         format!("{{{body}}}")
     } else {
         format!("{short}({body})")

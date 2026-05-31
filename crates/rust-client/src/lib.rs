@@ -123,7 +123,7 @@ pub mod grpc_support;
 pub mod keystore;
 pub mod note;
 pub mod note_transport;
-pub mod package_types;
+pub mod package_debug_info;
 pub mod rpc;
 pub mod settings;
 pub mod store;

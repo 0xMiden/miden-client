@@ -1763,6 +1763,13 @@ fn build_call_test_exports(
 /// Builds DEBUG sections describing `take-account-id(id: account-id) -> account-id` so the
 /// `call` command exercises its typed encode/decode path. Only this proc is annotated; `add`
 /// and `set_value` resolve to `None` in `TypedProcInfo` and stay on the raw path.
+///
+/// These sections are hand-built because the officially published compiler does not yet emit
+/// `DebugTypeInfo::Function` entries carrying high-level (WIT) parameter/return types. That
+/// support is added by <https://github.com/0xMiden/compiler/pull/1151> (branch
+/// `pr/preserve-func-records`); until it lands in the published toolchain, packages built with
+/// `cargo miden build` have the debug sections but no typed signatures, so `call` falls back to
+/// raw rendering.
 fn build_take_account_id_debug_sections() -> (
     miden_mast_package::debug_info::DebugFunctionsSection,
     miden_mast_package::debug_info::DebugTypesSection,

@@ -11,7 +11,7 @@ use miden_mast_package::debug_info::{
     DebugTypesSection,
 };
 
-use super::introspect::wit_short_name;
+use super::introspect::{field_name, is_anonymous, type_name_raw, wit_type_name};
 
 // Stops infinite recursion if a type refers back to itself.
 const MAX_DEPTH: usize = 8;
@@ -43,11 +43,11 @@ pub(super) fn format_type(types: &DebugTypesSection, idx: DebugTypeIdx, depth: u
 
 fn format_array(
     types: &DebugTypesSection,
-    elem: DebugTypeIdx,
+    element: DebugTypeIdx,
     count: Option<u32>,
     depth: usize,
 ) -> String {
-    let inner = format_type(types, elem, depth + 1);
+    let inner = format_type(types, element, depth + 1);
     match count {
         Some(n) => format!("[{inner}; {n}]"),
         None => format!("[{inner}]"),
@@ -60,16 +60,13 @@ fn format_struct(
     fields: &[DebugFieldInfo],
     depth: usize,
 ) -> String {
-    let full = types.strings.get(name_idx as usize).map_or("", AsRef::as_ref);
-    let short = wit_short_name(full);
-    if short.is_empty() || short == "<anonymous>" {
+    let full = type_name_raw(types, name_idx);
+    let short = wit_type_name(full);
+    if is_anonymous(short) {
         let fields_str = fields
             .iter()
             .map(|f| {
-                let fname = types
-                    .strings
-                    .get(f.name_idx as usize)
-                    .map_or_else(|| format!("f{}", f.name_idx), |s| s.as_ref().to_string());
+                let fname = field_name(types, f.name_idx);
                 let fty = format_type(types, f.type_idx, depth + 1);
                 format!("{fname}: {fty}")
             })
