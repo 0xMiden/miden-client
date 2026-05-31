@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use clap::Parser;
 use miden_client::assembly::CodeBuilder;
 use miden_client::keystore::Keystore;
-use miden_client::package_types::{TypedProcInfo, parse_felt_token};
+use miden_client::package_debug_info::{TypedProcInfo, parse_felt_token};
 use miden_client::transaction::{AdviceInputs, TransactionRequestBuilder, TransactionScript};
 use miden_client::vm::{Package, PackageExport};
 use miden_client::{Client, Deserializable, Felt, Word};
@@ -38,9 +38,7 @@ impl CallCmd {
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
         if client.get_sync_height().await? == 0.into() {
-            return Err(CliError::InvalidArgument(
-                "Client has not been synced yet. Run `miden-client sync` first.".to_string(),
-            ));
+            return Err(CliError::NotSynced);
         }
 
         let (account_str, procedure) = self.target.split_once(':').ok_or_else(|| {
@@ -58,29 +56,36 @@ impl CallCmd {
 
         let typed = TypedProcInfo::resolve(&package, procedure);
 
-        let (args, result_count) = if let Some(t) = &typed {
+        // Print the signature and get the expected arg count and result size. `None` count means
+        // it isn't statically known (no manifest info, or a typed param with no fixed token size).
+        let (expected_args, result_count) = if let Some(t) = &typed {
             println!("Signature: {}\n", t.format_signature());
-            (t.encode_args(&self.args)?, t.result_felt_count())
+            (t.expected_arg_count(), t.return_value_felt_count())
         } else {
             let sig = print_manifest_signature(&package, procedure);
-            let args = parse_args_raw(&self.args)?;
-            match sig.param_count {
-                Some(expected) if args.len() != expected => {
-                    return Err(CliError::InvalidArgument(format!(
-                        "Procedure '{procedure}' expects {expected} argument(s), got {}.",
-                        args.len()
-                    )));
-                },
-                None => {
-                    println!(
-                        "Warning: no type info for procedure '{procedure}'. Skipping argument \
-                         count check. Passing a wrong number of arguments may cause errors or \
-                         wrong results."
-                    );
-                },
-                _ => {},
-            }
-            (args, sig.result_count)
+            (sig.param_count, sig.result_count)
+        };
+
+        // Validate the argument count once, up front, for both the typed and raw paths.
+        match expected_args {
+            Some(expected) if self.args.len() != expected => {
+                return Err(CliError::InvalidArgument(format!(
+                    "Procedure '{procedure}' expects {expected} argument(s), got {}.",
+                    self.args.len()
+                )));
+            },
+            None => {
+                println!(
+                    "Warning: argument count for '{procedure}' is unknown. Passing a wrong number \
+                     of arguments may cause errors or wrong results."
+                );
+            },
+            _ => {},
+        }
+
+        let args = match &typed {
+            Some(t) => t.encode_args(&self.args)?,
+            None => parse_args_raw(&self.args)?,
         };
 
         // The account's code is loaded from the client's store at VM runtime, so we don't need
@@ -144,22 +149,26 @@ fn load_package(path: &Path) -> Result<Package, CliError> {
 }
 
 fn resolve_procedure_digest(package: &Package, procedure_name: &str) -> Result<Word, CliError> {
-    let library = &*package.mast;
-    for module_info in library.module_infos() {
-        if let Some(digest) = module_info.get_procedure_digest_by_name(procedure_name) {
-            return Ok(digest);
-        }
-    }
+    // Resolve via the manifest, not `package.mast`: `mast` is documented as unstable and will
+    // change from `Library` to `MastForest` (which has no procedure names), so the manifest is the
+    // stable name -> digest source. The user passes a bare name (e.g. `get_count`); match it
+    // against each export's name without the module path. Rust-built exports are kebab-case, so
+    // normalize the user's underscores to dashes first.
+    let target = procedure_name.replace('_', "-");
 
     let mut available = Vec::new();
-    for module_info in library.module_infos() {
-        for (_idx, proc_info) in module_info.procedures() {
-            available.push(format!("  {}::{}", module_info.path(), proc_info.name));
+    for export in package.manifest.exports() {
+        let PackageExport::Procedure(proc) = export else {
+            continue;
+        };
+        if export.name() == target {
+            return Ok(proc.digest);
         }
+        available.push(format!("  {}", proc.path));
     }
+
     Err(CliError::InvalidArgument(format!(
-        "Procedure '{}' not found. Available:\n{}",
-        procedure_name,
+        "Procedure '{procedure_name}' not found. Available:\n{}",
         available.join("\n")
     )))
 }

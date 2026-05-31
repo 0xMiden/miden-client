@@ -6,7 +6,7 @@ use thiserror::Error;
 
 /// Errors from resolving, encoding, or decoding values against a `Package`'s debug sections.
 #[derive(Debug, Error)]
-pub enum PackageTypesError {
+pub enum PackageDebugInfoError {
     #[error("invalid account-id '{token}': {source}")]
     InvalidAccountId { token: String, source: AccountIdError },
 
@@ -24,6 +24,9 @@ pub enum PackageTypesError {
 
     #[error("value '{0}' is out of range for a field element")]
     FeltOutOfRange(String),
+
+    #[error("expected {expected} argument(s), got {got}")]
+    WrongArgCount { expected: usize, got: usize },
 
     #[error("not enough arguments")]
     NotEnoughArgs,
