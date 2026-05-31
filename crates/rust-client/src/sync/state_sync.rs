@@ -5,7 +5,12 @@ use alloc::vec::Vec;
 
 use async_trait::async_trait;
 use miden_protocol::account::{
-    Account, AccountHeader, AccountId, AccountStorageHeader, StorageSlotName, StorageSlotType,
+    Account,
+    AccountHeader,
+    AccountId,
+    AccountStorageHeader,
+    StorageSlotName,
+    StorageSlotType,
 };
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
@@ -22,7 +27,8 @@ use crate::rpc::domain::account::{AccountDetails, AccountStorageRequirements};
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
 use crate::rpc::domain::sync::SyncTarget;
 use crate::rpc::domain::transaction::{
-    TransactionInclusion, TransactionRecord as RpcTransactionRecord,
+    TransactionInclusion,
+    TransactionRecord as RpcTransactionRecord,
 };
 use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError};
 use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
@@ -1045,16 +1051,27 @@ mod tests {
     use miden_protocol::block::BlockNumber;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, PartialMmr};
     use miden_protocol::note::{
-        Note, NoteAssets, NoteAttachment, NoteAttachments, NoteDetails, NoteHeader, NoteMetadata,
-        NoteRecipient, NoteStorage, NoteTag, NoteType, PartialNoteMetadata,
+        Note,
+        NoteAssets,
+        NoteAttachment,
+        NoteAttachments,
+        NoteDetails,
+        NoteHeader,
+        NoteMetadata,
+        NoteRecipient,
+        NoteStorage,
+        NoteTag,
+        NoteType,
+        PartialNoteMetadata,
     };
     use miden_protocol::testing::account_id::{
-        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET, ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
         ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
-        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE, ACCOUNT_ID_SENDER,
+        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+        ACCOUNT_ID_SENDER,
     };
-    use miden_protocol::transaction::TransactionArgs;
-    use miden_protocol::transaction::{InputNotes, TransactionHeader};
+    use miden_protocol::transaction::{InputNotes, TransactionArgs, TransactionHeader};
     use miden_protocol::vm::AdviceMap;
     use miden_protocol::{Felt, Word, ZERO};
     use miden_standards::code_builder::CodeBuilder;
@@ -1091,7 +1108,13 @@ mod tests {
     }
 
     fn word(n: u64) -> miden_protocol::Word {
-        [Felt::new(n), ZERO, ZERO, ZERO].into()
+        [
+            Felt::new(n).expect("test value should fit into the base field"),
+            ZERO,
+            ZERO,
+            ZERO,
+        ]
+        .into()
     }
 
     // COMPUTE NULLIFIER TX ORDER TESTS
@@ -1107,7 +1130,8 @@ mod tests {
 
         use super::word;
         use crate::rpc::domain::transaction::{
-            ACCOUNT_ID_NATIVE_ASSET_FAUCET, TransactionRecord as RpcTransactionRecord,
+            ACCOUNT_ID_NATIVE_ASSET_FAUCET,
+            TransactionRecord as RpcTransactionRecord,
         };
 
         fn make_rpc_tx(
@@ -1693,6 +1717,7 @@ mod tests {
             metadata,
             OutputNoteState::ExpectedFull { recipient },
             BlockNumber::from(1u32),
+            NoteAttachments::default(),
         );
         let note_id = output_note.id();
         let note_header = NoteHeader::new(output_note.details_commitment(), metadata);
@@ -1800,6 +1825,7 @@ mod tests {
             metadata,
             OutputNoteState::ExpectedFull { recipient },
             BlockNumber::from(1u32),
+            NoteAttachments::default(),
         );
         let erased_note_id = output_note.id();
         let erased_note_header = NoteHeader::new(output_note.details_commitment(), metadata);

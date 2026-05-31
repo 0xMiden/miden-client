@@ -4,27 +4,56 @@ use std::vec;
 
 use anyhow::{Context, Result, anyhow};
 use miden_client::account::component::{
-    AccessControl, AccountComponent, AccountComponentMetadata, BurnPolicyConfig, FungibleFaucet,
-    MintPolicyConfig, NetworkAccountNoteAllowlist, PausableManager, PolicyRegistration, TokenName,
+    AccessControl,
+    AccountComponent,
+    AccountComponentMetadata,
+    BurnPolicyConfig,
+    FungibleFaucet,
+    MintPolicyConfig,
+    NetworkAccountNoteAllowlist,
+    PausableManager,
+    PolicyRegistration,
+    TokenName,
     TokenPolicyManager,
 };
 use miden_client::account::{
-    Account, AccountBuilder, AccountBuilderSchemaCommitmentExt, AccountId, AccountType,
-    StorageSlot, StorageSlotName,
+    Account,
+    AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
+    AccountId,
+    AccountType,
+    StorageSlot,
+    StorageSlotName,
 };
 use miden_client::assembly::{CodeBuilder, Library, Module, ModuleKind, Path, SourceManagerSync};
 use miden_client::asset::{AssetAmount, FungibleAsset, TokenSymbol};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::crypto::FeltRng;
 use miden_client::note::{
-    MintNote, MintNoteStorage, NetworkAccountTarget, Note, NoteAssets, NoteAttachment,
-    NoteAttachments, NoteExecutionHint, NoteRecipient, NoteScriptRoot, NoteStorage, NoteTag,
-    NoteType, P2idNoteStorage, PartialNoteMetadata,
+    MintNote,
+    MintNoteStorage,
+    NetworkAccountTarget,
+    Note,
+    NoteAssets,
+    NoteAttachment,
+    NoteAttachments,
+    NoteExecutionHint,
+    NoteRecipient,
+    NoteScriptRoot,
+    NoteStorage,
+    NoteTag,
+    NoteType,
+    P2idNoteStorage,
+    PartialNoteMetadata,
 };
 use miden_client::store::{InputNoteState, NoteFilter};
 use miden_client::sync::NoteTagSource;
 use miden_client::testing::common::{
-    TestClient, execute_tx_and_sync, insert_new_wallet, wait_for_blocks, wait_for_tx,
+    TestClient,
+    execute_tx_and_sync,
+    insert_new_wallet,
+    wait_for_blocks,
+    wait_for_tx,
 };
 use miden_client::transaction::{TransactionKernel, TransactionRequestBuilder};
 use miden_client::{Felt, Word, ZERO};
@@ -566,13 +595,9 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
     )?;
 
     let target_ntx = NetworkAccountTarget::new(faucet.id(), NoteExecutionHint::Always)?;
-    let mint_note = MintNote::create(
-        faucet.id(),
-        alice.id(),
-        mint_storage,
-        NoteAttachments::new(vec![target_ntx.into()])?,
-        client.rng(),
-    )?;
+    let attachments = NoteAttachments::new(vec![target_ntx.into()])?;
+    let mint_note =
+        MintNote::create(faucet.id(), alice.id(), mint_storage, attachments, client.rng())?;
 
     let mint_tx = TransactionRequestBuilder::new().own_output_notes(vec![mint_note]).build()?;
     execute_tx_and_sync(&mut client, alice.id(), mint_tx).await?;

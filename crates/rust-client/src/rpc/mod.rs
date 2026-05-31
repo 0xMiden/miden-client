@@ -48,7 +48,11 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use domain::account::{
-    AccountProof, AccountUpdateSummary, FetchedAccount, StorageMapEntries, StorageMapEntry,
+    AccountProof,
+    AccountUpdateSummary,
+    FetchedAccount,
+    StorageMapEntries,
+    StorageMapEntry,
 };
 use domain::note::{FetchedNote, NoteSyncBlock, SyncNotesResult};
 use domain::nullifier::NullifierUpdate;

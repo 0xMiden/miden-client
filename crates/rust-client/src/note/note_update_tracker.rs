@@ -11,6 +11,7 @@ use miden_protocol::note::{
     NoteMetadata,
     Nullifier,
 };
+use miden_standards::note::NetworkAccountTarget;
 use miden_tx::utils::serde::{
     ByteReader,
     ByteWriter,
@@ -468,7 +469,15 @@ impl NoteUpdateTracker {
             && !input_note_update.inner().is_consumed()
         {
             let nullifier = input_note_update.inner().nullifier();
-            input_note_update.inner_mut().consumed_externally(nullifier, block_num, None)?;
+            let consumer_account =
+                NetworkAccountTarget::try_from(input_note_update.inner().attachments())
+                    .ok()
+                    .map(|target| target.target_id());
+            input_note_update.inner_mut().consumed_externally(
+                nullifier,
+                block_num,
+                consumer_account,
+            )?;
             input_note_update.inner_mut().set_consumed_tx_order(Some(0));
         }
 

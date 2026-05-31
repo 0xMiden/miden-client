@@ -34,6 +34,7 @@
 * [BREAKING][type][rust] `Client::import_notes` and `Client::sync_note_transport` now return `Vec<NoteDetailsCommitment>` instead of `Vec<NoteId>`, and `SyncSummary::new_private_notes` is now `Vec<NoteDetailsCommitment>`. Notes imported without metadata (e.g. `NoteFile::NoteDetails` in an `Expected` state, including all Note Transport Layer imports) have no `NoteId` yet, so they were previously silently dropped from these return values; the details commitment is always available. Use `Client::get_input_note_by_commitment` to resolve a record from a returned commitment. (#TBD)
 * [BREAKING][rust] `NodeRpcClient::get_note_script_by_root` now returns `Option<NoteScript>` (`None` when the node has no script for the requested root) instead of erroring when the script is absent ([#1840](https://github.com/0xMiden/miden-client/pull/1840)).
 * Added a blanket implementation for `NodeRpcClient::get_account_details` ([#2196](https://github.com/0xMiden/miden-client/pull/2196)).
+* [BREAKING][rust] Removed the top-level `miden_client::standards` alias. Use the curated client paths as before, or the new raw upstream namespaces `miden_client::account::standards::*`, `miden_client::note::standards::*`, and `miden_client::testing::standards::*`. ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
 
 ### Enhancements
 
