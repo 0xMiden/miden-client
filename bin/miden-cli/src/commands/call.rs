@@ -56,8 +56,9 @@ impl CallCmd {
 
         let typed = TypedProcInfo::resolve(&package, procedure);
 
-        // Print the signature and get the expected arg count and result size. `None` count means
-        // it isn't statically known (no manifest info, or a typed param with no fixed token size).
+        // Print the signature and get the expected arg count and result size. `None` means
+        // it's unknown: on the raw path the manifest carries no param count; on the typed path a
+        // parameter has no fixed token size (e.g. a dynamic array).
         let (expected_args, result_count) = if let Some(t) = &typed {
             println!("Signature: {}\n", t.format_signature());
             (t.expected_arg_count(), t.return_value_felt_count())
@@ -152,8 +153,8 @@ fn resolve_procedure_digest(package: &Package, procedure_name: &str) -> Result<W
     // Resolve via the manifest, not `package.mast`: `mast` is documented as unstable and will
     // change from `Library` to `MastForest` (which has no procedure names), so the manifest is the
     // stable name -> digest source. The user passes a bare name (e.g. `get_count`); match it
-    // against each export's name without the module path. Rust-built exports are kebab-case, so
-    // normalize the user's underscores to dashes first.
+    // against each export's name without the module path. Export names may be kebab (Rust/WIT) or
+    // snake (hand-written MASM bare identifiers), so compare with `_` and `-` treated as equal.
     let target = procedure_name.replace('_', "-");
 
     let mut available = Vec::new();
@@ -161,7 +162,7 @@ fn resolve_procedure_digest(package: &Package, procedure_name: &str) -> Result<W
         let PackageExport::Procedure(proc) = export else {
             continue;
         };
-        if export.name() == target {
+        if export.name().replace('_', "-") == target {
             return Ok(proc.digest);
         }
         available.push(format!("  {}", proc.path));
