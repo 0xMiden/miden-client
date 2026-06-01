@@ -180,26 +180,27 @@ async fn show_account<AUTH>(
             let (asset_type, faucet, amount) = match asset {
                 Asset::Fungible(fungible_asset) => {
                     let faucet_id = fungible_asset.faucet_id();
-                    let metadata = resolver.resolve(client, faucet_id).await?.ok_or_else(|| {
-                        CliError::Input(format!(
-                            "Unable to fetch account {account_id} from the network"
-                        ))
-                    })?;
-                    (
-                        "Fungible Asset",
-                        metadata.symbol,
-                        base_units_to_tokens(fungible_asset.amount(), metadata.decimals),
-                    )
+                    match resolver.resolve_local(client, faucet_id).await? {
+                        Some(metadata) => (
+                            "Fungible Asset",
+                            metadata.symbol,
+                            base_units_to_tokens(fungible_asset.amount(), metadata.decimals),
+                        ),
+                        None => (
+                            "Fungible Asset",
+                            Address::new(faucet_id).encode(network_id.clone()),
+                            fungible_asset.amount().to_string(),
+                        ),
+                    }
                 },
                 Asset::NonFungible(non_fungible_asset) => {
                     // TODO: Display non-fungible assets more clearly.
                     let faucet_id = non_fungible_asset.faucet_id();
-                    let metadata = resolver.resolve(client, faucet_id).await?.ok_or_else(|| {
-                        CliError::Input(format!(
-                            "Unable to fetch account {account_id} from the network"
-                        ))
-                    })?;
-                    ("Non Fungible Asset", metadata.symbol, 1.0.to_string())
+                    (
+                        "Non Fungible Asset",
+                        Address::new(faucet_id).encode(network_id.clone()),
+                        1.to_string(),
+                    )
                 },
             };
             table.add_row(vec![asset_type, &faucet, &amount.clone()]);

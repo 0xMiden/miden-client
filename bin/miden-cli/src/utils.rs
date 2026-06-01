@@ -327,6 +327,22 @@ impl FaucetMetadataResolver {
         Ok(Self { toml: parsed })
     }
 
+    /// Looks up `(symbol, decimals)` for a faucet using only local sources: the TOML map and the
+    /// settings store. Returns `None` without performing any network request.
+    pub async fn resolve_local<AUTH>(
+        &self,
+        client: &Client<AUTH>,
+        faucet_id: AccountId,
+    ) -> Result<Option<FaucetMetadata>, CliError> {
+        // 1) TOML
+        if let Some((symbol, decimals)) = self.lookup_toml(&faucet_id) {
+            return Ok(Some(FaucetMetadata { symbol, decimals }));
+        }
+        // 2) settings store
+        let setting_key = faucet_metadata_setting_key(faucet_id);
+        Ok(client.get_setting::<FaucetMetadata>(setting_key).await?)
+    }
+
     /// Looks up `(symbol, decimals)` for a faucet, walking TOML → settings store → RPC fetch.
     /// On RPC success, the result is persisted to the settings store.
     pub async fn resolve<AUTH>(
@@ -334,16 +350,12 @@ impl FaucetMetadataResolver {
         client: &mut Client<AUTH>,
         faucet_id: AccountId,
     ) -> Result<Option<FaucetMetadata>, CliError> {
-        // 1) TOML
-        if let Some((symbol, decimals)) = self.lookup_toml(&faucet_id) {
-            return Ok(Some(FaucetMetadata { symbol, decimals }));
-        }
-        let setting_key = faucet_metadata_setting_key(faucet_id);
-        // 2) settings store
-        if let Some(stored) = client.get_setting::<FaucetMetadata>(setting_key.clone()).await? {
-            return Ok(Some(stored));
+        // 1) & 2) local sources (TOML + settings store)
+        if let Some(meta) = self.resolve_local(client, faucet_id).await? {
+            return Ok(Some(meta));
         }
         // 3) RPC fetch
+        let setting_key = faucet_metadata_setting_key(faucet_id);
         match client.fetch_remote_token_metadata(faucet_id).await {
             Ok(Some(meta)) => {
                 if let Err(err) = client.set_setting(setting_key, meta.clone()).await {

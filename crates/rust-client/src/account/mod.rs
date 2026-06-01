@@ -114,7 +114,8 @@ use miden_standards::account::wallets::BasicWallet;
 
 use super::Client;
 use crate::errors::ClientError;
-use crate::rpc::domain::account::FetchedAccount;
+use crate::rpc::AccountStateAt;
+use crate::rpc::domain::account::{AccountStorageRequirements, FetchedAccount};
 use crate::rpc::node::{EndpointError, GetAccountError};
 use crate::store::{AccountStatus, AccountStorageFilter, ClientAccountType};
 use crate::sync::NoteTagRecord;
@@ -349,7 +350,11 @@ impl<AUTH> Client<AUTH> {
         }
     }
 
-    /// Fetches a public faucet account from the network and extracts its display metadata.
+    /// Fetches a public faucet's display metadata from the network.
+    ///
+    /// Uses [`get_account_proof`](crate::rpc::NodeRpcClient::get_account_proof) scoped to the
+    /// account's storage so that the node does not return vault data. The `TokenMetadata` lives in
+    /// a single value slot, which is always present in the returned storage header.
     ///
     /// Returns:
     /// - `Ok(Some(_))` — the account is public and its `TokenMetadata` storage slot decoded.
@@ -360,8 +365,18 @@ impl<AUTH> Client<AUTH> {
         &self,
         faucet_id: AccountId,
     ) -> Result<Option<FaucetMetadata>, ClientError> {
-        let fetched = match self.rpc_api.get_account_details(faucet_id).await {
-            Ok(fa) => fa,
+        let proof = match self
+            .rpc_api
+            .get_account_proof(
+                faucet_id,
+                AccountStorageRequirements::default(),
+                AccountStateAt::ChainTip,
+                None,
+                None,
+            )
+            .await
+        {
+            Ok((_, proof)) => proof,
             Err(err) => match err.endpoint_error() {
                 Some(EndpointError::GetAccount(
                     GetAccountError::AccountNotFound | GetAccountError::AccountNotPublic,
@@ -369,12 +384,18 @@ impl<AUTH> Client<AUTH> {
                 _ => return Err(ClientError::RpcError(err)),
             },
         };
-        let account = match fetched {
-            FetchedAccount::Private(..) => return Ok(None),
-            FetchedAccount::Public(account, ..) => *account,
+
+        let Some(storage_header) = proof.storage_header() else {
+            return Ok(None);
         };
 
-        let Ok(token_metadata) = TokenMetadata::try_from(account.storage()) else {
+        let Some(slot_header) =
+            storage_header.find_slot_header_by_name(TokenMetadata::metadata_slot())
+        else {
+            return Ok(None);
+        };
+
+        let Ok(token_metadata) = TokenMetadata::try_from(slot_header.value()) else {
             return Ok(None);
         };
         Ok(Some(FaucetMetadata {
