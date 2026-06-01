@@ -82,7 +82,7 @@ use miden_protocol::note::{
 };
 use miden_protocol::transaction::AccountInputs;
 use miden_protocol::vm::MIN_STACK_DEPTH;
-use miden_protocol::{EMPTY_WORD, Felt, Word};
+use miden_protocol::{Felt, Word};
 use miden_standards::account::interface::AccountInterfaceExt;
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
@@ -90,7 +90,7 @@ use tracing::info;
 use super::Client;
 use crate::ClientError;
 use crate::note::{NoteScreenerError, NoteUpdateTracker, StandardNote};
-use crate::rpc::domain::account::AccountStorageRequirements;
+use crate::rpc::domain::account::{AccountStorageRequirements, GetAccountRequest, VaultFetch};
 use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
@@ -707,12 +707,9 @@ where
                     let account_id = partial_account.id();
                     let (_, account_proof) = self
                         .rpc_api
-                        .get_account_proof(
+                        .get_account(
                             account_id,
-                            AccountStorageRequirements::default(),
-                            AccountStateAt::Block(block_num),
-                            None,
-                            None,
+                            GetAccountRequest::new().at(AccountStateAt::Block(block_num)),
                         )
                         .await?;
                     let (witness, _) = account_proof.into_parts();
@@ -1073,24 +1070,31 @@ pub(crate) async fn fetch_public_account_inputs(
     storage_requirements: AccountStorageRequirements,
     account_state_at: AccountStateAt,
 ) -> Result<AccountInputs, ClientError> {
-    let known_account_code: Option<AccountCode> =
+    let known_code: Option<AccountCode> =
         store.get_foreign_account_code(vec![account_id]).await?.into_values().next();
 
-    // Get vault assets only if known commitment doesn't match the current one.
-    let known_vault_commitment = store
+    let vault = store
         .get_account_header(account_id)
         .await?
-        .map_or(EMPTY_WORD, |(header, _)| header.vault_root());
+        .map_or(VaultFetch::Always, |(header, ..)| {
+            VaultFetch::IfChangedFrom(header.vault_root())
+        });
 
-    let (_, account_proof) = rpc_api
-        .get_account_proof(
+    let (block_num, mut account_proof) = rpc_api
+        .get_account(
             account_id,
-            storage_requirements.clone(),
-            account_state_at,
-            known_account_code,
-            Some(known_vault_commitment),
+            GetAccountRequest::new()
+                .with_storage(storage_requirements.clone())
+                .at(account_state_at)
+                .with_known_code(known_code)
+                .with_vault(vault),
         )
         .await?;
+
+    if let Some(details) = account_proof.details_mut() {
+        rpc_api.resolve_oversize_vault(account_id, block_num, details).await?;
+        rpc_api.resolve_oversize_storage_maps(account_id, block_num, details).await?;
+    }
 
     let account_inputs = request::account_proof_into_inputs(account_proof, &storage_requirements)?;
 

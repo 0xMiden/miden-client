@@ -4,6 +4,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use async_trait::async_trait;
+use miden_protocol::Word;
 use miden_protocol::account::{
     Account,
     AccountHeader,
@@ -15,7 +16,6 @@ use miden_protocol::account::{
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
 use miden_protocol::note::{Note, NoteId, NoteTag, NoteType, Nullifier};
-use miden_protocol::{EMPTY_WORD, Word};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -28,7 +28,12 @@ use super::{
 };
 use crate::ClientError;
 use crate::note::{NoteConsumption, NoteUpdateTracker};
-use crate::rpc::domain::account::{AccountDetails, AccountStorageRequirements};
+use crate::rpc::domain::account::{
+    AccountDetails,
+    AccountStorageRequirements,
+    GetAccountRequest,
+    VaultFetch,
+};
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock};
 use crate::rpc::domain::sync::SyncTarget;
 use crate::rpc::domain::transaction::TransactionRecord as RpcTransactionRecord;
@@ -73,9 +78,9 @@ pub struct AccountSyncHint {
     pub header: AccountHeader,
     /// Local snapshot of the account's storage layout (slot names, types, and current roots
     /// or values). When this carries up-to-date map slot names, `StateSync` can request all
-    /// map data in a single `get_account_proof` call. If the on-chain layout has new map
-    /// slots, `StateSync` fetches only those missing slots and reuses the already-downloaded
-    /// data for the slots covered here.
+    /// map data in a single `get_account` call. If the on-chain layout has new map slots,
+    /// `StateSync` fetches only those missing slots and reuses the already-downloaded data
+    /// for the slots covered here.
     pub storage_header: AccountStorageHeader,
 }
 
@@ -575,8 +580,8 @@ impl StateSync {
     /// Queries the node for updated public accounts and populates `account_updates`.
     ///
     /// For each public account whose commitment changed, an updated snapshot is fetched via
-    /// `get_account_proof`. Callers may supply [`AccountSyncHint::map_slot_names`] to request
-    /// map storage data up-front and avoid a roundtrip; otherwise a second call is issued when
+    /// `get_account`. Callers may supply [`AccountSyncHint::map_slot_names`] to request map
+    /// storage data up-front and avoid a roundtrip; otherwise a second call is issued when
     /// the account turns out to have map slots.
     ///
     /// Accounts whose vault or maps are too large to fit in a single response fall back to the
@@ -589,10 +594,12 @@ impl StateSync {
         current_public_accounts: &[&AccountSyncHint],
         block_from: BlockNumber,
     ) -> Result<(), ClientError> {
+        let hints_lookup: BTreeMap<AccountId, (&AccountSyncHint, Word)> = current_public_accounts
+            .iter()
+            .map(|hint| (hint.header.id(), (*hint, hint.header.to_commitment())))
+            .collect();
         for (id, commitment) in commitment_updates {
-            let Some(local_hint) = current_public_accounts
-                .iter()
-                .find(|hint| *id == hint.header.id() && *commitment != hint.header.to_commitment())
+            let Some((local_hint, _)) = hints_lookup.get(id).filter(|(_, c)| c != commitment)
             else {
                 continue;
             };
@@ -634,12 +641,11 @@ impl StateSync {
 
         let (proof_block_num, proof) = self
             .rpc_api
-            .get_account_proof(
+            .get_account(
                 account_id,
-                initial_requirements,
-                AccountStateAt::ChainTip,
-                None,
-                Some(EMPTY_WORD),
+                GetAccountRequest::new()
+                    .with_storage(initial_requirements)
+                    .with_vault(VaultFetch::Always),
             )
             .await
             .map_err(ClientError::RpcError)?;
@@ -667,6 +673,9 @@ impl StateSync {
             .cloned()
             .collect();
 
+        // TODO: we can handle vault and storage-map oversize independently. Today any oversize
+        // routes the whole account through the incremental delta path, which always fetches
+        // both `sync_storage_maps` and `sync_account_vault`, even if not needed.
         let public_update = if vault_oversized || any_map_oversized {
             // Some part of the account is oversized — use incremental endpoints.
             self.build_delta_update(account_id, &details, block_from, proof_block_num)
@@ -707,19 +716,20 @@ impl StateSync {
 
         let (_, follow_up_proof) = self
             .rpc_api
-            .get_account_proof(
+            .get_account(
                 account_id,
-                storage_requirements,
-                AccountStateAt::Block(block_to),
-                Some(initial_details.code.clone()),
-                Some(EMPTY_WORD),
+                GetAccountRequest::new()
+                    .with_storage(storage_requirements)
+                    .at(AccountStateAt::Block(block_to))
+                    .with_known_code(Some(initial_details.code.clone()))
+                    .with_vault(VaultFetch::Always),
             )
             .await
             .map_err(ClientError::RpcError)?;
 
         let Some(follow_up_details) = follow_up_proof.into_details() else {
             return Err(ClientError::RpcError(RpcError::ExpectedDataMissing(
-                "follow-up get_account_proof returned no details for a public account".into(),
+                "follow-up get_account returned no details for a public account".into(),
             )));
         };
 
@@ -1064,7 +1074,7 @@ mod tests {
         ACCOUNT_ID_SENDER,
     };
     use miden_protocol::transaction::{InputNotes, TransactionHeader};
-    use miden_protocol::{Felt, Word, ZERO};
+    use miden_protocol::{EMPTY_WORD, Felt, Word, ZERO};
     use miden_standards::code_builder::CodeBuilder;
     use miden_standards::note::{NetworkAccountTarget, NoteExecutionHint};
     use miden_testing::{MockChainBuilder, TxContextInput};

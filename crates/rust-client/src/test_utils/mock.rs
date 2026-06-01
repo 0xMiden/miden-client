@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 
 use miden_protocol::Word;
 use miden_protocol::account::delta::AccountUpdateDetails;
-use miden_protocol::account::{AccountCode, AccountId, StorageSlot, StorageSlotContent};
+use miden_protocol::account::{AccountId, StorageSlot, StorageSlotContent};
 use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
@@ -21,8 +21,8 @@ use crate::rpc::domain::account::{
     AccountProof,
     AccountStorageDetails,
     AccountStorageMapDetails,
-    AccountStorageRequirements,
     AccountVaultDetails,
+    GetAccountRequest,
     StorageMapEntries,
     StorageMapEntry,
 };
@@ -76,9 +76,9 @@ impl MockRpcApi {
         }
     }
 
-    /// Sets the oversize threshold for `get_account_proof`. Any storage map with more
-    /// entries than this threshold, or a vault with more assets, will have the
-    /// `too_many_entries` / `too_many_assets` flags set in the response.
+    /// Sets the oversize threshold for `get_account`. Any storage map with more entries than
+    /// this threshold, or a vault with more assets, will have the `too_many_entries` /
+    /// `too_many_assets` flags set in the response.
     #[must_use]
     pub fn with_oversize_threshold(mut self, threshold: usize) -> Self {
         self.oversize_threshold = threshold;
@@ -457,19 +457,18 @@ impl NodeRpcClient for MockRpcApi {
         Ok(block_num)
     }
 
-    /// Returns the account proof for the specified account. The `known_account_code` parameter
-    /// is ignored in the mock implementation and the latest account code is always returned.
-    async fn get_account_proof(
+    /// Returns the account proof for the specified account. The `known_code` and `vault` fields
+    /// of the request are ignored in the mock implementation: the latest account code and full
+    /// asset list are always returned, and the truncation flags are set when the data exceeds
+    /// `oversize_threshold`.
+    async fn get_account(
         &self,
         account_id: AccountId,
-        account_storage_requirements: AccountStorageRequirements,
-        account_state: AccountStateAt,
-        _known_account_code: Option<AccountCode>,
-        _known_vault_commitment: Option<Word>,
+        request: GetAccountRequest,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
         let mock_chain = self.mock_chain.read();
 
-        let block_number = match account_state {
+        let block_number = match request.at {
             AccountStateAt::Block(number) => number,
             AccountStateAt::ChainTip => mock_chain.latest_block_header().block_num(),
         };
@@ -478,7 +477,7 @@ impl NodeRpcClient for MockRpcApi {
             let account = mock_chain.committed_account(account_id).unwrap();
 
             let mut map_details = vec![];
-            for slot_name in account_storage_requirements.inner().keys() {
+            for slot_name in request.storage.inner().keys() {
                 if let Some(StorageSlotContent::Map(storage_map)) =
                     account.storage().get(slot_name).map(StorageSlot::content)
                 {

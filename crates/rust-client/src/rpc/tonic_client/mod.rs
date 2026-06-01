@@ -6,7 +6,6 @@ use alloc::vec::Vec;
 use core::error::Error;
 use core::pin::Pin;
 
-use miden_protocol::asset::Asset;
 use miden_protocol::vm::FutureMaybeSend;
 
 type RpcFuture<T> = Pin<Box<dyn FutureMaybeSend<T>>>;
@@ -27,7 +26,7 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{AccountProof, AccountStorageRequirements};
+use super::domain::account::{AccountProof, GetAccountRequest, VaultFetch};
 use super::domain::note::{FetchedNote, NoteSyncBlock};
 use super::domain::nullifier::NullifierUpdate;
 use super::generated::rpc::AccountRequest;
@@ -302,32 +301,6 @@ impl GrpcClient {
             .map(tonic::Response::into_inner)
             .and_then(RpcStatusInfo::try_from)
     }
-
-    // GET ACCOUNT HELPERS
-    // ============================================================================================
-
-    /// Fetches the full vault assets via `SyncAccountVault`.
-    ///
-    /// Used when `too_many_assets` is set in the response. Deduplicates updates by
-    /// vault key, keeping only the latest value per key.
-    async fn fetch_full_vault(
-        &self,
-        account_id: AccountId,
-        block_to: BlockNumber,
-    ) -> Result<Vec<Asset>, RpcError> {
-        let vault_info = self
-            .sync_account_vault(BlockNumber::from(0), Some(block_to), account_id)
-            .await?;
-        let mut updates = vault_info.updates;
-        updates.sort_by_key(|u| u.block_num);
-        Ok(updates
-            .into_iter()
-            .map(|u| (u.vault_key, u.asset))
-            .collect::<BTreeMap<_, _>>()
-            .into_values()
-            .flatten()
-            .collect())
-    }
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
@@ -510,39 +483,45 @@ impl NodeRpcClient for GrpcClient {
     /// - There was an error sending the request to the node.
     /// - The answer had a `None` for one of the expected fields.
     /// - There is an error during storage deserialization.
-    async fn get_account_proof(
+    async fn get_account(
         &self,
         account_id: AccountId,
-        storage_requirements: AccountStorageRequirements,
-        account_state: AccountStateAt,
-        known_account_code: Option<AccountCode>,
-        known_vault_commitment: Option<Word>,
+        request: GetAccountRequest,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
+        let GetAccountRequest { storage, at, known_code, vault } = request;
+
+        let known_code_commitment = known_code.as_ref().map_or(EMPTY_WORD, AccountCode::commitment);
         let mut known_codes_by_commitment: BTreeMap<Word, AccountCode> = BTreeMap::new();
-        if let Some(account_code) = known_account_code {
+        if let Some(account_code) = known_code {
             known_codes_by_commitment.insert(account_code.commitment(), account_code);
         }
 
-        let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
+        let storage_maps: Vec<StorageMapDetailRequest> = storage.clone().into();
 
-        // Only request details for accounts with public state (Public or Network);
-        // include known code commitment for this account when available
+        let asset_vault_commitment = match vault {
+            VaultFetch::Skip => None,
+            VaultFetch::Always => Some(EMPTY_WORD.into()),
+            VaultFetch::IfChangedFrom(commitment) => Some(commitment.into()),
+        };
+
+        // Only request details for accounts with public state (Public or Network), passing the
+        // known code commitment so the node can skip re-sending code we already hold.
         let account_details = if account_id.has_public_state() {
             Some(AccountDetailRequest {
-                code_commitment: Some(EMPTY_WORD.into()),
-                asset_vault_commitment: known_vault_commitment.map(Into::into),
+                code_commitment: Some(known_code_commitment.into()),
+                asset_vault_commitment,
                 storage_maps,
             })
         } else {
             None
         };
 
-        let block_num = match account_state {
+        let block_num = match at {
             AccountStateAt::Block(number) => Some(number.into()),
             AccountStateAt::ChainTip => None,
         };
 
-        let request = AccountRequest {
+        let proto_request = AccountRequest {
             account_id: Some(account_id.into()),
             block_num,
             details: account_details,
@@ -550,7 +529,7 @@ impl NodeRpcClient for GrpcClient {
 
         let response = self
             .call_with_retry(RpcEndpoint::GetAccount, |mut rpc_api| {
-                let request = request.clone();
+                let request = proto_request.clone();
                 Box::pin(async move { rpc_api.get_account(request).await })
             })
             .await?
@@ -569,15 +548,10 @@ impl NodeRpcClient for GrpcClient {
 
         // For accounts with public state, details should be present when requested
         let headers = if account_witness.id().has_public_state() {
-            let mut details = response
+            let details = response
                 .details
                 .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                .into_domain(&known_codes_by_commitment, &storage_requirements)?;
-
-            if details.vault_details.too_many_assets {
-                details.vault_details.assets = self.fetch_full_vault(account_id, block_num).await?;
-                details.vault_details.too_many_assets = false;
-            }
+                .into_domain(&known_codes_by_commitment, &storage)?;
 
             Some(details)
         } else {
