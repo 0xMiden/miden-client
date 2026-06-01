@@ -4,7 +4,6 @@ use alloc::string::String;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::string::ToString;
 use std::sync::Arc;
 
 use miden_protocol::Word;
@@ -333,8 +332,8 @@ impl Keystore for FilesystemKeyStore {
 // ================================================================================================
 
 /// Returns the file path that belongs to the public key commitment
-fn key_file_path(keys_directory: &Path, pub_key: PublicKeyCommitment) -> PathBuf {
-    let filename = Word::from(pub_key).to_hex();
+fn key_file_path(keys_directory: &Path, pub_key_commitment: PublicKeyCommitment) -> PathBuf {
+    let filename = Word::from(pub_key_commitment).to_hex();
     keys_directory.join(filename)
 }
 
