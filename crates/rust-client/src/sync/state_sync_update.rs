@@ -374,8 +374,8 @@ pub struct PublicAccountDelta {
     block_from: BlockNumber,
     /// Last block of the synced range (the block at which `new_header` is observed).
     block_to: BlockNumber,
-    /// New value-slot values from the `get_account_proof` storage header. Value slots are
-    /// always small enough to fit in the response.
+    /// New value-slot values from the `get_account` storage header. Value slots are always
+    /// small enough to fit in the response.
     value_slot_updates: Vec<(StorageSlotName, Word)>,
     /// Per-block storage map updates from `sync_storage_maps`.
     storage_map_updates: Vec<StorageMapUpdate>,

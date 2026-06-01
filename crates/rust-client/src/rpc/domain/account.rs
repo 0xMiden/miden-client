@@ -18,7 +18,7 @@ use miden_tx::utils::serde::{Deserializable, Serializable};
 use thiserror::Error;
 
 use crate::alloc::string::ToString;
-use crate::rpc::RpcError;
+use crate::rpc::{AccountStateAt, RpcError};
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::errors::RpcConversionError;
 use crate::rpc::generated::rpc::account_request::account_detail_request::storage_map_detail_request::{MapKeys, SlotData};
@@ -724,6 +724,15 @@ impl AccountProof {
     pub fn into_details(self) -> Option<AccountDetails> {
         self.state_headers
     }
+
+    /// Mutable accessor for the account details, when present.
+    ///
+    /// Useful for resolving oversized vault or storage data in place via
+    /// [`crate::rpc::NodeRpcClient::resolve_oversize_vault`] and
+    /// [`crate::rpc::NodeRpcClient::resolve_oversize_storage_maps`].
+    pub fn details_mut(&mut self) -> Option<&mut AccountDetails> {
+        self.state_headers.as_mut()
+    }
 }
 
 #[cfg(feature = "tonic")]
@@ -779,15 +788,17 @@ impl TryFrom<proto::account::AccountWitness> for AccountWitness {
 // ACCOUNT STORAGE REQUEST
 // ================================================================================================
 
-/// Describes storage slots indices to be requested, as well as a list of keys for each of those
-/// slots.
+/// Per-slot map data to include in a `/GetAccount` response. Slots absent here are omitted
+/// from `map_details` (the storage header still lists every slot).
 ///
-/// Note: If no specific keys are provided for a slot, all entries are requested. Though the
-/// node may respond with `too_many_entries` if the map exceeds the response limit.
+/// - Empty key list: all entries, no proofs. May come back flagged `too_many_entries`.
+/// - Non-empty key list: just those entries, each with its SMT inclusion proof.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AccountStorageRequirements(BTreeMap<StorageSlotName, Vec<StorageMapKey>>);
 
 impl AccountStorageRequirements {
+    /// Requests the specified keys per slot, each returned with an SMT inclusion proof. An
+    /// empty key iterator for a slot behaves like [`Self::all_entries`].
     pub fn new<'a>(
         slots_and_keys: impl IntoIterator<
             Item = (StorageSlotName, impl IntoIterator<Item = &'a StorageMapKey>),
@@ -804,7 +815,8 @@ impl AccountStorageRequirements {
         AccountStorageRequirements(map)
     }
 
-    /// Returns a new `AccountStorageRequirements` that requests all entries for all given slots.
+    /// Requests every entry of each given slot, without proofs. Oversize maps come back
+    /// flagged `too_many_entries`.
     pub fn all_entries(slot_names: &[StorageSlotName]) -> Self {
         AccountStorageRequirements(
             slot_names.iter().map(|name| (name.clone(), Vec::new())).collect(),
@@ -852,6 +864,80 @@ impl Deserializable for AccountStorageRequirements {
         source: &mut R,
     ) -> Result<Self, miden_tx::utils::serde::DeserializationError> {
         Ok(AccountStorageRequirements(source.read()?))
+    }
+}
+
+// GET ACCOUNT REQUEST
+// ================================================================================================
+
+/// Controls whether vault data is included in a `/GetAccount` response.
+#[derive(Clone, Debug, Default)]
+pub enum VaultFetch {
+    /// Do not include vault data in the response.
+    #[default]
+    Skip,
+    /// Always include vault data in the response.
+    Always,
+    /// Include vault data only if the account's current vault root differs from this commitment.
+    IfChangedFrom(Word),
+}
+
+/// Parameters for [`crate::rpc::NodeRpcClient::get_account`].
+#[derive(Clone, Debug, Default)]
+pub struct GetAccountRequest {
+    /// Per-slot map entries to include in the response. The storage header is always
+    /// returned; see [`AccountStorageRequirements`] for the per-slot semantics.
+    pub storage: AccountStorageRequirements,
+    /// Block at which to retrieve the proof.
+    pub at: AccountStateAt,
+    /// Code commitment the client already has. When the on-chain commitment matches, the node
+    /// skips re-sending the code.
+    pub known_code: Option<AccountCode>,
+    /// Vault data retrieval policy.
+    pub vault: VaultFetch,
+}
+
+impl GetAccountRequest {
+    /// Creates a request for the minimal account data: the account commitment and storage header
+    /// at the chain tip, with no map entries, no known code, and no vault data. Opt into
+    /// additional data with the builder methods.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            storage: AccountStorageRequirements(BTreeMap::new()),
+            at: AccountStateAt::ChainTip,
+            known_code: None,
+            vault: VaultFetch::Skip,
+        }
+    }
+
+    /// Includes the given per-slot storage map entries in the response.
+    #[must_use]
+    pub fn with_storage(mut self, storage: AccountStorageRequirements) -> Self {
+        self.storage = storage;
+        self
+    }
+
+    /// Sets the target block for this request.
+    #[must_use]
+    pub fn at(mut self, at: AccountStateAt) -> Self {
+        self.at = at;
+        self
+    }
+
+    /// Provides the code commitment the client already holds, so the node can skip re-sending
+    /// matching code.
+    #[must_use]
+    pub fn with_known_code(mut self, known_code: Option<AccountCode>) -> Self {
+        self.known_code = known_code;
+        self
+    }
+
+    /// Sets the vault data retrieval policy.
+    #[must_use]
+    pub fn with_vault(mut self, vault: VaultFetch) -> Self {
+        self.vault = vault;
+        self
     }
 }
 
