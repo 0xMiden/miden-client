@@ -13,7 +13,6 @@ use miden_tx::utils::serde::{
 };
 
 use crate::ClientError;
-use crate::rpc::RpcError;
 use crate::rpc::domain::note::CommittedNote;
 use crate::store::{InputNoteRecord, OutputNoteRecord};
 use crate::transaction::{TransactionRecord, TransactionStatus};
@@ -207,8 +206,8 @@ pub struct NoteUpdateTracker {
     /// Nullifiers from the same account are in execution order; ordering across different
     /// accounts is not guaranteed.
     nullifier_order: BTreeMap<Nullifier, u32>,
-    /// Account IDs tracked by this client. Used to detect if the consumer of an erased note is
-    /// tracked.
+    /// Account IDs tracked by this client. Used to attribute erased-note consumptions only to
+    /// accounts the client follows.
     tracked_accounts_ids: BTreeSet<AccountId>,
 }
 
@@ -229,7 +228,7 @@ impl NoteUpdateTracker {
         tracker
     }
 
-    /// Sets the accounts tracked by this client.
+    /// Sets the account IDs tracked by this client, used to attribute erased-note consumptions.
     #[must_use]
     pub fn with_tracked_accounts(mut self, tracked_accounts_ids: BTreeSet<AccountId>) -> Self {
         self.tracked_accounts_ids = tracked_accounts_ids;
@@ -352,12 +351,7 @@ impl NoteUpdateTracker {
 
         let is_tracked_as_input_note =
             if let Some(input_note_record) = self.get_input_note_by_id(*committed_note.note_id()) {
-                let metadata = committed_note.metadata().cloned().ok_or_else(|| {
-                    ClientError::RpcError(RpcError::ExpectedDataMissing(format!(
-                        "full metadata for committed note {}",
-                        committed_note.note_id()
-                    )))
-                })?;
+                let metadata = *committed_note.metadata();
                 input_note_record.inclusion_proof_received(inclusion_proof.clone(), metadata)?;
                 input_note_record.block_header_received(block_header)?;
 
@@ -393,12 +387,28 @@ impl NoteUpdateTracker {
     /// This handles notes that were erased due to same-batch note erasure: the note was
     /// created and consumed within the same batch, so it never appeared in the block body.
     /// The `block_num` is the block in which the creating transaction was committed.
+    ///
+    /// The erased-note RPC stream delivers only the [`NoteHeader`], whose metadata commits to the
+    /// attachment digest rather than carrying the attachment content. The consumer is therefore
+    /// derived from the locally tracked output note's attachments (the client created the note, so
+    /// it holds them): when they encode a [`NetworkAccountTarget`] for an account tracked by this
+    /// client, a consumed input record is created from the output note and attributed to that
+    /// network account.
     pub(crate) fn mark_erased_note_as_consumed(
         &mut self,
         note_header: &NoteHeader,
         block_num: BlockNumber,
     ) -> Result<(), ClientError> {
         let note_id = note_header.id();
+
+        let consumer_account = self
+            .output_notes
+            .get(&note_id)
+            .and_then(|output_note| {
+                NetworkAccountTarget::try_from(output_note.inner().attachments()).ok()
+            })
+            .map(|target| target.target_id())
+            .filter(|id| self.tracked_accounts_ids.contains(id));
 
         if let Some(output_note) = self.get_output_note_by_id(note_id)
             && !output_note.is_consumed()
@@ -408,20 +418,10 @@ impl NoteUpdateTracker {
             output_note.nullifier_received(nullifier, block_num)?;
         }
 
-        // Extract the consumer from the `NetworkAccountTarget` attachment, only if the target
-        // is a network account and it is tracked by this client.
-        let consumer_network_account_id =
-            NetworkAccountTarget::try_from(note_header.metadata().attachment())
-                .ok()
-                .map(|t| t.target_id())
-                .filter(|id| self.tracked_accounts_ids.contains(id));
-
-        // Only create an input record when the consumer is a tracked account.
-        if let Some(consumer_id) = consumer_network_account_id {
+        if let Some(consumer_id) = consumer_account {
             self.try_insert_consumed_input_from_output(note_id, consumer_id, block_num, Some(0))?;
         }
 
-        // Also mark the corresponding input note if tracked.
         if let Some(input_note_update) = self.input_notes.get_mut(&note_id)
             && !input_note_update.inner().is_consumed()
         {
@@ -429,7 +429,7 @@ impl NoteUpdateTracker {
             input_note_update.inner_mut().consumed_externally(
                 nullifier,
                 block_num,
-                consumer_network_account_id,
+                consumer_account,
             )?;
             input_note_update.inner_mut().set_consumed_tx_order(Some(0));
         }
@@ -661,6 +661,8 @@ impl Serializable for NoteUpdateTracker {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         // `input_notes_by_nullifier` and `output_notes_by_nullifier` are lookup indices that can
         // be reconstructed from `input_notes` and `output_notes`, so they are not serialized.
+        // `tracked_accounts_ids` is sync-time configuration rather than note state, so it is also
+        // not serialized.
         self.input_notes.write_into(target);
         self.output_notes.write_into(target);
         self.nullifier_order.write_into(target);

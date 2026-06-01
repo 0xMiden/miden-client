@@ -56,7 +56,7 @@ impl<AUTH> Client<AUTH> {
     ) -> Result<(), ClientError> {
         let api = self.get_note_transport_api()?;
 
-        let header = note.header().clone();
+        let header = *note.header();
         let details = NoteDetails::from(note);
         let details_bytes = details.to_bytes();
         // e2ee impl hint:
@@ -276,6 +276,13 @@ impl Deserializable for NoteTransportCursor {
 fn rejoin_note(header: &NoteHeader, details_bytes: &[u8]) -> Result<Note, DeserializationError> {
     let mut reader = SliceReader::new(details_bytes);
     let details = NoteDetails::read_from(&mut reader)?;
-    let metadata = header.metadata().clone();
-    Ok(Note::new(details.assets().clone(), metadata, details.recipient().clone()))
+    // The transport wire format only carries `NoteHeader` + serialized `NoteDetails`, not the
+    // attachments collection. We rejoin with empty attachments; this matches the original note
+    // only when it had no attachments in the first place.
+    let partial_metadata = *header.metadata().partial_metadata();
+    Ok(Note::new(
+        details.assets().clone(),
+        partial_metadata,
+        details.recipient().clone(),
+    ))
 }

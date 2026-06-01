@@ -20,7 +20,7 @@ pub struct SlotDescriptor {
 }
 
 #[cfg(test)]
-use miden_client::account::component::{AccountComponent, basic_wallet_library};
+use miden_client::account::component::AccountComponent;
 #[cfg(test)]
 use miden_client::account::{
     Account,
@@ -146,9 +146,12 @@ fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account,
     .map_err(|e| anyhow::anyhow!("Failed to create reader component: {e}"))?;
 
     // Wallet component: provides standard wallet operations (no storage slots)
-    let wallet_component =
-        AccountComponent::new(basic_wallet_library(), vec![], BasicWallet::component_metadata())
-            .expect("basic wallet component should satisfy account component requirements");
+    let wallet_component = AccountComponent::new(
+        BasicWallet::code().as_library().clone(),
+        vec![],
+        BasicWallet::component_metadata(),
+    )
+    .expect("basic wallet component should satisfy account component requirements");
 
     let account = AccountBuilder::new(config.seed)
         .with_auth_component(AuthSingleSig::new(

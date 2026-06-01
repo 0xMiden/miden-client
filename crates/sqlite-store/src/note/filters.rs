@@ -16,7 +16,8 @@ pub(super) fn note_filter_to_query_output_notes(filter: &NoteFilter) -> (String,
                     note.assets,
                     note.metadata,
                     note.expected_height,
-                    note.state
+                    note.state,
+                    note.attachments
                     from output_notes AS note";
 
     let (condition, params) = note_filter_output_notes_condition(filter);
@@ -94,7 +95,8 @@ const INPUT_NOTES_BASE_QUERY: &str = "SELECT
                 note.inputs,
                 script.serialized_note_script,
                 note.state,
-                note.created_at
+                note.created_at,
+                note.attachments
                 from input_notes AS note
                 LEFT OUTER JOIN notes_scripts AS script
                     ON note.script_root = script.script_root";

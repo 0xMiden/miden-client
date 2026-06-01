@@ -1539,9 +1539,16 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     let nullifier = note.nullifier();
 
+    let chain_tip = client
+        .test_rpc_api()
+        .get_block_header_by_number(None, false)
+        .await
+        .unwrap()
+        .0
+        .block_num();
     let node_nullifier = client
         .test_rpc_api()
-        .sync_nullifiers(&[nullifier.prefix()], 0.into(), None)
+        .sync_nullifiers(&[nullifier.prefix()], 0.into(), Some(chain_tip))
         .await
         .unwrap()
         .pop()
@@ -1562,13 +1569,6 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .sync_account_vault(0.into(), None, first_basic_account.id())
         .await
         .unwrap();
-    let chain_tip = client
-        .test_rpc_api()
-        .get_block_header_by_number(None, false)
-        .await
-        .unwrap()
-        .0
-        .block_num();
     let transactions = client
         .test_rpc_api()
         .sync_transactions(0.into(), chain_tip, vec![first_basic_account.id()])

@@ -22,14 +22,12 @@ use crate::rpc::domain::account::{
     AccountStorageDetails,
     AccountStorageMapDetails,
     AccountStorageRequirements,
-    AccountUpdateSummary,
     AccountVaultDetails,
-    FetchedAccount,
     StorageMapEntries,
     StorageMapEntry,
 };
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
-use crate::rpc::domain::note::{CommittedNote, CommittedNoteMetadata, FetchedNote, NoteSyncBlock};
+use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncBlock};
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
@@ -327,11 +325,8 @@ impl NodeRpcClient for MockRpcApi {
                 && note_block >= block_from
                 && note_block <= block_to
             {
-                let committed = CommittedNote::new(
-                    note.id(),
-                    CommittedNoteMetadata::Full(note.metadata().clone()),
-                    note.inclusion_proof().clone(),
-                );
+                let committed =
+                    CommittedNote::new(note.id(), *note.metadata(), note.inclusion_proof().clone());
                 blocks_with_notes.entry(note_block).or_default().insert(note.id(), committed);
             }
         }
@@ -412,7 +407,7 @@ impl NodeRpcClient for MockRpcApi {
         for note in hit_notes {
             let fetched_note = match note {
                 MockChainNote::Private(note_id, note_metadata, note_inclusion_proof) => {
-                    let note_header = NoteHeader::new(*note_id, note_metadata.clone());
+                    let note_header = NoteHeader::new(*note_id, *note_metadata);
                     FetchedNote::Private(note_header, note_inclusion_proof.clone())
                 },
                 MockChainNote::Public(note, note_inclusion_proof) => {
@@ -460,36 +455,6 @@ impl NodeRpcClient for MockRpcApi {
         let block_num = self.get_chain_tip_block_num();
 
         Ok(block_num)
-    }
-
-    /// Returns the node's tracked account details for the specified account ID.
-    /// Always returns the full account for public accounts.
-    async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        let summary =
-            self.account_commitment_updates
-                .read()
-                .iter()
-                .rev()
-                .find_map(|(block_num, updates)| {
-                    updates.get(&account_id).map(|commitment| AccountUpdateSummary {
-                        commitment: *commitment,
-                        last_block_num: *block_num,
-                    })
-                });
-
-        if let Ok(account) = self.mock_chain.read().committed_account(account_id) {
-            let summary = summary.unwrap_or_else(|| AccountUpdateSummary {
-                commitment: account.to_commitment(),
-                last_block_num: BlockNumber::GENESIS,
-            });
-            Ok(FetchedAccount::new_public(account.clone(), summary))
-        } else if let Some(summary) = summary {
-            Ok(FetchedAccount::new_private(account_id, summary))
-        } else {
-            Err(RpcError::ExpectedDataMissing(format!(
-                "account {account_id} not found in mock commitment updates or mock chain"
-            )))
-        }
     }
 
     /// Returns the account proof for the specified account. The `known_account_code` parameter

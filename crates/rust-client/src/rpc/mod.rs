@@ -47,18 +47,24 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
-use domain::account::{AccountProof, FetchedAccount};
+use domain::account::{
+    AccountProof,
+    AccountUpdateSummary,
+    FetchedAccount,
+    StorageMapEntries,
+    StorageMapEntry,
+};
 use domain::note::{FetchedNote, NoteSyncBlock};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
-use miden_protocol::Word;
-use miden_protocol::account::{AccountCode, AccountId};
+use miden_protocol::account::{Account, AccountCode, AccountId, StorageSlotName};
 use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
 use miden_protocol::note::{Note, NoteId, NoteScript, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
+use miden_protocol::{EMPTY_WORD, Word};
 
 use crate::rpc::domain::storage_map::StorageMapInfo;
 
@@ -190,11 +196,113 @@ pub trait NodeRpcClient: Send + Sync {
         upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError>;
 
-    /// Fetches the current state of an account from the node using the `/GetAccountDetails` RPC
-    /// endpoint.
+    /// Fetches the current state of an account from the node.
     ///
     /// - `account_id` is the ID of the wanted account.
-    async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError>;
+    ///
+    /// The default implementation builds the full account on top of
+    /// [`NodeRpcClient::get_account_proof`] (which already falls back to
+    /// [`NodeRpcClient::sync_account_vault`] when the response is truncated by `too_many_assets`)
+    /// plus [`NodeRpcClient::sync_storage_maps`] for any storage map flagged with
+    /// `too_many_entries`. Up to two `/GetAccount` requests are made for public accounts: one to
+    /// discover the storage layout, and a second to request entries for all map slots (skipped
+    /// when the account has no storage maps).
+    async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
+        // For accounts without public state, only the witness commitment is needed.
+        if !account_id.has_public_state() {
+            let (block_number, proof) = self
+                .get_account_proof(
+                    account_id,
+                    AccountStorageRequirements::default(),
+                    AccountStateAt::ChainTip,
+                    None,
+                    None,
+                )
+                .await?;
+            return Ok(FetchedAccount::new_private(
+                account_id,
+                AccountUpdateSummary::new(proof.account_commitment(), block_number),
+            ));
+        }
+
+        // First call discovers the storage layout (which slots are maps).
+        let (block_number, initial_proof) = self
+            .get_account_proof(
+                account_id,
+                AccountStorageRequirements::default(),
+                AccountStateAt::ChainTip,
+                None,
+                Some(EMPTY_WORD),
+            )
+            .await?;
+
+        let map_slot_names: Vec<StorageSlotName> = initial_proof
+            .storage_header()
+            .ok_or(RpcError::ExpectedDataMissing(
+                "storage_header missing for public account".into(),
+            ))?
+            .slots()
+            .filter(|slot| slot.slot_type().is_map())
+            .map(|slot| slot.name().clone())
+            .collect();
+
+        // Second call: request entries for every map slot at the same block, so the view is
+        // consistent. If there are no maps, the first proof already has what we need.
+        // TODO: this refetches the full vault and could be avoided
+        let final_proof = if map_slot_names.is_empty() {
+            initial_proof
+        } else {
+            let requirements = AccountStorageRequirements::all_entries(&map_slot_names);
+            let (_, proof) = self
+                .get_account_proof(
+                    account_id,
+                    requirements,
+                    AccountStateAt::Block(block_number),
+                    None,
+                    Some(EMPTY_WORD),
+                )
+                .await?;
+            proof
+        };
+
+        let summary = AccountUpdateSummary::new(final_proof.account_commitment(), block_number);
+        let mut details = final_proof.into_parts().1.ok_or(RpcError::ExpectedDataMissing(
+            "public account returned without details".into(),
+        ))?;
+
+        // Resolve any storage maps flagged as too_many_entries via SyncStorageMaps. Vault
+        // truncation is already handled by get_account_proof.
+        let has_oversized_maps =
+            details.storage_details.map_details.iter().any(|m| m.too_many_entries);
+        if has_oversized_maps {
+            let mut updates = self
+                .sync_storage_maps(BlockNumber::GENESIS, Some(block_number), account_id)
+                .await?
+                .updates;
+            // The sync endpoint may return multiple updates for the same key across different
+            // blocks. Sorting by block once (a stable sort preserves this order within each slot's
+            // subset) lets the per-slot BTreeMap below retain each key's latest value.
+            updates.sort_by_key(|u| u.block_num);
+            for map_details in &mut details.storage_details.map_details {
+                if !map_details.too_many_entries {
+                    continue;
+                }
+                let entries: Vec<StorageMapEntry> = updates
+                    .iter()
+                    .filter(|u| u.slot_name == map_details.slot_name)
+                    .map(|u| (u.key, u.value))
+                    .collect::<BTreeMap<_, _>>()
+                    .into_iter()
+                    .map(|(key, value)| StorageMapEntry { key, value })
+                    .collect();
+                map_details.too_many_entries = false;
+                map_details.entries = StorageMapEntries::AllEntries(entries);
+            }
+        }
+
+        let account = Account::try_from(&details)?;
+        Ok(FetchedAccount::new_public(account, summary))
+    }
 
     /// Fetches notes related to the specified tags using the `/SyncNotes` RPC endpoint,
     /// paginating over the full block range and returning, in block-number order, every block in
@@ -214,14 +322,12 @@ pub trait NodeRpcClient: Send + Sync {
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<Vec<NoteSyncBlock>, RpcError>;
 
-    /// Calls [`NodeRpcClient::sync_notes`] and then makes a single
-    /// [`NodeRpcClient::get_notes_by_id`] call to:
-    /// - Fill metadata on any [`CommittedNote`](domain::note::CommittedNote) whose sync response
-    ///   only included header fields.
-    /// - Collect full bodies for every public note in the sync range.
+    /// Calls [`NodeRpcClient::sync_notes`] for the requested range, then makes a single
+    /// [`NodeRpcClient::get_notes_by_id`] call to fetch full note bodies (scripts, assets,
+    /// recipient) for public notes.
     ///
-    /// All notes that are public or have missing metadata are fetched (not just the ones the
-    /// client tracks) to avoid revealing which specific notes the client is interested in.
+    /// All public notes in the range are fetched (not just the ones the client tracks) to
+    /// avoid revealing which specific notes the client is interested in.
     ///
     /// Returns the resolved note blocks paired with a map of public note bodies keyed by
     /// note ID.
@@ -231,12 +337,12 @@ pub trait NodeRpcClient: Send + Sync {
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, Note>), RpcError> {
-        let mut blocks = self.sync_notes(block_from, block_to, note_tags).await?;
+        let blocks = self.sync_notes(block_from, block_to, note_tags).await?;
 
         let note_ids: Vec<NoteId> = blocks
             .iter()
             .flat_map(|b| b.notes.values())
-            .filter(|n| n.metadata().is_none() || n.note_type() != NoteType::Private)
+            .filter(|n| n.note_type() == NoteType::Public)
             .map(|n| *n.note_id())
             .collect();
 
@@ -246,15 +352,6 @@ pub trait NodeRpcClient: Send + Sync {
             let fetched = self.get_notes_by_id(&note_ids).await?;
 
             for fetched_note in fetched {
-                let note_id = fetched_note.id();
-                for block in &mut blocks {
-                    if let Some(note) = block.notes.get_mut(&note_id)
-                        && note.metadata().is_none()
-                    {
-                        note.set_metadata(fetched_note.metadata().clone());
-                    }
-                }
-
                 if let FetchedNote::Public(note, _) = fetched_note {
                     public_notes.insert(note.id(), note);
                 }
@@ -279,7 +376,7 @@ pub trait NodeRpcClient: Send + Sync {
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
 
     /// Fetches the account proof and optionally its details from the node, using the
-    /// `GetAccountProof` endpoint.
+    /// `GetAccount` endpoint.
     ///
     /// The `account_state` parameter specifies the block number from which to retrieve
     /// the account proof from (the state of the account at that block).
@@ -355,11 +452,12 @@ pub trait NodeRpcClient: Send + Sync {
         for detail in note_details {
             if let FetchedNote::Public(note, inclusion_proof) = detail {
                 let state = UnverifiedNoteState {
-                    metadata: note.metadata().clone(),
+                    metadata: *note.metadata(),
                     inclusion_proof,
                 }
                 .into();
-                let note = InputNoteRecord::new(note.into(), current_timestamp, state);
+                let attachments = note.attachments().clone();
+                let note = InputNoteRecord::new(note.into(), attachments, current_timestamp, state);
 
                 public_notes.push(note);
             }
@@ -530,7 +628,7 @@ impl fmt::Display for RpcEndpoint {
             RpcEndpoint::SyncNullifiers => {
                 write!(f, "sync_nullifiers")
             },
-            RpcEndpoint::GetAccount => write!(f, "get_account_proof"),
+            RpcEndpoint::GetAccount => write!(f, "get_account"),
             RpcEndpoint::GetBlockByNumber => write!(f, "get_block_by_number"),
             RpcEndpoint::GetBlockHeaderByNumber => {
                 write!(f, "get_block_header_by_number")

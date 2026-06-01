@@ -157,6 +157,7 @@ CREATE TABLE transaction_scripts (
 CREATE TABLE input_notes (
     note_id TEXT NOT NULL,                                  -- the note id
     assets BLOB NOT NULL,                                   -- the serialized list of assets
+    attachments BLOB NOT NULL,                              -- the serialized NoteAttachments
     serial_number BLOB NOT NULL,                            -- the serial number of the note
     inputs BLOB NOT NULL,                                   -- the serialized list of note inputs
     script_root TEXT NOT NULL,                              -- the script root of the note, used to join with the notes_scripts table
@@ -186,6 +187,7 @@ CREATE TABLE output_notes (
 --     script_commitment TEXT NULL,
     state_discriminant UNSIGNED INT NOT NULL,               -- state discriminant of the note, used to query by state
     state BLOB NOT NULL,                                    -- serialized note state
+    attachments BLOB NOT NULL,
 
     PRIMARY KEY (note_id)
 ) WITHOUT ROWID;
