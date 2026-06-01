@@ -620,12 +620,13 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
 ///      a custom "claim to target" note script (asserts the consumer is Bob, then moves the minted
 ///      asset into Bob's vault). Its MAST root is unique per run, so it is neither a standard
 ///      script nor a previously registered one.
-///   2. Alice pre-registers the script with
-///      [`TransactionRequestBuilder::build_register_note_scripts`] and waits for that registration
-///      to be committed on-chain. This explicit, wait-for-commit step is required: the NTX builder
-///      resolves the output note's script while it executes, so relying on `expected_ntx_scripts`
-///      on the MINT request itself is not enough (it submits the registration without waiting for
-///      it to commit, so the NTX can run before the script lands).
+///   2. Alice pre-registers the script via [`TransactionRequestBuilder::expected_ntx_scripts`] on a
+///      trivial no-op transaction, then waits for that registration to be committed on-chain. The
+///      NTX builder resolves the output note's script while it executes, so the script must be
+///      committed before the MINT runs. `expected_ntx_scripts` submits the registration note but
+///      does not itself wait for it to commit, so it is set on an up-front no-op tx (not the MINT
+///      request) and followed by an explicit wait — otherwise the NTX could run before the script
+///      lands.
 ///   3. Alice mints. The node's NTX builder consumes the MINT note and emits the public note with
 ///      the custom script. Bob's client imports the expected `NoteId`, observes it `Committed`,
 ///      consumes it, and ends up holding the minted asset.
@@ -683,16 +684,23 @@ pub async fn test_ntx_mint_produces_public_note_with_non_standard_script(
         client.rng(),
     )?;
 
-    // Pre-register the non-standard output script and wait for the registration to commit before
-    // minting. The NTX builder resolves the public output note's script while it executes, so the
-    // script must already be in the node's registry. `execute_tx_and_sync` waits for the
-    // registration tx to commit (which indexes the script), and the extra block adds a margin for
-    // indexing before the NTX runs.
-    let register_tx = TransactionRequestBuilder::new().build_register_note_scripts(
-        alice.id(),
-        vec![custom_script],
-        client.rng(),
-    )?;
+    // Pre-register the non-standard output script via `expected_ntx_scripts`, then wait for the
+    // registration to commit before minting. Setting `expected_ntx_scripts` makes the client submit
+    // a public note carrying the script before the request's own transaction runs, so it is
+    // attached to a trivial no-op tx that runs up front. The NTX builder resolves the output note's
+    // script while it executes, so the registration must be committed (and indexed) before the MINT
+    // runs — `execute_tx_and_sync` waits for the no-op tx (committed alongside the registration
+    // note), and the extra block adds an indexing margin. Setting `expected_ntx_scripts` on the
+    // MINT request itself would race: the registration would not be committed before the NTX
+    // runs.
+    let noop_script = client
+        .code_builder()
+        .compile_tx_script(NOOP_TX_SCRIPT)
+        .context("failed to compile no-op registration tx script")?;
+    let register_tx = TransactionRequestBuilder::new()
+        .custom_script(noop_script)
+        .expected_ntx_scripts(vec![custom_script])
+        .build()?;
     execute_tx_and_sync(&mut client, alice.id(), register_tx).await?;
     wait_for_blocks(&mut client, 1).await;
 
