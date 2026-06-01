@@ -241,7 +241,7 @@ impl<AUTH> Client<AUTH> {
                     // the one in the network
                     let network_account_commitment = self
                         .rpc_api
-                        .get_account(account.id(), GetAccountRequest::witness_only())
+                        .get_account(account.id(), GetAccountRequest::new())
                         .await?
                         .1
                         .account_commitment();

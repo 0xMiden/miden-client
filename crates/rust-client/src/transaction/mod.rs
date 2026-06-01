@@ -701,7 +701,7 @@ where
                         .rpc_api
                         .get_account(
                             account_id,
-                            GetAccountRequest::witness_only().at(AccountStateAt::Block(block_num)),
+                            GetAccountRequest::new().at(AccountStateAt::Block(block_num)),
                         )
                         .await?;
                     let (witness, _) = account_proof.into_parts();
@@ -1072,12 +1072,11 @@ pub(crate) async fn fetch_public_account_inputs(
     let (block_num, mut account_proof) = rpc_api
         .get_account(
             account_id,
-            GetAccountRequest {
-                storage: storage_requirements.clone(),
-                at: account_state_at,
-                known_code,
-                vault,
-            },
+            GetAccountRequest::new()
+                .with_storage(storage_requirements.clone())
+                .at(account_state_at)
+                .with_known_code(known_code)
+                .with_vault(vault),
         )
         .await?;
 

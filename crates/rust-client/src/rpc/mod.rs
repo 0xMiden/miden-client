@@ -211,7 +211,7 @@ pub trait NodeRpcClient: Send + Sync {
         // For accounts without public state, only the witness commitment is needed.
         if !account_id.has_public_state() {
             let (block_number, proof) =
-                self.get_account(account_id, GetAccountRequest::witness_only()).await?;
+                self.get_account(account_id, GetAccountRequest::new()).await?;
             return Ok(FetchedAccount::new_private(
                 account_id,
                 AccountUpdateSummary::new(proof.account_commitment(), block_number),
@@ -220,13 +220,7 @@ pub trait NodeRpcClient: Send + Sync {
 
         // First call discovers the storage layout (which slots are maps).
         let (block_number, initial_proof) = self
-            .get_account(
-                account_id,
-                GetAccountRequest {
-                    vault: VaultFetch::Always,
-                    ..Default::default()
-                },
-            )
+            .get_account(account_id, GetAccountRequest::new().with_vault(VaultFetch::Always))
             .await?;
 
         let map_slot_names: Vec<StorageSlotName> = initial_proof
@@ -248,12 +242,10 @@ pub trait NodeRpcClient: Send + Sync {
             let (_, proof) = self
                 .get_account(
                     account_id,
-                    GetAccountRequest {
-                        storage: requirements,
-                        at: AccountStateAt::Block(block_number),
-                        vault: VaultFetch::Always,
-                        ..Default::default()
-                    },
+                    GetAccountRequest::new()
+                        .with_storage(requirements)
+                        .at(AccountStateAt::Block(block_number))
+                        .with_vault(VaultFetch::Always),
                 )
                 .await?;
             proof
@@ -387,6 +379,8 @@ pub trait NodeRpcClient: Send + Sync {
             .sync_account_vault(BlockNumber::GENESIS, Some(block_to), account_id)
             .await?;
         let mut updates = vault_info.updates;
+        // The node returns the full history of vault entries, so a given key may appear in more
+        // than one block. Sort by block so the BTreeMap keeps the latest value per key.
         updates.sort_by_key(|u| u.block_num);
         details.vault_details.assets = updates
             .into_iter()
@@ -416,7 +410,8 @@ pub trait NodeRpcClient: Send + Sync {
             if !map_details.too_many_entries {
                 continue;
             }
-            // Sort by block so the BTreeMap keeps the latest value per key.
+            // The node returns the full history of map entries, so a given key may appear in
+            // more than one block. Sort by block so the BTreeMap keeps the latest value per key.
             let mut sorted: Vec<_> =
                 info.updates.iter().filter(|u| u.slot_name == map_details.slot_name).collect();
             sorted.sort_by_key(|u| u.block_num);

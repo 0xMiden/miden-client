@@ -160,11 +160,9 @@ impl ClientDataStore {
             .rpc_api
             .get_account(
                 account_id,
-                GetAccountRequest {
-                    storage: storage_requirements,
-                    known_code: Some(known_code),
-                    ..Default::default()
-                },
+                GetAccountRequest::new()
+                    .with_storage(storage_requirements)
+                    .with_known_code(Some(known_code)),
             )
             .await
             .map_err(|err| {

@@ -864,7 +864,7 @@ impl Deserializable for AccountStorageRequirements {
     }
 }
 
-// GET ACCOUNT PROOF REQUEST
+// GET ACCOUNT REQUEST
 // ================================================================================================
 
 /// Controls whether vault data is included in a `/GetAccount` response.
@@ -895,10 +895,11 @@ pub struct GetAccountRequest {
 }
 
 impl GetAccountRequest {
-    /// Request only the witness (account commitment) — no storage entries, no known code,
-    /// no vault data.
+    /// Creates a request for the minimal account data: the account commitment and storage header
+    /// at the chain tip, with no map entries, no known code, and no vault data. Opt into
+    /// additional data with the builder methods.
     #[must_use]
-    pub fn witness_only() -> Self {
+    pub fn new() -> Self {
         Self {
             storage: AccountStorageRequirements(BTreeMap::new()),
             at: AccountStateAt::ChainTip,
@@ -907,10 +908,32 @@ impl GetAccountRequest {
         }
     }
 
+    /// Includes the given per-slot storage map entries in the response.
+    #[must_use]
+    pub fn with_storage(mut self, storage: AccountStorageRequirements) -> Self {
+        self.storage = storage;
+        self
+    }
+
     /// Sets the target block for this request.
     #[must_use]
     pub fn at(mut self, at: AccountStateAt) -> Self {
         self.at = at;
+        self
+    }
+
+    /// Provides the code commitment the client already holds, so the node can skip re-sending
+    /// matching code.
+    #[must_use]
+    pub fn with_known_code(mut self, known_code: Option<AccountCode>) -> Self {
+        self.known_code = known_code;
+        self
+    }
+
+    /// Sets the vault data retrieval policy.
+    #[must_use]
+    pub fn with_vault(mut self, vault: VaultFetch) -> Self {
+        self.vault = vault;
         self
     }
 }

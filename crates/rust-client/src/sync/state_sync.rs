@@ -644,11 +644,9 @@ impl StateSync {
             .rpc_api
             .get_account(
                 account_id,
-                GetAccountRequest {
-                    storage: initial_requirements,
-                    vault: VaultFetch::Always,
-                    ..Default::default()
-                },
+                GetAccountRequest::new()
+                    .with_storage(initial_requirements)
+                    .with_vault(VaultFetch::Always),
             )
             .await
             .map_err(ClientError::RpcError)?;
@@ -721,12 +719,11 @@ impl StateSync {
             .rpc_api
             .get_account(
                 account_id,
-                GetAccountRequest {
-                    storage: storage_requirements,
-                    at: AccountStateAt::Block(block_to),
-                    known_code: Some(initial_details.code.clone()),
-                    vault: VaultFetch::Always,
-                },
+                GetAccountRequest::new()
+                    .with_storage(storage_requirements)
+                    .at(AccountStateAt::Block(block_to))
+                    .with_known_code(Some(initial_details.code.clone()))
+                    .with_vault(VaultFetch::Always),
             )
             .await
             .map_err(ClientError::RpcError)?;
