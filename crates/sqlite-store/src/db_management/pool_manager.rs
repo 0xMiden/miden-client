@@ -73,7 +73,11 @@ impl Manager for SqlitePoolManager {
         deadpool_sync::SyncWrapper::new(RUNTIME, move || conn).await
     }
 
-    async fn recycle(&self, _: &mut Self::Type, _: &Metrics) -> RecycleResult<Self::Error> {
-        Ok(())
+    fn recycle(
+        &self,
+        _: &mut Self::Type,
+        _: &Metrics,
+    ) -> impl std::future::Future<Output = RecycleResult<Self::Error>> {
+        std::future::ready(Ok(()))
     }
 }

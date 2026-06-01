@@ -6,6 +6,9 @@ target/
 miden-node/
 miden-base/
 
+# Staged test-node binaries (built in CI, or locally when mimicking the CI artifact flow)
+test-node-bin/
+
 # Node.js dependencies — defensive ignore so a stray local `npm install`
 # (in any subdir, e.g. when checking out a branch with JS-flavored work)
 # can't be swept into a commit by `git add -A`.

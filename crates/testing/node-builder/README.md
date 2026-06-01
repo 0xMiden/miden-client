@@ -1,71 +1,38 @@
-# Miden Node Builder (Testing Only)
+# Genesis fixtures generator (testing only)
 
-A minimal node implementation used exclusively for running integration tests of the Miden client. This crate is NOT intended for production use.
+Generates the genesis fixtures used to bootstrap a testing node for the Miden client integration
+tests. This crate is NOT intended for production use.
 
-## Purpose
+The testing node itself is run from the standalone Miden node executables (`miden-validator`,
+`miden-node`, `miden-ntx-builder`); see `scripts/start-test-node.sh` and the `start-node` /
+`stop-node` Make targets. This crate only produces the genesis content those executables consume.
 
-This crate provides a simplified node implementation that is used to run integration tests for:
-- The Miden client library
-- The Miden web client
-- Other client-related integration tests
+## `gen-genesis`
 
-## Features
-
-- Minimal node implementation with essential components
-- Configurable block and batch intervals
-- Support for both local and remote provers
-- Simple setup for testing scenarios
-
-## Usage
-
-```rust
-use miden_node_builder::NodeBuilder;
-use std::path::PathBuf;
-use std::time::Duration;
-
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    // Create a new node builder for testing
-    let builder = NodeBuilder::new(PathBuf::from("./data"))
-        .with_block_interval(Duration::from_millis(1000))
-        .with_batch_interval(Duration::from_millis(1000));
-
-    // Start the node
-    let node_handle = builder.start().await?;
-    println!("RPC server listening at: {}", node_handle.rpc_url());
-
-    // ... run tests ...
-
-    // Stop the node when done
-    node_handle.stop().await?;
-
-    Ok(())
-}
+```bash
+gen-genesis [OUTPUT_DIR]   # defaults to ./genesis
 ```
 
-For a complete working example, see the `simple.rs` example in the crate's source code.
+Writes, into `OUTPUT_DIR`:
 
-## Components
+- `tst_faucet.mac` — the TST genesis faucet, written **with** its secret key so tests can mint.
+- `test_account_NNNN.mac` — the test faucets and the `too_many_assets` account (read-only
+  fixtures, no secret keys).
+- `genesis.toml` — references every `.mac` file via `[[account]]` entries, with
+  `verification_base_fee = 0`.
 
-The builder initializes and manages the following components:
+The node is then bootstrapped with:
 
-1. **Store**: Manages the node's state and data persistence
-2. **Block Producer**: Handles block production and validation
-3. **RPC Server**: Provides an interface for interacting with the node
+```bash
+miden-validator bootstrap --genesis-config-file OUTPUT_DIR/genesis.toml ...
+```
 
-## Configuration Options
+## Why a TOML manifest
 
-- `data_directory`: Path to store node data
-- `block_interval`: Duration between block production attempts
-- `batch_interval`: Duration between batch production attempts
-
-## Note
-
-This implementation is intentionally simplified and may not include all features of a production node. It is designed to be:
-- Easy to maintain
-- Quick to start up
-- Sufficient for running integration tests
-- NOT suitable for production use
+The accounts are built in Rust (depending only on `miden-protocol` / `miden-standards`) and emitted
+as `.mac` files. `genesis.toml` is a thin manifest the node's own `miden-validator bootstrap`
+consumes, so this crate stays decoupled from the node's internal crates.
 
 ## License
+
 This project is [MIT licensed](../../LICENSE).

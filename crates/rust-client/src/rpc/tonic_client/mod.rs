@@ -42,7 +42,11 @@ use crate::rpc::domain::transaction::TransactionRecord;
 use crate::rpc::errors::node::parse_node_error;
 use crate::rpc::errors::{AcceptHeaderContext, AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::BlockRange;
-use crate::rpc::generated::rpc::account_request::account_detail_request::StorageMapDetailRequest;
+use crate::rpc::generated::rpc::account_request::account_detail_request::{
+    StorageMapDetailRequest,
+    StorageMapDetailRequests,
+    StorageRequest,
+};
 use crate::rpc::{AccountStateAt, generated as proto};
 
 mod api_client;
@@ -532,7 +536,9 @@ impl NodeRpcClient for GrpcClient {
             Some(AccountDetailRequest {
                 code_commitment: Some(EMPTY_WORD.into()),
                 asset_vault_commitment: known_vault_commitment.map(Into::into),
-                storage_maps,
+                storage_request: Some(StorageRequest::StorageMaps(StorageMapDetailRequests {
+                    storage_maps,
+                })),
             })
         } else {
             None

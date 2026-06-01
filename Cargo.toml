@@ -42,18 +42,13 @@ miden-tx              = { default-features = false, version = "0.15" }
 miden-tx-batch-prover = { default-features = false, version = "0.15" }
 
 # Miden node dependencies
-miden-node-block-producer = { branch = "igamigo-export-ntxauth", git = "https://github.com/0xMiden/node.git" }
 miden-node-proto = { branch = "igamigo-export-ntxauth", git = "https://github.com/0xMiden/node.git" }
 miden-node-proto-build = { branch = "igamigo-export-ntxauth", default-features = false, git = "https://github.com/0xMiden/node.git" }
-miden-node-rpc = { branch = "igamigo-export-ntxauth", git = "https://github.com/0xMiden/node.git" }
-miden-node-store = { branch = "igamigo-export-ntxauth", git = "https://github.com/0xMiden/node.git" }
 miden-node-utils = { branch = "igamigo-export-ntxauth", git = "https://github.com/0xMiden/node.git" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-ntx-builder = { branch = "igamigo-export-ntxauth", git = "https://github.com/0xMiden/node.git" }
 miden-remote-prover-client = { branch = "igamigo-export-ntxauth", default-features = false, features = [
   "tx-prover",
 ], git = "https://github.com/0xMiden/node.git" }
-miden-validator = { branch = "igamigo-export-ntxauth", git = "https://github.com/0xMiden/node.git" }
 
 # Miden debug dependency
 miden-debug     = { default-features = false, features = ["dap", "std"], version = "0.8" }
