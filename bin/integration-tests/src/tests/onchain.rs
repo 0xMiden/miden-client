@@ -3,7 +3,14 @@ use miden_client::account::{AccountStorageMode, build_wallet_id};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::keystore::Keystore;
-use miden_client::note::{NoteAttachment, NoteAttachmentScheme, NoteFile, NoteType, P2idNote};
+use miden_client::note::{
+    NoteAttachment,
+    NoteAttachmentScheme,
+    NoteAttachments,
+    NoteFile,
+    NoteType,
+    P2idNote,
+};
 use miden_client::rpc::{AcceptHeaderError, RpcError};
 use miden_client::store::{InputNoteState, NoteFilter};
 use miden_client::sync::NoteTagSource;
@@ -776,14 +783,14 @@ pub async fn test_sync_note_with_attachment(client_config: ClientConfig) -> Resu
     // Mint a P2ID note with a Word attachment. The non-default attachment triggers
     // the get_notes_by_id metadata fetch during the receiver's sync.
     let attachment =
-        NoteAttachment::new_word(NoteAttachmentScheme::new(42), Word::from([1u32, 2, 3, 4]));
+        NoteAttachment::with_word(NoteAttachmentScheme::new(42)?, Word::from([1u32, 2, 3, 4]));
     let asset = FungibleAsset::new(faucet_account.id(), MINT_AMOUNT)?;
     let note = P2idNote::create(
         faucet_account.id(),
         wallet.id(),
         vec![asset.into()],
         NoteType::Public,
-        attachment,
+        NoteAttachments::new(vec![attachment.clone()])?,
         client_1.rng(),
     )?;
 
@@ -792,8 +799,8 @@ pub async fn test_sync_note_with_attachment(client_config: ClientConfig) -> Resu
         TransactionRequestBuilder::new().own_output_notes(vec![note.clone()]).build()?;
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await?;
 
-    // Client 2 syncs and should discover the note. The sync response will have
-    // attachment_kind != None, so the client must fetch full metadata via get_notes_by_id.
+    // Client 2 syncs and should discover the note. The sync response carries an attachment
+    // commitment, so the client must fetch the full note via get_notes_by_id.
     info!("Syncing client 2 to discover note with attachment");
     client_2.sync_state().await?;
 
@@ -804,12 +811,13 @@ pub async fn test_sync_note_with_attachment(client_config: ClientConfig) -> Resu
         .try_into()?;
 
     assert_eq!(
-        received_note.note().metadata().attachment().attachment_kind(),
-        miden_client::note::NoteAttachmentKind::Word,
-        "Synced note should have a Word attachment"
+        received_note.note().attachments().get(0),
+        Some(&attachment),
+        "Synced note should carry the Word attachment"
     );
 
-    // Consume the note — this will fail if the metadata wasn't properly resolved
+    // Consume the note — this will fail if the attachment wasn't preserved (the note commitment
+    // would not match the on-chain note).
     info!("Consuming note with attachment in client 2");
     let tx_id = consume_notes(&mut client_2, wallet.id(), &[received_note.note().clone()]).await;
     wait_for_tx(&mut client_2, tx_id).await?;

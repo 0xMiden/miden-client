@@ -10,12 +10,12 @@ use std::vec::Vec;
 use anyhow::{Context, Result};
 use miden_protocol::account::auth::AuthSecretKey;
 use miden_protocol::account::{Account, AccountComponentMetadata, AccountId, AccountStorageMode};
-use miden_protocol::asset::{FungibleAsset, TokenSymbol};
+use miden_protocol::asset::{AssetAmount, FungibleAsset, TokenSymbol};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use miden_protocol::transaction::TransactionId;
 use miden_standards::account::auth::AuthSingleSig;
-use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
+use miden_standards::account::faucets::TokenName;
 use miden_standards::code_builder::CodeBuilder;
 use rand::RngCore;
 use tracing::{debug, info};
@@ -23,9 +23,9 @@ use uuid::Uuid;
 
 use crate::account::component::{
     AccountComponent,
-    BasicFungibleFaucet,
     BasicWallet,
     BurnPolicyConfig,
+    FungibleFaucet,
     MintPolicyConfig,
     PolicyAuthority,
     TokenPolicyManager,
@@ -34,7 +34,7 @@ use crate::account::{AccountBuilder, AccountBuilderSchemaCommitmentExt, AccountT
 use crate::auth::AuthSchemeId;
 use crate::crypto::FeltRng;
 pub use crate::keystore::{FilesystemKeyStore, Keystore};
-use crate::note::{Note, NoteAttachment, P2idNote};
+use crate::note::{Note, NoteAttachments, P2idNote};
 use crate::rpc::RpcError;
 use crate::store::{NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
@@ -129,15 +129,19 @@ pub async fn insert_new_fungible_faucet(
     let symbol = TokenSymbol::new("TEST").unwrap();
     let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
     let max_supply = 9_999_999_u64;
-    let token_metadata =
-        FungibleTokenMetadata::builder(name, symbol, 10, max_supply).build().unwrap();
+    let faucet = FungibleFaucet::builder()
+        .name(name)
+        .symbol(symbol)
+        .decimals(10)
+        .max_supply(AssetAmount::new(max_supply).unwrap())
+        .build()
+        .unwrap();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(storage_mode)
         .with_auth_component(auth_component)
-        .with_component(token_metadata)
-        .with_component(BasicFungibleFaucet)
+        .with_component(faucet)
         .with_components(TokenPolicyManager::new(
             PolicyAuthority::AuthControlled,
             MintPolicyConfig::AllowAll,
@@ -482,7 +486,7 @@ pub fn mint_multiple_fungible_asset(
                 *account_id,
                 vec![asset.into()],
                 note_type,
-                NoteAttachment::default(),
+                NoteAttachments::empty(),
                 rng,
             )
             .unwrap()
