@@ -6,6 +6,7 @@ use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{
     Note,
     NoteAssets,
+    NoteAttachments,
     NoteDetails,
     NoteFile,
     NoteId,
@@ -50,6 +51,10 @@ pub struct OutputNoteRecord {
     state: OutputNoteState,
     /// The expected block height at which the note should be included in the chain.
     expected_height: BlockNumber,
+    /// The note's attachments. Required to consume the note, since consumption needs the full
+    /// attachment content (the note commitment only commits to the attachment digest). Empty when
+    /// the note's full details have not been fetched yet (e.g. expected notes).
+    attachments: NoteAttachments,
 }
 
 impl OutputNoteRecord {
@@ -59,6 +64,7 @@ impl OutputNoteRecord {
         metadata: NoteMetadata,
         state: OutputNoteState,
         expected_height: BlockNumber,
+        attachments: NoteAttachments,
     ) -> OutputNoteRecord {
         OutputNoteRecord {
             assets,
@@ -66,6 +72,7 @@ impl OutputNoteRecord {
             recipient_digest,
             state,
             expected_height,
+            attachments,
         }
     }
 
@@ -87,6 +94,10 @@ impl OutputNoteRecord {
 
     pub fn metadata(&self) -> &NoteMetadata {
         &self.metadata
+    }
+
+    pub fn attachments(&self) -> &NoteAttachments {
+        &self.attachments
     }
 
     pub fn inclusion_proof(&self) -> Option<&NoteInclusionProof> {
@@ -170,14 +181,16 @@ impl OutputNoteRecord {
 // TODO: Improve conversions by implementing into_parts()
 impl OutputNoteRecord {
     pub fn from_full_note(note: Note, expected_height: BlockNumber) -> Self {
-        let header = note.header().clone();
+        let header = *note.header();
+        let attachments = note.attachments().clone();
         let (assets, recipient) = NoteDetails::from(note).into_parts();
         OutputNoteRecord {
             recipient_digest: recipient.digest(),
             assets,
-            metadata: header.metadata().clone(),
+            metadata: *header.metadata(),
             state: OutputNoteState::ExpectedFull { recipient },
             expected_height,
+            attachments,
         }
     }
 
@@ -185,9 +198,10 @@ impl OutputNoteRecord {
         OutputNoteRecord {
             recipient_digest: partial_note.recipient_digest(),
             assets: partial_note.assets().clone(),
-            metadata: partial_note.metadata().clone(),
+            metadata: *partial_note.metadata(),
             state: OutputNoteState::ExpectedPartial,
             expected_height,
+            attachments: partial_note.attachments().clone(),
         }
     }
 
@@ -224,8 +238,12 @@ impl TryFrom<OutputNoteRecord> for Note {
     fn try_from(value: OutputNoteRecord) -> Result<Self, Self::Error> {
         match value.recipient() {
             Some(recipient) => {
-                let note =
-                    Note::new(value.assets.clone(), value.metadata.clone(), recipient.clone());
+                let note = Note::with_attachments(
+                    value.assets.clone(),
+                    *value.metadata.partial_metadata(),
+                    recipient.clone(),
+                    value.attachments.clone(),
+                );
                 Ok(note)
             },
             None => Err(NoteRecordError::ConversionError(
@@ -411,6 +429,7 @@ impl Serializable for OutputNoteRecord {
         self.metadata.write_into(target);
         self.state.write_into(target);
         self.expected_height.write_into(target);
+        self.attachments.write_into(target);
     }
 }
 
@@ -421,6 +440,7 @@ impl Deserializable for OutputNoteRecord {
         let metadata = NoteMetadata::read_from(source)?;
         let state = OutputNoteState::read_from(source)?;
         let expected_height = BlockNumber::read_from(source)?;
+        let attachments = NoteAttachments::read_from(source)?;
 
         Ok(Self {
             assets,
@@ -428,6 +448,7 @@ impl Deserializable for OutputNoteRecord {
             recipient_digest,
             state,
             expected_height,
+            attachments,
         })
     }
 }

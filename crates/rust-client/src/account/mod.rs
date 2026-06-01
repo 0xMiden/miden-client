@@ -71,6 +71,8 @@ use miden_protocol::note::NoteTag;
 
 mod account_reader;
 pub use account_reader::AccountReader;
+/// Raw access to `miden-standards` account modules for items not curated by `miden-client`.
+pub use miden_standards::account as standards;
 pub use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::auth::AuthSingleSig;
 // RE-EXPORTS
@@ -100,23 +102,14 @@ pub mod component {
         WordSchema,
     };
     pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
-    pub use miden_standards::account::access::Ownable2Step;
+    pub use miden_standards::account::access::{AccessControl, Ownable2Step};
     pub use miden_standards::account::auth::*;
-    pub use miden_standards::account::components::{
-        basic_fungible_faucet_library,
-        basic_wallet_library,
-        multisig_library,
-        network_fungible_faucet_library,
-        no_auth_library,
-        singlesig_acl_library,
-        singlesig_library,
-    };
     pub use miden_standards::account::faucets::{
-        BasicFungibleFaucet,
-        NetworkFungibleFaucet,
+        FungibleFaucet,
+        FungibleFaucetBuilder,
         TokenMetadata,
+        TokenName,
     };
-    pub use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
     pub use miden_standards::account::policies::{
         BurnAllowAll,
         BurnOwnerOnly,

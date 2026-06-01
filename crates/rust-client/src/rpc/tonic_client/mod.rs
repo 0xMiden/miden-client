@@ -594,7 +594,7 @@ impl NodeRpcClient for GrpcClient {
                 let request = proto::rpc::SyncNotesRequest {
                     block_range: Some(BlockRange {
                         block_from: pagination.current_block_from().as_u32(),
-                        block_to: pagination.block_to().map(|b| b.as_u32()),
+                        block_to: block_to.as_u32(),
                     }),
                     note_tags: proto_tags.clone(),
                 };
@@ -656,7 +656,7 @@ impl NodeRpcClient for GrpcClient {
                     prefix_len: 16,
                     block_range: Some(BlockRange {
                         block_from: pagination.current_block_from().as_u32(),
-                        block_to: pagination.block_to().map(|b| b.as_u32()),
+                        block_to: pagination.block_to().map_or(u32::MAX, |b| b.as_u32()),
                     }),
                 };
 
@@ -753,7 +753,7 @@ impl NodeRpcClient for GrpcClient {
             let request = proto::rpc::SyncAccountStorageMapsRequest {
                 block_range: Some(BlockRange {
                     block_from: pagination.current_block_from().as_u32(),
-                    block_to: pagination.block_to().map(|block| block.as_u32()),
+                    block_to: pagination.block_to().map_or(u32::MAX, |block| block.as_u32()),
                 }),
                 account_id: Some(account_id.into()),
             };
@@ -801,7 +801,7 @@ impl NodeRpcClient for GrpcClient {
             let request = proto::rpc::SyncAccountVaultRequest {
                 block_range: Some(BlockRange {
                     block_from: pagination.current_block_from().as_u32(),
-                    block_to: pagination.block_to().map(|block| block.as_u32()),
+                    block_to: pagination.block_to().map_or(u32::MAX, |block| block.as_u32()),
                 }),
                 account_id: Some(account_id.into()),
             };
@@ -862,7 +862,7 @@ impl NodeRpcClient for GrpcClient {
                 let request = proto::rpc::SyncTransactionsRequest {
                     block_range: Some(BlockRange {
                         block_from: pagination.current_block_from().as_u32(),
-                        block_to: pagination.block_to().map(|b| b.as_u32()),
+                        block_to: block_to.as_u32(),
                     }),
                     account_ids: proto_account_ids.clone(),
                 };

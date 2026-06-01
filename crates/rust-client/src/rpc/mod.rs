@@ -283,14 +283,12 @@ pub trait NodeRpcClient: Send + Sync {
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<Vec<NoteSyncBlock>, RpcError>;
 
-    /// Calls [`NodeRpcClient::sync_notes`] and then makes a single
-    /// [`NodeRpcClient::get_notes_by_id`] call to:
-    /// - Fill metadata on any [`CommittedNote`](domain::note::CommittedNote) whose sync response
-    ///   only included header fields.
-    /// - Collect full bodies for every public note in the sync range.
+    /// Calls [`NodeRpcClient::sync_notes`] for the requested range, then makes a single
+    /// [`NodeRpcClient::get_notes_by_id`] call to fetch full note bodies (scripts, assets,
+    /// recipient) for public notes.
     ///
-    /// All notes that are public or have missing metadata are fetched (not just the ones the
-    /// client tracks) to avoid revealing which specific notes the client is interested in.
+    /// All public notes in the range are fetched (not just the ones the client tracks) to
+    /// avoid revealing which specific notes the client is interested in.
     ///
     /// Returns the resolved note blocks paired with a map of public note bodies keyed by
     /// note ID.
@@ -300,12 +298,12 @@ pub trait NodeRpcClient: Send + Sync {
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, Note>), RpcError> {
-        let mut blocks = self.sync_notes(block_from, block_to, note_tags).await?;
+        let blocks = self.sync_notes(block_from, block_to, note_tags).await?;
 
         let note_ids: Vec<NoteId> = blocks
             .iter()
             .flat_map(|b| b.notes.values())
-            .filter(|n| n.metadata().is_none() || n.note_type() != NoteType::Private)
+            .filter(|n| n.note_type() == NoteType::Public)
             .map(|n| *n.note_id())
             .collect();
 
@@ -315,15 +313,6 @@ pub trait NodeRpcClient: Send + Sync {
             let fetched = self.get_notes_by_id(&note_ids).await?;
 
             for fetched_note in fetched {
-                let note_id = fetched_note.id();
-                for block in &mut blocks {
-                    if let Some(note) = block.notes.get_mut(&note_id)
-                        && note.metadata().is_none()
-                    {
-                        note.set_metadata(fetched_note.metadata().clone());
-                    }
-                }
-
                 if let FetchedNote::Public(note, _) = fetched_note {
                     public_notes.insert(note.id(), note);
                 }
@@ -477,11 +466,12 @@ pub trait NodeRpcClient: Send + Sync {
         for detail in note_details {
             if let FetchedNote::Public(note, inclusion_proof) = detail {
                 let state = UnverifiedNoteState {
-                    metadata: note.metadata().clone(),
+                    metadata: *note.metadata(),
                     inclusion_proof,
                 }
                 .into();
-                let note = InputNoteRecord::new(note.into(), current_timestamp, state);
+                let attachments = note.attachments().clone();
+                let note = InputNoteRecord::new(note.into(), attachments, current_timestamp, state);
 
                 public_notes.push(note);
             }

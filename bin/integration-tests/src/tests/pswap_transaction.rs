@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use miden_client::account::AccountStorageMode;
 use miden_client::asset::FungibleAsset;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
-use miden_client::note::{Note, NoteAttachment, NoteDetails, NoteType, PswapNote};
+use miden_client::note::{Note, NoteDetails, NoteType, PswapNote};
 use miden_client::testing::common::*;
 use miden_client::transaction::{PswapTransactionData, TransactionRequestBuilder};
 use tracing::info;
@@ -84,7 +84,7 @@ pub async fn test_pswap_full_fill_onchain(client_config: ClientConfig) -> Result
         &PswapTransactionData::new(alice_account.id(), offered_asset, requested_asset),
         NoteType::Public,
         NoteType::Public,
-        NoteAttachment::default(),
+        None,
         alice_client.rng(),
     )?;
 
@@ -222,7 +222,7 @@ pub async fn test_pswap_partial_fill_onchain(client_config: ClientConfig) -> Res
         &PswapTransactionData::new(alice_account.id(), offered_asset, requested_asset),
         NoteType::Public,
         NoteType::Public,
-        NoteAttachment::default(),
+        None,
         alice_client.rng(),
     )?;
     let pswap_note = tx_request.expected_output_own_notes()[0].clone();
@@ -334,7 +334,7 @@ pub async fn test_pswap_cancel_onchain(client_config: ClientConfig) -> Result<()
         &PswapTransactionData::new(alice_account.id(), offered_asset, requested_asset),
         NoteType::Private,
         NoteType::Private,
-        NoteAttachment::default(),
+        None,
         alice_client.rng(),
     )?;
     let pswap_note = create_request.expected_output_own_notes()[0].clone();

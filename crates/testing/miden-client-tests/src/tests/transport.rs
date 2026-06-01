@@ -6,7 +6,7 @@ use miden_client::account::{Account, AccountStorageMode};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteAttachment, NoteDetails, NoteTag, NoteType};
+use miden_client::note::{NoteAttachments, NoteDetails, NoteTag, NoteType};
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::create_test_store_path;
 use miden_client::testing::mock::{MockClient, MockRpcApi};
@@ -41,7 +41,7 @@ async fn transport_basic() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -86,7 +86,7 @@ async fn transport_cursor_pagination() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -96,7 +96,7 @@ async fn transport_cursor_pagination() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -129,7 +129,7 @@ async fn transport_duplicate_note_handling() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -162,7 +162,7 @@ async fn transport_fetch_no_matching_tags() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -260,9 +260,7 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     // 5. Now the NTL delivers the note (simulates late delivery after the first sync).
     let details = NoteDetails::from(private_note.clone());
     let details_bytes = details.to_bytes();
-    mock_transport_node
-        .write()
-        .add_note(private_note.header().clone(), details_bytes);
+    mock_transport_node.write().add_note(*private_note.header(), details_bytes);
 
     // 6. Second sync_state: fetch_transport_notes imports the note, then chain sync runs.
     // Without the fix, after_block_num = sync_height, scan misses the note at block 1.

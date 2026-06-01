@@ -15,6 +15,7 @@ use alloc::vec::Vec;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{
     Note,
+    NoteAttachments,
     NoteDetails,
     NoteFile,
     NoteId,
@@ -175,7 +176,7 @@ where
                 )))?;
             if let Some(mut previous_note) = previous_note {
                 if previous_note
-                    .inclusion_proof_received(inclusion_proof, fetched_note.metadata().clone())?
+                    .inclusion_proof_received(inclusion_proof, *fetched_note.metadata())?
                 {
                     self.store.remove_note_tag((&previous_note).try_into()?).await?;
 
@@ -243,12 +244,14 @@ where
             .await?;
 
         for (previous_note, note, inclusion_proof) in requested_notes {
-            let metadata = note.metadata().clone();
+            let metadata = *note.metadata();
+            let attachments = note.attachments().clone();
             let mut note_record = previous_note.unwrap_or(InputNoteRecord::new(
                 note.into(),
+                attachments,
                 self.store.get_current_timestamp(),
                 ExpectedNoteState {
-                    metadata: Some(metadata.clone()),
+                    metadata: Some(metadata),
                     after_block_num: inclusion_proof.location().block_num(),
                     tag: Some(metadata.tag()),
                 }
@@ -326,6 +329,7 @@ where
             let mut note_record = previous_note.unwrap_or({
                 InputNoteRecord::new(
                     details,
+                    NoteAttachments::empty(),
                     self.store.get_current_timestamp(),
                     ExpectedNoteState { metadata: None, after_block_num, tag }.into(),
                 )
@@ -401,13 +405,9 @@ where
                     continue;
                 }
 
-                let metadata = sync_note
-                    .metadata()
-                    .cloned()
-                    .expect("metadata should be available after sync_notes_with_details");
                 retrieved_proofs.insert(
                     *sync_note.note_id(),
-                    Some((metadata, sync_note.inclusion_proof().clone())),
+                    Some((*sync_note.metadata(), sync_note.inclusion_proof().clone())),
                 );
             }
         }

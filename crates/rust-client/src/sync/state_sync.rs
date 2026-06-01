@@ -249,12 +249,11 @@ impl StateSync {
 
         let note_tags = Arc::new(note_tags);
         let account_ids: Vec<AccountId> = accounts.iter().map(|hint| hint.header.id()).collect();
-        let tracked_accounts: BTreeSet<AccountId> = account_ids.iter().copied().collect();
 
         let mut state_sync_update = StateSyncUpdate {
             block_num,
             note_updates: NoteUpdateTracker::new(input_notes, output_notes)
-                .with_tracked_accounts(tracked_accounts),
+                .with_tracked_accounts(account_ids.iter().copied().collect()),
             transaction_updates: TransactionUpdateTracker::new(uncommitted_transactions),
             ..Default::default()
         };
@@ -922,11 +921,12 @@ impl StateSync {
 
             if let Some(inclusion_proof) = inclusion_proof {
                 let state = crate::store::input_note_states::UnverifiedNoteState {
-                    metadata: note.metadata().clone(),
+                    metadata: *note.metadata(),
                     inclusion_proof,
                 }
                 .into();
-                let record = InputNoteRecord::new(note.into(), None, state);
+                let attachments = note.attachments().clone();
+                let record = InputNoteRecord::new(note.into(), attachments, None, state);
                 records.insert(record.id(), record);
             }
         }
@@ -1057,12 +1057,14 @@ mod tests {
         Note,
         NoteAssets,
         NoteAttachment,
+        NoteAttachments,
         NoteHeader,
         NoteMetadata,
         NoteRecipient,
         NoteStorage,
         NoteTag,
         NoteType,
+        PartialNoteMetadata,
     };
     use miden_protocol::testing::account_id::{
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
@@ -1510,7 +1512,7 @@ mod tests {
                     push.{note_type}
                     push.{tag}
                     push.{amount}
-                    call.::miden::standards::faucets::basic_fungible::mint_and_send
+                    call.::miden::standards::faucets::fungible::mint_and_send
                     dropw dropw dropw dropw
                 end
                 ",
@@ -1658,7 +1660,8 @@ mod tests {
     async fn erased_notes_are_marked_as_consumed() {
         // Create a public output note. It won't be in the mock chain (simulating erasure).
         let sender_id: AccountId = ACCOUNT_ID_SENDER.try_into().unwrap();
-        let metadata = NoteMetadata::new(sender_id, NoteType::Public);
+        let partial_metadata = PartialNoteMetadata::new(sender_id, NoteType::Public);
+        let metadata = NoteMetadata::new(partial_metadata, &NoteAttachments::empty());
         let script = CodeBuilder::new()
             .compile_note_script("@note_script\npub proc main\n    nop\nend")
             .unwrap();
@@ -1670,9 +1673,10 @@ mod tests {
         let output_note = OutputNoteRecord::new(
             recipient.digest(),
             NoteAssets::new(vec![]).unwrap(),
-            metadata.clone(),
+            metadata,
             OutputNoteState::ExpectedFull { recipient },
             BlockNumber::from(1u32),
+            NoteAttachments::default(),
         );
         let note_id = output_note.id();
         let note_header = NoteHeader::new(note_id, metadata);
@@ -1698,17 +1702,15 @@ mod tests {
         );
     }
 
-    /// Tests that erased notes targeting a tracked network account are marked as consumed
-    /// by that account through the full sync flow.
+    /// Exercises the full sync flow for an erased output note that targets a network account.
     ///
-    /// Same-batch erasure scenario: a sender's transaction creates an output note
-    /// targeting a network account that consumes it in the same batch, so the note never
-    /// appears in the block body and the mock RPC surfaces it as erased in the
-    /// transaction sync response.
+    /// Same-batch erasure scenario: a sender's transaction creates an output note targeting a
+    /// network account that consumes it in the same batch, so the note never appears in the
+    /// block body and the mock RPC surfaces it as erased in the transaction sync response.
     ///
-    /// When the client tracks the network account, the expected end state is that an
-    /// input note record is created for the erased note in a consumed state with the
-    /// network account as the consumer.
+    /// The consumer is derived from the tracked output note's attachments (which encode the network
+    /// target), so the output note is marked consumed and a consumed input note record is created
+    /// and attributed to the network account.
     #[tokio::test]
     #[allow(clippy::too_many_lines)]
     async fn erased_notes_are_marked_as_consumed_by_network_account() {
@@ -1746,13 +1748,15 @@ mod tests {
         chain.add_pending_executed_transaction(&tx).unwrap();
         chain.prove_next_block().unwrap();
 
-        // Construct the erased note that will be marked as consumed by the network account.
+        // Construct the erased note that targets the network account.
         let network_account_id: AccountId =
             ACCOUNT_ID_REGULAR_NETWORK_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap();
         let target =
             NetworkAccountTarget::new(network_account_id, NoteExecutionHint::Always).unwrap();
         let attachment: NoteAttachment = target.into();
-        let metadata = NoteMetadata::new(sender_id, NoteType::Public).with_attachment(attachment);
+        let attachments = NoteAttachments::new(vec![attachment]).unwrap();
+        let partial_metadata = PartialNoteMetadata::new(sender_id, NoteType::Public);
+        let metadata = NoteMetadata::new(partial_metadata, &attachments);
         let script = CodeBuilder::new()
             .compile_note_script("@note_script\npub proc main\n    nop\nend")
             .unwrap();
@@ -1764,14 +1768,14 @@ mod tests {
         let recipient_digest = recipient.digest();
         let assets = NoteAssets::new(vec![]).unwrap();
 
-        // Output note record tracked by the sender prior to sync. The flow that builds the
-        // input record from the erased header relies on this output entry being present.
+        // Output note record tracked by the sender prior to sync.
         let output_note = OutputNoteRecord::new(
             recipient_digest,
-            assets.clone(),
-            metadata.clone(),
+            assets,
+            metadata,
             OutputNoteState::ExpectedFull { recipient },
             BlockNumber::from(1u32),
+            attachments,
         );
         let erased_note_id = output_note.id();
         let erased_note_header = NoteHeader::new(erased_note_id, metadata);
@@ -1779,8 +1783,7 @@ mod tests {
         let mock_rpc = MockRpcApi::new(chain);
         mock_rpc.mark_note_as_erased(erased_note_header);
 
-        // Track both the sender (so its tx is returned) and the network account (so the
-        // gating in `mark_erased_note_as_consumed` allows creating the input record).
+        // Track both the sender (so its tx is returned) and the network account.
         let network_header = AccountHeader::new(
             network_account_id,
             Felt::new(0),
@@ -1819,23 +1822,17 @@ mod tests {
             updated_output.inner().state()
         );
 
-        // A new input note record should be created with the network account as consumer.
-        let input_note_update = update
+        // The consumer is derived from the output note's attachments, so the erased note is
+        // surfaced as a consumed input note attributed to the network account.
+        let consumed_input = update
             .note_updates
             .updated_input_notes()
             .find(|n| n.id() == erased_note_id)
-            .expect("input note should be created from the erased output note");
-
-        let inner = input_note_update.inner();
-        assert!(
-            inner.is_consumed(),
-            "input note should be in a consumed state, got: {}",
-            inner.state()
-        );
+            .expect("an input note should be attributed to the network account");
         assert_eq!(
-            inner.consumer_account(),
+            consumed_input.inner().consumer_account(),
             Some(network_account_id),
-            "consumer should be the tracked network account"
+            "the erased note's consumer should be the network account",
         );
     }
 }

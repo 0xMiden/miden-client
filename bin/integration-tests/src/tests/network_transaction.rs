@@ -6,9 +6,8 @@ use miden_client::account::component::{
     AccountComponent,
     AccountComponentMetadata,
     BurnPolicyConfig,
-    FungibleTokenMetadata,
+    FungibleFaucet,
     MintPolicyConfig,
-    NetworkFungibleFaucet,
     Ownable2Step,
     PolicyAuthority,
     TokenName,
@@ -25,7 +24,7 @@ use miden_client::account::{
     StorageSlotName,
 };
 use miden_client::assembly::{CodeBuilder, Library, Module, ModuleKind, Path, SourceManagerSync};
-use miden_client::asset::{FungibleAsset, TokenSymbol};
+use miden_client::asset::{AssetAmount, FungibleAsset, TokenSymbol};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::crypto::FeltRng;
 use miden_client::note::{
@@ -35,15 +34,16 @@ use miden_client::note::{
     Note,
     NoteAssets,
     NoteAttachment,
+    NoteAttachments,
     NoteExecutionHint,
     NoteFile,
     NoteId,
-    NoteMetadata,
     NoteRecipient,
     NoteStorage,
     NoteTag,
     NoteType,
     P2idNoteStorage,
+    PartialNoteMetadata,
 };
 use miden_client::store::InputNoteState;
 use miden_client::sync::NoteTagSource;
@@ -322,12 +322,14 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     Ok(())
 }
 
-/// After a network account consumes a note (potentially in the same batch it was created),
-/// the receiver's `InputNoteReader` should find it as consumed by that account. Validates
-/// the erased-notes detection flow end-to-end against a real node.
-pub async fn test_note_reader_finds_note_consumed_by_ntx(
-    client_config: ClientConfig,
-) -> Result<()> {
+/// Validates end-to-end against a real node that a note created for a network account is consumed
+/// by that account and the client attributes the consumption to it.
+///
+/// The network account consumes the note via same-batch erasure, whose RPC stream carries only the
+/// `NoteHeader`. The network-account target lives in the note attachment (not delivered by that
+/// stream), but the creating client holds the attachments locally on the output note, so it derives
+/// the consumer and records the note as consumed by the network account.
+pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
 
@@ -368,23 +370,26 @@ pub async fn test_note_reader_finds_note_consumed_by_ntx(
         wait_for_blocks(&mut client, 1).await;
     }
 
-    client.sync_state().await?;
-
-    let mut reader = client.input_note_reader(network_account_id);
-    let mut found = false;
-    while let Some(note) = reader.next().await? {
-        if note.id() == note_id {
-            assert_eq!(
-                note.consumer_account(),
-                Some(network_account_id),
-                "consumer should be the network account"
-            );
-            found = true;
+    // The note is consumed via same-batch erasure. The creating client derives the consumer from
+    // the output note's attachments, so it records the note as consumed by the network account.
+    // Poll until the client records the consumption.
+    let mut consumer = None;
+    for _ in 0..10 {
+        client.sync_state().await?;
+        if let Some(record) = client.get_input_note(note_id).await?
+            && record.is_consumed()
+        {
+            consumer = record.consumer_account();
             break;
         }
+        wait_for_blocks(&mut client, 1).await;
     }
 
-    assert!(found, "NoteReader should find the note consumed by the network account");
+    assert_eq!(
+        consumer,
+        Some(network_account_id),
+        "the network note's consumer should be the network account"
+    );
 
     Ok(())
 }
@@ -442,15 +447,18 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
     let symbol = TokenSymbol::new("MNT").unwrap();
     let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
     let max_supply: u64 = 9_999_999;
-    let token_metadata = FungibleTokenMetadata::builder(name, symbol, 10, max_supply)
+    let fungible_faucet = FungibleFaucet::builder()
+        .name(name)
+        .symbol(symbol)
+        .decimals(10)
+        .max_supply(AssetAmount::new(max_supply).map_err(|e| anyhow!("invalid max supply: {e}"))?)
         .build()
-        .map_err(|e| anyhow!("failed to build fungible token metadata: {e}"))?;
+        .map_err(|e| anyhow!("failed to build fungible faucet: {e}"))?;
     let faucet = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(AccountStorageMode::Network)
         .with_auth_component(incr_nonce_auth)
-        .with_component(token_metadata)
-        .with_component(NetworkFungibleFaucet)
+        .with_component(fungible_faucet)
         .with_components(TokenPolicyManager::new(
             PolicyAuthority::OwnerControlled,
             MintPolicyConfig::OwnerOnly,
@@ -492,11 +500,12 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
     // The MINT note itself is routed to the network faucet via a
     // NetworkAccountTarget attachment.
     let target_ntx = NetworkAccountTarget::new(faucet.id(), NoteExecutionHint::Always)?;
+    let attachments = NoteAttachments::new(vec![target_ntx.into()])?;
     let mint_note = MintNote::create(
         faucet.id(),
         alice.id(), // must equal the faucet owner; checked by mint_and_send
         mint_storage,
-        target_ntx.into(),
+        attachments,
         client.rng(),
     )?;
 
@@ -565,9 +574,9 @@ pub(crate) fn get_network_note_with_script<T: Rng>(
 ) -> Result<Note> {
     let target = NetworkAccountTarget::new(network_account, NoteExecutionHint::Always)?;
     let attachment: NoteAttachment = target.into();
-    let metadata = NoteMetadata::new(sender, NoteType::Public)
-        .with_tag(NoteTag::with_account_target(network_account))
-        .with_attachment(attachment);
+    let attachments = NoteAttachments::new(vec![attachment])?;
+    let partial_metadata = PartialNoteMetadata::new(sender, NoteType::Public)
+        .with_tag(NoteTag::with_account_target(network_account));
 
     let script = CodeBuilder::with_source_manager(source_manager.clone())
         .with_dynamically_linked_library(counter_contract_library(source_manager))?
@@ -583,7 +592,8 @@ pub(crate) fn get_network_note_with_script<T: Rng>(
         NoteStorage::new(vec![])?,
     );
 
-    let network_note = Note::new(NoteAssets::new(vec![])?, metadata, recipient);
+    let network_note =
+        Note::with_attachments(NoteAssets::new(vec![])?, partial_metadata, recipient, attachments);
     Ok(network_note)
 }
 
