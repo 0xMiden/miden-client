@@ -136,6 +136,72 @@ where
         Ok(imported_note_ids)
     }
 
+    /// Re-verifies every `Expected` input note against the chain by note ID, independent of any
+    /// block-lookback window.
+    ///
+    /// A private note delivered through the note transport layer (or imported manually via
+    /// [`NoteFile::NoteDetails`]) is stored as `Expected` until its on-chain commitment is
+    /// confirmed. The windowed scan in `Client::fetch_transport_notes` only looks a fixed number of
+    /// blocks back from the current sync height, so it can miss a commitment that predates the
+    /// window when transport delivery lags far behind the commitment block. Because chain sync only
+    /// reports notes committed in newly synced blocks, such a note would otherwise never be
+    /// confirmed and the funds would be silently lost.
+    ///
+    /// This reconciliation closes that gap: it fetches each expected note by ID (the node returns
+    /// the inclusion proof regardless of block height) and, when committed, applies the inclusion
+    /// proof and block header so the note transitions to `Committed`. Notes that are not yet
+    /// committed are left untouched and retried on the next sync, so transient failures are
+    /// self-healing.
+    pub(crate) async fn reconcile_expected_notes(&self) -> Result<(), ClientError> {
+        let expected_notes = self.get_input_notes(NoteFilter::Expected).await?;
+        if expected_notes.is_empty() {
+            return Ok(());
+        }
+
+        let note_ids: Vec<NoteId> = expected_notes.iter().map(InputNoteRecord::id).collect();
+        let fetched_notes = self.rpc_api.get_notes_by_id(&note_ids).await?;
+
+        let mut proofs: BTreeMap<NoteId, (NoteMetadata, NoteInclusionProof)> = BTreeMap::new();
+        for fetched_note in fetched_notes {
+            let (note_id, metadata, inclusion_proof) = match fetched_note {
+                FetchedNote::Private(header, inclusion_proof) => {
+                    (header.id(), header.metadata().clone(), inclusion_proof)
+                },
+                FetchedNote::Public(note, inclusion_proof) => {
+                    (note.id(), note.metadata().clone(), inclusion_proof)
+                },
+            };
+            proofs.insert(note_id, (metadata, inclusion_proof));
+        }
+
+        for mut note_record in expected_notes {
+            let Some((metadata, inclusion_proof)) = proofs.remove(&note_record.id()) else {
+                // Not yet committed on-chain; leave as Expected and retry on the next sync.
+                continue;
+            };
+
+            let block_num = inclusion_proof.location().block_num();
+            let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
+            let block_header = self
+                .get_and_store_authenticated_block(block_num, &mut current_partial_mmr)
+                .await?;
+
+            let tag = metadata.tag();
+            let mut note_changed =
+                note_record.inclusion_proof_received(inclusion_proof, metadata)?;
+            note_changed |= note_record.block_header_received(&block_header)?;
+
+            if note_changed {
+                self.store
+                    .remove_note_tag(NoteTagRecord::with_note_source(tag, note_record.id()))
+                    .await?;
+                self.store.upsert_input_notes(&[note_record]).await?;
+            }
+        }
+
+        Ok(())
+    }
+
     // HELPERS
     // ================================================================================================
 

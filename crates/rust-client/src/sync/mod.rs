@@ -128,6 +128,12 @@ where
             let cursor = self.store.get_note_transport_cursor().await?;
             let note_tags = self.store.get_unique_note_tags().await?;
             self.fetch_transport_notes(cursor, note_tags).await?;
+
+            // Reconcile expected notes against the chain by note ID. This confirms private notes
+            // whose on-chain commitment predates the transport-import lookback window (which would
+            // otherwise be silently lost); it is block-window independent and retried on every
+            // sync.
+            self.reconcile_expected_notes().await?;
         }
 
         // Build sync state components

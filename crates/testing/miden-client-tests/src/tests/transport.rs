@@ -277,6 +277,120 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     );
 }
 
+/// Reproduces RC-2 (silent private-note loss): when the NTL delivers a private note's details
+/// more than `NOTE_LOOKBACK_BLOCKS` (20) blocks after the note was committed on-chain, the
+/// fixed-size lookback in `fetch_transport_notes` scans `[sync_height - 20, sync_height]`, which
+/// no longer covers the note's commitment block. `check_expected_notes` finds nothing, the note
+/// stays Expected with no inclusion proof, and no later sync recovers it (the bound only ever
+/// moves forward). The note is permanently lost despite being committed on-chain.
+///
+/// This is the same shape as `fetch_private_notes_finds_note_committed_at_sync_height` but with
+/// the NTL delivery lagging beyond the lookback window — which matches the production signature
+/// under load (high NTL delivery latency: private-note p99 ~123s).
+#[tokio::test]
+async fn fetch_private_notes_finds_note_committed_beyond_lookback_window() {
+    // Lookback window used by `fetch_transport_notes` (kept in sync with the production constant).
+    const NOTE_LOOKBACK_BLOCKS: u32 = 20;
+
+    // 1. Build a mock chain with a private note committed at block 1.
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let mock_account = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+
+    let private_note =
+        NoteBuilder::new(mock_account.id(), RandomCoin::new([1, 2, 3, 4].map(Felt::new).into()))
+            .note_type(ProtocolNoteType::Private)
+            .tag(NoteTag::new(0).into())
+            .build()
+            .unwrap();
+
+    let spawn_note =
+        mock_chain_builder.add_spawn_note(std::slice::from_ref(&private_note)).unwrap();
+    let mut mock_chain = mock_chain_builder.build().unwrap();
+
+    // Block 1: commit the private note.
+    let tx = Box::pin(
+        mock_chain
+            .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note])
+            .unwrap()
+            .extend_expected_output_notes(vec![RawOutputNote::Full(private_note.clone())])
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    mock_chain.add_pending_executed_transaction(&tx).unwrap();
+    mock_chain.prove_next_block().unwrap();
+    let commitment_block = 1u32;
+
+    // Advance the chain well past `commitment_block + NOTE_LOOKBACK_BLOCKS` so the fixed-size
+    // lookback window can no longer reach the note's commitment block.
+    for _ in 0..(NOTE_LOOKBACK_BLOCKS + 10) {
+        mock_chain.prove_next_block().unwrap();
+    }
+
+    // 2. Create client with empty NTL (note not yet delivered).
+    let mock_transport_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
+
+    let rpc_api = MockRpcApi::new(mock_chain);
+    let arc_rpc_api = Arc::new(rpc_api);
+    let transport_client = MockNoteTransportApi::new(mock_transport_node.clone());
+
+    let mut rng = rand::rng();
+    let coin_seed: [u64; 4] = rng.random();
+    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
+
+    let keystore_path = temp_dir();
+    let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
+
+    let builder: ClientBuilder<FilesystemKeyStore> = ClientBuilder::new()
+        .rpc(arc_rpc_api)
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_discard_delta(None)
+        .note_transport(Arc::new(transport_client));
+
+    let mut client = builder.build().await.unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    // 3. Register tag 0 so chain sync sees the note's block.
+    client.add_note_tag(NoteTag::new(0)).await.unwrap();
+
+    // 4. Sync to chain tip. The NTL is empty so no transport notes are imported.
+    client.sync_state().await.unwrap();
+    let sync_height = client.get_sync_height().await.unwrap();
+    assert!(
+        sync_height.as_u32() > commitment_block + NOTE_LOOKBACK_BLOCKS,
+        "precondition: sync_height ({}) must be more than {} blocks past the commitment block ({})",
+        sync_height.as_u32(),
+        NOTE_LOOKBACK_BLOCKS,
+        commitment_block,
+    );
+
+    // 5. Now the NTL delivers the note (simulates delivery lagging beyond the lookback window).
+    let details = NoteDetails::from(private_note.clone());
+    let details_bytes = details.to_bytes();
+    mock_transport_node
+        .write()
+        .add_note(private_note.header().clone(), details_bytes);
+
+    // 6. Second sync_state: fetch_transport_notes imports the note, but the lookback window
+    // `[sync_height - 20, sync_height]` no longer covers the commitment block, so the note's
+    // inclusion proof is never retrieved.
+    client.sync_state().await.unwrap();
+
+    // 7. The note must still become Committed — it is on-chain and the client knows its details.
+    let committed_notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();
+    assert!(
+        committed_notes.iter().any(|n| n.id() == private_note.id()),
+        "note committed beyond the lookback window must still be found (RC-2 silent private-note loss)"
+    );
+}
+
 // HELPERS
 // ================================================================================================
 
