@@ -4,8 +4,10 @@
 
 set -euo pipefail
 
-# shellcheck source=scripts/test-node-common.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test-node-common.sh"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CACHE="$ROOT/target/test-node"
+PID_FILE="$CACHE/pids"
+BIN="$CACHE/install/bin"
 
 if [ -f "$PID_FILE" ]; then
     while read -r pid; do
