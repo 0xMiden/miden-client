@@ -26,11 +26,7 @@ use miden_node_proto::clients::{
 };
 use miden_node_rpc::{Rpc, RpcMode};
 use miden_node_store::state::State;
-use miden_node_store::{
-    DatabaseOptions,
-    GenesisState,
-    default_sqlite_connection_pool_size,
-};
+use miden_node_store::{DatabaseOptions, GenesisState, default_sqlite_connection_pool_size};
 use miden_node_utils::clap::{GrpcOptionsExternal, GrpcOptionsInternal, StorageOptions};
 use miden_node_utils::crypto::get_random_coin;
 use miden_ntx_builder::NtxBuilderConfig;
@@ -276,12 +272,7 @@ impl NodeBuilder {
 
         Ok(NodeHandle {
             rpc_url: format!("http://{rpc_address}"),
-            handles: vec![
-                block_producer_handle,
-                validator_handle,
-                rpc_handle,
-                ntx_builder_handle,
-            ],
+            handles: vec![block_producer_handle, validator_handle, rpc_handle, ntx_builder_handle],
         })
     }
 
