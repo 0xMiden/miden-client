@@ -30,6 +30,7 @@
 * [BREAKING] `account list`, `account show`, and `account new-faucet` now read and build the new `FungibleFaucet` component (multi-slot) instead of the standalone `TokenMetadata` storage item. Faucet accounts created with the previous component layout are no longer recognized; new faucets are constructed via `FungibleFaucet::builder` rather than the `basic-fungible-faucet` package. ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
 * [BREAKING] Note attachments are no longer carried on the note-transport wire format (only `NoteHeader` + serialized `NoteDetails`). ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
 * [BREAKING][rust] Removed the top-level `miden_client::standards` alias. Use the curated client paths as before, or the new raw upstream namespaces `miden_client::account::standards::*`, `miden_client::note::standards::*`, and `miden_client::testing::standards::*`. ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
+* Added a blanket implementation for `NodeRpcClient::get_account_details` ([#2196](https://github.com/0xMiden/miden-client/pull/2196)).
 
 ### Enhancements
 
