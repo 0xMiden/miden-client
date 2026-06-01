@@ -6,6 +6,10 @@
 
 * Bumped `miden-vm` workspace dependencies from 0.22.1 to 0.22.4.
 
+### Fixes
+
+* [FIX][rust] Private notes committed on-chain are no longer silently lost when their Note Transport Layer delivery lags beyond the import lookback window. `Client::sync_state` now reconciles every `Expected` input note against the chain by note ID — independent of any block window — applying the inclusion proof once committed, and retried on every sync so late delivery and transient failures are self-healing ([#2212](https://github.com/0xMiden/miden-client/pull/2212)).
+
 ## 0.14.7 (2026-06-05)
 
 ### Enhancements
