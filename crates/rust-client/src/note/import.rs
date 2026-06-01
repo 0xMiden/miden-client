@@ -174,6 +174,7 @@ where
             proofs.insert(note_id, (metadata, inclusion_proof));
         }
 
+        let current_block_num = self.get_sync_height().await?;
         for mut note_record in expected_notes {
             let Some((metadata, inclusion_proof)) = proofs.remove(&note_record.id()) else {
                 // Not yet committed on-chain; leave as Expected and retry on the next sync.
@@ -181,6 +182,13 @@ where
             };
 
             let block_num = inclusion_proof.location().block_num();
+            // Only authenticate commitments at or behind the synced chain tip; the local partial
+            // MMR forest doesn't include blocks ahead of the sync height. A note committed in a
+            // block we haven't synced to yet is left Expected and reconciled on a later sync.
+            if block_num > current_block_num {
+                continue;
+            }
+
             let mut current_partial_mmr = self.store.get_current_partial_mmr().await?;
             let block_header = self
                 .get_and_store_authenticated_block(block_num, &mut current_partial_mmr)
