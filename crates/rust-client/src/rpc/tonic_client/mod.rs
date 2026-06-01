@@ -490,6 +490,7 @@ impl NodeRpcClient for GrpcClient {
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
         let GetAccountRequest { storage, at, known_code, vault } = request;
 
+        let known_code_commitment = known_code.as_ref().map_or(EMPTY_WORD, AccountCode::commitment);
         let mut known_codes_by_commitment: BTreeMap<Word, AccountCode> = BTreeMap::new();
         if let Some(account_code) = known_code {
             known_codes_by_commitment.insert(account_code.commitment(), account_code);
@@ -503,11 +504,11 @@ impl NodeRpcClient for GrpcClient {
             VaultFetch::IfChangedFrom(commitment) => Some(commitment.into()),
         };
 
-        // Only request details for accounts with public state (Public or Network);
-        // include known code commitment for this account when available
+        // Only request details for accounts with public state (Public or Network), passing the
+        // known code commitment so the node can skip re-sending code we already hold.
         let account_details = if account_id.has_public_state() {
             Some(AccountDetailRequest {
-                code_commitment: Some(EMPTY_WORD.into()),
+                code_commitment: Some(known_code_commitment.into()),
                 asset_vault_commitment,
                 storage_maps,
             })
