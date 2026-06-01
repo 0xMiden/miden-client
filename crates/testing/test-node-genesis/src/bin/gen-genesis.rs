@@ -10,7 +10,7 @@ fn main() -> anyhow::Result<()> {
         .nth(1)
         .map_or_else(|| PathBuf::from("./genesis"), PathBuf::from);
 
-    node_builder::write_genesis_config(&output_dir)?;
+    test_node_genesis::write_genesis_config(&output_dir)?;
     println!("Wrote genesis config to {}", output_dir.display());
 
     Ok(())

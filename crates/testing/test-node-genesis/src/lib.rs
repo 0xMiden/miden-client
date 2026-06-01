@@ -8,7 +8,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use ::rand::{Rng, random};
 use anyhow::{Context, Result};
-use miden_node_utils::crypto::get_random_coin;
 use miden_protocol::account::auth::{AuthScheme, AuthSecretKey};
 use miden_protocol::account::{
     Account,
@@ -105,7 +104,7 @@ pub fn write_genesis_config(output_dir: &Path) -> Result<()> {
 
 fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let mut rng = ChaCha20Rng::from_seed(random());
-    let secret = AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut get_random_coin(&mut rng));
+    let secret = AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut rng);
 
     let auth_method = AuthMethod::SingleSig {
         approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Poseidon2),
@@ -165,7 +164,7 @@ const ASSET_AMOUNT_PER_FAUCET: u64 = 75;
 /// retrieval and asset handling.
 fn build_test_faucets_and_account() -> anyhow::Result<Vec<Account>> {
     let mut rng = ChaCha20Rng::from_seed(random());
-    let secret = AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut get_random_coin(&mut rng));
+    let secret = AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut rng);
 
     let faucets = create_test_faucets(&secret)?;
     let account = create_test_account_with_many_assets(&faucets)?;

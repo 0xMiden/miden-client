@@ -2791,7 +2791,6 @@ dependencies = [
  "tower-http",
  "tower_governor",
  "tracing",
- "tracing-forest",
  "tracing-opentelemetry",
  "tracing-subscriber",
  "url",
@@ -3172,18 +3171,6 @@ name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
-
-[[package]]
-name = "node-builder"
-version = "0.15.0"
-dependencies = [
- "anyhow",
- "miden-node-utils",
- "miden-protocol",
- "miden-standards",
- "rand 0.9.4",
- "rand_chacha",
-]
 
 [[package]]
 name = "nonempty"
@@ -5106,6 +5093,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
 
 [[package]]
+name = "test-node-genesis"
+version = "0.15.0"
+dependencies = [
+ "anyhow",
+ "miden-protocol",
+ "miden-standards",
+ "rand 0.9.4",
+ "rand_chacha",
+]
+
+[[package]]
 name = "testing-remote-prover"
 version = "0.15.0"
 dependencies = [
@@ -5619,19 +5617,6 @@ checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
 dependencies = [
  "once_cell",
  "valuable",
-]
-
-[[package]]
-name = "tracing-forest"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f09cb459317a3811f76644334473239d696cd8efc606963ae7d1c308cead3b74"
-dependencies = [
- "chrono",
- "smallvec",
- "thiserror 2.0.18",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

@@ -4,7 +4,7 @@ description            = "Generates genesis fixtures for bootstrapping a Miden c
 edition.workspace      = true
 keywords               = ["genesis", "miden", "node", "testing"]
 license.workspace      = true
-name                   = "node-builder"
+name                   = "test-node-genesis"
 publish                = false
 readme                 = "README.md"
 repository.workspace   = true
@@ -17,10 +17,8 @@ path = "src/bin/gen-genesis.rs"
 
 [dependencies]
 # Miden dependencies
-# `std` is needed for `AccountFile::write`; the workspace pins these with default features off.
-miden-node-utils = { features = ["testing", "tracing-forest"], workspace = true }
-miden-protocol   = { features = ["std"], workspace = true }
-miden-standards  = { features = ["std"], workspace = true }
+miden-protocol  = { features = ["std", "testing"], workspace = true }
+miden-standards = { features = ["std"], workspace = true }
 
 # External dependencies
 anyhow      = { workspace = true }

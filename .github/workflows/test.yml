@@ -70,54 +70,6 @@ jobs:
       - name: Run doc-tests
         run: make test-docs
 
-  build-test-node:
-    name: Build test node
-    runs-on: warp-ubuntu-latest-x64-8x
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          persist-credentials: false
-      - name: Cleanup large tools for build space
-        uses: ./.github/actions/cleanup-runner
-      - name: Restore test node build cache
-        id: cache-test-node
-        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-        with:
-          path: target/test-node/build
-          key: ${{ runner.os }}-test-node-${{ hashFiles('Cargo.lock') }}
-      - name: Install Rust
-        run: rustup update --no-self-update
-      - name: Add Rust Cache
-        uses: WarpBuilds/rust-cache@9d0cc3090d9c87de74ea67617b246e978735b1a1 # v2.9.1
-        with:
-          shared-key: rust-release
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: false
-      # Builds the standalone node binaries (validator/sequencer/ntx-builder) into the cached
-      # target/test-node/build dir, plus the gen-genesis helper into the workspace target.
-      - name: Build test node binaries
-        run: ./scripts/build-test-node.sh
-      - name: Save test node build cache
-        if: steps.cache-test-node.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/next'
-        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-        with:
-          path: target/test-node/build
-          key: ${{ runner.os }}-test-node-${{ hashFiles('Cargo.lock') }}
-      - name: Stage binaries
-        run: |
-          mkdir -p test-node-bin
-          cp target/test-node/build/release/miden-validator test-node-bin/
-          cp target/test-node/build/release/miden-node test-node-bin/
-          cp target/test-node/build/release/miden-ntx-builder test-node-bin/
-          cp target/release/gen-genesis test-node-bin/
-      - name: Check binaries exist
-        run: file -E test-node-bin/miden-validator test-node-bin/miden-node test-node-bin/miden-ntx-builder test-node-bin/gen-genesis
-      - name: Upload test node binaries
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: test-node-artifact
-          path: test-node-bin
-
   build-note-transport:
     name: Build note-transport
     runs-on: warp-ubuntu-latest-x64-8x
@@ -212,7 +164,6 @@ jobs:
   miden-bench:
     name: miden-bench smoke tests
     runs-on: warp-ubuntu-latest-x64-8x
-    needs: [build-test-node]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -234,15 +185,20 @@ jobs:
           save-if: false
       - name: Run miden-bench CLI tests
         run: make test-miden-bench
-      - name: Fetch test node binaries
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - name: Restore test node binaries
+        id: cache-test-node
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
-          name: test-node-artifact
-          path: test-node-bin
-      - name: Restore test node permissions
-        run: chmod +x test-node-bin/*
+          path: target/test-node/install
+          key: ${{ runner.os }}-test-node-${{ hashFiles('Cargo.lock') }}
       - name: Start test node
-        run: TEST_NODE_SKIP_BUILD=1 TEST_NODE_BIN_DIR="$PWD/test-node-bin" TEST_NODE_GEN_GENESIS="$PWD/test-node-bin/gen-genesis" ./scripts/start-test-node.sh
+        run: make start-node
+      - name: Save test node binaries
+        if: steps.cache-test-node.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/next'
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: target/test-node/install
+          key: ${{ runner.os }}-test-node-${{ hashFiles('Cargo.lock') }}
       - name: Run miden-bench smoke tests
         run: make integration-test-miden-bench
       - name: Stop test node
@@ -252,7 +208,7 @@ jobs:
   integration-tests:
     name: Integration tests
     runs-on: warp-ubuntu-latest-x64-8x
-    needs: [build-test-node, build-note-transport]
+    needs: [build-note-transport]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -272,13 +228,12 @@ jobs:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: false
-      - name: Fetch test node binaries
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - name: Restore test node binaries
+        id: cache-test-node
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
-          name: test-node-artifact
-          path: test-node-bin
-      - name: Restore test node permissions
-        run: chmod +x test-node-bin/*
+          path: target/test-node/install
+          key: ${{ runner.os }}-test-node-${{ hashFiles('Cargo.lock') }}
       - name: Fetch note-transport binary
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -287,7 +242,13 @@ jobs:
       - name: Restore note-transport permissions
         run: chmod +x target/release/miden-note-transport-node-bin
       - name: Start test node
-        run: TEST_NODE_SKIP_BUILD=1 TEST_NODE_BIN_DIR="$PWD/test-node-bin" TEST_NODE_GEN_GENESIS="$PWD/test-node-bin/gen-genesis" ./scripts/start-test-node.sh
+        run: make start-node
+      - name: Save test node binaries
+        if: steps.cache-test-node.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/next'
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: target/test-node/install
+          key: ${{ runner.os }}-test-node-${{ hashFiles('Cargo.lock') }}
       - name: Start note transport
         run: ./scripts/start-ci-service.sh miden-note-transport-node-bin 57292 target/release/miden-note-transport-node-bin
       - name: Run integration tests
