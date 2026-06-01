@@ -54,7 +54,7 @@ use domain::account::{
     StorageMapEntries,
     StorageMapEntry,
 };
-use domain::note::{FetchedNote, NoteSyncBlock};
+use domain::note::{FetchedNote, NoteSyncBlock, SyncNotesResult};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::account::{Account, AccountCode, AccountId, StorageSlotName};
@@ -62,7 +62,7 @@ use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
-use miden_protocol::note::{Note, NoteId, NoteScript, NoteTag, NoteType, Nullifier};
+use miden_protocol::note::{NoteId, NoteScript, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_protocol::{EMPTY_WORD, Word};
 
@@ -205,7 +205,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// when the account has no storage maps).
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         // For accounts without public state, only the witness commitment is needed.
-        if !account_id.has_public_state() {
+        if !account_id.is_public() {
             let (block_number, proof) = self
                 .get_account_proof(
                     account_id,
@@ -300,17 +300,11 @@ pub trait NodeRpcClient: Send + Sync {
         Ok(FetchedAccount::new_public(account, summary))
     }
 
-    /// Fetches notes related to the specified tags using the `/SyncNotes` RPC endpoint,
-    /// paginating over the full block range and returning, in block-number order, every block in
-    /// that range that contains at least one note matching the requested tags.
+    /// Fetches the notes related to the specified tags using the `/SyncNotes` RPC endpoint.
     ///
     /// - `block_from`: The starting block number for the range (inclusive).
     /// - `block_to`: The ending block number for the range (inclusive).
     /// - `note_tags` is the set of tags used to filter the notes the client is interested in.
-    ///
-    /// Notes with attachments will have header-only metadata after this call; use
-    /// [`NodeRpcClient::sync_notes_with_details`] to also resolve their full metadata and
-    /// fetch public note bodies in a single follow-up call.
     async fn sync_notes(
         &self,
         block_from: BlockNumber,
@@ -325,14 +319,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// All public notes in the range are fetched (not just the ones the client tracks) to
     /// avoid revealing which specific notes the client is interested in.
     ///
-    /// Returns the resolved note blocks paired with a map of public note bodies keyed by
-    /// note ID.
+    /// Returns the resolved note blocks and the fetched public note bodies.
     async fn sync_notes_with_details(
         &self,
         block_from: BlockNumber,
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, Note>), RpcError> {
+    ) -> Result<SyncNotesResult, RpcError> {
         let blocks = self.sync_notes(block_from, block_to, note_tags).await?;
 
         let note_ids: Vec<NoteId> = blocks
@@ -354,7 +347,7 @@ pub trait NodeRpcClient: Send + Sync {
             }
         }
 
-        Ok((blocks, public_notes))
+        Ok(SyncNotesResult { blocks, public_notes })
     }
 
     /// Fetches the nullifiers corresponding to a list of prefixes using the
@@ -362,13 +355,14 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// - `prefix` is a list of nullifiers prefixes to search for.
     /// - `block_from`: The starting block number for the range (inclusive).
-    /// - `block_to`: The ending block number for the range (inclusive), or `None` to sync up to the
-    ///   chain tip.
+    /// - `block_to`: The ending block number for the range (inclusive). Callers that want to scan
+    ///   up to the chain tip should resolve it first (e.g. via
+    ///   [`NodeRpcClient::get_block_header_by_number`] with `None`).
     async fn sync_nullifiers(
         &self,
         prefix: &[u16],
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
 
     /// Fetches the account proof and optionally its details from the node, using the
@@ -412,7 +406,9 @@ pub trait NodeRpcClient: Send + Sync {
     ) -> Result<BTreeMap<Nullifier, Option<BlockNumber>>, RpcError> {
         let prefixes: Vec<u16> =
             requested_nullifiers.iter().map(crate::note::Nullifier::prefix).collect();
-        let retrieved_nullifiers = self.sync_nullifiers(&prefixes, block_from, None).await?;
+        let (chain_tip, _) = self.get_block_header_by_number(None, false).await?;
+        let retrieved_nullifiers =
+            self.sync_nullifiers(&prefixes, block_from, chain_tip.block_num()).await?;
 
         let mut nullifiers_height = BTreeMap::new();
         for nullifier in requested_nullifiers {

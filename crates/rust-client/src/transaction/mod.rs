@@ -68,7 +68,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::account::{Account, AccountCode, AccountId};
-use miden_protocol::asset::NonFungibleAsset;
+use miden_protocol::asset::{AssetCallbackFlag, AssetVaultKey, NonFungibleAsset};
 use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
 use miden_protocol::note::{
@@ -324,8 +324,11 @@ where
         // Verify that none of the authenticated input notes are already consumed.
         for note in &stored_note_records {
             if note.is_consumed() {
+                let id = note.id().expect(
+                    "stored note records reaching this check carry metadata so id() is Some",
+                );
                 return Err(ClientError::TransactionRequestError(
-                    TransactionRequestError::InputNoteAlreadyConsumed(note.id()),
+                    TransactionRequestError::InputNoteAlreadyConsumed(id),
                 ));
             }
         }
@@ -334,7 +337,7 @@ where
         stored_note_records.retain(InputNoteRecord::is_authenticated);
 
         let authenticated_note_ids =
-            stored_note_records.iter().map(InputNoteRecord::id).collect::<Vec<_>>();
+            stored_note_records.iter().filter_map(InputNoteRecord::id).collect::<Vec<_>>();
 
         // Upsert request notes missing from the store so they can be tracked and updated.
         // NOTE: Unauthenticated notes may be stored locally in an unverified/invalid state at
@@ -451,7 +454,7 @@ where
                 if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) =
                     note.state()
                 {
-                    Some(NoteTagRecord::with_note_source(*tag, note.id()))
+                    Some(NoteTagRecord::with_note_source(*tag, note.details_commitment()))
                 } else {
                     None
                 }
@@ -460,7 +463,7 @@ where
 
         new_tags.extend(note_updates.updated_output_notes().map(|note| {
             let note = note.inner();
-            NoteTagRecord::with_note_source(note.metadata().tag(), note.id())
+            NoteTagRecord::with_note_source(note.metadata().tag(), note.details_commitment())
         }));
 
         Ok(TransactionStoreUpdate::new(
@@ -1002,7 +1005,11 @@ pub(super) fn validate_account_request(
     transaction_request: &TransactionRequest,
     account: &Account,
 ) -> Result<(), ClientError> {
-    if account.is_faucet() {
+    let account_interface = AccountInterface::from_account(account);
+    if account_interface
+        .components()
+        .contains(&AccountComponentInterface::FungibleFaucet)
+    {
         // TODO(SantiagoPittella): Add faucet validations.
         Ok(())
     } else {
@@ -1026,7 +1033,7 @@ fn validate_basic_account_request(
     // Check if the account balance plus incoming assets is greater than or equal to the
     // outgoing fungible assets
     for (faucet_id, amount) in fungible_balance_map {
-        let account_asset_amount = account.vault().get_balance(faucet_id).unwrap_or(0);
+        let account_asset_amount = get_fungible_balance_by_faucet(account, faucet_id)?;
         let incoming_balance = incoming_fungible_balance_map.get(&faucet_id).unwrap_or(&0);
         if account_asset_amount + incoming_balance < amount {
             return Err(ClientError::AssetError(AssetError::FungibleAssetAmountNotSufficient {
@@ -1044,20 +1051,35 @@ fn validate_basic_account_request(
             Ok(false) => {
                 // Check if the non fungible asset is in the incoming assets
                 if !incoming_non_fungible_balance_set.contains(non_fungible) {
-                    return Err(ClientError::AssetError(
-                        AssetError::NonFungibleFaucetIdTypeMismatch(non_fungible.faucet_id()),
+                    return Err(ClientError::TransactionRequestError(
+                        TransactionRequestError::MissingNonFungibleAsset(non_fungible.faucet_id()),
                     ));
                 }
             },
             _ => {
-                return Err(ClientError::AssetError(AssetError::NonFungibleFaucetIdTypeMismatch(
-                    non_fungible.faucet_id(),
-                )));
+                return Err(ClientError::TransactionRequestError(
+                    TransactionRequestError::MissingNonFungibleAsset(non_fungible.faucet_id()),
+                ));
             },
         }
     }
 
     Ok(())
+}
+
+fn get_fungible_balance_by_faucet(
+    account: &Account,
+    faucet_id: AccountId,
+) -> Result<u64, ClientError> {
+    let mut total = 0u64;
+
+    for callback_flag in [AssetCallbackFlag::Disabled, AssetCallbackFlag::Enabled] {
+        let vault_key = AssetVaultKey::new_fungible(faucet_id, callback_flag);
+        let amount = account.vault().get_balance(vault_key).map_err(ClientError::AssetError)?;
+        total = total.saturating_add(u64::from(amount));
+    }
+
+    Ok(total)
 }
 
 /// Fetches a foreign account's proof and details from the network, converts them into

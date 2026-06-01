@@ -24,6 +24,7 @@ use miden_protocol::errors::{
 use miden_protocol::note::{
     Note,
     NoteDetails,
+    NoteDetailsCommitment,
     NoteId,
     NoteRecipient,
     NoteScript,
@@ -102,7 +103,7 @@ pub struct TransactionRequest {
     /// with their respective tags.
     ///
     /// For example, after a swap note is consumed, a payback note is expected to be created.
-    expected_future_notes: BTreeMap<NoteId, (NoteDetails, NoteTag)>,
+    expected_future_notes: BTreeMap<NoteDetailsCommitment, (NoteDetails, NoteTag)>,
     /// Initial state of the `AdviceMap` that provides data during runtime.
     advice_map: AdviceMap,
     /// Initial state of the `MerkleStore` that provides data during runtime.
@@ -252,19 +253,24 @@ impl TransactionRequest {
 
         // Add provided authenticated input notes to the input notes map.
         for authenticated_note_record in authenticated_note_records {
+            // Authenticated note records always carry metadata (their inclusion proof
+            // injected it), so `id()` is `Some`.
+            let authenticated_note_id = authenticated_note_record
+                .id()
+                .expect("authenticated note record carries metadata so id() is Some");
+
             if !authenticated_note_record.is_authenticated() {
                 return Err(TransactionRequestError::InputNoteNotAuthenticated(
-                    authenticated_note_record.id(),
+                    authenticated_note_id,
                 ));
             }
 
             if authenticated_note_record.is_consumed() {
                 return Err(TransactionRequestError::InputNoteAlreadyConsumed(
-                    authenticated_note_record.id(),
+                    authenticated_note_id,
                 ));
             }
 
-            let authenticated_note_id = authenticated_note_record.id();
             input_notes.insert(
                 authenticated_note_id,
                 authenticated_note_record
@@ -407,7 +413,8 @@ impl Deserializable for TransactionRequest {
         };
 
         let expected_output_recipients = BTreeMap::<Word, NoteRecipient>::read_from(source)?;
-        let expected_future_notes = BTreeMap::<NoteId, (NoteDetails, NoteTag)>::read_from(source)?;
+        let expected_future_notes =
+            BTreeMap::<NoteDetailsCommitment, (NoteDetails, NoteTag)>::read_from(source)?;
 
         let advice_map = AdviceMap::read_from(source)?;
         let merkle_store = MerkleStore::read_from(source)?;
@@ -451,10 +458,11 @@ pub(crate) fn collect_assets<'a>(
 
     assets.for_each(|asset| match asset {
         Asset::Fungible(fungible) => {
+            let amount = fungible.amount().as_u64();
             fungible_balance_map
                 .entry(fungible.faucet_id())
-                .and_modify(|balance| *balance += fungible.amount())
-                .or_insert(fungible.amount());
+                .and_modify(|balance| *balance += amount)
+                .or_insert(amount);
         },
         Asset::NonFungible(non_fungible) => {
             if !non_fungible_set.contains(non_fungible) {
@@ -491,7 +499,7 @@ pub enum TransactionRequestError {
     )]
     ForeignAccountDataMissing,
     #[error(
-        "foreign account {0} has an incompatible storage mode; use `ForeignAccount::public()` for public accounts and `ForeignAccount::private()` for private accounts"
+        "foreign account {0} has incompatible visibility; use `ForeignAccount::public()` for public accounts and `ForeignAccount::private()` for private accounts"
     )]
     InvalidForeignAccountId(AccountId),
     #[error(
@@ -520,6 +528,10 @@ pub enum TransactionRequestError {
     NoteArgError(#[source] NoteError),
     #[error("pay-to-ID note must contain at least one asset to transfer")]
     P2IDNoteWithoutAsset,
+    #[error(
+        "non-fungible asset issued by faucet {0} is not available in the account vault or incoming notes"
+    )]
+    MissingNonFungibleAsset(AccountId),
     #[error("PSWAP note can only be cancelled by its creator: expected {expected}, got {actual}")]
     PswapCancelCreatorMismatch { expected: AccountId, actual: AccountId },
     #[error("error building script")]
@@ -618,15 +630,14 @@ mod tests {
         }
 
         let mut advice_vec: Vec<(Word, Vec<Felt>)> = vec![];
-        for i in 0..10 {
-            advice_vec.push((rng.draw_word(), vec![Felt::new(i)]));
+        for i in 0u32..10 {
+            advice_vec.push((rng.draw_word(), vec![Felt::from(i)]));
         }
 
         let account = AccountBuilder::new(Default::default())
             .with_component(MockAccountComponent::with_empty_slots())
             .with_auth_component(auth_component())
-            .account_type(AccountType::RegularAccountImmutableCode)
-            .storage_mode(miden_protocol::account::AccountStorageMode::Private)
+            .account_type(AccountType::Private)
             .build_existing()
             .unwrap();
 

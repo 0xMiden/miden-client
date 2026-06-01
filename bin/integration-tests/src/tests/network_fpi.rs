@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use miden_client::account::AccountStorageMode;
+use miden_client::account::AccountType;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::testing::common::{execute_tx_and_sync, insert_new_wallet, wait_for_blocks};
 use miden_client::transaction::TransactionRequestBuilder;
@@ -8,8 +8,9 @@ use miden_client::{Felt, Word, ZERO};
 use super::fpi::{FPI_STORAGE_VALUE, MAP_KEY, MAP_SLOT_NAME, deploy_foreign_account};
 use super::network_transaction::{
     COUNTER_SLOT_NAME,
-    deploy_counter_contract,
+    deploy_network_counter_contract,
     get_network_note_with_script,
+    note_script_root,
 };
 use crate::tests::config::ClientConfig;
 
@@ -34,7 +35,7 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
     let (foreign_account, proc_root) = deploy_foreign_account(
         &mut client,
         &keystore,
-        AccountStorageMode::Public,
+        AccountType::Public,
         format!(
             r#"
             const MAP_STORAGE_SLOT = word("{MAP_SLOT_NAME}")
@@ -77,19 +78,6 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
     // creation block
     client2.sync_state().await?;
 
-    let target_network_account =
-        deploy_counter_contract(&mut client2, AccountStorageMode::Network).await?;
-
-    client2.sync_state().await?;
-
-    let (sender_account, ..) = insert_new_wallet(
-        &mut client2,
-        AccountStorageMode::Private,
-        &keystore2,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
-
     let network_fpi_note_script = format!(
         "
         use miden::protocol::tx
@@ -119,6 +107,23 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
         account_id_suffix = foreign_account_id.suffix(),
     );
 
+    // The counter account is deployed as a network account that allowlists the FPI note script, so
+    // the node routes the note to it and runs the network transaction.
+    let network_fpi_note_root =
+        note_script_root(&network_fpi_note_script, client2.source_manager())?;
+    let target_network_account = deploy_network_counter_contract(
+        &mut client2,
+        AccountType::Public,
+        &[network_fpi_note_root],
+    )
+    .await?;
+
+    client2.sync_state().await?;
+
+    let (sender_account, ..) =
+        insert_new_wallet(&mut client2, AccountType::Private, &keystore2, RPO_FALCON_SCHEME_ID)
+            .await?;
+
     let network_note = get_network_note_with_script(
         sender_account.id(),
         target_network_account.id(),
@@ -145,7 +150,7 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
 
     assert_eq!(
         updated_network_account.storage().get_item(&COUNTER_SLOT_NAME)?,
-        Word::from([Felt::new(2), ZERO, ZERO, ZERO])
+        Word::from([Felt::from(2u32), ZERO, ZERO, ZERO])
     );
 
     Ok(())

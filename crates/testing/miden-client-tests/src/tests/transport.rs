@@ -106,7 +106,9 @@ async fn transport_cursor_pagination() {
     recipient.sync_state().await.unwrap();
     let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 1, "should have 1 note after first sync");
-    assert_eq!(notes[0].id(), note_a.id());
+    // The note is delivered via the transport layer and isn't committed on-chain, so it has no
+    // metadata (and thus no `NoteId`); it's identified by its details commitment.
+    assert_eq!(notes[0].details_commitment(), note_a.details_commitment());
 
     // Send note B, sync → recipient receives note B (cursor advanced past A)
     sender.send_private_note(note_b.clone(), &recipient_address).await.unwrap();
@@ -192,12 +194,14 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
         .add_existing_mock_account(miden_testing::Auth::IncrNonce)
         .unwrap();
 
-    let private_note =
-        NoteBuilder::new(mock_account.id(), RandomCoin::new([1, 2, 3, 4].map(Felt::new).into()))
-            .note_type(ProtocolNoteType::Private)
-            .tag(NoteTag::new(0).into())
-            .build()
-            .unwrap();
+    let private_note = NoteBuilder::new(
+        mock_account.id(),
+        RandomCoin::new([1, 2, 3, 4].map(Felt::new_unchecked).into()),
+    )
+    .note_type(ProtocolNoteType::Private)
+    .tag(NoteTag::new(0).into())
+    .build()
+    .unwrap();
 
     let spawn_note =
         mock_chain_builder.add_spawn_note(std::slice::from_ref(&private_note)).unwrap();
@@ -232,7 +236,7 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
 
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
-    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
+    let rng = RandomCoin::new(coin_seed.map(|v| Felt::new_unchecked(v >> 1)).into());
 
     let keystore_path = temp_dir();
     let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
@@ -267,14 +271,14 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     // With the fix, lookback window catches it.
     let summary = client.sync_state().await.unwrap();
     assert!(
-        summary.new_private_notes.contains(&private_note.id()),
+        summary.new_private_notes.contains(&private_note.details_commitment()),
         "summary should report the NTL-imported note in new_private_notes"
     );
 
     // 7. The note should be Committed after the second sync.
     let committed_notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();
     assert!(
-        committed_notes.iter().any(|n| n.id() == private_note.id()),
+        committed_notes.iter().any(|n| n.id() == Some(private_note.id())),
         "note committed before sync_height should be found via lookback during NTL import"
     );
 }

@@ -63,6 +63,15 @@ pub(super) fn note_filter_output_notes_condition(filter: &NoteFilter) -> (String
             params.push(Rc::new(note_ids_list));
             "note.note_id IN rarray(?)".to_string()
         },
+        NoteFilter::DetailsCommitments(commitments) => {
+            let commitments_list = commitments
+                .iter()
+                .map(|commitment| Value::Text(commitment.to_hex()))
+                .collect::<Vec<Value>>();
+
+            params.push(Rc::new(commitments_list));
+            "note.details_commitment IN rarray(?)".to_string()
+        },
         NoteFilter::Nullifiers(nullifiers) => {
             let nullifiers_list = nullifiers
                 .iter()
@@ -188,6 +197,15 @@ pub(super) fn note_filter_input_notes_condition(filter: &NoteFilter) -> (String,
 
             params.push(Rc::new(note_ids_list));
             "(note.note_id IN rarray(?))".to_string()
+        },
+        NoteFilter::DetailsCommitments(commitments) => {
+            let commitments_list = commitments
+                .iter()
+                .map(|commitment| Value::Text(commitment.to_hex()))
+                .collect::<Vec<Value>>();
+
+            params.push(Rc::new(commitments_list));
+            "(note.details_commitment IN rarray(?))".to_string()
         },
         NoteFilter::Nullifiers(nullifiers) => {
             let nullifiers_list = nullifiers

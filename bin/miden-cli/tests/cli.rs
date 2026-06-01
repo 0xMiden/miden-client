@@ -7,6 +7,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use assert_cmd::Command;
 use assert_cmd::cargo::cargo_bin_cmd;
+use miden_client::account::component::FungibleFaucet;
 use miden_client::account::{AccountId, AccountStorageMode};
 use miden_client::address::{Address, NetworkId};
 use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
@@ -363,7 +364,10 @@ async fn token_symbol_mapping() -> Result<()> {
     };
 
     assert_eq!(note.assets().num_assets(), 1);
-    assert_eq!(note.assets().iter().next().unwrap().unwrap_fungible().amount(), 100_000);
+    assert_eq!(
+        note.assets().iter().next().unwrap().unwrap_fungible().amount().as_u64(),
+        100_000
+    );
     Ok(())
 }
 
@@ -446,8 +450,14 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
         let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
         let accounts = client.get_account_headers().await?;
 
-        let account_ids = accounts.iter().map(|(acc, _seed)| acc.id()).collect::<Vec<_>>();
-        let faucet_accounts = account_ids.iter().filter(|id| id.is_faucet()).collect::<Vec<_>>();
+        let mut faucet_accounts = Vec::new();
+        for (account_header, _) in accounts {
+            if let Some(account) = client.get_account(account_header.id()).await?
+                && FungibleFaucet::try_from(&account).is_ok()
+            {
+                faucet_accounts.push(account.id());
+            }
+        }
 
         assert_eq!(faucet_accounts.len(), 1);
 
@@ -1099,7 +1109,7 @@ async fn new_wallet_with_deploy_flag() -> Result<()> {
     sync_cli(&temp_dir);
 
     let mut create_wallet_cmd = cargo_bin_cmd!("miden-client");
-    create_wallet_cmd.args(["new-wallet", "-s", "public", "--deploy"]);
+    create_wallet_cmd.args(["new-wallet", "-t", "public", "--deploy"]);
 
     let output = create_wallet_cmd.current_dir(&temp_dir).output().unwrap();
     assert!(
@@ -1317,7 +1327,7 @@ fn consume_note_cli(cli_path: &Path, account_id: &str, note_ids: &[&str]) {
 }
 
 /// Creates a new faucet account using the CLI given by `cli_path`.
-fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
+fn new_faucet_cli(cli_path: &Path, visibility: AccountStorageMode) -> String {
     const INIT_DATA_FILENAME: &str = "init_data.toml";
     let mut create_faucet_cmd = cargo_bin_cmd!("miden-client");
 
@@ -1333,10 +1343,8 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
 
     create_faucet_cmd.args([
         "new-account",
-        "-s",
-        storage_mode.to_string().as_str(),
-        "--account-type",
-        "fungible-faucet",
+        "-t",
+        visibility.to_string().as_str(),
         "-p",
         "basic-fungible-faucet",
         "-i",
@@ -1357,9 +1365,9 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
 }
 
 /// Creates a new wallet account using the CLI given by `cli_path`.
-fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
+fn new_wallet_cli(cli_path: &Path, visibility: AccountStorageMode) -> String {
     let mut create_wallet_cmd = cargo_bin_cmd!("miden-client");
-    create_wallet_cmd.args(["new-wallet", "-s", storage_mode.to_string().as_str()]);
+    create_wallet_cmd.args(["new-wallet", "-t", visibility.to_string().as_str()]);
 
     let output = create_wallet_cmd.current_dir(cli_path).output().unwrap();
     assert!(
@@ -1418,7 +1426,7 @@ async fn create_rust_client_with_store_path(
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
 
-    let rng = Box::new(RandomCoin::new(coin_seed.map(Felt::new).into()));
+    let rng = Box::new(RandomCoin::new(coin_seed.map(Felt::new_unchecked).into()));
 
     let keystore = FilesystemKeyStore::new(temp_dir())?;
 
@@ -1540,6 +1548,7 @@ fn call_nonexistent_procedure() {
 /// Helper: builds the `call-test` package (arithmetic + storage procedures) at runtime and
 /// writes the serialized `.masp` to `out_path`.
 fn build_call_test_masp(out_path: &Path) {
+    use miden_client::account::StorageSlotName;
     use miden_client::account::component::{
         AccountComponentMetadata,
         FeltSchema,
@@ -1548,7 +1557,6 @@ fn build_call_test_masp(out_path: &Path) {
         ValueSlotSchema,
         WordSchema,
     };
-    use miden_client::account::{AccountType, StorageSlotName};
     use miden_client::assembly::{CodeBuilder, Library};
     use miden_client::vm::{
         Package,
@@ -1602,8 +1610,7 @@ fn build_call_test_masp(out_path: &Path) {
     )])
     .expect("valid storage schema");
 
-    let metadata = AccountComponentMetadata::new("call-test", AccountType::all())
-        .with_storage_schema(storage_schema);
+    let metadata = AccountComponentMetadata::new("call-test").with_storage_schema(storage_schema);
 
     let signature_overrides: [(&str, FunctionType); 2] = [
         ("add", FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt], [Type::Felt])),
@@ -1667,9 +1674,7 @@ fn setup_call_test_account() -> (PathBuf, String, PathBuf) {
     let mut create_cmd = cargo_bin_cmd!("miden-client");
     create_cmd.args([
         "new-account",
-        "--account-type",
-        "regular-account-immutable-code",
-        "-s",
+        "-t",
         "public",
         "-p",
         "auth/no-auth",
@@ -1829,10 +1834,8 @@ fn create_account_with_no_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",
@@ -1876,10 +1879,8 @@ fn create_account_with_multisig_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",
@@ -1914,10 +1915,8 @@ fn create_account_with_acl_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",
@@ -1945,10 +1944,8 @@ fn create_account_with_ecdsa_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",

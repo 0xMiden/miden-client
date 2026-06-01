@@ -170,9 +170,10 @@ impl TryInto<AccountHeader> for proto::account::AccountHeader {
             .ok_or(proto::account::AccountHeader::missing_field(stringify!(code_commitment)))?
             .try_into()?;
 
+        let nonce = Felt::new(nonce).map_err(|_| RpcConversionError::NotAValidFelt)?;
         Ok(AccountHeader::new(
             account_id,
-            Felt::new(nonce),
+            nonce,
             vault_root,
             storage_commitment,
             code_commitment,
@@ -237,6 +238,8 @@ impl proto::rpc::account_response::AccountDetails {
         known_account_codes: &BTreeMap<Word, AccountCode>,
         storage_requirements: &AccountStorageRequirements,
     ) -> Result<AccountDetails, crate::rpc::RpcError> {
+        use miden_protocol::account::StorageMapKeyHash;
+
         use crate::rpc::RpcError;
         use crate::rpc::domain::MissingFieldHelper;
 
@@ -276,8 +279,8 @@ impl proto::rpc::account_response::AccountDetails {
                     )));
                 }
                 for (proof, raw_key) in proofs.iter().zip(requested_keys.iter()) {
-                    let hashed_key = raw_key.hash().as_word();
-                    if proof.get(&hashed_key).is_none() {
+                    let hashed_key: StorageMapKeyHash = raw_key.hash();
+                    if proof.get(&Word::from(hashed_key)).is_none() {
                         return Err(RpcError::InvalidResponse(format!(
                             "proof for storage map key {} does not match the requested key",
                             raw_key.to_hex(),

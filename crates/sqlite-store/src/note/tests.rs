@@ -41,7 +41,8 @@ fn create_consumed_external_input_note(
     block_height: u32,
     consumer_account: Option<AccountId>,
 ) -> InputNoteRecord {
-    let serial_number: Word = [Felt::new(u64::from(index) + 2000), ZERO, ZERO, ZERO].into();
+    let serial_number: Word =
+        [Felt::new_unchecked(u64::from(index) + 2000), ZERO, ZERO, ZERO].into();
     let assets = NoteAssets::new(vec![]).unwrap();
     let recipient = NoteRecipient::new(
         serial_number,
@@ -61,7 +62,8 @@ fn create_consumed_external_input_note(
 
 /// Helper to create an expected (non-consumed) input note.
 fn create_expected_input_note(index: u32) -> InputNoteRecord {
-    let serial_number: Word = [Felt::new(u64::from(index) + 3000), ZERO, ZERO, ZERO].into();
+    let serial_number: Word =
+        [Felt::new_unchecked(u64::from(index) + 3000), ZERO, ZERO, ZERO].into();
     let assets = NoteAssets::new(vec![]).unwrap();
     let recipient = NoteRecipient::new(
         serial_number,
@@ -86,7 +88,8 @@ fn create_consumed_input_note_with_consumer(
     block_height: u32,
     consumed_tx_order: u32,
 ) -> InputNoteRecord {
-    let serial_number: Word = [Felt::new(u64::from(index) + 5000), ZERO, ZERO, ZERO].into();
+    let serial_number: Word =
+        [Felt::new_unchecked(u64::from(index) + 5000), ZERO, ZERO, ZERO].into();
     let assets = NoteAssets::new(vec![]).unwrap();
     let recipient = NoteRecipient::new(
         serial_number,

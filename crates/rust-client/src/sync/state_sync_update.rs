@@ -24,7 +24,7 @@ use super::SyncSummary;
 use crate::note::{NoteUpdateTracker, NoteUpdateType};
 use crate::rpc::domain::account_vault::AccountVaultUpdate;
 use crate::rpc::domain::storage_map::StorageMapUpdate;
-use crate::rpc::domain::transaction::TransactionRecord as RpcTransactionRecord;
+use crate::rpc::domain::transaction::TransactionInclusion;
 use crate::transaction::{DiscardCause, TransactionRecord, TransactionStatus};
 
 // STATE SYNC UPDATE
@@ -53,7 +53,7 @@ impl From<&StateSyncUpdate> for SyncSummary {
             .filter_map(|note_update| {
                 let note = note_update.inner();
                 if let NoteUpdateType::Insert = note_update.update_type() {
-                    Some(note.id())
+                    note.id()
                 } else {
                     None
                 }
@@ -65,8 +65,15 @@ impl From<&StateSyncUpdate> for SyncSummary {
             .updated_input_notes()
             .filter_map(|note_update| {
                 let note = note_update.inner();
-                if let NoteUpdateType::Update = note_update.update_type() {
-                    note.is_committed().then_some(note.id())
+                // `InsertCommitted` is a previously-tracked expected note that just committed, so
+                // it counts as committed (not as a newly-discovered note) even though it is
+                // persisted via a full-row insert.
+                if matches!(
+                    note_update.update_type(),
+                    NoteUpdateType::Update | NoteUpdateType::InsertCommitted
+                ) && note.is_committed()
+                {
+                    note.id()
                 } else {
                     None
                 }
@@ -81,11 +88,8 @@ impl From<&StateSyncUpdate> for SyncSummary {
             }))
             .collect();
 
-        let consumed_note_ids: BTreeSet<NoteId> = value
-            .note_updates
-            .updated_input_notes()
-            .filter_map(|note| note.inner().is_consumed().then_some(note.inner().id()))
-            .collect();
+        let consumed_note_ids: BTreeSet<NoteId> =
+            value.note_updates.consumed_input_note_ids().collect();
 
         SyncSummary::new(
             value.block_num,
@@ -216,12 +220,14 @@ impl TransactionUpdateTracker {
 
     /// Applies the necessary state transitions to the [`TransactionUpdateTracker`] when a
     /// transaction is included in a block.
-    pub fn apply_transaction_inclusion(&mut self, record: &RpcTransactionRecord, timestamp: u64) {
-        let header = &record.transaction_header;
-        let account_id = header.account_id();
-
-        if let Some(transaction) = self.transactions.get_mut(&header.id()) {
-            transaction.commit_transaction(record.block_num, timestamp);
+    pub fn apply_transaction_inclusion(
+        &mut self,
+        transaction_inclusion: &TransactionInclusion,
+        timestamp: u64,
+    ) {
+        if let Some(transaction) = self.transactions.get_mut(&transaction_inclusion.transaction_id)
+        {
+            transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
             return;
         }
 
@@ -229,18 +235,19 @@ impl TransactionUpdateTracker {
         // authenticates these notes during processing, which changes the transaction
         // ID. Match by account ID and pre-transaction state instead.
         if let Some(transaction) = self.transactions.values_mut().find(|tx| {
-            tx.details.account_id == account_id
-                && tx.details.init_account_state == header.initial_state_commitment()
+            tx.details.account_id == transaction_inclusion.account_id
+                && tx.details.init_account_state == transaction_inclusion.initial_state_commitment
         }) {
-            transaction.commit_transaction(record.block_num, timestamp);
+            transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
             return;
         }
 
         // No local transaction matched. This is an external transaction by a tracked account.
         // Record the nullifier→account mappings so we can attribute note consumption to tracked
         // accounts during nullifier processing.
-        for commitment in header.input_notes().iter() {
-            self.external_nullifier_accounts.insert(commitment.nullifier(), account_id);
+        for nullifier in &transaction_inclusion.nullifiers {
+            self.external_nullifier_accounts
+                .insert(*nullifier, transaction_inclusion.account_id);
         }
     }
 
@@ -450,7 +457,9 @@ impl PublicAccountDelta {
         )?;
         let vault_delta = replay_vault_updates(local_vault, &self.vault_updates)?;
 
-        let nonce_delta = Felt::new(new_nonce - old_nonce);
+        let nonce_delta = Felt::new(new_nonce - old_nonce).expect(
+            "new_nonce was checked to be higher than old_nonce; should return a valid nonce",
+        );
 
         AccountDelta::new(self.new_header.id(), storage_delta, vault_delta, nonce_delta)
     }
@@ -619,7 +628,12 @@ mod tests {
     }
 
     fn word(n: u64) -> Word {
-        Word::from([Felt::new(n), Felt::new(0), Felt::new(0), Felt::new(0)])
+        Word::from([
+            Felt::new_unchecked(n),
+            Felt::new_unchecked(0),
+            Felt::new_unchecked(0),
+            Felt::new_unchecked(0),
+        ])
     }
 
     fn fungible(amount: u64) -> Asset {
@@ -629,7 +643,7 @@ mod tests {
     fn header_with_nonce(nonce: u64) -> AccountHeader {
         AccountHeader::new(
             account_id(),
-            Felt::new(nonce),
+            Felt::new(nonce).expect("test nonce must be a valid Felt"),
             Word::default(),
             Word::default(),
             Word::default(),
@@ -873,7 +887,7 @@ mod tests {
             .compute_account_delta(&local_header, &local_storage, &local_vault)
             .unwrap();
 
-        assert_eq!(delta.nonce_delta(), Felt::new(3));
+        assert_eq!(delta.nonce_delta(), Felt::new_unchecked(3));
         assert!(delta.storage().is_empty());
         assert!(delta.vault().is_empty());
     }

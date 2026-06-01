@@ -8,6 +8,7 @@ use miden_protocol::note::{
     NoteAssets,
     NoteAttachments,
     NoteDetails,
+    NoteDetailsCommitment,
     NoteFile,
     NoteId,
     NoteInclusionProof,
@@ -51,8 +52,8 @@ pub struct OutputNoteRecord {
     state: OutputNoteState,
     /// The expected block height at which the note should be included in the chain.
     expected_height: BlockNumber,
-    /// The note's attachments. Required to consume the note, since consumption needs the full
-    /// attachment content (the note commitment only commits to the attachment digest). Empty when
+    /// The note's attachments. Required to reconstruct a [`Note`] whose commitment matches the
+    /// on-chain note, since the attachments contribute to the note metadata commitment. Empty when
     /// the note's full details have not been fetched yet (e.g. expected notes).
     attachments: NoteAttachments,
 }
@@ -77,7 +78,13 @@ impl OutputNoteRecord {
     }
 
     pub fn id(&self) -> NoteId {
-        NoteId::new(self.recipient_digest, self.assets.commitment())
+        NoteId::new(self.details_commitment(), &self.metadata)
+    }
+
+    /// Returns the commitment to the note's details (recipient + assets), independent of
+    /// note metadata. Use this as a stable identifier when metadata may not be present.
+    pub fn details_commitment(&self) -> NoteDetailsCommitment {
+        NoteDetailsCommitment::from_raw_commitments(self.recipient_digest, self.assets.commitment())
     }
 
     pub fn recipient_digest(&self) -> Word {
@@ -110,12 +117,8 @@ impl OutputNoteRecord {
 
     pub fn nullifier(&self) -> Option<Nullifier> {
         let recipient = self.recipient()?;
-        Some(Nullifier::new(
-            recipient.script().root().into(),
-            recipient.storage().commitment(),
-            self.assets.commitment(),
-            recipient.serial_num(),
-        ))
+        let details = NoteDetails::new(self.assets.clone(), recipient.clone());
+        Some(Nullifier::from_details_and_metadata(&details, &self.metadata))
     }
 
     pub fn expected_height(&self) -> BlockNumber {

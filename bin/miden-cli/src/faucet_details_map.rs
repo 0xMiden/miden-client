@@ -140,11 +140,11 @@ impl FaucetDetailsMap {
                     token_symbol.clone(),
                 ))?
                 .decimals;
-            let amount = base_units_to_tokens(asset.amount(), decimals);
+            let amount = base_units_to_tokens(asset.amount().as_u64(), decimals);
 
             Ok((token_symbol, amount))
         } else {
-            Ok((asset.faucet_id().to_hex(), asset.amount().to_string()))
+            Ok((asset.faucet_id().to_hex(), asset.amount().as_u64().to_string()))
         }
     }
 }

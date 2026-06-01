@@ -347,10 +347,8 @@ impl NodeRpcClient for MockRpcApi {
         upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError> {
         let chain_tip = self.get_chain_tip_block_num();
-        // The mock chain doesn't distinguish committed vs proven tips, but respects
-        // explicit block numbers.
+        // The mock chain doesn't distinguish committed vs proven tips.
         let target_block = match upper_bound {
-            SyncTarget::BlockNumber(block_num) => block_num.min(chain_tip),
             SyncTarget::CommittedChainTip | SyncTarget::ProvenChainTip => chain_tip,
         };
 
@@ -362,7 +360,10 @@ impl NodeRpcClient for MockRpcApi {
 
         let mmr_delta = self
             .get_mmr()
-            .get_delta(Forest::new(from_forest), Forest::new(target_block.as_usize()))
+            .get_delta(
+                Forest::new(from_forest).unwrap(),
+                Forest::new(target_block.as_usize()).unwrap(),
+            )
             .unwrap();
 
         let block_header = self.get_block_by_num(target_block);
@@ -407,8 +408,7 @@ impl NodeRpcClient for MockRpcApi {
         for note in hit_notes {
             let fetched_note = match note {
                 MockChainNote::Private(note_id, note_metadata, note_inclusion_proof) => {
-                    let note_header = NoteHeader::new(*note_id, *note_metadata);
-                    FetchedNote::Private(note_header, note_inclusion_proof.clone())
+                    FetchedNote::Private(*note_id, *note_metadata, note_inclusion_proof.clone())
                 },
                 MockChainNote::Public(note, note_inclusion_proof) => {
                     FetchedNote::Public(note.clone(), note_inclusion_proof.clone())
@@ -474,7 +474,7 @@ impl NodeRpcClient for MockRpcApi {
             AccountStateAt::ChainTip => mock_chain.latest_block_header().block_num(),
         };
 
-        let headers = if account_id.has_public_state() {
+        let headers = if account_id.is_public() {
             let account = mock_chain.committed_account(account_id).unwrap();
 
             let mut map_details = vec![];
@@ -539,7 +539,7 @@ impl NodeRpcClient for MockRpcApi {
         &self,
         prefixes: &[u16],
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         let nullifiers = self
             .mock_chain
@@ -547,11 +547,7 @@ impl NodeRpcClient for MockRpcApi {
             .nullifier_tree()
             .entries()
             .filter_map(|(nullifier, block_num)| {
-                let within_range = if let Some(to_block) = block_to {
-                    block_num >= block_from && block_num <= to_block
-                } else {
-                    block_num >= block_from
-                };
+                let within_range = block_num >= block_from && block_num <= block_to;
 
                 if prefixes.contains(&nullifier.prefix()) && within_range {
                     Some(NullifierUpdate { nullifier, block_num })
