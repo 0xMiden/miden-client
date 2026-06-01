@@ -59,8 +59,8 @@ pub use states::{
 pub struct InputNoteRecord {
     /// Details of a note consisting of assets, script, inputs, and a serial number.
     details: NoteDetails,
-    /// The note's attachments. Required to reconstruct a [`Note`] whose commitment matches the
-    /// on-chain note, since the attachments contribute to the note metadata commitment. Empty when
+    /// The note's attachments. Required to consume the note, since consumption needs the full
+    /// attachment content (the note commitment only commits to the attachment digest). Empty when
     /// the note's full details have not been fetched yet (e.g. expected notes).
     attachments: NoteAttachments,
     /// The timestamp at which the note was created. If it's not known, it will be None.
@@ -70,7 +70,6 @@ pub struct InputNoteRecord {
 }
 
 impl InputNoteRecord {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         details: NoteDetails,
         attachments: NoteAttachments,

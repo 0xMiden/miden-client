@@ -323,13 +323,12 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
 }
 
 /// Validates end-to-end against a real node that a note created for a network account is consumed
-/// by that account and the client records the consumption.
+/// by that account and the client attributes the consumption to it.
 ///
 /// The network account consumes the note via same-batch erasure, whose RPC stream carries only the
 /// `NoteHeader`. The network-account target lives in the note attachment (not delivered by that
-/// stream), so the consumer is not derivable: the note is recorded as consumed with an unknown
-/// consumer rather than attributed to the network account. The test therefore asserts the note
-/// reaches a consumed state, not the consumer identity.
+/// stream), but the creating client holds the attachments locally on the output note, so it derives
+/// the consumer and records the note as consumed by the network account.
 pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.into_client().await?;
     client.sync_state().await?;
@@ -371,23 +370,25 @@ pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> R
         wait_for_blocks(&mut client, 1).await;
     }
 
-    // The note is consumed via same-batch erasure, so the consumer is not derivable and the note
-    // is recorded as consumed with an unknown consumer. Poll until the client records it consumed.
-    let mut consumed = false;
+    // The note is consumed via same-batch erasure. The creating client derives the consumer from
+    // the output note's attachments, so it records the note as consumed by the network account.
+    // Poll until the client records the consumption.
+    let mut consumer = None;
     for _ in 0..10 {
         client.sync_state().await?;
         if let Some(record) = client.get_input_note(note_id).await?
             && record.is_consumed()
         {
-            consumed = true;
+            consumer = record.consumer_account();
             break;
         }
         wait_for_blocks(&mut client, 1).await;
     }
 
-    assert!(
-        consumed,
-        "network note should be marked consumed after the network account consumes it"
+    assert_eq!(
+        consumer,
+        Some(network_account_id),
+        "the network note's consumer should be the network account"
     );
 
     Ok(())

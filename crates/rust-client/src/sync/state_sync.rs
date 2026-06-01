@@ -248,7 +248,8 @@ impl StateSync {
 
         let mut state_sync_update = StateSyncUpdate {
             block_num,
-            note_updates: NoteUpdateTracker::new(input_notes, output_notes),
+            note_updates: NoteUpdateTracker::new(input_notes, output_notes)
+                .with_tracked_accounts(account_ids.iter().copied().collect()),
             transaction_updates: TransactionUpdateTracker::new(uncommitted_transactions),
             ..Default::default()
         };
@@ -1706,10 +1707,9 @@ mod tests {
     /// network account that consumes it in the same batch, so the note never appears in the
     /// block body and the mock RPC surfaces it as erased in the transaction sync response.
     ///
-    /// The consumer account is not derivable from the erased note's [`NoteHeader`] (the network
-    /// target lives in the attachment content, which the erased-note stream does not deliver), so
-    /// the output note is marked consumed but no input note record is attributed to the network
-    /// account.
+    /// The consumer is derived from the tracked output note's attachments (which encode the network
+    /// target), so the output note is marked consumed and a consumed input note record is created
+    /// and attributed to the network account.
     #[tokio::test]
     #[allow(clippy::too_many_lines)]
     async fn erased_notes_are_marked_as_consumed_by_network_account() {
@@ -1774,7 +1774,7 @@ mod tests {
             metadata,
             OutputNoteState::ExpectedFull { recipient },
             BlockNumber::from(1u32),
-            NoteAttachments::default(),
+            attachments,
         );
         let erased_note_id = output_note.id();
         let erased_note_header = NoteHeader::new(erased_note_id, metadata);
@@ -1821,11 +1821,17 @@ mod tests {
             updated_output.inner().state()
         );
 
-        // The consumer is not derivable from the erased note header, so no input note record is
-        // attributed to the network account.
-        assert!(
-            update.note_updates.updated_input_notes().all(|n| n.id() != erased_note_id),
-            "no input note should be attributed to the network account for an erased note",
+        // The consumer is derived from the output note's attachments, so the erased note is
+        // surfaced as a consumed input note attributed to the network account.
+        let consumed_input = update
+            .note_updates
+            .updated_input_notes()
+            .find(|n| n.id() == erased_note_id)
+            .expect("an input note should be attributed to the network account");
+        assert_eq!(
+            consumed_input.inner().consumer_account(),
+            Some(network_account_id),
+            "the erased note's consumer should be the network account",
         );
     }
 }

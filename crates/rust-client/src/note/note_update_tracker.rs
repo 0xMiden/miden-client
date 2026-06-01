@@ -1,4 +1,4 @@
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
@@ -206,6 +206,9 @@ pub struct NoteUpdateTracker {
     /// Nullifiers from the same account are in execution order; ordering across different
     /// accounts is not guaranteed.
     nullifier_order: BTreeMap<Nullifier, u32>,
+    /// Account IDs tracked by this client. Used to attribute erased-note consumptions only to
+    /// accounts the client follows.
+    tracked_accounts_ids: BTreeSet<AccountId>,
 }
 
 impl NoteUpdateTracker {
@@ -223,6 +226,13 @@ impl NoteUpdateTracker {
         }
 
         tracker
+    }
+
+    /// Sets the account IDs tracked by this client, used to attribute erased-note consumptions.
+    #[must_use]
+    pub fn with_tracked_accounts(mut self, tracked_accounts_ids: BTreeSet<AccountId>) -> Self {
+        self.tracked_accounts_ids = tracked_accounts_ids;
+        self
     }
 
     /// Creates a [`NoteUpdateTracker`] for updates related to transactions.
@@ -378,15 +388,27 @@ impl NoteUpdateTracker {
     /// created and consumed within the same batch, so it never appeared in the block body.
     /// The `block_num` is the block in which the creating transaction was committed.
     ///
-    /// The consumer account id is not derivable from a [`NoteHeader`] alone: attachment
-    /// content lives on `NoteAttachments`, which the erased-note RPC stream does not deliver.
-    /// Any input record for the erased note is marked consumed with an unknown consumer.
+    /// The erased-note RPC stream delivers only the [`NoteHeader`], whose metadata commits to the
+    /// attachment digest rather than carrying the attachment content. The consumer is therefore
+    /// derived from the locally tracked output note's attachments (the client created the note, so
+    /// it holds them): when they encode a [`NetworkAccountTarget`] for an account tracked by this
+    /// client, a consumed input record is created from the output note and attributed to that
+    /// network account.
     pub(crate) fn mark_erased_note_as_consumed(
         &mut self,
         note_header: &NoteHeader,
         block_num: BlockNumber,
     ) -> Result<(), ClientError> {
         let note_id = note_header.id();
+
+        let consumer_account = self
+            .output_notes
+            .get(&note_id)
+            .and_then(|output_note| {
+                NetworkAccountTarget::try_from(output_note.inner().attachments()).ok()
+            })
+            .map(|target| target.target_id())
+            .filter(|id| self.tracked_accounts_ids.contains(id));
 
         if let Some(output_note) = self.get_output_note_by_id(note_id)
             && !output_note.is_consumed()
@@ -396,14 +418,14 @@ impl NoteUpdateTracker {
             output_note.nullifier_received(nullifier, block_num)?;
         }
 
+        if let Some(consumer_id) = consumer_account {
+            self.try_insert_consumed_input_from_output(note_id, consumer_id, block_num, Some(0))?;
+        }
+
         if let Some(input_note_update) = self.input_notes.get_mut(&note_id)
             && !input_note_update.inner().is_consumed()
         {
             let nullifier = input_note_update.inner().nullifier();
-            let consumer_account =
-                NetworkAccountTarget::try_from(input_note_update.inner().attachments())
-                    .ok()
-                    .map(|target| target.target_id());
             input_note_update.inner_mut().consumed_externally(
                 nullifier,
                 block_num,
@@ -639,6 +661,8 @@ impl Serializable for NoteUpdateTracker {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         // `input_notes_by_nullifier` and `output_notes_by_nullifier` are lookup indices that can
         // be reconstructed from `input_notes` and `output_notes`, so they are not serialized.
+        // `tracked_accounts_ids` is sync-time configuration rather than note state, so it is also
+        // not serialized.
         self.input_notes.write_into(target);
         self.output_notes.write_into(target);
         self.nullifier_order.write_into(target);
@@ -668,6 +692,7 @@ impl Deserializable for NoteUpdateTracker {
             input_notes_by_nullifier,
             output_notes_by_nullifier,
             nullifier_order,
+            tracked_accounts_ids: BTreeSet::new(),
         })
     }
 }
