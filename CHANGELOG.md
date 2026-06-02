@@ -5,6 +5,7 @@
 ### Fixes
 
 * [FIX] Fixed `derive_account_commitments` to return the final account commitment when multiple transactions for the same account are committed in the same block ([#2164](https://github.com/0xMiden/miden-client/pull/2164)).
+* [FIX] Stopped state sync from aborting when the node reports a stale (non-monotonic) header for a rapidly-advancing account: such updates are now skipped instead of failing with a nonce error ([#2216](https://github.com/0xMiden/miden-client/pull/2216)).
 
 ### Changes
 

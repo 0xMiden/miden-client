@@ -351,6 +351,14 @@ impl PublicAccountUpdate {
             Self::Delta(delta) => delta.id(),
         }
     }
+
+    /// Returns the account nonce that this update advances the local state to.
+    pub fn nonce(&self) -> Felt {
+        match self {
+            Self::Full(account) => account.nonce(),
+            Self::Delta(delta) => delta.new_header().nonce(),
+        }
+    }
 }
 
 /// Incremental delta payload for a public account update.

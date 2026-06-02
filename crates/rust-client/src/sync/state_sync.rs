@@ -598,6 +598,19 @@ impl StateSync {
             };
 
             let public_update = self.sync_public_account(local_hint, block_from).await?;
+
+            // A differing commitment does not guarantee a newer state. The commitment updates are
+            // derived from in-range transactions while the proof is read at the moving chain tip,
+            // so an account that advances on consecutive blocks (such as a network
+            // account driven by the node) can leave the locally stored nonce ahead of
+            // an in-range commitment. Applying a non-monotonic update would abort the
+            // whole sync, so stale updates are dropped here.
+            if public_update.nonce().as_canonical_u64()
+                <= local_hint.header.nonce().as_canonical_u64()
+            {
+                continue;
+            }
+
             account_updates.extend(AccountUpdates::new(vec![public_update], Vec::new()));
         }
 
