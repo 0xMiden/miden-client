@@ -999,12 +999,45 @@ pub(super) fn validate_account_request(
     transaction_request: &TransactionRequest,
     account: &Account,
 ) -> Result<(), ClientError> {
+    // Output notes emitted by this transaction must declare the executing account as their
+    // sender. The kernel binds an emitted note's sender to the account that produces it, and
+    // note scripts (e.g. P2IDE reclaim) authorize on that field, so a foreign sender is
+    // unsatisfiable. Reject it here — read-only, before any execution or store writes —
+    // instead of failing deep in transaction script building.
+    validate_output_note_senders(transaction_request, account.id())?;
+
     if account.is_faucet() {
         // TODO(SantiagoPittella): Add faucet validations.
         Ok(())
     } else {
         validate_basic_account_request(transaction_request, account)
     }
+}
+
+/// Verifies that every output note emitted directly by the transaction declares `account_id` as
+/// its sender.
+///
+/// A note's sender is bound by the kernel to the account that emits it, and note scripts (e.g.
+/// P2IDE reclaim) authorize on that field, so an output note declaring a foreign sender can never
+/// be executed. Catching it here yields a clear, immediate error instead of a cryptic failure deep
+/// in transaction script building.
+fn validate_output_note_senders(
+    transaction_request: &TransactionRequest,
+    account_id: AccountId,
+) -> Result<(), ClientError> {
+    for note in transaction_request.expected_output_own_notes() {
+        let sender = note.metadata().sender();
+        if sender != account_id {
+            return Err(ClientError::TransactionRequestError(
+                TransactionRequestError::OutputNoteSenderMismatch {
+                    expected: account_id,
+                    actual: sender,
+                },
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 /// Ensures a transaction request is compatible with the current account state,
@@ -1148,4 +1181,97 @@ pub(crate) fn validate_executed_transaction(
     }
 
     Ok(())
+}
+
+// TESTS
+// ================================================================================================
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec;
+
+    use miden_protocol::Word;
+    use miden_protocol::account::AccountId;
+    use miden_protocol::asset::FungibleAsset;
+    use miden_protocol::crypto::rand::RandomCoin;
+    use miden_protocol::note::{Note, NoteAttachments, NoteType};
+    use miden_protocol::testing::account_id::{
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+        ACCOUNT_ID_SENDER,
+    };
+    use miden_standards::note::P2idNote;
+
+    use super::{TransactionRequestBuilder, validate_output_note_senders};
+    use crate::ClientError;
+    use crate::transaction::TransactionRequestError;
+
+    fn own_note_with_sender(sender: AccountId) -> Note {
+        let faucet_id = AccountId::try_from(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET).unwrap();
+        let target_id =
+            AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+        let mut rng = RandomCoin::new(Word::default());
+
+        P2idNote::create(
+            sender,
+            target_id,
+            vec![FungibleAsset::new(faucet_id, 100).unwrap().into()],
+            NoteType::Public,
+            NoteAttachments::empty(),
+            &mut rng,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn output_note_with_foreign_sender_is_rejected() {
+        let account_id =
+            AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+        let foreign_sender = AccountId::try_from(ACCOUNT_ID_SENDER).unwrap();
+        assert_ne!(account_id, foreign_sender);
+
+        let request = TransactionRequestBuilder::new()
+            .own_output_notes(vec![own_note_with_sender(foreign_sender)])
+            .build()
+            .unwrap();
+
+        let err = validate_output_note_senders(&request, account_id).unwrap_err();
+        match err {
+            ClientError::TransactionRequestError(
+                TransactionRequestError::OutputNoteSenderMismatch { expected, actual },
+            ) => {
+                assert_eq!(expected, account_id);
+                assert_eq!(actual, foreign_sender);
+            },
+            other => panic!("expected OutputNoteSenderMismatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn output_note_with_matching_sender_is_accepted() {
+        let account_id =
+            AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+
+        let request = TransactionRequestBuilder::new()
+            .own_output_notes(vec![own_note_with_sender(account_id)])
+            .build()
+            .unwrap();
+
+        validate_output_note_senders(&request, account_id).unwrap();
+    }
+
+    #[test]
+    fn request_without_own_output_notes_is_accepted() {
+        let account_id =
+            AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+        let faucet_id = AccountId::try_from(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET).unwrap();
+
+        // A consume-only request (input note, no own output notes) must pass the sender check.
+        let request = TransactionRequestBuilder::new()
+            .input_notes(vec![(own_note_with_sender(faucet_id), None)])
+            .build()
+            .unwrap();
+
+        validate_output_note_senders(&request, account_id).unwrap();
+    }
 }

@@ -5,6 +5,7 @@
 ### Fixes
 
 * [FIX] Fixed `derive_account_commitments` to return the final account commitment when multiple transactions for the same account are committed in the same block ([#2164](https://github.com/0xMiden/miden-client/pull/2164)).
+* [FIX][rust] Transaction requests whose output notes declare a sender other than the executing account are now rejected up front during request validation with a clear `TransactionRequestError::OutputNoteSenderMismatch`, instead of failing late inside transaction script building (the late failure surfaced as a cryptic `account interface error: invalid sender account` and could leave wallet integrations stuck retrying). ([#89](https://github.com/0xMiden/wallet-adapter/issues/89))
 
 ### Changes
 

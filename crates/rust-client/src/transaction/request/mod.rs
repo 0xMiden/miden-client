@@ -500,6 +500,10 @@ pub enum TransactionRequestError {
     InputNoteNotAuthenticated(NoteId),
     #[error("note {0} has already been consumed")]
     InputNoteAlreadyConsumed(NoteId),
+    #[error(
+        "output note declares sender {actual} but the transaction is executed by account {expected}"
+    )]
+    OutputNoteSenderMismatch { expected: AccountId, actual: AccountId },
     #[error("sender account {0} is not tracked by this client or does not exist")]
     InvalidSenderAccount(AccountId),
     #[error("invalid transaction script")]
