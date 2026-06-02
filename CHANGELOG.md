@@ -1,10 +1,16 @@
 # Changelog
 
-## 0.14.8 (Unreleased)
+## 0.14.10 (Unreleased)
 
 ### Fixes
 
 * [FIX][rust] `Client::send_private_note` is now durable across transient NTL failures. The relay outbox — a `Vec<NoteInfo>` of private notes whose chain transaction committed but whose transport delivery has not yet succeeded — is persisted under a single `note_transport_outbox` key in the existing `settings` k/v before invoking the transport. On `send_note` success the entry is removed; on failure it stays queued and `Client::sync_state` retries it on every subsequent sync (the receiver dedups by note id). Previously a single transient `send_note` rejection would permanently lose the private note — the chain transaction had already committed, the sender's vault was debited, and the recipient never learned of the note. New `Client::flush_relay_outbox()` lets callers drive retries without a full sync cycle ([#2127](https://github.com/0xMiden/miden-client/pull/2127)).
+
+## 0.14.9 (2026-05-19)
+
+### Enhancements
+
+* Bumped `miden-vm` workspace dependencies from 0.22.1 to 0.22.4.
 
 ## 0.14.7 (2026-06-05)
 
@@ -40,6 +46,7 @@
 
 ### Features
 
+* [FEATURE] Distinct `ApplyTransactionAfterSubmitFailed` error variant for the case where `submit_proven_transaction` succeeds but the local store update fails. The error carries the pending `TransactionStoreUpdate` so callers can persist it and re-apply later via `apply_transaction_update` without resubmitting (which the node would reject if the original is still in the mempool or has been finalized in a block, since the account and network state have already been mutated by the accepted copy) ([#2059](https://github.com/0xMiden/miden-client/pull/2059)).
 * [FEATURE][web] Serialize all async `WebClient` JS methods — both the explicit wrappers and every async call that falls through `createClientProxy` to the underlying WASM client (e.g. `getAccount`, `importAccountById`, `getAccountStorage`) — via an internal `_serializeWasmCall` chain. Prevents `"recursive use of an object detected"` panics when an unwrapped read/write races the auto-sync timer or any explicitly-wrapped method. Expose `waitForIdle()` on `MidenClient` so callers can drain in-flight work before mutating non-WASM state ([#2057](https://github.com/0xMiden/miden-client/pull/2057)).
 * [FEATURE][web] Split `@miden-sdk/miden-sdk` into eager and lazy entry points. The default entry (`import from "@miden-sdk/miden-sdk"`) now awaits WASM at module top level via a small shim (`js/eager.js`) — consumers don't need `await MidenClient.ready()` / `isReady` before constructing wasm-bindgen types. The lazy entry (`import from "@miden-sdk/miden-sdk/lazy"`) preserves the previous behavior and is required for Capacitor WKWebView hosts (the custom-scheme handler hangs on TLA) and Next.js SSR. Verified empirically against the Miden Wallet's iOS E2E suite on devnet. `@miden-sdk/react` imports from `/lazy` internally and manages readiness via `isReady`.
 * [FEATURE][web] Expose `lastAuthError()` on `MidenClient` for typed sign-callback failure recovery — preserves the raw thrown value from the JS signCallback so consumers can distinguish locked/rejected/IO-error failure modes ([#2058](https://github.com/0xMiden/miden-client/pull/2058)).
