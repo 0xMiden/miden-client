@@ -1,3 +1,4 @@
+use core::future::{Future, ready};
 use std::path::PathBuf;
 
 use deadpool::Runtime;
@@ -73,7 +74,11 @@ impl Manager for SqlitePoolManager {
         deadpool_sync::SyncWrapper::new(RUNTIME, move || conn).await
     }
 
-    async fn recycle(&self, _: &mut Self::Type, _: &Metrics) -> RecycleResult<Self::Error> {
-        Ok(())
+    fn recycle(
+        &self,
+        _: &mut Self::Type,
+        _: &Metrics,
+    ) -> impl Future<Output = RecycleResult<Self::Error>> {
+        ready(Ok(()))
     }
 }
