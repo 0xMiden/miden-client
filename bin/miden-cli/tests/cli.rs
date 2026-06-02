@@ -18,11 +18,11 @@ use miden_client::note::{
     NoteAssets,
     NoteFile,
     NoteId,
-    NoteMetadata,
     NoteRecipient,
     NoteStorage,
     NoteTag,
     NoteType,
+    PartialNoteMetadata,
 };
 use miden_client::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT;
 use miden_client::rpc::Endpoint;
@@ -969,7 +969,7 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     let note_script = client.code_builder().compile_note_script(note_script).unwrap();
     let inputs = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
-    let note_metadata = NoteMetadata::new(account.id(), NoteType::Private)
+    let note_metadata = PartialNoteMetadata::new(account.id(), NoteType::Private)
         .with_tag(NoteTag::with_account_target(account.id()));
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note_recipient = NoteRecipient::new(serial_num, note_script, inputs);

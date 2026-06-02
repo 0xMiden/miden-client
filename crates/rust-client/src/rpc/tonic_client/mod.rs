@@ -6,14 +6,11 @@ use alloc::vec::Vec;
 use core::error::Error;
 use core::pin::Pin;
 
-use miden_protocol::asset::{Asset, AssetVault};
 use miden_protocol::vm::FutureMaybeSend;
 
 type RpcFuture<T> = Pin<Box<dyn FutureMaybeSend<T>>>;
 
-use miden_protocol::account::{
-    Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot, StorageSlotType,
-};
+use miden_protocol::account::{AccountCode, AccountId};
 use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::account_tree::AccountWitness;
@@ -29,24 +26,22 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{
-    AccountProof, AccountStorageDetails, AccountStorageRequirements, AccountUpdateSummary,
-};
-use super::domain::{note::{FetchedNote, NoteSyncBlock}, nullifier::NullifierUpdate};
-use super::generated::rpc::account_request::AccountDetailRequest;
+use super::domain::account::{AccountProof, GetAccountRequest, VaultFetch};
+use super::domain::note::{FetchedNote, NoteSyncBlock};
+use super::domain::nullifier::NullifierUpdate;
 use super::generated::rpc::AccountRequest;
-use super::{Endpoint, FetchedAccount, NodeRpcClient, RpcEndpoint, RpcError, RpcStatusInfo};
-use crate::rpc::domain::status::NetworkNoteStatusInfo;
-use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
+use super::generated::rpc::account_request::AccountDetailRequest;
+use super::{Endpoint, NodeRpcClient, RpcEndpoint, RpcError, RpcStatusInfo};
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
+use crate::rpc::domain::limits::RpcLimits;
+use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
+use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::transaction::TransactionRecord;
 use crate::rpc::errors::node::parse_node_error;
 use crate::rpc::errors::{AcceptHeaderContext, AcceptHeaderError, GrpcError, RpcConversionError};
-use crate::rpc::generated::rpc::account_request::account_detail_request::storage_map_detail_request::SlotData;
-use crate::rpc::generated::rpc::account_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::generated::rpc::BlockRange;
-use crate::rpc::domain::limits::RpcLimits;
+use crate::rpc::generated::rpc::account_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::{AccountStateAt, generated as proto};
 
 mod api_client;
@@ -306,197 +301,6 @@ impl GrpcClient {
             .map(tonic::Response::into_inner)
             .and_then(RpcStatusInfo::try_from)
     }
-
-    // GET ACCOUNT HELPERS
-    // ============================================================================================
-
-    /// Given an [`AccountId`], return the proof for the account.
-    ///
-    /// If the account also has public state, its details will also be retrieved
-    pub async fn fetch_full_account_proof(
-        &self,
-        account_id: AccountId,
-    ) -> Result<(BlockNumber, AccountProof), RpcError> {
-        let has_public_state = account_id.has_public_state();
-        let account_request = {
-            AccountRequest {
-                account_id: Some(account_id.into()),
-                block_num: None,
-                details: {
-                    if has_public_state {
-                        // Since we have to request the storage maps for an account
-                        // we *dont know* anything about, we'll have to do first this
-                        // request, which will tell us about the account's storage slots,
-                        // and then, request the slots in another request.
-                        Some(AccountDetailRequest {
-                            code_commitment: Some(EMPTY_WORD.into()),
-                            asset_vault_commitment: Some(EMPTY_WORD.into()),
-                            storage_maps: vec![],
-                        })
-                    } else {
-                        None
-                    }
-                },
-            }
-        };
-        let account_response = self
-            .call_with_retry(RpcEndpoint::GetAccount, |mut rpc_api| {
-                let request = account_request.clone();
-                Box::pin(async move { rpc_api.get_account(request).await })
-            })
-            .await?
-            .into_inner();
-        let block_number = account_response.block_num.ok_or(RpcError::ExpectedDataMissing(
-            "GetAccountDetails returned an account without a matching block number for the witness"
-                .to_owned(),
-        ))?;
-        let account_proof = {
-            if has_public_state {
-                let account_details = account_response
-                    .details
-                    .ok_or(RpcError::ExpectedDataMissing("details in public account".to_owned()))?
-                    .into_domain(&BTreeMap::new(), &AccountStorageRequirements::default())?;
-                let storage_header = account_details.storage_details.header;
-                // This variable will hold the storage slots that are maps, below we will use it to
-                // actually fetch the storage maps details, since we now know the names of each
-                // storage slot.
-                let maps_to_request = storage_header
-                    .slots()
-                    .filter(|header| header.slot_type().is_map())
-                    .map(|map| map.name().to_string());
-                let account_request = AccountRequest {
-                    account_id: Some(account_id.into()),
-                    block_num: Some(block_number),
-                    details: Some(AccountDetailRequest {
-                        code_commitment: Some(EMPTY_WORD.into()),
-                        asset_vault_commitment: Some(EMPTY_WORD.into()),
-                        storage_maps: maps_to_request
-                            .map(|slot_name| StorageMapDetailRequest {
-                                slot_name,
-                                slot_data: Some(SlotData::AllEntries(true)),
-                            })
-                            .collect(),
-                    }),
-                };
-                let response = self
-                    .call_with_retry(RpcEndpoint::GetAccount, |mut rpc_api| {
-                        let request = account_request.clone();
-                        Box::pin(async move { rpc_api.get_account(request).await })
-                    })
-                    .await?;
-                response.into_inner().try_into()
-            } else {
-                account_response.try_into()
-            }
-        };
-        Ok((block_number.block_num.into(), account_proof?))
-    }
-
-    /// Given the storage details for an account and its id, returns a vector with all of its
-    /// storage slots. Keep in mind that if an account triggers the `too_many_entries` flag, there
-    /// will potentially be multiple requests.
-    async fn build_storage_slots(
-        &self,
-        account_id: AccountId,
-        storage_details: &AccountStorageDetails,
-        block_to: Option<BlockNumber>,
-    ) -> Result<Vec<StorageSlot>, RpcError> {
-        let mut slots = vec![];
-        // `SyncStorageMaps` will return information for *every* map for a given account, so this
-        // map_cache value should be fetched only once, hence the None placeholder
-        let mut map_cache: Option<StorageMapInfo> = None;
-        for slot_header in storage_details.header.slots() {
-            // We have two cases for each slot:
-            // - Slot is a value => We simply instance a StorageSlot
-            // - Slot is a map => If the map is 'small', we can simply
-            // build the map from the given entries. Otherwise we will have to
-            // call the SyncStorageMaps RPC method to obtain the data for the map.
-            // With the current setup, one RPC call should be enough.
-            match slot_header.slot_type() {
-                StorageSlotType::Value => {
-                    slots.push(miden_protocol::account::StorageSlot::with_value(
-                        slot_header.name().clone(),
-                        slot_header.value(),
-                    ));
-                },
-                StorageSlotType::Map => {
-                    let map_details = storage_details.find_map_details(slot_header.name()).ok_or(
-                        RpcError::ExpectedDataMissing(format!(
-                            "slot named '{}' was reported as a map, but it does not have a matching map_detail entry",
-                            slot_header.name(),
-                        )),
-                    )?;
-
-                    let storage_map = if map_details.too_many_entries {
-                        let map_info = if let Some(ref info) = map_cache {
-                            info
-                        } else {
-                            let fetched_data =
-                                self.sync_storage_maps(0_u32.into(), block_to, account_id).await?;
-                            map_cache.insert(fetched_data)
-                        };
-                        // The sync endpoint may return multiple updates for the same key
-                        // across different blocks. We sort by block number so that
-                        // inserting into the map keeps only the latest value per key.
-                        let mut sorted_updates: Vec<_> = map_info
-                            .updates
-                            .iter()
-                            .filter(|slot_info| slot_info.slot_name == *slot_header.name())
-                            .collect();
-                        sorted_updates.sort_by_key(|u| u.block_num);
-                        let map_entries: Vec<_> = sorted_updates
-                            .into_iter()
-                            .map(|u| (u.key, u.value))
-                            .collect::<BTreeMap<_, _>>()
-                            .into_iter()
-                            .collect();
-                        StorageMap::with_entries(map_entries)
-                    } else {
-                        map_details.entries.clone().into_storage_map().ok_or_else(|| {
-                            RpcError::ExpectedDataMissing(
-                                "expected AllEntries for full account fetch, got EntriesWithProofs"
-                                    .into(),
-                            )
-                        })?
-                    }
-                    .map_err(|err| {
-                        RpcError::InvalidResponse(format!(
-                            "the rpc api returned a non-valid map entry: {err}"
-                        ))
-                    })?;
-
-                    slots.push(miden_protocol::account::StorageSlot::with_map(
-                        slot_header.name().clone(),
-                        storage_map,
-                    ));
-                },
-            }
-        }
-        Ok(slots)
-    }
-
-    /// Fetches the full vault assets via `SyncAccountVault`.
-    ///
-    /// Used when `too_many_assets` is set in the response. Deduplicates updates by
-    /// vault key, keeping only the latest value per key.
-    async fn fetch_full_vault(
-        &self,
-        account_id: AccountId,
-        block_to: BlockNumber,
-    ) -> Result<Vec<Asset>, RpcError> {
-        let vault_info = self
-            .sync_account_vault(BlockNumber::from(0), Some(block_to), account_id)
-            .await?;
-        let mut updates = vault_info.updates;
-        updates.sort_by_key(|u| u.block_num);
-        Ok(updates
-            .into_iter()
-            .map(|u| (u.vault_key, u.asset))
-            .collect::<BTreeMap<_, _>>()
-            .into_values()
-            .flatten()
-            .collect())
-    }
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
@@ -668,68 +472,7 @@ impl NodeRpcClient for GrpcClient {
         response.into_inner().try_into()
     }
 
-    /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [`FetchedAccount`]
-    /// from the `GetAccountDetailsResponse` response.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if:
-    ///
-    /// - There was an error sending the request to the node.
-    /// - The answer had a `None` for one of the expected fields (`account`, `summary`,
-    ///   `account_commitment`, `details`).
-    /// - There is an error during [Account] deserialization.
-    async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        let (block_number, full_account_proof) = self.fetch_full_account_proof(account_id).await?;
-        let update_summary =
-            AccountUpdateSummary::new(full_account_proof.account_commitment(), block_number);
-
-        // The case for a private account is simple,
-        // we simple use the commitment and its id.
-        if account_id.is_private() {
-            Ok(FetchedAccount::new_private(account_id, update_summary))
-        } else {
-            let details =
-                full_account_proof.into_parts().1.ok_or(RpcError::ExpectedDataMissing(
-                    "GetAccountDetails returned a public account without details".to_owned(),
-                ))?;
-
-            let account_id = details.header.id();
-            let nonce = details.header.nonce();
-
-            // If the vault exceeds the node's size threshold, download the full vault
-            // via the sync endpoint; otherwise use the assets from the response directly.
-            let assets = if details.vault_details.too_many_assets {
-                self.fetch_full_vault(account_id, block_number).await?
-            } else {
-                details.vault_details.assets
-            };
-
-            // build_storage_slots handles too_many_entries maps internally via
-            // sync_storage_maps.
-            let slots = self
-                .build_storage_slots(account_id, &details.storage_details, Some(block_number))
-                .await?;
-            let asset_vault = AssetVault::new(&assets).map_err(|err| {
-                RpcError::InvalidResponse(format!("api rpc returned non-valid assets: {err}"))
-            })?;
-            let account_storage = AccountStorage::new(slots).map_err(|err| {
-                RpcError::InvalidResponse(format!(
-                    "api rpc returned non-valid storage slots: {err}"
-                ))
-            })?;
-            let account =
-                Account::new(account_id, asset_vault, account_storage, details.code, nonce, None)
-                    .map_err(|err| {
-                    RpcError::InvalidResponse(format!(
-                        "failed to instance an account from the rpc api response: {err}"
-                    ))
-                })?;
-            Ok(FetchedAccount::new_public(account, update_summary))
-        }
-    }
-
-    /// Sends a `GetAccountProof` request to the Miden node, and extracts the [AccountProof]
+    /// Sends a `GetAccount` request to the Miden node, and extracts the [`AccountProof`]
     /// from the response, as well as the block number that it was retrieved for.
     ///
     /// # Errors
@@ -740,39 +483,45 @@ impl NodeRpcClient for GrpcClient {
     /// - There was an error sending the request to the node.
     /// - The answer had a `None` for one of the expected fields.
     /// - There is an error during storage deserialization.
-    async fn get_account_proof(
+    async fn get_account(
         &self,
         account_id: AccountId,
-        storage_requirements: AccountStorageRequirements,
-        account_state: AccountStateAt,
-        known_account_code: Option<AccountCode>,
-        known_vault_commitment: Option<Word>,
+        request: GetAccountRequest,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
+        let GetAccountRequest { storage, at, known_code, vault } = request;
+
+        let known_code_commitment = known_code.as_ref().map_or(EMPTY_WORD, AccountCode::commitment);
         let mut known_codes_by_commitment: BTreeMap<Word, AccountCode> = BTreeMap::new();
-        if let Some(account_code) = known_account_code {
+        if let Some(account_code) = known_code {
             known_codes_by_commitment.insert(account_code.commitment(), account_code);
         }
 
-        let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
+        let storage_maps: Vec<StorageMapDetailRequest> = storage.clone().into();
 
-        // Only request details for accounts with public state (Public or Network);
-        // include known code commitment for this account when available
+        let asset_vault_commitment = match vault {
+            VaultFetch::Skip => None,
+            VaultFetch::Always => Some(EMPTY_WORD.into()),
+            VaultFetch::IfChangedFrom(commitment) => Some(commitment.into()),
+        };
+
+        // Only request details for accounts with public state (Public or Network), passing the
+        // known code commitment so the node can skip re-sending code we already hold.
         let account_details = if account_id.has_public_state() {
             Some(AccountDetailRequest {
-                code_commitment: Some(EMPTY_WORD.into()),
-                asset_vault_commitment: known_vault_commitment.map(Into::into),
+                code_commitment: Some(known_code_commitment.into()),
+                asset_vault_commitment,
                 storage_maps,
             })
         } else {
             None
         };
 
-        let block_num = match account_state {
+        let block_num = match at {
             AccountStateAt::Block(number) => Some(number.into()),
             AccountStateAt::ChainTip => None,
         };
 
-        let request = AccountRequest {
+        let proto_request = AccountRequest {
             account_id: Some(account_id.into()),
             block_num,
             details: account_details,
@@ -780,7 +529,7 @@ impl NodeRpcClient for GrpcClient {
 
         let response = self
             .call_with_retry(RpcEndpoint::GetAccount, |mut rpc_api| {
-                let request = request.clone();
+                let request = proto_request.clone();
                 Box::pin(async move { rpc_api.get_account(request).await })
             })
             .await?
@@ -799,14 +548,10 @@ impl NodeRpcClient for GrpcClient {
 
         // For accounts with public state, details should be present when requested
         let headers = if account_witness.id().has_public_state() {
-            let mut details = response
+            let details = response
                 .details
                 .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                .into_domain(&known_codes_by_commitment, &storage_requirements)?;
-
-            if details.vault_details.too_many_assets {
-                details.vault_details.assets = self.fetch_full_vault(account_id, block_num).await?;
-            }
+                .into_domain(&known_codes_by_commitment, &storage)?;
 
             Some(details)
         } else {
@@ -849,7 +594,7 @@ impl NodeRpcClient for GrpcClient {
                 let request = proto::rpc::SyncNotesRequest {
                     block_range: Some(BlockRange {
                         block_from: pagination.current_block_from().as_u32(),
-                        block_to: pagination.block_to().map(|b| b.as_u32()),
+                        block_to: block_to.as_u32(),
                     }),
                     note_tags: proto_tags.clone(),
                 };
@@ -911,7 +656,7 @@ impl NodeRpcClient for GrpcClient {
                     prefix_len: 16,
                     block_range: Some(BlockRange {
                         block_from: pagination.current_block_from().as_u32(),
-                        block_to: pagination.block_to().map(|b| b.as_u32()),
+                        block_to: pagination.block_to().map_or(u32::MAX, |b| b.as_u32()),
                     }),
                 };
 
@@ -1008,7 +753,7 @@ impl NodeRpcClient for GrpcClient {
             let request = proto::rpc::SyncAccountStorageMapsRequest {
                 block_range: Some(BlockRange {
                     block_from: pagination.current_block_from().as_u32(),
-                    block_to: pagination.block_to().map(|block| block.as_u32()),
+                    block_to: pagination.block_to().map_or(u32::MAX, |block| block.as_u32()),
                 }),
                 account_id: Some(account_id.into()),
             };
@@ -1056,7 +801,7 @@ impl NodeRpcClient for GrpcClient {
             let request = proto::rpc::SyncAccountVaultRequest {
                 block_range: Some(BlockRange {
                     block_from: pagination.current_block_from().as_u32(),
-                    block_to: pagination.block_to().map(|block| block.as_u32()),
+                    block_to: pagination.block_to().map_or(u32::MAX, |block| block.as_u32()),
                 }),
                 account_id: Some(account_id.into()),
             };
@@ -1117,7 +862,7 @@ impl NodeRpcClient for GrpcClient {
                 let request = proto::rpc::SyncTransactionsRequest {
                     block_range: Some(BlockRange {
                         block_from: pagination.current_block_from().as_u32(),
-                        block_to: pagination.block_to().map(|b| b.as_u32()),
+                        block_to: block_to.as_u32(),
                     }),
                     account_ids: proto_account_ids.clone(),
                 };

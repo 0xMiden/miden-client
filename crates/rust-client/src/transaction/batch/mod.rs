@@ -9,7 +9,6 @@
 //!    the previous push.
 //! 3. Finalize with [`BatchBuilder::submit`]. This assembles a `ProposedBatch`, proves it, submits
 //!    it to the node, and atomically applies the per-transaction updates to the local store.
-//!    Returns the [`BlockNumber`] the batch was accepted into.
 //!
 //! ## Multi-account semantics
 //!
@@ -110,8 +109,11 @@ where
     AUTH: TransactionAuthenticator + Sync + 'static,
 {
     /// Assemble the `ProposedBatch`, prove it, submit it via the client's RPC, and
-    /// atomically apply the per-transaction updates to the local store. Returns the block
-    /// number the batch was accepted into.
+    /// atomically apply the per-transaction updates to the local store.
+    ///
+    /// Returns the node's chain tip at submission (not the block the batch is committed). The
+    /// submitted transactions are recorded locally as pending; call `sync_state` to get the block
+    /// they commit in.
     pub async fn submit(self) -> Result<BlockNumber, ClientError> {
         // 1. Treat the largest ref as the reference block and the rest as authenticated. An empty
         //    batch surfaces here as a missing max.

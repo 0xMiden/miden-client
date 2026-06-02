@@ -79,7 +79,7 @@ use miden_tx::utils::serde::{
 
 /// Display-only metadata for a faucet account, persisted in the client's settings store.
 ///
-/// Populated lazily by the CLI resolver from the on-chain `TokenMetadata` of a public faucet
+/// Populated lazily by the CLI resolver from the on-chain token config of a public faucet
 /// and persisted under a `faucet_metadata:<faucet-id>` key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FaucetMetadata {
@@ -104,18 +104,20 @@ impl Deserializable for FaucetMetadata {
 
 mod account_reader;
 pub use account_reader::AccountReader;
+/// Raw access to `miden-standards` account modules for items not curated by `miden-client`.
+pub use miden_standards::account as standards;
 pub use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::auth::AuthSingleSig;
-use miden_standards::account::faucets::TokenMetadata;
+use miden_standards::account::faucets::FungibleFaucet;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_standards::account::interface::AccountInterfaceExt;
 use miden_standards::account::wallets::BasicWallet;
 
 use super::Client;
+use crate::asset::TokenSymbol;
 use crate::errors::ClientError;
-use crate::rpc::AccountStateAt;
-use crate::rpc::domain::account::{AccountStorageRequirements, FetchedAccount};
+use crate::rpc::domain::account::{FetchedAccount, GetAccountRequest};
 use crate::rpc::node::{EndpointError, GetAccountError};
 use crate::store::{AccountStatus, AccountStorageFilter, ClientAccountType};
 use crate::sync::NoteTagRecord;
@@ -135,23 +137,14 @@ pub mod component {
         WordSchema,
     };
     pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
-    pub use miden_standards::account::access::Ownable2Step;
+    pub use miden_standards::account::access::{AccessControl, Ownable2Step};
     pub use miden_standards::account::auth::*;
-    pub use miden_standards::account::components::{
-        basic_fungible_faucet_library,
-        basic_wallet_library,
-        multisig_library,
-        network_fungible_faucet_library,
-        no_auth_library,
-        singlesig_acl_library,
-        singlesig_library,
-    };
     pub use miden_standards::account::faucets::{
-        BasicFungibleFaucet,
-        NetworkFungibleFaucet,
+        FungibleFaucet,
+        FungibleFaucetBuilder,
         TokenMetadata,
+        TokenName,
     };
-    pub use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
     pub use miden_standards::account::policies::{
         BurnAllowAll,
         BurnOwnerOnly,
@@ -274,8 +267,12 @@ impl<AUTH> Client<AUTH> {
                 if tracked_account.is_locked() {
                     // If the tracked account is locked, check that the account commitment matches
                     // the one in the network
-                    let network_account_commitment =
-                        self.rpc_api.get_account_details(account.id()).await?.commitment();
+                    let network_account_commitment = self
+                        .rpc_api
+                        .get_account(account.id(), GetAccountRequest::new())
+                        .await?
+                        .1
+                        .account_commitment();
                     if network_account_commitment != account.to_commitment() {
                         return Err(ClientError::AccountCommitmentMismatch(
                             network_account_commitment,
@@ -352,30 +349,20 @@ impl<AUTH> Client<AUTH> {
 
     /// Fetches a public faucet's display metadata from the network.
     ///
-    /// Uses [`get_account_proof`](crate::rpc::NodeRpcClient::get_account_proof) scoped to the
-    /// account's storage so that the node does not return vault data. The `TokenMetadata` lives in
-    /// a single value slot, which is always present in the returned storage header.
+    /// Uses [`get_account`](crate::rpc::NodeRpcClient::get_account) with a minimal request so that
+    /// the node does not return vault data. The faucet's token config lives in a single value slot,
+    /// which is always present in the returned storage header.
     ///
     /// Returns:
-    /// - `Ok(Some(_))` — the account is public and its `TokenMetadata` storage slot decoded.
+    /// - `Ok(Some(_))` — the account is public and its token config storage slot decoded.
     /// - `Ok(None)`    — the account is private, not on chain, or the storage slot does not parse
-    ///   as `TokenMetadata`. Caller should fall back to a raw display.
+    ///   as a token config. Caller should fall back to a raw display.
     /// - `Err(_)`      — transport-level RPC error.
     pub async fn fetch_remote_token_metadata(
         &self,
         faucet_id: AccountId,
     ) -> Result<Option<FaucetMetadata>, ClientError> {
-        let proof = match self
-            .rpc_api
-            .get_account_proof(
-                faucet_id,
-                AccountStorageRequirements::default(),
-                AccountStateAt::ChainTip,
-                None,
-                None,
-            )
-            .await
-        {
+        let proof = match self.rpc_api.get_account(faucet_id, GetAccountRequest::new()).await {
             Ok((_, proof)) => proof,
             Err(err) => match err.endpoint_error() {
                 Some(EndpointError::GetAccount(
@@ -390,18 +377,19 @@ impl<AUTH> Client<AUTH> {
         };
 
         let Some(slot_header) =
-            storage_header.find_slot_header_by_name(TokenMetadata::metadata_slot())
+            storage_header.find_slot_header_by_name(FungibleFaucet::token_config_slot())
         else {
             return Ok(None);
         };
 
-        let Ok(token_metadata) = TokenMetadata::try_from(slot_header.value()) else {
+        let [_token_supply, _max_supply, decimals, symbol] = *slot_header.value();
+        let Ok(symbol) = TokenSymbol::try_from(symbol) else {
             return Ok(None);
         };
-        Ok(Some(FaucetMetadata {
-            symbol: token_metadata.symbol().to_string(),
-            decimals: token_metadata.decimals(),
-        }))
+        let Ok(decimals) = u8::try_from(decimals.as_canonical_u64()) else {
+            return Ok(None);
+        };
+        Ok(Some(FaucetMetadata { symbol: symbol.to_string(), decimals }))
     }
 
     /// Adds an [`Address`] to the associated [`AccountId`], alongside its derived [`NoteTag`]. If

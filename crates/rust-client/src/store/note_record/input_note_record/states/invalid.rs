@@ -69,7 +69,7 @@ impl NoteStateHandler for InvalidNoteState {
             Ok(Some(
                 CommittedNoteState {
                     inclusion_proof: self.invalid_inclusion_proof.clone(),
-                    metadata: self.metadata.clone(),
+                    metadata: self.metadata,
                     block_note_root: block_header.note_root(),
                 }
                 .into(),

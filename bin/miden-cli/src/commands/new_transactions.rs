@@ -7,7 +7,6 @@ use miden_client::keystore::Keystore;
 use miden_client::note::{
     BlockNumber,
     Note,
-    NoteAttachment,
     NoteType as MidenNoteType,
     SwapNote,
     get_input_note_with_id_prefix,
@@ -448,7 +447,7 @@ impl PswapCreateCmd {
                 &pswap_data,
                 (&self.note_type).into(),
                 (&self.payback_note_type).into(),
-                NoteAttachment::default(),
+                None,
                 client.rng(),
             )
             .map_err(|err| {

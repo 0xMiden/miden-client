@@ -66,12 +66,7 @@ impl TryFrom<proto::rpc::SyncChainMmrResponse> for ChainMmrInfo {
 
         Ok(Self {
             block_from: block_range.block_from.into(),
-            block_to: block_range
-                .block_to
-                .ok_or(proto::rpc::SyncChainMmrResponse::missing_field(stringify!(
-                    block_range.block_to
-                )))?
-                .into(),
+            block_to: block_range.block_to.into(),
             mmr_delta,
             block_header,
         })
