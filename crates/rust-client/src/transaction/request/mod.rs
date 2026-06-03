@@ -3,12 +3,10 @@
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
-use miden_protocol::assembly::SourceManagerSync;
 use miden_protocol::asset::{Asset, NonFungibleAsset};
 use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::store::MerkleStore;
@@ -34,7 +32,6 @@ use miden_protocol::note::{
 use miden_protocol::transaction::{InputNote, InputNotes, TransactionArgs, TransactionScript};
 use miden_protocol::vm::AdviceMap;
 use miden_standards::account::interface::{AccountInterface, AccountInterfaceError};
-use miden_standards::code_builder::CodeBuilder;
 use miden_standards::errors::CodeBuilderError;
 use miden_tx::utils::serde::{
     ByteReader,
@@ -299,7 +296,10 @@ impl TransactionRequest {
 
     /// Converts the [`TransactionRequest`] into [`TransactionArgs`] in order to be executed by a
     /// Miden host.
-    pub(crate) fn into_transaction_args(self, tx_script: TransactionScript) -> TransactionArgs {
+    pub(crate) fn into_transaction_args(
+        self,
+        tx_script: Option<TransactionScript>,
+    ) -> TransactionArgs {
         let note_args = self.get_note_args();
         let TransactionRequest {
             expected_output_recipients,
@@ -310,11 +310,15 @@ impl TransactionRequest {
 
         let mut tx_args = TransactionArgs::new(advice_map).with_note_args(note_args);
 
-        tx_args = if let Some(argument) = self.script_arg {
-            tx_args.with_tx_script_and_args(tx_script, argument)
-        } else {
-            tx_args.with_tx_script(tx_script)
-        };
+        // A script argument without a script has nothing to bind to, so it is only applied when a
+        // transaction script is present.
+        if let Some(tx_script) = tx_script {
+            tx_args = if let Some(argument) = self.script_arg {
+                tx_args.with_tx_script_and_args(tx_script, argument)
+            } else {
+                tx_args.with_tx_script(tx_script)
+            };
+        }
 
         if let Some(auth_argument) = self.auth_arg {
             tx_args = tx_args.with_auth_args(auth_argument);
@@ -328,32 +332,26 @@ impl TransactionRequest {
     }
 
     /// Builds the transaction script based on the account capabilities and the transaction request.
-    /// The debug mode enables the script debug logs.
     ///
-    /// The provided `source_manager` is used when compiling scripts owned by the request (currently
-    /// the empty fallback script) so that any source information attached to the produced
-    /// [`TransactionScript`] is registered in the same source manager used by the executor. Scripts
-    /// supplied by the caller via [`TransactionScriptTemplate::CustomScript`] are expected to have
-    /// already been compiled against the client's source manager (e.g. via
+    /// Returns `None` when the request carries no script template, producing a transaction with no
+    /// transaction script (a zero script root). This is required by auth components that forbid
+    /// transaction scripts (e.g. `AuthNetworkAccount`).
+    ///
+    /// Scripts supplied by the caller via [`TransactionScriptTemplate::CustomScript`] are expected
+    /// to have already been compiled against the client's source manager (e.g. via
     /// [`Client::code_builder`](crate::Client::code_builder)).
     pub(crate) fn build_transaction_script(
         &self,
         account_interface: &AccountInterface,
-        source_manager: Arc<dyn SourceManagerSync>,
-    ) -> Result<TransactionScript, TransactionRequestError> {
+    ) -> Result<Option<TransactionScript>, TransactionRequestError> {
         match &self.script_template {
-            Some(TransactionScriptTemplate::CustomScript(script)) => Ok(script.clone()),
+            Some(TransactionScriptTemplate::CustomScript(script)) => Ok(Some(script.clone())),
             Some(TransactionScriptTemplate::SendNotes(notes)) => {
                 // TODO: We could pass `SourceManager` to this call, but it needs to be supported
                 // in the protocol struct (however, this should also not fail to build often)
-                Ok(account_interface.build_send_notes_script(notes, self.expiration_delta)?)
+                Ok(Some(account_interface.build_send_notes_script(notes, self.expiration_delta)?))
             },
-            None => {
-                let empty_script = CodeBuilder::with_source_manager(source_manager)
-                    .compile_tx_script("begin nop end")?;
-
-                Ok(empty_script)
-            },
+            None => Ok(None),
         }
     }
 }

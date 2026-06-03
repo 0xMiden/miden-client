@@ -7,10 +7,10 @@ use miden_client::account::component::{
     AccessControl,
     AccountComponent,
     AccountComponentMetadata,
+    AuthNetworkAccount,
     BurnPolicyConfig,
     FungibleFaucet,
     MintPolicyConfig,
-    NetworkAccountNoteAllowlist,
     PausableManager,
     PolicyRegistration,
     TokenName,
@@ -104,13 +104,6 @@ const INCR_NONCE_AUTH_CODE: &str = "
     end
 ";
 
-const INCR_SCRIPT_CODE: &str = "
-    use external_contract::counter_contract
-    begin
-        call.counter_contract::increment_count
-    end
-";
-
 const INCR_NOTE_SCRIPT_CODE: &str = "
     use external_contract::counter_contract
     @note_script
@@ -119,16 +112,7 @@ const INCR_NOTE_SCRIPT_CODE: &str = "
     end
 ";
 
-// Minimal no-op tx script: the faucet's `INCR_NONCE_AUTH_CODE` auth procedure already increments
-// the nonce, so the script itself only needs to satisfy the builder's requirement that some user
-// code runs.
-const NOOP_TX_SCRIPT: &str = "
-    begin
-        push.0 drop
-    end
-";
-
-/// Deploys a counter contract account and bumps its counter once via a transaction script.
+/// Deploys a counter contract account with an empty (scriptless) transaction.
 ///
 /// `allowed_note_script_roots` holds the note-script roots the account should accept as a network
 /// account. When non-empty, the account is built with the standardized note-script allowlist slot
@@ -145,16 +129,10 @@ pub(crate) async fn deploy_network_counter_contract(
 
     client.add_account(&acc, false).await?;
 
-    let source_manager = client.source_manager();
-    let mut script_builder = CodeBuilder::with_source_manager(source_manager.clone());
-    script_builder.link_dynamic_library(&counter_contract_library(source_manager))?;
-    let tx_script = script_builder.compile_tx_script(INCR_SCRIPT_CODE)?;
-
-    // Build a transaction request with the custom script
-    let tx_increment_request = TransactionRequestBuilder::new().custom_script(tx_script).build()?;
-
-    // Execute the transaction locally
-    let tx_id = client.submit_new_transaction(acc.id(), tx_increment_request).await?;
+    // Deploying only needs to bump the account's nonce from 0 to 1, which the `incr_nonce_auth`
+    // component does on its own, so the deploy transaction carries no script.
+    let deploy_request = TransactionRequestBuilder::new().build()?;
+    let tx_id = client.submit_new_transaction(acc.id(), deploy_request).await?;
     wait_for_tx(client, tx_id).await?;
 
     Ok(acc)
@@ -177,39 +155,46 @@ async fn get_counter_contract_account(
     .map_err(|err| anyhow::anyhow!(err))
     .context("failed to create counter contract component")?;
 
-    // A network account is identified by the standardized note-script allowlist slot in its
-    // storage, and the node only routes notes whose script root is allowlisted. Carry the slot on
-    // the auth component (mirroring `AuthNetworkAccount`) while keeping the permissive nonce auth
-    // so the deploy-time tx-script bump still authorizes.
-    let mut auth_slots = vec![];
-    if !allowed_note_script_roots.is_empty() {
-        let roots = allowed_note_script_roots.iter().copied().collect::<BTreeSet<NoteScriptRoot>>();
-        let allowlist = NetworkAccountNoteAllowlist::new(roots)
-            .map_err(|err| anyhow::anyhow!(err))
-            .context("failed to build network account note-script allowlist")?;
-        auth_slots.push(allowlist.into_storage_slot());
-    }
-
-    let incr_nonce_auth_code = CodeBuilder::default()
-        .compile_component_code("miden::testing::incr_nonce_auth", INCR_NONCE_AUTH_CODE)
-        .context("failed to compile increment nonce auth component code")?;
-    let incr_nonce_auth = AccountComponent::new(
-        incr_nonce_auth_code,
-        auth_slots,
-        AccountComponentMetadata::new("miden::testing::incr_nonce_auth"),
-    )
-    .map_err(|err| anyhow::anyhow!(err))
-    .context("failed to create increment nonce auth component")?;
-
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let account = AccountBuilder::new(init_seed)
+    let builder = AccountBuilder::new(init_seed)
         .account_type(account_type)
-        .with_component(counter_component)
-        .with_auth_component(incr_nonce_auth)
-        .build_with_schema_commitment()
-        .context("failed to build account with counter contract")?;
+        .with_component(counter_component);
+
+    // A non-empty allowlist makes this a real network account: use the standardized
+    // `AuthNetworkAccount`, which carries the allowlist slot the node uses to identify the account
+    // and enforces at auth time that only allowlisted notes are consumed and no tx script runs.
+    // Deploys are scriptless precisely so this auth authorizes them.
+    //
+    // An empty allowlist produces an ordinary public account driven by user-submitted
+    // transactions (the node rejects user transactions against network accounts), so it uses the
+    // permissive signature-less nonce auth instead.
+    let account = if allowed_note_script_roots.is_empty() {
+        let incr_nonce_auth_code = CodeBuilder::default()
+            .compile_component_code("miden::testing::incr_nonce_auth", INCR_NONCE_AUTH_CODE)
+            .context("failed to compile increment nonce auth component code")?;
+        let incr_nonce_auth = AccountComponent::new(
+            incr_nonce_auth_code,
+            vec![],
+            AccountComponentMetadata::new("miden::testing::incr_nonce_auth"),
+        )
+        .map_err(|err| anyhow::anyhow!(err))
+        .context("failed to create increment nonce auth component")?;
+        builder
+            .with_auth_component(incr_nonce_auth)
+            .build_with_schema_commitment()
+            .context("failed to build account with counter contract")?
+    } else {
+        let roots = allowed_note_script_roots.iter().copied().collect::<BTreeSet<NoteScriptRoot>>();
+        let auth = AuthNetworkAccount::with_allowlist(roots)
+            .map_err(|err| anyhow::anyhow!(err))
+            .context("failed to build network account auth component")?;
+        builder
+            .with_auth_component(auth)
+            .build_with_schema_commitment()
+            .context("failed to build network account with counter contract")?
+    };
 
     Ok(account)
 }
@@ -234,7 +219,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find network account after deployment")?;
-    assert_eq!(counter_value, Word::from([Felt::from(1u32), ZERO, ZERO, ZERO]));
+    assert_eq!(counter_value, Word::from([ZERO, ZERO, ZERO, ZERO]));
 
     let (native_account, ..) =
         insert_new_wallet(&mut client, AccountType::Public, &keystore, RPO_FALCON_SCHEME_ID)
@@ -258,8 +243,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
     execute_tx_and_sync(&mut client, native_account.id(), tx_request).await?;
 
     // Wait for the node to consume the network notes in subsequent blocks
-    let expected_counter =
-        Word::from([Felt::new_unchecked(1 + BUMP_NOTE_NUMBER), ZERO, ZERO, ZERO]);
+    let expected_counter = Word::from([Felt::new_unchecked(BUMP_NOTE_NUMBER), ZERO, ZERO, ZERO]);
     for _ in 0..10 {
         let a = client
             .test_rpc_api()
@@ -345,7 +329,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find network account after recall test")?;
-    assert_eq!(network_counter, Word::from([Felt::from(1u32), ZERO, ZERO, ZERO]));
+    assert_eq!(network_counter, Word::from([ZERO, ZERO, ZERO, ZERO]));
 
     // The native account should have the incremented value
     let native_counter = client
@@ -353,7 +337,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find native account after recall test")?;
-    assert_eq!(native_counter, Word::from([Felt::from(2u32), ZERO, ZERO, ZERO]));
+    assert_eq!(native_counter, Word::from([Felt::from(1u32), ZERO, ZERO, ZERO]));
     Ok(())
 }
 
@@ -526,20 +510,12 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
         insert_new_wallet(&mut client_2, AccountType::Public, &keystore_2, RPO_FALCON_SCHEME_ID)
             .await?;
 
-    // The faucet needs the standardized network-account allowlist slot so the node routes MINT
-    // notes to it, while still allowing this test to submit the initial deploy transaction.
+    // The faucet is a network account: `AuthNetworkAccount` carries the standardized allowlist slot
+    // the node uses to route MINT notes to it and enforces that only allowlisted notes are consumed
+    // with no tx script. The scriptless deploy transaction below is authorized by this same auth.
     let allowed_roots = [MintNote::script_root()].into_iter().collect::<BTreeSet<_>>();
-    let allowlist = NetworkAccountNoteAllowlist::new(allowed_roots)
-        .map_err(|err| anyhow!("failed to build faucet note-script allowlist: {err}"))?;
-    let incr_nonce_auth_code = CodeBuilder::default()
-        .compile_component_code("miden::testing::incr_nonce_auth", INCR_NONCE_AUTH_CODE)
-        .context("failed to compile incr-nonce auth component")?;
-    let incr_nonce_auth = AccountComponent::new(
-        incr_nonce_auth_code,
-        vec![allowlist.into_storage_slot()],
-        AccountComponentMetadata::new("miden::testing::incr_nonce_auth"),
-    )
-    .map_err(|e| anyhow!("failed to create incr-nonce auth component: {e}"))?;
+    let network_auth = AuthNetworkAccount::with_allowlist(allowed_roots)
+        .map_err(|err| anyhow!("failed to build faucet network-account auth: {err}"))?;
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -557,7 +533,7 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
         .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)?;
     let faucet = AccountBuilder::new(init_seed)
         .account_type(AccountType::Public)
-        .with_auth_component(incr_nonce_auth)
+        .with_auth_component(network_auth)
         .with_component(faucet_component)
         .with_components(AccessControl::Ownable2Step { owner: alice.id() })
         .with_components(policy_manager)
@@ -566,10 +542,9 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
         .map_err(|e| anyhow!("failed to build network faucet: {e}"))?;
     client.add_account(&faucet, false).await?;
 
-    let deploy_script = CodeBuilder::with_source_manager(client.source_manager())
-        .compile_tx_script(NOOP_TX_SCRIPT)
-        .context("failed to compile faucet deploy tx script")?;
-    let deploy_tx = TransactionRequestBuilder::new().custom_script(deploy_script).build()?;
+    // Scriptless deploy: `AuthNetworkAccount` forbids tx scripts and bumps the nonce on its own, so
+    // an empty transaction is enough to register the faucet on-chain.
+    let deploy_tx = TransactionRequestBuilder::new().build()?;
     let deploy_tx_id = client.submit_new_transaction(faucet.id(), deploy_tx).await?;
     wait_for_tx(&mut client, deploy_tx_id).await?;
 
@@ -721,13 +696,13 @@ pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<(
             .await?;
     let network_account_id = network_account.id();
 
-    // Sanity: counter is 1 after deployment (deploy_counter_contract bumps it once).
+    // Sanity: counter is 0 after deployment (the deploy transaction carries no script).
     let counter_value = client_1
         .account_reader(network_account_id)
         .get_storage_item(COUNTER_SLOT_NAME.clone())
         .await
         .context("failed to find network account after deployment")?;
-    assert_eq!(counter_value, Word::from([Felt::from(1u32), ZERO, ZERO, ZERO]));
+    assert_eq!(counter_value, Word::from([ZERO, ZERO, ZERO, ZERO]));
 
     // client_2 starts watching the network account.
     client_2.import_watched_account_by_id(network_account_id).await?;
@@ -751,7 +726,7 @@ pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<(
         client_2.account_reader(network_account_id).commitment().await?;
 
     // client_1 emits BUMP_NOTE_NUMBER network notes targeted at the counter; the node will
-    // consume them in subsequent blocks and bump the counter to 1 + BUMP_NOTE_NUMBER.
+    // consume them in subsequent blocks and bump the counter to BUMP_NOTE_NUMBER.
     let (native_account, ..) =
         insert_new_wallet(&mut client_1, AccountType::Public, &keystore_1, RPO_FALCON_SCHEME_ID)
             .await?;
@@ -772,8 +747,7 @@ pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<(
     execute_tx_and_sync(&mut client_1, native_account.id(), tx_request).await?;
 
     // Poll the watched client until it observes the bumped counter.
-    let expected_counter =
-        Word::from([Felt::new_unchecked(1 + BUMP_NOTE_NUMBER), ZERO, ZERO, ZERO]);
+    let expected_counter = Word::from([Felt::new_unchecked(BUMP_NOTE_NUMBER), ZERO, ZERO, ZERO]);
     let mut observed = false;
     for _ in 0..10 {
         wait_for_blocks(&mut client_1, 1).await;
