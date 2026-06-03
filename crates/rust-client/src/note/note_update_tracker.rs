@@ -465,9 +465,9 @@ impl NoteUpdateTracker {
     /// created and consumed within the same batch, so it never appeared in the block body.
     /// The `block_num` is the block in which the creating transaction was committed.
     ///
-    /// The consumer account id is not derivable from a [`NoteHeader`] alone: attachment
-    /// content lives on `NoteAttachments`, which the erased-note RPC stream does not deliver.
-    /// Any input record for the erased note is marked consumed with an unknown consumer.
+    /// The consumer account id is derived from the tracked input record's attachments (a
+    /// [`NetworkAccountTarget`], when present), not from the erased-note RPC stream, which delivers
+    /// only a [`NoteHeader`]. When no such attachment is present the consumer is left unknown.
     pub(crate) fn mark_erased_note_as_consumed(
         &mut self,
         note_header: &NoteHeader,
