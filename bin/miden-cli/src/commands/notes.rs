@@ -7,7 +7,6 @@ use miden_client::note::{
     Note,
     NoteConsumability,
     NoteConsumptionStatus,
-    NoteId,
     NoteMetadata,
     NoteStorage,
     StandardNote,
@@ -440,14 +439,13 @@ fn note_summary(
     input_note_record: Option<&InputNoteRecord>,
     output_note_record: Option<&OutputNoteRecord>,
 ) -> CliNoteSummary {
-    // Use the NoteId when available; metadata-less input notes have none, so fall back to the
-    // details commitment.
-    let note_id = input_note_record
+    // Use the NoteId's hex when available; metadata-less input notes have no NoteId, so fall back
+    // to the details commitment as the identifier rather than fabricating a NoteId from it.
+    let id_str = input_note_record
         .and_then(InputNoteRecord::id)
         .or_else(|| output_note_record.map(OutputNoteRecord::id))
-        .or_else(|| {
-            input_note_record.map(|record| NoteId::from_raw(record.details_commitment().as_word()))
-        })
+        .map(|id| id.to_hex())
+        .or_else(|| input_note_record.map(|record| record.details_commitment().as_word().to_hex()))
         .expect("One of the two records should be Some");
 
     let assets_commitment_str = input_note_record
@@ -499,7 +497,7 @@ fn note_summary(
         note_metadata.map_or("-".to_string(), |metadata| metadata.tag().to_string());
 
     CliNoteSummary {
-        id: note_id.to_hex(),
+        id: id_str,
         script_root: script_root_str,
         assets_commitment: assets_commitment_str,
         inputs_commitment: inputs_commitment_str,

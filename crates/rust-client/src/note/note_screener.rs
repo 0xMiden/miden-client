@@ -206,6 +206,7 @@ impl OnNoteReceived for NoteScreener {
         // Notes imported without metadata (e.g. via `NoteFile::NoteDetails`) have a NULL `note_id`
         // and so can't be matched by id. Recognize them by reconstructing their id from the
         // committed metadata: `NoteId::new(details_commitment, metadata)`.
+        // TODO: revisit
         if !input_note_present {
             input_note_present = self
                 .store

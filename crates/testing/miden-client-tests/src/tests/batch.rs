@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use miden_client::account::AccountStorageMode;
+use miden_client::account::AccountType;
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::builder::ClientBuilder;
@@ -269,7 +269,7 @@ async fn batch_builder_push_succeeds_when_balance_depends_on_prior_push() {
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(
             &mut client,
-            AccountStorageMode::Private,
+            AccountType::Private,
             &authenticator,
             RPO_FALCON_SCHEME_ID,
         )
@@ -364,7 +364,7 @@ async fn batch_builder_push_rejects_duplicate_input_note() {
     let (first_regular_account, _second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(
             &mut client,
-            AccountStorageMode::Private,
+            AccountType::Private,
             &authenticator,
             RPO_FALCON_SCHEME_ID,
         )
@@ -530,7 +530,7 @@ async fn batch_builder_cross_account_note_flow() {
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(
             &mut client,
-            AccountStorageMode::Private,
+            AccountType::Private,
             &authenticator,
             RPO_FALCON_SCHEME_ID,
         )
@@ -619,7 +619,7 @@ async fn batch_builder_dedup_rejects_duplicate_input_note_across_accounts() {
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(
             &mut client,
-            AccountStorageMode::Private,
+            AccountType::Private,
             &authenticator,
             RPO_FALCON_SCHEME_ID,
         )

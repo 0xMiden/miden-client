@@ -311,13 +311,11 @@ impl TransactionRequest {
         let mut tx_args = TransactionArgs::new(advice_map).with_note_args(note_args);
 
         // A script argument without a script has nothing to bind to, so it is only applied when a
-        // transaction script is present.
+        // transaction script is present. With no argument the default empty word is used, which is
+        // equivalent to setting no argument at all.
         if let Some(tx_script) = tx_script {
-            tx_args = if let Some(argument) = self.script_arg {
-                tx_args.with_tx_script_and_args(tx_script, argument)
-            } else {
-                tx_args.with_tx_script(tx_script)
-            };
+            tx_args =
+                tx_args.with_tx_script_and_args(tx_script, self.script_arg.unwrap_or_default());
         }
 
         if let Some(auth_argument) = self.auth_arg {
@@ -334,8 +332,7 @@ impl TransactionRequest {
     /// Builds the transaction script based on the account capabilities and the transaction request.
     ///
     /// Returns `None` when the request carries no script template, producing a transaction with no
-    /// transaction script (a zero script root). This is required by auth components that forbid
-    /// transaction scripts (e.g. `AuthNetworkAccount`).
+    /// transaction script (a zero script root).
     ///
     /// Scripts supplied by the caller via [`TransactionScriptTemplate::CustomScript`] are expected
     /// to have already been compiled against the client's source manager (e.g. via

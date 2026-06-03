@@ -118,23 +118,18 @@ const INCR_NOTE_SCRIPT_CODE: &str = "
 /// the account as a network account and route matching notes to it.
 pub(crate) async fn deploy_network_counter_contract(
     client: &mut TestClient,
-    account_type: AccountType,
     allowed_note_script_roots: &[NoteScriptRoot],
 ) -> Result<Account> {
     let roots = allowed_note_script_roots.iter().copied().collect::<BTreeSet<NoteScriptRoot>>();
     let auth = AuthNetworkAccount::with_allowlist(roots)
         .map_err(|err| anyhow::anyhow!(err))
         .context("failed to build network account auth component")?;
-    let acc = build_counter_contract_account(client, account_type, auth)?;
-    deploy_account(client, acc).await
+    deploy_counter_with_auth(client, auth).await
 }
 
 /// Deploys a counter contract as an ordinary public account that consumes notes via user
 /// transactions (the node rejects user transactions against network accounts).
-pub(crate) async fn deploy_counter_contract(
-    client: &mut TestClient,
-    account_type: AccountType,
-) -> Result<Account> {
+pub(crate) async fn deploy_counter_contract(client: &mut TestClient) -> Result<Account> {
     let incr_nonce_auth_code = CodeBuilder::default()
         .compile_component_code("miden::testing::incr_nonce_auth", INCR_NONCE_AUTH_CODE)
         .context("failed to compile increment nonce auth component code")?;
@@ -145,13 +140,14 @@ pub(crate) async fn deploy_counter_contract(
     )
     .map_err(|err| anyhow::anyhow!(err))
     .context("failed to create increment nonce auth component")?;
-    let acc = build_counter_contract_account(client, account_type, incr_nonce_auth)?;
-    deploy_account(client, acc).await
+    deploy_counter_with_auth(client, incr_nonce_auth).await
 }
 
-fn build_counter_contract_account(
+/// Builds a public counter contract account with the given auth component and deploys it with an
+/// empty transaction; the auth component should bump the nonce from 0 to 1, which makes the account
+/// update valid.
+async fn deploy_counter_with_auth(
     client: &mut TestClient,
-    account_type: AccountType,
     auth: impl Into<AccountComponent>,
 ) -> Result<Account> {
     let counter_slot = StorageSlot::with_empty_value(COUNTER_SLOT_NAME.clone());
@@ -169,17 +165,13 @@ fn build_counter_contract_account(
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    AccountBuilder::new(init_seed)
-        .account_type(account_type)
+    let acc = AccountBuilder::new(init_seed)
+        .account_type(AccountType::Public)
         .with_component(counter_component)
         .with_auth_component(auth)
         .build_with_schema_commitment()
-        .context("failed to build counter contract account")
-}
+        .context("failed to build counter contract account")?;
 
-/// Deploys `acc` with an empty transaction; the auth component should bump the nonce from 0 to 1,
-/// which makes the account update valid.
-async fn deploy_account(client: &mut TestClient, acc: Account) -> Result<Account> {
     client.add_account(&acc, false).await?;
     let tx_id = client
         .submit_new_transaction(acc.id(), TransactionRequestBuilder::new().build()?)
@@ -199,9 +191,7 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
     client.sync_state().await?;
 
     let incr_note_root = note_script_root(INCR_NOTE_SCRIPT_CODE, client.source_manager())?;
-    let network_account =
-        deploy_network_counter_contract(&mut client, AccountType::Public, &[incr_note_root])
-            .await?;
+    let network_account = deploy_network_counter_contract(&mut client, &[incr_note_root]).await?;
 
     let counter_value = client
         .account_reader(network_account.id())
@@ -266,12 +256,10 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
     client.sync_state().await?;
 
     let incr_note_root = note_script_root(INCR_NOTE_SCRIPT_CODE, client.source_manager())?;
-    let network_account =
-        deploy_network_counter_contract(&mut client, AccountType::Public, &[incr_note_root])
-            .await?;
+    let network_account = deploy_network_counter_contract(&mut client, &[incr_note_root]).await?;
     // The native account consumes the note via a user-submitted transaction, so it must stay an
     // ordinary public account: the node rejects user transactions against network accounts.
-    let native_account = deploy_counter_contract(&mut client, AccountType::Public).await?;
+    let native_account = deploy_counter_contract(&mut client).await?;
 
     let wallet =
         insert_new_wallet(&mut client, AccountType::Public, &keystore, RPO_FALCON_SCHEME_ID)
@@ -339,9 +327,7 @@ pub async fn test_note_reader_finds_note_consumed_by_ntx(
     client.sync_state().await?;
 
     let incr_note_root = note_script_root(INCR_NOTE_SCRIPT_CODE, client.source_manager())?;
-    let network_account =
-        deploy_network_counter_contract(&mut client, AccountType::Public, &[incr_note_root])
-            .await?;
+    let network_account = deploy_network_counter_contract(&mut client, &[incr_note_root]).await?;
     let network_account_id = network_account.id();
 
     let (sender_account, ..) =
@@ -415,9 +401,7 @@ pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> R
     client.sync_state().await?;
 
     let incr_note_root = note_script_root(INCR_NOTE_SCRIPT_CODE, client.source_manager())?;
-    let network_account =
-        deploy_network_counter_contract(&mut client, AccountType::Public, &[incr_note_root])
-            .await?;
+    let network_account = deploy_network_counter_contract(&mut client, &[incr_note_root]).await?;
     let network_account_id = network_account.id();
 
     let (sender_account, ..) =
@@ -679,9 +663,7 @@ pub async fn test_watch_network_account(client_config: ClientConfig) -> Result<(
     client_1.sync_state().await?;
 
     let incr_note_root = note_script_root(INCR_NOTE_SCRIPT_CODE, client_1.source_manager())?;
-    let network_account =
-        deploy_network_counter_contract(&mut client_1, AccountType::Public, &[incr_note_root])
-            .await?;
+    let network_account = deploy_network_counter_contract(&mut client_1, &[incr_note_root]).await?;
     let network_account_id = network_account.id();
 
     // Sanity: counter is 0 after deployment (the deploy transaction carries no script).

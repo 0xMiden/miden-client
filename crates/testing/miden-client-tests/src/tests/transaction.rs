@@ -1,7 +1,6 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
-use miden_client::account::AccountStorageMode;
 use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::keystore::Keystore;
@@ -97,14 +96,10 @@ async fn transaction_creates_two_notes() {
 #[tokio::test]
 async fn transaction_error_reports_source_line() {
     let (mut client, _, keystore) = Box::pin(create_test_client()).await;
-    let (wallet, _) = setup_wallet_and_faucet(
-        &mut client,
-        AccountStorageMode::Private,
-        &keystore,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await
-    .unwrap();
+    let (wallet, _) =
+        setup_wallet_and_faucet(&mut client, AccountType::Private, &keystore, RPO_FALCON_SCHEME_ID)
+            .await
+            .unwrap();
 
     let failing_script = client
         .code_builder()
@@ -162,14 +157,10 @@ impl TransactionProver for AlwaysFailingProver {
 #[tokio::test]
 async fn prover_fallback_pattern_allows_retry_with_different_prover() {
     let (mut client, _, keystore) = Box::pin(create_test_client()).await;
-    let (wallet, faucet) = setup_wallet_and_faucet(
-        &mut client,
-        AccountStorageMode::Private,
-        &keystore,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await
-    .unwrap();
+    let (wallet, faucet) =
+        setup_wallet_and_faucet(&mut client, AccountType::Private, &keystore, RPO_FALCON_SCHEME_ID)
+            .await
+            .unwrap();
 
     let fungible_asset = FungibleAsset::new(faucet.id(), 100).unwrap();
 
@@ -267,7 +258,7 @@ async fn lazy_foreign_account_loading() {
     client.sync_state().await.unwrap();
 
     // Setup: Create a local wallet to execute the FPI transaction.
-    let local_wallet = super::insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore)
+    let local_wallet = super::insert_new_wallet(&mut client, AccountType::Public, &keystore)
         .await
         .unwrap();
 

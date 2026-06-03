@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use miden_client::account::AccountStorageMode;
+use miden_client::account::AccountType;
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::asset::FungibleAsset;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
@@ -54,7 +54,7 @@ pub async fn test_transport_note_inclusion_proof_and_consumption(
 
     let (faucet_account, _) = insert_new_fungible_faucet(
         &mut sender,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &sender_keystore,
         RPO_FALCON_SCHEME_ID,
     )
@@ -63,7 +63,7 @@ pub async fn test_transport_note_inclusion_proof_and_consumption(
 
     let (recipient_account, _) = insert_new_wallet(
         &mut recipient,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &recipient_keystore,
         RPO_FALCON_SCHEME_ID,
     )
@@ -169,7 +169,7 @@ pub async fn test_transport_multiple_notes_different_blocks(
 
     let (faucet_account, _) = insert_new_fungible_faucet(
         &mut sender,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &sender_keystore,
         RPO_FALCON_SCHEME_ID,
     )
@@ -178,7 +178,7 @@ pub async fn test_transport_multiple_notes_different_blocks(
 
     let (recipient_account, _) = insert_new_wallet(
         &mut recipient,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &recipient_keystore,
         RPO_FALCON_SCHEME_ID,
     )
@@ -321,7 +321,7 @@ pub async fn test_transport_note_not_yet_committed(client_config: ClientConfig) 
 
     let (faucet_account, _) = insert_new_fungible_faucet(
         &mut sender,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &sender_keystore,
         RPO_FALCON_SCHEME_ID,
     )
@@ -330,7 +330,7 @@ pub async fn test_transport_note_not_yet_committed(client_config: ClientConfig) 
 
     let (recipient_account, _) = insert_new_wallet(
         &mut recipient,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &recipient_keystore,
         RPO_FALCON_SCHEME_ID,
     )

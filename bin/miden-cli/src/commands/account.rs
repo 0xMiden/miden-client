@@ -108,7 +108,7 @@ impl AccountCmd {
 async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     let accounts = client.get_account_headers().await?;
 
-    let mut table = create_dynamic_table(&["Account ID", "Type", "Visibility", "Nonce", "Status"]);
+    let mut table = create_dynamic_table(&["Account ID", "Kind", "Type", "Nonce", "Status"]);
     for (acc, _acc_seed) in &accounts {
         let reader = client.account_reader(acc.id());
         let status = reader.status().await?.to_string();
@@ -119,7 +119,7 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
 
         table.add_row(vec![
             acc.id().to_hex(),
-            account_type_display_name(acc.id(), token_symbol.as_deref()),
+            account_kind_display_name(token_symbol.as_deref()),
             acc.id().account_type().to_string(),
             acc.nonce().as_canonical_u64().to_string(),
             status,
@@ -256,14 +256,8 @@ fn print_summary_table(account: &Account, network_id: NetworkId, token_symbol: O
         Cell::new("Account Commitment"),
         Cell::new(account.to_commitment().to_string()),
     ]);
-    table.add_row(vec![
-        Cell::new("Type"),
-        Cell::new(account_type_display_name(account.id(), token_symbol)),
-    ]);
-    table.add_row(vec![
-        Cell::new("Visibility"),
-        Cell::new(account.id().account_type().to_string()),
-    ]);
+    table.add_row(vec![Cell::new("Kind"), Cell::new(account_kind_display_name(token_symbol))]);
+    table.add_row(vec![Cell::new("Type"), Cell::new(account.id().account_type().to_string())]);
     table.add_row(vec![
         Cell::new("Code Commitment"),
         Cell::new(account.code().commitment().to_string()),
@@ -281,10 +275,11 @@ fn print_summary_table(account: &Account, network_id: NetworkId, token_symbol: O
     println!("{table}\n");
 }
 
-/// Loads the tracked account and reconstructs the canonical fungible-faucet component from it.
+/// Loads the tracked account for `account_id` and reconstructs its [`FungibleFaucet`] component.
 ///
-/// The CLI prefers this over decoding individual storage slots so the component layout remains
-/// owned by `miden_standards`.
+/// # Errors
+/// Returns an error if the account is not tracked by the client or its faucet metadata can't be
+/// read.
 async fn get_faucet_component<AUTH>(
     client: &Client<AUTH>,
     account_id: AccountId,
@@ -296,10 +291,10 @@ async fn get_faucet_component<AUTH>(
     faucet_component_from_account(&account)
 }
 
-/// Reconstructs the canonical fungible-faucet component from a full [`Account`].
+/// Reconstructs the [`FungibleFaucet`] component from a materialized [`Account`].
 ///
-/// This path is preferred whenever we already have the materialized account instead of a
-/// lightweight [`AccountReader`].
+/// # Errors
+/// Returns an error if the account's faucet metadata can't be read.
 fn faucet_component_from_account(account: &Account) -> Result<FungibleFaucet, CliError> {
     let account_id = account.id();
     FungibleFaucet::try_from(account).map_err(|err| {
@@ -307,12 +302,12 @@ fn faucet_component_from_account(account: &Account) -> Result<FungibleFaucet, Cl
     })
 }
 
-/// Returns a display name for the account. If `token_symbol` is provided the account is
-/// rendered as a fungible faucet (the symbol is appended); otherwise it's labelled "Regular".
+/// Returns the account's kind for display. If `token_symbol` is provided the account is rendered as
+/// a fungible faucet (the symbol is appended); otherwise it's labelled "Regular".
 ///
 /// The on-chain `AccountType` only encodes account visibility (`public` / `private`), so
 /// faucet-vs-wallet has to be inferred by the caller from the attached components.
-fn account_type_display_name(_account_id: AccountId, token_symbol: Option<&str>) -> String {
+fn account_kind_display_name(token_symbol: Option<&str>) -> String {
     if let Some(symbol) = token_symbol {
         format!("Fungible faucet (token symbol: {symbol})")
     } else {

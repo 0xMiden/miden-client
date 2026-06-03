@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use miden_client::Felt;
-use miden_client::account::AccountStorageMode;
+use miden_client::account::AccountType;
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::NoteType;
@@ -36,7 +36,7 @@ pub async fn test_batch_builder_submits_two_p2id_on_one_account(
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(
             &mut client,
-            AccountStorageMode::Private,
+            AccountType::Private,
             &authenticator,
             RPO_FALCON_SCHEME_ID,
         )
@@ -172,7 +172,7 @@ pub async fn test_batch_builder_multiple_accounts(client_config: ClientConfig) -
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(
             &mut client,
-            AccountStorageMode::Private,
+            AccountType::Private,
             &authenticator,
             RPO_FALCON_SCHEME_ID,
         )
@@ -316,7 +316,7 @@ pub async fn test_batch_builder_interleaved_pushes(client_config: ClientConfig) 
     let (first_regular_account, second_regular_account, faucet_account_header) =
         setup_two_wallets_and_faucet(
             &mut client,
-            AccountStorageMode::Private,
+            AccountType::Private,
             &authenticator,
             RPO_FALCON_SCHEME_ID,
         )

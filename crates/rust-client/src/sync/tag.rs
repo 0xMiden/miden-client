@@ -74,7 +74,7 @@ pub struct NoteTagRecord {
 pub enum NoteTagSource {
     /// Tag for notes directed to a tracked account.
     Account(AccountId),
-    /// Tag for tracked expected notes.
+    /// Tag for tracked expected notes, identified by the note's details commitment.
     Note(NoteDetailsCommitment),
     /// Tag manually added by the user.
     User,

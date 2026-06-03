@@ -93,7 +93,7 @@ impl InputNoteRecord {
     }
 
     /// Returns the commitment to the note's details (recipient + assets), independent of
-    /// note metadata. Use this as a stable identifier when metadata may not be present.
+    /// note metadata.
     pub fn details_commitment(&self) -> NoteDetailsCommitment {
         self.details.commitment()
     }

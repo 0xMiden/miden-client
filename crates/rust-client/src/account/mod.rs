@@ -80,15 +80,6 @@ pub use account_reader::AccountReader;
 /// Raw access to `miden-standards` account modules for items not curated by `miden-client`.
 pub use miden_standards::account as standards;
 use miden_standards::account::auth::AuthSingleSig;
-pub use miden_standards::account::metadata::{
-    AccountBuilderSchemaCommitmentExt,
-    AccountSchemaCommitment,
-};
-
-/// Client-layer alias for [`AccountType`] (`Public` / `Private`), which encodes account
-/// storage mode.
-pub type AccountStorageMode = AccountType;
-
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_standards::account::interface::{
@@ -96,6 +87,10 @@ pub use miden_standards::account::interface::{
     AccountComponentInterfaceExt,
     AccountInterface,
     AccountInterfaceExt,
+};
+pub use miden_standards::account::metadata::{
+    AccountBuilderSchemaCommitmentExt,
+    AccountSchemaCommitment,
 };
 use miden_standards::account::wallets::BasicWallet;
 

@@ -68,7 +68,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::account::{Account, AccountCode, AccountId};
-use miden_protocol::asset::{AssetCallbackFlag, AssetVaultKey, NonFungibleAsset};
+use miden_protocol::asset::{Asset, NonFungibleAsset};
 use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
 use miden_protocol::note::{
@@ -1025,10 +1025,20 @@ fn validate_basic_account_request(
     let (incoming_fungible_balance_map, incoming_non_fungible_balance_set) =
         transaction_request.incoming_assets();
 
+    // Aggregate the account's fungible balance per faucet in one pass. A faucet's fungible asset
+    // may occupy more than one callback-flag vault key, so all matching entries are summed.
+    let mut available_fungible: BTreeMap<AccountId, u64> = BTreeMap::new();
+    for asset in account.vault().assets() {
+        if let Asset::Fungible(fungible) = asset {
+            let balance = available_fungible.entry(fungible.faucet_id()).or_default();
+            *balance = balance.saturating_add(fungible.amount().as_u64());
+        }
+    }
+
     // Check if the account balance plus incoming assets is greater than or equal to the
     // outgoing fungible assets
     for (faucet_id, amount) in fungible_balance_map {
-        let account_asset_amount = get_fungible_balance_by_faucet(account, faucet_id)?;
+        let account_asset_amount = available_fungible.get(&faucet_id).copied().unwrap_or(0);
         let incoming_balance = incoming_fungible_balance_map.get(&faucet_id).unwrap_or(&0);
         if account_asset_amount + incoming_balance < amount {
             return Err(ClientError::AssetError(AssetError::FungibleAssetAmountNotSufficient {
@@ -1060,21 +1070,6 @@ fn validate_basic_account_request(
     }
 
     Ok(())
-}
-
-fn get_fungible_balance_by_faucet(
-    account: &Account,
-    faucet_id: AccountId,
-) -> Result<u64, ClientError> {
-    let mut total = 0u64;
-
-    for callback_flag in [AssetCallbackFlag::Disabled, AssetCallbackFlag::Enabled] {
-        let vault_key = AssetVaultKey::new_fungible(faucet_id, callback_flag);
-        let amount = account.vault().get_balance(vault_key).map_err(ClientError::AssetError)?;
-        total = total.saturating_add(u64::from(amount));
-    }
-
-    Ok(total)
 }
 
 /// Fetches a foreign account's proof and details from the network, converts them into

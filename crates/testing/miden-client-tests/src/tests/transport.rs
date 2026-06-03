@@ -2,7 +2,7 @@ use std::env::temp_dir;
 use std::sync::Arc;
 
 use miden_client::DebugMode;
-use miden_client::account::{Account, AccountStorageMode};
+use miden_client::account::{Account, AccountType};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
@@ -303,8 +303,6 @@ pub async fn create_test_user_transport(
     mock_node: Arc<RwLock<MockNoteTransportNode>>,
 ) -> (MockClient<FilesystemKeyStore>, Account) {
     let (mut client, keystore) = Box::pin(create_test_client_transport(mock_node.clone())).await;
-    let account = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
+    let account = insert_new_wallet(&mut client, AccountType::Private, &keystore).await.unwrap();
     (client, account)
 }

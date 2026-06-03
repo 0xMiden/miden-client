@@ -3,7 +3,6 @@ use alloc::vec::Vec;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use miden_client::account::AccountStorageMode;
 use miden_client::assembly::{CodeBuilder, Module, ModuleKind, Path, SourceManagerSync};
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, PublicKeyCommitment};
 use miden_client::keystore::Keystore;
@@ -186,10 +185,8 @@ async fn load_ecdsa_accounts_test() {
 async fn prune_account_history_with_pending_transaction() {
     let (mut client, mock_rpc_api, keystore) = Box::pin(create_test_client()).await;
 
-    let wallet = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
-    let faucet = insert_new_fungible_faucet(&mut client, AccountStorageMode::Private, &keystore)
+    let wallet = insert_new_wallet(&mut client, AccountType::Private, &keystore).await.unwrap();
+    let faucet = insert_new_fungible_faucet(&mut client, AccountType::Private, &keystore)
         .await
         .unwrap();
     let faucet_id = faucet.id();

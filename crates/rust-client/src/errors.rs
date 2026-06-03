@@ -15,14 +15,13 @@ use miden_protocol::errors::{
     TransactionScriptError,
 };
 use miden_protocol::note::NoteId;
-use miden_protocol::transaction::TransactionId;
 use miden_standards::account::interface::AccountInterfaceError;
 // RE-EXPORTS
 // ================================================================================================
 pub use miden_standards::errors::CodeBuilderError;
+pub use miden_tx::AuthenticationError;
 use miden_tx::utils::HexParseError;
 use miden_tx::utils::serde::DeserializationError;
-pub use miden_tx::{AuthenticationError, TransactionVerifierError};
 use miden_tx::{
     DataStoreError,
     NoteCheckerError,
@@ -162,12 +161,6 @@ pub enum ClientError {
     TransactionInputError(#[source] TransactionInputError),
     #[error("transaction proving failed")]
     TransactionProvingError(#[from] TransactionProverError),
-    #[error("transaction proof verification failed for transaction {transaction_id}")]
-    TransactionVerificationError {
-        transaction_id: TransactionId,
-        #[source]
-        source: TransactionVerifierError,
-    },
     #[error("invalid transaction request")]
     TransactionRequestError(#[from] TransactionRequestError),
     #[error("failed to build transaction script from account interface")]

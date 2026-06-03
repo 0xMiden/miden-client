@@ -117,7 +117,7 @@ This command has four flags:
 
 - `-t, --account-type <ACCOUNT_TYPE>`: Specifies the account visibility. It accepts either "private" or "public", with "private" as the default. This is the only thing the protocol's `AccountType` encodes.
 
-There is no `--faucet` flag: faucet-vs-regular is derived from the packages. If any package contributes the `FungibleFaucet` component, the resulting account is treated as a fungible faucet and an implicit `TokenPolicyManager` is installed when one is not already provided. `--account-type` now only selects visibility; its previous values (`fungible-faucet`, `non-fungible-faucet`, `regular-account-immutable-code`, `regular-account-updatable-code`) have been removed, as the protocol no longer encodes non-fungible-faucet as a distinct kind and code mutability is no longer encoded in the account ID.
+There is no `--faucet` flag: faucet-vs-regular is derived from the packages. If any package contributes the `FungibleFaucet` component, the resulting account is treated as a fungible faucet and an implicit `TokenPolicyManager` is installed when one is not already provided. `--account-type` only selects visibility.
 - `--packages <PACKAGES>`: Specifies a list of file paths for packages holding account components to include in the account. If the packages contain placeholders, the CLI will prompt the user to enter the required data for instantiating storage appropriately.
 - `--init-storage-data-path <INIT_STORAGE_DATA_PATH>`: Specifies an optional file path to a TOML file containing key/value pairs used for initializing storage. Each key should map to a placeholder within the packages' component metadata. The CLI will prompt for any keys that are not present in the file.
 

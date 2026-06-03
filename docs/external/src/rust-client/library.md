@@ -103,6 +103,28 @@ client.add_account(&new_account, false).await?;
 
 The account's state is also tracked locally, but during sync the client updates the account state by querying the node for the most recent account data.
 
+### Network accounts
+
+A network account is a public account that the node drives automatically: it consumes matching notes on the network's behalf via network transactions (NTX). An account becomes a network account by using the `AuthNetworkAccount` auth component, which carries a standardized allowlist of note script roots. The node uses that allowlist to identify the account and route only allowlisted notes to it; the auth procedure additionally enforces that consumed notes are allowlisted and that no transaction script runs.
+
+```rust
+let auth = AuthNetworkAccount::with_allowlist(allowed_note_script_roots)?;
+
+let network_account = AccountBuilder::new(init_seed)
+    .account_type(AccountType::Public) // network accounts must be public
+    .with_auth_component(auth)
+    .with_component(/* your contract component */)
+    .build_with_schema_commitment()?;
+client.add_account(&network_account, false).await?;
+
+// Deploy with an empty (scriptless) transaction: `AuthNetworkAccount` forbids transaction
+// scripts, and its auth procedure bumps the nonce from 0 to 1, which registers the account.
+let deploy = TransactionRequestBuilder::new().build()?;
+let tx_id = client.submit_new_transaction(network_account.id(), deploy).await?;
+```
+
+After deployment the account is a network account, so the node rejects user-submitted transactions against it; all further state changes happen through network transactions.
+
 ## Execute transaction
 
 In order to execute a transaction, you first need to define which type of transaction is to be executed. This may be done with the `TransactionRequest` which represents a general definition of a transaction. Some standardized constructors are available for common transaction types.

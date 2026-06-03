@@ -326,8 +326,11 @@ pub struct SyncSummary {
     pub new_public_notes: Vec<NoteId>,
     /// Details commitments of private notes imported from the Note Transport Layer in this sync.
     ///
-    /// These are identified by details commitment rather than note ID because NTL-imported notes
-    /// are `Expected` and have no note ID until they are observed on-chain.
+    /// Reported by details commitment because that is what `import_notes` returns. NTL notes carry
+    /// full details, so their `NoteId` is derivable; they are still `Expected` until observed
+    /// on-chain.
+    ///
+    /// TODO: expose `NoteId` here since NTL-imported notes have full details.
     ///
     /// Only populated by [`Client::sync_state`]; [`Client::sync_chain`] always leaves this empty
     /// because it does not touch the Note Transport Layer.

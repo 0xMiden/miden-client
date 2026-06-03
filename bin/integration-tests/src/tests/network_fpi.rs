@@ -111,12 +111,8 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
     // the node routes the note to it and runs the network transaction.
     let network_fpi_note_root =
         note_script_root(&network_fpi_note_script, client2.source_manager())?;
-    let target_network_account = deploy_network_counter_contract(
-        &mut client2,
-        AccountType::Public,
-        &[network_fpi_note_root],
-    )
-    .await?;
+    let target_network_account =
+        deploy_network_counter_contract(&mut client2, &[network_fpi_note_root]).await?;
 
     client2.sync_state().await?;
 
