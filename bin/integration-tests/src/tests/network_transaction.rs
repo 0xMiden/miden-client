@@ -112,36 +112,47 @@ const INCR_NOTE_SCRIPT_CODE: &str = "
     end
 ";
 
-/// Deploys a counter contract account with an empty (scriptless) transaction.
+/// Deploys a counter contract as a network account that allowlists `allowed_note_script_roots`.
 ///
-/// `allowed_note_script_roots` holds the note-script roots the account should accept as a network
-/// account. When non-empty, the account is built with the standardized note-script allowlist slot
-/// (containing each root), which is what makes the node treat it as a network account and route
-/// matching notes to it. Passing an empty slice produces an ordinary public account. Roots are
-/// compiled by callers (see [`note_script_root`]) so the account allowlists exactly the scripts the
-/// notes it is expected to consume carry.
+/// The standardized allowlist slot (carried by [`AuthNetworkAccount`]) is what makes the node treat
+/// the account as a network account and route matching notes to it.
 pub(crate) async fn deploy_network_counter_contract(
     client: &mut TestClient,
     account_type: AccountType,
     allowed_note_script_roots: &[NoteScriptRoot],
 ) -> Result<Account> {
-    let acc = get_counter_contract_account(client, account_type, allowed_note_script_roots).await?;
-
-    client.add_account(&acc, false).await?;
-
-    // Deploying only needs to bump the account's nonce from 0 to 1, which the `incr_nonce_auth`
-    // component does on its own, so the deploy transaction carries no script.
-    let deploy_request = TransactionRequestBuilder::new().build()?;
-    let tx_id = client.submit_new_transaction(acc.id(), deploy_request).await?;
-    wait_for_tx(client, tx_id).await?;
-
-    Ok(acc)
+    let roots = allowed_note_script_roots.iter().copied().collect::<BTreeSet<NoteScriptRoot>>();
+    let auth = AuthNetworkAccount::with_allowlist(roots)
+        .map_err(|err| anyhow::anyhow!(err))
+        .context("failed to build network account auth component")?;
+    let acc = build_counter_contract_account(client, account_type, auth)?;
+    deploy_account(client, acc).await
 }
 
-async fn get_counter_contract_account(
+/// Deploys a counter contract as an ordinary public account that consumes notes via user
+/// transactions (the node rejects user transactions against network accounts).
+pub(crate) async fn deploy_counter_contract(
     client: &mut TestClient,
     account_type: AccountType,
-    allowed_note_script_roots: &[NoteScriptRoot],
+) -> Result<Account> {
+    let incr_nonce_auth_code = CodeBuilder::default()
+        .compile_component_code("miden::testing::incr_nonce_auth", INCR_NONCE_AUTH_CODE)
+        .context("failed to compile increment nonce auth component code")?;
+    let incr_nonce_auth = AccountComponent::new(
+        incr_nonce_auth_code,
+        vec![],
+        AccountComponentMetadata::new("miden::testing::incr_nonce_auth"),
+    )
+    .map_err(|err| anyhow::anyhow!(err))
+    .context("failed to create increment nonce auth component")?;
+    let acc = build_counter_contract_account(client, account_type, incr_nonce_auth)?;
+    deploy_account(client, acc).await
+}
+
+fn build_counter_contract_account(
+    client: &mut TestClient,
+    account_type: AccountType,
+    auth: impl Into<AccountComponent>,
 ) -> Result<Account> {
     let counter_slot = StorageSlot::with_empty_value(COUNTER_SLOT_NAME.clone());
     let counter_code = CodeBuilder::default()
@@ -158,45 +169,23 @@ async fn get_counter_contract_account(
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let builder = AccountBuilder::new(init_seed)
+    AccountBuilder::new(init_seed)
         .account_type(account_type)
-        .with_component(counter_component);
+        .with_component(counter_component)
+        .with_auth_component(auth)
+        .build_with_schema_commitment()
+        .context("failed to build counter contract account")
+}
 
-    // A non-empty allowlist makes this a real network account: use the standardized
-    // `AuthNetworkAccount`, which carries the allowlist slot the node uses to identify the account
-    // and enforces at auth time that only allowlisted notes are consumed and no tx script runs.
-    // Deploys are scriptless precisely so this auth authorizes them.
-    //
-    // An empty allowlist produces an ordinary public account driven by user-submitted
-    // transactions (the node rejects user transactions against network accounts), so it uses the
-    // permissive signature-less nonce auth instead.
-    let account = if allowed_note_script_roots.is_empty() {
-        let incr_nonce_auth_code = CodeBuilder::default()
-            .compile_component_code("miden::testing::incr_nonce_auth", INCR_NONCE_AUTH_CODE)
-            .context("failed to compile increment nonce auth component code")?;
-        let incr_nonce_auth = AccountComponent::new(
-            incr_nonce_auth_code,
-            vec![],
-            AccountComponentMetadata::new("miden::testing::incr_nonce_auth"),
-        )
-        .map_err(|err| anyhow::anyhow!(err))
-        .context("failed to create increment nonce auth component")?;
-        builder
-            .with_auth_component(incr_nonce_auth)
-            .build_with_schema_commitment()
-            .context("failed to build account with counter contract")?
-    } else {
-        let roots = allowed_note_script_roots.iter().copied().collect::<BTreeSet<NoteScriptRoot>>();
-        let auth = AuthNetworkAccount::with_allowlist(roots)
-            .map_err(|err| anyhow::anyhow!(err))
-            .context("failed to build network account auth component")?;
-        builder
-            .with_auth_component(auth)
-            .build_with_schema_commitment()
-            .context("failed to build network account with counter contract")?
-    };
-
-    Ok(account)
+/// Deploys `acc` with an empty transaction; the auth component should bump the nonce from 0 to 1,
+/// which makes the account update valid.
+async fn deploy_account(client: &mut TestClient, acc: Account) -> Result<Account> {
+    client.add_account(&acc, false).await?;
+    let tx_id = client
+        .submit_new_transaction(acc.id(), TransactionRequestBuilder::new().build()?)
+        .await?;
+    wait_for_tx(client, tx_id).await?;
+    Ok(acc)
 }
 
 // TESTS
@@ -282,8 +271,7 @@ pub async fn test_recall_note_before_ntx_consumes_it(client_config: ClientConfig
             .await?;
     // The native account consumes the note via a user-submitted transaction, so it must stay an
     // ordinary public account: the node rejects user transactions against network accounts.
-    let native_account =
-        deploy_network_counter_contract(&mut client, AccountType::Public, &[]).await?;
+    let native_account = deploy_counter_contract(&mut client, AccountType::Public).await?;
 
     let wallet =
         insert_new_wallet(&mut client, AccountType::Public, &keystore, RPO_FALCON_SCHEME_ID)
