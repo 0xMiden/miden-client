@@ -285,13 +285,6 @@ impl From<&TransactionRequestError> for Option<ErrorHint> {
                           Add at least one fungible or non-fungible asset to the note.".to_string(),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
-            TransactionRequestError::InvalidSenderAccount(account_id) => Some(ErrorHint {
-                message: format!(
-                    "Account {account_id} is not tracked by this client. Import or create the \
-                     account first, then retry the transaction."
-                ),
-                docs_url: Some(TROUBLESHOOTING_DOC),
-            }),
             TransactionRequestError::OutputNoteSenderMismatch { expected, actual } => {
                 Some(ErrorHint {
                     message: format!(
