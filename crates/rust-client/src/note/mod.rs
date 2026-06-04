@@ -79,8 +79,10 @@ pub use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteAttachment,
-    NoteAttachmentKind,
+    NoteAttachmentContent,
+    NoteAttachmentHeader,
     NoteAttachmentScheme,
+    NoteAttachments,
     NoteDetails,
     NoteFile,
     NoteHeader,
@@ -88,7 +90,6 @@ pub use miden_protocol::note::{
     NoteInclusionProof,
     NoteLocation,
     NoteMetadata,
-    NoteMetadataHeader,
     NoteRecipient,
     NoteScript,
     NoteScriptRoot,
@@ -97,14 +98,21 @@ pub use miden_protocol::note::{
     NoteType,
     Nullifier,
     PartialNote,
+    PartialNoteMetadata,
 };
 pub use miden_protocol::transaction::ToInputNoteCommitments;
+/// Raw access to `miden-standards` note modules for items not curated by `miden-client`.
+pub use miden_standards::note as standards;
 pub use miden_standards::note::{
+    MintNote,
+    MintNoteStorage,
     NetworkAccountTarget,
     NoteConsumptionStatus,
     NoteExecutionHint,
     P2idNote,
     P2idNoteStorage,
+    P2ideNote,
+    P2ideNoteStorage,
     PswapNote,
     StandardNote,
     SwapNote,
@@ -114,6 +122,7 @@ pub use note_reader::InputNoteReader;
 pub use note_screener::{NoteConsumability, NoteScreener, NoteScreenerError};
 pub use note_update_tracker::{
     InputNoteUpdate,
+    NoteConsumption,
     NoteUpdateTracker,
     NoteUpdateType,
     OutputNoteUpdate,

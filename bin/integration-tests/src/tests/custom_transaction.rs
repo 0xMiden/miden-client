@@ -6,11 +6,11 @@ use miden_client::crypto::{FeltRng, MerkleStore, MerkleTree, NodeIndex, Poseidon
 use miden_client::note::{
     Note,
     NoteAssets,
-    NoteMetadata,
     NoteRecipient,
     NoteStorage,
     NoteTag,
     NoteType,
+    PartialNoteMetadata,
 };
 use miden_client::store::{NoteFilter, TransactionFilter};
 use miden_client::testing::common::*;
@@ -294,7 +294,7 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
     let note_script = client_1.code_builder().compile_note_script(note_script)?;
     let inputs = NoteStorage::new(vec![])?;
     let serial_num = client_1.rng().draw_word();
-    let note_metadata = NoteMetadata::new(basic_account_1.id(), NoteType::Public)
+    let note_metadata = PartialNoteMetadata::new(basic_account_1.id(), NoteType::Public)
         .with_tag(NoteTag::with_account_target(basic_account_1.id()));
     let note_assets = NoteAssets::new(vec![])?;
     let note_recipient = NoteRecipient::new(serial_num, note_script, inputs);
@@ -374,7 +374,7 @@ fn create_custom_note(
         NoteStorage::new(vec![target_account_id.suffix(), target_account_id.prefix().as_felt()])
             .context("failed to create note inputs")?;
     let serial_num = rng.draw_word();
-    let note_metadata = NoteMetadata::new(faucet_account_id, NoteType::Private)
+    let note_metadata = PartialNoteMetadata::new(faucet_account_id, NoteType::Private)
         .with_tag(NoteTag::with_account_target(target_account_id));
     let note_assets = NoteAssets::new(vec![
         FungibleAsset::new(faucet_account_id, 10)

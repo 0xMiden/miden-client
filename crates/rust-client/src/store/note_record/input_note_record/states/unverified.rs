@@ -68,7 +68,7 @@ impl NoteStateHandler for UnverifiedNoteState {
             Ok(Some(
                 CommittedNoteState {
                     inclusion_proof: self.inclusion_proof.clone(),
-                    metadata: self.metadata.clone(),
+                    metadata: self.metadata,
                     block_note_root: block_header.note_root(),
                 }
                 .into(),
@@ -76,7 +76,7 @@ impl NoteStateHandler for UnverifiedNoteState {
         } else {
             Ok(Some(
                 InvalidNoteState {
-                    metadata: self.metadata.clone(),
+                    metadata: self.metadata,
                     invalid_inclusion_proof: self.inclusion_proof.clone(),
                     block_note_root: block_header.note_root(),
                 }
@@ -101,7 +101,7 @@ impl NoteStateHandler for UnverifiedNoteState {
             self.inclusion_proof.location().block_num().as_u32().saturating_sub(1);
         Ok(Some(
             ProcessingUnauthenticatedNoteState {
-                metadata: self.metadata.clone(),
+                metadata: self.metadata,
                 after_block_num: BlockNumber::from(after_block_num),
                 submission_data,
             }

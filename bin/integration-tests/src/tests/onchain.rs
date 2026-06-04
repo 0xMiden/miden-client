@@ -1,11 +1,22 @@
+use std::collections::BTreeMap;
+
 use anyhow::{Context, Result};
 use miden_client::account::{AccountStorageMode, build_wallet_id};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::keystore::Keystore;
-use miden_client::note::{NoteAttachment, NoteAttachmentScheme, NoteFile, NoteType, P2idNote};
+use miden_client::note::{
+    BlockNumber,
+    NoteAttachment,
+    NoteAttachmentScheme,
+    NoteAttachments,
+    NoteFile,
+    NoteType,
+    P2idNote,
+};
 use miden_client::rpc::{AcceptHeaderError, RpcError};
-use miden_client::store::{InputNoteState, NoteFilter};
+use miden_client::store::{InputNoteState, NoteFilter, TransactionFilter};
+use miden_client::sync::NoteTagSource;
 use miden_client::testing::common::*;
 use miden_client::transaction::{
     InputNote,
@@ -13,7 +24,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{EMPTY_WORD, Word};
+use miden_client::{ClientError, EMPTY_WORD, Word};
 use rand::RngCore;
 use tracing::info;
 
@@ -423,6 +434,134 @@ pub async fn test_import_account_by_id(client_config: ClientConfig) -> Result<()
     Ok(())
 }
 
+/// Watched-account flow:
+///   - `client_1` owns the wallet and faucet, executes transactions.
+///   - `client_2` watches the wallet via `import_watched_account_by_id` (no note tag).
+///   - After `client_1` runs another mint+consume on the wallet, `client_2` should observe (a) the
+///     new account commitment matching `client_1`, (b) no input note record for the mint targeted
+///     at the wallet (no tag → not synced), and (c) no output note record for the consumed note
+///     (watched accounts are state-only; note activity is intentionally not surfaced).
+pub async fn test_import_watched_account_by_id(client_config: ClientConfig) -> Result<()> {
+    let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
+    let (mut client_2, _keystore_2) = ClientConfig::default()
+        .with_rpc_endpoint(client_config.rpc_endpoint())
+        .into_client()
+        .await?;
+    wait_for_node(&mut client_1).await;
+
+    let (faucet_account, _) = insert_new_fungible_faucet(
+        &mut client_1,
+        AccountStorageMode::Public,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+    let (wallet, _) = insert_new_wallet(
+        &mut client_1,
+        AccountStorageMode::Public,
+        &keystore_1,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+    let wallet_id = wallet.id();
+    let faucet_id = faucet_account.id();
+
+    // Fill the wallet with an asset so the watched account has non-trivial state.
+    let tx_id = mint_and_consume(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
+    wait_for_tx(&mut client_1, tx_id).await?;
+
+    // client_2 starts watching the wallet.
+    client_2.import_watched_account_by_id(wallet_id).await?;
+
+    let initial_source_commitment = client_1.account_reader(wallet_id).commitment().await?;
+    let initial_watched_commitment = client_2.account_reader(wallet_id).commitment().await?;
+    assert_eq!(
+        initial_watched_commitment, initial_source_commitment,
+        "watched account commitment should match source after watch",
+    );
+
+    let watched_record = client_2
+        .test_store()
+        .get_account(wallet_id)
+        .await?
+        .context("watched account should be tracked in client_2's store")?;
+    assert!(watched_record.is_watched(), "watched account must be marked as watched");
+
+    let tags = client_2.test_store().get_note_tags().await?;
+    assert!(
+        !tags
+            .iter()
+            .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
+        "watched account must not register a per-account note tag",
+    );
+
+    // client_1 mints another note targeted at the wallet and consumes it. client_2 should
+    // observe the commitment advance, but NOT pick up either the input note (no tag) or any
+    // output-note record from the consume tx (watched accounts are state-only).
+    let (tx_id, mint_note) = mint_note(&mut client_1, wallet_id, faucet_id, NoteType::Public).await;
+    wait_for_tx(&mut client_1, tx_id).await?;
+    let consume_tx_id =
+        consume_notes(&mut client_1, wallet_id, std::slice::from_ref(&mint_note)).await;
+    wait_for_tx(&mut client_1, consume_tx_id).await?;
+
+    client_2.sync_state().await?;
+
+    let updated_source_commitment = client_1.account_reader(wallet_id).commitment().await?;
+    let updated_watched_commitment = client_2.account_reader(wallet_id).commitment().await?;
+    assert_eq!(
+        updated_watched_commitment, updated_source_commitment,
+        "watched commitment should track source after sync",
+    );
+    assert_ne!(
+        updated_watched_commitment, initial_watched_commitment,
+        "watched account state should have advanced",
+    );
+
+    // Mint output note (targeted at the wallet) must NOT have been synced as an input note.
+    let watched_input_notes = client_2.test_store().get_input_notes(NoteFilter::All).await?;
+    assert!(
+        watched_input_notes.iter().all(|n| n.id() != mint_note.id()),
+        "watched client must not have synced notes targeted at the wallet (no note tag)",
+    );
+
+    // No output-note records should have been created for the consume tx either: watched
+    // accounts do not surface note activity, only on-chain state.
+    let watched_output_notes = client_2.test_store().get_output_notes(NoteFilter::All).await?;
+    assert!(
+        watched_output_notes.is_empty(),
+        "watched client must not surface output notes from followed account txs",
+    );
+
+    // Switching an already-tracked watched account to native (or vice versa) is not supported.
+    let err = client_2
+        .import_account_by_id(wallet_id)
+        .await
+        .expect_err("import_account_by_id must reject already-tracked watched accounts");
+    assert!(
+        matches!(err, ClientError::AccountWatchedMismatch(id) if id == wallet_id),
+        "expected AccountWatchedMismatch, got {err:?}",
+    );
+
+    // Re-importing in the same mode is still a no-op overwrite, and the account stays
+    // watched with no per-account tag.
+    client_2.import_watched_account_by_id(wallet_id).await?;
+    let record = client_2
+        .test_store()
+        .get_account(wallet_id)
+        .await?
+        .context("account should still be tracked after re-import")?;
+    assert!(record.is_watched(), "account must remain watched");
+    let tags = client_2.test_store().get_note_tags().await?;
+    assert!(
+        !tags
+            .iter()
+            .any(|t| matches!(t.source, NoteTagSource::Account(id) if id == wallet_id)),
+        "watched account must not have a per-account note tag",
+    );
+
+    Ok(())
+}
+
 pub async fn test_incorrect_genesis(client_config: ClientConfig) -> Result<()> {
     let (builder, _) = client_config.into_client_builder().await?;
     let mut client = builder.build().await?;
@@ -444,14 +583,13 @@ pub async fn test_incorrect_genesis(client_config: ClientConfig) -> Result<()> {
 /// Tests that consumed notes are returned in the correct transaction order when multiple
 /// consume transactions for the same account are included in the same block.
 ///
-/// The test mints 3 notes, then submits 3 separate consume transactions rapidly so they
-/// are likely included in the same block. After syncing, it verifies that the
-/// `InputNoteReader` returns the notes ordered by their consumption order.
+/// The test mints 3 notes, then submits 3 consume transactions as a single proven batch
+/// so they land in the same block. After syncing, it verifies that `InputNoteReader` returns the
+/// notes in submission order.
 pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.clone().into_client().await?;
     wait_for_node(&mut client).await;
 
-    // Create faucet and wallet
     let (faucet_account, _) = insert_new_fungible_faucet(
         &mut client,
         AccountStorageMode::Private,
@@ -470,7 +608,15 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
 
     client.sync_state().await?;
 
-    // Mint 3 notes, each in a separate transaction
+    // Pre-batch: put the wallet on-chain so the wallet's first batch-tx delta is partial, not
+    // full-state — the batch apply path rejects full-state deltas.
+    let bootstrap_tx_id =
+        mint_and_consume(&mut client, wallet_account.id(), faucet_account.id(), NoteType::Private)
+            .await;
+    wait_for_tx(&mut client, bootstrap_tx_id).await?;
+    client.sync_state().await?;
+
+    // Mint 3 notes, each in a separate transaction.
     let mut minted_notes = Vec::new();
     for i in 0..3 {
         let (tx_id, note) =
@@ -480,30 +626,50 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
         wait_for_tx(&mut client, tx_id).await?;
         minted_notes.push(note);
     }
-
-    // Sync to pick up the minted notes
     client.sync_state().await?;
 
-    // Submit 3 separate consume transactions without waiting between them.
-    // This makes it likely they will be included in the same block, which tests
-    // the consumed_tx_order field within a single block.
-    let mut consume_tx_ids = Vec::new();
+    // Build a consume request per minted note and submit them as a single proven batch.
+    let mut batch = client.new_transaction_batch();
     for (i, note) in minted_notes.iter().enumerate() {
-        let tx_id =
-            consume_notes(&mut client, wallet_account.id(), core::slice::from_ref(note)).await;
-        info!(tx_id = %tx_id, note_id = %note.id(), index = i, "Submitted consume transaction");
-        consume_tx_ids.push(tx_id);
+        let tx_request = TransactionRequestBuilder::new()
+            .build_consume_notes(vec![note.clone()])
+            .unwrap();
+        info!(note_id = %note.id(), index = i, "Pushing consume tx into batch");
+        batch = batch.push(wallet_account.id(), tx_request).await?;
     }
+    let submission_tip = batch.submit().await?;
+    info!(submission_tip = submission_tip.as_u32(), "Submitted 3-tx consume batch");
 
-    // Wait for all consume transactions to be committed
-    for tx_id in &consume_tx_ids {
-        wait_for_tx(&mut client, *tx_id).await?;
+    // Sync until the three consume txs are committed, then capture their batch block.
+    let mut batch_block = None;
+    for _ in 0..15 {
+        client.sync_state().await?;
+
+        let mut txs_per_block: BTreeMap<BlockNumber, usize> = BTreeMap::new();
+        for tx in client.get_transactions(TransactionFilter::All).await? {
+            if tx.details.account_id != wallet_account.id() {
+                continue;
+            }
+            if let TransactionStatus::Committed { block_number, .. } = tx.status {
+                *txs_per_block.entry(block_number).or_default() += 1;
+            }
+        }
+
+        if let Some((&block, _)) = txs_per_block.iter().find(|&(_, &count)| count == 3) {
+            batch_block = Some(block);
+            break;
+        }
+
+        wait_for_blocks(&mut client, 1).await;
     }
+    let batch_block =
+        batch_block.with_context(|| "3 consume txs were not committed in the same block")?;
+    info!(
+        batch_block = batch_block.as_u32(),
+        "All 3 consume txs committed in the same block"
+    );
 
-    // Sync to apply the state updates
-    client.sync_state().await?;
-
-    // Verify all notes are consumed
+    // Verify all 3 notes are marked as consumed.
     let consumed_notes = client.get_input_notes(NoteFilter::Consumed).await?;
     assert!(
         consumed_notes.len() >= 3,
@@ -511,30 +677,12 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
         consumed_notes.len()
     );
 
-    // Check if all consume transactions landed in the same block
-    let tx_records = client.get_transactions(miden_client::store::TransactionFilter::All).await?;
-    let consume_blocks: Vec<_> = consume_tx_ids
-        .iter()
-        .filter_map(|tx_id| {
-            tx_records.iter().find(|t| t.id == *tx_id).and_then(|t| {
-                if let TransactionStatus::Committed { block_number, .. } = t.status {
-                    Some(block_number)
-                } else {
-                    None
-                }
-            })
-        })
-        .collect();
-
-    info!(?consume_blocks, "Consume transaction block numbers");
-
-    // Use InputNoteReader to iterate consumed notes for this wallet
+    // Collect consumed notes via InputNoteReader for this wallet.
     let mut reader = client.input_note_reader(wallet_account.id());
     let mut reader_notes = Vec::new();
     while let Some(note) = reader.next().await? {
         reader_notes.push(note);
     }
-
     assert!(
         reader_notes.len() >= 3,
         "Expected at least 3 notes from reader, got {}",
@@ -554,15 +702,11 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
             _ => None,
         }
     };
-
-    // Verify the notes are ordered by block height, then by tx_order within a block
     for window in reader_notes.windows(2) {
         let a = &window[0];
         let b = &window[1];
-
         let a_block = consumed_block_height(a).expect("consumed note should have block height");
         let b_block = consumed_block_height(b).expect("consumed note should have block height");
-
         assert!(
             a_block <= b_block,
             "Notes should be ordered by block height: note {} at block {} came before note {} at block {}",
@@ -573,39 +717,21 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
         );
     }
 
-    // If all transactions landed in the same block, additionally verify the note IDs
-    // match the order we submitted them in
-    let all_same_block =
-        consume_blocks.len() == 3 && consume_blocks.iter().all(|b| *b == consume_blocks[0]);
-
-    if all_same_block {
-        info!("All consume transactions in the same block - verifying tx_order");
-        let reader_note_ids: Vec<_> = reader_notes.iter().map(|n| n.id()).collect();
-        for (i, note) in minted_notes.iter().enumerate() {
-            let pos = reader_note_ids
+    // The three consumed notes must appear in submission order.
+    let reader_note_ids: Vec<_> = reader_notes.iter().map(|n| n.id()).collect();
+    let positions: Vec<_> = minted_notes
+        .iter()
+        .map(|note| {
+            reader_note_ids
                 .iter()
                 .position(|id| *id == note.id())
-                .with_context(|| format!("Minted note {} not found in reader output", note.id()))?;
-            info!(note_id = %note.id(), expected_order = i, actual_pos = pos, "Note position");
-        }
-
-        // Verify that the relative order of our 3 notes matches submission order
-        let positions: Vec<_> = minted_notes
-            .iter()
-            .filter_map(|note| reader_note_ids.iter().position(|id| *id == note.id()))
-            .collect();
-
-        assert_eq!(positions.len(), 3, "All 3 minted notes should be in the reader output");
-        assert!(
-            positions.windows(2).all(|w| w[0] < w[1]),
-            "Notes should appear in submission order, but got positions: {:?}",
-            positions
-        );
-    } else {
-        info!(
-            "Consume transactions spread across multiple blocks - order verified by block height"
-        );
-    }
+                .with_context(|| format!("Minted note {} not found in reader output", note.id()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    assert!(
+        positions.windows(2).all(|w| w[0] < w[1]),
+        "Notes should appear in submission order, but got positions: {positions:?}"
+    );
 
     Ok(())
 }
@@ -647,14 +773,14 @@ pub async fn test_sync_note_with_attachment(client_config: ClientConfig) -> Resu
     // Mint a P2ID note with a Word attachment. The non-default attachment triggers
     // the get_notes_by_id metadata fetch during the receiver's sync.
     let attachment =
-        NoteAttachment::new_word(NoteAttachmentScheme::new(42), Word::from([1u32, 2, 3, 4]));
+        NoteAttachment::with_word(NoteAttachmentScheme::new(42)?, Word::from([1u32, 2, 3, 4]));
     let asset = FungibleAsset::new(faucet_account.id(), MINT_AMOUNT)?;
     let note = P2idNote::create(
         faucet_account.id(),
         wallet.id(),
         vec![asset.into()],
         NoteType::Public,
-        attachment,
+        NoteAttachments::new(vec![attachment.clone()])?,
         client_1.rng(),
     )?;
 
@@ -663,8 +789,8 @@ pub async fn test_sync_note_with_attachment(client_config: ClientConfig) -> Resu
         TransactionRequestBuilder::new().own_output_notes(vec![note.clone()]).build()?;
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await?;
 
-    // Client 2 syncs and should discover the note. The sync response will have
-    // attachment_kind != None, so the client must fetch full metadata via get_notes_by_id.
+    // Client 2 syncs and should discover the note. The sync response carries an attachment
+    // commitment, so the client must fetch the full note via get_notes_by_id.
     info!("Syncing client 2 to discover note with attachment");
     client_2.sync_state().await?;
 
@@ -675,12 +801,13 @@ pub async fn test_sync_note_with_attachment(client_config: ClientConfig) -> Resu
         .try_into()?;
 
     assert_eq!(
-        received_note.note().metadata().attachment().attachment_kind(),
-        miden_client::note::NoteAttachmentKind::Word,
-        "Synced note should have a Word attachment"
+        received_note.note().attachments().get(0),
+        Some(&attachment),
+        "Synced note should carry the Word attachment"
     );
 
-    // Consume the note — this will fail if the metadata wasn't properly resolved
+    // Consume the note — this will fail if the attachment wasn't preserved (the note commitment
+    // would not match the on-chain note).
     info!("Consuming note with attachment in client 2");
     let tx_id = consume_notes(&mut client_2, wallet.id(), &[received_note.note().clone()]).await;
     wait_for_tx(&mut client_2, tx_id).await?;

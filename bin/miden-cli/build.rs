@@ -7,16 +7,10 @@ use miden_client::account::component::{
     AuthMultisig,
     AuthSingleSig,
     AuthSingleSigAcl,
-    BasicFungibleFaucet,
     BasicWallet,
+    FungibleFaucet,
     MIDEN_PACKAGE_EXTENSION,
     NoAuth,
-    basic_fungible_faucet_library,
-    basic_wallet_library,
-    multisig_library,
-    no_auth_library,
-    singlesig_acl_library,
-    singlesig_library,
 };
 use miden_client::assembly::Library;
 use miden_client::utils::Serializable;
@@ -36,13 +30,18 @@ const PACKAGE_DIR: &str = "packages";
 fn main() {
     // Basic wallet (no storage schema)
     let basic_wallet_metadata = BasicWallet::component_metadata();
-    build_package("basic-wallet", basic_wallet_library(), &basic_wallet_metadata, None);
+    build_package(
+        "basic-wallet",
+        BasicWallet::code().as_library().clone(),
+        &basic_wallet_metadata,
+        None,
+    );
 
     // Basic fungible faucet
-    let basic_faucet_metadata = BasicFungibleFaucet::component_metadata();
+    let basic_faucet_metadata = FungibleFaucet::component_metadata();
     build_package(
         "basic-fungible-faucet",
-        basic_fungible_faucet_library(),
+        FungibleFaucet::code().as_library().clone(),
         &basic_faucet_metadata,
         None,
     );
@@ -50,23 +49,43 @@ fn main() {
     // Basic auth (singlesig - supports both RPO Falcon and ECDSA)
     let singlesig_metadata = AuthSingleSig::component_metadata();
 
-    build_package("basic-auth", singlesig_library(), &singlesig_metadata, Some("auth"));
+    build_package(
+        "basic-auth",
+        AuthSingleSig::code().as_library().clone(),
+        &singlesig_metadata,
+        Some("auth"),
+    );
 
     // ECDSA auth (same component, different package name for discoverability)
-    build_package("ecdsa-auth", singlesig_library(), &singlesig_metadata, Some("auth"));
+    build_package(
+        "ecdsa-auth",
+        AuthSingleSig::code().as_library().clone(),
+        &singlesig_metadata,
+        Some("auth"),
+    );
 
     // No authentication component. Nonce is incremented on first transaction and when the account
     // state is changed. Provides no cryptographic authentication.
     let no_auth_metadata = NoAuth::component_metadata();
-    build_package("no-auth", no_auth_library(), &no_auth_metadata, Some("auth"));
+    build_package("no-auth", NoAuth::code().as_library().clone(), &no_auth_metadata, Some("auth"));
 
     // Multisig auth
     let multisig_metadata = AuthMultisig::component_metadata();
-    build_package("multisig-auth", multisig_library(), &multisig_metadata, Some("auth"));
+    build_package(
+        "multisig-auth",
+        AuthMultisig::code().as_library().clone(),
+        &multisig_metadata,
+        Some("auth"),
+    );
 
     // ACL auth
     let acl_metadata = AuthSingleSigAcl::component_metadata();
-    build_package("acl-auth", singlesig_acl_library(), &acl_metadata, Some("auth"));
+    build_package(
+        "acl-auth",
+        AuthSingleSigAcl::code().as_library().clone(),
+        &acl_metadata,
+        Some("auth"),
+    );
 }
 
 /// Builds a package and stores it under `{OUT_DIR}/{PACKAGE_DIR}` or

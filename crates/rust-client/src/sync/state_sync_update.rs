@@ -24,7 +24,7 @@ use super::SyncSummary;
 use crate::note::{NoteUpdateTracker, NoteUpdateType};
 use crate::rpc::domain::account_vault::AccountVaultUpdate;
 use crate::rpc::domain::storage_map::StorageMapUpdate;
-use crate::rpc::domain::transaction::TransactionInclusion;
+use crate::rpc::domain::transaction::TransactionRecord as RpcTransactionRecord;
 use crate::transaction::{DiscardCause, TransactionRecord, TransactionStatus};
 
 // STATE SYNC UPDATE
@@ -216,14 +216,12 @@ impl TransactionUpdateTracker {
 
     /// Applies the necessary state transitions to the [`TransactionUpdateTracker`] when a
     /// transaction is included in a block.
-    pub fn apply_transaction_inclusion(
-        &mut self,
-        transaction_inclusion: &TransactionInclusion,
-        timestamp: u64,
-    ) {
-        if let Some(transaction) = self.transactions.get_mut(&transaction_inclusion.transaction_id)
-        {
-            transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
+    pub fn apply_transaction_inclusion(&mut self, record: &RpcTransactionRecord, timestamp: u64) {
+        let header = &record.transaction_header;
+        let account_id = header.account_id();
+
+        if let Some(transaction) = self.transactions.get_mut(&header.id()) {
+            transaction.commit_transaction(record.block_num, timestamp);
             return;
         }
 
@@ -231,19 +229,18 @@ impl TransactionUpdateTracker {
         // authenticates these notes during processing, which changes the transaction
         // ID. Match by account ID and pre-transaction state instead.
         if let Some(transaction) = self.transactions.values_mut().find(|tx| {
-            tx.details.account_id == transaction_inclusion.account_id
-                && tx.details.init_account_state == transaction_inclusion.initial_state_commitment
+            tx.details.account_id == account_id
+                && tx.details.init_account_state == header.initial_state_commitment()
         }) {
-            transaction.commit_transaction(transaction_inclusion.block_num, timestamp);
+            transaction.commit_transaction(record.block_num, timestamp);
             return;
         }
 
         // No local transaction matched. This is an external transaction by a tracked account.
         // Record the nullifier→account mappings so we can attribute note consumption to tracked
         // accounts during nullifier processing.
-        for nullifier in &transaction_inclusion.nullifiers {
-            self.external_nullifier_accounts
-                .insert(*nullifier, transaction_inclusion.account_id);
+        for commitment in header.input_notes().iter() {
+            self.external_nullifier_accounts.insert(commitment.nullifier(), account_id);
         }
     }
 
@@ -370,8 +367,8 @@ pub struct PublicAccountDelta {
     block_from: BlockNumber,
     /// Last block of the synced range (the block at which `new_header` is observed).
     block_to: BlockNumber,
-    /// New value-slot values from the `get_account_proof` storage header. Value slots are
-    /// always small enough to fit in the response.
+    /// New value-slot values from the `get_account` storage header. Value slots are always
+    /// small enough to fit in the response.
     value_slot_updates: Vec<(StorageSlotName, Word)>,
     /// Per-block storage map updates from `sync_storage_maps`.
     storage_map_updates: Vec<StorageMapUpdate>,

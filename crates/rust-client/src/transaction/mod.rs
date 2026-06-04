@@ -71,22 +71,31 @@ use miden_protocol::account::{Account, AccountCode, AccountId};
 use miden_protocol::asset::NonFungibleAsset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
-use miden_protocol::note::{Note, NoteDetails, NoteId, NoteRecipient, NoteScript, NoteTag};
+use miden_protocol::note::{
+    Note,
+    NoteAttachments,
+    NoteDetails,
+    NoteId,
+    NoteRecipient,
+    NoteScript,
+    NoteTag,
+};
 use miden_protocol::transaction::AccountInputs;
 use miden_protocol::vm::MIN_STACK_DEPTH;
-use miden_protocol::{EMPTY_WORD, Felt, Word};
+use miden_protocol::{Felt, Word};
 use miden_standards::account::interface::AccountInterfaceExt;
 use miden_tx::{DataStore, NoteConsumptionChecker, TransactionExecutor};
 use tracing::info;
 
 use super::Client;
 use crate::ClientError;
-use crate::note::{NoteScreenerError, NoteUpdateTracker};
-use crate::rpc::domain::account::AccountStorageRequirements;
-use crate::rpc::{AccountStateAt, GrpcError, NodeRpcClient, RpcError};
+use crate::note::{NoteScreenerError, NoteUpdateTracker, StandardNote};
+use crate::rpc::domain::account::{AccountStorageRequirements, GetAccountRequest, VaultFetch};
+use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{
+    AccountRecord,
     InputNoteRecord,
     InputNoteState,
     NoteFilter,
@@ -247,7 +256,27 @@ where
         let submission_height =
             self.submit_proven_transaction(proven_transaction, &tx_result).await?;
 
-        self.apply_transaction(&tx_result, submission_height).await?;
+        // The transaction has been accepted by the node; the local store update
+        // is a separate step that can fail independently. On failure, return a
+        // distinct error carrying the pending update so the caller can decide
+        // how to recover (re-apply later via `apply_transaction_update`,
+        // persist for the next session, etc.).
+        //
+        // The update is boxed so it does not inflate the enclosing future
+        // across await points (triggers clippy::large_futures).
+        let tx_update =
+            Box::new(self.get_transaction_store_update(&tx_result, submission_height).await?);
+
+        if let Err(apply_err) = self.apply_transaction_update((*tx_update).clone()).await {
+            info!(
+                "apply_transaction_update failed for submitted tx {tx_id}; returning \
+                 ApplyTransactionAfterSubmitFailed with the pending update attached: {apply_err}"
+            );
+            return Err(ClientError::ApplyTransactionAfterSubmitFailed {
+                pending_update: tx_update,
+                source: Box::new(apply_err),
+            });
+        }
 
         Ok(tx_id)
     }
@@ -266,7 +295,8 @@ where
         account_id: AccountId,
         transaction_request: TransactionRequest,
     ) -> Result<TransactionResult, ClientError> {
-        let account = self.try_get_account(account_id).await?;
+        let account: Account = self.get_native_account_record(account_id).await?.try_into()?;
+
         let prep = self.prepare_transaction(&account, transaction_request).await?;
 
         let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
@@ -579,6 +609,9 @@ where
     ///
     /// `account_id` is the account that will execute the registration transaction.
     ///
+    /// Standard note scripts are skipped — the NTX builder resolves those directly, so they
+    /// never need registering. A missing non-standard script is registered, not an error.
+    ///
     /// This method is called automatically by [`Self::submit_new_transaction_with_prover`] when the
     /// [`TransactionRequest`] contains expected NTX scripts. It can also be called directly if
     /// you want to register scripts ahead of time.
@@ -591,18 +624,21 @@ where
         let mut missing_scripts = Vec::new();
 
         for script in scripts {
+            // Standard scripts are resolved by the NTX builder directly; no registration needed.
+            if StandardNote::from_script(script).is_some() {
+                continue;
+            }
+
             let script_root = script.root();
 
-            // Check if the node already has this script registered.
+            // Scripts the node doesn't have are queued for registration; only RPC errors abort.
             match self.rpc_api.get_note_script_by_root(script_root.into()).await {
-                Ok(_) => {},
-                Err(RpcError::RequestError { error_kind: GrpcError::NotFound, .. }) => {
-                    missing_scripts.push(script.clone());
-                },
-                Err(other) => {
+                Ok(Some(_)) => {},
+                Ok(None) => missing_scripts.push(script.clone()),
+                Err(source) => {
                     return Err(ClientError::NtxScriptRegistrationFailed {
                         script_root: script_root.into(),
-                        source: other,
+                        source,
                     });
                 },
             }
@@ -698,12 +734,9 @@ where
                     let account_id = partial_account.id();
                     let (_, account_proof) = self
                         .rpc_api
-                        .get_account_proof(
+                        .get_account(
                             account_id,
-                            AccountStorageRequirements::default(),
-                            AccountStateAt::Block(block_num),
-                            None,
-                            None,
+                            GetAccountRequest::new().at(AccountStateAt::Block(block_num)),
                         )
                         .await?;
                     let (witness, _) = account_proof.into_parts();
@@ -771,6 +804,23 @@ where
         Ok(executor)
     }
 
+    /// Loads an [`AccountRecord`] for an account that must be usable as a transaction's native
+    /// account. Errors out if the account is not tracked or if it is watched.
+    async fn get_native_account_record(
+        &self,
+        account_id: AccountId,
+    ) -> Result<AccountRecord, ClientError> {
+        let account_record = self
+            .store
+            .get_account(account_id)
+            .await?
+            .ok_or(ClientError::AccountDataNotFound(account_id))?;
+        if account_record.is_watched() {
+            return Err(ClientError::AccountIsWatched(account_id));
+        }
+        Ok(account_record)
+    }
+
     /// Creates a transaction executor configured for DAP (Debug Adapter Protocol) debugging.
     #[cfg(feature = "dap")]
     pub(crate) fn build_dap_executor<'store, 'auth, STORE: DataStore + Sync>(
@@ -822,11 +872,13 @@ where
 
         for note in output_notes {
             if output_note_relevances.contains_key(&note.id()) {
-                let metadata = note.metadata().clone();
+                let metadata = *note.metadata();
                 let tag = metadata.tag();
+                let attachments = note.attachments().clone();
 
                 new_input_notes.push(InputNoteRecord::new(
                     note.into(),
+                    attachments,
                     current_timestamp,
                     ExpectedNoteState {
                         metadata: Some(metadata),
@@ -842,6 +894,7 @@ where
         new_input_notes.extend(tx_result.future_notes().iter().map(|(note_details, tag)| {
             InputNoteRecord::new(
                 note_details.clone(),
+                NoteAttachments::empty(),
                 None,
                 ExpectedNoteState {
                     metadata: None,
@@ -991,12 +1044,45 @@ pub(super) fn validate_account_request(
     transaction_request: &TransactionRequest,
     account: &Account,
 ) -> Result<(), ClientError> {
+    // Output notes emitted by this transaction must declare the executing account as their
+    // sender. The kernel binds an emitted note's sender to the account that produces it, and
+    // note scripts (e.g. P2IDE reclaim) authorize on that field, so a foreign sender is
+    // unsatisfiable. Reject it here — read-only, before any execution or store writes —
+    // instead of failing deep in transaction script building.
+    validate_output_note_senders(transaction_request, account.id())?;
+
     if account.is_faucet() {
         // TODO(SantiagoPittella): Add faucet validations.
         Ok(())
     } else {
         validate_basic_account_request(transaction_request, account)
     }
+}
+
+/// Verifies that every output note emitted directly by the transaction declares `account_id` as
+/// its sender.
+///
+/// A note's sender is bound by the kernel to the account that emits it, and note scripts (e.g.
+/// P2IDE reclaim) authorize on that field, so an output note declaring a foreign sender can never
+/// be executed. Catching it here yields a clear, immediate error instead of a cryptic failure deep
+/// in transaction script building.
+fn validate_output_note_senders(
+    transaction_request: &TransactionRequest,
+    account_id: AccountId,
+) -> Result<(), ClientError> {
+    for note in transaction_request.expected_output_own_notes() {
+        let sender = note.metadata().sender();
+        if sender != account_id {
+            return Err(ClientError::TransactionRequestError(
+                TransactionRequestError::OutputNoteSenderMismatch {
+                    expected: account_id,
+                    actual: sender,
+                },
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 /// Ensures a transaction request is compatible with the current account state,
@@ -1062,24 +1148,31 @@ pub(crate) async fn fetch_public_account_inputs(
     storage_requirements: AccountStorageRequirements,
     account_state_at: AccountStateAt,
 ) -> Result<AccountInputs, ClientError> {
-    let known_account_code: Option<AccountCode> =
+    let known_code: Option<AccountCode> =
         store.get_foreign_account_code(vec![account_id]).await?.into_values().next();
 
-    // Get vault assets only if known commitment doesn't match the current one.
-    let known_vault_commitment = store
+    let vault = store
         .get_account_header(account_id)
         .await?
-        .map_or(EMPTY_WORD, |(header, _)| header.vault_root());
+        .map_or(VaultFetch::Always, |(header, ..)| {
+            VaultFetch::IfChangedFrom(header.vault_root())
+        });
 
-    let (_, account_proof) = rpc_api
-        .get_account_proof(
+    let (block_num, mut account_proof) = rpc_api
+        .get_account(
             account_id,
-            storage_requirements.clone(),
-            account_state_at,
-            known_account_code,
-            Some(known_vault_commitment),
+            GetAccountRequest::new()
+                .with_storage(storage_requirements.clone())
+                .at(account_state_at)
+                .with_known_code(known_code)
+                .with_vault(vault),
         )
         .await?;
+
+    if let Some(details) = account_proof.details_mut() {
+        rpc_api.resolve_oversize_vault(account_id, block_num, details).await?;
+        rpc_api.resolve_oversize_storage_maps(account_id, block_num, details).await?;
+    }
 
     let account_inputs = request::account_proof_into_inputs(account_proof, &storage_requirements)?;
 
@@ -1133,4 +1226,97 @@ pub(crate) fn validate_executed_transaction(
     }
 
     Ok(())
+}
+
+// TESTS
+// ================================================================================================
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec;
+
+    use miden_protocol::Word;
+    use miden_protocol::account::AccountId;
+    use miden_protocol::asset::FungibleAsset;
+    use miden_protocol::crypto::rand::RandomCoin;
+    use miden_protocol::note::{Note, NoteAttachments, NoteType};
+    use miden_protocol::testing::account_id::{
+        ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
+        ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+        ACCOUNT_ID_SENDER,
+    };
+    use miden_standards::note::P2idNote;
+
+    use super::{TransactionRequestBuilder, validate_output_note_senders};
+    use crate::ClientError;
+    use crate::transaction::TransactionRequestError;
+
+    fn own_note_with_sender(sender: AccountId) -> Note {
+        let faucet_id = AccountId::try_from(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET).unwrap();
+        let target_id =
+            AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+        let mut rng = RandomCoin::new(Word::default());
+
+        P2idNote::create(
+            sender,
+            target_id,
+            vec![FungibleAsset::new(faucet_id, 100).unwrap().into()],
+            NoteType::Public,
+            NoteAttachments::empty(),
+            &mut rng,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn output_note_with_foreign_sender_is_rejected() {
+        let account_id =
+            AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+        let foreign_sender = AccountId::try_from(ACCOUNT_ID_SENDER).unwrap();
+        assert_ne!(account_id, foreign_sender);
+
+        let request = TransactionRequestBuilder::new()
+            .own_output_notes(vec![own_note_with_sender(foreign_sender)])
+            .build()
+            .unwrap();
+
+        let err = validate_output_note_senders(&request, account_id).unwrap_err();
+        match err {
+            ClientError::TransactionRequestError(
+                TransactionRequestError::OutputNoteSenderMismatch { expected, actual },
+            ) => {
+                assert_eq!(expected, account_id);
+                assert_eq!(actual, foreign_sender);
+            },
+            other => panic!("expected OutputNoteSenderMismatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn output_note_with_matching_sender_is_accepted() {
+        let account_id =
+            AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+
+        let request = TransactionRequestBuilder::new()
+            .own_output_notes(vec![own_note_with_sender(account_id)])
+            .build()
+            .unwrap();
+
+        validate_output_note_senders(&request, account_id).unwrap();
+    }
+
+    #[test]
+    fn request_without_own_output_notes_is_accepted() {
+        let account_id =
+            AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
+        let faucet_id = AccountId::try_from(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET).unwrap();
+
+        // A consume-only request (input note, no own output notes) must pass the sender check.
+        let request = TransactionRequestBuilder::new()
+            .input_notes(vec![(own_note_with_sender(faucet_id), None)])
+            .build()
+            .unwrap();
+
+        validate_output_note_senders(&request, account_id).unwrap();
+    }
 }

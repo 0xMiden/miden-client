@@ -173,13 +173,14 @@ impl TransactionRequest {
             Some(TransactionScriptTemplate::SendNotes(notes)) => notes
                 .iter()
                 .map(|partial| {
-                    Note::new(
+                    Note::with_attachments(
                         partial.assets().clone(),
-                        partial.metadata().clone(),
+                        *partial.partial_metadata(),
                         self.expected_output_recipients
                             .get(&partial.recipient_digest())
                             .expect("Recipient should be included if it's an own note")
                             .clone(),
+                        partial.attachments().clone(),
                     )
                 })
                 .collect(),
@@ -512,8 +513,10 @@ pub enum TransactionRequestError {
     InputNoteNotAuthenticated(NoteId),
     #[error("note {0} has already been consumed")]
     InputNoteAlreadyConsumed(NoteId),
-    #[error("sender account {0} is not tracked by this client or does not exist")]
-    InvalidSenderAccount(AccountId),
+    #[error(
+        "output note declares sender {actual} but the transaction is executed by account {expected}"
+    )]
+    OutputNoteSenderMismatch { expected: AccountId, actual: AccountId },
     #[error("invalid transaction script")]
     InvalidTransactionScript(#[from] TransactionScriptError),
     #[error("merkle proof error")]
@@ -570,7 +573,7 @@ mod tests {
     };
     use miden_protocol::asset::FungibleAsset;
     use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
-    use miden_protocol::note::{NoteAttachment, NoteTag, NoteType};
+    use miden_protocol::note::{NoteAttachments, NoteTag, NoteType};
     use miden_protocol::testing::account_id::{
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
@@ -622,7 +625,7 @@ mod tests {
                 target_id,
                 vec![FungibleAsset::new(faucet_id, 100 + i).unwrap().into()],
                 NoteType::Private,
-                NoteAttachment::default(),
+                NoteAttachments::empty(),
                 &mut rng,
             )
             .unwrap();

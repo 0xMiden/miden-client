@@ -26,9 +26,11 @@ use miden_client::note::{BlockNumber, NoteFile, NoteTag, NoteType};
 use miden_client::rpc::domain::account::{
     AccountStorageRequirements,
     FetchedAccount,
+    GetAccountRequest,
     StorageMapEntries,
+    VaultFetch,
 };
-use miden_client::rpc::{AccountStateAt, GrpcClient, NodeRpcClient};
+use miden_client::rpc::{GrpcClient, NodeRpcClient};
 use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
@@ -48,7 +50,7 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::{ClientError, EMPTY_WORD, Felt, Word};
+use miden_client::{ClientError, Felt, Word};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use tracing::info;
 
@@ -1437,16 +1439,10 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         consume_notes(&mut client, first_basic_account.id(), std::slice::from_ref(&note)).await;
     wait_for_tx(&mut client, tx_id).await?;
 
-    // Test get_account_proof retrieval (account must be deployed on-chain first)
+    // Test get_account retrieval (account must be deployed on-chain first)
     let (proof_block_num, account_proof) = client
         .test_rpc_api()
-        .get_account_proof(
-            first_basic_account.id(),
-            AccountStorageRequirements::default(),
-            AccountStateAt::ChainTip,
-            None,
-            None,
-        )
+        .get_account(first_basic_account.id(), GetAccountRequest::new())
         .await?;
     assert!(proof_block_num >= first_block_num);
     assert_eq!(account_proof.account_id(), first_basic_account.id());
@@ -1539,9 +1535,16 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
 
     let nullifier = note.nullifier();
 
+    let chain_tip = client
+        .test_rpc_api()
+        .get_block_header_by_number(None, false)
+        .await
+        .unwrap()
+        .0
+        .block_num();
     let node_nullifier = client
         .test_rpc_api()
-        .sync_nullifiers(&[nullifier.prefix()], 0.into(), None)
+        .sync_nullifiers(&[nullifier.prefix()], 0.into(), Some(chain_tip))
         .await
         .unwrap()
         .pop()
@@ -1550,7 +1553,8 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .test_rpc_api()
         .get_note_script_by_root(note.script().root().into())
         .await
-        .unwrap();
+        .unwrap()
+        .expect("node should have the note script registered");
     let sync_storage_maps = client
         .test_rpc_api()
         .sync_storage_maps(0.into(), None, account_with_map_item.id())
@@ -1561,13 +1565,6 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .sync_account_vault(0.into(), None, first_basic_account.id())
         .await
         .unwrap();
-    let chain_tip = client
-        .test_rpc_api()
-        .get_block_header_by_number(None, false)
-        .await
-        .unwrap()
-        .0
-        .block_num();
     let transactions = client
         .test_rpc_api()
         .sync_transactions(0.into(), chain_tip, vec![first_basic_account.id()])
@@ -1667,7 +1664,7 @@ pub async fn test_output_only_note(client_config: ClientConfig) -> Result<()> {
     Ok(())
 }
 
-/// Tests that `get_account_proof` with `AccountStorageRequirements` correctly filters storage
+/// Tests that `get_account` with `AccountStorageRequirements` correctly filters storage
 /// map entries by key.
 ///
 /// Creates a public account with a map slot containing 2 entries, then verifies:
@@ -1731,7 +1728,13 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     // Request all entries (empty keys)
     let requirements_all = AccountStorageRequirements::new([(map_slot_name.clone(), [].iter())]);
     let (_, proof_all) = rpc
-        .get_account_proof(account_id, requirements_all, AccountStateAt::ChainTip, None, None)
+        .get_account(
+            account_id,
+            GetAccountRequest {
+                storage: requirements_all,
+                ..Default::default()
+            },
+        )
         .await?;
     let map_all = proof_all
         .find_map_details(&map_slot_name)
@@ -1746,7 +1749,13 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     // Request one specific key
     let requirements_one = AccountStorageRequirements::new([(map_slot_name.clone(), [&map_key_1])]);
     let (_, proof_one) = rpc
-        .get_account_proof(account_id, requirements_one, AccountStateAt::ChainTip, None, None)
+        .get_account(
+            account_id,
+            GetAccountRequest {
+                storage: requirements_one,
+                ..Default::default()
+            },
+        )
         .await?;
     let map_one = proof_one
         .find_map_details(&map_slot_name)
@@ -1766,17 +1775,15 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     Ok(())
 }
 
-/// Tests that `get_account_proof` returns vault details based on the `known_vault_commitment`
-/// parameter.
+/// Tests that `get_account` returns vault details based on the [`VaultFetch`] policy.
 ///
-/// Creates a public faucet and wallet, mints tokens so the wallet holds assets,
-/// then calls `get_account_proof` three times with different vault commitment values:
-/// - `Some(EMPTY_WORD)`: always fetches vault data (commitment never matches).
-/// - `Some(actual_root)`: commitment matches the node's state, so assets are empty.
-/// - `None`: vault data not requested, so assets are empty.
-pub async fn test_get_account_proof_returns_vault_details(
-    client_config: ClientConfig,
-) -> Result<()> {
+/// Creates a public faucet and wallet, mints tokens so the wallet holds assets, then calls
+/// `get_account` three times with different vault policies:
+/// - [`VaultFetch::Always`]: always fetches vault data.
+/// - [`VaultFetch::IfChangedFrom`] with the current root: commitment matches the node's state, so
+///   assets are empty.
+/// - [`VaultFetch::Skip`] (default): vault data not requested, so assets are empty.
+pub async fn test_get_account_returns_vault_details(client_config: ClientConfig) -> Result<()> {
     let (mut client, keystore) = client_config.into_client().await?;
     wait_for_node(&mut client).await;
 
@@ -1794,14 +1801,14 @@ pub async fn test_get_account_proof_returns_vault_details(
 
     let rpc = client.test_rpc_api();
 
-    // Query 1: Some(EMPTY_WORD) — always fetches vault data since EMPTY_WORD never matches
+    // Query 1: VaultFetch::Always — always fetches vault data
     let (_, proof) = rpc
-        .get_account_proof(
+        .get_account(
             wallet.id(),
-            AccountStorageRequirements::default(),
-            AccountStateAt::ChainTip,
-            None,
-            Some(EMPTY_WORD),
+            GetAccountRequest {
+                vault: VaultFetch::Always,
+                ..Default::default()
+            },
         )
         .await?;
 
@@ -1815,14 +1822,15 @@ pub async fn test_get_account_proof_returns_vault_details(
         "expected exactly 1 asset (the minted fungible token)"
     );
 
-    // Query 2: Some(actual_root) — commitment matches, node returns empty assets
+    // Query 2: VaultFetch::IfChangedFrom(actual_root) — commitment matches, node returns empty
+    // assets
     let (_, proof) = rpc
-        .get_account_proof(
+        .get_account(
             wallet.id(),
-            AccountStorageRequirements::default(),
-            AccountStateAt::ChainTip,
-            None,
-            Some(vault_root),
+            GetAccountRequest {
+                vault: VaultFetch::IfChangedFrom(vault_root),
+                ..Default::default()
+            },
         )
         .await?;
 
@@ -1834,16 +1842,8 @@ pub async fn test_get_account_proof_returns_vault_details(
         "expected empty assets when vault commitment matches"
     );
 
-    // Query 3: None — vault data not requested, node returns empty assets
-    let (_, proof) = rpc
-        .get_account_proof(
-            wallet.id(),
-            AccountStorageRequirements::default(),
-            AccountStateAt::ChainTip,
-            None,
-            None,
-        )
-        .await?;
+    // Query 3: VaultFetch::Skip — vault data not requested, node returns empty assets
+    let (_, proof) = rpc.get_account(wallet.id(), GetAccountRequest::new()).await?;
 
     let (_, details) = proof.into_parts();
     let details = details.context("expected account details for public account")?;
