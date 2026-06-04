@@ -677,13 +677,7 @@ async fn sync_state_no_redundant_get_account_calls() {
     use miden_client::async_trait;
     use miden_client::rpc::domain::note::CommittedNote;
     use miden_client::store::InputNoteRecord;
-    use miden_client::sync::{
-        AccountSyncHint,
-        NoteUpdateAction,
-        OnNoteReceived,
-        StateSync,
-        StateSyncInput,
-    };
+    use miden_client::sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
     use miden_protocol::crypto::merkle::mmr::{Forest, MmrPeaks, PartialMmr};
 
     struct DiscardAllNotes;
@@ -731,7 +725,7 @@ async fn sync_state_no_redundant_get_account_calls() {
     let note_tags = BTreeSet::from([NoteTag::new(0)]);
 
     let input = StateSyncInput {
-        accounts: vec![AccountSyncHint::from_header(account_header)],
+        accounts: vec![account_header],
         note_tags,
         input_notes: vec![],
         output_notes: vec![],

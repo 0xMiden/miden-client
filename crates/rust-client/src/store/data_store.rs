@@ -28,6 +28,7 @@ use crate::rpc::domain::account::{
     AccountStorageRequirements,
     GetAccountRequest,
     StorageMapEntries,
+    StorageMapFetch,
 };
 use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::StoreError;
@@ -161,7 +162,7 @@ impl ClientDataStore {
             .get_account(
                 account_id,
                 GetAccountRequest::new()
-                    .with_storage(storage_requirements)
+                    .with_storage(StorageMapFetch::Slots(storage_requirements))
                     .with_known_code(Some(known_code)),
             )
             .await
