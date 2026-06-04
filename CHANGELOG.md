@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.9 (2026-05-19)
+
+### Enhancements
+
+* Bumped `miden-vm` workspace dependencies from 0.22.1 to 0.22.4.
+
 ## 0.14.7 (2026-06-05)
 
 ### Enhancements
@@ -34,6 +40,7 @@
 
 ### Features
 
+* [FEATURE] Distinct `ApplyTransactionAfterSubmitFailed` error variant for the case where `submit_proven_transaction` succeeds but the local store update fails. The error carries the pending `TransactionStoreUpdate` so callers can persist it and re-apply later via `apply_transaction_update` without resubmitting (which the node would reject if the original is still in the mempool or has been finalized in a block, since the account and network state have already been mutated by the accepted copy) ([#2059](https://github.com/0xMiden/miden-client/pull/2059)).
 * [FEATURE][web] Serialize all async `WebClient` JS methods — both the explicit wrappers and every async call that falls through `createClientProxy` to the underlying WASM client (e.g. `getAccount`, `importAccountById`, `getAccountStorage`) — via an internal `_serializeWasmCall` chain. Prevents `"recursive use of an object detected"` panics when an unwrapped read/write races the auto-sync timer or any explicitly-wrapped method. Expose `waitForIdle()` on `MidenClient` so callers can drain in-flight work before mutating non-WASM state ([#2057](https://github.com/0xMiden/miden-client/pull/2057)).
 * [FEATURE][web] Split `@miden-sdk/miden-sdk` into eager and lazy entry points. The default entry (`import from "@miden-sdk/miden-sdk"`) now awaits WASM at module top level via a small shim (`js/eager.js`) — consumers don't need `await MidenClient.ready()` / `isReady` before constructing wasm-bindgen types. The lazy entry (`import from "@miden-sdk/miden-sdk/lazy"`) preserves the previous behavior and is required for Capacitor WKWebView hosts (the custom-scheme handler hangs on TLA) and Next.js SSR. Verified empirically against the Miden Wallet's iOS E2E suite on devnet. `@miden-sdk/react` imports from `/lazy` internally and manages readiness via `isReady`.
 * [FEATURE][web] Expose `lastAuthError()` on `MidenClient` for typed sign-callback failure recovery — preserves the raw thrown value from the JS signCallback so consumers can distinguish locked/rejected/IO-error failure modes ([#2058](https://github.com/0xMiden/miden-client/pull/2058)).
