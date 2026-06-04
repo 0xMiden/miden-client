@@ -285,13 +285,17 @@ impl From<&TransactionRequestError> for Option<ErrorHint> {
                           Add at least one fungible or non-fungible asset to the note.".to_string(),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
-            TransactionRequestError::InvalidSenderAccount(account_id) => Some(ErrorHint {
-                message: format!(
-                    "Account {account_id} is not tracked by this client. Import or create the \
-                     account first, then retry the transaction."
-                ),
-                docs_url: Some(TROUBLESHOOTING_DOC),
-            }),
+            TransactionRequestError::OutputNoteSenderMismatch { expected, actual } => {
+                Some(ErrorHint {
+                    message: format!(
+                        "A note's sender is the account that emits it: it must be the account \
+                         executing the transaction. This transaction runs as account {expected}, \
+                         but one of its output notes declares sender {actual}. Rebuild the note \
+                         with {expected} as its sender, or execute the transaction from {actual}."
+                    ),
+                    docs_url: Some(TROUBLESHOOTING_DOC),
+                })
+            },
             _ => None,
         }
     }
