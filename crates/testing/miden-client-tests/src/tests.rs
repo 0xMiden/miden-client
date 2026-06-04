@@ -3393,7 +3393,7 @@ async fn consume_note_with_custom_script_default_policy_rejects_local_hit() {
 
     let note_storage = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
-    let note_metadata = NoteMetadata::new(sender_id, NoteType::Private)
+    let note_metadata = PartialNoteMetadata::new(sender_id, NoteType::Private)
         .with_tag(NoteTag::with_account_target(receiver_id));
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note_recipient = NoteRecipient::new(serial_num, note_script.clone(), note_storage);
@@ -3471,7 +3471,7 @@ async fn consume_notes_with_custom_scripts_reports_all_rejected_roots() {
 
     let mut build_note = |script: NoteScript| {
         let serial_num = client.rng().draw_word();
-        let metadata = NoteMetadata::new(sender_id, NoteType::Private)
+        let metadata = PartialNoteMetadata::new(sender_id, NoteType::Private)
             .with_tag(NoteTag::with_account_target(receiver_id));
         let assets = NoteAssets::new(vec![]).unwrap();
         let recipient = NoteRecipient::new(serial_num, script, NoteStorage::new(vec![]).unwrap());
