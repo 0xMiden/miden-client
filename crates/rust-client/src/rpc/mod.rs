@@ -57,7 +57,7 @@ use domain::account::{
     StorageMapEntry,
     VaultFetch,
 };
-use domain::note::{FetchedNote, NoteSyncBlock, SyncNotesResult};
+use domain::note::{FetchedNote, NoteSyncBlock, SyncedNote};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
@@ -66,15 +66,7 @@ use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
-use miden_protocol::note::{
-    NoteAttachments,
-    NoteId,
-    NoteMetadata,
-    NoteScript,
-    NoteTag,
-    NoteType,
-    Nullifier,
-};
+use miden_protocol::note::{NoteId, NoteMetadata, NoteScript, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 
 use crate::rpc::domain::storage_map::StorageMapInfo;
@@ -314,14 +306,14 @@ pub trait NodeRpcClient: Send + Sync {
     /// carries attachment scheme markers but not the attachment content, which is needed to
     /// reconstruct the note's ID.
     ///
-    /// Returns the resolved note blocks, the fetched public note bodies, and the fetched
-    /// private-note attachment content (keyed by note ID).
+    /// Returns the resolved note blocks paired with a map of the fetched content (public note
+    /// bodies and private-note attachments), keyed by note ID.
     async fn sync_notes_with_details(
         &self,
         block_from: BlockNumber,
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<SyncNotesResult, RpcError> {
+    ) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, SyncedNote>), RpcError> {
         let blocks = self.sync_notes(block_from, block_to, note_tags).await?;
 
         let note_ids: Vec<NoteId> = blocks
@@ -331,11 +323,7 @@ pub trait NodeRpcClient: Send + Sync {
             .map(|n| *n.note_id())
             .collect();
 
-        let mut public_notes = BTreeMap::new();
-
-        // Private-note attachment content, keyed by note ID, resolved from the `GetNotesById`
-        // response. Private notes without attachments do not appear here.
-        let mut private_attachments: BTreeMap<NoteId, NoteAttachments> = BTreeMap::new();
+        let mut synced_notes: BTreeMap<NoteId, SyncedNote> = BTreeMap::new();
 
         if !note_ids.is_empty() {
             let fetched = self.get_notes_by_id(&note_ids).await?;
@@ -343,22 +331,17 @@ pub trait NodeRpcClient: Send + Sync {
             for fetched_note in fetched {
                 match fetched_note {
                     FetchedNote::Public(note, _) => {
-                        public_notes.insert(note.id(), note);
+                        synced_notes.insert(note.id(), SyncedNote::Public(note));
                     },
                     FetchedNote::Private(note_id, _, attachments, _) => {
-                        if !attachments.is_empty() {
-                            private_attachments.insert(note_id, attachments);
-                        }
+                        let attachments = (!attachments.is_empty()).then_some(attachments);
+                        synced_notes.insert(note_id, SyncedNote::Private(attachments));
                     },
                 }
             }
         }
 
-        Ok(SyncNotesResult {
-            blocks,
-            public_notes,
-            private_attachments,
-        })
+        Ok((blocks, synced_notes))
     }
 
     /// Fetches the nullifiers corresponding to a list of prefixes using the

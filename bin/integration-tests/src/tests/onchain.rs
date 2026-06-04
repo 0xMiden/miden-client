@@ -7,17 +7,13 @@ use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::keystore::Keystore;
 use miden_client::note::{
     BlockNumber,
-    NetworkAccountTarget,
     NoteAttachment,
     NoteAttachmentScheme,
     NoteAttachments,
-    NoteExecutionHint,
     NoteFile,
     NoteType,
     P2idNote,
 };
-use miden_client::rpc::generated::note::NoteIdList;
-use miden_client::rpc::generated::rpc::api_client::ApiClient;
 use miden_client::rpc::{AcceptHeaderError, RpcError};
 use miden_client::store::{InputNoteState, NoteFilter, TransactionFilter};
 use miden_client::sync::NoteTagSource;
@@ -28,7 +24,6 @@ use miden_client::transaction::{
     TransactionRequestBuilder,
     TransactionStatus,
 };
-use miden_client::utils::Deserializable;
 use miden_client::{ClientError, EMPTY_WORD, Word};
 use rand::RngCore;
 use tracing::info;

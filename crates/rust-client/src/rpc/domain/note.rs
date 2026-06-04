@@ -209,18 +209,16 @@ pub struct NoteSyncBlock {
     pub notes: BTreeMap<NoteId, CommittedNote>,
 }
 
-/// Result of [`NodeRpcClient::sync_notes_with_details`](crate::rpc::NodeRpcClient::sync_notes_with_details).
-///
-/// Contains fully-resolved note blocks. Blocks carry note metadata + inclusion proofs, while
-/// `public_notes` carries public note full content and `private_attachments` carries private-note
-/// attachment content.
-pub struct SyncNotesResult {
-    /// Blocks containing matching notes with fully-resolved metadata.
-    pub blocks: Vec<NoteSyncBlock>,
-    /// Full note bodies for public notes, keyed by note ID.
-    pub public_notes: BTreeMap<NoteId, Note>,
-    /// Attachment content for private notes that carry attachments, keyed by note ID.
-    pub private_attachments: BTreeMap<NoteId, NoteAttachments>,
+/// Content resolved for a single note during
+/// [`NodeRpcClient::sync_notes_with_details`](crate::rpc::NodeRpcClient::sync_notes_with_details)
+/// as response from `GetNotesById`.
+#[allow(clippy::large_enum_variant)]
+pub enum SyncedNote {
+    /// A public note's full body.
+    Public(Note),
+    /// A private note's attachment content, if it carries any. Private notes expose no on-chain
+    /// body; only their attachments are resolved.
+    Private(Option<NoteAttachments>),
 }
 
 impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for NoteSyncBlock {
