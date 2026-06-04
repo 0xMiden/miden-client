@@ -113,7 +113,11 @@ impl SqliteStore {
         // We first process the fungible assets. Adding or subtracting them from the vault as
         // requested.
         for (vault_key, delta) in delta.vault().fungible().iter() {
-            let delta_asset = FungibleAsset::new(vault_key.faucet_id(), delta.unsigned_abs())?;
+            // Preserve the vault key's callback flag: it is part of the asset's vault key and
+            // value encoding, so dropping it would make the locally recomputed vault root diverge
+            // from the kernel's (this matches `AssetVault::apply_delta` in miden-protocol).
+            let delta_asset = FungibleAsset::new(vault_key.faucet_id(), delta.unsigned_abs())?
+                .with_callbacks(vault_key.callback_flag());
 
             let asset = match updated_fungible_assets.remove(vault_key) {
                 Some(asset) => {
