@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
+use core::future::Future;
 use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::Write;
@@ -229,23 +230,23 @@ impl TransactionAuthenticator for FilesystemKeyStore {
     /// # Errors
     /// If the public key isn't found in the store, [`AuthenticationError::UnknownPublicKey`] is
     /// returned.
-    async fn get_signature(
+    fn get_signature(
         &self,
         pub_key: PublicKeyCommitment,
         signing_info: &SigningInputs,
-    ) -> Result<Signature, AuthenticationError> {
+    ) -> impl Future<Output = Result<Signature, AuthenticationError>> {
         let message = signing_info.to_commitment();
+        let secret_key = self.get_key_sync(pub_key);
 
-        let secret_key = self
-            .get_key_sync(pub_key)
-            .map_err(|err| {
-                AuthenticationError::other_with_source("failed to load secret key", err)
-            })?
-            .ok_or(AuthenticationError::UnknownPublicKey(pub_key))?;
+        async move {
+            let secret_key = secret_key
+                .map_err(|err| {
+                    AuthenticationError::other_with_source("failed to load secret key", err)
+                })?
+                .ok_or(AuthenticationError::UnknownPublicKey(pub_key))?;
 
-        let signature = secret_key.sign(message);
-
-        Ok(signature)
+            Ok(secret_key.sign(message))
+        }
     }
 
     /// Retrieves a public key for a specific public key commitment.
