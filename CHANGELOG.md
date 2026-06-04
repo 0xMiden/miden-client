@@ -5,6 +5,7 @@
 ### Fixes
 
 * [FIX] Fixed `derive_account_commitments` to return the final account commitment when multiple transactions for the same account are committed in the same block ([#2164](https://github.com/0xMiden/miden-client/pull/2164)).
+* [rust] Expanded validation for output notes before executing a `TransactionRequest`. ([#89](https://github.com/0xMiden/wallet-adapter/issues/89))
 
 ### Changes
 
