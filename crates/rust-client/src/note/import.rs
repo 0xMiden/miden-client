@@ -428,13 +428,13 @@ where
             return Ok(retrieved_proofs);
         }
 
-        let sync_result = self
+        let blocks = self
             .rpc_api
-            .sync_notes_with_details(request_block_num, current_block_num, &tracked_tags)
+            .sync_notes(request_block_num, current_block_num, &tracked_tags)
             .await
             .map_err(ClientError::RpcError)?;
 
-        for block in &sync_result.blocks {
+        for block in &blocks {
             if block.block_header.block_num() > current_block_num {
                 break;
             }
