@@ -15,6 +15,7 @@ use tracing::info;
 use super::state_sync_update::TransactionUpdateTracker;
 use super::{
     AccountUpdates,
+    NoteObserver,
     PartialBlockchainUpdates,
     PublicAccountDelta,
     PublicAccountUpdate,
@@ -136,12 +137,14 @@ pub struct StateSync {
     /// Responsible for checking the relevance of notes and executing the
     /// [`OnNoteReceived`] callback when a new note inclusion is received.
     note_screener: Arc<dyn OnNoteReceived>,
+    /// Per-note observers (see [`NoteObserver`]), invoked *before* the
+    /// screener verdict in `note_state_sync`. Empty by default.
+    note_observers: Vec<Arc<dyn NoteObserver>>,
     /// Number of blocks after which pending transactions are considered stale and discarded.
     /// If `None`, there is no limit and transactions will be kept indefinitely.
     tx_discard_delta: Option<u32>,
-    /// Whether to check for nullifiers during state sync. When enabled, the component will query
-    /// the nullifiers for unspent notes at each sync step. This allows to detect when tracked
-    /// notes have been consumed externally and discard local transactions that depend on them.
+    /// If true, queries the node for consumption of tracked unspent-note nullifiers
+    /// each sync and discards local transactions whose inputs were nullified.
     sync_nullifiers: bool,
 }
 
@@ -164,9 +167,19 @@ impl StateSync {
         Self {
             rpc_api,
             note_screener,
+            note_observers: Vec::new(),
             tx_discard_delta,
             sync_nullifiers: true,
         }
+    }
+
+    /// Attaches a [`NoteObserver`] to this sync component. Observers run
+    /// in attachment order *before* the screener verdict; failures are
+    /// logged (tagged with [`NoteObserver::name`]) and never abort sync.
+    #[must_use]
+    pub fn with_note_observer(mut self, observer: Arc<dyn NoteObserver>) -> Self {
+        self.note_observers.push(observer);
+        self
     }
 
     /// Disables the nullifier sync.
@@ -181,6 +194,28 @@ impl StateSync {
     /// Enables the nullifier sync.
     pub fn enable_nullifier_sync(&mut self) {
         self.sync_nullifiers = true;
+    }
+
+    /// Runs each attached observer's `apply()` hook against `state_sync_update`.
+    /// Called by the orchestrator after [`Self::sync_state`] returns but
+    /// before the caller persists the sync update. Per-observer failures are
+    /// logged (tagged with the observer's [`NoteObserver::name`]) and never
+    /// abort the rest of the pass — symmetric with the per-note `observe()`
+    /// dispatcher.
+    pub async fn run_apply_hooks(
+        &self,
+        state_sync_update: &StateSyncUpdate,
+    ) -> Result<(), ClientError> {
+        for observer in &self.note_observers {
+            if let Err(err) = observer.apply(state_sync_update).await {
+                tracing::warn!(
+                    observer = observer.name(),
+                    error = ?err,
+                    "NoteObserver::apply failed; continuing with remaining observers",
+                );
+            }
+        }
+        Ok(())
     }
 
     /// Syncs the state of the client with the chain tip of the node, returning the updates that
@@ -833,6 +868,30 @@ impl StateSync {
                 .then(|| public_notes.get(committed_note.note_id()))
                 .flatten()
                 .cloned();
+
+            // Observers run BEFORE the screener: they are a side-effect
+            // channel independent of the Commit/Insert/Discard decision,
+            // and a failing screener must not rob them of the note. Clone
+            // is skipped when no observers are attached (the common case).
+            if !self.note_observers.is_empty() {
+                // Resolve attachment content for the note from the sync window: public note
+                // bodies carry their attachments on the cached `InputNoteRecord`; private-note
+                // attachments arrive in their own side-table. Both are keyed by note ID.
+                let note_attachments = if committed_note.note_type() == NoteType::Private {
+                    private_attachments.get(committed_note.note_id())
+                } else {
+                    public_note.as_ref().map(InputNoteRecord::attachments)
+                };
+                for obs in &self.note_observers {
+                    if let Err(err) = obs.observe(&committed_note, note_attachments).await {
+                        tracing::warn!(
+                            observer = obs.name(),
+                            error = ?err,
+                            "note observer failed; sync continues",
+                        );
+                    }
+                }
+            }
 
             match self.note_screener.on_note_received(committed_note, public_note).await? {
                 NoteUpdateAction::Commit(committed_note) => {

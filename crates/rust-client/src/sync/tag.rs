@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 
 use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountId};
-use miden_protocol::note::{NoteDetailsCommitment, NoteTag};
+use miden_protocol::note::{NoteDetailsCommitment, NoteId, NoteTag};
 use miden_tx::utils::serde::{
     ByteReader,
     ByteWriter,
@@ -178,21 +178,72 @@ impl TryInto<NoteTagRecord> for &InputNoteRecord {
 }
 
 #[cfg(test)]
-mod tests {
-    use miden_protocol::{Felt, Word};
-    use miden_tx::utils::serde::{Deserializable, Serializable};
+mod tag_source_tests {
+    use miden_protocol::Word;
+    use miden_protocol::account::AccountId;
+    use miden_protocol::note::{NoteDetailsCommitment, NoteId};
+    use miden_protocol::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
 
-    use super::NoteTagSource;
+    use super::{Deserializable, NoteTagSource, Serializable};
 
+    /// Helper: builds a deterministic `NoteId` from a single u64.
+    fn note_id_from_u64(value: u64) -> NoteId {
+        let f = miden_protocol::Felt::new(value).unwrap();
+        NoteId::from_raw(Word::from([f, f, f, f]))
+    }
+
+    /// `NoteTagSource` is serialised into the on-disk `tags.source` BLOB
+    /// column. The wire encoding starts with a `u8` discriminant —
+    /// stability of those values is part of the persisted-format
+    /// contract. This test pins the discriminants explicitly so a
+    /// renumber would fail it before any user upgrades a wallet to a
+    /// version with shifted bytes.
     #[test]
-    fn subscription_note_tag_source_round_trips_with_stable_discriminant() {
-        let key: Word =
-            [Felt::from(1u32), Felt::from(2u32), Felt::from(3u32), Felt::from(4u32)].into();
-        let source = NoteTagSource::Subscription(key);
+    fn note_tag_source_discriminants_are_stable() {
+        let cases = [
+            (NoteTagSource::User, 2u8),
+            (NoteTagSource::Subscription(*note_id_from_u64(42)), 3u8),
+        ];
+        for (variant, expected_disc) in cases {
+            let bytes = variant.to_bytes();
+            assert_eq!(
+                bytes[0], expected_disc,
+                "variant {variant:?} expected discriminant {expected_disc}, got {}",
+                bytes[0],
+            );
+        }
+    }
 
-        let bytes = source.to_bytes();
-        // Discriminant byte must stay 3 so persisted rows keep deserializing across releases.
-        assert_eq!(bytes[0], 3, "Subscription discriminant must remain 3");
-        assert_eq!(NoteTagSource::read_from_bytes(&bytes).unwrap(), source);
+    /// Round-trip every variant. Confirms the new `Subscription` discriminant
+    /// (3) coexists with the existing `Account` / `Note` / `User` variants
+    /// without disturbing their on-disk encoding.
+    #[test]
+    fn note_tag_source_round_trip_every_variant() {
+        let account_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET).unwrap();
+        let details_commitment =
+            NoteDetailsCommitment::from_raw_commitments(Word::empty(), Word::empty());
+        let subscription_key = *note_id_from_u64(0xdead_beef_dead_beef);
+
+        let variants = [
+            NoteTagSource::Account(account_id),
+            NoteTagSource::Note(details_commitment),
+            NoteTagSource::User,
+            NoteTagSource::Subscription(subscription_key),
+        ];
+
+        for v in variants {
+            let bytes = v.to_bytes();
+            let decoded = NoteTagSource::read_from_bytes(&bytes).unwrap();
+            assert_eq!(decoded, v, "round-trip failed for {v:?}");
+        }
+    }
+
+    /// Deserialising an unknown discriminant must error rather than
+    /// silently mapping to a known variant — defends against a future
+    /// version writing a byte we don't understand.
+    #[test]
+    fn note_tag_source_unknown_discriminant_errors() {
+        let bogus = [99u8];
+        assert!(NoteTagSource::read_from_bytes(&bogus).is_err());
     }
 }

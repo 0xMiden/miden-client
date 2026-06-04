@@ -23,7 +23,7 @@ use miden_tx::utils::serde::{
 
 use crate::ClientError;
 use crate::rpc::domain::note::CommittedNote;
-use crate::store::{InputNoteRecord, OutputNoteRecord};
+use crate::store::{InputNoteRecord, InputNoteState, OutputNoteRecord, OutputNoteState};
 use crate::transaction::{TransactionRecord, TransactionStatus};
 
 // NOTE CONSUMPTION
@@ -331,6 +331,39 @@ impl NoteUpdateTracker {
                 ) && update.inner().is_consumed()
             })
             .map(|(note_id, _)| *note_id)
+    }
+
+    /// `NoteId`s of every input + output note that transitioned to a
+    /// consumed state this sync. True positives only — no 16-bit-prefix
+    /// noise from the raw `sync_nullifiers` RPC.
+    pub fn consumed_note_ids(&self) -> impl Iterator<Item = NoteId> + '_ {
+        let input = self.input_notes.iter().filter_map(|(note_id, update)| {
+            if !matches!(
+                update.update_type,
+                NoteUpdateType::Insert | NoteUpdateType::Update | NoteUpdateType::InsertCommitted
+            ) {
+                return None;
+            }
+            if !matches!(
+                update.inner().state(),
+                InputNoteState::ConsumedAuthenticatedLocal(_)
+                    | InputNoteState::ConsumedUnauthenticatedLocal(_)
+                    | InputNoteState::ConsumedExternal(_)
+            ) {
+                return None;
+            }
+            Some(*note_id)
+        });
+        let output = self.output_notes.iter().filter_map(|(note_id, update)| {
+            if !matches!(update.update_type, NoteUpdateType::Insert | NoteUpdateType::Update) {
+                return None;
+            }
+            if !matches!(update.inner().state(), OutputNoteState::Consumed { .. }) {
+                return None;
+            }
+            Some(*note_id)
+        });
+        input.chain(output)
     }
 
     /// Returns all output note records that have been updated.

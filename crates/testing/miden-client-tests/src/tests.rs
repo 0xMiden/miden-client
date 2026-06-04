@@ -19,6 +19,7 @@ use miden_client::auth::{
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::note::{BlockNumber, NetworkAccountTarget, NoteExecutionHint};
+use miden_client::pswap::PswapLineageState;
 use miden_client::rpc::NodeRpcClient;
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{
@@ -125,6 +126,7 @@ use miden_standards::note::{
     P2idNote,
     P2idNoteStorage,
     PswapNote,
+    PswapNoteAttachment,
     StandardNote,
 };
 use miden_standards::testing::mock_account::MockAccountExt;
@@ -2929,6 +2931,240 @@ async fn pswap_cancel_test() {
             .as_u64(),
         MINT_AMOUNT,
         "Alice's ETH balance should be fully restored after canceling the PSWAP note"
+    );
+}
+
+// Builds a client backed by the given shared mock chain. Cloning a `MockRpcApi`
+// shares its `Arc<RwLock<MockChain>>`, so every client built this way transacts
+// against — and syncs from — the same chain while keeping its own store and
+// keystore. This is what lets the PSWAP lineage test model Alice and Bob as two
+// genuinely separate clients (as they are in production), rather than two
+// accounts colocated on one store.
+async fn create_pswap_test_client(
+    mock_rpc_api: &MockRpcApi,
+) -> (MockClient<FilesystemKeyStore>, FilesystemKeyStore) {
+    let mut seed_rng = rand::rng();
+    let coin_seed: [u64; 4] = seed_rng.random();
+    let rng = RandomCoin::new(coin_seed.map(|v| Felt::new_unchecked(v >> 1)).into());
+
+    let keystore = FilesystemKeyStore::new(temp_dir()).unwrap();
+
+    let mut client = ClientBuilder::new()
+        .rpc(Arc::new(mock_rpc_api.clone()))
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore.clone()))
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_discard_delta(None)
+        .build()
+        .await
+        .unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    (client, keystore)
+}
+
+/// Two-client mock-chain test: Alice (creator) and Bob (filler) on a shared
+/// `MockChain`. Exercises the production wiring end-to-end at the client API
+/// level: the `PswapTransactionObserver` creation hook installs the lineage
+/// row, Bob's partial fill is picked up by Alice via her asset-pair tag
+/// subscription, the post-sync `discover_pswap_rounds` correlator advances
+/// the lineage to depth 1, and `build_pswap_cancel_by_order` reclaims the
+/// remainder Alice never minted. Multi-round and reconstruction-edge-case
+/// coverage lives at the unit + store tier (`pswap::discovery::tests`,
+/// `sqlite-store::pswap::tests::private_pswap_e2e`).
+///
+/// Runs as two `#[rstest]` cases:
+/// * `public_pswap` — PSWAP and payback are both [`NoteType::Public`]; full
+///   bodies arrive via sync, the payback lands `Committed` in Alice's
+///   `input_notes`, and she consumes it.
+/// * `private_pswap` — PSWAP and payback are both [`NoteType::Private`]; the
+///   mock RPC carries attachments only when explicitly registered, so the
+///   case pre-derives Bob's payback + remainder via
+///   [`PswapNote::payback_note`] / [`PswapNote::remainder_note`] and
+///   registers their attachments before the post-fill syncs. A real node
+///   returns those attachments automatically — registration is mock-only.
+///   The payback-consume tail (`get_consumable_notes` → `consume_notes`) is
+///   skipped for the private case: `apply_pswap_round` inserts the
+///   reconstructed payback into `input_notes` as `Unverified`, and the
+///   path that promotes an `Unverified` private note to consumable is a
+///   consumer-side concern outside the chain-tracking surface this test
+///   covers.
+#[rstest]
+#[case::public_pswap(NoteType::Public)]
+#[case::private_pswap(NoteType::Private)]
+#[allow(clippy::too_many_lines)]
+#[tokio::test]
+async fn pswap_chain_tracking_test(#[case] note_type: NoteType) {
+    // One shared chain, two independent clients.
+    let mock_rpc_api = MockRpcApi::new(Box::pin(create_prebuilt_mock_chain()).await);
+    let (mut alice_client, alice_keystore) = create_pswap_test_client(&mock_rpc_api).await;
+    let (mut bob_client, bob_keystore) = create_pswap_test_client(&mock_rpc_api).await;
+
+    let (alice_wallet, btc_faucet) = setup_wallet_and_faucet(
+        &mut alice_client,
+        AccountType::Private,
+        &alice_keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    let (bob_wallet, eth_faucet) = setup_wallet_and_faucet(
+        &mut bob_client,
+        AccountType::Private,
+        &bob_keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    mint_and_consume(&mut alice_client, alice_wallet.id(), btc_faucet.id(), NoteType::Private)
+        .await;
+    mock_rpc_api.prove_block();
+    alice_client.sync_state().await.unwrap();
+
+    mint_and_consume(&mut bob_client, bob_wallet.id(), eth_faucet.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    bob_client.sync_state().await.unwrap();
+
+    // ── Alice creates the PSWAP offering 100 BTC for 50 ETH (2:1 rate). ──
+    let offered_amount = 100u64;
+    let requested_amount = 50u64;
+    let offered_asset = FungibleAsset::new(btc_faucet.id(), offered_amount).unwrap();
+    let requested_asset = FungibleAsset::new(eth_faucet.id(), requested_amount).unwrap();
+    let pswap_data = PswapTransactionData::new(alice_wallet.id(), offered_asset, requested_asset);
+
+    let create_request = TransactionRequestBuilder::new()
+        .build_pswap_create(&pswap_data, note_type, note_type, None, alice_client.rng())
+        .unwrap();
+
+    let pswap_note = create_request.expected_output_own_notes()[0].clone();
+    let pswap_typed = PswapNote::try_from(&pswap_note).unwrap();
+    let order_id = pswap_typed.order_id();
+
+    Box::pin(alice_client.submit_new_transaction(alice_wallet.id(), create_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    alice_client.sync_state().await.unwrap();
+
+    // Public-only: Bob discovers the order through the asset-pair tag (in
+    // production a filler finds public orders this way; private orders are
+    // exchanged off-chain). For private the test hands `pswap_note` to Bob
+    // directly below, so the tag-discovery sync is meaningful only here.
+    if note_type == NoteType::Public {
+        let pswap_tag = PswapNote::create_tag(note_type, &offered_asset, &requested_asset);
+        bob_client.add_note_tag(pswap_tag).await.unwrap();
+        bob_client.sync_state().await.unwrap();
+    }
+
+    // The creation hook installs a depth-0 Active lineage with the full amounts.
+    let lineage = alice_client
+        .pswap_lineage(order_id)
+        .await
+        .unwrap()
+        .expect("creating a PSWAP should install a lineage row");
+    assert_eq!(lineage.current_depth, 0);
+    assert_eq!(lineage.state, PswapLineageState::Active);
+    assert_eq!(lineage.remaining_offered.amount().as_u64(), offered_amount);
+    assert_eq!(lineage.remaining_requested.amount().as_u64(), requested_amount);
+
+    // Private-only: pre-compute the deterministic payback + remainder so we can
+    // register their private attachments on the mock BEFORE the post-fill syncs.
+    // `build_pswap_consume` produces byte-identical notes (same IDs).
+    if note_type == NoteType::Private {
+        let fill_amount = AssetAmount::new(25).unwrap();
+        let payout_amount = AssetAmount::new(50).unwrap();
+        let new_offered = AssetAmount::new(50).unwrap();
+        let new_requested = AssetAmount::new(25).unwrap();
+        let payback_attachment = PswapNoteAttachment::new(fill_amount, order_id, 1);
+        let remainder_attachment = PswapNoteAttachment::new(payout_amount, order_id, 1);
+        let expected_payback =
+            pswap_typed.payback_note(bob_wallet.id(), &payback_attachment).unwrap();
+        let expected_remainder = pswap_typed
+            .remainder_note(bob_wallet.id(), &remainder_attachment, new_offered, new_requested)
+            .unwrap();
+        mock_rpc_api.register_private_note_attachments(
+            expected_payback.id(),
+            expected_payback.attachments().clone(),
+        );
+        mock_rpc_api.register_private_note_attachments(
+            expected_remainder.id(),
+            expected_remainder.attachments().clone(),
+        );
+    }
+
+    // ── Bob partial-fills: 25 ETH → 50 BTC payout, leaving 50 BTC / 25 ETH. ──
+    let consume_request = TransactionRequestBuilder::new()
+        .build_pswap_consume(&pswap_note, bob_wallet.id(), 25, 0)
+        .unwrap();
+    Box::pin(bob_client.submit_new_transaction(bob_wallet.id(), consume_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    bob_client.sync_state().await.unwrap();
+    alice_client.sync_state().await.unwrap();
+
+    let lineage = alice_client.pswap_lineage(order_id).await.unwrap().unwrap();
+    assert_eq!(lineage.current_depth, 1, "fill should advance the tip to depth 1");
+    assert_eq!(lineage.state, PswapLineageState::Active);
+    assert_eq!(lineage.remaining_offered.amount().as_u64(), 50);
+    assert_eq!(lineage.remaining_requested.amount().as_u64(), 25);
+
+    // ── Reclaim: Alice cancels the depth-1 tip via the order id. ──
+    let cancel_request = alice_client.build_pswap_cancel_by_order(order_id).await.unwrap();
+    Box::pin(alice_client.submit_new_transaction(alice_wallet.id(), cancel_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    alice_client.sync_state().await.unwrap();
+
+    let lineage = alice_client.pswap_lineage(order_id).await.unwrap().unwrap();
+    assert_eq!(
+        lineage.state,
+        PswapLineageState::Reclaimed,
+        "reclaiming the depth-1 tip should terminate the lineage"
+    );
+
+    // Public-only: Alice consumes the ETH payback she received from Bob's fill.
+    // For private notes the apply_pswap_round-inserted payback lands as
+    // `Unverified`; promoting an Unverified private record to consumable is a
+    // consumer-side concern outside this test's scope (see test docstring).
+    if note_type == NoteType::Public {
+        let consumable = alice_client.get_consumable_notes(Some(alice_wallet.id())).await.unwrap();
+        let payback_notes: Vec<Note> =
+            consumable.iter().map(|(record, _)| record.try_into().unwrap()).collect();
+        assert_eq!(payback_notes.len(), 1, "Alice should hold one ETH payback note");
+        consume_notes(&mut alice_client, alice_wallet.id(), &payback_notes).await;
+        mock_rpc_api.prove_block();
+        alice_client.sync_state().await.unwrap();
+
+        let alice_account = alice_client.get_account(alice_wallet.id()).await.unwrap().unwrap();
+        assert_eq!(
+            alice_account
+                .vault()
+                .get_balance(AssetVaultKey::new_fungible(
+                    eth_faucet.id(),
+                    AssetCallbackFlag::Disabled,
+                ))
+                .unwrap()
+                .as_u64(),
+            25,
+            "Alice should have received 25 ETH from the fill"
+        );
+    }
+
+    // Both cases: BTC reflects 100 locked − 50 paid out to Bob + 50 reclaimed = MINT − 50.
+    let alice_account = alice_client.get_account(alice_wallet.id()).await.unwrap().unwrap();
+    assert_eq!(
+        alice_account
+            .vault()
+            .get_balance(AssetVaultKey::new_fungible(btc_faucet.id(), AssetCallbackFlag::Disabled))
+            .unwrap()
+            .as_u64(),
+        MINT_AMOUNT - 50,
+        "Alice's BTC should reflect 50 paid out and 50 reclaimed"
     );
 }
 
