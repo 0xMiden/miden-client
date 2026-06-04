@@ -252,16 +252,15 @@ where
         let mut nullifier_requests = BTreeSet::new();
         let mut lowest_block_height: BlockNumber = u32::MAX.into();
         for (previous_note, note, inclusion_proof) in &requested_notes {
-            if let Some(previous_note) = previous_note {
-                nullifier_requests.insert(previous_note.nullifier());
-                if inclusion_proof.location().block_num() < lowest_block_height {
-                    lowest_block_height = inclusion_proof.location().block_num();
-                }
-            } else {
-                nullifier_requests.insert(note.nullifier());
-                if inclusion_proof.location().block_num() < lowest_block_height {
-                    lowest_block_height = inclusion_proof.location().block_num();
-                }
+            let nullifier = match previous_note {
+                Some(previous_note) => previous_note.nullifier(),
+                None => Some(note.nullifier()),
+            };
+            if let Some(nullifier) = nullifier {
+                nullifier_requests.insert(nullifier);
+            }
+            if inclusion_proof.location().block_num() < lowest_block_height {
+                lowest_block_height = inclusion_proof.location().block_num();
             }
         }
 
@@ -285,9 +284,10 @@ where
                 .into(),
             ));
 
-            if let Some(Some(block_height)) = nullifier_commit_heights.get(&note_record.nullifier())
+            if let Some(nullifier) = note_record.nullifier()
+                && let Some(Some(block_height)) = nullifier_commit_heights.get(&nullifier)
             {
-                if note_record.consumed_externally(note_record.nullifier(), *block_height, None)? {
+                if note_record.consumed_externally(nullifier, *block_height, None)? {
                     note_records.push(Some(note_record));
                 }
 

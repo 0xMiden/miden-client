@@ -356,7 +356,7 @@ impl NoteUpdateTracker {
             .input_notes
             .values()
             .filter(|note| !note.inner().is_consumed())
-            .map(|note| note.inner().nullifier());
+            .filter_map(|note| note.inner().nullifier());
 
         let output_note_unspent_nullifiers = self
             .output_notes
@@ -427,7 +427,7 @@ impl NoteUpdateTracker {
                 // `InsertCommitted` so the now-known `note_id`/`nullifier` columns are persisted
                 // (a full-row insert), while still being reported as a committed tracked note
                 // rather than a newly-discovered one. Re-key by the now-available id.
-                let nullifier = record.nullifier();
+                let nullifier = record.nullifier().expect("metadata was just received above");
                 self.input_notes_by_nullifier.insert(nullifier, note_id);
                 self.input_notes
                     .insert(note_id, InputNoteUpdate::new_insert_committed(update.note));
@@ -485,8 +485,8 @@ impl NoteUpdateTracker {
 
         if let Some(input_note_update) = self.input_notes.get_mut(&note_id)
             && !input_note_update.inner().is_consumed()
+            && let Some(nullifier) = input_note_update.inner().nullifier()
         {
-            let nullifier = input_note_update.inner().nullifier();
             let consumer_account =
                 NetworkAccountTarget::try_from(input_note_update.inner().attachments())
                     .ok()
@@ -526,7 +526,8 @@ impl NoteUpdateTracker {
         };
 
         let mut input_record = InputNoteRecord::from(note);
-        let nullifier = input_record.nullifier();
+        let nullifier =
+            input_record.nullifier().expect("record built from a full note has metadata");
         input_record.consumed_externally(nullifier, block_num, Some(consumer))?;
         input_record.set_consumed_tx_order(consumed_tx_order);
         self.insert_input_note(input_record, NoteUpdateType::Insert);
@@ -672,7 +673,7 @@ impl NoteUpdateTracker {
         if let Some(note_id) = update.inner().id() {
             // A note with metadata supersedes any metadata-less record for the same note.
             self.expected_input_notes.remove(&update.inner().details_commitment());
-            let nullifier = update.inner().nullifier();
+            let nullifier = update.inner().nullifier().expect("note with an id has metadata");
             self.input_notes_by_nullifier.insert(nullifier, note_id);
             self.input_notes.insert(note_id, update);
         } else {
@@ -770,7 +771,9 @@ impl Deserializable for NoteUpdateTracker {
 
         let input_notes_by_nullifier = input_notes
             .iter()
-            .map(|(note_id, update)| (update.inner().nullifier(), *note_id))
+            .map(|(note_id, update)| {
+                (update.inner().nullifier().expect("note with an id has metadata"), *note_id)
+            })
             .collect();
         let output_notes_by_nullifier = output_notes
             .iter()

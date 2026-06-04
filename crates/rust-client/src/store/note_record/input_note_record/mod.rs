@@ -134,12 +134,10 @@ impl InputNoteRecord {
         self.state.metadata()
     }
 
-    /// Returns the note nullifier.
-    pub fn nullifier(&self) -> Nullifier {
-        let metadata = self.metadata().expect(
-            "input note nullifier requires metadata; metadata-less notes have no nullifier",
-        );
-        Nullifier::from_details_and_metadata(&self.details, metadata)
+    /// Returns the note nullifier, if the record contains the [`NoteMetadata`].
+    pub fn nullifier(&self) -> Option<Nullifier> {
+        let metadata = self.metadata()?;
+        Some(Nullifier::from_details_and_metadata(&self.details, metadata))
     }
 
     /// Returns the inclusion proof for the note.
@@ -276,7 +274,7 @@ impl InputNoteRecord {
         nullifier_block_height: BlockNumber,
         consumer_account: Option<AccountId>,
     ) -> Result<bool, NoteRecordError> {
-        if self.nullifier() != nullifier {
+        if self.nullifier() != Some(nullifier) {
             return Err(NoteRecordError::StateTransitionError(
                 "Nullifier does not match the expected value".to_string(),
             ));
