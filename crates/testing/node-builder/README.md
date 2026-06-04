@@ -58,6 +58,26 @@ The builder initializes and manages the following components:
 - `data_directory`: Path to store node data
 - `block_interval`: Duration between block production attempts
 - `batch_interval`: Duration between batch production attempts
+- `with_agglayer_accounts()`: Include AggLayer accounts in genesis (bridge admin, GER manager, bridge with a registered faucet)
+
+## AggLayer Genesis
+
+To start the node with pre-deployed AggLayer accounts:
+
+```bash
+AGGLAYER_GENESIS=1 cargo run --release --package node-builder
+# or
+make start-node-agglayer
+```
+
+This creates the following additional `.mac` files in the data directory:
+
+- `bridge_admin.mac` - Bridge admin wallet (with secret key)
+- `ger_manager.mac` - GER manager wallet (with secret key)
+- `bridge.mac` - AggLayer bridge account
+- `agglayer_faucet.mac` - AggLayer faucet (token symbol "AGG", origin address `0xAA..AA`)
+
+The faucet is pre-registered in the bridge's faucet registry at genesis. Integration tests can load these files via `AGGLAYER_ACCOUNTS_DIR=./data/` to use the pre-deployed accounts.
 
 ## Note
 
