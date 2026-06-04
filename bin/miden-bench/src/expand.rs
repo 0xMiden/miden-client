@@ -35,7 +35,7 @@ fn generate_entries(map_idx: usize, offset: usize, count: usize) -> Vec<([Felt; 
     (0..count)
         .map(|i| {
             let key_val = seed.wrapping_mul(1000).wrapping_add((offset + i) as u32);
-            let key = [Felt::new(key_val as u64); 4];
+            let key = [Felt::new_unchecked(key_val as u64); 4];
             let value = random_word(&mut rng);
             (key, value)
         })

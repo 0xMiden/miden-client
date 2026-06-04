@@ -213,7 +213,7 @@ pub trait NodeRpcClient: Send + Sync {
     // `/GetAccount` requests, and even unify this with `get_account`.
     async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
         // For accounts without public state, only the witness commitment is needed.
-        if !account_id.has_public_state() {
+        if !account_id.is_public() {
             let (block_number, proof) =
                 self.get_account(account_id, GetAccountRequest::new()).await?;
             return Ok(FetchedAccount::new_private(
@@ -287,9 +287,11 @@ pub trait NodeRpcClient: Send + Sync {
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<Vec<NoteSyncBlock>, RpcError>;
 
-    /// Calls [`NodeRpcClient::sync_notes`] for the requested range, then makes a single
-    /// [`NodeRpcClient::get_notes_by_id`] call to fetch full note bodies (scripts, assets,
-    /// recipient) for public notes.
+    /// Calls [`NodeRpcClient::sync_notes`] and then makes a single
+    /// [`NodeRpcClient::get_notes_by_id`] call to:
+    /// - Fill metadata on any [`CommittedNote`](domain::note::CommittedNote) whose sync response
+    ///   only included header fields.
+    /// - Collect full bodies for every public note in the sync range.
     ///
     /// All public notes in the range are fetched (not just the ones the client tracks) to
     /// avoid revealing which specific notes the client is interested in.
@@ -331,13 +333,12 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// - `prefix` is a list of nullifiers prefixes to search for.
     /// - `block_from`: The starting block number for the range (inclusive).
-    /// - `block_to`: The ending block number for the range (inclusive), or `None` to sync up to the
-    ///   chain tip.
+    /// - `block_to`: The ending block number for the range (inclusive).
     async fn sync_nullifiers(
         &self,
         prefix: &[u16],
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
 
     /// Fetches the account from the node, using the `/GetAccount` endpoint.
@@ -434,7 +435,9 @@ pub trait NodeRpcClient: Send + Sync {
     ) -> Result<BTreeMap<Nullifier, Option<BlockNumber>>, RpcError> {
         let prefixes: Vec<u16> =
             requested_nullifiers.iter().map(crate::note::Nullifier::prefix).collect();
-        let retrieved_nullifiers = self.sync_nullifiers(&prefixes, block_from, None).await?;
+        let (chain_tip, _) = self.get_block_header_by_number(None, false).await?;
+        let retrieved_nullifiers =
+            self.sync_nullifiers(&prefixes, block_from, chain_tip.block_num()).await?;
 
         let mut nullifiers_height = BTreeMap::new();
         for nullifier in requested_nullifiers {

@@ -53,7 +53,7 @@ impl From<&StateSyncUpdate> for SyncSummary {
             .filter_map(|note_update| {
                 let note = note_update.inner();
                 if let NoteUpdateType::Insert = note_update.update_type() {
-                    Some(note.id())
+                    note.id()
                 } else {
                     None
                 }
@@ -65,8 +65,15 @@ impl From<&StateSyncUpdate> for SyncSummary {
             .updated_input_notes()
             .filter_map(|note_update| {
                 let note = note_update.inner();
-                if let NoteUpdateType::Update = note_update.update_type() {
-                    note.is_committed().then_some(note.id())
+                // `InsertCommitted` is a previously-tracked expected note that just committed, so
+                // it counts as committed (not as a newly-discovered note) even though it is
+                // persisted via a full-row insert.
+                if matches!(
+                    note_update.update_type(),
+                    NoteUpdateType::Update | NoteUpdateType::InsertCommitted
+                ) && note.is_committed()
+                {
+                    note.id()
                 } else {
                     None
                 }
@@ -81,11 +88,8 @@ impl From<&StateSyncUpdate> for SyncSummary {
             }))
             .collect();
 
-        let consumed_note_ids: BTreeSet<NoteId> = value
-            .note_updates
-            .updated_input_notes()
-            .filter_map(|note| note.inner().is_consumed().then_some(note.inner().id()))
-            .collect();
+        let consumed_note_ids: BTreeSet<NoteId> =
+            value.note_updates.consumed_input_note_ids().collect();
 
         SyncSummary::new(
             value.block_num,
@@ -450,7 +454,9 @@ impl PublicAccountDelta {
         )?;
         let vault_delta = replay_vault_updates(local_vault, &self.vault_updates)?;
 
-        let nonce_delta = Felt::new(new_nonce - old_nonce);
+        let nonce_delta = Felt::new(new_nonce - old_nonce).expect(
+            "new_nonce was checked to be higher than old_nonce; should return a valid nonce",
+        );
 
         AccountDelta::new(self.new_header.id(), storage_delta, vault_delta, nonce_delta)
     }
@@ -619,7 +625,12 @@ mod tests {
     }
 
     fn word(n: u64) -> Word {
-        Word::from([Felt::new(n), Felt::new(0), Felt::new(0), Felt::new(0)])
+        Word::from([
+            Felt::new_unchecked(n),
+            Felt::new_unchecked(0),
+            Felt::new_unchecked(0),
+            Felt::new_unchecked(0),
+        ])
     }
 
     fn fungible(amount: u64) -> Asset {
@@ -629,7 +640,7 @@ mod tests {
     fn header_with_nonce(nonce: u64) -> AccountHeader {
         AccountHeader::new(
             account_id(),
-            Felt::new(nonce),
+            Felt::new(nonce).expect("test nonce must be a valid Felt"),
             Word::default(),
             Word::default(),
             Word::default(),
@@ -873,7 +884,7 @@ mod tests {
             .compute_account_delta(&local_header, &local_storage, &local_vault)
             .unwrap();
 
-        assert_eq!(delta.nonce_delta(), Felt::new(3));
+        assert_eq!(delta.nonce_delta(), Felt::new_unchecked(3));
         assert!(delta.storage().is_empty());
         assert!(delta.vault().is_empty());
     }

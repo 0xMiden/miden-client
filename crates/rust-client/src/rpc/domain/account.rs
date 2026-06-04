@@ -170,9 +170,10 @@ impl TryInto<AccountHeader> for proto::account::AccountHeader {
             .ok_or(proto::account::AccountHeader::missing_field(stringify!(code_commitment)))?
             .try_into()?;
 
+        let nonce = Felt::new(nonce).map_err(|_| RpcConversionError::NotAValidFelt)?;
         Ok(AccountHeader::new(
             account_id,
-            Felt::new(nonce),
+            nonce,
             vault_root,
             storage_commitment,
             code_commitment,
@@ -276,8 +277,7 @@ impl proto::rpc::account_response::AccountDetails {
                     )));
                 }
                 for (proof, raw_key) in proofs.iter().zip(requested_keys.iter()) {
-                    let hashed_key = raw_key.hash().as_word();
-                    if proof.get(&hashed_key).is_none() {
+                    if proof.get(&raw_key.hash().as_word()).is_none() {
                         return Err(RpcError::InvalidResponse(format!(
                             "proof for storage map key {} does not match the requested key",
                             raw_key.to_hex(),

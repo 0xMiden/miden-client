@@ -7,7 +7,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use assert_cmd::Command;
 use assert_cmd::cargo::cargo_bin_cmd;
-use miden_client::account::{AccountId, AccountStorageMode};
+use miden_client::account::component::FungibleFaucet;
+use miden_client::account::{AccountId, AccountType};
 use miden_client::address::{Address, NetworkId};
 use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
 use miden_client::builder::ClientBuilder;
@@ -295,7 +296,7 @@ async fn mint_with_untracked_account() -> Result<()> {
     let temp_dir = init_cli().1;
 
     // Create faucet account
-    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Private);
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountType::Private);
 
     sync_cli(&temp_dir);
 
@@ -319,7 +320,7 @@ async fn token_symbol_mapping() -> Result<()> {
     let (store_path, temp_dir, endpoint) = init_cli();
 
     // Create faucet account
-    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Private);
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountType::Private);
 
     // Create a token symbol mapping file in the MIDEN_DIR directory
     let token_symbol_map_path = temp_dir.join(MIDEN_DIR).join("token_symbol_map.toml");
@@ -363,7 +364,10 @@ async fn token_symbol_mapping() -> Result<()> {
     };
 
     assert_eq!(note.assets().num_assets(), 1);
-    assert_eq!(note.assets().iter().next().unwrap().unwrap_fungible().amount(), 100_000);
+    assert_eq!(
+        note.assets().iter().next().unwrap().unwrap_fungible().amount().as_u64(),
+        100_000
+    );
     Ok(())
 }
 
@@ -377,7 +381,7 @@ async fn token_symbol_mapping() -> Result<()> {
 async fn show_untracked_public_account() -> Result<()> {
     // First client: creates a public fungible faucet and commits it to the node via a mint.
     let (_store_path_a, temp_dir_a, endpoint) = init_cli();
-    let fungible_faucet_account_id = new_faucet_cli(&temp_dir_a, AccountStorageMode::Public);
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir_a, AccountType::Public);
     sync_cli(&temp_dir_a);
 
     mint_cli(
@@ -446,8 +450,14 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
         let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
         let accounts = client.get_account_headers().await?;
 
-        let account_ids = accounts.iter().map(|(acc, _seed)| acc.id()).collect::<Vec<_>>();
-        let faucet_accounts = account_ids.iter().filter(|id| id.is_faucet()).collect::<Vec<_>>();
+        let mut faucet_accounts = Vec::new();
+        for (account_header, _) in accounts {
+            if let Some(account) = client.get_account(account_header.id()).await?
+                && FungibleFaucet::try_from(&account).is_ok()
+            {
+                faucet_accounts.push(account.id());
+            }
+        }
 
         assert_eq!(faucet_accounts.len(), 1);
 
@@ -487,10 +497,10 @@ async fn cli_export_import_note() -> Result<()> {
     let temp_dir_2 = init_cli().1;
 
     // Create wallet account
-    let first_basic_account_id = new_wallet_cli(&temp_dir_2, AccountStorageMode::Private);
+    let first_basic_account_id = new_wallet_cli(&temp_dir_2, AccountType::Private);
 
     // Create faucet account
-    let fungible_faucet_account_id = new_faucet_cli(&temp_dir_1, AccountStorageMode::Private);
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir_1, AccountType::Private);
 
     sync_cli(&temp_dir_1);
 
@@ -555,10 +565,10 @@ async fn cli_export_import_account() -> Result<()> {
     let (store_path_2, temp_dir_2, endpoint_2) = init_cli();
 
     // Create faucet account
-    let faucet_id = new_faucet_cli(&temp_dir_1, AccountStorageMode::Private);
+    let faucet_id = new_faucet_cli(&temp_dir_1, AccountType::Private);
 
     // Create wallet account
-    let wallet_id = new_wallet_cli(&temp_dir_1, AccountStorageMode::Private);
+    let wallet_id = new_wallet_cli(&temp_dir_1, AccountType::Private);
 
     // Export the accounts
     let mut export_cmd = cargo_bin_cmd!("miden-client");
@@ -781,10 +791,10 @@ async fn consume_unauthenticated_note() -> Result<()> {
     let temp_dir = init_cli().1;
 
     // Create wallet account
-    let wallet_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Public);
+    let wallet_account_id = new_wallet_cli(&temp_dir, AccountType::Public);
 
     // Create faucet account
-    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Public);
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountType::Public);
 
     sync_cli(&temp_dir);
 
@@ -855,13 +865,9 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     let (store_path, _, endpoint) = init_cli();
     let (mut client, authenticator) =
         create_rust_client_with_store_path(&store_path, endpoint).await?;
-    let (account, ..) = insert_new_wallet(
-        &mut client,
-        AccountStorageMode::Private,
-        &authenticator,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (account, ..) =
+        insert_new_wallet(&mut client, AccountType::Private, &authenticator, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     // Create the custom note with a script that will print the stack state
     let note_script = "
@@ -909,7 +915,7 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     sync_cli(&temp_dir);
 
     // Create wallet account
-    let wallet_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let wallet_account_id = new_wallet_cli(&temp_dir, AccountType::Private);
 
     // Consume the note and check the output
     let mut consume_note_cmd = cargo_bin_cmd!("miden-client");
@@ -938,7 +944,7 @@ async fn list_addresses_add() -> Result<()> {
     let temp_dir = init_cli().1;
 
     // Create wallet account
-    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountType::Private);
 
     sync_cli(&temp_dir);
 
@@ -997,8 +1003,8 @@ async fn list_addresses_add() -> Result<()> {
 async fn address_add_rejects_mismatched_account() -> Result<()> {
     let temp_dir = init_cli().1;
 
-    let account_a = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
-    let account_b = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let account_a = new_wallet_cli(&temp_dir, AccountType::Private);
+    let account_b = new_wallet_cli(&temp_dir, AccountType::Private);
     assert_ne!(account_a, account_b, "two new wallets should have distinct ids");
 
     sync_cli(&temp_dir);
@@ -1024,7 +1030,7 @@ async fn address_add_rejects_mismatched_account() -> Result<()> {
 async fn address_add_rejects_mismatched_network() -> Result<()> {
     let temp_dir = init_cli().1;
 
-    let account = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let account = new_wallet_cli(&temp_dir, AccountType::Private);
     sync_cli(&temp_dir);
 
     // Encode a valid address against the CLI's configured network, then re-encode it under a
@@ -1056,7 +1062,7 @@ async fn list_addresses_remove() -> Result<()> {
     let temp_dir = init_cli().1;
 
     // Create wallet account
-    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountType::Private);
 
     sync_cli(&temp_dir);
 
@@ -1099,7 +1105,7 @@ async fn new_wallet_with_deploy_flag() -> Result<()> {
     sync_cli(&temp_dir);
 
     let mut create_wallet_cmd = cargo_bin_cmd!("miden-client");
-    create_wallet_cmd.args(["new-wallet", "-s", "public", "--deploy"]);
+    create_wallet_cmd.args(["new-wallet", "-t", "public", "--deploy"]);
 
     let output = create_wallet_cmd.current_dir(&temp_dir).output().unwrap();
     assert!(
@@ -1317,7 +1323,7 @@ fn consume_note_cli(cli_path: &Path, account_id: &str, note_ids: &[&str]) {
 }
 
 /// Creates a new faucet account using the CLI given by `cli_path`.
-fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
+fn new_faucet_cli(cli_path: &Path, visibility: AccountType) -> String {
     const INIT_DATA_FILENAME: &str = "init_data.toml";
     let mut create_faucet_cmd = cargo_bin_cmd!("miden-client");
 
@@ -1333,10 +1339,8 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
 
     create_faucet_cmd.args([
         "new-account",
-        "-s",
-        storage_mode.to_string().as_str(),
-        "--account-type",
-        "fungible-faucet",
+        "-t",
+        visibility.to_string().as_str(),
         "-p",
         "basic-fungible-faucet",
         "-i",
@@ -1357,9 +1361,9 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
 }
 
 /// Creates a new wallet account using the CLI given by `cli_path`.
-fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
+fn new_wallet_cli(cli_path: &Path, visibility: AccountType) -> String {
     let mut create_wallet_cmd = cargo_bin_cmd!("miden-client");
-    create_wallet_cmd.args(["new-wallet", "-s", storage_mode.to_string().as_str()]);
+    create_wallet_cmd.args(["new-wallet", "-t", visibility.to_string().as_str()]);
 
     let output = create_wallet_cmd.current_dir(cli_path).output().unwrap();
     assert!(
@@ -1418,7 +1422,7 @@ async fn create_rust_client_with_store_path(
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
 
-    let rng = Box::new(RandomCoin::new(coin_seed.map(Felt::new).into()));
+    let rng = Box::new(RandomCoin::new(coin_seed.map(Felt::new_unchecked).into()));
 
     let keystore = FilesystemKeyStore::new(temp_dir())?;
 
@@ -1456,7 +1460,7 @@ fn exec_parse() {
     let temp_dir = init_cli().1;
 
     // Create wallet account
-    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountType::Private);
 
     sync_cli(&temp_dir);
     let mut success_cmd = cargo_bin_cmd!("miden-client");
@@ -1503,7 +1507,7 @@ fn call_empty_command() {
 fn call_nonexistent_package() {
     let temp_dir = init_cli().1;
 
-    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountType::Private);
 
     let mut cmd = cargo_bin_cmd!("miden-client");
     cmd.args([
@@ -1521,7 +1525,7 @@ fn call_nonexistent_package() {
 fn call_nonexistent_procedure() {
     let temp_dir = init_cli().1;
 
-    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountType::Private);
     let package_path = temp_dir.join(MIDEN_DIR).join("packages/basic-wallet.masp");
 
     sync_cli(&temp_dir);
@@ -1540,6 +1544,7 @@ fn call_nonexistent_procedure() {
 /// Helper: builds the `call-test` package (arithmetic + storage procedures) at runtime and
 /// writes the serialized `.masp` to `out_path`.
 fn build_call_test_masp(out_path: &Path) {
+    use miden_client::account::StorageSlotName;
     use miden_client::account::component::{
         AccountComponentMetadata,
         FeltSchema,
@@ -1548,7 +1553,6 @@ fn build_call_test_masp(out_path: &Path) {
         ValueSlotSchema,
         WordSchema,
     };
-    use miden_client::account::{AccountType, StorageSlotName};
     use miden_client::assembly::{CodeBuilder, Library};
     use miden_client::vm::{
         Package,
@@ -1602,8 +1606,7 @@ fn build_call_test_masp(out_path: &Path) {
     )])
     .expect("valid storage schema");
 
-    let metadata = AccountComponentMetadata::new("call-test", AccountType::all())
-        .with_storage_schema(storage_schema);
+    let metadata = AccountComponentMetadata::new("call-test").with_storage_schema(storage_schema);
 
     let signature_overrides: [(&str, FunctionType); 2] = [
         ("add", FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt], [Type::Felt])),
@@ -1667,9 +1670,7 @@ fn setup_call_test_account() -> (PathBuf, String, PathBuf) {
     let mut create_cmd = cargo_bin_cmd!("miden-client");
     create_cmd.args([
         "new-account",
-        "--account-type",
-        "regular-account-immutable-code",
-        "-s",
+        "-t",
         "public",
         "-p",
         "auth/no-auth",
@@ -1829,10 +1830,8 @@ fn create_account_with_no_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",
@@ -1876,10 +1875,8 @@ fn create_account_with_multisig_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",
@@ -1914,10 +1911,8 @@ fn create_account_with_acl_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",
@@ -1945,10 +1940,8 @@ fn create_account_with_ecdsa_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",

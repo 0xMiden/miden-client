@@ -68,7 +68,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::account::{Account, AccountCode, AccountId};
-use miden_protocol::asset::NonFungibleAsset;
+use miden_protocol::asset::{Asset, NonFungibleAsset};
 use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
 use miden_protocol::note::{
@@ -344,8 +344,11 @@ where
         // Verify that none of the authenticated input notes are already consumed.
         for note in &stored_note_records {
             if note.is_consumed() {
+                let id = note.id().expect(
+                    "stored note records reaching this check carry metadata so id() is Some",
+                );
                 return Err(ClientError::TransactionRequestError(
-                    TransactionRequestError::InputNoteAlreadyConsumed(note.id()),
+                    TransactionRequestError::InputNoteAlreadyConsumed(id),
                 ));
             }
         }
@@ -354,7 +357,7 @@ where
         stored_note_records.retain(InputNoteRecord::is_authenticated);
 
         let authenticated_note_ids =
-            stored_note_records.iter().map(InputNoteRecord::id).collect::<Vec<_>>();
+            stored_note_records.iter().filter_map(InputNoteRecord::id).collect::<Vec<_>>();
 
         // Upsert request notes missing from the store so they can be tracked and updated.
         // NOTE: Unauthenticated notes may be stored locally in an unverified/invalid state at
@@ -378,10 +381,8 @@ where
         let future_notes: Vec<(NoteDetails, NoteTag)> =
             transaction_request.expected_future_notes().cloned().collect();
 
-        let tx_script = transaction_request.build_transaction_script(
-            &self.get_account_interface(account_id).await?,
-            self.source_manager.clone(),
-        )?;
+        let tx_script = transaction_request
+            .build_transaction_script(&self.get_account_interface(account_id).await?)?;
 
         let foreign_accounts = transaction_request.foreign_accounts().clone();
 
@@ -471,7 +472,7 @@ where
                 if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) =
                     note.state()
                 {
-                    Some(NoteTagRecord::with_note_source(*tag, note.id()))
+                    Some(NoteTagRecord::with_note_source(*tag, note.details_commitment()))
                 } else {
                     None
                 }
@@ -480,7 +481,7 @@ where
 
         new_tags.extend(note_updates.updated_output_notes().map(|note| {
             let note = note.inner();
-            NoteTagRecord::with_note_source(note.metadata().tag(), note.id())
+            NoteTagRecord::with_note_source(note.metadata().tag(), note.details_commitment())
         }));
 
         Ok(TransactionStoreUpdate::new(
@@ -578,6 +579,7 @@ where
         transaction_request: &TransactionRequest,
     ) -> Result<(), ClientError> {
         self.validate_recency().await?;
+        validate_output_note_senders(transaction_request, account_id)?;
         let account = self.try_get_account(account_id).await?;
         validate_account_request(transaction_request, &account)
     }
@@ -1019,14 +1021,11 @@ pub(super) fn validate_account_request(
     transaction_request: &TransactionRequest,
     account: &Account,
 ) -> Result<(), ClientError> {
-    // Output notes emitted by this transaction must declare the executing account as their
-    // sender. The kernel binds an emitted note's sender to the account that produces it, and
-    // note scripts (e.g. P2IDE reclaim) authorize on that field, so a foreign sender is
-    // unsatisfiable. Reject it here — read-only, before any execution or store writes —
-    // instead of failing deep in transaction script building.
-    validate_output_note_senders(transaction_request, account.id())?;
-
-    if account.is_faucet() {
+    let account_interface = AccountInterface::from_account(account);
+    if account_interface
+        .components()
+        .contains(&AccountComponentInterface::FungibleFaucet)
+    {
         // TODO(SantiagoPittella): Add faucet validations.
         Ok(())
     } else {
@@ -1073,10 +1072,20 @@ fn validate_basic_account_request(
     let (incoming_fungible_balance_map, incoming_non_fungible_balance_set) =
         transaction_request.incoming_assets();
 
+    // Aggregate the account's fungible balance per faucet in one pass. A faucet's fungible asset
+    // may occupy more than one callback-flag vault key, so all matching entries are summed.
+    let mut available_fungible: BTreeMap<AccountId, u64> = BTreeMap::new();
+    for asset in account.vault().assets() {
+        if let Asset::Fungible(fungible) = asset {
+            let balance = available_fungible.entry(fungible.faucet_id()).or_default();
+            *balance = balance.saturating_add(fungible.amount().as_u64());
+        }
+    }
+
     // Check if the account balance plus incoming assets is greater than or equal to the
     // outgoing fungible assets
     for (faucet_id, amount) in fungible_balance_map {
-        let account_asset_amount = account.vault().get_balance(faucet_id).unwrap_or(0);
+        let account_asset_amount = available_fungible.get(&faucet_id).copied().unwrap_or(0);
         let incoming_balance = incoming_fungible_balance_map.get(&faucet_id).unwrap_or(&0);
         if account_asset_amount + incoming_balance < amount {
             return Err(ClientError::AssetError(AssetError::FungibleAssetAmountNotSufficient {
@@ -1094,15 +1103,15 @@ fn validate_basic_account_request(
             Ok(false) => {
                 // Check if the non fungible asset is in the incoming assets
                 if !incoming_non_fungible_balance_set.contains(non_fungible) {
-                    return Err(ClientError::AssetError(
-                        AssetError::NonFungibleFaucetIdTypeMismatch(non_fungible.faucet_id()),
+                    return Err(ClientError::TransactionRequestError(
+                        TransactionRequestError::MissingNonFungibleAsset(non_fungible.faucet_id()),
                     ));
                 }
             },
             _ => {
-                return Err(ClientError::AssetError(AssetError::NonFungibleFaucetIdTypeMismatch(
-                    non_fungible.faucet_id(),
-                )));
+                return Err(ClientError::TransactionRequestError(
+                    TransactionRequestError::MissingNonFungibleAsset(non_fungible.faucet_id()),
+                ));
             },
         }
     }
