@@ -579,6 +579,7 @@ where
         transaction_request: &TransactionRequest,
     ) -> Result<(), ClientError> {
         self.validate_recency().await?;
+        validate_output_note_senders(transaction_request, account_id)?;
         let account = self.try_get_account(account_id).await?;
         validate_account_request(transaction_request, &account)
     }
