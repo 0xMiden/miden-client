@@ -56,8 +56,10 @@ miden-remote-prover-client = { branch = "jmunoz-update-miden-deps", default-feat
 miden-validator = { branch = "jmunoz-update-miden-deps", git = "https://github.com/0xMiden/node.git" }
 
 # Miden debug dependency
-miden-debug     = { default-features = false, features = ["dap", "std"], version = "0.7" }
-miden-processor = { default-features = false, version = "0.22" }
+miden-debug        = { default-features = false, features = ["dap", "std"], version = "0.7" }
+miden-debug-types  = { default-features = false, version = "0.22" }
+miden-mast-package = { default-features = false, version = "0.22" }
+miden-processor    = { default-features = false, version = "0.22" }
 
 # External dependencies
 anyhow             = { default-features = false, version = "1.0" }
