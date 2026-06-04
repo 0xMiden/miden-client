@@ -679,6 +679,47 @@ pub trait Store: Send + Sync {
         &self,
         account_id: AccountId,
     ) -> Result<Option<AccountRecord>, StoreError>;
+
+    // PSWAP LINEAGES
+    // --------------------------------------------------------------------------------------------
+
+    /// Persists a [`crate::pswap::PswapLineageRecord`]. Performs an UPSERT
+    /// on `order_id` so the call is safe to retry; existing rows are
+    /// overwritten in full. Callers should use this only at lineage
+    /// creation time — once a lineage is live, mutations go through
+    /// [`Self::apply_pswap_round`] instead.
+    async fn upsert_pswap_lineage(
+        &self,
+        record: &crate::pswap::PswapLineageRecord,
+    ) -> Result<(), StoreError>;
+
+    /// Returns the lineage row for `order_id`, or `None` if not tracked.
+    async fn get_pswap_lineage(
+        &self,
+        order_id: Felt,
+    ) -> Result<Option<crate::pswap::PswapLineageRecord>, StoreError>;
+
+    /// Lists lineage rows matching `filter`.
+    async fn list_pswap_lineages(
+        &self,
+        filter: crate::pswap::PswapLineageFilter,
+    ) -> Result<Vec<crate::pswap::PswapLineageRecord>, StoreError>;
+
+    /// Atomically applies one round of a PSWAP lineage. In a single SQL
+    /// transaction the implementation MUST:
+    /// 1. Reject `update.round_depth != current_depth + 1` (fail-loud against correlator
+    ///    off-by-ones and duplicate deliveries).
+    /// 2. Update the row's tip, depth, `remaining_*`, `last_consumer` / `last_payout`, `state`, and
+    ///    `updated_at_block`.
+    /// 3. If `update.payback.is_some()`, `INSERT OR IGNORE` it into `input_notes` (public paybacks
+    ///    are pre-inserted by `NoteScreener`; private ones land here only).
+    ///
+    /// Backends without real transactions (e.g. a WASM stub) MUST error
+    /// rather than commit a half-applied state.
+    async fn apply_pswap_round(
+        &self,
+        update: &crate::pswap::PswapLineageRoundUpdate,
+    ) -> Result<(), StoreError>;
 }
 
 // PARTIAL BLOCKCHAIN NODE FILTER

@@ -194,10 +194,22 @@ pub enum ClientError {
         #[source]
         source: Box<ClientError>,
     },
+    /// Generic carrier for feature-specific errors raised by an observer
+    /// or domain module. Keeps `ClientError` free of per-feature variants;
+    /// each feature provides its own `From<MyFeatureError> for ClientError`
+    /// returning `Observer(Box::new(err))`.
+    #[error(transparent)]
+    Observer(Box<dyn core::error::Error + Send + Sync + 'static>),
 }
 
 // CONVERSIONS
 // ================================================================================================
+
+impl From<crate::pswap::PswapLineageError> for ClientError {
+    fn from(err: crate::pswap::PswapLineageError) -> Self {
+        ClientError::Observer(Box::new(err))
+    }
+}
 
 impl From<ClientError> for String {
     fn from(err: ClientError) -> String {

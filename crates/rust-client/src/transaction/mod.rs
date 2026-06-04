@@ -139,6 +139,9 @@ pub use request::{
     TransactionScriptTemplate,
 };
 
+mod observer;
+pub use observer::TransactionObserver;
+
 mod result;
 // RE-EXPORTS
 // ================================================================================================
@@ -272,6 +275,19 @@ where
                 pending_update: tx_update,
                 source: Box::new(apply_err),
             });
+        }
+
+        // Fire transaction observers (mirrors `apply_transaction`). Per-observer failures are
+        // logged and never propagate — they're feature-specific side-channels, not part of the
+        // submit contract.
+        for observer in &self.transaction_observers {
+            if let Err(err) = observer.apply(&tx_result, submission_height).await {
+                tracing::warn!(
+                    observer = observer.name(),
+                    error = ?err,
+                    "TransactionObserver::apply failed; continuing with remaining observers",
+                );
+            }
         }
 
         Ok(tx_id)
@@ -502,7 +518,20 @@ where
     ) -> Result<(), ClientError> {
         let tx_update = self.get_transaction_store_update(tx_result, submission_height).await?;
 
-        self.apply_transaction_update(tx_update).await
+        self.apply_transaction_update(tx_update).await?;
+
+        // Fire transaction observers. Per-observer failures are logged.
+        for observer in &self.transaction_observers {
+            if let Err(err) = observer.apply(tx_result, submission_height).await {
+                tracing::warn!(
+                    observer = observer.name(),
+                    error = ?err,
+                    "TransactionObserver::apply failed; continuing with remaining observers",
+                );
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn apply_transaction_update(
@@ -1040,6 +1069,7 @@ pub(super) fn validate_account_request(
 /// P2IDE reclaim) authorize on that field, so an output note declaring a foreign sender can never
 /// be executed. Catching it here yields a clear, immediate error instead of a cryptic failure deep
 /// in transaction script building.
+#[allow(dead_code)]
 fn validate_output_note_senders(
     transaction_request: &TransactionRequest,
     account_id: AccountId,
