@@ -399,11 +399,6 @@ impl NoteUpdateTracker {
 
     /// Applies the necessary state transitions to the [`NoteUpdateTracker`] when a note is
     /// committed in a block and returns whether the committed note is tracked as input note.
-    ///
-    /// `attachments` carries the note's resolved attachment content when it was fetched during
-    /// sync (via `GetNotesById`); private notes carry their attachments on-chain and need them
-    /// stored so the record reconstructs the correct note ID. It is `None` for notes without
-    /// attachments.
     pub(crate) fn apply_committed_note_state_transitions(
         &mut self,
         committed_note: &CommittedNote,
