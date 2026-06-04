@@ -11,18 +11,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use ::rand::{Rng, random};
 use anyhow::{Context, Result};
 use miden_node_block_producer::{
-    BlockProducerApi,
-    DEFAULT_MAX_BATCHES_PER_BLOCK,
-    DEFAULT_MAX_CONCURRENT_PROOFS,
-    DEFAULT_MAX_TXS_PER_BATCH,
-    DEFAULT_MEMPOOL_TX_CAPACITY,
-    Sequencer,
+    BlockProducerApi, DEFAULT_MAX_BATCHES_PER_BLOCK, DEFAULT_MAX_CONCURRENT_PROOFS,
+    DEFAULT_MAX_TXS_PER_BATCH, DEFAULT_MEMPOOL_TX_CAPACITY, Sequencer,
 };
 use miden_node_proto::clients::{
-    Builder as GrpcClientBuilder,
-    GrpcClient,
-    NtxBuilderClient,
-    ValidatorClient,
+    Builder as GrpcClientBuilder, GrpcClient, NtxBuilderClient, ValidatorClient,
 };
 use miden_node_rpc::{Rpc, RpcMode};
 use miden_node_store::state::State;
@@ -32,14 +25,8 @@ use miden_node_utils::crypto::get_random_coin;
 use miden_ntx_builder::NtxBuilderConfig;
 use miden_protocol::account::auth::{AuthScheme, AuthSecretKey};
 use miden_protocol::account::{
-    Account,
-    AccountBuilder,
-    AccountComponent,
-    AccountComponentMetadata,
-    AccountFile,
-    AccountType,
-    StorageMap,
-    StorageMapKey,
+    Account, AccountBuilder, AccountComponent, AccountComponentMetadata, AccountFile, AccountType,
+    StorageMap, StorageMapKey,
 };
 use miden_protocol::asset::{Asset, AssetAmount, FungibleAsset, TokenSymbol};
 use miden_protocol::block::FeeParameters;
@@ -52,10 +39,7 @@ use miden_standards::account::access::AccessControl;
 use miden_standards::account::auth::AuthSingleSig;
 use miden_standards::account::faucets::{FungibleFaucet, TokenName, create_fungible_faucet};
 use miden_standards::account::policies::{
-    BurnPolicyConfig,
-    MintPolicyConfig,
-    PolicyRegistration,
-    TokenPolicyManager,
+    BurnPolicyConfig, MintPolicyConfig, PolicyRegistration, TokenPolicyManager,
 };
 use miden_standards::account::wallets::BasicWallet;
 use miden_validator::{Validator, ValidatorSigner};
@@ -182,10 +166,12 @@ impl NodeBuilder {
             .with_context(|| "failed to bootstrap store")?;
 
         // Bootstrap the validator database with the genesis block header so that block
-        // validation can find the chain tip.
-        let validator_db = miden_validator::db::load(self.data_directory.join("validator.sqlite3"))
-            .await
-            .with_context(|| "failed to initialize validator database")?;
+        // validation can find the chain tip. `setup` creates the database and applies migrations;
+        // `load` would require an already-bootstrapped file.
+        let validator_db =
+            miden_validator::db::setup(self.data_directory.join("validator.sqlite3"))
+                .await
+                .with_context(|| "failed to initialize validator database")?;
         validator_db
             .transact("bootstrap_validator", move |conn| {
                 miden_validator::db::upsert_block_header(conn, &genesis_header)
