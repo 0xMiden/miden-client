@@ -15,7 +15,7 @@ use miden_protocol::account::{
 };
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
-use miden_protocol::note::{Note, NoteId, NoteTag, NoteType, Nullifier};
+use miden_protocol::note::{Note, NoteAttachments, NoteId, NoteTag, NoteType, Nullifier};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -58,6 +58,8 @@ struct FetchedSyncData {
     note_blocks: Vec<NoteSyncBlock>,
     /// Full note bodies for public notes, keyed by note ID.
     public_notes: BTreeMap<NoteId, Note>,
+    /// Attachment content for private notes that carry attachments, keyed by note ID.
+    private_attachments: BTreeMap<NoteId, NoteAttachments>,
     /// Transaction records for the synced range, as returned by `sync_transactions`.
     transactions: Vec<RpcTransactionRecord>,
 }
@@ -319,15 +321,18 @@ impl StateSync {
             "Syncing state.",
         );
 
-        // Step 2: sync notes and fetch full note bodies for public notes, paginating with the
-        // same chain tip so MMR paths are opened at a consistent forest. With no tracked tags
-        // there's nothing the node could match, so skip the RPC entirely.
-        let (note_blocks, public_notes) = if note_tags.is_empty() {
-            (Vec::new(), BTreeMap::new())
+        // Step 2: sync notes and fetch full note bodies for public notes (and attachment content
+        // for private notes that carry attachments), paginating with the same chain tip so MMR
+        // paths are opened at a consistent forest. With no tracked tags there's nothing the node
+        // could match, so skip the RPC entirely.
+        let (note_blocks, public_notes, private_attachments) = if note_tags.is_empty() {
+            (Vec::new(), BTreeMap::new(), BTreeMap::new())
         } else {
-            self.rpc_api
+            let result = self
+                .rpc_api
                 .sync_notes_with_details(current_block_num + 1, chain_tip, note_tags.as_ref())
-                .await?
+                .await?;
+            (result.blocks, result.public_notes, result.private_attachments)
         };
 
         let note_count: usize = note_blocks.iter().map(|b| b.notes.len()).sum();
@@ -353,6 +358,7 @@ impl StateSync {
             chain_tip_header: chain_mmr_info.block_header,
             note_blocks,
             public_notes,
+            private_attachments,
             transactions: transaction_records,
         }))
     }
@@ -377,6 +383,7 @@ impl StateSync {
             chain_tip_header,
             note_blocks,
             public_notes,
+            private_attachments,
             transactions,
         } = sync_data;
 
@@ -387,8 +394,14 @@ impl StateSync {
             &mut state_sync_update.partial_blockchain_updates,
         )?;
 
-        self.screen_note_blocks(note_blocks, public_notes, state_sync_update, current_partial_mmr)
-            .await?;
+        self.screen_note_blocks(
+            note_blocks,
+            public_notes,
+            &private_attachments,
+            state_sync_update,
+            current_partial_mmr,
+        )
+        .await?;
 
         self.apply_transactions_and_nullifiers(
             &chain_tip_header,
@@ -433,6 +446,7 @@ impl StateSync {
         &self,
         note_blocks: Vec<NoteSyncBlock>,
         public_notes: BTreeMap<NoteId, Note>,
+        private_attachments: &BTreeMap<NoteId, NoteAttachments>,
         state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<(), ClientError> {
@@ -445,6 +459,7 @@ impl StateSync {
                     block.notes,
                     &block.block_header,
                     &public_note_records,
+                    private_attachments,
                 )
                 .await?;
 
@@ -808,13 +823,16 @@ impl StateSync {
     /// * Tracked notes that were nullified by an external transaction.
     ///
     /// The `public_notes` parameter provides cached public note details for the current sync
-    /// iteration so the node is only queried once per batch.
+    /// iteration so the node is only queried once per batch. The `private_attachments` parameter
+    /// carries attachment content resolved for private notes, keyed by note ID; it is joined to
+    /// each committed note by ID so the stored record reconstructs the correct note ID.
     async fn note_state_sync(
         &self,
         note_updates: &mut NoteUpdateTracker,
         note_inclusions: BTreeMap<NoteId, CommittedNote>,
         block_header: &BlockHeader,
         public_notes: &BTreeMap<NoteId, InputNoteRecord>,
+        private_attachments: &BTreeMap<NoteId, NoteAttachments>,
     ) -> Result<bool, ClientError> {
         // `found_relevant_note` tracks whether we want to persist the block header in the end
         let mut found_relevant_note = false;
@@ -830,8 +848,12 @@ impl StateSync {
                     // Only mark the downloaded block header as relevant if we are talking about
                     // an input note (output notes get marked as committed but we don't need the
                     // block for anything there)
-                    found_relevant_note |= note_updates
-                        .apply_committed_note_state_transitions(&committed_note, block_header)?;
+                    let attachments = private_attachments.get(committed_note.note_id());
+                    found_relevant_note |= note_updates.apply_committed_note_state_transitions(
+                        &committed_note,
+                        block_header,
+                        attachments,
+                    )?;
                 },
                 NoteUpdateAction::Insert(public_note) => {
                     found_relevant_note = true;
@@ -1682,14 +1704,18 @@ mod tests {
         let (chain, note_tags) = build_chain_with_mint_notes(10).await;
         let mock_rpc = MockRpcApi::new(chain);
 
-        let (blocks, _public_notes) = mock_rpc
+        let result = mock_rpc
             .sync_notes_with_details(4_u32.into(), 10_u32.into(), &note_tags)
             .await
             .expect("sync notes should succeed");
 
-        assert_eq!(blocks.last().unwrap().block_header.block_num(), BlockNumber::from(10u32));
+        assert_eq!(
+            result.blocks.last().unwrap().block_header.block_num(),
+            BlockNumber::from(10u32)
+        );
         assert!(
-            blocks
+            result
+                .blocks
                 .iter()
                 .any(|block| block.block_header.block_num() == BlockNumber::from(9u32))
         );

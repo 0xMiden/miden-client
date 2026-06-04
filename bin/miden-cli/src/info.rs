@@ -84,9 +84,7 @@ fn print_status_info(status: &RpcStatusInfo) {
     if let Some(genesis) = status.genesis_commitment {
         println!("Node genesis: {}", genesis.to_hex());
     }
-    if let Some(ref store) = status.store {
-        println!("Store: {} (chain tip: {})", store.status, store.chain_tip);
-    }
+    println!("Chain tip: {}", status.chain_tip);
     if let Some(ref bp) = status.block_producer {
         println!("Block producer: {} (chain tip: {})", bp.status, bp.chain_tip);
     }
