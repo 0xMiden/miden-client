@@ -252,7 +252,27 @@ where
         let submission_height =
             self.submit_proven_transaction(proven_transaction, &tx_result).await?;
 
-        self.apply_transaction(&tx_result, submission_height).await?;
+        // The transaction has been accepted by the node; the local store update
+        // is a separate step that can fail independently. On failure, return a
+        // distinct error carrying the pending update so the caller can decide
+        // how to recover (re-apply later via `apply_transaction_update`,
+        // persist for the next session, etc.).
+        //
+        // The update is boxed so it does not inflate the enclosing future
+        // across await points (triggers clippy::large_futures).
+        let tx_update =
+            Box::new(self.get_transaction_store_update(&tx_result, submission_height).await?);
+
+        if let Err(apply_err) = self.apply_transaction_update((*tx_update).clone()).await {
+            info!(
+                "apply_transaction_update failed for submitted tx {tx_id}; returning \
+                 ApplyTransactionAfterSubmitFailed with the pending update attached: {apply_err}"
+            );
+            return Err(ClientError::ApplyTransactionAfterSubmitFailed {
+                pending_update: tx_update,
+                source: Box::new(apply_err),
+            });
+        }
 
         Ok(tx_id)
     }
