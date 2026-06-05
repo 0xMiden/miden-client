@@ -716,11 +716,12 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
     Ok(())
 }
 
-/// Verifies syncing and consuming notes with attachments.
-/// 1. Client 1 mints a public P2ID note **with an attachment** targeting client 2's wallet.
-/// 2. Client 2 syncs and discovers the note via `sync_notes`.
-/// 3. The sync triggers a `get_notes_by_id` call to fetch the public note body.
-/// 4. Client 2 consumes the note.
+/// Verifies syncing and consuming notes with attachments, for both a public and a private note.
+/// 1. Client 1 mints a public and a private P2ID note, each with an attachment, targeting client 2.
+/// 2. Client 2 syncs and discovers both notes via `sync_notes`.
+/// 3. The sync triggers a `get_notes_by_id` call that resolves the public note's body and the
+///    private note's attachment content.
+/// 4. Client 2 consumes both notes.
 pub async fn test_sync_note_with_attachment(client_config: ClientConfig) -> Result<()> {
     let (mut client_1, keystore_1) = client_config.clone().into_client().await?;
     let (mut client_2, keystore_2) = ClientConfig::default()
@@ -746,51 +747,84 @@ pub async fn test_sync_note_with_attachment(client_config: ClientConfig) -> Resu
     client_1.sync_state().await?;
     client_2.sync_state().await?;
 
-    // Mint a P2ID note with a Word attachment. The public note is fetched via get_notes_by_id
-    // during the receiver's sync.
-    let attachment_scheme = NoteAttachmentScheme::new(42)?;
-    let attachment = NoteAttachment::with_word(attachment_scheme, Word::from([1u32, 2, 3, 4]));
-    let attachments = NoteAttachments::new(vec![attachment])?;
+    // Mint two P2ID notes carrying Word attachments: one public, one private.
+    let public_attachments = NoteAttachments::new(vec![NoteAttachment::with_word(
+        NoteAttachmentScheme::new(42)?,
+        Word::from([1u32, 2, 3, 4]),
+    )])?;
+    let private_attachments = NoteAttachments::new(vec![NoteAttachment::with_word(
+        NoteAttachmentScheme::new(43)?,
+        Word::from([5u32, 6, 7, 8]),
+    )])?;
     let asset = FungibleAsset::new(faucet_account.id(), MINT_AMOUNT)?;
-    let note = P2idNote::create(
+
+    let public_note = P2idNote::create(
         faucet_account.id(),
         wallet.id(),
         vec![asset.into()],
         NoteType::Public,
-        attachments,
+        public_attachments,
+        client_1.rng(),
+    )?;
+    let private_note = P2idNote::create(
+        faucet_account.id(),
+        wallet.id(),
+        vec![asset.into()],
+        NoteType::Private,
+        private_attachments,
         client_1.rng(),
     )?;
 
-    info!(note_id = %note.id(), "Minting P2ID note with attachment");
-    let tx_request =
-        TransactionRequestBuilder::new().own_output_notes(vec![note.clone()]).build()?;
+    info!(public = %public_note.id(), private = %private_note.id(), "Minting P2ID notes with attachments");
+    let tx_request = TransactionRequestBuilder::new()
+        .own_output_notes(vec![public_note.clone(), private_note.clone()])
+        .build()?;
     execute_tx_and_sync(&mut client_1, faucet_account.id(), tx_request).await?;
 
-    // Client 2 syncs and should discover the note. The sync response carries full metadata,
-    // while get_notes_by_id fetches the public note body, including attachment content.
-    info!("Syncing client 2 to discover note with attachment");
+    // A private note's details never appear on-chain, so client 2 must receive the details.
+    client_2.add_note_tag(private_note.metadata().tag()).await?;
+    client_2
+        .import_notes(&[NoteFile::NoteDetails {
+            details: private_note.clone().into(),
+            after_block_num: 0u32.into(),
+            tag: Some(private_note.metadata().tag()),
+        }])
+        .await?;
+
+    // Client 2 syncs and should discover both notes. sync_notes carries full metadata for both;
+    // get_notes_by_id then resolves the public note body and the private note's attachment content.
+    info!("Syncing client 2 to discover notes with attachments");
     client_2.sync_state().await?;
 
-    let received_note_record = client_2
-        .get_input_note(note.id())
-        .await?
-        .with_context(|| format!("Note {} not found in client_2 after sync", note.id()))?;
-    assert_eq!(
-        received_note_record.metadata().unwrap().attachment_headers()[0].scheme(),
-        Some(attachment_scheme),
-    );
+    // Both records must retain their attachment content and reconstruct to the same note ID as the
+    // on-chain notes.
+    let mut received_notes = vec![];
+    for original in [&public_note, &private_note] {
+        let record = client_2
+            .get_input_note(original.id())
+            .await?
+            .with_context(|| format!("Note {} not found in client_2 after sync", original.id()))?;
+        let received: InputNote = record.try_into()?;
+        assert_eq!(
+            received.note().attachments(),
+            original.attachments(),
+            "reconstructed note should retain the original attachment content",
+        );
+        assert_eq!(
+            received.note().id(),
+            original.id(),
+            "reconstructed note must match the on-chain note ID",
+        );
+        received_notes.push(received.note().clone());
+    }
 
-    // The stored record retains the attachment metadata above. What does not survive is the
-    // attachment content, so converting the record back into a `Note` rebuilds it with empty
-    // attachments and loses the original attachment commitment.
-    let received_note: InputNote = received_note_record.try_into()?;
-
-    // Consume the note — this will fail if the metadata wasn't properly resolved
-    info!("Consuming note with attachment in client 2");
-    let tx_id = consume_notes(&mut client_2, wallet.id(), &[received_note.note().clone()]).await;
+    // Consume both notes — this fails if either note's attachments weren't resolved.
+    info!("Consuming both notes with attachments in client 2");
+    let tx_id = consume_notes(&mut client_2, wallet.id(), &received_notes).await;
     wait_for_tx(&mut client_2, tx_id).await?;
 
-    assert_account_has_single_asset(&client_2, wallet.id(), faucet_account.id(), MINT_AMOUNT).await;
+    assert_account_has_single_asset(&client_2, wallet.id(), faucet_account.id(), MINT_AMOUNT * 2)
+        .await;
 
     Ok(())
 }

@@ -428,9 +428,9 @@ where
             return Ok(retrieved_proofs);
         }
 
-        let (blocks, _) = self
+        let blocks = self
             .rpc_api
-            .sync_notes_with_details(request_block_num, current_block_num, &tracked_tags)
+            .sync_notes(request_block_num, current_block_num, &tracked_tags)
             .await
             .map_err(ClientError::RpcError)?;
 

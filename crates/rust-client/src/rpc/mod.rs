@@ -57,7 +57,7 @@ use domain::account::{
     StorageMapEntry,
     VaultFetch,
 };
-use domain::note::{FetchedNote, NoteSyncBlock};
+use domain::note::{FetchedNote, NoteSyncBlock, SyncedNoteDetails};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
@@ -66,7 +66,7 @@ use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
-use miden_protocol::note::{Note, NoteId, NoteScript, NoteTag, NoteType, Nullifier};
+use miden_protocol::note::{NoteId, NoteMetadata, NoteScript, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 
 use crate::rpc::domain::storage_map::StorageMapInfo;
@@ -108,6 +108,14 @@ pub enum AccountStateAt {
     ChainTip,
     /// Gets the state at a specific block number
     Block(BlockNumber),
+}
+
+/// Returns `true` if the note's metadata advertises at least one attachment.
+///
+/// Sync records carry attachment scheme markers (not the attachment content), so a present scheme
+/// in any header slot indicates the note has attachments whose content must be fetched separately.
+fn metadata_has_attachments(metadata: &NoteMetadata) -> bool {
+    metadata.attachment_headers().iter().any(|header| header.scheme().is_some())
 }
 
 // NODE RPC CLIENT TRAIT
@@ -287,45 +295,53 @@ pub trait NodeRpcClient: Send + Sync {
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<Vec<NoteSyncBlock>, RpcError>;
 
-    /// Calls [`NodeRpcClient::sync_notes`] and then makes a single
-    /// [`NodeRpcClient::get_notes_by_id`] call to:
-    /// - Fill metadata on any [`CommittedNote`](domain::note::CommittedNote) whose sync response
-    ///   only included header fields.
-    /// - Collect full bodies for every public note in the sync range.
+    /// Calls [`NodeRpcClient::sync_notes`] for the requested range, then makes a single
+    /// [`NodeRpcClient::get_notes_by_id`] call to fetch full note bodies (scripts, assets,
+    /// recipient) for public notes and attachment content for private notes that carry
+    /// attachments.
     ///
     /// All public notes in the range are fetched (not just the ones the client tracks) to
-    /// avoid revealing which specific notes the client is interested in.
+    /// avoid revealing which specific notes the client is interested in. Private notes are only
+    /// fetched when their synced metadata indicates non-empty attachments, since the sync record
+    /// carries attachment scheme markers but not the attachment content, which is needed to
+    /// reconstruct the note's ID.
     ///
-    /// Returns the resolved note blocks paired with a map of public note bodies keyed by
-    /// note ID.
+    /// Returns the resolved note blocks paired with a map of the fetched content (public note
+    /// bodies and private-note attachments), keyed by note ID.
     async fn sync_notes_with_details(
         &self,
         block_from: BlockNumber,
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, Note>), RpcError> {
+    ) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, SyncedNoteDetails>), RpcError> {
         let blocks = self.sync_notes(block_from, block_to, note_tags).await?;
 
         let note_ids: Vec<NoteId> = blocks
             .iter()
             .flat_map(|b| b.notes.values())
-            .filter(|n| n.note_type() == NoteType::Public)
+            .filter(|n| n.note_type() == NoteType::Public || metadata_has_attachments(n.metadata()))
             .map(|n| *n.note_id())
             .collect();
 
-        let mut public_notes = BTreeMap::new();
+        let mut synced_notes: BTreeMap<NoteId, SyncedNoteDetails> = BTreeMap::new();
 
         if !note_ids.is_empty() {
             let fetched = self.get_notes_by_id(&note_ids).await?;
 
             for fetched_note in fetched {
-                if let FetchedNote::Public(note, _) = fetched_note {
-                    public_notes.insert(note.id(), note);
+                match fetched_note {
+                    FetchedNote::Public(note, _) => {
+                        synced_notes.insert(note.id(), SyncedNoteDetails::Public(note));
+                    },
+                    FetchedNote::Private(note_id, _, attachments, _) => {
+                        let attachments = (!attachments.is_empty()).then_some(attachments);
+                        synced_notes.insert(note_id, SyncedNoteDetails::Private(attachments));
+                    },
                 }
             }
         }
 
-        Ok((blocks, public_notes))
+        Ok((blocks, synced_notes))
     }
 
     /// Fetches the nullifiers corresponding to a list of prefixes using the
