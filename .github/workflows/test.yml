@@ -246,7 +246,7 @@ jobs:
   integration-tests:
     name: Integration tests
     runs-on: warp-ubuntu-latest-x64-8x
-    needs: [build-node-builder, build-note-transport]
+    needs: [build-node-builder, build-note-transport, build-remote-prover]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -280,6 +280,15 @@ jobs:
           path: target/release
       - name: Restore note-transport permissions
         run: chmod +x target/release/miden-note-transport-node-bin
+      - name: Fetch remote-prover binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: remote-prover-artifact
+          path: target/release
+      - name: Restore remote-prover permissions
+        run: chmod +x target/release/testing-remote-prover
+      - name: Start remote prover
+        run: ./scripts/start-ci-service.sh testing-remote-prover 50051 target/release/testing-remote-prover
       - name: Start test node
         run: ./scripts/start-ci-service.sh testing-node-builder 57291 target/release/testing-node-builder
       - name: Start note transport
@@ -292,3 +301,6 @@ jobs:
       - name: Stop note transport
         if: always()
         run: make stop-note-transport
+      - name: Stop remote prover
+        if: always()
+        run: make stop-prover

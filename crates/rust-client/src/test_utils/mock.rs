@@ -10,7 +10,7 @@ use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::{Forest, Mmr, MmrProof};
-use miden_protocol::note::{NoteHeader, NoteId, NoteScript, NoteTag};
+use miden_protocol::note::{NoteAttachments, NoteHeader, NoteId, NoteScript, NoteTag};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
@@ -55,6 +55,10 @@ pub struct MockRpcApi {
     oversize_threshold: usize,
     /// Note headers to report as erased in sync transaction responses.
     erased_notes: Arc<RwLock<Vec<NoteHeader>>>,
+    /// Attachment content for private notes, keyed by note ID. The [`MockChain`] stores private
+    /// notes without their attachment content (only metadata), so tests that need
+    /// `get_notes_by_id` to return private-note attachments register them here.
+    private_note_attachments: Arc<RwLock<BTreeMap<NoteId, NoteAttachments>>>,
 }
 
 impl Default for MockRpcApi {
@@ -74,7 +78,14 @@ impl MockRpcApi {
             mock_chain: Arc::new(RwLock::new(mock_chain)),
             oversize_threshold: 1000,
             erased_notes: Arc::new(RwLock::new(Vec::new())),
+            private_note_attachments: Arc::new(RwLock::new(BTreeMap::new())),
         }
+    }
+
+    /// Registers the attachment content for a private note so that subsequent `get_notes_by_id`
+    /// responses include it, mirroring a node that stores private-note attachments on-chain.
+    pub fn register_private_note_attachments(&self, note_id: NoteId, attachments: NoteAttachments) {
+        self.private_note_attachments.write().insert(note_id, attachments);
     }
 
     /// Sets the oversize threshold for `get_account`. Any storage map with more entries than
@@ -409,7 +420,18 @@ impl NodeRpcClient for MockRpcApi {
         for note in hit_notes {
             let fetched_note = match note {
                 MockChainNote::Private(note_id, note_metadata, note_inclusion_proof) => {
-                    FetchedNote::Private(*note_id, *note_metadata, note_inclusion_proof.clone())
+                    let attachments = self
+                        .private_note_attachments
+                        .read()
+                        .get(note_id)
+                        .cloned()
+                        .unwrap_or_else(NoteAttachments::empty);
+                    FetchedNote::Private(
+                        *note_id,
+                        *note_metadata,
+                        attachments,
+                        note_inclusion_proof.clone(),
+                    )
                 },
                 MockChainNote::Public(note, note_inclusion_proof) => {
                     FetchedNote::Public(note.clone(), note_inclusion_proof.clone())
@@ -687,7 +709,7 @@ impl NodeRpcClient for MockRpcApi {
         Ok(RpcStatusInfo {
             version: env!("CARGO_PKG_VERSION").into(),
             genesis_commitment: None,
-            store: None,
+            chain_tip: 0,
             block_producer: None,
         })
     }

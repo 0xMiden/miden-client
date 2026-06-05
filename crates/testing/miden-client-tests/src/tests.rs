@@ -18,7 +18,7 @@ use miden_client::auth::{
 };
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
-use miden_client::note::BlockNumber;
+use miden_client::note::{BlockNumber, NetworkAccountTarget, NoteExecutionHint};
 use miden_client::rpc::NodeRpcClient;
 use miden_client::store::input_note_states::ConsumedAuthenticatedLocalNoteState;
 use miden_client::store::{
@@ -89,6 +89,7 @@ use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
 use miden_protocol::note::{
     Note,
     NoteAssets,
+    NoteAttachments,
     NoteFile,
     NoteRecipient,
     NoteStorage,
@@ -119,7 +120,13 @@ use miden_standards::account::policies::{
     TokenPolicyManager,
 };
 use miden_standards::account::wallets::BasicWallet;
-use miden_standards::note::{NoteConsumptionStatus, P2idNoteStorage, PswapNote, StandardNote};
+use miden_standards::note::{
+    NoteConsumptionStatus,
+    P2idNote,
+    P2idNoteStorage,
+    PswapNote,
+    StandardNote,
+};
 use miden_standards::testing::mock_account::MockAccountExt;
 use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
@@ -3485,6 +3492,135 @@ async fn sync_storage_maps_pagination_from_middle() {
 
     assert_eq!(result.chain_tip, chain_tip);
     assert_eq!(result.block_number, chain_tip);
+}
+
+// PRIVATE NOTE ATTACHMENT SYNC TESTS
+// ================================================================================================
+
+/// A private note carries its [`NoteAttachments`] on-chain: they feed the metadata commitment and
+/// thus the note ID. This test verifies that when such a note commits during a regular state sync,
+/// the client fetches the attachments via `GetNotesById` and stores them on the resulting
+/// [`InputNoteRecord`], so the note can be reconstructed with the same ID it has on-chain (and is
+/// therefore consumable).
+#[tokio::test]
+async fn sync_stores_private_note_attachments() {
+    // 1. Build a mock chain with a sender and a public target account (the attachment target must
+    //    be public).
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let sender = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+    let target = mock_chain_builder.add_existing_wallet(miden_testing::Auth::IncrNonce).unwrap();
+
+    // 2. Build a PRIVATE P2ID note carrying a NetworkAccountTarget attachment.
+    let ntx_target = NetworkAccountTarget::new(target.id(), NoteExecutionHint::Always).unwrap();
+    let attachments = NoteAttachments::new(vec![ntx_target.into()]).unwrap();
+    let mut note_rng = RandomCoin::new([1, 2, 3, 4].map(Felt::new_unchecked).into());
+    let private_note = P2idNote::create(
+        sender.id(),
+        target.id(),
+        vec![],
+        NoteType::Private,
+        attachments.clone(),
+        &mut note_rng,
+    )
+    .unwrap();
+
+    // Declare the note as a spawn note (not yet committed) and build the chain at genesis.
+    let spawn_note =
+        mock_chain_builder.add_spawn_note(std::slice::from_ref(&private_note)).unwrap();
+    let mut mock_chain = mock_chain_builder.build().unwrap();
+
+    // 3. Commit the private note at block 1, then advance a few blocks.
+    let tx = Box::pin(
+        mock_chain
+            .build_tx_context(TxContextInput::AccountId(sender.id()), &[], &[spawn_note])
+            .unwrap()
+            .extend_expected_output_notes(vec![RawOutputNote::Full(private_note.clone())])
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    mock_chain.add_pending_executed_transaction(&tx).unwrap();
+    mock_chain.prove_next_block().unwrap();
+    for _ in 0..3 {
+        mock_chain.prove_next_block().unwrap();
+    }
+
+    // 4. Build a client backed by this chain. A fixed node returns private-note attachments via
+    //    `get_notes_by_id`, but the MockChain stores private notes without their attachment
+    //    content, so register them on the mock RPC explicitly.
+    let rpc_api = Arc::new(MockRpcApi::new(mock_chain));
+    rpc_api.register_private_note_attachments(private_note.id(), attachments.clone());
+
+    let rng =
+        RandomCoin::new(rand::random::<[u64; 4]>().map(|v| Felt::new_unchecked(v >> 1)).into());
+    let keystore = FilesystemKeyStore::new(std::env::temp_dir()).unwrap();
+    let mut client = ClientBuilder::new()
+        .rpc(rpc_api)
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_discard_delta(None)
+        .build()
+        .await
+        .unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+
+    // 5. Track the note as an expected input note (no metadata, empty attachments) and register its
+    //    tag so the chain sync sees the note's block. The client has not synced past block 1, so
+    //    the import leaves the note in the Expected state rather than committing it.
+    let note_tag = private_note.metadata().tag();
+    client.add_note_tag(note_tag).await.unwrap();
+    client
+        .import_notes(&[NoteFile::NoteDetails {
+            details: private_note.clone().into(),
+            after_block_num: BlockNumber::from(0u32),
+            tag: Some(note_tag),
+        }])
+        .await
+        .unwrap();
+
+    let expected = client
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![private_note.details_commitment()]))
+        .await
+        .unwrap()
+        .pop()
+        .unwrap();
+    assert!(
+        expected.attachments().is_empty(),
+        "imported expected note should start with empty attachments"
+    );
+
+    // 6. Sync: the note commits via the regular note-state sync path, which fetches the attachments
+    //    and stores them on the record.
+    client.sync_state().await.unwrap();
+
+    // 7. The committed record should carry the original attachments and reconstruct to the same
+    //    note ID as the on-chain note.
+    let committed = client
+        .get_input_notes(NoteFilter::Committed)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|n| n.id() == Some(private_note.id()))
+        .expect("private note should be committed after sync");
+
+    assert_eq!(
+        committed.attachments(),
+        &attachments,
+        "sync should store the private note's attachments on the record"
+    );
+
+    let reconstructed: Note = (&committed).try_into().unwrap();
+    assert_eq!(
+        reconstructed.id(),
+        private_note.id(),
+        "reconstructed note must match the on-chain note ID (attachments feed the ID)"
+    );
 }
 
 // LARGE PUBLIC ACCOUNT SYNC TESTS
