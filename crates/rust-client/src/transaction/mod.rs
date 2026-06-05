@@ -162,6 +162,7 @@ pub use miden_protocol::transaction::{
     TransactionInputs,
     TransactionKernel,
     TransactionScript,
+    TransactionScriptRoot,
     TransactionSummary,
 };
 pub use miden_protocol::vm::{AdviceInputs, AdviceMap};
