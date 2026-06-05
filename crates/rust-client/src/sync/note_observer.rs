@@ -17,16 +17,16 @@ pub trait NoteObserver {
     /// Identifier surfaced on `tracing::warn!` events for this observer.
     fn name(&self) -> &'static str;
 
-    /// Per-note hook. Runs before the screener verdict.
+    /// Per-note hook. Runs before the screener verdict. `attachments` is the note's resolved
+    /// attachment content for this sync window (`None` if absent).
     ///
-    /// `attachments` carries the note's resolved attachment content for this sync window
-    /// (`Some` when the note has attachments — public note bodies and private-note attachment
-    /// side-tables both arrive inline on sync), or `None` when the note has no attachments.
+    /// Returns `true` to mark the enclosing block as relevant even if the screener discards it,
+    /// so sync persists its header.
     async fn observe(
         &self,
         committed_note: &CommittedNote,
         attachments: Option<&NoteAttachments>,
-    ) -> Result<(), ClientError>;
+    ) -> Result<bool, ClientError>;
 
     /// Post-sync hook, invoked once after the sync window closes.
     /// Default impl is a no-op for observers that only need `observe()`.

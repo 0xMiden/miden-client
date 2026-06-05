@@ -8,7 +8,8 @@ use std::vec::Vec;
 
 #[cfg(test)]
 use miden_client::account::AccountId;
-use miden_client::note::{BlockNumber, Note, NoteId, PswapNote};
+use miden_client::block::BlockHeader;
+use miden_client::note::{BlockNumber, Note, NoteDetails, NoteId, NoteInclusionProof, PswapNote};
 use miden_client::pswap::lineage::build_record_from_columns;
 use miden_client::pswap::{
     PswapLineageFilter,
@@ -16,7 +17,8 @@ use miden_client::pswap::{
     PswapLineageRoundUpdate,
     PswapLineageState,
 };
-use miden_client::store::StoreError;
+use miden_client::store::input_note_states::{CommittedNoteState, UnverifiedNoteState};
+use miden_client::store::{InputNoteRecord, StoreError};
 use miden_client::sync::{NoteTagRecord, NoteTagSource};
 use miden_client::utils::{Deserializable, DeserializationError, Serializable};
 use miden_protocol::Felt;
@@ -97,19 +99,16 @@ impl SqliteStore {
         // 1. Mutate the lineage row.
         update_lineage_tip_tx(&tx, update)?;
 
-        // 2. Insert payback + remainder into `input_notes`. See `insert_pswap_round_note_tx` for
-        //    the skip-if-present rationale. The remainder insert ensures round-N+1 detection works
-        //    for private PSWAPs (screener can't see private content). Each note is observed
-        //    together with its inclusion proof in the same sync window, so they arrive paired.
+        // 2. Insert payback + remainder into `input_notes`.
+        let at_block_header = update.at_block_header.as_ref();
         if let Some((payback_note, inclusion_proof)) = &update.payback {
-            insert_pswap_round_note_tx(&tx, payback_note, inclusion_proof)?;
+            insert_pswap_round_note_tx(&tx, payback_note, inclusion_proof, at_block_header)?;
         }
         if let Some((remainder_note, inclusion_proof)) = &update.remainder {
-            insert_pswap_round_note_tx(&tx, remainder_note, inclusion_proof)?;
+            insert_pswap_round_note_tx(&tx, remainder_note, inclusion_proof, at_block_header)?;
         }
 
-        // 3. Drop the asset-pair tag on terminal states (same tx — crash between row update and tag
-        //    delete would leave a terminal lineage paying sync bandwidth).
+        // 3. Drop the asset-pair tag on terminal states.
         if matches!(update.state, PswapLineageState::FullyFilled | PswapLineageState::Reclaimed) {
             remove_pswap_asset_pair_tag_tx(&tx, update.order_id)?;
         }
@@ -362,23 +361,14 @@ WHERE order_id = ?";
     Ok(())
 }
 
-/// Inserts a reconstructed payback or remainder into `input_notes`. Skips
-/// if a row for the same `note_id` already exists — for public notes the
-/// screener has already inserted a `Committed` row that's richer than
-/// ours; for private notes this is the only insertion site.
-///
-/// The inclusion proof is always available: a reconstructed note and its
-/// proof are observed together in the same sync window. The note lands as
-/// `Unverified`, which sync's state-promotion path turns into `Committed`
-/// on the next run.
+/// Inserts a reconstructed payback or remainder into `input_notes`. Skips if a row already
+/// exists. With `at_block_header` the note lands as `Committed`, otherwise as `Unverified`.
 fn insert_pswap_round_note_tx(
     tx: &Transaction<'_>,
     note: &Note,
-    inclusion_proof: &miden_client::note::NoteInclusionProof,
+    inclusion_proof: &NoteInclusionProof,
+    at_block_header: Option<&BlockHeader>,
 ) -> Result<(), StoreError> {
-    use miden_client::store::InputNoteRecord;
-    use miden_client::store::input_note_states::UnverifiedNoteState;
-
     const EXISTS_SQL: &str = "SELECT 1 FROM input_notes WHERE note_id = ?";
 
     let note_id_text = note.id().as_word().to_string();
@@ -392,19 +382,24 @@ fn insert_pswap_round_note_tx(
     }
 
     let metadata = *note.metadata();
-    let details = miden_client::note::NoteDetails::from(note.clone());
+    let details = NoteDetails::from(note.clone());
     let attachments = note.attachments().clone();
 
-    let record = InputNoteRecord::new(
-        details,
-        attachments,
-        None,
-        UnverifiedNoteState {
+    let state = match at_block_header {
+        Some(header) => CommittedNoteState {
+            inclusion_proof: inclusion_proof.clone(),
+            metadata,
+            block_note_root: header.note_root(),
+        }
+        .into(),
+        None => UnverifiedNoteState {
             metadata,
             inclusion_proof: inclusion_proof.clone(),
         }
         .into(),
-    );
+    };
+
+    let record = InputNoteRecord::new(details, attachments, None, state);
     upsert_input_note_tx(tx, &record)
 }
 
@@ -542,6 +537,7 @@ mod tests {
             state: PswapLineageState::Active,
             tip_note_id: Some(record.current_tip_note_id),
             at_block: BlockNumber::from(8),
+            at_block_header: None,
             payback: None,
             remainder: None,
         };
@@ -582,6 +578,7 @@ mod tests {
             state: PswapLineageState::Active,
             tip_note_id: None,
             at_block: BlockNumber::from(8),
+            at_block_header: None,
             payback: None,
             remainder: None,
         };

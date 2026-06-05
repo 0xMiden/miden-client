@@ -2970,27 +2970,10 @@ async fn create_pswap_test_client(
     (client, keystore)
 }
 
-/// Two-client mock-chain test: Alice (creator) and Bob (filler) on a shared
-/// `MockChain`. Exercises the production wiring end-to-end at the client API
-/// level: the `PswapTransactionObserver` creation hook installs the lineage
-/// row, Bob's partial fill is picked up by Alice via her asset-pair tag
-/// subscription, the post-sync `discover_pswap_rounds` correlator advances
-/// the lineage to depth 1, and `build_pswap_cancel_by_order` reclaims the
-/// remainder Alice never minted. Multi-round and reconstruction-edge-case
-/// coverage lives at the unit + store tier (`pswap::discovery::tests`,
-/// `sqlite-store::pswap::tests::private_pswap_e2e`).
-///
-/// Runs as two `#[rstest]` cases:
-/// * `public_pswap` — PSWAP and payback are both [`NoteType::Public`]; full bodies arrive via sync,
-///   the payback lands `Committed` in Alice's `input_notes`, and she consumes it.
-/// * `private_pswap` — PSWAP and payback are both [`NoteType::Private`]; the mock RPC carries
-///   attachments only when explicitly registered, so the case pre-derives Bob's payback + remainder
-///   via [`PswapNote::payback_note`] / [`PswapNote::remainder_note`] and registers their
-///   attachments before the post-fill syncs. A real node returns those attachments automatically —
-///   registration is mock-only. The payback-consume tail (`get_consumable_notes` → `consume_notes`)
-///   is skipped for the private case: `apply_pswap_round` inserts the reconstructed payback into
-///   `input_notes` as `Unverified`, and the path that promotes an `Unverified` private note to
-///   consumable is a consumer-side concern outside the chain-tracking surface this test covers.
+/// Two-client mock-chain test: Alice creates a PSWAP, Bob partial-fills, Alice reclaims the
+/// remainder and consumes the payback. Runs as `#[rstest]` cases for `NoteType::Public` and
+/// `NoteType::Private`; for the private case the test pre-registers Bob's payback + remainder
+/// attachments on the mock RPC (a real node returns them automatically).
 #[rstest]
 #[case::public_pswap(NoteType::Public)]
 #[case::private_pswap(NoteType::Private)]
@@ -3050,10 +3033,8 @@ async fn pswap_chain_tracking_test(#[case] note_type: NoteType) {
     mock_rpc_api.prove_block();
     alice_client.sync_state().await.unwrap();
 
-    // Public-only: Bob discovers the order through the asset-pair tag (in
-    // production a filler finds public orders this way; private orders are
-    // exchanged off-chain). For private the test hands `pswap_note` to Bob
-    // directly below, so the tag-discovery sync is meaningful only here.
+    // Public-only: Bob discovers the order via the asset-pair tag. Private orders are
+    // exchanged off-chain (the test hands `pswap_note` to Bob directly).
     if note_type == NoteType::Public {
         let pswap_tag = PswapNote::create_tag(note_type, &offered_asset, &requested_asset);
         bob_client.add_note_tag(pswap_tag).await.unwrap();
@@ -3071,9 +3052,8 @@ async fn pswap_chain_tracking_test(#[case] note_type: NoteType) {
     assert_eq!(lineage.remaining_offered.amount().as_u64(), offered_amount);
     assert_eq!(lineage.remaining_requested.amount().as_u64(), requested_amount);
 
-    // Private-only: pre-compute the deterministic payback + remainder so we can
-    // register their private attachments on the mock BEFORE the post-fill syncs.
-    // `build_pswap_consume` produces byte-identical notes (same IDs).
+    // Private-only: pre-register payback + remainder attachments on the mock (a real node
+    // returns them via RPC).
     if note_type == NoteType::Private {
         let fill_amount = AssetAmount::new(25).unwrap();
         let payout_amount = AssetAmount::new(50).unwrap();
@@ -3128,35 +3108,27 @@ async fn pswap_chain_tracking_test(#[case] note_type: NoteType) {
         "reclaiming the depth-1 tip should terminate the lineage"
     );
 
-    // Public-only: Alice consumes the ETH payback she received from Bob's fill.
-    // For private notes the apply_pswap_round-inserted payback lands as
-    // `Unverified`; promoting an Unverified private record to consumable is a
-    // consumer-side concern outside this test's scope (see test docstring).
-    if note_type == NoteType::Public {
-        let consumable = alice_client.get_consumable_notes(Some(alice_wallet.id())).await.unwrap();
-        let payback_notes: Vec<Note> =
-            consumable.iter().map(|(record, _)| record.try_into().unwrap()).collect();
-        assert_eq!(payback_notes.len(), 1, "Alice should hold one ETH payback note");
-        consume_notes(&mut alice_client, alice_wallet.id(), &payback_notes).await;
-        mock_rpc_api.prove_block();
-        alice_client.sync_state().await.unwrap();
+    // Alice consumes the ETH payback Bob's fill produced.
+    let consumable = alice_client.get_consumable_notes(Some(alice_wallet.id())).await.unwrap();
+    let payback_notes: Vec<Note> =
+        consumable.iter().map(|(record, _)| record.try_into().unwrap()).collect();
+    assert_eq!(payback_notes.len(), 1, "Alice should hold one ETH payback note");
+    consume_notes(&mut alice_client, alice_wallet.id(), &payback_notes).await;
+    mock_rpc_api.prove_block();
+    alice_client.sync_state().await.unwrap();
 
-        let alice_account = alice_client.get_account(alice_wallet.id()).await.unwrap().unwrap();
-        assert_eq!(
-            alice_account
-                .vault()
-                .get_balance(AssetVaultKey::new_fungible(
-                    eth_faucet.id(),
-                    AssetCallbackFlag::Disabled,
-                ))
-                .unwrap()
-                .as_u64(),
-            25,
-            "Alice should have received 25 ETH from the fill"
-        );
-    }
+    let alice_account = alice_client.get_account(alice_wallet.id()).await.unwrap().unwrap();
+    assert_eq!(
+        alice_account
+            .vault()
+            .get_balance(AssetVaultKey::new_fungible(eth_faucet.id(), AssetCallbackFlag::Disabled))
+            .unwrap()
+            .as_u64(),
+        25,
+        "Alice should have received 25 ETH from the fill"
+    );
 
-    // Both cases: BTC reflects 100 locked − 50 paid out to Bob + 50 reclaimed = MINT − 50.
+    // BTC: 100 locked − 50 to Bob + 50 reclaimed = MINT − 50.
     let alice_account = alice_client.get_account(alice_wallet.id()).await.unwrap().unwrap();
     assert_eq!(
         alice_account

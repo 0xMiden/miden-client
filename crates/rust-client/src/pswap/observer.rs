@@ -72,14 +72,14 @@ impl NoteObserver for PswapChainObserver {
         &self,
         committed_note: &CommittedNote,
         attachments: Option<&NoteAttachments>,
-    ) -> Result<(), ClientError> {
+    ) -> Result<bool, ClientError> {
         // Notes without a PSWAP attachment are the common case; `extract_pswap_attachment`
         // fast-rejects them. Foreign-order filtering happens later in `discovery`.
         let Some(attachments) = attachments else {
-            return Ok(());
+            return Ok(false);
         };
         let Some(attachment) = extract_pswap_attachment(attachments) else {
-            return Ok(());
+            return Ok(false);
         };
 
         let inclusion_proof = committed_note.inclusion_proof().clone();
@@ -91,7 +91,7 @@ impl NoteObserver for PswapChainObserver {
             block_num: inclusion_proof.location().block_num(),
             inclusion_proof,
         });
-        Ok(())
+        Ok(true)
     }
 
     /// Drains the collector, runs the correlator, applies round updates.

@@ -10,7 +10,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::asset::FungibleAsset;
-use miden_protocol::block::BlockNumber;
+use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::NoteId;
 use tracing::error;
 
@@ -72,6 +72,11 @@ pub async fn discover_pswap_rounds(
 
     // All rounds discovered this sync share the sync's terminal block.
     let sync_block = state_sync_update.block_num;
+    let block_headers: BTreeMap<BlockNumber, BlockHeader> = state_sync_update
+        .partial_blockchain_updates
+        .block_headers()
+        .map(|(header, _)| (header.block_num(), header.clone()))
+        .collect();
     let mut round_updates: Vec<PswapLineageRoundUpdate> = Vec::new();
 
     for lineage_record in active_lineages {
@@ -96,7 +101,13 @@ pub async fn discover_pswap_rounds(
                 break;
             }
 
-            let update = match build_round_update(&lineage, round_depth, sync_block, notes) {
+            let update = match build_round_update(
+                &lineage,
+                round_depth,
+                sync_block,
+                notes,
+                &block_headers,
+            ) {
                 Ok(u) => u,
                 Err(err) => {
                     error!(
@@ -139,11 +150,12 @@ fn build_round_update(
     round_depth: u32,
     block_number: BlockNumber,
     notes: &[&PswapChainNoteUpdate],
+    block_headers: &BTreeMap<BlockNumber, BlockHeader>,
 ) -> Result<PswapLineageRoundUpdate, PswapLineageError> {
     match notes.len() {
         0 => Ok(build_reclaim_round(lineage, round_depth, block_number)),
-        1 => build_full_fill_round(lineage, round_depth, block_number, notes[0]),
-        2 => build_partial_fill_round(lineage, round_depth, block_number, notes),
+        1 => build_full_fill_round(lineage, round_depth, block_number, notes[0], block_headers),
+        2 => build_partial_fill_round(lineage, round_depth, block_number, notes, block_headers),
         _ => unreachable!("PSWAP emits ≤ 2 notes per (order_id, depth)"),
     }
 }
@@ -177,6 +189,7 @@ fn build_reclaim_round(
         state: PswapLineageState::Reclaimed,
         tip_note_id: None,
         at_block: block_number,
+        at_block_header: None,
         payback: None,
         remainder: None,
     }
@@ -188,6 +201,7 @@ fn build_full_fill_round(
     round_depth: u32,
     block_number: BlockNumber,
     payback_note_update: &PswapChainNoteUpdate,
+    block_headers: &BTreeMap<BlockNumber, BlockHeader>,
 ) -> Result<PswapLineageRoundUpdate, PswapLineageError> {
     let pswap = &lineage.original_pswap;
     let requested_faucet = pswap.storage().requested_asset().faucet_id();
@@ -209,6 +223,7 @@ fn build_full_fill_round(
         state: PswapLineageState::FullyFilled,
         tip_note_id: None,
         at_block: block_number,
+        at_block_header: block_headers.get(&payback_note_update.block_num).cloned(),
         payback: Some((payback, payback_note_update.inclusion_proof.clone())),
         remainder: None,
     })
@@ -220,6 +235,7 @@ fn build_partial_fill_round(
     round_depth: u32,
     block_number: BlockNumber,
     notes: &[&PswapChainNoteUpdate],
+    block_headers: &BTreeMap<BlockNumber, BlockHeader>,
 ) -> Result<PswapLineageRoundUpdate, PswapLineageError> {
     let pswap = &lineage.original_pswap;
     let offered_faucet = pswap.offered_asset().faucet_id();
@@ -272,6 +288,7 @@ fn build_partial_fill_round(
         state: PswapLineageState::Active,
         tip_note_id: Some(remainder_note_update.note_id),
         at_block: block_number,
+        at_block_header: block_headers.get(&payback_note_update.block_num).cloned(),
         payback: Some((payback_note, payback_note_update.inclusion_proof.clone())),
         remainder: Some((remainder_note, remainder_note_update.inclusion_proof.clone())),
     })
@@ -320,6 +337,11 @@ mod tests {
             SparseMerklePath::from_parts(0, Vec::new()).expect("empty SparseMerklePath is valid");
         NoteInclusionProof::new(BlockNumber::from(block), 0, path)
             .expect("zero index is well below the per-block notes ceiling")
+    }
+
+    /// Empty header map — these tests don't assert on inserted-note state.
+    fn no_block_headers() -> BTreeMap<BlockNumber, BlockHeader> {
+        BTreeMap::new()
     }
 
     /// Active lineage at depth 0 built from a fresh test PSWAP.
@@ -398,9 +420,14 @@ mod tests {
         let cand_payback = chain_update_from(&payback, payback_att, consumer, 7);
         let cand_remainder = chain_update_from(&remainder, remainder_att, consumer, 7);
 
-        let update =
-            build_round_update(&record, 1, BlockNumber::from(7), &[&cand_payback, &cand_remainder])
-                .expect("partial fill must produce a round update");
+        let update = build_round_update(
+            &record,
+            1,
+            BlockNumber::from(7),
+            &[&cand_payback, &cand_remainder],
+            &no_block_headers(),
+        )
+        .expect("partial fill must produce a round update");
 
         assert_eq!(update.round_depth, 1);
         assert_eq!(update.consumer_account_id, consumer);
@@ -456,9 +483,14 @@ mod tests {
         let cand_remainder = chain_update_from(&remainder, remainder_att, consumer, 7);
 
         // Reverse the input order — remainder first.
-        let update =
-            build_round_update(&record, 1, BlockNumber::from(7), &[&cand_remainder, &cand_payback])
-                .expect("partial fill must classify regardless of input order");
+        let update = build_round_update(
+            &record,
+            1,
+            BlockNumber::from(7),
+            &[&cand_remainder, &cand_payback],
+            &no_block_headers(),
+        )
+        .expect("partial fill must classify regardless of input order");
 
         assert_eq!(update.fill_amount.amount(), AssetAmount::new(fill_amount).unwrap());
         assert_eq!(update.payout_amount.amount(), AssetAmount::new(payout_amount).unwrap());
@@ -491,7 +523,8 @@ mod tests {
         let dummy_note = Note::from(pswap);
         let cand = chain_update_from(&dummy_note, bad_attachment, consumer, 5);
 
-        let result = build_round_update(&record, 1, BlockNumber::from(5), &[&cand]);
+        let result =
+            build_round_update(&record, 1, BlockNumber::from(5), &[&cand], &no_block_headers());
         assert!(result.is_err(), "depth-0 attachment must fail reconstruction");
     }
 
@@ -518,8 +551,9 @@ mod tests {
         let payback = pswap.payback_note(consumer, &payback_att).unwrap();
         let cand = chain_update_from(&payback, payback_att, consumer, 9);
 
-        let update = build_round_update(&record, 1, BlockNumber::from(9), &[&cand])
-            .expect("full fill must produce a round update");
+        let update =
+            build_round_update(&record, 1, BlockNumber::from(9), &[&cand], &no_block_headers())
+                .expect("full fill must produce a round update");
 
         assert_eq!(update.state, PswapLineageState::FullyFilled);
         assert_eq!(update.fill_amount.amount(), AssetAmount::new(fill_amount).unwrap());
@@ -547,7 +581,7 @@ mod tests {
         let pswap = build_test_pswap(consumer, creator, offered_faucet, 80, requested_faucet, 40);
         let record = initial_record(pswap, 80, 40);
 
-        let update = build_round_update(&record, 1, BlockNumber::from(5), &[])
+        let update = build_round_update(&record, 1, BlockNumber::from(5), &[], &no_block_headers())
             .expect("zero-output consumption must produce a round update");
 
         assert_eq!(update.state, PswapLineageState::Reclaimed);
@@ -604,6 +638,7 @@ mod tests {
             1,
             BlockNumber::from(11),
             &[&payback_cand, &remainder_cand],
+            &no_block_headers(),
         )
         .unwrap();
 
@@ -622,7 +657,14 @@ mod tests {
         let payback2 = pswap.payback_note(consumer, &payback_att2).unwrap();
         let cand_p2 = chain_update_from(&payback2, payback_att2, consumer, 11);
 
-        let update2 = build_round_update(&record1, 2, BlockNumber::from(11), &[&cand_p2]).unwrap();
+        let update2 = build_round_update(
+            &record1,
+            2,
+            BlockNumber::from(11),
+            &[&cand_p2],
+            &no_block_headers(),
+        )
+        .unwrap();
 
         assert_eq!(update2.round_depth, 2);
         assert_eq!(update2.state, PswapLineageState::FullyFilled);
