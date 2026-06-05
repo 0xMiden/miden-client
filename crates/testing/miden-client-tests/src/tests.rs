@@ -2975,21 +2975,16 @@ async fn create_pswap_test_client(
 /// `sqlite-store::pswap::tests::private_pswap_e2e`).
 ///
 /// Runs as two `#[rstest]` cases:
-/// * `public_pswap` — PSWAP and payback are both [`NoteType::Public`]; full
-///   bodies arrive via sync, the payback lands `Committed` in Alice's
-///   `input_notes`, and she consumes it.
-/// * `private_pswap` — PSWAP and payback are both [`NoteType::Private`]; the
-///   mock RPC carries attachments only when explicitly registered, so the
-///   case pre-derives Bob's payback + remainder via
-///   [`PswapNote::payback_note`] / [`PswapNote::remainder_note`] and
-///   registers their attachments before the post-fill syncs. A real node
-///   returns those attachments automatically — registration is mock-only.
-///   The payback-consume tail (`get_consumable_notes` → `consume_notes`) is
-///   skipped for the private case: `apply_pswap_round` inserts the
-///   reconstructed payback into `input_notes` as `Unverified`, and the
-///   path that promotes an `Unverified` private note to consumable is a
-///   consumer-side concern outside the chain-tracking surface this test
-///   covers.
+/// * `public_pswap` — PSWAP and payback are both [`NoteType::Public`]; full bodies arrive via sync,
+///   the payback lands `Committed` in Alice's `input_notes`, and she consumes it.
+/// * `private_pswap` — PSWAP and payback are both [`NoteType::Private`]; the mock RPC carries
+///   attachments only when explicitly registered, so the case pre-derives Bob's payback + remainder
+///   via [`PswapNote::payback_note`] / [`PswapNote::remainder_note`] and registers their
+///   attachments before the post-fill syncs. A real node returns those attachments automatically —
+///   registration is mock-only. The payback-consume tail (`get_consumable_notes` → `consume_notes`)
+///   is skipped for the private case: `apply_pswap_round` inserts the reconstructed payback into
+///   `input_notes` as `Unverified`, and the path that promotes an `Unverified` private note to
+///   consumable is a consumer-side concern outside the chain-tracking surface this test covers.
 #[rstest]
 #[case::public_pswap(NoteType::Public)]
 #[case::private_pswap(NoteType::Private)]
