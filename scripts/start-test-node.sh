@@ -41,6 +41,7 @@ PID_FILE="$CACHE/pids"
 RPC="127.0.0.1:57291"   # matches the client default (`MIDEN_NODE_PORT`)
 VALIDATOR="127.0.0.1:50101"
 NTX="127.0.0.1:50301"
+TX_PROVER="${MIDEN_TX_PROVER:-127.0.0.1:50051}"
 
 # Resolve the pinned node url + rev from Cargo.lock.
 # Example: source = "git+https://github.com/0xMiden/node.git?branch=<b>#<sha>"
@@ -109,7 +110,7 @@ start validator   "$BIN/miden-validator" start --listen "$VALIDATOR" --data-dire
 start sequencer   "$BIN/miden-node" sequencer --rpc.listen "$RPC" --data-directory "$DATA/node" \
     --validator.url "http://$VALIDATOR" --ntx-builder.url "http://$NTX"
 start ntx-builder "$BIN/miden-ntx-builder" start --listen "$NTX" --rpc.url "http://$RPC" \
-    --data-directory "$DATA/ntx-builder"
+    --tx-prover.url "http://$TX_PROVER" --data-directory "$DATA/ntx-builder"
 
 echo "==> waiting for RPC on $RPC"
 for _ in $(seq 1 60); do
