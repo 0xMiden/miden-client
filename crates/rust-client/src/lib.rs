@@ -207,6 +207,7 @@ pub mod auth {
         PublicKeyCommitment,
         Signature,
     };
+    pub use miden_standards::AuthMethod;
     pub use miden_standards::account::auth::{
         AuthMultisig,
         AuthMultisigConfig,
