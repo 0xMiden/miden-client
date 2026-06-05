@@ -88,17 +88,16 @@ test-docs: ## Run documentation tests
 # --- Integration testing -------------------------------------------------------------------------
 
 .PHONY: start-node
-start-node: ## Start the testing node server
-	RUST_LOG=info cargo run --release --package node-builder --locked
+start-node: ## Start the testing node (standalone node executables, runs in background)
+	./scripts/start-test-node.sh
 
 .PHONY: start-node-background
-start-node-background: ## Start the testing node server in background
-	./scripts/start-binary-bg.sh node-builder
+start-node-background: ## Start the testing node in background (alias for start-node)
+	./scripts/start-test-node.sh
 
 .PHONY: stop-node
-stop-node: ## Stop the testing node server
-	-pkill -f "node-builder"
-	sleep 1
+stop-node: ## Stop the testing node
+	./scripts/stop-test-node.sh
 
 .PHONY: start-note-transport-background
 start-note-transport-background: ## Start the note transport service in background
