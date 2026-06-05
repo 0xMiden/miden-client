@@ -140,8 +140,6 @@ pub async fn test_network_fpi(client_config: ClientConfig) -> Result<()> {
         .test_rpc_api()
         .get_account_details(target_network_account.id())
         .await?
-        .account()
-        .cloned()
         .with_context(|| "account details not available")?;
 
     assert_eq!(

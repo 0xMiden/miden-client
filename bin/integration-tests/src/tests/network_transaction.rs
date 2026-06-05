@@ -228,8 +228,6 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
             .test_rpc_api()
             .get_account_details(network_account.id())
             .await?
-            .account()
-            .cloned()
             .with_context(|| "account details not available")?;
 
         if a.storage().get_item(&COUNTER_SLOT_NAME)? == expected_counter {
@@ -243,8 +241,6 @@ pub async fn test_counter_contract_ntx(client_config: ClientConfig) -> Result<()
         .test_rpc_api()
         .get_account_details(network_account.id())
         .await?
-        .account()
-        .cloned()
         .with_context(|| "account details not available")?;
 
     assert_eq!(a.storage().get_item(&COUNTER_SLOT_NAME)?, expected_counter);
@@ -357,8 +353,6 @@ pub async fn test_note_reader_finds_note_consumed_by_ntx(
             .test_rpc_api()
             .get_account_details(network_account_id)
             .await?
-            .account()
-            .cloned()
             .with_context(|| "account details not available")?;
 
         if account_details.storage().get_item(&COUNTER_SLOT_NAME)? == expected_counter {
@@ -431,8 +425,6 @@ pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> R
             .test_rpc_api()
             .get_account_details(network_account_id)
             .await?
-            .account()
-            .cloned()
             .with_context(|| "account details not available")?;
 
         if account_details.storage().get_item(&COUNTER_SLOT_NAME)? == expected_counter {

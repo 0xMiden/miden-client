@@ -96,7 +96,7 @@ use miden_standards::account::wallets::BasicWallet;
 
 use super::Client;
 use crate::errors::ClientError;
-use crate::rpc::domain::account::{FetchedAccount, GetAccountRequest};
+use crate::rpc::domain::account::GetAccountRequest;
 use crate::rpc::node::{EndpointError, GetAccountError};
 use crate::store::{AccountStatus, AccountStorageFilter, ClientAccountType};
 use crate::sync::NoteTagRecord;
@@ -358,10 +358,7 @@ impl<AUTH> Client<AUTH> {
                 }
             })?;
 
-        match fetched_account {
-            FetchedAccount::Private(..) => Err(ClientError::AccountIsPrivate(account_id)),
-            FetchedAccount::Public(account, ..) => Ok(*account),
-        }
+        fetched_account.ok_or(ClientError::AccountIsPrivate(account_id))
     }
 
     /// Adds an [`Address`] to the associated [`AccountId`], alongside its derived [`NoteTag`]. If

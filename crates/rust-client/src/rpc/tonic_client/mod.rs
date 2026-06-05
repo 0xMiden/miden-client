@@ -26,7 +26,12 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{AccountProof, GetAccountRequest, VaultFetch};
+use super::domain::account::{
+    AccountProof,
+    AccountStorageRequirements,
+    GetAccountRequest,
+    StorageMapFetch,
+};
 use super::domain::note::{FetchedNote, NoteSyncBlock};
 use super::domain::nullifier::NullifierUpdate;
 use super::generated::rpc::AccountRequest;
@@ -41,11 +46,6 @@ use crate::rpc::domain::transaction::TransactionRecord;
 use crate::rpc::errors::node::parse_node_error;
 use crate::rpc::errors::{AcceptHeaderContext, AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::BlockRange;
-use crate::rpc::generated::rpc::account_request::account_detail_request::{
-    StorageMapDetailRequest,
-    StorageMapDetailRequests,
-    StorageRequest,
-};
 use crate::rpc::{AccountStateAt, generated as proto};
 
 mod api_client;
@@ -501,12 +501,10 @@ impl NodeRpcClient for GrpcClient {
             known_codes_by_commitment.insert(account_code.commitment(), account_code);
         }
 
-        let storage_maps: Vec<StorageMapDetailRequest> = storage.clone().into();
-
-        let asset_vault_commitment = match vault {
-            VaultFetch::Skip => None,
-            VaultFetch::Always => Some(EMPTY_WORD.into()),
-            VaultFetch::IfChangedFrom(commitment) => Some(commitment.into()),
+        // We need the requested slots to interpret the node response.
+        let requirements = match storage.clone() {
+            StorageMapFetch::Slots(reqs) => reqs,
+            StorageMapFetch::Skip | StorageMapFetch::All => AccountStorageRequirements::default(),
         };
 
         // Only request details for accounts with public state (Public or Network), passing the
@@ -514,10 +512,8 @@ impl NodeRpcClient for GrpcClient {
         let account_details = if account_id.is_public() {
             Some(AccountDetailRequest {
                 code_commitment: Some(known_code_commitment.into()),
-                asset_vault_commitment,
-                storage_request: Some(StorageRequest::StorageMaps(StorageMapDetailRequests {
-                    storage_maps,
-                })),
+                asset_vault_commitment: vault.into(),
+                storage_request: storage.into(),
             })
         } else {
             None
@@ -558,7 +554,7 @@ impl NodeRpcClient for GrpcClient {
             let details = response
                 .details
                 .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                .into_domain(&known_codes_by_commitment, &storage)?;
+                .into_domain(&known_codes_by_commitment, &requirements)?;
 
             Some(details)
         } else {

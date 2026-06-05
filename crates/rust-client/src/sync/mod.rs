@@ -77,13 +77,7 @@ mod tag;
 pub use tag::{NoteTagRecord, NoteTagSource};
 
 mod state_sync;
-pub use state_sync::{
-    AccountSyncHint,
-    NoteUpdateAction,
-    OnNoteReceived,
-    StateSync,
-    StateSyncInput,
-};
+pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
 
 mod state_sync_update;
 pub use state_sync_update::{
@@ -186,13 +180,13 @@ where
     /// This includes all tracked account headers, all unique note tags, all unspent input and
     /// output notes, and all uncommitted transactions.
     pub async fn build_sync_input(&self) -> Result<StateSyncInput, ClientError> {
-        let mut accounts = Vec::new();
-        // TODO 2178:
-        // Reduce amount of queries done to the database
-        for (header, _status) in self.store.get_account_headers().await? {
-            let storage_header = self.store.get_account_storage_header(header.id()).await?;
-            accounts.push(AccountSyncHint { header, storage_header });
-        }
+        let accounts = self
+            .store
+            .get_account_headers()
+            .await?
+            .into_iter()
+            .map(|(header, _status)| header)
+            .collect();
 
         let note_tags = self.store.get_unique_note_tags().await?;
 
