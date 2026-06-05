@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 use miden_protocol::Felt;
 use miden_protocol::account::AccountId;
 use miden_protocol::asset::FungibleAsset;
-use miden_protocol::block::BlockNumber;
+use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::{Note, NoteId, NoteInclusionProof, NoteTag, NoteType};
 use miden_standards::note::PswapNote;
 
@@ -125,6 +125,9 @@ pub struct PswapLineageRoundUpdate {
     /// New tip; `None` for terminal rounds.
     pub tip_note_id: Option<NoteId>,
     pub at_block: BlockNumber,
+    /// Header for the commit block, used by `apply_pswap_round` to insert payback/remainder as
+    /// `Committed`. `None` only in store-tier fixtures.
+    pub at_block_header: Option<BlockHeader>,
     /// Reconstructed payback and its inclusion proof. `None` only on
     /// reclaim. The note and proof are always observed together in the
     /// same sync window, so they live or die as a pair.

@@ -883,12 +883,16 @@ impl StateSync {
                     public_note.as_ref().map(InputNoteRecord::attachments)
                 };
                 for obs in &self.note_observers {
-                    if let Err(err) = obs.observe(&committed_note, note_attachments).await {
-                        tracing::warn!(
-                            observer = obs.name(),
-                            error = ?err,
-                            "note observer failed; sync continues",
-                        );
+                    match obs.observe(&committed_note, note_attachments).await {
+                        Ok(true) => found_relevant_note = true,
+                        Ok(false) => {},
+                        Err(err) => {
+                            tracing::warn!(
+                                observer = obs.name(),
+                                error = ?err,
+                                "note observer failed; sync continues",
+                            );
+                        },
                     }
                 }
             }
