@@ -34,7 +34,7 @@ use crate::rpc::domain::account::{
     GetAccountRequest,
     VaultFetch,
 };
-use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock, SyncedNote};
+use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock, SyncedNoteDetails};
 use crate::rpc::domain::sync::SyncTarget;
 use crate::rpc::domain::transaction::TransactionRecord as RpcTransactionRecord;
 use crate::rpc::{AccountStateAt, NodeRpcClient, RpcError};
@@ -58,7 +58,7 @@ struct FetchedSyncData {
     note_blocks: Vec<NoteSyncBlock>,
     /// Content fetched for the synced notes (public note bodies and private-note attachments),
     /// keyed by note ID.
-    synced_notes: BTreeMap<NoteId, SyncedNote>,
+    synced_notes: BTreeMap<NoteId, SyncedNoteDetails>,
     /// Transaction records for the synced range, as returned by `sync_transactions`.
     transactions: Vec<RpcTransactionRecord>,
 }
@@ -434,7 +434,7 @@ impl StateSync {
     async fn screen_note_blocks(
         &self,
         note_blocks: Vec<NoteSyncBlock>,
-        synced_notes: BTreeMap<NoteId, SyncedNote>,
+        synced_notes: BTreeMap<NoteId, SyncedNoteDetails>,
         state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<(), ClientError> {
@@ -443,7 +443,7 @@ impl StateSync {
         let private_attachments: BTreeMap<NoteId, NoteAttachments> = synced_notes
             .iter()
             .filter_map(|(id, synced)| match synced {
-                SyncedNote::Private(Some(attachments)) => Some((*id, attachments.clone())),
+                SyncedNoteDetails::Private(Some(attachments)) => Some((*id, attachments.clone())),
                 _ => None,
             })
             .collect();
@@ -926,12 +926,12 @@ impl StateSync {
     /// Pairs each public note body with the matching inclusion proof from `note_blocks`. Private
     /// notes and public notes without a matching inclusion proof are dropped.
     fn build_public_note_records(
-        synced_notes: BTreeMap<NoteId, SyncedNote>,
+        synced_notes: BTreeMap<NoteId, SyncedNoteDetails>,
         note_blocks: &[NoteSyncBlock],
     ) -> BTreeMap<NoteId, InputNoteRecord> {
         let mut records = BTreeMap::new();
         for (note_id, synced) in synced_notes {
-            let SyncedNote::Public(note) = synced else {
+            let SyncedNoteDetails::Public(note) = synced else {
                 continue;
             };
             let inclusion_proof = note_blocks

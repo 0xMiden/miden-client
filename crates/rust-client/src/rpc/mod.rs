@@ -57,7 +57,7 @@ use domain::account::{
     StorageMapEntry,
     VaultFetch,
 };
-use domain::note::{FetchedNote, NoteSyncBlock, SyncedNote};
+use domain::note::{FetchedNote, NoteSyncBlock, SyncedNoteDetails};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
@@ -313,7 +313,7 @@ pub trait NodeRpcClient: Send + Sync {
         block_from: BlockNumber,
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, SyncedNote>), RpcError> {
+    ) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, SyncedNoteDetails>), RpcError> {
         let blocks = self.sync_notes(block_from, block_to, note_tags).await?;
 
         let note_ids: Vec<NoteId> = blocks
@@ -323,7 +323,7 @@ pub trait NodeRpcClient: Send + Sync {
             .map(|n| *n.note_id())
             .collect();
 
-        let mut synced_notes: BTreeMap<NoteId, SyncedNote> = BTreeMap::new();
+        let mut synced_notes: BTreeMap<NoteId, SyncedNoteDetails> = BTreeMap::new();
 
         if !note_ids.is_empty() {
             let fetched = self.get_notes_by_id(&note_ids).await?;
@@ -331,11 +331,11 @@ pub trait NodeRpcClient: Send + Sync {
             for fetched_note in fetched {
                 match fetched_note {
                     FetchedNote::Public(note, _) => {
-                        synced_notes.insert(note.id(), SyncedNote::Public(note));
+                        synced_notes.insert(note.id(), SyncedNoteDetails::Public(note));
                     },
                     FetchedNote::Private(note_id, _, attachments, _) => {
                         let attachments = (!attachments.is_empty()).then_some(attachments);
-                        synced_notes.insert(note_id, SyncedNote::Private(attachments));
+                        synced_notes.insert(note_id, SyncedNoteDetails::Private(attachments));
                     },
                 }
             }

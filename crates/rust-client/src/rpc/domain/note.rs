@@ -213,7 +213,7 @@ pub struct NoteSyncBlock {
 /// [`NodeRpcClient::sync_notes_with_details`](crate::rpc::NodeRpcClient::sync_notes_with_details)
 /// as response from `GetNotesById`.
 #[allow(clippy::large_enum_variant)]
-pub enum SyncedNote {
+pub enum SyncedNoteDetails {
     /// A public note's full body.
     Public(Note),
     /// A private note's attachment content, if it carries any. Private notes expose no on-chain
