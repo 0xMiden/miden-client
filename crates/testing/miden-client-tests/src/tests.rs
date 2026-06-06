@@ -3102,6 +3102,18 @@ async fn pswap_chain_tracking_test(#[case] note_type: NoteType) {
         "reclaiming the depth-1 tip should terminate the lineage"
     );
 
+    // Terminal state must drop the asset-pair subscription.
+    let asset_pair_tag = PswapNote::create_tag(note_type, &offered_asset, &requested_asset);
+    assert!(
+        !alice_client
+            .get_note_tags()
+            .await
+            .unwrap()
+            .iter()
+            .any(|r| r.tag == asset_pair_tag),
+        "asset-pair tag should be unsubscribed after Reclaimed"
+    );
+
     // Alice consumes the ETH payback Bob's fill produced.
     let consumable = alice_client.get_consumable_notes(Some(alice_wallet.id())).await.unwrap();
     let payback_notes: Vec<Note> =
@@ -3132,6 +3144,105 @@ async fn pswap_chain_tracking_test(#[case] note_type: NoteType) {
             .as_u64(),
         MINT_AMOUNT - 50,
         "Alice's BTC should reflect 50 paid out and 50 reclaimed"
+    );
+}
+
+/// Two PSWAP orders for the same asset pair share one asset-pair tag (one `Subscription` row
+/// per order). Terminating one must not cancel the other's subscription; only when the LAST
+/// order on the pair terminates does the tag drop out of the client's tracked-tag set.
+#[tokio::test]
+async fn pswap_asset_pair_tag_isolated_per_order() {
+    let mock_rpc_api = MockRpcApi::new(Box::pin(create_prebuilt_mock_chain()).await);
+    let (mut alice_client, alice_keystore) = create_pswap_test_client(&mock_rpc_api).await;
+
+    let (alice_wallet, btc_faucet) = setup_wallet_and_faucet(
+        &mut alice_client,
+        AccountType::Private,
+        &alice_keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+    // Second faucet only — its `_throwaway_wallet` is unused; we just need the ETH faucet id.
+    let (_throwaway_wallet, eth_faucet) = setup_wallet_and_faucet(
+        &mut alice_client,
+        AccountType::Private,
+        &alice_keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    mint_and_consume(&mut alice_client, alice_wallet.id(), btc_faucet.id(), NoteType::Public).await;
+    mock_rpc_api.prove_block();
+    alice_client.sync_state().await.unwrap();
+
+    // Helper: build, submit, and sync one PSWAP. Returns the order id.
+    let mut create_order = async |offered: u64, requested: u64| -> Felt {
+        let data = PswapTransactionData::new(
+            alice_wallet.id(),
+            FungibleAsset::new(btc_faucet.id(), offered).unwrap(),
+            FungibleAsset::new(eth_faucet.id(), requested).unwrap(),
+        );
+        let request = TransactionRequestBuilder::new()
+            .build_pswap_create(&data, NoteType::Public, NoteType::Public, None, alice_client.rng())
+            .unwrap();
+        let note = request.expected_output_own_notes()[0].clone();
+        let order_id = PswapNote::try_from(&note).unwrap().order_id();
+        Box::pin(alice_client.submit_new_transaction(alice_wallet.id(), request))
+            .await
+            .unwrap();
+        mock_rpc_api.prove_block();
+        alice_client.sync_state().await.unwrap();
+        order_id
+    };
+
+    let order_id_a = create_order(40, 20).await;
+    let order_id_b = create_order(30, 15).await;
+
+    // Same (note_type, offered_faucet, requested_faucet) → same tag for both orders.
+    let asset_pair_tag = PswapNote::create_tag(
+        NoteType::Public,
+        &FungibleAsset::new(btc_faucet.id(), 40).unwrap(),
+        &FungibleAsset::new(eth_faucet.id(), 20).unwrap(),
+    );
+    let pair_subscriptions = async |client: &MockClient<FilesystemKeyStore>| -> usize {
+        client
+            .get_note_tags()
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|r| {
+                r.tag == asset_pair_tag && matches!(r.source, NoteTagSource::Subscription(_))
+            })
+            .count()
+    };
+    assert_eq!(pair_subscriptions(&alice_client).await, 2, "both orders subscribe the tag");
+
+    // Reclaim order A.
+    let cancel_a = alice_client.build_pswap_cancel_by_order(order_id_a).await.unwrap();
+    Box::pin(alice_client.submit_new_transaction(alice_wallet.id(), cancel_a))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    alice_client.sync_state().await.unwrap();
+    assert_eq!(
+        pair_subscriptions(&alice_client).await,
+        1,
+        "order B's subscription must survive order A's reclaim",
+    );
+
+    // Reclaim order B.
+    let cancel_b = alice_client.build_pswap_cancel_by_order(order_id_b).await.unwrap();
+    Box::pin(alice_client.submit_new_transaction(alice_wallet.id(), cancel_b))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    alice_client.sync_state().await.unwrap();
+    assert_eq!(
+        pair_subscriptions(&alice_client).await,
+        0,
+        "tag must be fully unsubscribed once the last order terminates",
     );
 }
 
