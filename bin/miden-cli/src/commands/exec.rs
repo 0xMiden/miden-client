@@ -133,10 +133,15 @@ impl ExecCmd {
 
             let script_path = PathBuf::from(&self.script_path);
             loop {
-                client.reset_source_manager();
+                // DAP restart can happen after the user edits the script. Refresh the cached
+                // source before compiling again so execution uses the current file contents.
+                client.reload_source_file(script_path.as_path()).map_err(|err| {
+                    CliError::Exec(
+                        err.into(),
+                        "error reloading the program source file".to_string(),
+                    )
+                })?;
 
-                // Compile from path so source URIs point at the real file on disk (see
-                // the comment in `execute()` above for why this matters for DAP clients).
                 let tx_script = client.code_builder().compile_tx_script(script_path.as_path())?;
 
                 let result = client

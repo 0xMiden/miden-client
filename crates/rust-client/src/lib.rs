@@ -304,6 +304,7 @@ pub mod vm {
 pub use async_trait::async_trait;
 pub use errors::*;
 use miden_protocol::assembly::SourceManagerSync;
+use miden_protocol::assembly::debuginfo::{SourceManagerExt, Uri};
 pub use miden_protocol::{
     EMPTY_WORD,
     Felt,
@@ -475,13 +476,47 @@ where
         self.source_manager.clone()
     }
 
-    /// Replaces the client's source manager with a fresh, empty one.
+    /// Reloads a source file from disk into the client's source manager.
     ///
-    /// Source managers cache files by URI, so loading a path that was loaded before returns
-    /// the original `SourceFile` even if the file on disk has changed. Call this between DAP
-    /// restart iterations to force the next `compile_tx_script(path)` to re-read from disk.
-    pub fn reset_source_manager(&mut self) {
-        self.source_manager = Arc::new(assembly::DefaultSourceManager::default());
+    /// Source managers cache files by URI, so compiling a path that has already been loaded may
+    /// reuse the cached [`SourceFile`](assembly::SourceFile). This updates an existing entry for
+    /// `path` in-place, or loads it if the source manager has not seen it yet.
+    pub fn reload_source_file(&self, path: impl AsRef<std::path::Path>) -> Result<(), ClientError> {
+        let path = path.as_ref();
+        let uri = Uri::from(path);
+
+        let Some(source_id) = self.source_manager.find(&uri) else {
+            self.source_manager.load_file(path).map_err(|source| {
+                ClientError::SourceFileReloadError {
+                    path: path.to_path_buf(),
+                    source: Box::new(source),
+                }
+            })?;
+            return Ok(());
+        };
+
+        let source =
+            std::fs::read_to_string(path).map_err(|source| ClientError::SourceFileReloadError {
+                path: path.to_path_buf(),
+                source: Box::new(source),
+            })?;
+        let version = self
+            .source_manager
+            .get(source_id)
+            .map_err(|source| ClientError::SourceFileReloadError {
+                path: path.to_path_buf(),
+                source: Box::new(source),
+            })?
+            .content()
+            .version()
+            .saturating_add(1);
+
+        self.source_manager.update(source_id, source, None, version).map_err(|source| {
+            ClientError::SourceFileReloadError {
+                path: path.to_path_buf(),
+                source: Box::new(source),
+            }
+        })
     }
 }
 

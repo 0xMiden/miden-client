@@ -7,30 +7,29 @@ sidebar_position: 7
 
 The Miden client supports interactive debugging via the [Debug Adapter Protocol (DAP)](https://microsoft.github.io/debug-adapter-protocol/). You can debug both raw Miden Assembly scripts and Rust programs compiled to Miden via `midenc`. This lets you step through execution, set breakpoints, and inspect stack/memory state using any DAP-compatible client (e.g. VS Code, the `miden-debug` TUI).
 
-## Feature Flags
+## Feature flags
 
 Two feature flags control debugging support:
 
 | Feature | Crate | What it enables |
-|---------|-------|-----------------|
-| `dap` | `miden-client`, `miden-client-cli` | Compiles in DAP support (`execute_program_with_dap`, `--start-debug-adapter` CLI flag). **Enabled by default.** |
-| `testing` | `miden-client-cli` | Enables the `--offline` flag on `new-wallet`/`new-account` commands for node-less account creation. Not available in production builds. |
+| ------- | ----- | --------------- |
+| `dap` | `miden-client`, `miden-client-cli` | Compiles in DAP support (`execute_program_with_dap`, `--start-debug-adapter` CLI flag). |
+| `testing` | `miden-client-cli` | Enables test-only CLI helpers such as offline account creation. Not available in production builds. |
 
 ### Building with features
 
 ```bash
-# Default build (DAP enabled)
+# Build the CLI with DAP support
+cargo build -p miden-client-cli --features dap
+
+# Build with DAP and test-only offline helpers
+cargo build -p miden-client-cli --features dap,testing
+
+# Build without DAP
 cargo build -p miden-client-cli
-
-# With offline mode for testing
-cargo build -p miden-client-cli --features testing
-
-# Without DAP (smaller binary)
-cargo build -p miden-client-cli --no-default-features
 ```
 
-If you build from source with default features disabled, include the `dap` feature to use
-`--start-debug-adapter`.
+Include the `dap` feature to use `--start-debug-adapter`.
 
 ## Quick Start
 
@@ -72,7 +71,8 @@ miden-client exec \
   --start-debug-adapter 127.0.0.1:4711
 ```
 
-The client will compile the script and wait for a DAP client to connect before executing.
+The client will compile the script, start a debug adapter server, and wait for a DAP client to
+connect before executing.
 
 ### 4. Connect a debugger
 
@@ -85,12 +85,15 @@ miden-debug --dap-connect 127.0.0.1:4711
 You can now step through execution, inspect the stack, and set breakpoints.
 
 
-## How it Works
+## How it works
 
 When `--start-debug-adapter` is passed:
 
-1. The client compiles the transaction script normally.
-2. Instead of using the default `FastProcessor`, it creates a `DapExecutor` (from the `miden-debug` crate) which implements the `ProgramExecutor` trait.
-3. The `DapExecutor` binds a TCP listener on the specified address and waits for a DAP client connection.
-4. Once connected, the DAP client controls execution (continue, step, breakpoints, inspect state).
-5. If the DAP client requests a restart, the client recompiles the script from disk and re-executes — enabling an edit-and-continue workflow.
+1. The client compiles the transaction script from its filesystem path so source locations point at
+   the real file.
+2. The transaction executor runs with the DAP program executor, which binds a TCP listener on the
+   specified address and waits for a DAP client connection.
+3. Once connected, the DAP client controls execution: continue, step, breakpoints, and state
+   inspection.
+4. If the DAP client requests a restart, the client refreshes the cached source file, recompiles the
+   script from disk, and starts a new debug session.

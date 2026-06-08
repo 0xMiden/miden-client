@@ -1,10 +1,10 @@
-//! Adapter around `miden_debug::DapExecutor` so it slots into
-//! `miden_tx::TransactionExecutor`.
+//! Program executor used by the client's DAP debugging path.
 //!
-//! `miden-debug` does not depend on `miden-tx`, so its `DapExecutor` does not
-//! implement the `miden_tx::ProgramExecutor` trait directly. This newtype
-//! bridges the two: it constructs and drives the upstream `DapExecutor` while
-//! presenting the trait the transaction executor expects.
+//! The transaction executor is generic over the VM program executor. This wrapper selects the
+//! debug-aware executor used by
+//! [`Client::execute_program_with_dap`](crate::Client::execute_program_with_dap), allowing a DAP
+//! client to attach before execution, set breakpoints, step through the transaction script, inspect
+//! VM state, and request restart without changing the normal transaction setup.
 
 use miden_processor::advice::AdviceInputs;
 use miden_processor::{
