@@ -3,12 +3,10 @@
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
-use miden_protocol::assembly::SourceManagerSync;
 use miden_protocol::asset::{Asset, NonFungibleAsset};
 use miden_protocol::crypto::merkle::MerkleError;
 use miden_protocol::crypto::merkle::store::MerkleStore;
@@ -24,6 +22,7 @@ use miden_protocol::errors::{
 use miden_protocol::note::{
     Note,
     NoteDetails,
+    NoteDetailsCommitment,
     NoteId,
     NoteRecipient,
     NoteScript,
@@ -33,7 +32,6 @@ use miden_protocol::note::{
 use miden_protocol::transaction::{InputNote, InputNotes, TransactionArgs, TransactionScript};
 use miden_protocol::vm::AdviceMap;
 use miden_standards::account::interface::{AccountInterface, AccountInterfaceError};
-use miden_standards::code_builder::CodeBuilder;
 use miden_standards::errors::CodeBuilderError;
 use miden_tx::utils::serde::{
     ByteReader,
@@ -102,7 +100,7 @@ pub struct TransactionRequest {
     /// with their respective tags.
     ///
     /// For example, after a swap note is consumed, a payback note is expected to be created.
-    expected_future_notes: BTreeMap<NoteId, (NoteDetails, NoteTag)>,
+    expected_future_notes: BTreeMap<NoteDetailsCommitment, (NoteDetails, NoteTag)>,
     /// Initial state of the `AdviceMap` that provides data during runtime.
     advice_map: AdviceMap,
     /// Initial state of the `MerkleStore` that provides data during runtime.
@@ -252,19 +250,24 @@ impl TransactionRequest {
 
         // Add provided authenticated input notes to the input notes map.
         for authenticated_note_record in authenticated_note_records {
+            // Authenticated note records always carry metadata (their inclusion proof
+            // injected it), so `id()` is `Some`.
+            let authenticated_note_id = authenticated_note_record
+                .id()
+                .expect("authenticated note record carries metadata so id() is Some");
+
             if !authenticated_note_record.is_authenticated() {
                 return Err(TransactionRequestError::InputNoteNotAuthenticated(
-                    authenticated_note_record.id(),
+                    authenticated_note_id,
                 ));
             }
 
             if authenticated_note_record.is_consumed() {
                 return Err(TransactionRequestError::InputNoteAlreadyConsumed(
-                    authenticated_note_record.id(),
+                    authenticated_note_id,
                 ));
             }
 
-            let authenticated_note_id = authenticated_note_record.id();
             input_notes.insert(
                 authenticated_note_id,
                 authenticated_note_record
@@ -293,7 +296,10 @@ impl TransactionRequest {
 
     /// Converts the [`TransactionRequest`] into [`TransactionArgs`] in order to be executed by a
     /// Miden host.
-    pub(crate) fn into_transaction_args(self, tx_script: TransactionScript) -> TransactionArgs {
+    pub(crate) fn into_transaction_args(
+        self,
+        tx_script: Option<TransactionScript>,
+    ) -> TransactionArgs {
         let note_args = self.get_note_args();
         let TransactionRequest {
             expected_output_recipients,
@@ -304,11 +310,13 @@ impl TransactionRequest {
 
         let mut tx_args = TransactionArgs::new(advice_map).with_note_args(note_args);
 
-        tx_args = if let Some(argument) = self.script_arg {
-            tx_args.with_tx_script_and_args(tx_script, argument)
-        } else {
-            tx_args.with_tx_script(tx_script)
-        };
+        // A script argument without a script has nothing to bind to, so it is only applied when a
+        // transaction script is present. With no argument the default empty word is used, which is
+        // equivalent to setting no argument at all.
+        if let Some(tx_script) = tx_script {
+            tx_args =
+                tx_args.with_tx_script_and_args(tx_script, self.script_arg.unwrap_or_default());
+        }
 
         if let Some(auth_argument) = self.auth_arg {
             tx_args = tx_args.with_auth_args(auth_argument);
@@ -322,32 +330,25 @@ impl TransactionRequest {
     }
 
     /// Builds the transaction script based on the account capabilities and the transaction request.
-    /// The debug mode enables the script debug logs.
     ///
-    /// The provided `source_manager` is used when compiling scripts owned by the request (currently
-    /// the empty fallback script) so that any source information attached to the produced
-    /// [`TransactionScript`] is registered in the same source manager used by the executor. Scripts
-    /// supplied by the caller via [`TransactionScriptTemplate::CustomScript`] are expected to have
-    /// already been compiled against the client's source manager (e.g. via
+    /// Returns `None` when the request carries no script template, producing a transaction with no
+    /// transaction script (a zero script root).
+    ///
+    /// Scripts supplied by the caller via [`TransactionScriptTemplate::CustomScript`] are expected
+    /// to have already been compiled against the client's source manager (e.g. via
     /// [`Client::code_builder`](crate::Client::code_builder)).
     pub(crate) fn build_transaction_script(
         &self,
         account_interface: &AccountInterface,
-        source_manager: Arc<dyn SourceManagerSync>,
-    ) -> Result<TransactionScript, TransactionRequestError> {
+    ) -> Result<Option<TransactionScript>, TransactionRequestError> {
         match &self.script_template {
-            Some(TransactionScriptTemplate::CustomScript(script)) => Ok(script.clone()),
+            Some(TransactionScriptTemplate::CustomScript(script)) => Ok(Some(script.clone())),
             Some(TransactionScriptTemplate::SendNotes(notes)) => {
                 // TODO: We could pass `SourceManager` to this call, but it needs to be supported
                 // in the protocol struct (however, this should also not fail to build often)
-                Ok(account_interface.build_send_notes_script(notes, self.expiration_delta)?)
+                Ok(Some(account_interface.build_send_notes_script(notes, self.expiration_delta)?))
             },
-            None => {
-                let empty_script = CodeBuilder::with_source_manager(source_manager)
-                    .compile_tx_script("begin nop end")?;
-
-                Ok(empty_script)
-            },
+            None => Ok(None),
         }
     }
 }
@@ -407,7 +408,8 @@ impl Deserializable for TransactionRequest {
         };
 
         let expected_output_recipients = BTreeMap::<Word, NoteRecipient>::read_from(source)?;
-        let expected_future_notes = BTreeMap::<NoteId, (NoteDetails, NoteTag)>::read_from(source)?;
+        let expected_future_notes =
+            BTreeMap::<NoteDetailsCommitment, (NoteDetails, NoteTag)>::read_from(source)?;
 
         let advice_map = AdviceMap::read_from(source)?;
         let merkle_store = MerkleStore::read_from(source)?;
@@ -451,10 +453,11 @@ pub(crate) fn collect_assets<'a>(
 
     assets.for_each(|asset| match asset {
         Asset::Fungible(fungible) => {
+            let amount = fungible.amount().as_u64();
             fungible_balance_map
                 .entry(fungible.faucet_id())
-                .and_modify(|balance| *balance += fungible.amount())
-                .or_insert(fungible.amount());
+                .and_modify(|balance| *balance += amount)
+                .or_insert(amount);
         },
         Asset::NonFungible(non_fungible) => {
             if !non_fungible_set.contains(non_fungible) {
@@ -491,7 +494,7 @@ pub enum TransactionRequestError {
     )]
     ForeignAccountDataMissing,
     #[error(
-        "foreign account {0} has an incompatible storage mode; use `ForeignAccount::public()` for public accounts and `ForeignAccount::private()` for private accounts"
+        "foreign account {0} has incompatible visibility; use `ForeignAccount::public()` for public accounts and `ForeignAccount::private()` for private accounts"
     )]
     InvalidForeignAccountId(AccountId),
     #[error(
@@ -500,8 +503,10 @@ pub enum TransactionRequestError {
     InputNoteNotAuthenticated(NoteId),
     #[error("note {0} has already been consumed")]
     InputNoteAlreadyConsumed(NoteId),
-    #[error("sender account {0} is not tracked by this client or does not exist")]
-    InvalidSenderAccount(AccountId),
+    #[error(
+        "output note declares sender {actual} but the transaction is executed by account {expected}"
+    )]
+    OutputNoteSenderMismatch { expected: AccountId, actual: AccountId },
     #[error("invalid transaction script")]
     InvalidTransactionScript(#[from] TransactionScriptError),
     #[error("merkle proof error")]
@@ -520,6 +525,10 @@ pub enum TransactionRequestError {
     NoteArgError(#[source] NoteError),
     #[error("pay-to-ID note must contain at least one asset to transfer")]
     P2IDNoteWithoutAsset,
+    #[error(
+        "non-fungible asset issued by faucet {0} is not available in the account vault or incoming notes"
+    )]
+    MissingNonFungibleAsset(AccountId),
     #[error("PSWAP note can only be cancelled by its creator: expected {expected}, got {actual}")]
     PswapCancelCreatorMismatch { expected: AccountId, actual: AccountId },
     #[error("error building script")]
@@ -618,15 +627,14 @@ mod tests {
         }
 
         let mut advice_vec: Vec<(Word, Vec<Felt>)> = vec![];
-        for i in 0..10 {
-            advice_vec.push((rng.draw_word(), vec![Felt::new(i)]));
+        for i in 0u32..10 {
+            advice_vec.push((rng.draw_word(), vec![Felt::from(i)]));
         }
 
         let account = AccountBuilder::new(Default::default())
             .with_component(MockAccountComponent::with_empty_slots())
             .with_auth_component(auth_component())
-            .account_type(AccountType::RegularAccountImmutableCode)
-            .storage_mode(miden_protocol::account::AccountStorageMode::Private)
+            .account_type(AccountType::Private)
             .build_existing()
             .unwrap();
 

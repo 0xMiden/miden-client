@@ -76,8 +76,7 @@ The `AccountBuilder` can be used to create a new account with the specified para
 let key_pair = SecretKey::with_rng(client.rng());
 
 let new_account = AccountBuilder::new(init_seed) // Seed should be random for each account
-    .account_type(AccountType::RegularAccountImmutableCode)
-    .storage_mode(AccountStorageMode::Private)
+    .account_type(AccountType::Private)
     .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
     .with_component(BasicWallet)
     .build()?;
@@ -86,7 +85,7 @@ client.add_account(&new_account, false).await?;
 ```
 Once an account is created, it is kept locally and its state is automatically tracked by the client.
 
-To create an public account, you can specify `AccountStorageMode::Public` like so:
+To create a public account, specify `AccountType::Public`:
 
 ```Rust
 let key_pair = SecretKey::with_rng(client.rng());
@@ -94,8 +93,7 @@ let anchor_block = client.get_latest_epoch_block().await.unwrap();
 
 let new_account = AccountBuilder::new(init_seed) // Seed should be random for each account
     .anchor((&anchor_block).try_into().unwrap())
-    .account_type(AccountType::RegularAccountImmutableCode)
-    .storage_mode(AccountStorageMode::Public)
+    .account_type(AccountType::Public)
     .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
     .with_component(BasicWallet)
     .build()?;
@@ -104,6 +102,28 @@ client.add_account(&new_account, false).await?;
 ```
 
 The account's state is also tracked locally, but during sync the client updates the account state by querying the node for the most recent account data.
+
+### Network accounts
+
+A network account is a public account that the node drives automatically: it consumes matching notes on the network's behalf via network transactions (NTX). An account becomes a network account by using the `AuthNetworkAccount` auth component, which carries a standardized allowlist of note script roots. The node uses that allowlist to identify the account and route only allowlisted notes to it; the auth procedure additionally enforces that consumed notes are allowlisted and that no transaction script runs.
+
+```rust
+let auth = AuthNetworkAccount::with_allowlist(allowed_note_script_roots)?;
+
+let network_account = AccountBuilder::new(init_seed)
+    .account_type(AccountType::Public) // network accounts must be public
+    .with_auth_component(auth)
+    .with_component(/* your contract component */)
+    .build_with_schema_commitment()?;
+client.add_account(&network_account, false).await?;
+
+// Deploy with an empty (scriptless) transaction: `AuthNetworkAccount` forbids transaction
+// scripts, and its auth procedure bumps the nonce from 0 to 1, which registers the account.
+let deploy = TransactionRequestBuilder::new().build()?;
+let tx_id = client.submit_new_transaction(network_account.id(), deploy).await?;
+```
+
+After deployment the account is a network account, so the node rejects user-submitted transactions against it; all further state changes happen through network transactions.
 
 ## Execute transaction
 
@@ -285,4 +305,3 @@ for failed_note in &consumption_info.failed {
     println!("cannot consume {}: {}", failed_note.note.id().to_hex(), failed_note.error);
 }
 ```
-

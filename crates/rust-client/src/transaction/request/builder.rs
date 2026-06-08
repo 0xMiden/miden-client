@@ -16,6 +16,7 @@ use miden_protocol::note::{
     NoteAttachment,
     NoteAttachments,
     NoteDetails,
+    NoteDetailsCommitment,
     NoteId,
     NoteRecipient,
     NoteScript,
@@ -71,7 +72,7 @@ pub struct TransactionRequestBuilder {
     /// with their respective tags.
     ///
     /// For example, after a swap note is consumed, a payback note is expected to be created.
-    expected_future_notes: BTreeMap<NoteId, (NoteDetails, NoteTag)>,
+    expected_future_notes: BTreeMap<NoteDetailsCommitment, (NoteDetails, NoteTag)>,
     /// Custom transaction script to be used.
     custom_script: Option<TransactionScript>,
     /// Initial state of the `AdviceMap` that provides data during runtime.
@@ -214,8 +215,10 @@ impl TransactionRequestBuilder {
     /// allows the client to track this note accordingly.
     #[must_use]
     pub fn expected_future_notes(mut self, notes: Vec<(NoteDetails, NoteTag)>) -> Self {
-        self.expected_future_notes =
-            notes.into_iter().map(|note| (note.0.id(), note)).collect::<BTreeMap<_, _>>();
+        self.expected_future_notes = notes
+            .into_iter()
+            .map(|note| (note.0.commitment(), note))
+            .collect::<BTreeMap<_, _>>();
         self
     }
 
@@ -357,7 +360,7 @@ impl TransactionRequestBuilder {
         if payment_data
             .assets()
             .iter()
-            .all(|asset| asset.is_fungible() && asset.unwrap_fungible().amount() == 0)
+            .all(|asset| asset.is_fungible() && asset.unwrap_fungible().amount().as_u64() == 0)
         {
             return Err(TransactionRequestError::P2IDNoteWithoutAsset);
         }

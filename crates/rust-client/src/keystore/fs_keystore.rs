@@ -227,20 +227,23 @@ impl TransactionAuthenticator for FilesystemKeyStore {
     /// # Errors
     /// If the public key isn't found in the store, [`AuthenticationError::UnknownPublicKey`] is
     /// returned.
-    fn get_signature(
+    async fn get_signature(
         &self,
         pub_key: PublicKeyCommitment,
         signing_info: &SigningInputs,
-    ) -> impl core::future::Future<Output = Result<Signature, AuthenticationError>> {
+    ) -> Result<Signature, AuthenticationError> {
         let message = signing_info.to_commitment();
 
-        let signature = self
+        let secret_key = self
             .get_key_sync(pub_key)
-            .map_err(|err| AuthenticationError::other_with_source("failed to load secret key", err))
-            .and_then(|key| key.ok_or(AuthenticationError::UnknownPublicKey(pub_key)))
-            .map(|secret_key| secret_key.sign(message));
+            .map_err(|err| {
+                AuthenticationError::other_with_source("failed to load secret key", err)
+            })?
+            .ok_or(AuthenticationError::UnknownPublicKey(pub_key))?;
 
-        core::future::ready(signature)
+        let signature = secret_key.sign(message);
+
+        Ok(signature)
     }
 
     /// Retrieves a public key for a specific public key commitment.

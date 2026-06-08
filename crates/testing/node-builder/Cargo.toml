@@ -18,6 +18,7 @@ path = "src/main.rs"
 [dependencies]
 # Miden dependencies
 miden-node-block-producer = { workspace = true }
+miden-node-proto          = { workspace = true }
 miden-node-rpc            = { workspace = true }
 miden-node-store          = { workspace = true }
 miden-node-utils          = { features = ["testing", "tracing-forest"], workspace = true }
@@ -31,6 +32,7 @@ anyhow      = { workspace = true }
 rand        = { workspace = true }
 rand_chacha = { workspace = true }
 tokio       = { features = ["signal"], workspace = true }
+tonic       = { workspace = true }
 url         = { features = ["serde"], version = "2.5" }
 
 [dev-dependencies]

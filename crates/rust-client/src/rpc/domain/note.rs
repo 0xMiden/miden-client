@@ -10,6 +10,7 @@ use miden_protocol::note::{
     NoteAttachmentScheme,
     NoteAttachments,
     NoteDetails,
+    NoteDetailsCommitment,
     NoteHeader,
     NoteId,
     NoteInclusionProof,
@@ -159,15 +160,18 @@ impl TryFrom<proto::note::NoteHeader> for NoteHeader {
     type Error = RpcConversionError;
 
     fn try_from(value: proto::note::NoteHeader) -> Result<Self, Self::Error> {
-        let note_id = value
-            .note_id
-            .ok_or(proto::note::NoteHeader::missing_field(stringify!(note_id)))?
+        let details_commitment_word: Word = value
+            .details_commitment
+            .ok_or(proto::note::NoteHeader::missing_field(stringify!(details_commitment)))?
             .try_into()?;
         let metadata = value
             .metadata
             .ok_or(proto::note::NoteHeader::missing_field(stringify!(metadata)))?
             .try_into()?;
-        Ok(NoteHeader::new(note_id, metadata))
+        Ok(NoteHeader::new(
+            NoteDetailsCommitment::from_raw(details_commitment_word),
+            metadata,
+        ))
     }
 }
 
@@ -203,6 +207,18 @@ pub struct NoteSyncBlock {
     pub mmr_path: MerklePath,
     /// Notes matching the requested tags in this block, keyed by note ID.
     pub notes: BTreeMap<NoteId, CommittedNote>,
+}
+
+/// Content resolved for a single note during
+/// [`NodeRpcClient::sync_notes_with_details`](crate::rpc::NodeRpcClient::sync_notes_with_details)
+/// as response from `GetNotesById`.
+#[allow(clippy::large_enum_variant)]
+pub enum SyncedNoteDetails {
+    /// A public note's full body.
+    Public(Note),
+    /// A private note's attachment content, if it carries any. Private notes expose no on-chain
+    /// body; only their attachments are resolved.
+    Private(Option<NoteAttachments>),
 }
 
 impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for NoteSyncBlock {
@@ -317,9 +333,12 @@ impl TryFrom<proto::note::NoteSyncRecord> for CommittedNote {
 /// Describes the possible responses from the `GetNotesById` endpoint for a single note.
 #[allow(clippy::large_enum_variant)]
 pub enum FetchedNote {
-    /// Details for a private note only include its [`NoteHeader`] and [`NoteInclusionProof`].
-    /// Other details needed to consume the note are expected to be stored locally, off-chain.
-    Private(NoteHeader, NoteInclusionProof),
+    /// Details for a private note include its ID, metadata, attachments and inclusion proof. Other
+    /// details needed to consume the note are expected to be stored locally, off-chain.
+    ///
+    /// Attachments are a public extension of the note and are stored on-chain even for private
+    /// notes, so the node returns them here; they are needed to reconstruct the correct note ID.
+    Private(NoteId, NoteMetadata, NoteAttachments, NoteInclusionProof),
     /// Contains the full [`Note`] object alongside its [`NoteInclusionProof`].
     Public(Note, NoteInclusionProof),
 }
@@ -328,24 +347,31 @@ impl FetchedNote {
     /// Returns the note's inclusion details.
     pub fn inclusion_proof(&self) -> &NoteInclusionProof {
         match self {
-            FetchedNote::Private(_, inclusion_proof) | FetchedNote::Public(_, inclusion_proof) => {
-                inclusion_proof
-            },
+            FetchedNote::Private(_, _, _, inclusion_proof)
+            | FetchedNote::Public(_, inclusion_proof) => inclusion_proof,
         }
     }
 
     /// Returns the note's metadata.
     pub fn metadata(&self) -> &NoteMetadata {
         match self {
-            FetchedNote::Private(header, _) => header.metadata(),
+            FetchedNote::Private(_, metadata, ..) => metadata,
             FetchedNote::Public(note, _) => note.metadata(),
+        }
+    }
+
+    /// Returns the note's attachments.
+    pub fn attachments(&self) -> &NoteAttachments {
+        match self {
+            FetchedNote::Private(_, _, attachments, _) => attachments,
+            FetchedNote::Public(note, _) => note.attachments(),
         }
     }
 
     /// Returns the note's ID.
     pub fn id(&self) -> NoteId {
         match self {
-            FetchedNote::Private(header, _) => header.id(),
+            FetchedNote::Private(note_id, ..) => *note_id,
             FetchedNote::Public(note, _) => note.id(),
         }
     }
@@ -378,23 +404,22 @@ impl TryFrom<proto::note::CommittedNote> for FetchedNote {
         let metadata: NoteMetadata = proto_metadata.clone().try_into()?;
         let partial_metadata: PartialNoteMetadata = (&proto_metadata).try_into()?;
 
+        let attachments = if note.attachments.is_empty() {
+            NoteAttachments::empty()
+        } else {
+            NoteAttachments::read_from_bytes(&note.attachments)?
+        };
+
         if let Some(detail_bytes) = note.details {
             let details = NoteDetails::read_from_bytes(&detail_bytes)?;
             let (assets, recipient) = details.into_parts();
-
-            let attachments = if note.attachments.is_empty() {
-                NoteAttachments::empty()
-            } else {
-                NoteAttachments::read_from_bytes(&note.attachments)?
-            };
 
             Ok(FetchedNote::Public(
                 Note::with_attachments(assets, partial_metadata, recipient, attachments),
                 inclusion_proof,
             ))
         } else {
-            let note_header = NoteHeader::new(note_id, metadata);
-            Ok(FetchedNote::Private(note_header, inclusion_proof))
+            Ok(FetchedNote::Private(note_id, metadata, attachments, inclusion_proof))
         }
     }
 }

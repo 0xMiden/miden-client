@@ -9,7 +9,6 @@ use miden_client::account::{
     AccountBuilder,
     AccountBuilderSchemaCommitmentExt,
     AccountId,
-    AccountStorageMode,
     AccountType,
     StorageMap,
     StorageSlot,
@@ -73,7 +72,7 @@ fn create_account_with_empty_maps(
     let expansion_component = AccountComponent::new(
         expansion_component_code,
         storage_slots,
-        AccountComponentMetadata::new("miden::testing::storage_expander", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::storage_expander"),
     )
     .map_err(|e| anyhow::anyhow!("Failed to create expansion component: {e}"))?;
 
@@ -91,7 +90,7 @@ fn create_account_with_empty_maps(
     let reader_component = AccountComponent::new(
         reader_component_code,
         vec![],
-        AccountComponentMetadata::new("miden::testing::storage_reader", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::storage_reader"),
     )
     .map_err(|e| anyhow::anyhow!("Failed to create reader component: {e}"))?;
 
@@ -108,11 +107,10 @@ fn create_account_with_empty_maps(
             sk.public_key().to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
         ))
-        .account_type(AccountType::RegularAccountUpdatableCode)
+        .account_type(AccountType::Public)
         .with_component(wallet_component)
         .with_component(expansion_component)
         .with_component(reader_component)
-        .storage_mode(AccountStorageMode::Public)
         .build_with_schema_commitment()?;
 
     Ok((account, sk))

@@ -148,7 +148,7 @@ impl SqliteStore {
                 if note.is_committed() {
                     Some(NoteTagRecord {
                         tag: note.metadata().expect("Committed notes should have metadata").tag(),
-                        source: NoteTagSource::Note(note.id()),
+                        source: NoteTagSource::Note(note.details_commitment()),
                     })
                 } else {
                     None
