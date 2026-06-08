@@ -1,11 +1,10 @@
 //! Adapter around `miden_debug::DapExecutor` so it slots into
 //! `miden_tx::TransactionExecutor`.
 //!
-//! As of `miden-debug` 0.7 the crate no longer depends on `miden-tx` and so
-//! its `DapExecutor` no longer implements the `miden_tx::ProgramExecutor`
-//! trait directly. This newtype bridges the two: it constructs and drives
-//! the upstream `DapExecutor` while presenting the trait the transaction
-//! executor expects.
+//! `miden-debug` does not depend on `miden-tx`, so its `DapExecutor` does not
+//! implement the `miden_tx::ProgramExecutor` trait directly. This newtype
+//! bridges the two: it constructs and drives the upstream `DapExecutor` while
+//! presenting the trait the transaction executor expects.
 
 use miden_processor::advice::AdviceInputs;
 use miden_processor::{
