@@ -125,11 +125,13 @@ where
         // Note Transport update
         // TODO We can run both sync_state, fetch_transport_notes futures in parallel
         if self.is_note_transport_enabled() {
-            // Drain any private notes whose previous relay attempt failed.
-            // Errors here are surfaced rather than swallowed because a stuck
-            // outbox indicates a NTL problem the caller should know about;
-            // the entries themselves remain durable for the next attempt.
-            self.flush_relay_outbox().await?;
+            // Drain any private notes whose previous relay attempt failed. A
+            // flush error is logged, not propagated: a failing relay must not
+            // block the chain sync, and the entries stay durable for the next
+            // attempt.
+            if let Err(err) = self.flush_relay_outbox().await {
+                tracing::warn!(?err, "relay outbox flush failed during sync; entries retained");
+            }
 
             let cursor = self.store.get_note_transport_cursor().await?;
             let note_tags = self.store.get_unique_note_tags().await?;

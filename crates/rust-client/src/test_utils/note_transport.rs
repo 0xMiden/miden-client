@@ -162,11 +162,10 @@ impl NoteTransportClient for MockNoteTransportApi {
 /// into `send_note` calls.
 ///
 /// Reproduces the failure mode where the NTL is reachable but rejects (or
-/// silently drops) a relay attempt. With the current implementation of
-/// [`Client::send_private_note`](crate::Client::send_private_note), such a
-/// failure is unrecoverable: the chain transaction has already committed by
-/// the time the relay is attempted, so the sender's vault is debited and the
-/// note details are lost — the recipient has no way to discover the note.
+/// silently drops) a relay attempt, exercising the durable outbox in
+/// [`Client::send_private_note`](crate::Client::send_private_note): without
+/// retry/persistence a failed relay would leave the recipient unable to
+/// discover the note.
 ///
 /// The decorator counts attempts (`send_attempts`) and lets a test specify how
 /// many of the next `send_note` calls should fail (`fail_next`); successful
