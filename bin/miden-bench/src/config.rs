@@ -45,7 +45,7 @@ pub async fn create_client(
 
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
-    let rng_coin = RandomCoin::new(coin_seed.map(Felt::new).into());
+    let rng_coin = RandomCoin::new(coin_seed.map(Felt::new_unchecked).into());
 
     let client = ClientBuilder::new()
         .rpc(Arc::new(GrpcClient::new(endpoint, 30_000)))

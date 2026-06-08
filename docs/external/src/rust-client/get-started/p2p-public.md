@@ -31,10 +31,10 @@ To do this, we use two terminals with their own state (using their own `miden-cl
 2. On the new client, create a new [basic account](https://docs.miden.xyz/builder/smart-contracts/accounts):
 
     ```sh
-    miden-client new-wallet --mutable -s public
+    miden-client new-wallet --account-type public
     ```
 
-    We refer to this account as _Account C_. Note that we set the account's storage mode to `public`, which means that the account details are public and its latest state can be retrieved from the node.
+    We refer to this account as _Account C_. Note that we set the account visibility to `public`, which means that the account details are public and its latest state can be retrieved from the node.
 
 3. List and view the account with the following command:
 

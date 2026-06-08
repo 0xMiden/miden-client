@@ -483,7 +483,7 @@ where
         } else {
             let mut seed_rng = rand::rng();
             let coin_seed: [u64; 4] = seed_rng.random();
-            Box::new(RandomCoin::new(coin_seed.map(Felt::new).into()))
+            Box::new(RandomCoin::new(coin_seed.map(Felt::new_unchecked).into()))
         };
 
         // Set default prover if not provided

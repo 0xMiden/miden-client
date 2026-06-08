@@ -308,11 +308,15 @@ fn query_partial_blockchain_nodes<P: rusqlite::Params>(
 fn parse_partial_blockchain_peaks(forest: u32, peaks_nodes: &[u8]) -> Result<MmrPeaks, StoreError> {
     let mmr_peaks_nodes = Vec::<Word>::read_from_bytes(peaks_nodes)?;
 
-    MmrPeaks::new(
-        Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
-        mmr_peaks_nodes,
-    )
-    .map_err(StoreError::MmrError)
+    let forest_size = usize::try_from(forest).expect("u64 should fit in usize");
+    let forest = Forest::new(forest_size).map_err(|err| {
+        StoreError::DataDeserializationError(
+            miden_protocol::utils::serde::DeserializationError::InvalidValue(format!(
+                "invalid forest size {forest_size}: {err}"
+            )),
+        )
+    })?;
+    MmrPeaks::new(forest, mmr_peaks_nodes).map_err(StoreError::MmrError)
 }
 
 fn serialize_block_header(
@@ -494,7 +498,7 @@ mod test {
 
         let mut mmr = Mmr::default();
         for header in &block_headers {
-            mmr.add(header.commitment());
+            mmr.add(header.commitment()).expect("valid MMR append");
         }
 
         let mut tracked_set: BTreeSet<usize> = (0..(TOTAL_BLOCKS - 1)).step_by(97).collect();
@@ -516,7 +520,10 @@ mod test {
         let tracked_nodes: Vec<(InOrderIndex, Word)> = tracked_nodes.into_iter().collect();
 
         let peaks_by_block: Vec<MmrPeaks> = (0..TOTAL_BLOCKS)
-            .map(|block_num| mmr.peaks_at(Forest::new(block_num)).expect("valid peaks"))
+            .map(|block_num| {
+                mmr.peaks_at(Forest::new(block_num).expect("valid forest"))
+                    .expect("valid peaks")
+            })
             .collect();
 
         // Save blocks and nodes
@@ -633,14 +640,18 @@ mod test {
             .collect();
         let mut mmr = Mmr::default();
         for h in &headers {
-            mmr.add(h.commitment());
+            mmr.add(h.commitment()).expect("valid MMR append");
         }
 
         // Track blocks 3 and 10; we will untrack 3 later.
         let tracked: BTreeSet<usize> = [3, 10].into();
         let auth_nodes = collect_auth_nodes(&mmr, &headers, &tracked);
-        let tip_peaks_bytes =
-            mmr.peaks_at(Forest::new(TOTAL_BLOCKS - 1)).unwrap().peaks().to_vec().to_bytes();
+        let tip_peaks_bytes = mmr
+            .peaks_at(Forest::new(TOTAL_BLOCKS - 1).expect("valid forest"))
+            .unwrap()
+            .peaks()
+            .to_vec()
+            .to_bytes();
 
         // Persist everything.
         let headers_clone = headers.clone();

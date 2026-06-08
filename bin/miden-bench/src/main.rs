@@ -9,7 +9,9 @@ mod benchmarks;
 mod config;
 mod deploy;
 mod expand;
+mod export;
 mod generators;
+mod import;
 mod masm;
 mod metrics;
 mod report;
@@ -46,6 +48,32 @@ enum Command {
     Deploy(StorageArgs),
     /// Expand storage: fill entries in a specific map of a deployed account (requires node)
     Expand(ExpandArgs),
+    /// Import an account from a `.mac` file or download a public account by ID
+    Import(ImportArgs),
+    /// Export an account from the local store to a `.mac` file
+    Export(ExportArgs),
+}
+
+impl Command {
+    /// Returns whether the command needs the global startup sync against the network.
+    ///
+    /// Only commands that read pre-existing chain state (deploy, expand, transaction)
+    /// require a synced client at startup. Import / export operate on a file or call
+    /// their own RPC and do not benefit from the pre-sync.
+    fn startup_mode(&self) -> StartupMode {
+        match self {
+            Command::Deploy(_) | Command::Expand(_) | Command::Transaction(_) => {
+                StartupMode::Synced
+            },
+            Command::Import(_) | Command::Export(_) => StartupMode::Unsynced,
+        }
+    }
+}
+
+/// Whether the client should be synced against the network at startup.
+enum StartupMode {
+    Synced,
+    Unsynced,
 }
 
 /// Storage configuration options for benchmarks
@@ -73,6 +101,37 @@ struct TransactionArgs {
     /// Number of benchmark iterations
     #[arg(short, long, default_value_t = DEFAULT_ITERATION_COUNT)]
     iterations: usize,
+}
+
+/// Import an account from a `.mac` file or download a public account by ID.
+///
+/// Exactly one of `--filename` or `--account-id` must be provided.
+#[derive(Args, Clone)]
+struct ImportArgs {
+    /// Path to a `.mac` account file
+    #[arg(
+        short,
+        long,
+        conflicts_with = "account_id",
+        required_unless_present = "account_id"
+    )]
+    filename: Option<PathBuf>,
+
+    /// Public account ID to download from the network (hex format, e.g., 0x...)
+    #[arg(short, long, conflicts_with = "filename", required_unless_present = "filename")]
+    account_id: Option<String>,
+}
+
+/// Export an account from the local store to a `.mac` file
+#[derive(Args, Clone)]
+struct ExportArgs {
+    /// Account ID to export (hex format, e.g., 0x...)
+    #[arg(short, long)]
+    account_id: String,
+
+    /// Output `.mac` file path. Defaults to `<account_id>.mac` in the current directory.
+    #[arg(short, long)]
+    filename: Option<PathBuf>,
 }
 
 /// Expand storage: fill entries in a specific map of a deployed account
@@ -175,15 +234,30 @@ async fn main() {
         .await
         .expect("Failed to create client");
 
-    println!("Connecting to node at {endpoint}...");
-    client.sync_state().await.expect("Failed to sync with node");
-    let chain_height = client.get_sync_height().await.expect("Failed to get sync height");
-    println!("Connected successfully. Chain height: {chain_height}");
+    match args.command.startup_mode() {
+        StartupMode::Synced => {
+            println!("Connecting to node at {endpoint}...");
+            client.sync_state().await.expect("Failed to sync with node");
+            let chain_height = client.get_sync_height().await.expect("Failed to get sync height");
+            println!("Connected successfully. Chain height: {chain_height}");
+        },
+        StartupMode::Unsynced => {},
+    }
 
-    match args.command {
+    dispatch_command(args.command, &mut client, store_path, endpoint, &store_flag).await;
+}
+
+async fn dispatch_command(
+    command: Command,
+    client: &mut miden_client::Client<miden_client::keystore::FilesystemKeyStore>,
+    store_path: PathBuf,
+    endpoint: Endpoint,
+    store_flag: &str,
+) {
+    match command {
         Command::Deploy(deploy_args) => {
             let result =
-                Box::pin(deploy::deploy_account(&mut client, &store_path, deploy_args.maps)).await;
+                Box::pin(deploy::deploy_account(client, &store_path, deploy_args.maps)).await;
 
             match result {
                 Ok(account_id) => {
@@ -200,7 +274,7 @@ async fn main() {
         },
         Command::Expand(expand_args) => {
             let result = Box::pin(expand::expand_storage(
-                &mut client,
+                client,
                 &expand_args.account_id,
                 expand_args.map_idx,
                 expand_args.offset,
@@ -222,11 +296,11 @@ async fn main() {
                 },
             }
         },
-        Command::Transaction(ref tx_args) => {
+        Command::Transaction(tx_args) => {
             let start_time = Instant::now();
             let config = BenchConfig::new(endpoint, tx_args.iterations, store_path);
             let results = Box::pin(benchmarks::transaction::run_transaction_benchmarks(
-                &mut client,
+                client,
                 &config,
                 tx_args.account_id.clone(),
                 tx_args.reads,
@@ -241,6 +315,35 @@ async fn main() {
                 Err(e) => {
                     panic!("Benchmark failed: {e:?}");
                 },
+            }
+        },
+        Command::Import(import_args) => {
+            let result = match (import_args.filename, import_args.account_id) {
+                (Some(filename), None) => {
+                    Box::pin(import::import_from_file(client, &store_path, &filename)).await
+                },
+                (None, Some(account_id)) => {
+                    Box::pin(import::import_from_network(client, &account_id)).await
+                },
+                // clap enforces exactly one of the two via `required_unless_present`.
+                _ => unreachable!("clap should enforce exactly one of --filename / --account-id"),
+            };
+
+            if let Err(e) = result {
+                panic!("Import failed: {e:?}");
+            }
+        },
+        Command::Export(export_args) => {
+            let result = Box::pin(export::export_account(
+                client,
+                &store_path,
+                &export_args.account_id,
+                export_args.filename,
+            ))
+            .await;
+
+            if let Err(e) = result {
+                panic!("Export failed: {e:?}");
             }
         },
     }

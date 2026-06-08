@@ -10,7 +10,14 @@ use alloc::vec::Vec;
 use futures::Stream;
 use miden_protocol::address::Address;
 use miden_protocol::block::BlockNumber;
-use miden_protocol::note::{Note, NoteDetails, NoteFile, NoteHeader, NoteId, NoteTag};
+use miden_protocol::note::{
+    Note,
+    NoteDetails,
+    NoteDetailsCommitment,
+    NoteFile,
+    NoteHeader,
+    NoteTag,
+};
 use miden_protocol::utils::serde::Serializable;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::serde::{
@@ -56,7 +63,7 @@ impl<AUTH> Client<AUTH> {
     ) -> Result<(), ClientError> {
         let api = self.get_note_transport_api()?;
 
-        let header = note.header().clone();
+        let header = *note.header();
         let details = NoteDetails::from(note);
         let details_bytes = details.to_bytes();
         // e2ee impl hint:
@@ -145,9 +152,9 @@ where
     /// provided tags.
     ///
     /// The server paginates; this method issues one RPC and returns the
-    /// imported note IDs together with the new cursor. The returned cursor
-    /// equals the input cursor when the batch was empty (i.e. no new notes).
-    /// Callers that want to drain the full backlog should loop until
+    /// imported details commitments together with the new cursor. The returned
+    /// cursor equals the input cursor when the batch was empty (i.e. no new
+    /// notes). Callers that want to drain the full backlog should loop until
     /// `new_cursor == cursor` (see [`Client::fetch_all_private_notes`]).
     /// Callers that do steady-state polling (see [`Client::sync_state`] /
     /// [`Client::fetch_private_notes`]) should call this once per tick with
@@ -160,7 +167,7 @@ where
         &mut self,
         cursor: NoteTransportCursor,
         tags: &[NoteTag],
-    ) -> Result<(Vec<NoteId>, NoteTransportCursor), ClientError> {
+    ) -> Result<(Vec<NoteDetailsCommitment>, NoteTransportCursor), ClientError> {
         // Number of blocks to look back from sync height when scanning for committed notes.
         // Handles the race where a note is committed on-chain just before the NTL delivers
         // its data — without this, check_expected_notes would scan from sync_height forward
@@ -192,9 +199,9 @@ where
             };
             note_requests.push(note_file);
         }
-        let imported_note_ids = self.import_notes(&note_requests).await?;
+        let imported_commitments = self.import_notes(&note_requests).await?;
 
-        Ok((imported_note_ids, rcursor))
+        Ok((imported_commitments, rcursor))
     }
 }
 
@@ -311,6 +318,13 @@ impl Deserializable for NoteTransportCursor {
 fn rejoin_note(header: &NoteHeader, details_bytes: &[u8]) -> Result<Note, DeserializationError> {
     let mut reader = SliceReader::new(details_bytes);
     let details = NoteDetails::read_from(&mut reader)?;
-    let metadata = header.metadata().clone();
-    Ok(Note::new(details.assets().clone(), metadata, details.recipient().clone()))
+    // The transport wire format only carries `NoteHeader` + serialized `NoteDetails`, not the
+    // attachments collection. We rejoin with empty attachments; this matches the original note
+    // only when it had no attachments in the first place.
+    let partial_metadata = *header.metadata().partial_metadata();
+    Ok(Note::new(
+        details.assets().clone(),
+        partial_metadata,
+        details.recipient().clone(),
+    ))
 }

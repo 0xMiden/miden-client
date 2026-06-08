@@ -2,11 +2,11 @@ use std::env::temp_dir;
 use std::sync::Arc;
 
 use miden_client::DebugMode;
-use miden_client::account::{Account, AccountStorageMode};
+use miden_client::account::{Account, AccountType};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteAttachment, NoteDetails, NoteTag, NoteType};
+use miden_client::note::{NoteAttachments, NoteDetails, NoteTag, NoteType};
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::create_test_store_path;
 use miden_client::testing::mock::{MockClient, MockRpcApi};
@@ -41,7 +41,7 @@ async fn transport_basic() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -86,7 +86,7 @@ async fn transport_cursor_pagination() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -96,7 +96,7 @@ async fn transport_cursor_pagination() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -106,7 +106,9 @@ async fn transport_cursor_pagination() {
     recipient.sync_state().await.unwrap();
     let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 1, "should have 1 note after first sync");
-    assert_eq!(notes[0].id(), note_a.id());
+    // The note is delivered via the transport layer and isn't committed on-chain, so it has no
+    // metadata (and thus no `NoteId`); it's identified by its details commitment.
+    assert_eq!(notes[0].details_commitment(), note_a.details_commitment());
 
     // Send note B, sync → recipient receives note B (cursor advanced past A)
     sender.send_private_note(note_b.clone(), &recipient_address).await.unwrap();
@@ -129,7 +131,7 @@ async fn transport_duplicate_note_handling() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -174,7 +176,7 @@ async fn fetch_all_private_notes_drains_across_batches() {
             recipient_account.id(),
             vec![],
             NoteType::Private,
-            NoteAttachment::default(),
+            NoteAttachments::empty(),
             sender.rng(),
         )
         .unwrap();
@@ -211,7 +213,7 @@ async fn transport_fetch_no_matching_tags() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -241,12 +243,14 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
         .add_existing_mock_account(miden_testing::Auth::IncrNonce)
         .unwrap();
 
-    let private_note =
-        NoteBuilder::new(mock_account.id(), RandomCoin::new([1, 2, 3, 4].map(Felt::new).into()))
-            .note_type(ProtocolNoteType::Private)
-            .tag(NoteTag::new(0).into())
-            .build()
-            .unwrap();
+    let private_note = NoteBuilder::new(
+        mock_account.id(),
+        RandomCoin::new([1, 2, 3, 4].map(Felt::new_unchecked).into()),
+    )
+    .note_type(ProtocolNoteType::Private)
+    .tag(NoteTag::new(0).into())
+    .build()
+    .unwrap();
 
     let spawn_note =
         mock_chain_builder.add_spawn_note(std::slice::from_ref(&private_note)).unwrap();
@@ -281,7 +285,7 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
 
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
-    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
+    let rng = RandomCoin::new(coin_seed.map(|v| Felt::new_unchecked(v >> 1)).into());
 
     let keystore_path = temp_dir();
     let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
@@ -309,23 +313,21 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     // 5. Now the NTL delivers the note (simulates late delivery after the first sync).
     let details = NoteDetails::from(private_note.clone());
     let details_bytes = details.to_bytes();
-    mock_transport_node
-        .write()
-        .add_note(private_note.header().clone(), details_bytes);
+    mock_transport_node.write().add_note(*private_note.header(), details_bytes);
 
     // 6. Second sync_state: fetch_transport_notes imports the note, then chain sync runs.
     // Without the fix, after_block_num = sync_height, scan misses the note at block 1.
     // With the fix, lookback window catches it.
     let summary = client.sync_state().await.unwrap();
     assert!(
-        summary.new_private_notes.contains(&private_note.id()),
+        summary.new_private_notes.contains(&private_note.details_commitment()),
         "summary should report the NTL-imported note in new_private_notes"
     );
 
     // 7. The note should be Committed after the second sync.
     let committed_notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();
     assert!(
-        committed_notes.iter().any(|n| n.id() == private_note.id()),
+        committed_notes.iter().any(|n| n.id() == Some(private_note.id())),
         "note committed before sync_height should be found via lookback during NTL import"
     );
 }
@@ -350,8 +352,6 @@ pub async fn create_test_user_transport(
     mock_node: Arc<RwLock<MockNoteTransportNode>>,
 ) -> (MockClient<FilesystemKeyStore>, Account) {
     let (mut client, keystore) = Box::pin(create_test_client_transport(mock_node.clone())).await;
-    let account = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
+    let account = insert_new_wallet(&mut client, AccountType::Private, &keystore).await.unwrap();
     (client, account)
 }

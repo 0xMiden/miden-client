@@ -17,10 +17,10 @@ In this section, we show you how to make private transactions and send funds to 
 Remember to use the [Miden client documentation](https://docs.miden.xyz/builder/tools/clients/rust-client/cli/) for clarifications.
 :::
 
-1. Create a second account to send funds with. Previously, we created a type `mutable` account (`Account A`). Now, create another `mutable` (`Account B`) using the following command:
+1. Create a second account to send funds with. Previously, we created a wallet account (`Account A`). Now, create another wallet (`Account B`) using the following command:
 
    ```sh
-   miden-client new-wallet --mutable
+   miden-client new-wallet
    ```
 
 2. List and view the newly created accounts with the following command:
