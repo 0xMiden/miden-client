@@ -183,7 +183,8 @@ pub(crate) fn adjust_merkle_path_for_forest(
 }
 
 /// Adjusts a Merkle path for the given forest, then calls [`PartialMmr::track`] to verify
-/// and register the block. Returns the authentication nodes produced by the tracking.
+/// and register the block. Returns the forest-adjusted authentication path nodes for the
+/// tracked block.
 pub(crate) fn track_block_in_mmr(
     partial_mmr: &mut PartialMmr,
     block_num: BlockNumber,

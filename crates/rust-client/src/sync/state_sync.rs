@@ -417,9 +417,9 @@ impl StateSync {
         let peaks_commitment = new_peaks.hash_peaks();
         if peaks_commitment != chain_tip_header.chain_commitment() {
             return Err(ClientError::ChainValidationError(format!(
-                "MMR peaks commitment is {:?} and does not match block header chain commitment {:?}",
-                peaks_commitment,
-                chain_tip_header.chain_commitment()
+                "MMR peaks commitment is {} and does not match block header chain commitment {}",
+                peaks_commitment.to_hex(),
+                chain_tip_header.chain_commitment().to_hex()
             )));
         }
 
