@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 #
-# Starts a testing node from the standalone Miden node executables (validator, sequencer,
-# ntx-builder).
+# Starts a self-contained testing node from the standalone Miden node executables: validator,
+# sequencer, network-transaction builder, and a transaction prover (`miden-remote-prover`). This
+# mirrors the node repo's own `scripts/run-node.sh` wiring, so network transactions work without
+# any external service.
 #
 # Binaries are built with `cargo install` from the exact git rev our workspace pins for the
 # `miden-node-*` crates (read from Cargo.lock), so they stay in lockstep with our library deps —
@@ -41,7 +43,13 @@ PID_FILE="$CACHE/pids"
 RPC="127.0.0.1:57291"   # matches the client default (`MIDEN_NODE_PORT`)
 VALIDATOR="127.0.0.1:50101"
 NTX="127.0.0.1:50301"
-TX_PROVER="${MIDEN_TX_PROVER:-127.0.0.1:50051}"
+PROVER_PORT=50051
+PROVER="127.0.0.1:$PROVER_PORT"
+# Shared secret authorizing the ntx-builder to submit network transactions to the sequencer's RPC.
+# Must match on the sequencer (--rpc.network-tx-auth-header-value) and the ntx-builder
+# (--rpc.auth-header-value); otherwise the sequencer rejects network transactions with
+# "Network transactions may not be submitted by users yet".
+NETWORK_TX_AUTH="${MIDEN_NETWORK_TX_AUTH:-miden-client-testing-ntx-secret}"
 
 # Resolve the pinned node url + rev from Cargo.lock.
 # Example: source = "git+https://github.com/0xMiden/node.git?branch=<b>#<sha>"
@@ -60,7 +68,7 @@ node_binaries_installed() {
     local metadata="$CACHE/install/.crates.toml"
     [ -f "$metadata" ] || return 1
 
-    for bin in miden-validator miden-node miden-ntx-builder; do
+    for bin in miden-validator miden-node miden-ntx-builder miden-remote-prover; do
         [ -x "$BIN/$bin" ] || return 1
         if ! grep -F "\"$bin " "$metadata" | grep -Fq "#$NODE_REV)"; then
             return 1
@@ -74,7 +82,7 @@ else
     echo "==> installing node binaries ($NODE_URL @ $NODE_REV)"
     cargo install --locked --root "$CACHE/install" --target-dir "$BUILD" \
         --git "$NODE_URL" --rev "$NODE_REV" \
-        miden-validator miden-node miden-ntx-builder
+        miden-validator miden-node miden-ntx-builder miden-remote-prover
 fi
 
 if [ "$MODE" = "install-only" ]; then
@@ -107,10 +115,17 @@ start() {
     echo "$!" >> "$PID_FILE"
 }
 start validator   "$BIN/miden-validator" start --listen "$VALIDATOR" --data-directory "$DATA/validator"
+# Let the validator bind before the sequencer starts producing blocks against it.
+sleep 2
 start sequencer   "$BIN/miden-node" sequencer --rpc.listen "$RPC" --data-directory "$DATA/node" \
-    --validator.url "http://$VALIDATOR" --ntx-builder.url "http://$NTX"
+    --validator.url "http://$VALIDATOR" --ntx-builder.url "http://$NTX" \
+    --rpc.network-tx-auth-header-value "$NETWORK_TX_AUTH"
+start prover      "$BIN/miden-remote-prover" --kind=transaction --port="$PROVER_PORT"
+# Let the sequencer bind its RPC before the ntx-builder dials it.
+sleep 2
 start ntx-builder "$BIN/miden-ntx-builder" start --listen "$NTX" --rpc.url "http://$RPC" \
-    --tx-prover.url "http://$TX_PROVER" --data-directory "$DATA/ntx-builder"
+    --rpc.auth-header-value "$NETWORK_TX_AUTH" --tx-prover.url "http://$PROVER" \
+    --data-directory "$DATA/ntx-builder"
 
 echo "==> waiting for RPC on $RPC"
 for _ in $(seq 1 60); do

@@ -264,7 +264,7 @@ jobs:
   integration-tests:
     name: Integration tests
     runs-on: warp-ubuntu-latest-x64-8x
-    needs: [build-note-transport, build-remote-prover, build-test-node]
+    needs: [build-note-transport, build-test-node]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -298,15 +298,8 @@ jobs:
           path: target/release
       - name: Restore note-transport permissions
         run: chmod +x target/release/miden-note-transport-node-bin
-      - name: Fetch remote-prover binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: remote-prover-artifact
-          path: target/release
-      - name: Restore remote-prover permissions
-        run: chmod +x target/release/testing-remote-prover
-      - name: Start remote prover
-        run: ./scripts/start-ci-service.sh testing-remote-prover 50051 target/release/testing-remote-prover
+      # The test node now runs its own transaction prover (miden-remote-prover) for the ntx-builder;
+      # see scripts/start-test-node.sh.
       - name: Start test node
         run: make start-node
       - name: Start note transport
@@ -319,6 +312,3 @@ jobs:
       - name: Stop note transport
         if: always()
         run: make stop-note-transport
-      - name: Stop remote prover
-        if: always()
-        run: make stop-prover
