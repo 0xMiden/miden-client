@@ -282,8 +282,12 @@ where
         Ok(tx_id)
     }
 
-    /// Creates and executes a transaction specified by the request against the specified account,
-    /// but doesn't change the local database.
+    /// Creates and executes a transaction specified by the request against the specified account.
+    ///
+    /// This does not persist any transaction tracking state: the account, input notes, and output
+    /// notes are only written to the store later, atomically, by [`Client::apply_transaction`]
+    /// after the transaction is proven and submitted. Execution may populate the content-addressed
+    /// note-script cache (keyed by script root), which is idempotent and safe to leave behind.
     ///
     /// # Errors
     ///
@@ -361,23 +365,11 @@ where
         // Only keep authenticated input notes from the store.
         stored_note_records.retain(InputNoteRecord::is_authenticated);
 
-        let authenticated_note_ids =
-            stored_note_records.iter().filter_map(InputNoteRecord::id).collect::<Vec<_>>();
-
-        // Upsert request notes missing from the store so they can be tracked and updated.
-        // NOTE: Unauthenticated notes may be stored locally in an unverified/invalid state at
-        // this point. The upsert will replace the state to an InputNoteState::Expected (with
-        // metadata included).
-        let unauthenticated_input_notes = transaction_request
-            .input_notes()
-            .iter()
-            .filter(|n| !authenticated_note_ids.contains(&n.id()))
-            .cloned()
-            .map(Into::into)
-            .collect::<Vec<_>>();
-
-        self.store.upsert_input_notes(&unauthenticated_input_notes).await?;
-
+        // Transaction execution must not persist input-note tracking state: a process death between
+        // here and the atomic `apply_transaction` would otherwise leave orphaned note rows with no
+        // transaction record. Unauthenticated request notes are fed to the executor directly by
+        // `build_input_notes`; their tracking rows are persisted atomically in the apply, sourced
+        // from the executed transaction's inputs (see `get_note_updates`).
         let notes = transaction_request.build_input_notes(stored_note_records)?;
 
         let output_recipients =
@@ -905,22 +897,45 @@ where
             )
         }));
 
-        // Locally consumed notes
-        let consumed_note_ids =
-            executed_tx.tx_inputs().input_notes().iter().map(InputNote::id).collect();
+        // Locally consumed notes.
+        //
+        // Notes already tracked in the store are updated in place. Notes supplied directly in the
+        // request (e.g. unauthenticated private notes) have no store row, because execution does
+        // not persist tracking state; their record is built from the executed transaction's inputs
+        // and inserted already in the consumed state, so the consume lands atomically in the apply.
+        let consumed_input_notes = executed_tx.tx_inputs().input_notes();
+        let consumed_note_ids: Vec<NoteId> =
+            consumed_input_notes.iter().map(InputNote::id).collect();
 
-        let consumed_notes =
+        let stored_consumed_notes =
             self.store.get_input_notes(NoteFilter::List(consumed_note_ids)).await?;
+        let stored_consumed_ids: BTreeSet<NoteId> =
+            stored_consumed_notes.iter().filter_map(InputNoteRecord::id).collect();
 
         let mut updated_input_notes = vec![];
 
-        for mut input_note_record in consumed_notes {
+        for mut input_note_record in stored_consumed_notes {
             if input_note_record.consumed_locally(
                 executed_tx.account_id(),
                 executed_tx.id(),
                 self.store.get_current_timestamp(),
             )? {
                 updated_input_notes.push(input_note_record);
+            }
+        }
+
+        for input_note in consumed_input_notes.iter() {
+            if stored_consumed_ids.contains(&input_note.id()) {
+                continue;
+            }
+
+            let mut record = InputNoteRecord::from(input_note.clone());
+            if record.consumed_locally(
+                executed_tx.account_id(),
+                executed_tx.id(),
+                self.store.get_current_timestamp(),
+            )? {
+                new_input_notes.push(record);
             }
         }
 

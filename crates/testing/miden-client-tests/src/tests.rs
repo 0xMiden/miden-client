@@ -1003,6 +1003,73 @@ async fn import_processing_note_returns_error() {
     ));
 }
 
+/// `execute_transaction` must not persist any input-note tracking state. The note rows are written
+/// only by the atomic `apply_transaction`, which runs after the transaction is proven and
+/// submitted.
+///
+/// This guards the crash-safety invariant behind <https://github.com/0xMiden/wallet/issues/260>: a
+/// process death anywhere during execute/prove/submit must leave the store with no half-applied
+/// note rows, so a retry always starts from a clean substrate.
+#[tokio::test]
+async fn execute_transaction_does_not_persist_input_notes() {
+    let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;
+    client.sync_state().await.unwrap();
+
+    let account = insert_new_wallet(&mut client, AccountType::Private, &keystore).await.unwrap();
+    let faucet = insert_new_fungible_faucet(&mut client, AccountType::Private, &keystore)
+        .await
+        .unwrap();
+
+    // Mint a note to the wallet so it has an asset to consume.
+    let (_tx_id, note) = mint_note(&mut client, account.id(), faucet.id(), NoteType::Private).await;
+
+    // Snapshot the tracked input notes before executing the consume transaction.
+    let notes_before = client.get_input_notes(NoteFilter::All).await.unwrap();
+    let states_before: BTreeMap<_, _> = notes_before
+        .iter()
+        .filter_map(|n| n.id().map(|id| (id, n.state().discriminant())))
+        .collect();
+
+    // Build a consume request that passes the note directly as an unauthenticated input note, then
+    // execute it WITHOUT proving/submitting/applying.
+    let consume_request = TransactionRequestBuilder::new()
+        .input_notes([(note.clone(), None)])
+        .build()
+        .unwrap();
+    Box::pin(client.execute_transaction(account.id(), consume_request))
+        .await
+        .unwrap();
+
+    // The store must be untouched: no rows inserted, no note advanced into a processing/consumed
+    // state by execution alone.
+    let notes_after = client.get_input_notes(NoteFilter::All).await.unwrap();
+    let states_after: BTreeMap<_, _> = notes_after
+        .iter()
+        .filter_map(|n| n.id().map(|id| (id, n.state().discriminant())))
+        .collect();
+
+    assert_eq!(
+        states_before, states_after,
+        "execute_transaction must not insert input-note rows or change their state"
+    );
+    assert!(
+        client.get_input_notes(NoteFilter::Processing).await.unwrap().is_empty(),
+        "execute_transaction must not advance a note into the processing state"
+    );
+
+    // The full pipeline (execute + prove + submit + apply) must still track the consume: after
+    // submitting, the note moves into the processing state via the atomic apply.
+    let consume_request =
+        TransactionRequestBuilder::new().input_notes([(note, None)]).build().unwrap();
+    Box::pin(client.submit_new_transaction(account.id(), consume_request))
+        .await
+        .unwrap();
+    assert!(
+        !client.get_input_notes(NoteFilter::Processing).await.unwrap().is_empty(),
+        "submitting the consume transaction must track the note as processing"
+    );
+}
+
 #[tokio::test]
 async fn note_without_asset() {
     let (mut client, _rpc_api, keystore) = Box::pin(create_test_client()).await;

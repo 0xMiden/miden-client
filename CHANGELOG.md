@@ -7,6 +7,7 @@
 * [FIX] Fixed `derive_account_commitments` to return the final account commitment when multiple transactions for the same account are committed in the same block ([#2164](https://github.com/0xMiden/miden-client/pull/2164)).
 * [FIX] Fixed the `sync_notes_with_details` to fetch the attachments for private notes ([#2214](https://github.com/0xMiden/miden-client/pull/2214)).
 * [rust] Expanded validation for output notes before executing a `TransactionRequest`. ([#89](https://github.com/0xMiden/wallet-adapter/issues/89))
+* [FIX][rust] `execute_transaction` no longer writes input-note tracking state to the store; input- and output-note tracking is persisted only by the atomic `apply_transaction` after the transaction is proven and submitted. This removes the half-applied-store window that could leave orphaned note rows if the process died mid-dispatch (root cause of recurring stuck "Consuming" notes). ([0xMiden/wallet#260](https://github.com/0xMiden/wallet/issues/260))
 
 ### Changes
 
