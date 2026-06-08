@@ -222,7 +222,7 @@ async fn apply_account_delta_preserves_fungible_callback_flag() -> anyhow::Resul
 
     // Create and insert an account with an empty vault.
     let account = AccountBuilder::new([7; 32])
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Private)
         .with_auth_component(AuthSingleSig::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
