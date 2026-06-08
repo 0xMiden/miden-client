@@ -38,6 +38,7 @@
 * [BREAKING] Note attachments are no longer carried on the note-transport wire format (only `NoteHeader` + serialized `NoteDetails`). ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
 * [BREAKING][rust] Removed the top-level `miden_client::standards` alias. Use the curated client paths as before, or the new raw upstream namespaces `miden_client::account::standards::*`, `miden_client::note::standards::*`, and `miden_client::testing::standards::*`. ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
 * Added a blanket implementation for `NodeRpcClient::get_account_details` ([#2196](https://github.com/0xMiden/miden-client/pull/2196)).
+* Replaced `node-builder` crate with a leaner `test-node-genesis` crate ([#2232](https://github.com/0xMiden/miden-client/pull/2232)).
 
 ### Enhancements
 
