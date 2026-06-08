@@ -154,6 +154,13 @@ where
             return Ok(Vec::new());
         }
 
+        // Drain any private notes whose previous relay attempt failed. A flush
+        // error is logged, not propagated: a failing relay must not block the
+        // sync, and the entries stay durable for the next attempt.
+        if let Err(err) = self.flush_relay_outbox().await {
+            tracing::warn!(?err, "relay outbox flush failed during sync; entries retained");
+        }
+
         let cursor = self.store.get_note_transport_cursor().await?;
         let note_tags: Vec<_> = self.store.get_unique_note_tags().await?.into_iter().collect();
         let (ids, new_cursor) = self.fetch_transport_notes(cursor, &note_tags).await?;

@@ -4,6 +4,7 @@ pub mod generated;
 pub mod grpc;
 
 use alloc::boxed::Box;
+use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -35,6 +36,14 @@ pub const NOTE_TRANSPORT_TESTNET_ENDPOINT: &str = "https://transport.miden.io";
 pub const NOTE_TRANSPORT_DEVNET_ENDPOINT: &str = "https://transport.devnet.miden.io";
 pub const NOTE_TRANSPORT_CURSOR_STORE_SETTING: &str = "note_transport_cursor";
 
+/// Settings key for the durable relay outbox: a serialized `Vec<NoteInfo>` of
+/// private notes whose transport delivery has not yet succeeded.
+/// `send_private_note` appends (replacing any entry with the same note id)
+/// before relaying; [`Client::flush_relay_outbox`] drains entries that re-send
+/// successfully. Reusing the settings k/v avoids a Store-trait schema change
+/// while surviving process restarts.
+pub const NOTE_TRANSPORT_OUTBOX_KEY: &str = "note_transport_outbox";
+
 /// Client note transport methods.
 impl<AUTH> Client<AUTH> {
     /// Check if note transport connection is configured
@@ -56,6 +65,13 @@ impl<AUTH> Client<AUTH> {
     /// The note will be end-to-end encrypted (unimplemented, currently plaintext)
     /// using the provided recipient's `address` details.
     /// The recipient will be able to retrieve this note through the note's [`NoteTag`].
+    ///
+    /// **Durability.** The relay payload is persisted to the outbox before the
+    /// transport call. If the call fails or is interrupted, the entry stays in
+    /// the outbox and is retried on the next [`Client::flush_relay_outbox`]
+    /// (which [`Client::sync_note_transport`] runs), so a transient transport
+    /// failure does not drop the note. The receiver dedupes by note id, so a
+    /// re-send after a partial success is harmless.
     pub async fn send_private_note(
         &mut self,
         note: Note,
@@ -64,13 +80,117 @@ impl<AUTH> Client<AUTH> {
         let api = self.get_note_transport_api()?;
 
         let header = *note.header();
+        let note_id = header.id();
         let details = NoteDetails::from(note);
         let details_bytes = details.to_bytes();
         // e2ee impl hint:
         // address.key().encrypt(details_bytes)
+
+        // Persist the payload before the network call so a failed or
+        // interrupted `send_note` leaves a recoverable record rather than
+        // losing the only copy with the call frame.
+        let entry = NoteInfo {
+            header,
+            details_bytes: details_bytes.clone(),
+        };
+        let mut outbox = self.load_relay_outbox().await?;
+        // Replace any existing entry for this note id so the latest payload
+        // wins when a still-pending note is re-sent.
+        outbox.retain(|e| e.header.id() != note_id);
+        outbox.push(entry);
+        self.save_relay_outbox(outbox).await?;
+
         api.send_note(header, details_bytes).await?;
 
+        // Relay succeeded — drop the entry. A failed store write here is
+        // tolerable: the next flush re-sends and the receiver dedupes by note
+        // id, so a stale entry never causes loss.
+        let mut outbox = self.load_relay_outbox().await?;
+        outbox.retain(|e| e.header.id() != note_id);
+        self.save_relay_outbox(outbox).await?;
+
         Ok(())
+    }
+
+    /// Re-attempt every relay payload in the durable outbox. Each entry is a
+    /// private note whose previous transport delivery failed. Successful
+    /// re-sends are dropped; failures are kept for the next call. Every entry
+    /// is attempted independently, so one persistently-failing note does not
+    /// block the others.
+    ///
+    /// [`Client::sync_note_transport`] runs this automatically and ignores its
+    /// error, so a relay failure can't block a sync. Callers driving retries
+    /// themselves can invoke it directly and inspect the returned error.
+    pub async fn flush_relay_outbox(&self) -> Result<(), ClientError> {
+        let api = self.get_note_transport_api()?;
+
+        let entries = self.load_relay_outbox().await?;
+        if entries.is_empty() {
+            return Ok(());
+        }
+
+        // Attempt every entry independently so a single persistently-failing
+        // note can't block the rest. The outbox holds only the caller's own
+        // failed sends, so it stays small and this is not a meaningful burst.
+        let mut remaining = Vec::new();
+        let mut last_err: Option<NoteTransportError> = None;
+
+        for entry in entries {
+            match api.send_note(entry.header, entry.details_bytes.clone()).await {
+                Ok(()) => {},
+                Err(err) => {
+                    tracing::warn!(?err, "relay-outbox entry retry failed; will retry next sync");
+                    remaining.push(entry);
+                    last_err = Some(err);
+                },
+            }
+        }
+
+        self.save_relay_outbox(remaining).await?;
+
+        if let Some(err) = last_err {
+            return Err(err.into());
+        }
+        Ok(())
+    }
+
+    /// Load the durable relay outbox.
+    ///
+    /// Returns an empty `Vec` if the outbox key is absent. On deserialization
+    /// failure (schema mismatch or storage corruption) the entry is dropped and
+    /// an empty `Vec` is returned — leaving unreadable bytes in place would
+    /// block every subsequent relay because each sync would re-read them.
+    async fn load_relay_outbox(&self) -> Result<Vec<NoteInfo>, ClientError> {
+        let bytes = self
+            .store
+            .get_setting(String::from(NOTE_TRANSPORT_OUTBOX_KEY))
+            .await
+            .map_err(ClientError::StoreError)?;
+        let Some(bytes) = bytes else {
+            return Ok(Vec::new());
+        };
+        match Vec::<NoteInfo>::read_from_bytes(&bytes) {
+            Ok(entries) => Ok(entries),
+            Err(err) => {
+                tracing::warn!(?err, "dropping unreadable relay outbox; resetting to empty");
+                self.store
+                    .remove_setting(String::from(NOTE_TRANSPORT_OUTBOX_KEY))
+                    .await
+                    .map_err(ClientError::StoreError)?;
+                Ok(Vec::new())
+            },
+        }
+    }
+
+    /// Persist the relay outbox, removing the key entirely when empty so the
+    /// settings table doesn't accumulate empty-vec blobs.
+    async fn save_relay_outbox(&self, entries: Vec<NoteInfo>) -> Result<(), ClientError> {
+        let key = String::from(NOTE_TRANSPORT_OUTBOX_KEY);
+        if entries.is_empty() {
+            return self.store.remove_setting(key).await.map_err(ClientError::StoreError);
+        }
+        let bytes = entries.to_bytes();
+        self.store.set_setting(key, bytes).await.map_err(ClientError::StoreError)
     }
 }
 
