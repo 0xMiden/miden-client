@@ -17,4 +17,9 @@ pub enum NoteTransportError {
     Deserialization(#[from] DeserializationError),
     #[error("note transport network error: {0}")]
     Network(String),
+    #[error(
+        "fetch_all_private_notes did not converge after {0} iterations — the server cursor \
+         is advancing but never returns an empty batch"
+    )]
+    PaginationDidNotTerminate(usize),
 }
