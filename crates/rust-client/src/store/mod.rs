@@ -32,7 +32,6 @@ use miden_protocol::account::{
     AccountHeader,
     AccountId,
     AccountStorage,
-    AccountStorageHeader,
     StorageMapKey,
     StorageMapWitness,
     StorageSlot,
@@ -608,21 +607,6 @@ pub trait Store: Send + Sync {
         account_id: AccountId,
         filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError>;
-
-    /// Returns the storage header (slot names, types, and current values/roots) for the given
-    /// account.
-    ///
-    /// This is a lightweight read used by `Client::build_sync_input` to populate
-    /// `AccountSyncHint`s without paying the cost of reading every map entry. The default
-    /// implementation falls back to `get_account_storage`; backends are encouraged to override
-    /// it with a focused query.
-    async fn get_account_storage_header(
-        &self,
-        account_id: AccountId,
-    ) -> Result<AccountStorageHeader, StoreError> {
-        let storage = self.get_account_storage(account_id, AccountStorageFilter::All).await?;
-        Ok(AccountStorageHeader::from(&storage))
-    }
 
     /// Retrieves a storage slot value by name.
     ///

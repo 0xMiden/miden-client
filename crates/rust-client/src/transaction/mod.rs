@@ -90,7 +90,12 @@ use tracing::info;
 use super::Client;
 use crate::ClientError;
 use crate::note::{NoteScreenerError, NoteUpdateTracker, StandardNote};
-use crate::rpc::domain::account::{AccountStorageRequirements, GetAccountRequest, VaultFetch};
+use crate::rpc::domain::account::{
+    AccountStorageRequirements,
+    GetAccountRequest,
+    StorageMapFetch,
+    VaultFetch,
+};
 use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
@@ -1146,7 +1151,7 @@ pub(crate) async fn fetch_public_account_inputs(
         .get_account(
             account_id,
             GetAccountRequest::new()
-                .with_storage(storage_requirements.clone())
+                .with_storage(StorageMapFetch::Slots(storage_requirements.clone()))
                 .at(account_state_at)
                 .with_known_code(known_code)
                 .with_vault(vault),

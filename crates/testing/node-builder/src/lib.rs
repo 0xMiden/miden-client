@@ -69,6 +69,9 @@ use url::Url;
 pub const DEFAULT_BLOCK_INTERVAL: u64 = 5_000;
 pub const DEFAULT_BATCH_INTERVAL: u64 = 2_000;
 pub const DEFAULT_RPC_PORT: u16 = 57_291;
+/// Default remote transaction prover endpoint used by the ntx-builder. Matches the local prover
+/// started via `make start-prover` (see `crates/testing/prover`).
+pub const DEFAULT_PROVER_URL: &str = "http://127.0.0.1:50051";
 pub const GENESIS_ACCOUNT_FILE: &str = "account.mac";
 /// Arbitrary shared secret authenticating ntx-builder RPC calls. The value is unconstrained;
 /// the ntx-builder (client) and the RPC server (validator) only need to agree on it.
@@ -80,6 +83,7 @@ pub struct NodeBuilder {
     block_interval: Duration,
     batch_interval: Duration,
     rpc_port: u16,
+    prover_url: Url,
 }
 
 impl NodeBuilder {
@@ -93,7 +97,15 @@ impl NodeBuilder {
             block_interval: Duration::from_millis(DEFAULT_BLOCK_INTERVAL),
             batch_interval: Duration::from_millis(DEFAULT_BATCH_INTERVAL),
             rpc_port: DEFAULT_RPC_PORT,
+            prover_url: Url::parse(DEFAULT_PROVER_URL).expect("default prover URL is valid"),
         }
+    }
+
+    /// Sets the remote transaction prover endpoint used by the ntx-builder.
+    #[must_use]
+    pub fn with_prover_url(mut self, prover_url: Url) -> Self {
+        self.prover_url = prover_url;
+        self
     }
 
     /// Sets the block production interval.
@@ -170,10 +182,12 @@ impl NodeBuilder {
             .with_context(|| "failed to bootstrap store")?;
 
         // Bootstrap the validator database with the genesis block header so that block
-        // validation can find the chain tip.
-        let validator_db = miden_validator::db::load(self.data_directory.join("validator.sqlite3"))
-            .await
-            .with_context(|| "failed to initialize validator database")?;
+        // validation can find the chain tip. `setup` creates the database and applies migrations;
+        // `load` would require an already-bootstrapped file.
+        let validator_db =
+            miden_validator::db::setup(self.data_directory.join("validator.sqlite3"))
+                .await
+                .with_context(|| "failed to initialize validator database")?;
         validator_db
             .transact("bootstrap_validator", move |conn| {
                 miden_validator::db::upsert_block_header(conn, &genesis_header)
@@ -221,6 +235,7 @@ impl NodeBuilder {
 
         let ntx_builder_handle = Self::start_ntx_builder(
             rpc_address,
+            self.prover_url.clone(),
             ntx_builder_database_filepath,
             ntx_builder_listener,
             ntx_auth_header.clone(),
@@ -314,6 +329,7 @@ impl NodeBuilder {
     /// Start ntx-builder and return the task handle.
     fn start_ntx_builder(
         rpc_address: SocketAddr,
+        prover_url: Url,
         database_filepath: PathBuf,
         listener: TcpListener,
         rpc_auth_header: AsciiMetadataValue,
@@ -322,7 +338,7 @@ impl NodeBuilder {
             let rpc_url =
                 Url::parse(&format!("http://{rpc_address}/")).context("Failed to parse URL")?;
 
-            NtxBuilderConfig::new(rpc_url, database_filepath)
+            NtxBuilderConfig::new(rpc_url, prover_url, database_filepath)
                 .with_max_cycles(1 << 18)
                 .with_rpc_auth_header(rpc_auth_header)
                 .build()

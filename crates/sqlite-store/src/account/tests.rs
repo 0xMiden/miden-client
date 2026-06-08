@@ -33,6 +33,7 @@ use miden_client::store::{ClientAccountType, Store};
 use miden_client::testing::common::ACCOUNT_ID_REGULAR;
 use miden_client::{EMPTY_WORD, Felt, ONE, ZERO};
 use miden_protocol::account::AccountComponentMetadata;
+use miden_protocol::asset::AssetCallbackFlag;
 use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
@@ -198,6 +199,88 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
         panic!("Expected map slot content");
     };
     assert_eq!(map_b.entries().count(), 0);
+
+    Ok(())
+}
+
+/// Regression test: applying a fungible vault delta must preserve the asset's
+/// [`AssetCallbackFlag`].
+///
+/// The callback flag is part of an asset's vault key *and* value encoding, so if the store
+/// drops it while replaying a delta, the locally recomputed vault root diverges from the one
+/// the transaction kernel produced (which carries the flag, exactly as
+/// `AssetVault::apply_delta` does in miden-protocol). That divergence surfaces as a
+/// `MerkleStoreError`/`ConflictingRoots` when `apply_account_vault_delta` compares the
+/// recomputed root against `final_account_state.vault_root()`.
+///
+/// Callback-bearing fungible assets are produced by agglayer faucets (B2AGG), so this path
+/// is exercised when a wallet consumes an agglayer-minted note. Ordinary assets use the
+/// disabled flag, where preserving it is a no-op — which is why only agglayer hit the bug.
+#[tokio::test]
+async fn apply_account_delta_preserves_fungible_callback_flag() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+
+    // Create and insert an account with an empty vault.
+    let account = AccountBuilder::new([7; 32])
+        .account_type(AccountType::Private)
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Poseidon2,
+        ))
+        .with_component(BasicWallet)
+        .build_existing()?;
+    store
+        .insert_account(&account, Address::new(account.id()), ClientAccountType::Native)
+        .await?;
+
+    // A fungible asset that carries an *enabled* callback flag (as agglayer-minted assets do).
+    let callback_asset: Asset =
+        FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?, 100)?
+            .with_callbacks(AssetCallbackFlag::Enabled)
+            .into();
+
+    let vault_delta = AccountVaultDelta::from_iters(vec![callback_asset], []);
+    let delta = AccountDelta::new(account.id(), AccountStorageDelta::new(), vault_delta, ONE)?;
+
+    // `apply_delta` uses miden-protocol's `AssetVault::apply_delta`, which preserves the
+    // callback flag; the resulting header carries the authoritative (with-callback) vault root.
+    let mut account_after_delta = account.clone();
+    account_after_delta.apply_delta(&delta)?;
+
+    let account_id = account.id();
+    let final_state: AccountHeader = (&account_after_delta).into();
+    let expected_vault_root = final_state.vault_root();
+    let smt_forest = store.smt_forest.clone();
+    store
+        .interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+
+            // Without preserving the callback flag this fails with a `ConflictingRoots`
+            // merkle store error (recomputed root != final_state.vault_root()).
+            SqliteStore::apply_account_delta(
+                &tx,
+                &mut smt_forest,
+                &account.into(),
+                &final_state,
+                BTreeMap::default(),
+                &BTreeMap::new(),
+                &delta,
+            )?;
+
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    let updated_account: Account = store
+        .get_account(account_id)
+        .await?
+        .context("failed to find inserted account")?
+        .try_into()?;
+
+    assert_eq!(updated_account, account_after_delta);
+    assert_eq!(updated_account.vault().root(), expected_vault_root);
 
     Ok(())
 }
