@@ -12,19 +12,17 @@
 //!
 //! ```rust
 //! # use miden_client::{
-//! #   account::{Account, AccountBuilder, AccountType, component::BasicWallet},
+//! #   account::{Account, AccountBuilder, AccountBuilderSchemaCommitmentExt, AccountType, component::BasicWallet},
 //! #   crypto::FeltRng
 //! # };
-//! # use miden_protocol::account::AccountStorageMode;
 //! # async fn add_new_account_example<AUTH>(
 //! #     client: &mut miden_client::Client<AUTH>
 //! # ) -> Result<(), miden_client::ClientError> {
 //! #   let random_seed = Default::default();
 //! let account = AccountBuilder::new(random_seed)
-//!     .account_type(AccountType::RegularAccountImmutableCode)
-//!     .storage_mode(AccountStorageMode::Private)
+//!     .account_type(AccountType::Private)
 //!     .with_component(BasicWallet)
-//!     .build()?;
+//!     .build_with_schema_commitment()?;
 //!
 //! // Add the account to the client. The account already embeds its seed information.
 //! client.add_account(&account, false).await?;
@@ -38,6 +36,7 @@ use alloc::vec::Vec;
 
 use miden_protocol::Felt;
 use miden_protocol::account::auth::PublicKey;
+pub use miden_protocol::account::delta::AccountUpdateDetails;
 pub use miden_protocol::account::{
     Account,
     AccountBuilder,
@@ -49,17 +48,24 @@ pub use miden_protocol::account::{
     AccountHeader,
     AccountId,
     AccountIdPrefix,
+    AccountIdPrefixV1,
+    AccountIdV1,
+    AccountIdVersion,
+    AccountProcedureRoot,
     AccountStorage,
-    AccountStorageMode,
     AccountType,
     PartialAccount,
     PartialStorage,
     PartialStorageMap,
+    RoleSymbol,
     StorageMap,
+    StorageMapDelta,
     StorageMapKey,
+    StorageMapKeyHash,
     StorageMapWitness,
     StorageSlot,
     StorageSlotContent,
+    StorageSlotDelta,
     StorageSlotId,
     StorageSlotName,
     StorageSlotType,
@@ -71,17 +77,28 @@ use miden_protocol::note::NoteTag;
 
 mod account_reader;
 pub use account_reader::AccountReader;
+/// Raw access to `miden-standards` account modules for items not curated by `miden-client`.
+pub use miden_standards::account as standards;
 use miden_standards::account::auth::AuthSingleSig;
 // RE-EXPORTS
 // ================================================================================================
-pub use miden_standards::account::interface::AccountInterfaceExt;
+pub use miden_standards::account::interface::{
+    AccountComponentInterface,
+    AccountComponentInterfaceExt,
+    AccountInterface,
+    AccountInterfaceExt,
+};
+pub use miden_standards::account::metadata::{
+    AccountBuilderSchemaCommitmentExt,
+    AccountSchemaCommitment,
+};
 use miden_standards::account::wallets::BasicWallet;
 
 use super::Client;
 use crate::errors::ClientError;
-use crate::rpc::domain::account::FetchedAccount;
+use crate::rpc::domain::account::GetAccountRequest;
 use crate::rpc::node::{EndpointError, GetAccountError};
-use crate::store::{AccountStatus, AccountStorageFilter};
+use crate::store::{AccountStatus, AccountStorageFilter, ClientAccountType};
 use crate::sync::NoteTagRecord;
 
 pub mod component {
@@ -91,28 +108,69 @@ pub mod component {
     pub use miden_protocol::account::component::{
         FeltSchema,
         InitStorageData,
+        InitStorageDataError,
+        MapSlotSchema,
+        SchemaRequirement,
         SchemaType,
+        SchemaTypeError,
         StorageSchema,
         StorageSlotSchema,
         StorageValueName,
+        StorageValueNameError,
+        ValueSlotSchema,
+        WordSchema,
+        WordValue,
     };
-    pub use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
+    pub use miden_protocol::account::{
+        AccountComponent,
+        AccountComponentMetadata,
+        AccountComponentName,
+        AccountProcedureRoot,
+        RoleSymbol,
+    };
+    pub use miden_standards::account::access::{
+        AccessControl,
+        Authority,
+        AuthorityError,
+        Ownable2Step,
+        Ownable2StepError,
+        Pausable,
+        PausableManager,
+        PausableStorage,
+        RoleBasedAccessControl,
+    };
     pub use miden_standards::account::auth::*;
-    pub use miden_standards::account::components::{
-        basic_fungible_faucet_library,
-        basic_wallet_library,
-        multisig_library,
-        network_fungible_faucet_library,
-        no_auth_library,
-        singlesig_acl_library,
-        singlesig_library,
+    pub use miden_standards::account::components::StandardAccountComponent;
+    pub use miden_standards::account::faucets::{
+        Description,
+        ExternalLink,
+        FungibleFaucet,
+        FungibleFaucetBuilder,
+        FungibleFaucetError,
+        LogoURI,
+        TokenMetadata,
+        TokenMetadataError,
+        TokenName,
+        create_fungible_faucet,
     };
-    pub use miden_standards::account::faucets::{BasicFungibleFaucet, NetworkFungibleFaucet};
-    pub use miden_standards::account::mint_policies::{
-        AuthControlled,
-        AuthControlledInitConfig,
-        OwnerControlled,
-        OwnerControlledInitConfig,
+    pub use miden_standards::account::policies::{
+        AllowlistOwnerControlled,
+        AllowlistStorage,
+        BasicAllowlist,
+        BasicBlocklist,
+        BlocklistOwnerControlled,
+        BlocklistStorage,
+        BurnAllowAll,
+        BurnOwnerOnly,
+        BurnPolicyConfig,
+        MintAllowAll,
+        MintOwnerOnly,
+        MintPolicyConfig,
+        PolicyRegistration,
+        TokenPolicyManager,
+        TokenPolicyManagerError,
+        TransferAllowAll,
+        TransferPolicy,
     };
     pub use miden_standards::account::wallets::BasicWallet;
 }
@@ -123,8 +181,11 @@ pub mod component {
 /// This section of the [Client] contains methods for:
 ///
 /// - **Account creation:** Use the [`AccountBuilder`] to construct new accounts, specifying account
-///   type, storage mode (public/private), and attaching necessary components (e.g., basic wallet or
-///   fungible faucet). After creation, they can be added to the client.
+///   visibility (`AccountType::Public` / `AccountType::Private`) and attaching necessary components
+///   (e.g., basic wallet or fungible faucet). Prefer
+///   [`AccountBuilderSchemaCommitmentExt::build_with_schema_commitment`] so the account includes
+///   merged storage schema commitment metadata; use plain [`AccountBuilder::build`] only when you
+///   need to opt out. After creation, accounts can be added to the client.
 ///
 /// - **Account tracking:** Accounts added via the client are persisted to the local store, where
 ///   their state (including nonce, balance, and metadata) is updated upon every synchronization
@@ -149,11 +210,23 @@ impl<AUTH> Client<AUTH> {
     ///   being tracked.
     /// - If `overwrite` is set to `true` and the `account_data` commitment doesn't match the
     ///   network's account commitment.
-    /// - If the client has reached the accounts limit.
-    /// - If the client has reached the note tags limit.
     pub async fn add_account(
         &mut self,
         account: &Account,
+        overwrite: bool,
+    ) -> Result<(), ClientError> {
+        self.add_account_inner(account, ClientAccountType::Native, overwrite).await
+    }
+
+    /// Inserts `account` into the store (or overwrites it if `overwrite` is true) and registers
+    /// the per-account note tag if `client_account_type` is [`ClientAccountType::Native`].
+    ///
+    /// Switching the [`ClientAccountType`] of an already-tracked account is not supported and
+    /// returns [`ClientError::AccountWatchedMismatch`].
+    async fn add_account_inner(
+        &mut self,
+        account: &Account,
+        client_account_type: ClientAccountType,
         overwrite: bool,
     ) -> Result<(), ClientError> {
         if account.is_new() {
@@ -173,28 +246,34 @@ impl<AUTH> Client<AUTH> {
 
         match tracked_account {
             None => {
-                // Check limits since it's a non-tracked account
-                self.check_account_limit().await?;
-                self.check_note_tag_limit().await?;
-
                 let default_address = Address::new(account.id());
 
-                // If the account is not being tracked, insert it into the store regardless of the
-                // `overwrite` flag
-                let default_address_note_tag = default_address.to_note_tag();
-                let note_tag_record =
-                    NoteTagRecord::with_account_source(default_address_note_tag, account.id());
-                self.store.add_note_tag(note_tag_record).await?;
-
                 self.store
-                    .insert_account(account, default_address)
+                    .insert_account(account, default_address.clone(), client_account_type)
                     .await
-                    .map_err(ClientError::StoreError)
+                    .map_err(ClientError::StoreError)?;
+
+                if matches!(client_account_type, ClientAccountType::Native) {
+                    // Set the default address note tag so sync pulls notes.
+                    let default_address_note_tag = default_address.to_note_tag();
+                    let note_tag_record =
+                        NoteTagRecord::with_account_source(default_address_note_tag, account.id());
+                    self.store.add_note_tag(note_tag_record).await?;
+                }
+
+                Ok(())
             },
             Some(tracked_account) => {
                 if !overwrite {
                     // Only overwrite the account if the flag is set to `true`
                     return Err(ClientError::AccountAlreadyTracked(account.id()));
+                }
+
+                if client_account_type != tracked_account.client_account_type() {
+                    // Switching between Watched and Native after the account is tracked is not
+                    // supported: the per-account note tag and any client-side state derived from
+                    // that mode are set up at insertion time and not migrated on the fly.
+                    return Err(ClientError::AccountWatchedMismatch(account.id()));
                 }
 
                 if tracked_account.nonce().as_canonical_u64() > account.nonce().as_canonical_u64() {
@@ -205,8 +284,12 @@ impl<AUTH> Client<AUTH> {
                 if tracked_account.is_locked() {
                     // If the tracked account is locked, check that the account commitment matches
                     // the one in the network
-                    let network_account_commitment =
-                        self.rpc_api.get_account_details(account.id()).await?.commitment();
+                    let network_account_commitment = self
+                        .rpc_api
+                        .get_account(account.id(), GetAccountRequest::new())
+                        .await?
+                        .1
+                        .account_commitment();
                     if network_account_commitment != account.to_commitment() {
                         return Err(ClientError::AccountCommitmentMismatch(
                             network_account_commitment,
@@ -214,20 +297,57 @@ impl<AUTH> Client<AUTH> {
                     }
                 }
 
-                self.store.update_account(account).await.map_err(ClientError::StoreError)
+                self.store.update_account(account).await?;
+
+                Ok(())
             },
         }
     }
 
     /// Imports an account from the network to the client's store. The account needs to be public
     /// and be tracked by the network, it will be fetched by its ID. If the account was already
-    /// being tracked by the client, it's state will be overwritten.
+    /// being tracked by the client, its state will be overwritten.
+    ///
+    /// To import an account as watched (state-tracking only, no note sync), use
+    /// [`Self::import_watched_account_by_id`] instead. Switching an already-tracked account
+    /// between Native and Watched is not supported.
     ///
     /// # Errors
     /// - If the account is not found on the network.
     /// - If the account is private.
+    /// - If the account is already tracked as watched.
     /// - There was an error sending the request to the network.
     pub async fn import_account_by_id(&mut self, account_id: AccountId) -> Result<(), ClientError> {
+        let account = self.fetch_public_account(account_id).await?;
+        self.add_account_inner(&account, ClientAccountType::Native, true).await
+    }
+
+    /// Starts watching an on-chain account ([`ClientAccountType::Watched`]).
+    ///
+    /// Like [`Self::import_account_by_id`], the account is fetched from the network by its ID.
+    /// Unlike `import_account_by_id`, the account is added without registering its derived note
+    /// tag: `sync_state` will keep the account's commitment, nonce and storage up to date but
+    /// will **not** pull notes targeted at it.
+    ///
+    /// If the account is already being tracked as watched its state is overwritten. Switching an
+    /// already-tracked native account to watched is not supported.
+    ///
+    /// # Errors
+    /// - If the account is not found on the network.
+    /// - If the account is private.
+    /// - If the account is already tracked as native.
+    /// - There was an error sending the request to the network.
+    pub async fn import_watched_account_by_id(
+        &mut self,
+        account_id: AccountId,
+    ) -> Result<(), ClientError> {
+        let account = self.fetch_public_account(account_id).await?;
+        self.add_account_inner(&account, ClientAccountType::Watched, true).await
+    }
+
+    /// Fetches a public [`Account`] from the network, returning a typed error when the account
+    /// doesn't exist on chain or is private.
+    async fn fetch_public_account(&self, account_id: AccountId) -> Result<Account, ClientError> {
         let fetched_account =
             self.rpc_api.get_account_details(account_id).await.map_err(|err| {
                 match err.endpoint_error() {
@@ -238,22 +358,15 @@ impl<AUTH> Client<AUTH> {
                 }
             })?;
 
-        let account = match fetched_account {
-            FetchedAccount::Private(..) => {
-                return Err(ClientError::AccountIsPrivate(account_id));
-            },
-            FetchedAccount::Public(account, ..) => *account,
-        };
-
-        self.add_account(&account, true).await
+        fetched_account.ok_or(ClientError::AccountIsPrivate(account_id))
     }
 
-    /// Adds an [`Address`] to the associated [`AccountId`], alongside its derived [`NoteTag`].
+    /// Adds an [`Address`] to the associated [`AccountId`], alongside its derived [`NoteTag`]. If
+    /// the account is tracked as watched, the note tag is not registered.
     ///
     /// # Errors
     /// - If the account is not found on the network.
     /// - If the address is already being tracked.
-    /// - If the client has reached the note tags limit.
     pub async fn add_address(
         &mut self,
         address: Address,
@@ -268,36 +381,36 @@ impl<AUTH> Client<AUTH> {
         let tracked_account = self.store.get_account(account_id).await?;
         match tracked_account {
             None => Err(ClientError::AccountDataNotFound(account_id)),
-            Some(_tracked_account) => {
-                // Check that the Address is not already tracked
-                let derived_note_tag: NoteTag = address.to_note_tag();
-                let note_tag_record =
-                    NoteTagRecord::with_account_source(derived_note_tag, account_id);
-                if self.store.get_note_tags().await?.contains(&note_tag_record) {
-                    return Err(ClientError::NoteTagDerivedAddressAlreadyTracked(
-                        address_bench32,
-                        derived_note_tag,
-                    ));
+            Some(tracked_account) => {
+                self.store.insert_address(address.clone(), account_id).await?;
+                // Watched accounts intentionally have no derived note tag registered to avoid sync
+                // state pulling notes for them.
+                if !tracked_account.is_watched() {
+                    let derived_note_tag: NoteTag = address.to_note_tag();
+                    let note_tag_record =
+                        NoteTagRecord::with_account_source(derived_note_tag, account_id);
+                    self.store.add_note_tag(note_tag_record).await?;
                 }
-
-                self.check_note_tag_limit().await?;
-                self.store.insert_address(address, account_id).await?;
                 Ok(())
             },
         }
     }
 
     /// Removes an [`Address`] from the associated [`AccountId`], alongside its derived [`NoteTag`].
-    ///
-    /// # Errors
-    /// - If the account is not found on the network.
-    /// - If the address is not being tracked.
+    /// If no address was tracked for the given account, this is a no-op.
     pub async fn remove_address(
         &mut self,
         address: Address,
         account_id: AccountId,
     ) -> Result<(), ClientError> {
-        self.store.remove_address(address, account_id).await?;
+        let derived_note_tag = address.to_note_tag();
+        let note_tag_record = NoteTagRecord::with_account_source(derived_note_tag, account_id);
+        self.store.remove_address(address).await?;
+        // Remove the note tag if no other address are associated with it.
+        let addresses = self.store.get_addresses_by_account_id(account_id).await?;
+        if addresses.iter().all(|address| address.to_note_tag() != derived_note_tag) {
+            self.store.remove_note_tag(note_tag_record).await?;
+        }
         Ok(())
     }
 
@@ -426,33 +539,60 @@ impl<AUTH> Client<AUTH> {
 /// - `init_seed`: Initial seed used to create the account. This is the seed passed to
 ///   [`AccountBuilder::new`].
 /// - `public_key`: Public key of the account used for the authentication component.
-/// - `storage_mode`: Storage mode of the account.
-/// - `is_mutable`: Whether the account is mutable or not.
+/// - `account_visibility`: Public/private visibility of the account.
 ///
 /// # Errors
 /// - If the account cannot be built.
 pub fn build_wallet_id(
     init_seed: [u8; 32],
     public_key: &PublicKey,
-    storage_mode: AccountStorageMode,
-    is_mutable: bool,
+    account_visibility: AccountType,
 ) -> Result<AccountId, ClientError> {
-    let account_type = if is_mutable {
-        AccountType::RegularAccountUpdatableCode
-    } else {
-        AccountType::RegularAccountImmutableCode
-    };
-
     let auth_scheme = public_key.auth_scheme();
     let auth_component: AccountComponent =
         AuthSingleSig::new(public_key.to_commitment(), auth_scheme).into();
 
     let account = AccountBuilder::new(init_seed)
-        .account_type(account_type)
-        .storage_mode(storage_mode)
+        .account_type(account_visibility)
         .with_auth_component(auth_component)
         .with_component(BasicWallet)
-        .build()?;
+        .build_with_schema_commitment()?;
 
     Ok(account.id())
+}
+
+#[cfg(test)]
+mod schema_commitment_tests {
+    use miden_protocol::EMPTY_WORD;
+    use miden_protocol::account::auth::AuthSecretKey;
+    use miden_standards::account::metadata::AccountSchemaCommitment;
+
+    use super::{
+        AccountBuilder,
+        AccountBuilderSchemaCommitmentExt,
+        AccountType,
+        AuthSingleSig,
+        BasicWallet,
+    };
+    use crate::auth::AuthSchemeId;
+
+    #[test]
+    fn wallet_build_includes_schema_commitment_metadata_slot() {
+        let key = AuthSecretKey::new_falcon512_poseidon2();
+        let account = AccountBuilder::new([2u8; 32])
+            .account_type(AccountType::Private)
+            .with_auth_component(AuthSingleSig::new(
+                key.public_key().to_commitment(),
+                AuthSchemeId::Falcon512Poseidon2,
+            ))
+            .with_component(BasicWallet)
+            .build_with_schema_commitment()
+            .expect("build_with_schema_commitment");
+
+        let commitment = account
+            .storage()
+            .get_item(AccountSchemaCommitment::schema_commitment_slot())
+            .expect("schema commitment slot");
+        assert_ne!(commitment, EMPTY_WORD);
+    }
 }

@@ -6,7 +6,7 @@ mod transaction;
 
 pub use account::GetAccountError;
 pub use block::{GetBlockByNumberError, GetBlockHeaderError};
-pub use note::{CheckNullifiersError, GetNoteScriptByRootError, GetNotesByIdError};
+pub use note::{GetNoteScriptByRootError, GetNotesByIdError};
 pub use sync::{
     NoteSyncError,
     SyncAccountStorageMapsError,
@@ -54,9 +54,6 @@ pub enum EndpointError {
     /// Error from the `GetNoteScriptByRoot` endpoint
     #[error(transparent)]
     GetNoteScriptByRoot(#[from] GetNoteScriptByRootError),
-    /// Error from the `CheckNullifiers` endpoint
-    #[error(transparent)]
-    CheckNullifiers(#[from] CheckNullifiersError),
     /// Error from the `GetAccount` endpoint
     #[error(transparent)]
     GetAccount(#[from] GetAccountError),
@@ -103,13 +100,14 @@ pub fn parse_node_error(
         RpcEndpoint::GetNoteScriptByRoot => Some(EndpointError::GetNoteScriptByRoot(
             GetNoteScriptByRootError::from_code(code, message),
         )),
-        RpcEndpoint::CheckNullifiers => {
-            Some(EndpointError::CheckNullifiers(CheckNullifiersError::from_code(code, message)))
-        },
         RpcEndpoint::GetAccount => {
             Some(EndpointError::GetAccount(GetAccountError::from_code(code, message)))
         },
         // These endpoints don't have typed errors from the node
-        RpcEndpoint::SyncChainMmr | RpcEndpoint::Status | RpcEndpoint::GetLimits => None,
+        RpcEndpoint::SyncChainMmr
+        | RpcEndpoint::Status
+        | RpcEndpoint::GetLimits
+        | RpcEndpoint::GetNetworkNoteStatus
+        | RpcEndpoint::SubmitProvenBatch => None,
     }
 }

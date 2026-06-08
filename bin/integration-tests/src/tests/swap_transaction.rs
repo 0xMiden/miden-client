@@ -1,8 +1,9 @@
 use anyhow::{Context, Result};
-use miden_client::account::AccountStorageMode;
+use miden_client::account::AccountType;
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{Note, NoteDetails, NoteFile, NoteType, SwapNote};
+use miden_client::store::NoteFilter;
 use miden_client::testing::common::*;
 use miden_client::transaction::{SwapTransactionData, TransactionRequestBuilder};
 use tracing::info;
@@ -28,7 +29,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     // Create Client 1's basic wallet (We'll call it accountA)
     let (account_a, ..) = insert_new_wallet(
         &mut client1,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_1,
         RPO_FALCON_SCHEME_ID,
     )
@@ -36,7 +37,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     // Create Client 2's basic wallet (We'll call it accountB)
     let (account_b, ..) = insert_new_wallet(
         &mut client2,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_2,
         RPO_FALCON_SCHEME_ID,
     )
@@ -45,7 +46,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     // Create client with faucets BTC faucet (note: it's not real BTC)
     let (btc_faucet_account, _) = insert_new_fungible_faucet(
         &mut client1,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_1,
         RPO_FALCON_SCHEME_ID,
     )
@@ -54,7 +55,7 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     // Create client with faucets ETH faucet (note: it's not real ETH)
     let (eth_faucet_account, _) = insert_new_fungible_faucet(
         &mut client2,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_2,
         RPO_FALCON_SCHEME_ID,
     )
@@ -130,12 +131,14 @@ pub async fn test_swap_fully_onchain(client_config: ClientConfig) -> Result<()> 
     // sync on client 1, we should get the missing payback note details.
     // try consuming the received note with accountA, it should now have 25 ETH
     client1.sync_state().await?;
-    info!(note_id = %expected_payback_note_details[0].id(), account_id = %account_a.id(), "Consuming swap payback note on client 1");
+    let payback_commitment = expected_payback_note_details[0].commitment();
+    info!(payback_commitment = %payback_commitment.to_hex(), account_id = %account_a.id(), "Consuming swap payback note on client 1");
 
     let note = client1
-        .get_input_note(expected_payback_note_details[0].id())
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![payback_commitment]))
         .await?
-        .unwrap()
+        .pop()
+        .expect("payback note should be present after sync")
         .try_into()?;
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;
     execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await?;
@@ -178,7 +181,7 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     // Create Client 1's basic wallet (We'll call it accountA)
     let (account_a, ..) = insert_new_wallet(
         &mut client1,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_1,
         RPO_FALCON_SCHEME_ID,
     )
@@ -186,7 +189,7 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     // Create Client 2's basic wallet (We'll call it accountB)
     let (account_b, ..) = insert_new_wallet(
         &mut client2,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_2,
         RPO_FALCON_SCHEME_ID,
     )
@@ -195,7 +198,7 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     // Create client with faucets BTC faucet (note: it's not real BTC)
     let (btc_faucet_account, _) = insert_new_fungible_faucet(
         &mut client1,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_1,
         RPO_FALCON_SCHEME_ID,
     )
@@ -203,7 +206,7 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     // Create client with faucets ETH faucet (note: it's not real ETH)
     let (eth_faucet_account, _) = insert_new_fungible_faucet(
         &mut client2,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_2,
         RPO_FALCON_SCHEME_ID,
     )
@@ -286,12 +289,14 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     // sync on client 1, we should get the missing payback note details.
     // try consuming the received note with accountA, it should now have 25 ETH
     client1.sync_state().await?;
-    info!(note_id = %expected_payback_note_details[0].id(), account_id = %account_a.id(), "Consuming swap payback note on client 1");
+    let payback_commitment = expected_payback_note_details[0].commitment();
+    info!(payback_commitment = %payback_commitment.to_hex(), account_id = %account_a.id(), "Consuming swap payback note on client 1");
 
     let note = client1
-        .get_input_note(expected_payback_note_details[0].id())
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![payback_commitment]))
         .await?
-        .unwrap()
+        .pop()
+        .expect("payback note should be present after sync")
         .try_into()?;
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;
     execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await?;

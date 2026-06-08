@@ -17,7 +17,6 @@ use miden_protocol::account::{
     AccountBuilder,
     AccountComponent,
     AccountComponentMetadata,
-    AccountStorageMode,
     AccountType,
     StorageMap,
     StorageMapKey,
@@ -33,6 +32,7 @@ use miden_protocol::testing::account_id::{
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
 };
 use miden_protocol::{Felt, Word};
+use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::wallets::BasicWallet;
 
 use super::PaymentNoteDescription;
@@ -96,14 +96,10 @@ async fn transaction_creates_two_notes() {
 #[tokio::test]
 async fn transaction_error_reports_source_line() {
     let (mut client, _, keystore) = Box::pin(create_test_client()).await;
-    let (wallet, _) = setup_wallet_and_faucet(
-        &mut client,
-        AccountStorageMode::Private,
-        &keystore,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await
-    .unwrap();
+    let (wallet, _) =
+        setup_wallet_and_faucet(&mut client, AccountType::Private, &keystore, RPO_FALCON_SCHEME_ID)
+            .await
+            .unwrap();
 
     let failing_script = client
         .code_builder()
@@ -161,14 +157,10 @@ impl TransactionProver for AlwaysFailingProver {
 #[tokio::test]
 async fn prover_fallback_pattern_allows_retry_with_different_prover() {
     let (mut client, _, keystore) = Box::pin(create_test_client()).await;
-    let (wallet, faucet) = setup_wallet_and_faucet(
-        &mut client,
-        AccountStorageMode::Private,
-        &keystore,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await
-    .unwrap();
+    let (wallet, faucet) =
+        setup_wallet_and_faucet(&mut client, AccountType::Private, &keystore, RPO_FALCON_SCHEME_ID)
+            .await
+            .unwrap();
 
     let fungible_asset = FungibleAsset::new(faucet.id(), 100).unwrap();
 
@@ -207,8 +199,10 @@ async fn lazy_foreign_account_loading() {
     let (mut client, rpc_api, keystore) = Box::pin(create_test_client()).await;
 
     // Setup: Create and deploy a public foreign account with a storage map.
-    let map_key: Word = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)].into();
-    let map_value: Word = [Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)].into();
+    let map_key: Word =
+        [Felt::from(15u32), Felt::from(15u32), Felt::from(15u32), Felt::from(15u32)].into();
+    let map_value: Word =
+        [Felt::from(9u32), Felt::from(12u32), Felt::from(18u32), Felt::from(30u32)].into();
     let map_slot_name = StorageSlotName::new("miden::testing::fpi::map").unwrap();
 
     let mut storage_map = StorageMap::new();
@@ -233,20 +227,20 @@ async fn lazy_foreign_account_loading() {
     let fpi_component = AccountComponent::new(
         component_code,
         vec![map_slot],
-        AccountComponentMetadata::new("miden::testing::fpi_lazy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::fpi_lazy_component"),
     )
     .unwrap();
     let proc_root = fpi_component.mast_forest().procedure_digests().next().unwrap();
 
     let secret_key = AuthSecretKey::new_falcon512_poseidon2();
     let foreign_account = AccountBuilder::new(Default::default())
+        .account_type(AccountType::Public)
         .with_component(fpi_component)
         .with_auth_component(AuthSingleSig::new(
             secret_key.public_key().to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
         ))
-        .storage_mode(AccountStorageMode::Public)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
     let foreign_account_id = foreign_account.id();
 
@@ -264,7 +258,7 @@ async fn lazy_foreign_account_loading() {
     client.sync_state().await.unwrap();
 
     // Setup: Create a local wallet to execute the FPI transaction.
-    let local_wallet = super::insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore)
+    let local_wallet = super::insert_new_wallet(&mut client, AccountType::Public, &keystore)
         .await
         .unwrap();
 

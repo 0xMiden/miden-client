@@ -40,6 +40,7 @@ use miden_client::store::{
     AccountStatus,
     AccountStorageFilter,
     BlockRelevance,
+    ClientAccountType,
     InputNoteRecord,
     NoteFilter,
     OutputNoteRecord,
@@ -206,6 +207,17 @@ impl Store for SqliteStore {
         .await
     }
 
+    async fn apply_transaction_batch(
+        &self,
+        tx_updates: Vec<TransactionStoreUpdate>,
+    ) -> Result<(), StoreError> {
+        let smt_forest = self.smt_forest.clone();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::apply_transaction_batch(conn, &smt_forest, &tx_updates)
+        })
+        .await
+    }
+
     async fn get_input_notes(
         &self,
         filter: NoteFilter,
@@ -265,23 +277,26 @@ impl Store for SqliteStore {
     async fn insert_block_header(
         &self,
         block_header: &BlockHeader,
-        partial_blockchain_peaks: MmrPeaks,
         has_client_notes: bool,
     ) -> Result<(), StoreError> {
         let block_header = block_header.clone();
         self.interact_with_connection(move |conn| {
-            SqliteStore::insert_block_header(
-                conn,
-                &block_header,
-                &partial_blockchain_peaks,
-                has_client_notes,
-            )
+            SqliteStore::insert_block_header(conn, &block_header, has_client_notes)
         })
         .await
     }
 
-    async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError> {
-        self.interact_with_connection(SqliteStore::prune_irrelevant_blocks).await
+    async fn untrack_and_prune_irrelevant_blocks(
+        &self,
+        blocks_to_untrack: &[BlockNumber],
+        node_indices_to_remove: &[InOrderIndex],
+    ) -> Result<(), StoreError> {
+        let blocks_to_untrack = blocks_to_untrack.to_vec();
+        let node_indices_to_remove = node_indices_to_remove.to_vec();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::prune_irrelevant_blocks(conn, &blocks_to_untrack, &node_indices_to_remove)
+        })
+        .await
     }
 
     async fn prune_account_history(
@@ -337,26 +352,27 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn get_partial_blockchain_peaks_by_block_num(
-        &self,
-        block_num: BlockNumber,
-    ) -> Result<MmrPeaks, StoreError> {
-        self.interact_with_connection(move |conn| {
-            SqliteStore::get_partial_blockchain_peaks_by_block_num(conn, block_num)
-        })
-        .await
+    async fn get_current_blockchain_peaks(&self) -> Result<MmrPeaks, StoreError> {
+        self.interact_with_connection(SqliteStore::get_current_blockchain_peaks).await
     }
 
     async fn insert_account(
         &self,
         account: &Account,
         initial_address: Address,
+        client_account_type: ClientAccountType,
     ) -> Result<(), StoreError> {
         let cloned_account = account.clone();
         let smt_forest = self.smt_forest.clone();
 
         self.interact_with_connection(move |conn| {
-            SqliteStore::insert_account(conn, &smt_forest, &cloned_account, &initial_address)
+            SqliteStore::insert_account(
+                conn,
+                &smt_forest,
+                &cloned_account,
+                &initial_address,
+                client_account_type,
+            )
         })
         .await
     }
@@ -525,15 +541,9 @@ impl Store for SqliteStore {
         .await
     }
 
-    async fn remove_address(
-        &self,
-        address: Address,
-        account_id: AccountId,
-    ) -> Result<(), StoreError> {
-        self.interact_with_connection(move |conn| {
-            SqliteStore::remove_address(conn, &address, account_id)
-        })
-        .await
+    async fn remove_address(&self, address: Address) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| SqliteStore::remove_address(conn, &address))
+            .await
     }
 
     async fn get_minimal_partial_account(

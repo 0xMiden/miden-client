@@ -11,7 +11,14 @@ use alloc::vec::Vec;
 use futures::Stream;
 use miden_protocol::address::Address;
 use miden_protocol::block::BlockNumber;
-use miden_protocol::note::{Note, NoteDetails, NoteFile, NoteHeader, NoteTag};
+use miden_protocol::note::{
+    Note,
+    NoteDetails,
+    NoteDetailsCommitment,
+    NoteFile,
+    NoteHeader,
+    NoteTag,
+};
 use miden_protocol::utils::serde::Serializable;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::serde::{
@@ -62,9 +69,9 @@ impl<AUTH> Client<AUTH> {
     /// **Durability.** The relay payload is persisted to the outbox before the
     /// transport call. If the call fails or is interrupted, the entry stays in
     /// the outbox and is retried on the next [`Client::flush_relay_outbox`]
-    /// (which [`Client::sync_state`] runs), so a transient transport failure
-    /// does not drop the note. The receiver dedupes by note id, so a re-send
-    /// after a partial success is harmless.
+    /// (which [`Client::sync_note_transport`] runs), so a transient transport
+    /// failure does not drop the note. The receiver dedupes by note id, so a
+    /// re-send after a partial success is harmless.
     pub async fn send_private_note(
         &mut self,
         note: Note,
@@ -72,7 +79,7 @@ impl<AUTH> Client<AUTH> {
     ) -> Result<(), ClientError> {
         let api = self.get_note_transport_api()?;
 
-        let header = note.header().clone();
+        let header = *note.header();
         let note_id = header.id();
         let details = NoteDetails::from(note);
         let details_bytes = details.to_bytes();
@@ -83,7 +90,7 @@ impl<AUTH> Client<AUTH> {
         // interrupted `send_note` leaves a recoverable record rather than
         // losing the only copy with the call frame.
         let entry = NoteInfo {
-            header: header.clone(),
+            header,
             details_bytes: details_bytes.clone(),
         };
         let mut outbox = self.load_relay_outbox().await?;
@@ -111,9 +118,9 @@ impl<AUTH> Client<AUTH> {
     /// is attempted independently, so one persistently-failing note does not
     /// block the others.
     ///
-    /// [`Client::sync_state`] runs this automatically and ignores its error, so
-    /// a relay failure can't block a sync. Callers driving retries themselves
-    /// can invoke it directly and inspect the returned error.
+    /// [`Client::sync_note_transport`] runs this automatically and ignores its
+    /// error, so a relay failure can't block a sync. Callers driving retries
+    /// themselves can invoke it directly and inspect the returned error.
     pub async fn flush_relay_outbox(&self) -> Result<(), ClientError> {
         let api = self.get_note_transport_api()?;
 
@@ -129,7 +136,7 @@ impl<AUTH> Client<AUTH> {
         let mut last_err: Option<NoteTransportError> = None;
 
         for entry in entries {
-            match api.send_note(entry.header.clone(), entry.details_bytes.clone()).await {
+            match api.send_note(entry.header, entry.details_bytes.clone()).await {
                 Ok(()) => {},
                 Err(err) => {
                     tracing::warn!(?err, "relay-outbox entry retry failed; will retry next sync");
@@ -150,10 +157,9 @@ impl<AUTH> Client<AUTH> {
     /// Load the durable relay outbox.
     ///
     /// Returns an empty `Vec` if the outbox key is absent. On deserialization
-    /// failure (schema mismatch or storage corruption) the entry is dropped
-    /// and an empty `Vec` is returned — leaving unreadable bytes in place
-    /// would block every subsequent relay because each sync would re-read
-    /// the same bad bytes.
+    /// failure (schema mismatch or storage corruption) the entry is dropped and
+    /// an empty `Vec` is returned — leaving unreadable bytes in place would
+    /// block every subsequent relay because each sync would re-read them.
     async fn load_relay_outbox(&self) -> Result<Vec<NoteInfo>, ClientError> {
         let bytes = self
             .store
@@ -231,12 +237,12 @@ where
     /// Fetch notes from the note transport network for provided note tags
     ///
     /// Pagination is employed, where only notes after the provided cursor are requested.
-    /// Downloaded notes are imported.
+    /// Downloaded notes are imported. Returns the details commitments of the imported notes.
     pub(crate) async fn fetch_transport_notes<I>(
         &mut self,
         cursor: NoteTransportCursor,
         tags: I,
-    ) -> Result<(), ClientError>
+    ) -> Result<Vec<NoteDetailsCommitment>, ClientError>
     where
         I: IntoIterator<Item = NoteTag>,
     {
@@ -275,12 +281,12 @@ where
             };
             note_requests.push(note_file);
         }
-        self.import_notes(&note_requests).await?;
+        let imported_commitments = self.import_notes(&note_requests).await?;
 
         // Update cursor (pagination)
         self.store.update_note_transport_cursor(rcursor).await?;
 
-        Ok(())
+        Ok(imported_commitments)
     }
 }
 
@@ -397,6 +403,13 @@ impl Deserializable for NoteTransportCursor {
 fn rejoin_note(header: &NoteHeader, details_bytes: &[u8]) -> Result<Note, DeserializationError> {
     let mut reader = SliceReader::new(details_bytes);
     let details = NoteDetails::read_from(&mut reader)?;
-    let metadata = header.metadata().clone();
-    Ok(Note::new(details.assets().clone(), metadata, details.recipient().clone()))
+    // The transport wire format only carries `NoteHeader` + serialized `NoteDetails`, not the
+    // attachments collection. We rejoin with empty attachments; this matches the original note
+    // only when it had no attachments in the first place.
+    let partial_metadata = *header.metadata().partial_metadata();
+    Ok(Note::new(
+        details.assets().clone(),
+        partial_metadata,
+        details.recipient().clone(),
+    ))
 }

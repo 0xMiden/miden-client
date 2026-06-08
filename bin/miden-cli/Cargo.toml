@@ -18,7 +18,7 @@ path = "src/main.rs"
 
 [features]
 dap     = ["dep:miden-debug", "miden-client/dap"]
-default = ["dap"]
+default = []
 testing = ["miden-client/testing"]
 
 [dependencies]
@@ -39,18 +39,19 @@ thiserror          = { workspace = true }
 tokio              = { workspace = true }
 toml               = { version = "0.9" }
 tracing            = { workspace = true }
-tracing-subscriber = { features = ["fmt"], workspace = true }
+tracing-subscriber = { default-features = true, workspace = true }
 
 [build-dependencies]
 miden-client = { features = ["std"], workspace = true }
 
 [dev-dependencies]
-anyhow       = { workspace = true }
-assert_cmd   = { workspace = true }
-miden-client = { features = ["testing"], workspace = true }
-predicates   = { workspace = true }
-regex        = { workspace = true }
-serial_test  = { features = ["file_locks"], version = "3.0" }
+anyhow          = { workspace = true }
+assert_cmd      = { workspace = true }
+miden-client    = { features = ["testing"], workspace = true }
+midenc-hir-type = "0.6"
+predicates      = { workspace = true }
+regex           = { workspace = true }
+serial_test     = { features = ["file_locks"], version = "3.0" }
 
 [lints]
 workspace = true

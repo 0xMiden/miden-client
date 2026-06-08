@@ -69,10 +69,6 @@ impl FaucetDetailsMap {
             .map(|(symbol, _)| symbol.clone())
     }
 
-    pub fn get_token_symbol_or_default(&self, faucet_id: &AccountId) -> String {
-        self.get_token_symbol(faucet_id).unwrap_or("Unknown".to_string())
-    }
-
     /// Parses a string representing a [`FungibleAsset`]. There are two accepted formats for the
     /// string:
     /// - `<AMOUNT>::<FAUCET_ID>` where `<AMOUNT>` is in the faucet base units and `<FAUCET_ID>` is
@@ -144,11 +140,11 @@ impl FaucetDetailsMap {
                     token_symbol.clone(),
                 ))?
                 .decimals;
-            let amount = base_units_to_tokens(asset.amount(), decimals);
+            let amount = base_units_to_tokens(asset.amount().as_u64(), decimals);
 
             Ok((token_symbol, amount))
         } else {
-            Ok((asset.faucet_id().to_hex(), asset.amount().to_string()))
+            Ok((asset.faucet_id().to_hex(), asset.amount().as_u64().to_string()))
         }
     }
 }

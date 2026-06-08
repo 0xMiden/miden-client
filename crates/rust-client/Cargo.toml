@@ -33,14 +33,14 @@ crate-type = ["lib"]
 # of `miden-client`'s own `std` feature so wasm32 consumers (the web-sdk's
 # MT WASM bundle, the miden-mobile-prover crate that ships in iOS/Android
 # Capacitor plugins) can opt in to parallel proving without dragging in
-# the heavy `miden-client/std` deps — `dep:tokio`, `dep:tempfile`, and
+# the heavy `miden-client/std` deps - `dep:tokio`, `dep:tempfile`, and
 # `tonic`'s `transport`/`tls-*` features.
 #
 # Note: `miden-tx`'s own `concurrent` feature is defined upstream as
 # `["miden-prover/concurrent", "std"]`, so enabling `concurrent` here
 # does activate `std` on the protocol crates (miden-tx, miden-prover,
 # miden-protocol). That `std` is unavoidable for parallel proving and
-# is cheap on wasm32 — it doesn't reach the tokio/tempfile/transport
+# is cheap on wasm32 - it doesn't reach the tokio/tempfile/transport
 # pieces gated above. The win this feature delivers is dropping those
 # `miden-client`-side deps; full no_std is not a goal of this feature.
 #
@@ -48,8 +48,8 @@ crate-type = ["lib"]
 # `std`; the duplication in the `std` feature list is intentional so
 # each consumer can pick the smallest feature set they need.
 concurrent = ["miden-tx/concurrent"]
-dap = ["dep:miden-debug"]
-default = ["dap", "std"]
+dap = ["dep:miden-debug", "dep:miden-processor"]
+default = ["std"]
 std = [
   "concurrent",
   "dep:tempfile",
@@ -67,11 +67,13 @@ tonic = []
 [dependencies]
 # Miden dependencies
 miden-debug                = { optional = true, workspace = true }
+miden-processor            = { optional = true, workspace = true }
 miden-protocol             = { workspace = true }
 miden-remote-prover-client = { default-features = false, features = ["tx-prover"], workspace = true }
 miden-standards            = { workspace = true }
 miden-testing              = { optional = true, workspace = true }
 miden-tx                   = { workspace = true }
+miden-tx-batch-prover      = { workspace = true }
 
 # External dependencies
 anyhow       = { workspace = true }

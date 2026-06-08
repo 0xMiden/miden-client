@@ -6,8 +6,9 @@ use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::{
     Note,
     NoteAssets,
+    NoteAttachments,
     NoteDetails,
-    NoteHeader,
+    NoteDetailsCommitment,
     NoteId,
     NoteInclusionProof,
     NoteMetadata,
@@ -58,6 +59,10 @@ pub use states::{
 pub struct InputNoteRecord {
     /// Details of a note consisting of assets, script, inputs, and a serial number.
     details: NoteDetails,
+    /// The note's attachments. Required to reconstruct a [`Note`] whose commitment matches the
+    /// on-chain note, since the attachments contribute to the note metadata commitment. Empty when
+    /// the note's full details have not been fetched yet (e.g. expected notes).
+    attachments: NoteAttachments,
     /// The timestamp at which the note was created. If it's not known, it will be None.
     created_at: Option<u64>,
     /// The state of the note, with specific fields for each one.
@@ -65,21 +70,32 @@ pub struct InputNoteRecord {
 }
 
 impl InputNoteRecord {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         details: NoteDetails,
+        attachments: NoteAttachments,
         created_at: Option<u64>,
         state: InputNoteState,
     ) -> InputNoteRecord {
-        InputNoteRecord { details, created_at, state }
+        InputNoteRecord { details, attachments, created_at, state }
     }
 
     // PUBLIC ACCESSORS
     // ================================================================================================
 
-    /// Returns the input note ID.
-    pub fn id(&self) -> NoteId {
-        self.details.id()
+    /// Returns the input note ID, computed by combining the details commitment with the
+    /// note metadata. Returns `None` when the current state has no metadata (e.g. an
+    /// expected note imported from bare `NoteFile::NoteDetails`, or a note in the
+    /// `ConsumedExternal` state). Use [`Self::details_commitment`] when a stable identifier
+    /// is needed in those cases.
+    pub fn id(&self) -> Option<NoteId> {
+        let metadata = self.metadata()?;
+        Some(NoteId::new(self.details.commitment(), metadata))
+    }
+
+    /// Returns the commitment to the note's details (recipient + assets), independent of
+    /// note metadata.
+    pub fn details_commitment(&self) -> NoteDetailsCommitment {
+        self.details.commitment()
     }
 
     /// Returns the note's recipient.
@@ -89,12 +105,27 @@ impl InputNoteRecord {
 
     /// Returns the note's commitment, if the record contains the [`NoteMetadata`].
     pub fn commitment(&self) -> Option<Word> {
-        self.metadata().map(|m| NoteHeader::new(self.id(), m.clone()).to_commitment())
+        self.metadata()
+            .map(|metadata| NoteId::new(self.details.commitment(), metadata).as_word())
     }
 
     /// Returns the note's assets.
     pub fn assets(&self) -> &NoteAssets {
         self.details.assets()
+    }
+
+    /// Returns the note's attachments.
+    pub fn attachments(&self) -> &NoteAttachments {
+        &self.attachments
+    }
+
+    /// Sets the note's attachments.
+    ///
+    /// Attachments are a top-level field of the record, independent of the [`InputNoteState`]
+    /// machine, so this is a plain field assignment. They are populated during sync once fetched
+    /// from the node, since they are required to reconstruct the note's ID for consumption.
+    pub(crate) fn set_attachments(&mut self, attachments: NoteAttachments) {
+        self.attachments = attachments;
     }
 
     /// Returns the timestamp in which the note record was created, if available.
@@ -112,9 +143,10 @@ impl InputNoteRecord {
         self.state.metadata()
     }
 
-    /// Returns the note nullifier.
-    pub fn nullifier(&self) -> Nullifier {
-        self.details.nullifier()
+    /// Returns the note nullifier, if the record contains the [`NoteMetadata`].
+    pub fn nullifier(&self) -> Option<Nullifier> {
+        let metadata = self.metadata()?;
+        Some(Nullifier::from_details_and_metadata(&self.details, metadata))
     }
 
     /// Returns the inclusion proof for the note.
@@ -225,7 +257,10 @@ impl InputNoteRecord {
         &mut self,
         block_header: &BlockHeader,
     ) -> Result<bool, NoteRecordError> {
-        let new_state = self.state.block_header_received(self.id(), block_header)?;
+        let note_id = self
+            .id()
+            .expect("block_header_received is only called after metadata is populated");
+        let new_state = self.state.block_header_received(note_id, block_header)?;
         if let Some(new_state) = new_state {
             self.state = new_state;
             Ok(true)
@@ -248,7 +283,7 @@ impl InputNoteRecord {
         nullifier_block_height: BlockNumber,
         consumer_account: Option<AccountId>,
     ) -> Result<bool, NoteRecordError> {
-        if self.nullifier() != nullifier {
+        if self.nullifier() != Some(nullifier) {
             return Err(NoteRecordError::StateTransitionError(
                 "Nullifier does not match the expected value".to_string(),
             ));
@@ -307,6 +342,7 @@ impl InputNoteRecord {
 impl Serializable for InputNoteRecord {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         self.details.write_into(target);
+        self.attachments.write_into(target);
         self.created_at.write_into(target);
         self.state.write_into(target);
     }
@@ -315,10 +351,11 @@ impl Serializable for InputNoteRecord {
 impl Deserializable for InputNoteRecord {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let details = NoteDetails::read_from(source)?;
+        let attachments = NoteAttachments::read_from(source)?;
         let created_at = Option::<u64>::read_from(source)?;
         let state = InputNoteState::read_from(source)?;
 
-        Ok(InputNoteRecord { details, created_at, state })
+        Ok(InputNoteRecord { details, attachments, created_at, state })
     }
 }
 
@@ -327,12 +364,14 @@ impl Deserializable for InputNoteRecord {
 
 impl From<Note> for InputNoteRecord {
     fn from(value: Note) -> Self {
-        let metadata = value.metadata().clone();
+        let metadata = *value.metadata();
+        let attachments = value.attachments().clone();
         Self {
             details: value.into(),
+            attachments,
             created_at: None,
             state: ExpectedNoteState {
-                metadata: Some(metadata.clone()),
+                metadata: Some(metadata),
                 after_block_num: BlockNumber::from(0),
                 tag: Some(metadata.tag()),
             }
@@ -345,10 +384,11 @@ impl From<InputNote> for InputNoteRecord {
     fn from(value: InputNote) -> Self {
         match value {
             InputNote::Authenticated { note, proof } => Self {
+                attachments: note.attachments().clone(),
                 details: note.clone().into(),
                 created_at: None,
                 state: UnverifiedNoteState {
-                    metadata: note.metadata().clone(),
+                    metadata: *note.metadata(),
                     inclusion_proof: proof,
                 }
                 .into(),
@@ -364,17 +404,19 @@ impl TryInto<InputNote> for InputNoteRecord {
     fn try_into(self) -> Result<InputNote, Self::Error> {
         match (self.metadata(), self.inclusion_proof()) {
             (Some(metadata), Some(inclusion_proof)) => Ok(InputNote::authenticated(
-                Note::new(
+                Note::with_attachments(
                     self.details.assets().clone(),
-                    metadata.clone(),
+                    *metadata.partial_metadata(),
                     self.details.recipient().clone(),
+                    self.attachments.clone(),
                 ),
                 inclusion_proof.clone(),
             )),
-            (Some(metadata), None) => Ok(InputNote::unauthenticated(Note::new(
+            (Some(metadata), None) => Ok(InputNote::unauthenticated(Note::with_attachments(
                 self.details.assets().clone(),
-                metadata.clone(),
+                *metadata.partial_metadata(),
                 self.details.recipient().clone(),
+                self.attachments.clone(),
             ))),
             _ => Err(NoteRecordError::ConversionError(
                 "Input Note Record does not contain metadata".to_string(),
@@ -387,11 +429,12 @@ impl TryInto<Note> for InputNoteRecord {
     type Error = NoteRecordError;
 
     fn try_into(self) -> Result<Note, Self::Error> {
-        match self.metadata().cloned() {
-            Some(metadata) => Ok(Note::new(
+        match self.metadata() {
+            Some(metadata) => Ok(Note::with_attachments(
                 self.details.assets().clone(),
-                metadata,
+                *metadata.partial_metadata(),
                 self.details.recipient().clone(),
+                self.attachments.clone(),
             )),
             None => Err(NoteRecordError::ConversionError(
                 "Input Note Record does not contain metadata".to_string(),
@@ -404,11 +447,12 @@ impl TryInto<Note> for &InputNoteRecord {
     type Error = NoteRecordError;
 
     fn try_into(self) -> Result<Note, Self::Error> {
-        match self.metadata().cloned() {
-            Some(metadata) => Ok(Note::new(
+        match self.metadata() {
+            Some(metadata) => Ok(Note::with_attachments(
                 self.details.assets().clone(),
-                metadata,
+                *metadata.partial_metadata(),
                 self.details.recipient().clone(),
+                self.attachments.clone(),
             )),
             None => Err(NoteRecordError::ConversionError(
                 "Input Note Record does not contain metadata".to_string(),

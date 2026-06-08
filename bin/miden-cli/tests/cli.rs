@@ -7,8 +7,9 @@ use std::sync::Arc;
 use anyhow::Result;
 use assert_cmd::Command;
 use assert_cmd::cargo::cargo_bin_cmd;
-use miden_client::account::{AccountId, AccountStorageMode};
-use miden_client::address::AddressInterface;
+use miden_client::account::component::FungibleFaucet;
+use miden_client::account::{AccountId, AccountType};
+use miden_client::address::{Address, NetworkId};
 use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::{FeltRng, RandomCoin};
@@ -18,11 +19,11 @@ use miden_client::note::{
     NoteAssets,
     NoteFile,
     NoteId,
-    NoteMetadata,
     NoteRecipient,
     NoteStorage,
     NoteTag,
     NoteType,
+    PartialNoteMetadata,
 };
 use miden_client::note_transport::NOTE_TRANSPORT_TESTNET_ENDPOINT;
 use miden_client::rpc::Endpoint;
@@ -295,7 +296,7 @@ async fn mint_with_untracked_account() -> Result<()> {
     let temp_dir = init_cli().1;
 
     // Create faucet account
-    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Private);
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountType::Private);
 
     sync_cli(&temp_dir);
 
@@ -319,7 +320,7 @@ async fn token_symbol_mapping() -> Result<()> {
     let (store_path, temp_dir, endpoint) = init_cli();
 
     // Create faucet account
-    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Private);
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountType::Private);
 
     // Create a token symbol mapping file in the MIDEN_DIR directory
     let token_symbol_map_path = temp_dir.join(MIDEN_DIR).join("token_symbol_map.toml");
@@ -363,7 +364,46 @@ async fn token_symbol_mapping() -> Result<()> {
     };
 
     assert_eq!(note.assets().num_assets(), 1);
-    assert_eq!(note.assets().iter().next().unwrap().unwrap_fungible().amount(), 100_000);
+    assert_eq!(
+        note.assets().iter().next().unwrap().unwrap_fungible().amount().as_u64(),
+        100_000
+    );
+    Ok(())
+}
+
+// ACCOUNT SHOW TESTS
+// ================================================================================================
+
+/// Runs `account show` against a public account that is NOT tracked by the local client. The
+/// account must be fetched from the node, its token metadata read from the fetched `Account`
+/// storage, and its bech32 address rendered without hitting the client's store.
+#[tokio::test]
+async fn show_untracked_public_account() -> Result<()> {
+    // First client: creates a public fungible faucet and commits it to the node via a mint.
+    let (_store_path_a, temp_dir_a, endpoint) = init_cli();
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir_a, AccountType::Public);
+    sync_cli(&temp_dir_a);
+
+    mint_cli(
+        &temp_dir_a,
+        &AccountId::try_from(ACCOUNT_ID_REGULAR).unwrap().to_hex(),
+        &fungible_faucet_account_id,
+    );
+    sync_until_committed_transaction(&temp_dir_a);
+
+    // Second client: fresh CLI on the same network, not tracking the faucet.
+    let store_path_b = create_test_store_path();
+    let temp_dir_b = init_cli_with_store_path(&store_path_b, &endpoint);
+
+    let mut show_cmd = cargo_bin_cmd!("miden-client");
+    show_cmd.args(["account", "--show", &fungible_faucet_account_id]);
+    show_cmd
+        .current_dir(&temp_dir_b)
+        .assert()
+        .success()
+        .stdout(contains("Fetching from the network"))
+        .stdout(contains("Fungible faucet (token symbol: BTC)"));
+
     Ok(())
 }
 
@@ -410,8 +450,14 @@ async fn import_genesis_accounts_can_be_used_for_transactions() -> Result<()> {
         let (client, _) = create_rust_client_with_store_path(&store_path, endpoint).await?;
         let accounts = client.get_account_headers().await?;
 
-        let account_ids = accounts.iter().map(|(acc, _seed)| acc.id()).collect::<Vec<_>>();
-        let faucet_accounts = account_ids.iter().filter(|id| id.is_faucet()).collect::<Vec<_>>();
+        let mut faucet_accounts = Vec::new();
+        for (account_header, _) in accounts {
+            if let Some(account) = client.get_account(account_header.id()).await?
+                && FungibleFaucet::try_from(&account).is_ok()
+            {
+                faucet_accounts.push(account.id());
+            }
+        }
 
         assert_eq!(faucet_accounts.len(), 1);
 
@@ -451,10 +497,10 @@ async fn cli_export_import_note() -> Result<()> {
     let temp_dir_2 = init_cli().1;
 
     // Create wallet account
-    let first_basic_account_id = new_wallet_cli(&temp_dir_2, AccountStorageMode::Private);
+    let first_basic_account_id = new_wallet_cli(&temp_dir_2, AccountType::Private);
 
     // Create faucet account
-    let fungible_faucet_account_id = new_faucet_cli(&temp_dir_1, AccountStorageMode::Private);
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir_1, AccountType::Private);
 
     sync_cli(&temp_dir_1);
 
@@ -519,10 +565,10 @@ async fn cli_export_import_account() -> Result<()> {
     let (store_path_2, temp_dir_2, endpoint_2) = init_cli();
 
     // Create faucet account
-    let faucet_id = new_faucet_cli(&temp_dir_1, AccountStorageMode::Private);
+    let faucet_id = new_faucet_cli(&temp_dir_1, AccountType::Private);
 
     // Create wallet account
-    let wallet_id = new_wallet_cli(&temp_dir_1, AccountStorageMode::Private);
+    let wallet_id = new_wallet_cli(&temp_dir_1, AccountType::Private);
 
     // Export the accounts
     let mut export_cmd = cargo_bin_cmd!("miden-client");
@@ -620,6 +666,124 @@ fn cli_empty_commands() {
 
     let mut swam_cmd = cargo_bin_cmd!("miden-client");
     assert_command_fails_but_does_not_panic(swam_cmd.args(["swap"]).current_dir(&temp_dir));
+
+    // pswap with no subcommand should fail
+    let mut pswap_cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(pswap_cmd.args(["pswap"]).current_dir(&temp_dir));
+
+    // pswap create with no args should fail
+    let mut pswap_create_cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        pswap_create_cmd.args(["pswap", "create"]).current_dir(&temp_dir),
+    );
+
+    // pswap consume with no args should fail
+    let mut pswap_consume_cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        pswap_consume_cmd.args(["pswap", "consume"]).current_dir(&temp_dir),
+    );
+
+    // pswap cancel with no args should fail
+    let mut pswap_cancel_cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        pswap_cancel_cmd.args(["pswap", "cancel"]).current_dir(&temp_dir),
+    );
+
+    // unknown subcommand should fail
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(cmd.args(["pswap", "unknown"]).current_dir(&temp_dir));
+}
+
+#[test]
+fn pswap_cli_help_output() {
+    let temp_dir = init_cli().1;
+
+    // `pswap --help` should succeed and list subcommands
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    let output = cmd.args(["pswap", "--help"]).current_dir(&temp_dir).output().unwrap();
+    assert!(output.status.success(), "pswap --help should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("create"), "Help should list 'create' subcommand");
+    assert!(stdout.contains("consume"), "Help should list 'consume' subcommand");
+    assert!(stdout.contains("cancel"), "Help should list 'cancel' subcommand");
+
+    // `pswap create --help` should succeed and show flag names
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    let output = cmd.args(["pswap", "create", "--help"]).current_dir(&temp_dir).output().unwrap();
+    assert!(output.status.success(), "pswap create --help should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("--sender"), "Help should show --sender flag");
+    assert!(stdout.contains("--offered-asset"), "Help should show --offered-asset flag");
+    assert!(stdout.contains("--requested-asset"), "Help should show --requested-asset flag");
+    assert!(stdout.contains("--note-type"), "Help should show --note-type flag");
+
+    // `pswap consume --help` should show --account and --fill-amount
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    let output = cmd
+        .args(["pswap", "consume", "--help"])
+        .current_dir(&temp_dir)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "pswap consume --help should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("--account"), "Help should show --account flag");
+    assert!(stdout.contains("--fill-amount"), "Help should show --fill-amount flag");
+}
+
+#[test]
+fn pswap_cli_invalid_args() {
+    let temp_dir = init_cli().1;
+
+    // Required flags missing (both --offered-asset and --requested-asset are required;
+    // omitting one must fail at clap parse time, before reaching `parse_fungible_asset`).
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        cmd.args([
+            "pswap",
+            "create",
+            "--sender",
+            "0xaabbccdd",
+            "--offered-asset",
+            "100::0x1111111111111111",
+            "--note-type",
+            "public",
+        ])
+        .current_dir(&temp_dir),
+    );
+
+    // Invalid note-type
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        cmd.args([
+            "pswap",
+            "create",
+            "--sender",
+            "0xaabbccdd",
+            "--offered-asset",
+            "100::0x1111111111111111",
+            "--requested-asset",
+            "50::0x2222222222222222",
+            "--note-type",
+            "invalid",
+        ])
+        .current_dir(&temp_dir),
+    );
+
+    // Invalid fill-amount for consume
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(
+        cmd.args([
+            "pswap",
+            "consume",
+            "--account",
+            "0xaabbccdd",
+            "--note",
+            "0xdeadbeef",
+            "--fill-amount",
+            "not_a_number",
+        ])
+        .current_dir(&temp_dir),
+    );
 }
 
 #[tokio::test]
@@ -627,10 +791,10 @@ async fn consume_unauthenticated_note() -> Result<()> {
     let temp_dir = init_cli().1;
 
     // Create wallet account
-    let wallet_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Public);
+    let wallet_account_id = new_wallet_cli(&temp_dir, AccountType::Public);
 
     // Create faucet account
-    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountStorageMode::Public);
+    let fungible_faucet_account_id = new_faucet_cli(&temp_dir, AccountType::Public);
 
     sync_cli(&temp_dir);
 
@@ -701,13 +865,9 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     let (store_path, _, endpoint) = init_cli();
     let (mut client, authenticator) =
         create_rust_client_with_store_path(&store_path, endpoint).await?;
-    let (account, ..) = insert_new_wallet(
-        &mut client,
-        AccountStorageMode::Private,
-        &authenticator,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (account, ..) =
+        insert_new_wallet(&mut client, AccountType::Private, &authenticator, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     // Create the custom note with a script that will print the stack state
     let note_script = "
@@ -720,7 +880,7 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     let note_script = client.code_builder().compile_note_script(note_script).unwrap();
     let inputs = NoteStorage::new(vec![]).unwrap();
     let serial_num = client.rng().draw_word();
-    let note_metadata = NoteMetadata::new(account.id(), NoteType::Private)
+    let note_metadata = PartialNoteMetadata::new(account.id(), NoteType::Private)
         .with_tag(NoteTag::with_account_target(account.id()));
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note_recipient = NoteRecipient::new(serial_num, note_script, inputs);
@@ -755,7 +915,7 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     sync_cli(&temp_dir);
 
     // Create wallet account
-    let wallet_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let wallet_account_id = new_wallet_cli(&temp_dir, AccountType::Private);
 
     // Consume the note and check the output
     let mut consume_note_cmd = cargo_bin_cmd!("miden-client");
@@ -784,7 +944,7 @@ async fn list_addresses_add() -> Result<()> {
     let temp_dir = init_cli().1;
 
     // Create wallet account
-    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountType::Private);
 
     sync_cli(&temp_dir);
 
@@ -798,16 +958,12 @@ async fn list_addresses_add() -> Result<()> {
     assert!(formatted_output.contains("Unspecified"));
     assert!(!formatted_output.contains("BasicWallet"));
 
-    // Add a basic wallet address to the account
+    // Encode a BasicWallet address with tag length 10, then add it to the account.
+    let encoded_address =
+        encode_address_cli(&temp_dir, &basic_account_id, "basic-wallet", Some("10"));
+
     let mut add_address_cmd = cargo_bin_cmd!("miden-client");
-    let custom_note_tag_len = "10";
-    add_address_cmd.args([
-        "address",
-        "add",
-        &basic_account_id,
-        &AddressInterface::BasicWallet.to_string(),
-        custom_note_tag_len,
-    ]);
+    add_address_cmd.args(["address", "add", &basic_account_id, &encoded_address]);
     let output = add_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
     assert!(output.status.success());
 
@@ -820,16 +976,12 @@ async fn list_addresses_add() -> Result<()> {
     assert_eq!(formatted_output.matches("Unspecified").count(), 1);
     assert_eq!(formatted_output.matches("BasicWallet").count(), 1);
 
-    // Add another basic wallet address to the account
+    // Encode another BasicWallet address (different tag length → different address) and add it too.
+    let encoded_address =
+        encode_address_cli(&temp_dir, &basic_account_id, "basic-wallet", Some("5"));
+
     let mut add_address_cmd = cargo_bin_cmd!("miden-client");
-    let custom_note_tag_len = "5";
-    add_address_cmd.args([
-        "address",
-        "add",
-        &basic_account_id,
-        &AddressInterface::BasicWallet.to_string(),
-        custom_note_tag_len,
-    ]);
+    add_address_cmd.args(["address", "add", &basic_account_id, &encoded_address]);
     let output = add_address_cmd.current_dir(temp_dir.clone()).output().unwrap();
     assert!(output.status.success());
 
@@ -845,12 +997,72 @@ async fn list_addresses_add() -> Result<()> {
     Ok(())
 }
 
+/// Verifies that `address add` rejects a bech32 address whose encoded account ID does not
+/// match the `<ACCOUNT_ID>` argument.
+#[tokio::test]
+async fn address_add_rejects_mismatched_account() -> Result<()> {
+    let temp_dir = init_cli().1;
+
+    let account_a = new_wallet_cli(&temp_dir, AccountType::Private);
+    let account_b = new_wallet_cli(&temp_dir, AccountType::Private);
+    assert_ne!(account_a, account_b, "two new wallets should have distinct ids");
+
+    sync_cli(&temp_dir);
+
+    // Encode an address that points at account A.
+    let encoded_for_a = encode_address_cli(&temp_dir, &account_a, "basic-wallet", None);
+
+    // Trying to add it to account B must fail.
+    let mut add_cmd = cargo_bin_cmd!("miden-client");
+    add_cmd.args(["address", "add", &account_b, &encoded_for_a]);
+    let output = add_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(!output.status.success(), "expected add to fail on account mismatch");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("does not match the provided account ID"),
+        "unexpected stderr: {stderr}"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn address_add_rejects_mismatched_network() -> Result<()> {
+    let temp_dir = init_cli().1;
+
+    let account = new_wallet_cli(&temp_dir, AccountType::Private);
+    sync_cli(&temp_dir);
+
+    // Encode a valid address against the CLI's configured network, then re-encode it under a
+    // different `NetworkId` so the HRP no longer matches.
+    let encoded_local = encode_address_cli(&temp_dir, &account, "basic-wallet", None);
+    let (cli_network_id, address) = Address::decode(&encoded_local)?;
+    let other_network_id = if cli_network_id == NetworkId::Mainnet {
+        NetworkId::Testnet
+    } else {
+        NetworkId::Mainnet
+    };
+    let encoded_other = address.encode(other_network_id);
+
+    let mut add_cmd = cargo_bin_cmd!("miden-client");
+    add_cmd.args(["address", "add", &account, &encoded_other]);
+    let output = add_cmd.current_dir(temp_dir.clone()).output().unwrap();
+    assert!(!output.status.success(), "expected add to fail on network mismatch");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("does not match configured network"),
+        "unexpected stderr: {stderr}"
+    );
+
+    Ok(())
+}
+
 #[tokio::test]
 async fn list_addresses_remove() -> Result<()> {
     let temp_dir = init_cli().1;
 
     // Create wallet account
-    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountType::Private);
 
     sync_cli(&temp_dir);
 
@@ -893,7 +1105,7 @@ async fn new_wallet_with_deploy_flag() -> Result<()> {
     sync_cli(&temp_dir);
 
     let mut create_wallet_cmd = cargo_bin_cmd!("miden-client");
-    create_wallet_cmd.args(["new-wallet", "-s", "public", "--deploy"]);
+    create_wallet_cmd.args(["new-wallet", "-t", "public", "--deploy"]);
 
     let output = create_wallet_cmd.current_dir(&temp_dir).output().unwrap();
     assert!(
@@ -1111,26 +1323,24 @@ fn consume_note_cli(cli_path: &Path, account_id: &str, note_ids: &[&str]) {
 }
 
 /// Creates a new faucet account using the CLI given by `cli_path`.
-fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
+fn new_faucet_cli(cli_path: &Path, visibility: AccountType) -> String {
     const INIT_DATA_FILENAME: &str = "init_data.toml";
     let mut create_faucet_cmd = cargo_bin_cmd!("miden-client");
 
     // Create a TOML file with the InitStorageData
     let init_storage_data_toml = r#"
-        ["miden::standards::fungible_faucets::metadata"]
-        decimals="10"
-        max_supply="10000000"
-        symbol="BTC"
+        [fungible-faucet-metadata]
+        symbol = "BTC"
+        decimals = 10
+        max_supply = 10000000
         "#;
     let file_path = cli_path.join(INIT_DATA_FILENAME);
     fs::write(&file_path, init_storage_data_toml).unwrap();
 
     create_faucet_cmd.args([
         "new-account",
-        "-s",
-        storage_mode.to_string().as_str(),
-        "--account-type",
-        "fungible-faucet",
+        "-t",
+        visibility.to_string().as_str(),
         "-p",
         "basic-fungible-faucet",
         "-i",
@@ -1151,9 +1361,9 @@ fn new_faucet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
 }
 
 /// Creates a new wallet account using the CLI given by `cli_path`.
-fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
+fn new_wallet_cli(cli_path: &Path, visibility: AccountType) -> String {
     let mut create_wallet_cmd = cargo_bin_cmd!("miden-client");
-    create_wallet_cmd.args(["new-wallet", "-s", storage_mode.to_string().as_str()]);
+    create_wallet_cmd.args(["new-wallet", "-t", visibility.to_string().as_str()]);
 
     let output = create_wallet_cmd.current_dir(cli_path).output().unwrap();
     assert!(
@@ -1174,6 +1384,29 @@ fn new_wallet_cli(cli_path: &Path, storage_mode: AccountStorageMode) -> String {
         .to_string()
 }
 
+/// Runs `miden-client address encode` and returns the printed bech32 address.
+fn encode_address_cli(
+    cli_path: &Path,
+    account_id: &str,
+    interface: &str,
+    tag_len: Option<&str>,
+) -> String {
+    let mut encode_cmd = cargo_bin_cmd!("miden-client");
+    let mut args = vec!["address", "encode", account_id, interface];
+    if let Some(tag_len) = tag_len {
+        args.push(tag_len);
+    }
+    encode_cmd.args(args);
+    let output = encode_cmd.current_dir(cli_path).output().unwrap();
+    assert!(
+        output.status.success(),
+        "address encode failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    String::from_utf8(output.stdout).unwrap().trim().to_string()
+}
+
 pub type TestClient = Client<FilesystemKeyStore>;
 
 /// Creates a new [`Client`] with a given store. Also returns the keystore associated with it.
@@ -1189,7 +1422,7 @@ async fn create_rust_client_with_store_path(
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
 
-    let rng = Box::new(RandomCoin::new(coin_seed.map(Felt::new).into()));
+    let rng = Box::new(RandomCoin::new(coin_seed.map(Felt::new_unchecked).into()));
 
     let keystore = FilesystemKeyStore::new(temp_dir())?;
 
@@ -1227,7 +1460,7 @@ fn exec_parse() {
     let temp_dir = init_cli().1;
 
     // Create wallet account
-    let basic_account_id = new_wallet_cli(&temp_dir, AccountStorageMode::Private);
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountType::Private);
 
     sync_cli(&temp_dir);
     let mut success_cmd = cargo_bin_cmd!("miden-client");
@@ -1257,6 +1490,335 @@ fn exec_parse() {
     failure_cmd.current_dir(&temp_dir).assert().failure();
 }
 
+// CALL COMMAND TESTS
+// ================================================================================================
+
+/// Tests that the `call` command fails when no arguments are provided.
+#[test]
+fn call_empty_command() {
+    let temp_dir = init_cli().1;
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    assert_command_fails_but_does_not_panic(cmd.args(["call"]).current_dir(&temp_dir));
+}
+
+/// Tests that the `call` command fails when the package file does not exist.
+#[test]
+fn call_nonexistent_package() {
+    let temp_dir = init_cli().1;
+
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountType::Private);
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &format!("{basic_account_id}:some_procedure"),
+        "--package",
+        "nonexistent/path/package.masp",
+    ]);
+
+    cmd.current_dir(&temp_dir).assert().failure();
+}
+
+/// Tests that the `call` command fails when the procedure name is not found in the package.
+#[test]
+fn call_nonexistent_procedure() {
+    let temp_dir = init_cli().1;
+
+    let basic_account_id = new_wallet_cli(&temp_dir, AccountType::Private);
+    let package_path = temp_dir.join(MIDEN_DIR).join("packages/basic-wallet.masp");
+
+    sync_cli(&temp_dir);
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &format!("{basic_account_id}:nonexistent_procedure"),
+        "--package",
+        package_path.to_str().unwrap(),
+    ]);
+
+    cmd.current_dir(&temp_dir).assert().failure();
+}
+
+/// Helper: builds the `call-test` package (arithmetic + storage procedures) at runtime and
+/// writes the serialized `.masp` to `out_path`.
+fn build_call_test_masp(out_path: &Path) {
+    use miden_client::account::StorageSlotName;
+    use miden_client::account::component::{
+        AccountComponentMetadata,
+        FeltSchema,
+        StorageSchema,
+        StorageSlotSchema,
+        ValueSlotSchema,
+        WordSchema,
+    };
+    use miden_client::assembly::{CodeBuilder, Library};
+    use miden_client::vm::{
+        Package,
+        PackageExport,
+        PackageManifest,
+        ProcedureExport,
+        QualifiedProcedureName,
+        Section,
+        SectionId,
+        TargetType,
+    };
+    use midenc_hir_type::{CallConv, FunctionType, Type};
+
+    let call_test_code = r#"
+        use miden::protocol::native_account
+        use miden::core::word
+        use miden::core::sys
+
+        const STORED_VALUE = word("miden::testing::call_test::stored_value")
+
+        pub proc add
+            add
+        end
+
+        pub proc set_value
+            push.STORED_VALUE[0..2]
+            exec.native_account::set_item
+            dropw
+            exec.sys::truncate_stack
+        end
+    "#;
+
+    let library: Library = CodeBuilder::default()
+        .compile_component_code("miden::testing::call_test", call_test_code)
+        .expect("failed to compile call-test component")
+        .into();
+
+    let slot_name =
+        StorageSlotName::new("miden::testing::call_test::stored_value").expect("valid slot name");
+
+    let word_schema = WordSchema::new_value([
+        FeltSchema::new_void(),
+        FeltSchema::new_void(),
+        FeltSchema::new_void(),
+        FeltSchema::new_void(),
+    ]);
+
+    let storage_schema = StorageSchema::new([(
+        slot_name,
+        StorageSlotSchema::Value(ValueSlotSchema::new(None, word_schema)),
+    )])
+    .expect("valid storage schema");
+
+    let metadata = AccountComponentMetadata::new("call-test").with_storage_schema(storage_schema);
+
+    let signature_overrides: [(&str, FunctionType); 2] = [
+        ("add", FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt], [Type::Felt])),
+        (
+            "set_value",
+            FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt, Type::Felt, Type::Felt], []),
+        ),
+    ];
+
+    let mut exports: Vec<PackageExport> = Vec::new();
+    for module_info in library.module_infos() {
+        for (_, proc_info) in module_info.procedures() {
+            let name = QualifiedProcedureName::new(module_info.path(), proc_info.name.clone());
+            let override_sig = signature_overrides
+                .iter()
+                .find(|(n, _)| *n == proc_info.name.as_str())
+                .map(|(_, sig)| sig.clone());
+            let export = ProcedureExport {
+                path: name.into_inner(),
+                digest: proc_info.digest,
+                signature: override_sig.or_else(|| proc_info.signature.as_deref().cloned()),
+                attributes: proc_info.attributes.clone(),
+            };
+            exports.push(PackageExport::Procedure(export));
+        }
+    }
+
+    let manifest = PackageManifest::new(exports).expect("manifest validation failed");
+    let section = Section::new(SectionId::ACCOUNT_COMPONENT_METADATA, metadata.to_bytes());
+
+    let package = Package {
+        name: metadata.name().to_string().into(),
+        version: metadata.version().clone(),
+        description: Some(metadata.description().to_string()),
+        mast: Arc::new(library),
+        manifest,
+        sections: vec![section],
+        kind: TargetType::AccountComponent,
+    };
+
+    fs::write(out_path, package.to_bytes()).expect("failed to write call-test .masp");
+}
+
+/// Helper: creates an account with the `call-test.masp` package and returns (`temp_dir`,
+/// `account_id`, `masp_path`).
+fn setup_call_test_account() -> (PathBuf, String, PathBuf) {
+    let temp_dir = init_cli().1;
+
+    // Generate the call-test .masp directly in the temp dir
+    let masp_dst = temp_dir.join("call_test.masp");
+    build_call_test_masp(&masp_dst);
+
+    // Init storage for the stored_value slot
+    let init_toml = r#"
+"miden::testing::call_test::stored_value" = "0x0000000000000000000000000000000000000000000000000000000000000000"
+"#;
+    let init_path = temp_dir.join("call_test_init.toml");
+    fs::write(&init_path, init_toml).unwrap();
+
+    // Create account with the custom package
+    let mut create_cmd = cargo_bin_cmd!("miden-client");
+    create_cmd.args([
+        "new-account",
+        "-t",
+        "public",
+        "-p",
+        "auth/no-auth",
+        "-p",
+        masp_dst.to_str().unwrap(),
+        "-i",
+        init_path.to_str().unwrap(),
+    ]);
+
+    let output = create_cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "Failed to create account: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Parse account ID from output: "...account -s <ID>"
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let account_id = stdout
+        .split_whitespace()
+        .skip_while(|&w| w != "-s")
+        .nth(1)
+        .expect("Could not parse account ID from new-account output")
+        .to_string();
+
+    sync_cli(&temp_dir);
+
+    (temp_dir, account_id, masp_dst)
+}
+
+/// Tests calling a procedure by name (add) with felt arguments.
+#[test]
+fn call_procedure_by_name() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &format!("{account_id}:add"),
+        "3",
+        "7",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
+
+    cmd.current_dir(&temp_dir).assert().success();
+}
+
+/// Tests that transaction execution produces a nonce change in the state delta.
+#[test]
+fn call_shows_nonce_delta() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &format!("{account_id}:add"),
+        "1",
+        "2",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
+
+    let output = cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "Call failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Nonce incremented by:"),
+        "Expected nonce delta in output:\n{stdout}"
+    );
+}
+
+/// Tests calling `set_value` and verifying storage delta is shown.
+#[test]
+fn call_set_value_shows_storage_delta() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    // set_value expects [VALUE (4 felts)] on the stack
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &format!("{account_id}:set_value"),
+        "42",
+        "0",
+        "0",
+        "0",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
+
+    let output = cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "Call failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Storage Slot"), "Expected storage delta in output:\n{stdout}");
+}
+
+/// Tests that calling a `add` with the wrong number of arguments fails
+#[test]
+fn call_rejects_wrong_arg_count() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    // Too few: 1 arg for a 2-arg procedure.
+    let mut too_few = cargo_bin_cmd!("miden-client");
+    too_few.args([
+        "call",
+        &format!("{account_id}:add"),
+        "3",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
+    let out = too_few.current_dir(&temp_dir).output().unwrap();
+    assert!(!out.status.success(), "Expected failure for too-few args");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("expects 2 argument") && stderr.contains("got 1"),
+        "Unexpected stderr:\n{stderr}"
+    );
+
+    // Too many: 3 args for a 2-arg procedure.
+    let mut too_many = cargo_bin_cmd!("miden-client");
+    too_many.args([
+        "call",
+        &format!("{account_id}:add"),
+        "3",
+        "7",
+        "11",
+        "--package",
+        masp_path.to_str().unwrap(),
+    ]);
+    let out = too_many.current_dir(&temp_dir).output().unwrap();
+    assert!(!out.status.success(), "Expected failure for too-many args");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("expects 2 argument") && stderr.contains("got 3"),
+        "Unexpected stderr:\n{stderr}"
+    );
+}
+
 // AUTH COMPONENT TESTS
 // ================================================================================================
 
@@ -1268,10 +1830,8 @@ fn create_account_with_no_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",
@@ -1315,10 +1875,8 @@ fn create_account_with_multisig_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",
@@ -1353,10 +1911,8 @@ fn create_account_with_acl_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",
@@ -1384,10 +1940,8 @@ fn create_account_with_ecdsa_auth() {
     let mut create_account_cmd = cargo_bin_cmd!("miden-client");
     create_account_cmd.args([
         "new-account",
-        "-s",
+        "-t",
         "private",
-        "--account-type",
-        "regular-account-updatable-code",
         "-p",
         "basic-wallet",
         "-p",

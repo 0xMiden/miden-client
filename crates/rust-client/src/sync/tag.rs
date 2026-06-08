@@ -2,7 +2,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use miden_protocol::account::{Account, AccountId};
-use miden_protocol::note::{NoteId, NoteTag};
+use miden_protocol::note::{NoteDetailsCommitment, NoteTag};
 use miden_tx::utils::serde::{
     ByteReader,
     ByteWriter,
@@ -36,21 +36,14 @@ impl<AUTH> Client<AUTH> {
 
     /// Adds a note tag for the client to track. This tag's source will be marked as `User`.
     pub async fn add_note_tag(&mut self, tag: NoteTag) -> Result<(), ClientError> {
-        match self.insert_note_tag(NoteTagRecord { tag, source: NoteTagSource::User }).await {
-            Ok(true) => Ok(()),
-            Ok(false) => {
-                warn!("Tag {} is already being tracked", tag);
-                Ok(())
-            },
-            Err(err) => Err(err),
+        let added = self
+            .store
+            .add_note_tag(NoteTagRecord { tag, source: NoteTagSource::User })
+            .await?;
+        if !added {
+            warn!("Tag {} is already being tracked", tag);
         }
-    }
-
-    /// Wrapper around the store's `add_note_tag` method that checks the note tags limit before the
-    /// insert.
-    pub async fn insert_note_tag(&self, tag_record: NoteTagRecord) -> Result<bool, ClientError> {
-        self.check_note_tag_limit().await?;
-        self.store.add_note_tag(tag_record).await.map_err(Into::into)
+        Ok(())
     }
 
     /// Removes a note tag for the client to track. Only tags added by the user can be removed.
@@ -81,17 +74,17 @@ pub struct NoteTagRecord {
 pub enum NoteTagSource {
     /// Tag for notes directed to a tracked account.
     Account(AccountId),
-    /// Tag for tracked expected notes.
-    Note(NoteId),
+    /// Tag for tracked expected notes, identified by the note's details commitment.
+    Note(NoteDetailsCommitment),
     /// Tag manually added by the user.
     User,
 }
 
 impl NoteTagRecord {
-    pub fn with_note_source(tag: NoteTag, note_id: NoteId) -> Self {
+    pub fn with_note_source(tag: NoteTag, details_commitment: NoteDetailsCommitment) -> Self {
         Self {
             tag,
-            source: NoteTagSource::Note(note_id),
+            source: NoteTagSource::Note(details_commitment),
         }
     }
 
@@ -103,6 +96,21 @@ impl NoteTagRecord {
     }
 }
 
+impl Serializable for NoteTagRecord {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        self.tag.write_into(target);
+        self.source.write_into(target);
+    }
+}
+
+impl Deserializable for NoteTagRecord {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let tag = NoteTag::read_from(source)?;
+        let source = NoteTagSource::read_from(source)?;
+        Ok(Self { tag, source })
+    }
+}
+
 impl Serializable for NoteTagSource {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         match self {
@@ -110,9 +118,9 @@ impl Serializable for NoteTagSource {
                 target.write_u8(0);
                 account_id.write_into(target);
             },
-            NoteTagSource::Note(note_id) => {
+            NoteTagSource::Note(details_commitment) => {
                 target.write_u8(1);
-                note_id.write_into(target);
+                details_commitment.write_into(target);
             },
             NoteTagSource::User => target.write_u8(2),
         }
@@ -123,7 +131,7 @@ impl Deserializable for NoteTagSource {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         match source.read_u8()? {
             0 => Ok(NoteTagSource::Account(AccountId::read_from(source)?)),
-            1 => Ok(NoteTagSource::Note(NoteId::read_from(source)?)),
+            1 => Ok(NoteTagSource::Note(NoteDetailsCommitment::read_from(source)?)),
             2 => Ok(NoteTagSource::User),
             val => Err(DeserializationError::InvalidValue(format!("Invalid tag source: {val}"))),
         }
@@ -147,7 +155,9 @@ impl TryInto<NoteTagRecord> for &InputNoteRecord {
 
     fn try_into(self) -> Result<NoteTagRecord, Self::Error> {
         match self.metadata() {
-            Some(metadata) => Ok(NoteTagRecord::with_note_source(metadata.tag(), self.id())),
+            Some(metadata) => {
+                Ok(NoteTagRecord::with_note_source(metadata.tag(), self.details_commitment()))
+            },
             None => Err(NoteRecordError::ConversionError(
                 "Input Note Record does not contain tag".to_string(),
             )),

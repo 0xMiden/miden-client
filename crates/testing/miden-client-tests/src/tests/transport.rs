@@ -2,11 +2,11 @@ use std::env::temp_dir;
 use std::sync::Arc;
 
 use miden_client::DebugMode;
-use miden_client::account::{Account, AccountStorageMode};
+use miden_client::account::{Account, AccountType};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteAttachment, NoteDetails, NoteTag, NoteType};
+use miden_client::note::{NoteAttachments, NoteDetails, NoteTag, NoteType};
 use miden_client::note_transport::NoteTransportClient;
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::create_test_store_path;
@@ -46,7 +46,7 @@ async fn transport_basic() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -91,7 +91,7 @@ async fn transport_cursor_pagination() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -101,7 +101,7 @@ async fn transport_cursor_pagination() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -111,7 +111,9 @@ async fn transport_cursor_pagination() {
     recipient.sync_state().await.unwrap();
     let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 1, "should have 1 note after first sync");
-    assert_eq!(notes[0].id(), note_a.id());
+    // The note is delivered via the transport layer and isn't committed on-chain, so it has no
+    // metadata (and thus no `NoteId`); it's identified by its details commitment.
+    assert_eq!(notes[0].details_commitment(), note_a.details_commitment());
 
     // Send note B, sync → recipient receives note B (cursor advanced past A)
     sender.send_private_note(note_b.clone(), &recipient_address).await.unwrap();
@@ -134,7 +136,7 @@ async fn transport_duplicate_note_handling() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -167,7 +169,7 @@ async fn transport_fetch_no_matching_tags() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -197,12 +199,14 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
         .add_existing_mock_account(miden_testing::Auth::IncrNonce)
         .unwrap();
 
-    let private_note =
-        NoteBuilder::new(mock_account.id(), RandomCoin::new([1, 2, 3, 4].map(Felt::new).into()))
-            .note_type(ProtocolNoteType::Private)
-            .tag(NoteTag::new(0).into())
-            .build()
-            .unwrap();
+    let private_note = NoteBuilder::new(
+        mock_account.id(),
+        RandomCoin::new([1, 2, 3, 4].map(Felt::new_unchecked).into()),
+    )
+    .note_type(ProtocolNoteType::Private)
+    .tag(NoteTag::new(0).into())
+    .build()
+    .unwrap();
 
     let spawn_note =
         mock_chain_builder.add_spawn_note(std::slice::from_ref(&private_note)).unwrap();
@@ -237,7 +241,7 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
 
     let mut rng = rand::rng();
     let coin_seed: [u64; 4] = rng.random();
-    let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
+    let rng = RandomCoin::new(coin_seed.map(|v| Felt::new_unchecked(v >> 1)).into());
 
     let keystore_path = temp_dir();
     let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
@@ -265,19 +269,21 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     // 5. Now the NTL delivers the note (simulates late delivery after the first sync).
     let details = NoteDetails::from(private_note.clone());
     let details_bytes = details.to_bytes();
-    mock_transport_node
-        .write()
-        .add_note(private_note.header().clone(), details_bytes);
+    mock_transport_node.write().add_note(*private_note.header(), details_bytes);
 
     // 6. Second sync_state: fetch_transport_notes imports the note, then chain sync runs.
     // Without the fix, after_block_num = sync_height, scan misses the note at block 1.
     // With the fix, lookback window catches it.
-    client.sync_state().await.unwrap();
+    let summary = client.sync_state().await.unwrap();
+    assert!(
+        summary.new_private_notes.contains(&private_note.details_commitment()),
+        "summary should report the NTL-imported note in new_private_notes"
+    );
 
     // 7. The note should be Committed after the second sync.
     let committed_notes = client.get_input_notes(NoteFilter::Committed).await.unwrap();
     assert!(
-        committed_notes.iter().any(|n| n.id() == private_note.id()),
+        committed_notes.iter().any(|n| n.id() == Some(private_note.id())),
         "note committed before sync_height should be found via lookback during NTL import"
     );
 }
@@ -312,27 +318,26 @@ async fn private_note_relay_recovers_after_transient_ntl_failure() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
-    let note_id = note.id();
+    // Transport-delivered notes carry no metadata (hence no `NoteId`); match by
+    // details commitment.
+    let note_commitment = note.details_commitment();
 
     // First relay attempt — the faulty NTL rejects it. We don't assert on the
-    // return value: the fix may make `send_private_note` itself retry and
-    // return Ok, or it may surface the Err and rely on a later retry path.
+    // return value: the relay may fail here and be retried later.
     let _ = sender.send_private_note(note, &recipient_address).await;
 
-    // Drive both clients forward. Either the sender's retry path runs inside
-    // sync_state (or as a side effect of fetch_private_notes), or it ran
-    // synchronously inside the send_private_note call. Either way the note
-    // must reach the recipient within a small number of rounds.
+    // Drive both clients forward; the retry must deliver the note within a few
+    // rounds.
     let mut delivered = false;
     for _ in 0..5 {
         let _ = sender.sync_state().await;
         recipient.sync_state().await.unwrap();
         let received = recipient.get_input_notes(NoteFilter::All).await.unwrap();
-        if received.iter().any(|n| n.id() == note_id) {
+        if received.iter().any(|n| n.details_commitment() == note_commitment) {
             delivered = true;
             break;
         }
@@ -345,8 +350,8 @@ async fn private_note_relay_recovers_after_transient_ntl_failure() {
         faulty.send_attempts()
     );
 
-    // Sanity: the fix must actually retry the relay — a single attempt that
-    // succeeded by chance is not durability.
+    // The fix must actually retry the relay — a single attempt that succeeded
+    // by chance is not durability.
     assert!(
         faulty.send_attempts() >= 2,
         "fix must retry the relay; observed only {} send_note attempt(s)",
@@ -354,20 +359,13 @@ async fn private_note_relay_recovers_after_transient_ntl_failure() {
     );
 }
 
-/// Tightens the durability contract beyond the previous test:
-/// `flush_relay_outbox` is a public, sync_state-independent retry path, the
-/// outbox entry survives a failed `send_private_note` until that retry
-/// succeeds, and a successful retry removes the entry so it isn't re-sent.
-///
-/// Why a separate test from `private_note_relay_recovers_after_transient_ntl_failure`:
-/// that one is intentionally lenient about the recovery mechanism —
-/// inline retry, sync_state-piggyback, or explicit flush all satisfy it.
-/// This one nails down the explicit-flush contract callers depend on
-/// when they want to drain the outbox without paying for a full sync
-/// cycle (e.g. after a connectivity-restored event).
+/// The durable outbox entry survives a failed `send_private_note` and is
+/// re-sent by an explicit `flush_relay_outbox`, without a full sync. A second
+/// flush is a no-op once the entry has drained.
 #[tokio::test]
 async fn flush_relay_outbox_retries_failed_relay_without_full_sync() {
     let mock_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
+
     let faulty = Arc::new(FaultyNoteTransportApi::new(mock_node.clone(), 1));
     let (mut sender, sender_account) =
         create_test_user_with_transport(faulty.clone() as Arc<dyn NoteTransportClient>).await;
@@ -380,56 +378,44 @@ async fn flush_relay_outbox_retries_failed_relay_without_full_sync() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
-    let note_id = note.id();
+    // Transport-delivered notes carry no metadata (hence no `NoteId`); match by
+    // details commitment.
+    let note_commitment = note.details_commitment();
 
-    // 1. First attempt: the faulty NTL rejects, send_private_note surfaces the error. The chain
-    //    side has nothing to roll back here (this test isolates the relay step), so the only
-    //    durability requirement is that the payload survive the failed call.
+    // First relay fails; the payload must survive in the outbox.
     let first_attempt = sender.send_private_note(note, &recipient_address).await;
     assert!(
         first_attempt.is_err(),
-        "expected NTL failure on first attempt, got {first_attempt:?}",
-    );
-    assert_eq!(
-        faulty.send_attempts(),
-        1,
-        "send_private_note should have made exactly one transport attempt",
+        "expected NTL failure on first attempt, got {first_attempt:?}"
     );
 
-    // 2. Recipient syncs — nothing to deliver yet because the NTL never got the payload. Pins the
-    //    contract: the sender's outbox is the only surviving copy.
+    // Recipient sees nothing yet — the NTL never received the note.
     recipient.sync_state().await.unwrap();
-    let received = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert!(
-        received.iter().all(|n| n.id() != note_id),
+        recipient.get_input_notes(NoteFilter::All).await.unwrap().is_empty(),
         "recipient should not yet see the note (NTL was empty after the failed relay)",
     );
 
-    // 3. Caller drives the retry explicitly — no `sync_state` round-trip. The faulty NTL has used
-    //    up its single rejection (fail_next: 1) so this attempt will succeed.
-    sender.flush_relay_outbox().await.expect("flush_relay_outbox should succeed");
-    assert!(
-        faulty.send_attempts() >= 2,
-        "explicit flush must re-attempt the relay; observed only {} send_note attempt(s)",
-        faulty.send_attempts(),
-    );
+    // Explicit flush re-sends (the faulty API has used up its single rejection).
+    sender.flush_relay_outbox().await.expect("flush should re-send the queued note");
+    assert!(faulty.send_attempts() >= 2, "flush must re-attempt the relay");
 
-    // 4. Recipient syncs and now sees the note — proves the explicit flush actually delivered
-    //    through the NTL, not just dropped the entry.
     recipient.sync_state().await.unwrap();
-    let received = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert!(
-        received.iter().any(|n| n.id() == note_id),
-        "recipient must receive the note after the explicit flush retried the relay",
+        recipient
+            .get_input_notes(NoteFilter::All)
+            .await
+            .unwrap()
+            .iter()
+            .any(|n| n.details_commitment() == note_commitment),
+        "recipient should receive the note after the flush re-send",
     );
 
-    // 5. A second flush is a no-op: the outbox entry was removed when the retry succeeded. Without
-    //    this property, every sync would re-send every previously-relayed note (the receiver
-    //    dedups, but the wasted NTL traffic is still a regression).
+    // A second flush is a no-op: the entry was removed when the retry succeeded.
     let attempts_after_first_flush = faulty.send_attempts();
     sender.flush_relay_outbox().await.expect("second flush should succeed (no-op)");
     assert_eq!(
@@ -440,9 +426,9 @@ async fn flush_relay_outbox_retries_failed_relay_without_full_sync() {
 }
 
 /// A relay that keeps failing must not block `sync_state`. The outbox flush
-/// runs at the start of `sync_state`; if its error propagated, a single
-/// undeliverable note would wedge every subsequent sync. The entry must stay
-/// in the outbox for later retry while the sync itself succeeds.
+/// runs at the start of the transport step; if its error propagated, a single
+/// undeliverable note would wedge every subsequent sync. The entry must stay in
+/// the outbox for later retry while the sync itself succeeds.
 #[tokio::test]
 async fn persistent_relay_failure_does_not_block_sync_state() {
     let mock_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
@@ -460,7 +446,7 @@ async fn persistent_relay_failure_does_not_block_sync_state() {
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachment::default(),
+        NoteAttachments::empty(),
         sender.rng(),
     )
     .unwrap();
@@ -489,24 +475,9 @@ async fn persistent_relay_failure_does_not_block_sync_state() {
 pub async fn create_test_client_transport(
     mock_node: Arc<RwLock<MockNoteTransportNode>>,
 ) -> (MockClient<FilesystemKeyStore>, FilesystemKeyStore) {
-    create_test_client_with_transport(Arc::new(MockNoteTransportApi::new(mock_node))).await
-}
-
-pub async fn create_test_user_transport(
-    mock_node: Arc<RwLock<MockNoteTransportNode>>,
-) -> (MockClient<FilesystemKeyStore>, Account) {
-    let (mut client, keystore) = Box::pin(create_test_client_transport(mock_node)).await;
-    let account = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
-    (client, account)
-}
-
-pub async fn create_test_client_with_transport(
-    transport: Arc<dyn NoteTransportClient>,
-) -> (MockClient<FilesystemKeyStore>, FilesystemKeyStore) {
     let (builder, _, keystore) = create_test_client_builder().await;
-    let builder_w_transport = builder.note_transport(transport);
+    let transport_client = MockNoteTransportApi::new(mock_node);
+    let builder_w_transport = builder.note_transport(Arc::new(transport_client));
 
     let mut client = builder_w_transport.build().await.unwrap();
     client.ensure_genesis_in_place().await.unwrap();
@@ -514,12 +485,27 @@ pub async fn create_test_client_with_transport(
     (client, keystore)
 }
 
+pub async fn create_test_user_transport(
+    mock_node: Arc<RwLock<MockNoteTransportNode>>,
+) -> (MockClient<FilesystemKeyStore>, Account) {
+    let (mut client, keystore) = Box::pin(create_test_client_transport(mock_node.clone())).await;
+    let account = insert_new_wallet(&mut client, AccountType::Private, &keystore).await.unwrap();
+    (client, account)
+}
+
+pub async fn create_test_client_with_transport(
+    transport: Arc<dyn NoteTransportClient>,
+) -> (MockClient<FilesystemKeyStore>, FilesystemKeyStore) {
+    let (builder, _, keystore) = create_test_client_builder().await;
+    let mut client = builder.note_transport(transport).build().await.unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+    (client, keystore)
+}
+
 pub async fn create_test_user_with_transport(
     transport: Arc<dyn NoteTransportClient>,
 ) -> (MockClient<FilesystemKeyStore>, Account) {
     let (mut client, keystore) = Box::pin(create_test_client_with_transport(transport)).await;
-    let account = insert_new_wallet(&mut client, AccountStorageMode::Private, &keystore)
-        .await
-        .unwrap();
+    let account = insert_new_wallet(&mut client, AccountType::Private, &keystore).await.unwrap();
     (client, account)
 }

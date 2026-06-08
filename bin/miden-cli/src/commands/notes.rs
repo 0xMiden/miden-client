@@ -13,7 +13,7 @@ use miden_client::note::{
     get_input_note_with_id_prefix,
 };
 use miden_client::store::{InputNoteRecord, NoteFilter as ClientNoteFilter, OutputNoteRecord};
-use miden_client::{Client, ClientError, IdPrefixFetchError, PrettyPrint, Word};
+use miden_client::{Client, ClientError, IdPrefixFetchError, PrettyPrint};
 
 use crate::errors::CliError;
 use crate::utils::{load_faucet_details_map, parse_account_id};
@@ -178,7 +178,9 @@ async fn show_note<AUTH: Keystore + Sync>(
 
     // If we match one note as the input note and another one as the output note return an error
     match (&input_note_record, &output_note_record) {
-        (Some(input_record), Some(output_record)) if input_record.id() != output_record.id() => {
+        (Some(input_record), Some(output_record))
+            if input_record.id() != Some(output_record.id()) =>
+        {
             return Err(CliError::Import(
                 "The specified note ID hex prefix matched with more than one note.".to_string(),
             ));
@@ -212,8 +214,8 @@ async fn show_note<AUTH: Keystore + Sync>(
         _ => None,
     };
 
-    if let Some(standard_note_name) = script_root_word.and_then(identify_standard_note) {
-        table.add_row(vec![Cell::new("Standard Note"), Cell::new(standard_note_name)]);
+    if let Some(standard_note) = script_root_word.and_then(StandardNote::from_script_root) {
+        table.add_row(vec![Cell::new("Standard Note"), Cell::new(standard_note.name())]);
     }
 
     table.add_row(vec![Cell::new("Script Root"), Cell::new(script_root)]);
@@ -390,9 +392,11 @@ where
     let mut table = create_dynamic_table(&["Note ID", "Account ID", "Relevance"]);
 
     for (note, relevances) in notes {
+        // Consumable notes are committed, so they carry metadata and id() is Some.
+        let note_id_hex = note.id().map_or_else(|| "<unknown>".to_string(), |id| id.to_hex());
         for relevance in relevances {
             table.add_row(vec![
-                note.id().to_hex(),
+                note_id_hex.clone(),
                 relevance.0.to_string(),
                 note_consumption_status_type(&relevance.1),
             ]);
@@ -435,9 +439,13 @@ fn note_summary(
     input_note_record: Option<&InputNoteRecord>,
     output_note_record: Option<&OutputNoteRecord>,
 ) -> CliNoteSummary {
-    let note_id = input_note_record
-        .map(InputNoteRecord::id)
-        .or(output_note_record.map(OutputNoteRecord::id))
+    // Use the NoteId's hex when available; metadata-less input notes have no NoteId, so fall back
+    // to the details commitment as the identifier rather than fabricating a NoteId from it.
+    let id_str = input_note_record
+        .and_then(InputNoteRecord::id)
+        .or_else(|| output_note_record.map(OutputNoteRecord::id))
+        .map(|id| id.to_hex())
+        .or_else(|| input_note_record.map(|record| record.details_commitment().as_word().to_hex()))
         .expect("One of the two records should be Some");
 
     let assets_commitment_str = input_note_record
@@ -489,7 +497,7 @@ fn note_summary(
         note_metadata.map_or("-".to_string(), |metadata| metadata.tag().to_string());
 
     CliNoteSummary {
-        id: note_id.to_hex(),
+        id: id_str,
         script_root: script_root_str,
         assets_commitment: assets_commitment_str,
         inputs_commitment: inputs_commitment_str,
@@ -499,18 +507,5 @@ fn note_summary(
         tag: note_tag_str,
         sender: note_sender_str,
         exportable: output_note_record.is_some(),
-    }
-}
-
-/// Identifies if a note with the given script root is a standard note type.
-/// Returns the name of the standard note type if found, or `None` if not a standard note.
-fn identify_standard_note(script_root: Word) -> Option<&'static str> {
-    match script_root {
-        sr if sr == StandardNote::P2ID.script_root() => Some("P2ID"),
-        sr if sr == StandardNote::P2IDE.script_root() => Some("P2IDE"),
-        sr if sr == StandardNote::SWAP.script_root() => Some("SWAP"),
-        sr if sr == StandardNote::MINT.script_root() => Some("MINT"),
-        sr if sr == StandardNote::BURN.script_root() => Some("BURN"),
-        _ => None,
     }
 }

@@ -9,7 +9,7 @@ use miden_client::utils::Deserializable;
 use miden_client::{Client, ClientError};
 use tracing::info;
 
-use crate::commands::account::set_default_account_if_unset;
+use crate::commands::account::{account_code_has_basic_wallet, set_default_account_if_unset};
 use crate::errors::CliError;
 use crate::{FilesystemKeyStore, Parser};
 
@@ -35,8 +35,13 @@ impl ImportCmd {
             let note_file = read_note_file(filename.clone());
 
             if let Ok(note_file) = note_file {
-                let note_id = client.import_notes(&[note_file]).await?[0];
-                println!("Successfully imported note {}", note_id.to_hex());
+                match client.import_notes(&[note_file]).await?.first() {
+                    Some(commitment) => println!(
+                        "Successfully imported note with details commitment {}",
+                        commitment.to_hex()
+                    ),
+                    None => println!("Note was already up to date; nothing to import."),
+                }
             } else {
                 info!(
                     "Attempting to import account data from {}...",
@@ -48,7 +53,11 @@ impl ImportCmd {
 
                 println!("Successfully imported account {account_id}");
 
-                if account_id.is_regular_account() {
+                // Only basic wallets are eligible to become the default account; faucets and
+                // other account kinds are skipped.
+                if let Some(code) = client.get_account_code(account_id).await?
+                    && account_code_has_basic_wallet(account_id, &code)
+                {
                     set_default_account_if_unset(&mut client, account_id).await?;
                 }
             }

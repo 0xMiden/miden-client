@@ -1,8 +1,11 @@
-use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::address::{Address, AddressId};
+use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
+use miden_client::transaction::{ExecutedTransaction, InputNote};
+use miden_client::vm::MIN_STACK_DEPTH;
+use miden_client::{Client, Felt, WORD_SIZE, Word};
 
-use super::{CLIENT_CONFIG_FILE_NAME, get_account_with_id_prefix};
+use super::{CLIENT_CONFIG_FILE_NAME, create_dynamic_table, get_account_with_id_prefix};
 use crate::commands::account::DEFAULT_ACCOUNT_ID_KEY;
 use crate::config::{CliConfig, get_global_miden_dir, get_local_miden_dir};
 use crate::errors::CliError;
@@ -91,4 +94,151 @@ pub(super) fn config_file_exists() -> Result<bool, CliError> {
 pub fn load_faucet_details_map() -> Result<FaucetDetailsMap, CliError> {
     let config = CliConfig::load()?;
     FaucetDetailsMap::new(config.token_symbol_map_filepath)
+}
+
+/// Prints the effects of an executed transaction: input notes, output notes, storage value
+/// changes, storage map changes, vault changes, and the nonce change.
+pub fn print_executed_transaction(executed_tx: &ExecutedTransaction) -> Result<(), CliError> {
+    println!("The transaction will have the following effects:\n");
+
+    let delta = executed_tx.account_delta();
+
+    // INPUT NOTES
+    let input_note_ids = executed_tx.input_notes().iter().map(InputNote::id).collect::<Vec<_>>();
+    if input_note_ids.is_empty() {
+        println!("No notes will be consumed.");
+    } else {
+        println!("The following notes will be consumed:");
+        for input_note_id in input_note_ids {
+            println!("\t- {}", input_note_id.to_hex());
+        }
+    }
+    println!();
+
+    // OUTPUT NOTES
+    let output_notes: Vec<_> = executed_tx.output_notes().iter().collect();
+    if output_notes.is_empty() {
+        println!("No notes will be created as a result of this transaction.");
+    } else {
+        println!("{} notes will be created as a result of this transaction:", output_notes.len());
+        for note in &output_notes {
+            println!("\t- {}", note.id().to_hex());
+        }
+    }
+    println!();
+
+    // STORAGE VALUES
+    if delta.storage().values().next().is_some() {
+        let mut table = create_dynamic_table(&["Storage Slot", "Effect"]);
+        for (slot, new_value) in delta.storage().values() {
+            table.add_row(vec![slot.to_string(), format!("Updated ({})", new_value.to_hex())]);
+        }
+        println!("Storage changes:");
+        println!("{table}");
+    } else {
+        println!("Account Storage will not be changed.");
+    }
+
+    // STORAGE MAPS
+    if delta.storage().maps().next().is_some() {
+        let mut table = create_dynamic_table(&["Storage Slot", "Map Key", "New Value"]);
+        for (slot, map_delta) in delta.storage().maps() {
+            for (key, value) in map_delta.entries() {
+                table.add_row(vec![slot.to_string(), Word::from(*key).to_hex(), value.to_hex()]);
+            }
+        }
+        println!("Storage map changes:");
+        println!("{table}");
+    }
+
+    // VAULT
+    if delta.vault().is_empty() {
+        println!("Account Vault will not be changed.");
+    } else {
+        let faucet_details_map = load_faucet_details_map()?;
+        let mut table = create_dynamic_table(&["Asset Type", "Faucet ID", "Amount"]);
+
+        for (vault_key, amount) in delta.vault().fungible().iter() {
+            let asset = FungibleAsset::new(vault_key.faucet_id(), amount.unsigned_abs())
+                .map_err(CliError::Asset)?;
+            let (faucet_fmt, amount_fmt) = faucet_details_map.format_fungible_asset(&asset)?;
+
+            if amount.is_positive() {
+                table.add_row(vec!["Fungible Asset", &faucet_fmt, &format!("+{amount_fmt}")]);
+            } else {
+                table.add_row(vec!["Fungible Asset", &faucet_fmt, &format!("-{amount_fmt}")]);
+            }
+        }
+
+        for (asset, action) in delta.vault().non_fungible().iter() {
+            match action {
+                NonFungibleDeltaAction::Add => {
+                    table.add_row(vec![
+                        "Non Fungible Asset",
+                        &asset.faucet_id().prefix().to_hex(),
+                        "1",
+                    ]);
+                },
+                NonFungibleDeltaAction::Remove => {
+                    table.add_row(vec![
+                        "Non Fungible Asset",
+                        &asset.faucet_id().prefix().to_hex(),
+                        "-1",
+                    ]);
+                },
+            }
+        }
+
+        println!("Vault changes:");
+        println!("{table}");
+    }
+
+    // NONCE
+    println!("Nonce incremented by: {}.", delta.nonce_delta());
+
+    Ok(())
+}
+
+/// Prints the output stack from `execute_program`.
+///
+/// If `expected_results` is `Some(n)`, prints the top `n` values. If `None`, prints up to the
+/// last non-zero value so trailing zero-padding is hidden.
+pub fn print_executed_program_stack(
+    stack: &[Felt; MIN_STACK_DEPTH],
+    expected_results: Option<usize>,
+) {
+    let count = match expected_results {
+        Some(n) => n,
+        None => stack.iter().rposition(|v| v.as_canonical_u64() != 0).map_or(0, |pos| pos + 1),
+    };
+
+    match count {
+        0 => println!("\nResult: 0"),
+        1 => println!("\nResult: {}", stack[0]),
+        _ => {
+            println!("\nResult ({count} values):");
+            for (i, val) in stack.iter().enumerate().take(count) {
+                println!("  [{i}]: {val}");
+            }
+        },
+    }
+}
+
+/// Prints the output stack as four 4-felt words with their hex encoding.
+pub fn print_executed_program_stack_hex_words(stack: &[Felt; MIN_STACK_DEPTH]) {
+    let last_word_start = MIN_STACK_DEPTH - WORD_SIZE;
+    println!("Output stack:");
+    for word_idx in (0..MIN_STACK_DEPTH).step_by(WORD_SIZE) {
+        let word_idx_end = word_idx + WORD_SIZE - 1;
+        let prefix = if word_idx == last_word_start {
+            "└──"
+        } else {
+            "├──"
+        };
+        let word = [stack[word_idx], stack[word_idx + 1], stack[word_idx + 2], stack[word_idx + 3]];
+        println!(
+            "{prefix} {word_idx:2} - {word_idx_end:2}: {word:?} ({})",
+            Word::from(word).to_hex()
+        );
+    }
 }
