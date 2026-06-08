@@ -180,8 +180,8 @@ fn build_test_faucets_and_account() -> anyhow::Result<Vec<Account>> {
 }
 
 /// Creates multiple fungible faucets for testing purposes.
-/// Each faucet is created with a deterministic seed derived from its index,
-/// ensuring reproducible test scenarios.
+/// Each faucet's index-derived seed gives it a distinct ID within a genesis, but IDs are not
+/// stable across runs: the shared auth key is randomly seeded and feeds ID derivation.
 fn create_test_faucets(secret: &AuthSecretKey) -> anyhow::Result<Vec<Account>> {
     (0..NUM_TEST_FAUCETS)
         .map(|i| create_single_test_faucet(i, secret))

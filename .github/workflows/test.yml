@@ -119,48 +119,6 @@ jobs:
           name: note-transport-artifact
           path: target/release/miden-note-transport-node-bin
 
-  build-remote-prover:
-    name: Build remote-prover
-    runs-on: warp-ubuntu-latest-x64-8x
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          persist-credentials: false
-      - name: Cleanup large tools for build space
-        uses: ./.github/actions/cleanup-runner
-      - name: Restore remote-prover binary
-        id: cache-remote-prover
-        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-        with:
-          path: target/release/testing-remote-prover
-          key: ${{ runner.os }}-prover-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/prover/**/*') }}
-      - name: Install Rust
-        if: steps.cache-remote-prover.outputs.cache-hit != 'true'
-        run: rustup update --no-self-update
-      - name: Add Rust Cache
-        if: steps.cache-remote-prover.outputs.cache-hit != 'true'
-        uses: WarpBuilds/rust-cache@9d0cc3090d9c87de74ea67617b246e978735b1a1 # v2.9.1
-        with:
-          shared-key: rust-release
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: false
-      - name: Build remote-prover
-        if: steps.cache-remote-prover.outputs.cache-hit != 'true'
-        run: cargo build --release --package testing-remote-prover --locked
-      - name: Save remote-prover binary
-        if: steps.cache-remote-prover.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/next'
-        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-        with:
-          path: target/release/testing-remote-prover
-          key: ${{ runner.os }}-prover-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/prover/**/*') }}
-      - name: Upload remote-prover binary
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: remote-prover-artifact
-          path: target/release/testing-remote-prover
-      - name: Check binary existance
-        run: file -E target/release/testing-remote-prover
-
   build-test-node:
     name: Build test node
     runs-on: warp-ubuntu-latest-x64-8x
