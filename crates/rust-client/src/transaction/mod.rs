@@ -314,6 +314,9 @@ where
 
         let mut notes = prep.notes;
         if prep.ignore_invalid_notes {
+            // Notes dropped here are never consumed, so by the no-orphan-rows invariant they get no
+            // tracking row: execution persists nothing, and only the notes actually consumed by the
+            // executed transaction are recorded at apply time.
             notes = self.get_valid_input_notes(&account, notes, prep.tx_args.clone()).await?;
         }
 
@@ -899,42 +902,53 @@ where
 
         // Locally consumed notes.
         //
-        // Notes already tracked in the store are updated in place. Notes supplied directly in the
-        // request (e.g. unauthenticated private notes) have no store row, because execution does
-        // not persist tracking state; their record is built from the executed transaction's inputs
-        // and inserted already in the consumed state, so the consume lands atomically in the apply.
+        // Each consumed note is tracked exactly once, atomically, in the apply. A note already in
+        // the store is consumed in place from its authoritative prior state, which preserves its
+        // authenticated/unauthenticated variant and consuming-transaction linkage (and surfaces a
+        // genuine conflict, e.g. re-consuming a note already in flight, by propagating the error).
+        //
+        // Two cases instead rebuild the record from the executed transaction's input:
+        //   - a note with no store row at all (e.g. an unauthenticated private note supplied
+        //     directly in the request — because execution no longer pre-persists request notes,
+        //     this rebuild is what records them); and
+        //   - a stored `Invalid` row, whose synced inclusion proof failed verification and is
+        //     therefore stale: it is rebuilt and `INSERT OR REPLACE`d (this resets the note's
+        //     creation timestamp, which is acceptable for a note now transitioning to consumed).
+        //
+        // Other stored states (`Processing*`, `Consumed*`) must NOT be rebuilt: doing so would
+        // overwrite an authoritative in-flight/consumed row and downgrade its variant.
+        let now = self.store.get_current_timestamp();
         let consumed_input_notes = executed_tx.tx_inputs().input_notes();
         let consumed_note_ids: Vec<NoteId> =
             consumed_input_notes.iter().map(InputNote::id).collect();
 
-        let stored_consumed_notes =
-            self.store.get_input_notes(NoteFilter::List(consumed_note_ids)).await?;
-        let stored_consumed_ids: BTreeSet<NoteId> =
-            stored_consumed_notes.iter().filter_map(InputNoteRecord::id).collect();
+        let mut stored_consumed: BTreeMap<NoteId, InputNoteRecord> = self
+            .store
+            .get_input_notes(NoteFilter::List(consumed_note_ids))
+            .await?
+            .into_iter()
+            .filter_map(|record| record.id().map(|id| (id, record)))
+            .collect();
 
         let mut updated_input_notes = vec![];
 
-        for mut input_note_record in stored_consumed_notes {
-            if input_note_record.consumed_locally(
-                executed_tx.account_id(),
-                executed_tx.id(),
-                self.store.get_current_timestamp(),
-            )? {
-                updated_input_notes.push(input_note_record);
-            }
-        }
-
         for input_note in consumed_input_notes.iter() {
-            if stored_consumed_ids.contains(&input_note.id()) {
+            // Consume an existing, non-`Invalid` store record in place; its prior state is
+            // authoritative.
+            if let Some(mut record) = stored_consumed
+                .remove(&input_note.id())
+                .filter(|record| !matches!(record.state(), InputNoteState::Invalid(_)))
+            {
+                if record.consumed_locally(executed_tx.account_id(), executed_tx.id(), now)? {
+                    updated_input_notes.push(record);
+                }
                 continue;
             }
 
+            // No usable store row (absent, or a stale `Invalid` row): rebuild from the executed
+            // input and insert it in the consumed state.
             let mut record = InputNoteRecord::from(input_note.clone());
-            if record.consumed_locally(
-                executed_tx.account_id(),
-                executed_tx.id(),
-                self.store.get_current_timestamp(),
-            )? {
+            if record.consumed_locally(executed_tx.account_id(), executed_tx.id(), now)? {
                 new_input_notes.push(record);
             }
         }

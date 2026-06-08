@@ -1056,6 +1056,10 @@ async fn execute_transaction_does_not_persist_input_notes() {
         client.get_input_notes(NoteFilter::Processing).await.unwrap().is_empty(),
         "execute_transaction must not advance a note into the processing state"
     );
+    assert!(
+        client.get_input_notes(NoteFilter::Consumed).await.unwrap().is_empty(),
+        "execute_transaction must not advance a note into the consumed state"
+    );
 
     // The full pipeline (execute + prove + submit + apply) must still track the consume: after
     // submitting, the note moves into the processing state via the atomic apply.
