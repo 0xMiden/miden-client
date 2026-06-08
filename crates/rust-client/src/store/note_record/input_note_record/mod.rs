@@ -8,7 +8,7 @@ use miden_protocol::note::{
     NoteAssets,
     NoteAttachments,
     NoteDetails,
-    NoteHeader,
+    NoteDetailsCommitment,
     NoteId,
     NoteInclusionProof,
     NoteMetadata,
@@ -59,8 +59,8 @@ pub use states::{
 pub struct InputNoteRecord {
     /// Details of a note consisting of assets, script, inputs, and a serial number.
     details: NoteDetails,
-    /// The note's attachments. Required to consume the note, since consumption needs the full
-    /// attachment content (the note commitment only commits to the attachment digest). Empty when
+    /// The note's attachments. Required to reconstruct a [`Note`] whose commitment matches the
+    /// on-chain note, since the attachments contribute to the note metadata commitment. Empty when
     /// the note's full details have not been fetched yet (e.g. expected notes).
     attachments: NoteAttachments,
     /// The timestamp at which the note was created. If it's not known, it will be None.
@@ -82,9 +82,20 @@ impl InputNoteRecord {
     // PUBLIC ACCESSORS
     // ================================================================================================
 
-    /// Returns the input note ID.
-    pub fn id(&self) -> NoteId {
-        self.details.id()
+    /// Returns the input note ID, computed by combining the details commitment with the
+    /// note metadata. Returns `None` when the current state has no metadata (e.g. an
+    /// expected note imported from bare `NoteFile::NoteDetails`, or a note in the
+    /// `ConsumedExternal` state). Use [`Self::details_commitment`] when a stable identifier
+    /// is needed in those cases.
+    pub fn id(&self) -> Option<NoteId> {
+        let metadata = self.metadata()?;
+        Some(NoteId::new(self.details.commitment(), metadata))
+    }
+
+    /// Returns the commitment to the note's details (recipient + assets), independent of
+    /// note metadata.
+    pub fn details_commitment(&self) -> NoteDetailsCommitment {
+        self.details.commitment()
     }
 
     /// Returns the note's recipient.
@@ -94,7 +105,8 @@ impl InputNoteRecord {
 
     /// Returns the note's commitment, if the record contains the [`NoteMetadata`].
     pub fn commitment(&self) -> Option<Word> {
-        self.metadata().map(|m| NoteHeader::new(self.id(), *m).to_commitment())
+        self.metadata()
+            .map(|metadata| NoteId::new(self.details.commitment(), metadata).as_word())
     }
 
     /// Returns the note's assets.
@@ -105,6 +117,15 @@ impl InputNoteRecord {
     /// Returns the note's attachments.
     pub fn attachments(&self) -> &NoteAttachments {
         &self.attachments
+    }
+
+    /// Sets the note's attachments.
+    ///
+    /// Attachments are a top-level field of the record, independent of the [`InputNoteState`]
+    /// machine, so this is a plain field assignment. They are populated during sync once fetched
+    /// from the node, since they are required to reconstruct the note's ID for consumption.
+    pub(crate) fn set_attachments(&mut self, attachments: NoteAttachments) {
+        self.attachments = attachments;
     }
 
     /// Returns the timestamp in which the note record was created, if available.
@@ -122,9 +143,10 @@ impl InputNoteRecord {
         self.state.metadata()
     }
 
-    /// Returns the note nullifier.
-    pub fn nullifier(&self) -> Nullifier {
-        self.details.nullifier()
+    /// Returns the note nullifier, if the record contains the [`NoteMetadata`].
+    pub fn nullifier(&self) -> Option<Nullifier> {
+        let metadata = self.metadata()?;
+        Some(Nullifier::from_details_and_metadata(&self.details, metadata))
     }
 
     /// Returns the inclusion proof for the note.
@@ -235,7 +257,10 @@ impl InputNoteRecord {
         &mut self,
         block_header: &BlockHeader,
     ) -> Result<bool, NoteRecordError> {
-        let new_state = self.state.block_header_received(self.id(), block_header)?;
+        let note_id = self
+            .id()
+            .expect("block_header_received is only called after metadata is populated");
+        let new_state = self.state.block_header_received(note_id, block_header)?;
         if let Some(new_state) = new_state {
             self.state = new_state;
             Ok(true)
@@ -258,7 +283,7 @@ impl InputNoteRecord {
         nullifier_block_height: BlockNumber,
         consumer_account: Option<AccountId>,
     ) -> Result<bool, NoteRecordError> {
-        if self.nullifier() != nullifier {
+        if self.nullifier() != Some(nullifier) {
             return Err(NoteRecordError::StateTransitionError(
                 "Nullifier does not match the expected value".to_string(),
             ));

@@ -92,10 +92,12 @@ impl TryFrom<proto::primitives::MmrDelta> for MmrDelta {
         let data: Result<Vec<_>, RpcConversionError> =
             value.data.into_iter().map(Word::try_from).collect();
 
+        let num_leaves = usize::try_from(value.forest).map_err(|_| {
+            RpcConversionError::InvalidField("MmrDelta forest value exceeds usize".into())
+        })?;
         Ok(MmrDelta {
-            forest: Forest::new(usize::try_from(value.forest).map_err(|_| {
-                RpcConversionError::InvalidField("MmrDelta forest value exceeds usize".into())
-            })?),
+            forest: Forest::new(num_leaves)
+                .map_err(|_| RpcConversionError::InvalidField("MmrDelta forest invalid".into()))?,
             data: data?,
         })
     }

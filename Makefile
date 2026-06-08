@@ -23,11 +23,11 @@ TEST_MIDEN_NOTE_TRANSPORT_URL?=http://127.0.0.1:57292
 
 .PHONY: clippy
 clippy: ## Run Clippy with configs
-	cargo +nightly clippy --workspace --features "testing std" --all-targets -- -D warnings
+	cargo clippy --workspace --features "testing std" --all-targets -- -D warnings
 
 .PHONY: fix
 fix: ## Run Fix with configs
-	cargo +nightly fix --workspace --features "testing std" --all-targets --allow-staged --allow-dirty
+	cargo fix --workspace --features "testing std" --all-targets --allow-staged --allow-dirty
 
 .PHONY: format
 format: ## Run format using nightly toolchain

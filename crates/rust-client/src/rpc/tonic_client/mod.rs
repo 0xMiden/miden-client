@@ -26,7 +26,12 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{AccountProof, GetAccountRequest, VaultFetch};
+use super::domain::account::{
+    AccountProof,
+    AccountStorageRequirements,
+    GetAccountRequest,
+    StorageMapFetch,
+};
 use super::domain::note::{FetchedNote, NoteSyncBlock};
 use super::domain::nullifier::NullifierUpdate;
 use super::generated::rpc::AccountRequest;
@@ -41,7 +46,6 @@ use crate::rpc::domain::transaction::TransactionRecord;
 use crate::rpc::errors::node::parse_node_error;
 use crate::rpc::errors::{AcceptHeaderContext, AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::BlockRange;
-use crate::rpc::generated::rpc::account_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::{AccountStateAt, generated as proto};
 
 mod api_client;
@@ -347,7 +351,7 @@ impl NodeRpcClient for GrpcClient {
         let api_response = self
             .call_with_retry(RpcEndpoint::SubmitProvenTx, |mut rpc_api| {
                 let request = request.clone();
-                Box::pin(async move { rpc_api.submit_proven_transaction(request).await })
+                Box::pin(async move { rpc_api.submit_proven_tx(request).await })
             })
             .await?;
 
@@ -369,7 +373,7 @@ impl NodeRpcClient for GrpcClient {
         let api_response = self
             .call_with_retry(RpcEndpoint::SubmitProvenBatch, |mut rpc_api| {
                 let request = request.clone();
-                Box::pin(async move { rpc_api.submit_proven_batch(request).await })
+                Box::pin(async move { rpc_api.submit_proven_tx_batch(request).await })
             })
             .await?;
 
@@ -410,12 +414,12 @@ impl NodeRpcClient for GrpcClient {
                 .ok_or(RpcError::ExpectedDataMissing("MmrPath".into()))?
                 .try_into()?;
 
+            let forest_size = usize::try_from(forest).expect("u64 should fit in usize");
+            let forest = Forest::new(forest_size).map_err(|_| {
+                RpcError::InvalidResponse(format!("invalid forest size: {forest_size}"))
+            })?;
             Some(MmrProof::new(
-                MmrPath::new(
-                    Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
-                    block_header.block_num().as_usize(),
-                    merkle_path,
-                ),
+                MmrPath::new(forest, block_header.block_num().as_usize(), merkle_path),
                 block_header.commitment(),
             ))
         } else {
@@ -457,11 +461,12 @@ impl NodeRpcClient for GrpcClient {
         current_block_height: BlockNumber,
         upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError> {
-        let block_from = current_block_height.as_u32();
+        let finality_level: proto::rpc::FinalityLevel = upper_bound.into();
 
-        let upper_bound = Some(upper_bound.into());
-
-        let request = proto::rpc::SyncChainMmrRequest { block_from, upper_bound };
+        let request = proto::rpc::SyncChainMmrRequest {
+            current_client_block_height: current_block_height.as_u32(),
+            finality_level: finality_level.into(),
+        };
 
         let response = self
             .call_with_retry(RpcEndpoint::SyncChainMmr, |mut rpc_api| {
@@ -496,21 +501,19 @@ impl NodeRpcClient for GrpcClient {
             known_codes_by_commitment.insert(account_code.commitment(), account_code);
         }
 
-        let storage_maps: Vec<StorageMapDetailRequest> = storage.clone().into();
-
-        let asset_vault_commitment = match vault {
-            VaultFetch::Skip => None,
-            VaultFetch::Always => Some(EMPTY_WORD.into()),
-            VaultFetch::IfChangedFrom(commitment) => Some(commitment.into()),
+        // We need the requested slots to interpret the node response.
+        let requirements = match storage.clone() {
+            StorageMapFetch::Slots(reqs) => reqs,
+            StorageMapFetch::Skip | StorageMapFetch::All => AccountStorageRequirements::default(),
         };
 
         // Only request details for accounts with public state (Public or Network), passing the
         // known code commitment so the node can skip re-sending code we already hold.
-        let account_details = if account_id.has_public_state() {
+        let account_details = if account_id.is_public() {
             Some(AccountDetailRequest {
                 code_commitment: Some(known_code_commitment.into()),
-                asset_vault_commitment,
-                storage_maps,
+                asset_vault_commitment: vault.into(),
+                storage_request: storage.into(),
             })
         } else {
             None
@@ -547,11 +550,11 @@ impl NodeRpcClient for GrpcClient {
             .into();
 
         // For accounts with public state, details should be present when requested
-        let headers = if account_witness.id().has_public_state() {
+        let headers = if account_witness.id().is_public() {
             let details = response
                 .details
                 .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                .into_domain(&known_codes_by_commitment, &storage)?;
+                .into_domain(&known_codes_by_commitment, &requirements)?;
 
             Some(details)
         } else {
@@ -639,7 +642,7 @@ impl NodeRpcClient for GrpcClient {
         &self,
         prefixes: &[u16],
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         let limits = self.get_rpc_limits().await?;
         let mut all_nullifiers = BTreeSet::new();
@@ -648,7 +651,7 @@ impl NodeRpcClient for GrpcClient {
         // violating the RPC limit.
         for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
             let proto_prefixes: Vec<u32> = chunk.iter().map(|&x| u32::from(x)).collect();
-            let mut pagination = BlockPagination::new(block_from, block_to);
+            let mut pagination = BlockPagination::new(block_from, Some(block_to));
 
             loop {
                 let request = proto::rpc::SyncNullifiersRequest {
@@ -656,7 +659,10 @@ impl NodeRpcClient for GrpcClient {
                     prefix_len: 16,
                     block_range: Some(BlockRange {
                         block_from: pagination.current_block_from().as_u32(),
-                        block_to: pagination.block_to().map_or(u32::MAX, |b| b.as_u32()),
+                        block_to: pagination
+                            .block_to()
+                            .map(|b| b.as_u32())
+                            .expect("sync_nullifiers is paginated with a bounded block_to"),
                     }),
                 };
 
@@ -1087,15 +1093,13 @@ mod tests {
 
     #[tokio::test]
     async fn set_genesis_commitment_does_nothing_if_the_commitment_is_already_set() {
-        use miden_protocol::Felt;
-
         let endpoint = &Endpoint::devnet();
         let client = GrpcClient::new(endpoint, 10000);
 
         let initial_commitment = Word::default();
         client.set_genesis_commitment(initial_commitment).await.unwrap();
 
-        let new_commitment = Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+        let new_commitment = Word::from([1u32, 2, 3, 4]);
         client.set_genesis_commitment(new_commitment).await.unwrap();
 
         assert_eq!(client.genesis_commitment.read().unwrap(), initial_commitment);

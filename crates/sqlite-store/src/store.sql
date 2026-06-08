@@ -155,13 +155,14 @@ CREATE TABLE transaction_scripts (
 -- ── Notes ────────────────────────────────────────────────────────────────
 
 CREATE TABLE input_notes (
-    note_id TEXT NOT NULL,                                  -- the note id
+    details_commitment TEXT NOT NULL,                       -- commitment to the note details (recipient + assets); stable across the note's lifecycle and independent of metadata
+    note_id TEXT NULL,                                      -- the full note id (hash(details_commitment, metadata_commitment)); NULL until metadata is known
     assets BLOB NOT NULL,                                   -- the serialized list of assets
     attachments BLOB NOT NULL,                              -- the serialized NoteAttachments
     serial_number BLOB NOT NULL,                            -- the serial number of the note
     inputs BLOB NOT NULL,                                   -- the serialized list of note inputs
     script_root TEXT NOT NULL,                              -- the script root of the note, used to join with the notes_scripts table
-    nullifier TEXT NOT NULL,                                -- the nullifier of the note, used to query by nullifier
+    nullifier TEXT NULL,                                    -- the nullifier of the note, used to query by nullifier; NULL until metadata is known
     state_discriminant UNSIGNED INT NOT NULL,               -- state discriminant of the note, used to query by state
     state BLOB NOT NULL,                                    -- serialized note state
     created_at UNSIGNED BIG INT NOT NULL,                   -- timestamp of the note creation/import
@@ -169,15 +170,17 @@ CREATE TABLE input_notes (
     consumed_tx_order INTEGER NULL,                         -- per-account position of the consuming tx in the account's execution chain within the block; NULL for external consumption or non-consumed notes
     consumer_account_id TEXT NULL,                          -- account ID that consumed this note; NULL for non-consumed or externally consumed notes
 
-    PRIMARY KEY (note_id),
+    PRIMARY KEY (details_commitment),
     FOREIGN KEY (script_root) REFERENCES notes_scripts(script_root)
 ) WITHOUT ROWID;
 CREATE INDEX idx_input_notes_state ON input_notes(state_discriminant);
 CREATE INDEX idx_input_notes_nullifier ON input_notes(nullifier);
+CREATE INDEX idx_input_notes_note_id ON input_notes(note_id);
 CREATE INDEX idx_input_notes_consumption ON input_notes(consumed_block_height, consumed_tx_order);
 
 CREATE TABLE output_notes (
-    note_id TEXT NOT NULL,                                  -- the note id
+    details_commitment TEXT NOT NULL,                       -- commitment to the note details (recipient + assets); primary key
+    note_id TEXT NOT NULL,                                  -- the full note id (hash(details_commitment, metadata_commitment))
     recipient_digest TEXT NOT NULL,                                -- the note recipient
     assets BLOB NOT NULL,                                   -- the serialized NoteAssets, including vault commitment and list of assets
     metadata BLOB NOT NULL,                                 -- serialized metadata
@@ -189,10 +192,11 @@ CREATE TABLE output_notes (
     state BLOB NOT NULL,                                    -- serialized note state
     attachments BLOB NOT NULL,
 
-    PRIMARY KEY (note_id)
+    PRIMARY KEY (details_commitment)
 ) WITHOUT ROWID;
 CREATE INDEX idx_output_notes_state ON output_notes(state_discriminant);
 CREATE INDEX idx_output_notes_nullifier ON output_notes(nullifier);
+CREATE INDEX idx_output_notes_note_id ON output_notes(note_id);
 
 CREATE TABLE notes_scripts (
     script_root TEXT NOT NULL,                       -- Note script root

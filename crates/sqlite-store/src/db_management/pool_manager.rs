@@ -73,7 +73,6 @@ impl Manager for SqlitePoolManager {
         deadpool_sync::SyncWrapper::new(RUNTIME, move || conn).await
     }
 
-    #[allow(clippy::unused_async_trait_impl)]
     async fn recycle(&self, _: &mut Self::Type, _: &Metrics) -> RecycleResult<Self::Error> {
         Ok(())
     }

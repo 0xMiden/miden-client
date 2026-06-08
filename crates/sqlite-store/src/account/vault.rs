@@ -131,7 +131,7 @@ impl SqliteStore {
                 },
             };
 
-            if asset.amount() > 0 {
+            if asset.amount().as_u64() > 0 {
                 updated_assets.insert(asset.vault_key(), Asset::Fungible(asset));
             } else {
                 removed_vault_keys.push(asset.vault_key());
