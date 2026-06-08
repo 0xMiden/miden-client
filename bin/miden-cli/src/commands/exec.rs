@@ -219,7 +219,11 @@ fn deserialize_tx_inputs(serialized: &str) -> Result<Vec<(Word, Vec<Felt>)>, Cli
         .into_iter()
         .map(|input| {
             let word = Word::try_from(input.key).map_err(|err| err.to_string())?;
-            let felts = input.values.into_iter().map(Felt::new).collect();
+            let felts: Vec<Felt> = input
+                .values
+                .into_iter()
+                .map(|v| Felt::new(v).map_err(|err| err.to_string()))
+                .collect::<Result<_, _>>()?;
             Ok((word, felts))
         })
         .collect::<Result<Vec<_>, _>>()

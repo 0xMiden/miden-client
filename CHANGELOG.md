@@ -6,6 +6,7 @@
 
 * [FIX] Fixed `derive_account_commitments` to return the final account commitment when multiple transactions for the same account are committed in the same block ([#2164](https://github.com/0xMiden/miden-client/pull/2164)).
 * [FIX] Stopped state sync from aborting when the node reports a stale (non-monotonic) header for a rapidly-advancing account: such updates are now skipped instead of failing with a nonce error ([#2216](https://github.com/0xMiden/miden-client/pull/2216)).
+* [rust] Expanded validation for output notes before executing a `TransactionRequest`. ([#89](https://github.com/0xMiden/wallet-adapter/issues/89))
 
 ### Changes
 
@@ -24,6 +25,11 @@
 * Added a `Client::import_watched_account_by_id` method to track an external account state without syncing notes ([#2143](https://github.com/0xMiden/miden-client/pull/2143)).
 * Removed limit on accounts and note tags that can be tracked by the client ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
 * [BREAKING] Updated the `sync_notes` and `sync_transactions` to return directly the fetched updates. Removed `TransactionsInfo` and `NoteSyncInfo` structs ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
+* [BREAKING][param][rust,store] `InputNoteRecord::new` takes a `NoteAttachments` argument; input notes persist attachments (new `attachments` column on `input_notes`) ([#2203](https://github.com/0xMiden/miden-client/pull/2203)).
+* [BREAKING][param][rust] `build_wallet_id` dropped its trailing `is_mutable: bool` (code mutability isn't encoded in the account ID) ([#2203](https://github.com/0xMiden/miden-client/pull/2203)).
+* [BREAKING][behavior][cli] `new-account`/`new-wallet` `--account-type` (`-t`) now accepts only `private`/`public`; legacy faucet/mutability values and `--mutable` are removed. Faucet-vs-regular is derived from packages — a `FungibleFaucet` component yields a fungible faucet with an implicit `TokenPolicyManager` ([#2203](https://github.com/0xMiden/miden-client/pull/2203)).
+* [BREAKING][type][rust] `Client::import_notes` and `sync_note_transport` return `Vec<NoteDetailsCommitment>` (was `Vec<NoteId>`); `SyncSummary::new_private_notes` too. Metadata-less imports have no `NoteId` yet — resolve via `Client::get_input_note_by_commitment` ([#2203](https://github.com/0xMiden/miden-client/pull/2203)).
+* [BREAKING] Reworked the `GetAccount` surface on `NodeRpcClient`: replaced `get_account_proof` with `get_account(account_id, GetAccountRequest)` and added `resolve_oversize_vault` / `resolve_oversize_storage_maps` helpers. `GetAccountRequest` bundles the previous positional args ([#2202](https://github.com/0xMiden/miden-client/pull/2202)).
 * [BREAKING][rust] `NodeRpcClient::get_note_script_by_root` now returns `Option<NoteScript>` (`None` when the node has no script for the requested root) instead of erroring when the script is absent ([#1840](https://github.com/0xMiden/miden-client/pull/1840)).
 * [BREAKING] `miden_client::note` re-exports updated to match the protocol's split of attachment data off `NoteMetadata`: removed `NoteAttachmentKind` and `NoteMetadataHeader`, added `NoteAttachmentHeader`, `NoteAttachments`, and `PartialNoteMetadata`. ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
 * [BREAKING] `CommittedNoteMetadata` simplified to a single `Full(NoteMetadata)` variant; the `Header { sender, note_type, tag, attachment_kind }` variant is removed because sync responses now always carry full metadata (attachment content is still fetched separately via `GetNotesById`, but is no longer part of `NoteMetadata`). Callers no longer need to handle the header-only case. ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
