@@ -1,27 +1,35 @@
 #![recursion_limit = "256"]
 
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::net::SocketAddr;
 use std::num::{NonZeroU32, NonZeroU64};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ::rand::{Rng, random};
 use anyhow::{Context, Result};
 use miden_node_block_producer::{
-    BlockProducer,
+    BlockProducerApi,
     DEFAULT_MAX_BATCHES_PER_BLOCK,
+    DEFAULT_MAX_CONCURRENT_PROOFS,
     DEFAULT_MAX_TXS_PER_BATCH,
     DEFAULT_MEMPOOL_TX_CAPACITY,
+    Sequencer,
 };
-use miden_node_ntx_builder::NtxBuilderConfig;
-use miden_node_rpc::Rpc;
-use miden_node_store::{DEFAULT_MAX_CONCURRENT_PROOFS, GenesisState, Store, StoreMode};
+use miden_node_proto::clients::{
+    Builder as GrpcClientBuilder,
+    GrpcClient,
+    NtxBuilderClient,
+    ValidatorClient,
+};
+use miden_node_rpc::{Rpc, RpcMode};
+use miden_node_store::state::State;
+use miden_node_store::{DatabaseOptions, GenesisState, default_sqlite_connection_pool_size};
 use miden_node_utils::clap::{GrpcOptionsExternal, GrpcOptionsInternal, StorageOptions};
-use miden_node_utils::crypto::get_rpo_random_coin;
-use miden_node_validator::{Validator, ValidatorSigner};
+use miden_node_utils::crypto::get_random_coin;
+use miden_ntx_builder::NtxBuilderConfig;
 use miden_protocol::account::auth::{AuthScheme, AuthSecretKey};
 use miden_protocol::account::{
     Account,
@@ -33,27 +41,41 @@ use miden_protocol::account::{
     StorageMap,
     StorageMapKey,
 };
-use miden_protocol::asset::{Asset, FungibleAsset, TokenSymbol};
+use miden_protocol::asset::{Asset, AssetAmount, FungibleAsset, TokenSymbol};
 use miden_protocol::block::FeeParameters;
 use miden_protocol::crypto::dsa::ecdsa_k256_keccak;
 use miden_protocol::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
 use miden_protocol::utils::serde::Serializable;
 use miden_protocol::{ONE, Word};
 use miden_standards::AuthMethod;
+use miden_standards::account::access::AccessControl;
 use miden_standards::account::auth::AuthSingleSig;
-use miden_standards::account::components::basic_wallet_library;
-use miden_standards::account::faucets::create_basic_fungible_faucet;
-use miden_standards::account::metadata::{FungibleTokenMetadata, TokenName};
+use miden_standards::account::faucets::{FungibleFaucet, TokenName, create_fungible_faucet};
+use miden_standards::account::policies::{
+    BurnPolicyConfig,
+    MintPolicyConfig,
+    PolicyRegistration,
+    TokenPolicyManager,
+};
+use miden_standards::account::wallets::BasicWallet;
+use miden_validator::{Validator, ValidatorSigner};
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
 use tokio::net::TcpListener;
-use tokio::task::{Id, JoinSet};
+use tokio::task::JoinHandle;
+use tonic::metadata::AsciiMetadataValue;
 use url::Url;
 
 pub const DEFAULT_BLOCK_INTERVAL: u64 = 5_000;
 pub const DEFAULT_BATCH_INTERVAL: u64 = 2_000;
 pub const DEFAULT_RPC_PORT: u16 = 57_291;
+/// Default remote transaction prover endpoint used by the ntx-builder. Matches the local prover
+/// started via `make start-prover` (see `crates/testing/prover`).
+pub const DEFAULT_PROVER_URL: &str = "http://127.0.0.1:50051";
 pub const GENESIS_ACCOUNT_FILE: &str = "account.mac";
+/// Arbitrary shared secret authenticating ntx-builder RPC calls. The value is unconstrained;
+/// the ntx-builder (client) and the RPC server (validator) only need to agree on it.
+const NTX_AUTH_HEADER_VALUE: &str = "miden-client-testing-node-ntx";
 
 /// Builder for configuring and starting a Miden node with all components.
 pub struct NodeBuilder {
@@ -61,6 +83,7 @@ pub struct NodeBuilder {
     block_interval: Duration,
     batch_interval: Duration,
     rpc_port: u16,
+    prover_url: Url,
 }
 
 impl NodeBuilder {
@@ -74,7 +97,15 @@ impl NodeBuilder {
             block_interval: Duration::from_millis(DEFAULT_BLOCK_INTERVAL),
             batch_interval: Duration::from_millis(DEFAULT_BATCH_INTERVAL),
             rpc_port: DEFAULT_RPC_PORT,
+            prover_url: Url::parse(DEFAULT_PROVER_URL).expect("default prover URL is valid"),
         }
+    }
+
+    /// Sets the remote transaction prover endpoint used by the ntx-builder.
+    #[must_use]
+    pub fn with_prover_url(mut self, prover_url: Url) -> Self {
+        self.prover_url = prover_url;
+        self
     }
 
     /// Sets the block production interval.
@@ -129,64 +160,47 @@ impl NodeBuilder {
             .as_secs()
             .try_into()
             .expect("timestamp should fit into u32");
-        let validator_signer = ecdsa_k256_keccak::SecretKey::new();
+        let validator_signing_key = ecdsa_k256_keccak::SigningKey::new();
+        let validator_public_key = validator_signing_key.public_key();
 
         let genesis_state = GenesisState::new(
             [&[account_file.account][..], &test_faucets_and_account[..]].concat(),
-            FeeParameters::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap(), 0u32)
-                .unwrap(),
+            FeeParameters::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap(), 0u32),
             version,
             timestamp,
-            validator_signer.clone(),
+            validator_public_key,
         );
 
         // Bootstrap the store database
         let genesis_block = genesis_state
-            .into_block()
-            .await
+            .into_block(&validator_signing_key)
             .with_context(|| "failed to create genesis block")?;
 
-        let genesis_header = genesis_block.inner().header().clone();
-        Store::bootstrap(genesis_block, &self.data_directory)
+        let signed_genesis_block = genesis_block.inner().clone();
+        let genesis_header = signed_genesis_block.header().clone();
+        State::bootstrap(genesis_block, &self.data_directory)
             .with_context(|| "failed to bootstrap store")?;
 
         // Bootstrap the validator database with the genesis block header so that block
-        // validation can find the chain tip.
+        // validation can find the chain tip. `setup` creates the database and applies migrations;
+        // `load` would require an already-bootstrapped file.
         let validator_db =
-            miden_node_validator::db::load(self.data_directory.join("validator.sqlite3"))
+            miden_validator::db::setup(self.data_directory.join("validator.sqlite3"))
                 .await
                 .with_context(|| "failed to initialize validator database")?;
         validator_db
             .transact("bootstrap_validator", move |conn| {
-                miden_node_validator::db::upsert_block_header(conn, &genesis_header)
+                miden_validator::db::upsert_block_header(conn, &genesis_header)
             })
             .await
             .with_context(|| "failed to bootstrap validator with genesis block header")?;
 
-        // Start listening on all gRPC urls so that inter-component connections can be created
-        // before each component is fully started up.
         let grpc_rpc = TcpListener::bind(format!("127.0.0.1:{}", self.rpc_port))
             .await
             .with_context(|| "failed to bind to RPC gRPC endpoint")?;
-        let store_rpc_listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .with_context(|| "failed to bind to store RPC gRPC endpoint")?;
-        let store_ntx_builder_listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .with_context(|| "failed to bind to store ntx-builder gRPC endpoint")?;
-        let store_block_producer_listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .with_context(|| "failed to bind to store block-producer gRPC endpoint")?;
-
-        let store_rpc_address = store_rpc_listener
+        let rpc_address = grpc_rpc
             .local_addr()
-            .with_context(|| "failed to retrieve the store's RPC gRPC address")?;
-        let store_block_producer_address = store_block_producer_listener
-            .local_addr()
-            .with_context(|| "failed to retrieve the store's block-producer gRPC address")?;
-        let store_ntx_builder_address = store_ntx_builder_listener
-            .local_addr()
-            .with_context(|| "failed to retrieve the store's ntx-builder gRPC address")?;
+            .with_context(|| "failed to retrieve the RPC gRPC address")?;
 
         let ntx_builder_listener = TcpListener::bind("127.0.0.1:0")
             .await
@@ -195,230 +209,145 @@ impl NodeBuilder {
             .local_addr()
             .with_context(|| "failed to retrieve the ntx-builder gRPC address")?;
 
-        let block_producer_address = available_socket_addr()
-            .await
-            .with_context(|| "failed to bind to block-producer gRPC endpoint")?;
-
         let validator_address = available_socket_addr()
             .await
             .with_context(|| "failed to bind to validator gRPC endpoint")?;
 
         // Start components
 
-        let mut join_set = JoinSet::new();
-        let (store_id, _) = Self::start_store(
-            self.data_directory.clone(),
-            &mut join_set,
-            store_rpc_listener,
-            store_ntx_builder_listener,
-            store_block_producer_listener,
+        let sqlite_connection_pool_size = default_sqlite_connection_pool_size();
+        let ntx_builder_database_filepath = self.data_directory.join("ntx-builder.sqlite3");
+        miden_ntx_builder::bootstrap(ntx_builder_database_filepath.clone(), &signed_genesis_block)
+            .await
+            .context("failed to bootstrap ntx-builder database")?;
+
+        let store = State::load_with_database_options(
+            &self.data_directory,
+            StorageOptions::default(),
+            DatabaseOptions {
+                connection_pool_size: sqlite_connection_pool_size,
+            },
         )
-        .with_context(|| "failed to start store")?;
+        .await
+        .context("failed to load store state")?;
+        let store = Arc::new(store);
+        let ntx_auth_header = AsciiMetadataValue::from_static(NTX_AUTH_HEADER_VALUE);
 
-        let ntx_builder_id = Self::start_ntx_builder(
-            block_producer_address,
-            store_ntx_builder_address,
-            validator_address,
-            self.data_directory.join("ntx-builder.sqlite3"),
-            Some(ntx_builder_listener),
-            &mut join_set,
+        let ntx_builder_handle = Self::start_ntx_builder(
+            rpc_address,
+            self.prover_url.clone(),
+            ntx_builder_database_filepath,
+            ntx_builder_listener,
+            ntx_auth_header.clone(),
         );
 
-        let block_producer_id = self.start_block_producer(
-            block_producer_address,
-            store_block_producer_address,
-            validator_address,
-            &mut join_set,
-        );
+        let (block_producer_api, block_producer_handle) =
+            self.start_block_producer(Arc::clone(&store), validator_address).await?;
 
-        let validator_id = join_set
-            .spawn({
-                async move {
-                    Validator {
-                        address: validator_address,
-                        grpc_options: GrpcOptionsInternal::default(),
-                        signer: ValidatorSigner::Local(validator_signer),
-                        data_directory: self.data_directory,
-                    }
-                    .serve()
-                    .await
-                    .context("failed while serving validator component")
-                }
-            })
-            .id();
-
-        let rpc_id = join_set
-            .spawn(async move {
-                let store_url = Url::parse(&format!("http://{store_rpc_address}"))
-                    .context("Failed to parse URL")?;
-                let block_producer_url = Some(
-                    Url::parse(&format!("http://{block_producer_address}"))
-                        .context("Failed to parse URL")?,
-                );
-                let validator_url = Url::parse(&format!("http://{validator_address}"))
-                    .context("Failed to parse URL")?;
-
-                let ntx_builder_url = Some(
-                    Url::parse(&format!("http://{ntx_builder_address}"))
-                        .context("Failed to parse URL")?,
-                );
-
-                Rpc {
-                    listener: grpc_rpc,
-                    store_url,
-                    block_producer_url,
-                    validator_url,
-                    ntx_builder_url,
-                    grpc_options: GrpcOptionsExternal {
-                        burst_size: NonZeroU32::new(10_000).unwrap(),
-                        replenish_n_per_second_per_ip: NonZeroU64::new(10_000).unwrap(),
-                        ..GrpcOptionsExternal::default()
-                    },
+        let validator_handle = tokio::spawn({
+            let data_directory = self.data_directory.clone();
+            async move {
+                Validator {
+                    address: validator_address,
+                    grpc_options: GrpcOptionsInternal::default(),
+                    signer: ValidatorSigner::new_local(validator_signing_key),
+                    data_directory,
+                    sqlite_connection_pool_size,
                 }
                 .serve()
                 .await
-                .context("failed while serving RPC component")
-            })
-            .id();
+                .context("failed while serving validator component")
+            }
+        });
 
-        let component_ids = HashMap::from([
-            (store_id, "store"),
-            (block_producer_id, "block-producer"),
-            (validator_id, "validator"),
-            (rpc_id, "rpc"),
-            (ntx_builder_id, "ntx-builder"),
-        ]);
+        let rpc_handle = tokio::spawn(async move {
+            let validator_url = Url::parse(&format!("http://{validator_address}"))
+                .context("Failed to parse URL")?;
+            let validator: ValidatorClient = grpc_client(validator_url);
+            let ntx_builder_url = Url::parse(&format!("http://{ntx_builder_address}"))
+                .context("Failed to parse URL")?;
+            let ntx_builder: Option<NtxBuilderClient> = Some(grpc_client(ntx_builder_url));
 
-        // SAFETY: The joinset is definitely not empty.
-        let component_result = join_set.join_next_with_id().await.unwrap();
+            Rpc {
+                listener: grpc_rpc,
+                store,
+                mode: RpcMode::sequencer(block_producer_api, validator),
+                ntx_builder,
+                grpc_options: GrpcOptionsExternal {
+                    burst_size: NonZeroU32::new(10_000).unwrap(),
+                    replenish_n_per_second_per_ip: NonZeroU64::new(10_000).unwrap(),
+                    ..GrpcOptionsExternal::default()
+                },
+                network_tx_auth: Some(ntx_auth_header),
+            }
+            .serve()
+            .await
+            .context("failed while serving RPC component")
+        });
 
-        // We expect components to run indefinitely, so we treat any return as fatal.
-        //
-        // Map all outcomes to an error, and provide component context.
-        let (id, err) = match component_result {
-            Ok((id, Ok(_))) => (id, Err(anyhow::anyhow!("Component completed unexpectedly"))),
-            Ok((id, Err(err))) => (id, Err(err)),
-            Err(join_err) => (join_err.id(), Err(join_err).context("Joining component task")),
-        };
-        let component = component_ids.get(&id).unwrap_or(&"unknown");
-
-        // We could abort and gracefully shutdown the other components, but since we're crashing the
-        // node there is no point.
-
-        err.context(format!("Component {component} failed"))
+        Ok(NodeHandle {
+            rpc_url: format!("http://{rpc_address}"),
+            handles: vec![block_producer_handle, validator_handle, rpc_handle, ntx_builder_handle],
+        })
     }
 
-    // Start store and return the tokio task ID plus the store's gRPC address. The store endpoint is
-    // available after loading completes.
-    fn start_store(
-        data_directory: PathBuf,
-        join_set: &mut JoinSet<Result<()>>,
-        rpc_listener: TcpListener,
-        ntx_builder_listener: TcpListener,
-        block_producer_listener: TcpListener,
-    ) -> Result<(Id, SocketAddr)> {
-        let store_address = rpc_listener
-            .local_addr()
-            .context("failed to retrieve the store's gRPC address")?;
-        Ok((
-            join_set
-                .spawn(async move {
-                    Store {
-                        data_directory,
-                        rpc_listener,
-                        mode: StoreMode::BlockProducer {
-                            block_producer_listener,
-                            ntx_builder_listener,
-                            block_prover_url: None,
-                            max_concurrent_proofs: DEFAULT_MAX_CONCURRENT_PROOFS,
-                        },
-                        storage_options: StorageOptions::default(),
-                        grpc_options: GrpcOptionsInternal::default(),
-                    }
-                    .serve()
-                    .await
-                    .context("failed while serving store component")
-                })
-                .id(),
-            store_address,
-        ))
-    }
-
-    /// Start block-producer and return the tokio task ID. The block-producer's endpoint is
-    /// available after loading completes.
-    fn start_block_producer(
+    /// Start block-producer and return its in-process API and runtime task.
+    async fn start_block_producer(
         &self,
-        block_producer_address: SocketAddr,
-        store_address: SocketAddr,
+        store: Arc<State>,
         validator_address: SocketAddr,
-        join_set: &mut JoinSet<Result<()>>,
-    ) -> Id {
+    ) -> Result<(BlockProducerApi, JoinHandle<Result<()>>)> {
         let batch_interval = self.batch_interval;
         let block_interval = self.block_interval;
-        join_set
-            .spawn(async move {
-                let store_url = Url::parse(&format!("http://{store_address}"))
-                    .context("Failed to parse URL")?;
-                let validator_url = Url::parse(&format!("http://{validator_address}"))
-                    .context("Failed to parse URL")?;
-                BlockProducer {
-                    block_producer_address,
-                    store_url,
-                    grpc_options: GrpcOptionsInternal::default(),
-                    batch_prover_url: None,
-                    validator_url,
-                    batch_interval,
-                    block_interval,
-                    max_txs_per_batch: DEFAULT_MAX_TXS_PER_BATCH,
-                    max_batches_per_block: DEFAULT_MAX_BATCHES_PER_BLOCK,
-                    mempool_tx_capacity: DEFAULT_MEMPOOL_TX_CAPACITY,
-                }
-                .serve()
-                .await
-                .context("failed while serving block-producer component")
-            })
-            .id()
+        let validator_url =
+            Url::parse(&format!("http://{validator_address}")).context("Failed to parse URL")?;
+        let sequencer = Sequencer {
+            store,
+            validator_url,
+            batch_prover_url: None,
+            block_prover_url: None,
+            batch_interval,
+            block_interval,
+            max_txs_per_batch: DEFAULT_MAX_TXS_PER_BATCH,
+            max_batches_per_block: DEFAULT_MAX_BATCHES_PER_BLOCK,
+            max_concurrent_proofs: DEFAULT_MAX_CONCURRENT_PROOFS,
+            mempool_tx_capacity: DEFAULT_MEMPOOL_TX_CAPACITY,
+        };
+
+        let runtime = sequencer
+            .spawn()
+            .await
+            .context("failed while starting block-producer component")?;
+        let api = runtime.api();
+        let handle = tokio::spawn(async move {
+            runtime.wait().await.context("failed while serving block-producer component")
+        });
+
+        Ok((api, handle))
     }
 
-    /// Start ntx-builder and return the tokio task ID.
+    /// Start ntx-builder and return the task handle.
     fn start_ntx_builder(
-        block_producer_address: SocketAddr,
-        store_address: SocketAddr,
-        validator_address: SocketAddr,
+        rpc_address: SocketAddr,
+        prover_url: Url,
         database_filepath: PathBuf,
-        listener: Option<TcpListener>,
-        join_set: &mut JoinSet<Result<()>>,
-    ) -> Id {
-        let store_url =
-            Url::parse(&format!("http://{}:{}/", store_address.ip(), store_address.port()))
-                .unwrap();
-        let block_producer_url = Url::parse(&format!(
-            "http://{}:{}/",
-            block_producer_address.ip(),
-            block_producer_address.port()
-        ))
-        .unwrap();
-        let validator_url =
-            Url::parse(&format!("http://{}:{}/", validator_address.ip(), validator_address.port()))
-                .unwrap();
+        listener: TcpListener,
+        rpc_auth_header: AsciiMetadataValue,
+    ) -> JoinHandle<Result<()>> {
+        tokio::spawn(async move {
+            let rpc_url =
+                Url::parse(&format!("http://{rpc_address}/")).context("Failed to parse URL")?;
 
-        join_set
-            .spawn(async move {
-                NtxBuilderConfig::new(
-                    store_url,
-                    block_producer_url,
-                    validator_url,
-                    database_filepath,
-                )
+            NtxBuilderConfig::new(rpc_url, prover_url, database_filepath)
                 .with_max_cycles(1 << 18)
+                .with_rpc_auth_header(rpc_auth_header)
                 .build()
                 .await
                 .context("failed to build ntx builder")?
                 .run(listener)
                 .await
                 .context("failed while serving ntx builder component")
-            })
-            .id()
+        })
     }
 }
 
@@ -427,22 +356,19 @@ impl NodeBuilder {
 
 pub struct NodeHandle {
     pub rpc_url: String,
-    pub rpc_handle: tokio::task::JoinHandle<()>,
-    pub block_producer_handle: tokio::task::JoinHandle<()>,
-    pub store_handle: tokio::task::JoinHandle<()>,
+    handles: Vec<JoinHandle<Result<()>>>,
 }
 
 impl NodeHandle {
     /// Stops all node components.
-    pub async fn stop(self) -> Result<()> {
-        self.rpc_handle.abort();
-        self.block_producer_handle.abort();
-        self.store_handle.abort();
+    pub async fn stop(mut self) -> Result<()> {
+        for handle in &self.handles {
+            handle.abort();
+        }
 
-        // Wait for the tasks to complete
-        let _ = self.rpc_handle.await;
-        let _ = self.block_producer_handle.await;
-        let _ = self.store_handle.await;
+        while let Some(handle) = self.handles.pop() {
+            let _ = handle.await;
+        }
 
         Ok(())
     }
@@ -453,8 +379,7 @@ impl NodeHandle {
 
 fn generate_genesis_account() -> anyhow::Result<AccountFile> {
     let mut rng = ChaCha20Rng::from_seed(random());
-    let secret =
-        AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut get_rpo_random_coin(&mut rng));
+    let secret = AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut get_random_coin(&mut rng));
 
     let auth_method = AuthMethod::SingleSig {
         approver: (secret.public_key().to_commitment(), AuthScheme::Falcon512Poseidon2),
@@ -462,12 +387,19 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
 
     let symbol = TokenSymbol::try_from("TST").expect("TST should be a valid token symbol");
     let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
-    let metadata = FungibleTokenMetadata::builder(name, symbol, 12, 1_000_000_000_000).build()?;
-    let account = create_basic_fungible_faucet(
+    let faucet = FungibleFaucet::builder()
+        .name(name)
+        .symbol(symbol)
+        .decimals(12)
+        .max_supply(AssetAmount::new(1_000_000_000_000).unwrap())
+        .build()?;
+    let account = create_fungible_faucet(
         rng.random(),
-        metadata,
-        miden_protocol::account::AccountStorageMode::Public,
+        faucet,
+        AccountType::Public,
         auth_method,
+        AccessControl::AuthControlled,
+        allow_all_policy_manager(),
     )?;
 
     // Force the account nonce to 1.
@@ -489,11 +421,23 @@ async fn available_socket_addr() -> Result<SocketAddr> {
     listener.local_addr().context("failed to retrieve the address")
 }
 
+fn grpc_client<T: GrpcClient>(url: Url) -> T {
+    GrpcClientBuilder::new(url)
+        .without_tls()
+        .without_timeout()
+        .without_metadata_version()
+        .without_metadata_genesis()
+        .with_otel_context_injection()
+        .connect_lazy::<T>()
+}
+
 // UTILS (GENESIS ACCOUNTS)
 // ================================================================================================
 
-/// Expected account ID for the test account. Used to verify deterministic generation.
-const TEST_ACCOUNT_ID: &str = "0x0a0a0a0a0a0a0a100a0a0a0a0a0a0a";
+/// Expected account ID produced by [`TEST_ACCOUNT_SEED`] under the current `FungibleFaucet`
+/// component layout, policy components, and schema commitments. Used to verify deterministic
+/// account generation; update this constant if any input to ID derivation changes.
+const TEST_ACCOUNT_ID: &str = "0x0a0a0a0a0a0a0a110a0a0a0a0a0a0a";
 
 /// Deterministic seed used for the test account to ensure reproducible account IDs.
 const TEST_ACCOUNT_SEED: [u8; 32] = [0xa; 32];
@@ -513,8 +457,7 @@ const ASSET_AMOUNT_PER_FAUCET: u64 = 75;
 /// retrieval and asset handling.
 fn build_test_faucets_and_account() -> anyhow::Result<Vec<Account>> {
     let mut rng = ChaCha20Rng::from_seed(random());
-    let secret =
-        AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut get_rpo_random_coin(&mut rng));
+    let secret = AuthSecretKey::new_falcon512_poseidon2_with_rng(&mut get_random_coin(&mut rng));
 
     let faucets = create_test_faucets(&secret)?;
     let account = create_test_account_with_many_assets(&faucets)?;
@@ -551,14 +494,19 @@ fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Res
 
     let symbol = TokenSymbol::new("TKN")?;
     let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
-    let metadata =
-        FungibleTokenMetadata::builder(name, symbol, FAUCET_DECIMALS, u64::from(FAUCET_MAX_SUPPLY))
-            .build()?;
-    let faucet = create_basic_fungible_faucet(
+    let faucet_component = FungibleFaucet::builder()
+        .name(name)
+        .symbol(symbol)
+        .decimals(FAUCET_DECIMALS)
+        .max_supply(AssetAmount::new(u64::from(FAUCET_MAX_SUPPLY)).unwrap())
+        .build()?;
+    let faucet = create_fungible_faucet(
         init_seed,
-        metadata,
-        miden_protocol::account::AccountStorageMode::Public,
+        faucet_component,
+        AccountType::Public,
         auth_scheme,
+        AccessControl::AuthControlled,
+        allow_all_policy_manager(),
     )?;
 
     // Set nonce to ONE to indicate the account is deployed (see generate_genesis_account)
@@ -575,9 +523,9 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
 
     let storage_map = create_large_storage_map();
     let acc_component = AccountComponent::new(
-        basic_wallet_library(),
+        BasicWallet::code().as_library().clone(),
         vec![storage_map],
-        AccountComponentMetadata::new("miden::testing::basic_wallet", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::basic_wallet"),
     )
     .expect("basic wallet component should satisfy account component requirements");
 
@@ -593,13 +541,25 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
             sk.public_key().to_commitment(),
             AuthScheme::Falcon512Poseidon2,
         ))
-        .account_type(miden_protocol::account::AccountType::RegularAccountUpdatableCode)
+        .account_type(AccountType::Public)
         .with_component(acc_component)
-        .storage_mode(miden_protocol::account::AccountStorageMode::Public)
         .with_assets(assets)
         .build_existing()?;
 
     Ok(account)
+}
+
+fn allow_all_policy_manager() -> TokenPolicyManager {
+    // Only mint/burn — registering transfer policies installs asset-callback slots on the
+    // faucet, which forces minted assets to carry `AssetCallbackFlag::Enabled`. Tests build
+    // assets via `FungibleAsset::new`, which defaults to `Disabled`, so adding transfer
+    // policies makes `mint_and_send` reject the mint with
+    // `ERR_FUNGIBLE_MINT_NOTE_ASSET_NOT_FROM_THIS_FAUCET`.
+    TokenPolicyManager::new()
+        .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
+        .expect("allow-all mint policy should register")
+        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
+        .expect("allow-all burn policy should register")
 }
 
 /// Creates a storage map with many entries for stress-testing storage handling.

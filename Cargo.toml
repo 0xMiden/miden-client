@@ -35,29 +35,29 @@ miden-client              = { default-features = false, path = "crates/rust-clie
 miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-store", version = "0.15.0" }
 
 # Miden protocol dependencies
-miden-protocol        = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
-miden-standards       = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
-miden-testing         = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
-miden-tx              = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
-miden-tx-batch-prover = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
+miden-protocol        = { default-features = false, version = "0.15" }
+miden-standards       = { default-features = false, version = "0.15" }
+miden-testing         = { default-features = false, version = "0.15" }
+miden-tx              = { default-features = false, version = "0.15" }
+miden-tx-batch-prover = { default-features = false, version = "0.15" }
 
 # Miden node dependencies
-miden-node-block-producer = { branch = "next", git = "https://github.com/0xMiden/node.git" }
-miden-node-ntx-builder = { branch = "next", git = "https://github.com/0xMiden/node.git" }
-miden-node-proto = { branch = "next", git = "https://github.com/0xMiden/node.git" }
-miden-node-proto-build = { branch = "next", default-features = false, git = "https://github.com/0xMiden/node.git" }
-miden-node-rpc = { branch = "next", git = "https://github.com/0xMiden/node.git" }
-miden-node-store = { branch = "next", git = "https://github.com/0xMiden/node.git" }
-miden-node-utils = { branch = "next", git = "https://github.com/0xMiden/node.git" }
-miden-node-validator = { branch = "next", git = "https://github.com/0xMiden/node.git" }
+miden-node-block-producer = { git = "https://github.com/0xMiden/node.git", rev = "6649a4ce774bc842c08e6bdc314f6ddafb816282" }
+miden-node-proto = { git = "https://github.com/0xMiden/node.git", rev = "6649a4ce774bc842c08e6bdc314f6ddafb816282" }
+miden-node-proto-build = { default-features = false, git = "https://github.com/0xMiden/node.git", rev = "6649a4ce774bc842c08e6bdc314f6ddafb816282" }
+miden-node-rpc = { git = "https://github.com/0xMiden/node.git", rev = "6649a4ce774bc842c08e6bdc314f6ddafb816282" }
+miden-node-store = { git = "https://github.com/0xMiden/node.git", rev = "6649a4ce774bc842c08e6bdc314f6ddafb816282" }
+miden-node-utils = { git = "https://github.com/0xMiden/node.git", rev = "6649a4ce774bc842c08e6bdc314f6ddafb816282" }
 miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-remote-prover-client = { branch = "next", default-features = false, features = [
+miden-ntx-builder = { git = "https://github.com/0xMiden/node.git", rev = "6649a4ce774bc842c08e6bdc314f6ddafb816282" }
+miden-remote-prover-client = { default-features = false, features = [
   "tx-prover",
-], git = "https://github.com/0xMiden/node.git" }
+], git = "https://github.com/0xMiden/node.git", rev = "6649a4ce774bc842c08e6bdc314f6ddafb816282" }
+miden-validator = { git = "https://github.com/0xMiden/node.git", rev = "6649a4ce774bc842c08e6bdc314f6ddafb816282" }
 
 # Miden debug dependency
-miden-debug     = { default-features = false, features = ["dap", "std"], version = "0.7" }
-miden-processor = { default-features = false, version = "0.22" }
+miden-debug     = { default-features = false, features = ["dap", "std"], version = "0.8" }
+miden-processor = { default-features = false, version = "0.23" }
 
 # External dependencies
 anyhow             = { default-features = false, version = "1.0" }

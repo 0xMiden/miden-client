@@ -18,19 +18,21 @@ path = "src/main.rs"
 [dependencies]
 # Miden dependencies
 miden-node-block-producer = { workspace = true }
-miden-node-ntx-builder    = { workspace = true }
+miden-node-proto          = { workspace = true }
 miden-node-rpc            = { workspace = true }
 miden-node-store          = { workspace = true }
 miden-node-utils          = { features = ["testing", "tracing-forest"], workspace = true }
-miden-node-validator      = { workspace = true }
+miden-ntx-builder         = { workspace = true }
 miden-protocol            = { workspace = true }
 miden-standards           = { workspace = true }
+miden-validator           = { workspace = true }
 
 # External dependencies
 anyhow      = { workspace = true }
 rand        = { workspace = true }
 rand_chacha = { workspace = true }
 tokio       = { features = ["signal"], workspace = true }
+tonic       = { workspace = true }
 url         = { features = ["serde"], version = "2.5" }
 
 [dev-dependencies]

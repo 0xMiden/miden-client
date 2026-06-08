@@ -63,7 +63,7 @@ use core::cmp::max;
 
 use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockNumber;
-use miden_protocol::note::NoteId;
+use miden_protocol::note::{NoteDetailsCommitment, NoteId};
 use miden_protocol::transaction::TransactionId;
 use miden_tx::auth::TransactionAuthenticator;
 use miden_tx::utils::serde::{Deserializable, DeserializationError, Serializable};
@@ -83,6 +83,7 @@ mod state_sync_update;
 pub use state_sync_update::{
     AccountUpdates,
     PartialBlockchainUpdates,
+    PublicAccountDelta,
     PublicAccountUpdate,
     StateSyncUpdate,
     TransactionUpdateTracker,
@@ -117,12 +118,8 @@ where
 
         // Build sync state components
         let note_screener = self.note_screener();
-        let state_sync = StateSync::new(
-            self.rpc_api.clone(),
-            Some(self.store.clone()),
-            Arc::new(note_screener),
-            self.tx_discard_delta,
-        );
+        let state_sync =
+            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
         let input = self.build_sync_input().await?;
 
         let mut partial_mmr = self.get_current_partial_mmr().await?;
@@ -150,16 +147,25 @@ where
 
     /// Fetches private notes from the Note Transport Layer for the tracked note tags.
     ///
-    /// Returns the IDs of notes imported in this call. No-op (returns an empty vec) if note
-    /// transport is disabled.
-    pub async fn sync_note_transport(&mut self) -> Result<Vec<NoteId>, ClientError> {
+    /// Returns the details commitments of notes imported in this call. No-op (returns an empty
+    /// vec) if note transport is disabled.
+    pub async fn sync_note_transport(&mut self) -> Result<Vec<NoteDetailsCommitment>, ClientError> {
         if !self.is_note_transport_enabled() {
             return Ok(Vec::new());
         }
 
+        // Drain any private notes whose previous relay attempt failed. A flush
+        // error is logged, not propagated: a failing relay must not block the
+        // sync, and the entries stay durable for the next attempt.
+        if let Err(err) = self.flush_relay_outbox().await {
+            tracing::warn!(?err, "relay outbox flush failed during sync; entries retained");
+        }
+
         let cursor = self.store.get_note_transport_cursor().await?;
-        let note_tags = self.store.get_unique_note_tags().await?;
-        self.fetch_transport_notes(cursor, note_tags).await
+        let note_tags: Vec<_> = self.store.get_unique_note_tags().await?.into_iter().collect();
+        let (ids, new_cursor) = self.fetch_transport_notes(cursor, &note_tags).await?;
+        self.store.update_note_transport_cursor(new_cursor).await?;
+        Ok(ids)
     }
 
     /// Runs the full client sync.
@@ -321,11 +327,17 @@ pub struct SyncSummary {
     pub block_num: BlockNumber,
     /// IDs of new public notes that the client has received.
     pub new_public_notes: Vec<NoteId>,
-    /// IDs of private notes imported from the Note Transport Layer in this sync.
+    /// Details commitments of private notes imported from the Note Transport Layer in this sync.
+    ///
+    /// Reported by details commitment because that is what `import_notes` returns. NTL notes carry
+    /// full details, so their `NoteId` is derivable; they are still `Expected` until observed
+    /// on-chain.
+    ///
+    /// TODO: expose `NoteId` here since NTL-imported notes have full details.
     ///
     /// Only populated by [`Client::sync_state`]; [`Client::sync_chain`] always leaves this empty
     /// because it does not touch the Note Transport Layer.
-    pub new_private_notes: Vec<NoteId>,
+    pub new_private_notes: Vec<NoteDetailsCommitment>,
     /// IDs of tracked notes that have been committed.
     pub committed_notes: Vec<NoteId>,
     /// IDs of notes that have been consumed.
@@ -342,7 +354,7 @@ impl SyncSummary {
     pub fn new(
         block_num: BlockNumber,
         new_public_notes: Vec<NoteId>,
-        new_private_notes: Vec<NoteId>,
+        new_private_notes: Vec<NoteDetailsCommitment>,
         committed_notes: Vec<NoteId>,
         consumed_notes: Vec<NoteId>,
         updated_accounts: Vec<AccountId>,
@@ -415,7 +427,7 @@ impl Deserializable for SyncSummary {
     ) -> Result<Self, DeserializationError> {
         let block_num = BlockNumber::read_from(source)?;
         let new_public_notes = Vec::<NoteId>::read_from(source)?;
-        let new_private_notes = Vec::<NoteId>::read_from(source)?;
+        let new_private_notes = Vec::<NoteDetailsCommitment>::read_from(source)?;
         let committed_notes = Vec::<NoteId>::read_from(source)?;
         let consumed_notes = Vec::<NoteId>::read_from(source)?;
         let updated_accounts = Vec::<AccountId>::read_from(source)?;

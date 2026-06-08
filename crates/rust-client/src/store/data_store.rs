@@ -24,7 +24,12 @@ use miden_protocol::{MastForest, Word, ZERO};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
 use super::{AccountStorageFilter, PartialBlockchainFilter, Store};
-use crate::rpc::domain::account::{AccountStorageRequirements, StorageMapEntries};
+use crate::rpc::domain::account::{
+    AccountStorageRequirements,
+    GetAccountRequest,
+    StorageMapEntries,
+    StorageMapFetch,
+};
 use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::StoreError;
 use crate::transaction::fetch_public_account_inputs;
@@ -154,12 +159,11 @@ impl ClientDataStore {
         let storage_requirements = AccountStorageRequirements::new([(slot_name, &[map_key])]);
         let (_, account_proof): (BlockNumber, _) = self
             .rpc_api
-            .get_account_proof(
+            .get_account(
                 account_id,
-                storage_requirements,
-                AccountStateAt::ChainTip,
-                Some(known_code),
-                None,
+                GetAccountRequest::new()
+                    .with_storage(StorageMapFetch::Slots(storage_requirements))
+                    .with_known_code(Some(known_code)),
             )
             .await
             .map_err(|err| {
@@ -430,10 +434,13 @@ impl DataStore for ClientDataStore {
             }
 
             // Store miss, fetch from the network via RPC.
-            let note_script: NoteScript =
+            let Some(note_script) =
                 rpc_api.get_note_script_by_root(script_root.into()).await.map_err(|err| {
                     DataStoreError::other_with_source("failed to fetch note script via RPC", err)
-                })?;
+                })?
+            else {
+                return Ok(None);
+            };
 
             // Persist for future lookups.
             if let Err(err) = store.upsert_note_scripts(core::slice::from_ref(&note_script)).await {

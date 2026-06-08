@@ -5,13 +5,13 @@ use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::hash::rpo::Rpo256;
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, PartialMmr};
-#[cfg(feature = "testing")]
-use miden_protocol::transaction::TransactionKernel;
 use miden_protocol::{Felt, Word};
 use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
 use crate::store::{BlockRelevance, StoreError};
+#[cfg(feature = "testing")]
+use crate::test_utils::mock::MockRpcApi;
 use crate::{CachedPartialMmr, Client, ClientError};
 
 /// Network information management methods.
@@ -44,11 +44,11 @@ impl<AUTH> Client<AUTH> {
         Ok(())
     }
 
-    /// Seeds the local client state needed to create accounts and execute programs without a node.
+    /// Seeds local state for offline account creation and debugging without a real node.
     ///
-    /// This stores default RPC limits and inserts a synthetic genesis header if one is not
-    /// already present in the store. The synthetic header is only intended for local-only
-    /// execution and debugging.
+    /// Applies default RPC limits, then either aligns the RPC genesis with an existing stored
+    /// genesis, or replaces the RPC client with [`MockRpcApi`] and runs
+    /// [`Self::ensure_genesis_in_place`] so genesis comes from the mock chain.
     #[cfg(feature = "testing")]
     pub async fn prepare_offline_bootstrap(&mut self) -> Result<(), ClientError> {
         let limits = self.store.get_rpc_limits().await?.unwrap_or_default();
@@ -61,9 +61,8 @@ impl<AUTH> Client<AUTH> {
             return Ok(());
         }
 
-        let genesis = synthetic_offline_genesis_header();
-        self.store.insert_block_header(&genesis, false).await?;
-        self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+        *self.test_rpc_api() = Arc::new(MockRpcApi::default());
+        self.ensure_genesis_in_place().await?;
         Ok(())
     }
 
@@ -152,11 +151,6 @@ impl<AUTH> Client<AUTH> {
     }
 }
 
-#[cfg(feature = "testing")]
-fn synthetic_offline_genesis_header() -> BlockHeader {
-    BlockHeader::mock(BlockNumber::GENESIS, None, None, &[], TransactionKernel.to_commitment())
-}
-
 // UTILS
 // --------------------------------------------------------------------------------------------
 
@@ -238,25 +232,26 @@ pub(crate) async fn fetch_block_header(
 
 #[cfg(test)]
 mod tests {
-    use miden_protocol::block::account_tree::AccountTree;
     use miden_protocol::block::{BlockHeader, BlockNumber};
     use miden_protocol::crypto::merkle::MerklePath;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, Mmr, PartialMmr};
-    use miden_protocol::crypto::merkle::smt::Smt;
     use miden_protocol::transaction::TransactionKernel;
     use miden_protocol::{Felt, Word};
 
-    #[cfg(feature = "testing")]
-    use super::synthetic_offline_genesis_header;
     use super::{adjust_merkle_path_for_forest, authenticated_block_nodes};
 
     fn word(n: u64) -> Word {
-        Word::new([Felt::new(n), Felt::new(0), Felt::new(0), Felt::new(0)])
+        Word::new([
+            Felt::new(n).expect("test value should fit into the base field"),
+            Felt::new(0).expect("zero is a valid field element"),
+            Felt::new(0).expect("zero is a valid field element"),
+            Felt::new(0).expect("zero is a valid field element"),
+        ])
     }
 
     #[test]
     fn adjust_merkle_path_truncates_to_forest_bounds() {
-        let forest = Forest::new(5);
+        let forest = Forest::new(5).expect("valid forest");
         // Forest 5 <=> block 4 is rightmost leaf
         let block_num = BlockNumber::from(4u32);
         let path = MerklePath::new(vec![word(1), word(2), word(3)]);
@@ -272,11 +267,11 @@ mod tests {
         // different tree in the smaller forest, which would invalidate the proof.
         let mut mmr = Mmr::new();
         for value in 0u64..8 {
-            mmr.add(word(value));
+            mmr.add(word(value)).expect("test MMR append should succeed");
         }
 
-        let large_forest = Forest::new(8);
-        let small_forest = Forest::new(5);
+        let large_forest = Forest::new(8).expect("valid forest");
+        let small_forest = Forest::new(5).expect("valid forest");
         let leaf_pos = 4usize;
         let block_num = BlockNumber::from(u32::try_from(leaf_pos).unwrap());
 
@@ -297,7 +292,7 @@ mod tests {
     #[test]
     fn adjust_merkle_path_correct_indices() {
         // Forest 6 has trees of size 2 and 4
-        let forest = Forest::new(6);
+        let forest = Forest::new(6).expect("valid forest");
         // Block 1 is on tree with size 4 (merkle path should have 2 nodes)
         let block_num = BlockNumber::from(1u32);
         let nodes = vec![word(10), word(11), word(12), word(13)];
@@ -327,11 +322,13 @@ mod tests {
         let leaf_pos = 2usize;
         let mut mmr = Mmr::new();
         for value in 0u64..large_leaves as u64 {
-            mmr.add(word(value));
+            mmr.add(word(value)).expect("test MMR append should succeed");
         }
 
-        let small_forest = Forest::new(small_leaves);
-        let proof = mmr.open_at(leaf_pos, Forest::new(large_leaves)).expect("valid proof");
+        let small_forest = Forest::new(small_leaves).expect("valid forest");
+        let proof = mmr
+            .open_at(leaf_pos, Forest::new(large_leaves).expect("valid forest"))
+            .expect("valid proof");
         let expected_depth =
             small_forest.leaf_to_corresponding_tree(leaf_pos).expect("leaf is in forest") as usize;
 
@@ -366,15 +363,5 @@ mod tests {
 
         assert_eq!(nodes[0], (InOrderIndex::from_leaf_pos(4), block_header.commitment()));
         assert_eq!(&nodes[1..], path_nodes.as_slice());
-    }
-
-    #[test]
-    #[cfg(feature = "testing")]
-    fn synthetic_offline_genesis_header_uses_mock_genesis() {
-        let genesis = synthetic_offline_genesis_header();
-
-        assert_eq!(genesis.block_num(), BlockNumber::GENESIS);
-        assert_eq!(genesis.account_root(), AccountTree::<Smt>::default().root());
-        assert_eq!(genesis.tx_kernel_commitment(), TransactionKernel.to_commitment());
     }
 }

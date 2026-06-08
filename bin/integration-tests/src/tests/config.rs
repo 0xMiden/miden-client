@@ -137,7 +137,7 @@ impl ClientConfig {
         let mut rng = rand::rng();
         let coin_seed: [u64; 4] = rng.random();
 
-        let rng = RandomCoin::new(coin_seed.map(Felt::new).into());
+        let rng = RandomCoin::new(coin_seed.map(Felt::new_unchecked).into());
 
         let keystore = FilesystemKeyStore::new(auth_path.clone()).with_context(|| {
             format!("failed to create keystore at path: {}", auth_path.to_string_lossy())
