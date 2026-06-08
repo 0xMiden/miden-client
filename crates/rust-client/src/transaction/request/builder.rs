@@ -516,23 +516,22 @@ impl TransactionRequestBuilder {
         let note_args = PswapNote::create_args(account_fill_amount, note_fill_amount)
             .map_err(TransactionRequestError::NoteArgError)?;
 
-        // Register output notes as expected future notes (created by the script, not the account).
-        let payback_details = NoteDetails::from(&payback_note);
-        let payback_tag = payback_note.metadata().tag();
-        let payback_recipient = payback_note.recipient().clone();
-
-        let mut expected_future_notes = vec![(payback_details, payback_tag)];
-        let mut expected_recipients = vec![payback_recipient];
+        // Neither output note belongs to the consumer. The payback settles to the order's creator,
+        // and the remainder is the order's next tip (consumed by a future filler, or by the creator
+        // on reclaim). Both are declared as expected output recipients so the executed transaction
+        // is validated against them, but neither is registered as an expected future note: tracking
+        // notes one will receive is the creator's concern, not the consumer's. Registering either
+        // here would leave a stale, un-consumable expected note in the consumer's store. The
+        // creator picks up the payback through its own note screening (public) or PSWAP
+        // lineage discovery (private), and follows the remainder the same way.
+        let mut expected_recipients = vec![payback_note.recipient().clone()];
 
         if let Some(remainder) = remainder_pswap {
             let remainder_note: Note = remainder.into();
-            expected_future_notes
-                .push((NoteDetails::from(&remainder_note), remainder_note.metadata().tag()));
             expected_recipients.push(remainder_note.recipient().clone());
         }
 
         self.input_notes(vec![(pswap_note.clone(), Some(note_args))])
-            .expected_future_notes(expected_future_notes)
             .expected_output_recipients(expected_recipients)
             .build()
     }

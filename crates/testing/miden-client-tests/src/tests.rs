@@ -3296,6 +3296,186 @@ async fn pswap_full_fill_chain_tracking_test(#[case] note_type: NoteType) {
     );
 }
 
+/// Cross-sync multi-round lineage tracking. Bob fills the same order twice in *separate* blocks,
+/// consuming his own round-1 remainder as the round-2 input. This is the scenario the
+/// `build_pswap_consume` fix unblocks: a consumer's fill registers no expected future notes, so the
+/// remainder is no longer left in Bob's store as a proofless, un-consumable duplicate. After round
+/// 1 it instead lands in Bob's store as a Committed note via the output-note screening path, which
+/// makes it cleanly consumable in round 2. Alice's lineage must walk depth 0 → 1 → 2 and then
+/// Reclaim the final tip.
+#[allow(clippy::too_many_lines)]
+#[tokio::test]
+async fn pswap_multi_round_chain_tracking_test() {
+    let note_type = NoteType::Public;
+    let mock_rpc_api = MockRpcApi::new(Box::pin(create_prebuilt_mock_chain()).await);
+    let (mut alice_client, alice_keystore) = create_pswap_test_client(&mock_rpc_api).await;
+    let (mut bob_client, bob_keystore) = create_pswap_test_client(&mock_rpc_api).await;
+
+    let (alice_wallet, btc_faucet) = setup_wallet_and_faucet(
+        &mut alice_client,
+        AccountType::Private,
+        &alice_keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+    let (bob_wallet, eth_faucet) = setup_wallet_and_faucet(
+        &mut bob_client,
+        AccountType::Private,
+        &bob_keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await
+    .unwrap();
+
+    mint_and_consume(&mut alice_client, alice_wallet.id(), btc_faucet.id(), NoteType::Private)
+        .await;
+    mock_rpc_api.prove_block();
+    alice_client.sync_state().await.unwrap();
+    mint_and_consume(&mut bob_client, bob_wallet.id(), eth_faucet.id(), NoteType::Private).await;
+    mock_rpc_api.prove_block();
+    bob_client.sync_state().await.unwrap();
+
+    // ── Alice creates the PSWAP offering 100 BTC for 50 ETH (2:1 rate). ──
+    let offered_amount = 100u64;
+    let requested_amount = 50u64;
+    let offered_asset = FungibleAsset::new(btc_faucet.id(), offered_amount).unwrap();
+    let requested_asset = FungibleAsset::new(eth_faucet.id(), requested_amount).unwrap();
+    let pswap_data = PswapTransactionData::new(alice_wallet.id(), offered_asset, requested_asset);
+
+    let create_request = TransactionRequestBuilder::new()
+        .build_pswap_create(&pswap_data, note_type, note_type, None, alice_client.rng())
+        .unwrap();
+    let pswap_note = create_request.expected_output_own_notes()[0].clone();
+    let pswap_typed = PswapNote::try_from(&pswap_note).unwrap();
+    let order_id = pswap_typed.order_id();
+
+    Box::pin(alice_client.submit_new_transaction(alice_wallet.id(), create_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    alice_client.sync_state().await.unwrap();
+
+    // Bob discovers the public order via the asset-pair tag.
+    let pswap_tag = PswapNote::create_tag(note_type, &offered_asset, &requested_asset);
+    bob_client.add_note_tag(pswap_tag).await.unwrap();
+    bob_client.sync_state().await.unwrap();
+
+    // ── Round 1: Bob fills 25 ETH → 50 BTC payout, leaving 50 BTC / 25 ETH. ──
+    let consume_request = TransactionRequestBuilder::new()
+        .build_pswap_consume(&pswap_note, bob_wallet.id(), 25, 0)
+        .unwrap();
+    Box::pin(bob_client.submit_new_transaction(bob_wallet.id(), consume_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    bob_client.sync_state().await.unwrap();
+    alice_client.sync_state().await.unwrap();
+
+    let lineage = alice_client.pswap_lineage(order_id).await.unwrap().unwrap();
+    assert_eq!(lineage.current_depth, 1, "round 1 advances the tip to depth 1");
+    assert_eq!(lineage.state, PswapLineageState::Active);
+    assert_eq!(lineage.remaining_offered.amount().as_u64(), 50);
+    assert_eq!(lineage.remaining_requested.amount().as_u64(), 25);
+
+    // Bob's round-1 remainder must be tracked as a consumable note in his own store — this is
+    // exactly what the fix enables. Previously it was a proofless `expected_future_notes`
+    // duplicate that could never be consumed, blocking round 2.
+    let bob_consumable = bob_client.get_consumable_notes(Some(bob_wallet.id())).await.unwrap();
+    let remainder_r1 = bob_consumable
+        .iter()
+        .find_map(|(record, _)| {
+            let note: Note = record.try_into().ok()?;
+            PswapNote::try_from(&note).ok()?;
+            Some(note)
+        })
+        .expect("Bob should hold his round-1 remainder as a consumable PSWAP note");
+
+    // ── Round 2 (separate block): Bob consumes his own remainder, filling 10 ETH → 20 BTC,
+    //    leaving 30 BTC / 15 ETH. ──
+    let consume_request = TransactionRequestBuilder::new()
+        .build_pswap_consume(&remainder_r1, bob_wallet.id(), 10, 0)
+        .unwrap();
+    Box::pin(bob_client.submit_new_transaction(bob_wallet.id(), consume_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    bob_client.sync_state().await.unwrap();
+    alice_client.sync_state().await.unwrap();
+
+    let lineage = alice_client.pswap_lineage(order_id).await.unwrap().unwrap();
+    assert_eq!(lineage.current_depth, 2, "round 2 advances the tip to depth 2");
+    assert_eq!(lineage.state, PswapLineageState::Active);
+    assert_eq!(lineage.remaining_offered.amount().as_u64(), 30);
+    assert_eq!(lineage.remaining_requested.amount().as_u64(), 15);
+
+    // ── Reclaim: Alice cancels the depth-2 tip via the order id. ──
+    let cancel_request = alice_client.build_pswap_cancel_by_order(order_id).await.unwrap();
+    Box::pin(alice_client.submit_new_transaction(alice_wallet.id(), cancel_request))
+        .await
+        .unwrap();
+    mock_rpc_api.prove_block();
+    alice_client.sync_state().await.unwrap();
+
+    let lineage = alice_client.pswap_lineage(order_id).await.unwrap().unwrap();
+    assert_eq!(
+        lineage.state,
+        PswapLineageState::Reclaimed,
+        "reclaiming the depth-2 tip should terminate the lineage"
+    );
+
+    // Alice consumes both ETH paybacks (25 + 10 = 35 ETH).
+    let consumable = alice_client.get_consumable_notes(Some(alice_wallet.id())).await.unwrap();
+    let payback_notes: Vec<Note> =
+        consumable.iter().map(|(record, _)| record.try_into().unwrap()).collect();
+    assert_eq!(payback_notes.len(), 2, "Alice should hold two ETH paybacks (one per round)");
+    consume_notes(&mut alice_client, alice_wallet.id(), &payback_notes).await;
+    mock_rpc_api.prove_block();
+    alice_client.sync_state().await.unwrap();
+
+    let alice_account = alice_client.get_account(alice_wallet.id()).await.unwrap().unwrap();
+    assert_eq!(
+        alice_account
+            .vault()
+            .get_balance(AssetVaultKey::new_fungible(eth_faucet.id(), AssetCallbackFlag::Disabled))
+            .unwrap()
+            .as_u64(),
+        35,
+        "Alice should have received 25 + 10 = 35 ETH across both rounds"
+    );
+    // BTC: 100 locked − 70 paid out (50 + 20) + 30 reclaimed = MINT − 70.
+    assert_eq!(
+        alice_account
+            .vault()
+            .get_balance(AssetVaultKey::new_fungible(btc_faucet.id(), AssetCallbackFlag::Disabled))
+            .unwrap()
+            .as_u64(),
+        MINT_AMOUNT - 70,
+        "Alice's BTC should reflect 70 paid out and 30 reclaimed"
+    );
+
+    // Bob received 50 + 20 = 70 BTC and paid 25 + 10 = 35 ETH across both fills.
+    let bob_account = bob_client.get_account(bob_wallet.id()).await.unwrap().unwrap();
+    assert_eq!(
+        bob_account
+            .vault()
+            .get_balance(AssetVaultKey::new_fungible(btc_faucet.id(), AssetCallbackFlag::Disabled))
+            .unwrap()
+            .as_u64(),
+        70,
+        "Bob should have received 70 BTC across both fills"
+    );
+    assert_eq!(
+        bob_account
+            .vault()
+            .get_balance(AssetVaultKey::new_fungible(eth_faucet.id(), AssetCallbackFlag::Disabled))
+            .unwrap()
+            .as_u64(),
+        MINT_AMOUNT - 35,
+        "Bob should have paid 35 ETH across both fills"
+    );
+}
+
 /// Two PSWAP orders for the same asset pair share one asset-pair tag (one `Subscription` row
 /// per order). Terminating one must not cancel the other's subscription; only when the LAST
 /// order on the pair terminates does the tag drop out of the client's tracked-tag set.
