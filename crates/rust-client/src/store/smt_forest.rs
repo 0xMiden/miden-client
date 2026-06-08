@@ -6,6 +6,7 @@ use miden_protocol::account::{
     AccountStorage,
     StorageMap,
     StorageMapKey,
+    StorageMapKeyHash,
     StorageMapWitness,
     StorageSlotContent,
 };
@@ -70,8 +71,8 @@ impl AccountSmtForest {
         map_root: Word,
         key: StorageMapKey,
     ) -> Result<StorageMapWitness, StoreError> {
-        let hashed_key = key.hash().as_word();
-        let proof = self.forest.open(map_root, hashed_key).map_err(StoreError::from)?;
+        let hashed_key = key.hash();
+        let proof = self.forest.open(map_root, Word::from(hashed_key)).map_err(StoreError::from)?;
         Ok(StorageMapWitness::new(proof, [key])?)
     }
 
@@ -178,14 +179,17 @@ impl AccountSmtForest {
         root: Word,
         entries: impl Iterator<Item = (StorageMapKey, Word)>,
     ) -> Result<Word, StoreError> {
-        let entries: Vec<(Word, Word)> =
-            entries.map(|(key, value)| (key.hash().as_word(), value)).collect();
+        let entries: Vec<(StorageMapKeyHash, Word)> =
+            entries.map(|(key, value)| (key.hash(), value)).collect();
 
         if entries.is_empty() {
             return Ok(root);
         }
 
-        let new_root = self.forest.batch_insert(root, entries).map_err(StoreError::from)?;
+        let new_root = self
+            .forest
+            .batch_insert(root, entries.into_iter().map(|(key, value)| (Word::from(key), value)))
+            .map_err(StoreError::from)?;
         Ok(new_root)
     }
 
@@ -264,12 +268,17 @@ impl AccountSmtForest {
     /// Inserts storage map SMT nodes for a specific storage map.
     pub fn insert_storage_map_nodes_for_map(&mut self, map: &StorageMap) -> Result<(), StoreError> {
         let empty_root = *EmptySubtreeRoots::entry(SMT_DEPTH, 0);
-        let entries: Vec<(Word, Word)> =
-            map.entries().map(|(k, v)| (k.hash().as_word(), *v)).collect();
+        let entries: Vec<(StorageMapKeyHash, Word)> =
+            map.entries().map(|(key, value)| (key.hash(), *value)).collect();
         if entries.is_empty() {
             return Ok(());
         }
-        self.forest.batch_insert(empty_root, entries).map_err(StoreError::from)?;
+        self.forest
+            .batch_insert(
+                empty_root,
+                entries.into_iter().map(|(key, value)| (Word::from(key), value)),
+            )
+            .map_err(StoreError::from)?;
         Ok(())
     }
 

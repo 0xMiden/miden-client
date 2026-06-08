@@ -1,12 +1,11 @@
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, presets};
-use miden_client::account::component::TokenMetadata;
+use miden_client::account::component::FungibleFaucet;
 use miden_client::account::{
     Account,
+    AccountCode,
     AccountId,
     AccountInterfaceExt,
-    AccountReader,
-    AccountType,
     StorageSlotContent,
 };
 use miden_client::address::{Address, AddressInterface, NetworkId, RoutingParameters};
@@ -14,7 +13,7 @@ use miden_client::asset::Asset;
 use miden_client::rpc::{GrpcClient, NodeRpcClient};
 use miden_client::transaction::{AccountComponentInterface, AccountInterface};
 use miden_client::utils::base_units_to_tokens;
-use miden_client::{Client, PrettyPrint, Word, ZERO};
+use miden_client::{Client, PrettyPrint, ZERO};
 
 use crate::config::{CliConfig, RpcConfig};
 use crate::errors::CliError;
@@ -109,21 +108,19 @@ impl AccountCmd {
 async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     let accounts = client.get_account_headers().await?;
 
-    let mut table =
-        create_dynamic_table(&["Account ID", "Type", "Storage Mode", "Nonce", "Status"]);
+    let mut table = create_dynamic_table(&["Account ID", "Kind", "Type", "Nonce", "Status"]);
     for (acc, _acc_seed) in &accounts {
         let reader = client.account_reader(acc.id());
         let status = reader.status().await?.to_string();
-        let token_symbol = if acc.id().account_type() == AccountType::FungibleFaucet {
-            Some(get_token_metadata(&reader, acc.id()).await?.symbol().to_string())
-        } else {
-            None
-        };
+        let token_symbol = get_faucet_component(&client, acc.id())
+            .await
+            .ok()
+            .map(|faucet| faucet.symbol().to_string());
 
         table.add_row(vec![
             acc.id().to_hex(),
-            account_type_display_name(acc.id(), token_symbol.as_deref()),
-            acc.id().storage_mode().to_string(),
+            account_kind_display_name(token_symbol.as_deref()),
+            acc.id().account_type().to_string(),
             acc.nonce().as_canonical_u64().to_string(),
             status,
         ]);
@@ -154,19 +151,15 @@ async fn show_account<AUTH>(
             CliError::Input(format!("Unable to fetch account {account_id} from the network: {err}"))
         })?;
 
-        let account: Option<Account> = fetched_account.into();
-
-        account.ok_or(CliError::Input(format!(
+        fetched_account.ok_or(CliError::Input(format!(
             "Account {account_id} is private and not tracked by the client",
         )))?
     };
 
     let network_id = rpc_config.endpoint.0.to_network_id();
-    let token_symbol = if account.id().account_type() == AccountType::FungibleFaucet {
-        Some(get_token_metadata_from_account(&account)?.symbol().to_string())
-    } else {
-        None
-    };
+    let token_symbol = faucet_component_from_account(&account)
+        .ok()
+        .map(|faucet| faucet.symbol().to_string());
     print_summary_table(&account, network_id, token_symbol.as_deref());
 
     // Vault Table
@@ -179,15 +172,13 @@ async fn show_account<AUTH>(
             let (asset_type, faucet, amount) = match asset {
                 Asset::Fungible(fungible_asset) => {
                     let faucet_id = fungible_asset.faucet_id();
-                    let reader = client.account_reader(faucet_id);
-                    let (faucet, amount) = match get_token_metadata(&reader, faucet_id).await {
-                        Ok(metadata) => (
-                            metadata.symbol().to_string(),
-                            base_units_to_tokens(fungible_asset.amount(), metadata.decimals()),
+                    let amount_u64 = fungible_asset.amount().as_u64();
+                    let (faucet, amount) = match get_faucet_component(&client, faucet_id).await {
+                        Ok(faucet_component) => (
+                            faucet_component.symbol().to_string(),
+                            base_units_to_tokens(amount_u64, faucet_component.decimals()),
                         ),
-                        Err(_) => {
-                            (faucet_id.prefix().to_hex(), fungible_asset.amount().to_string())
-                        },
+                        Err(_) => (faucet_id.prefix().to_hex(), amount_u64.to_string()),
                     };
                     ("Fungible Asset", faucet, amount)
                 },
@@ -263,14 +254,8 @@ fn print_summary_table(account: &Account, network_id: NetworkId, token_symbol: O
         Cell::new("Account Commitment"),
         Cell::new(account.to_commitment().to_string()),
     ]);
-    table.add_row(vec![
-        Cell::new("Type"),
-        Cell::new(account_type_display_name(account.id(), token_symbol)),
-    ]);
-    table.add_row(vec![
-        Cell::new("Storage mode"),
-        Cell::new(account.id().storage_mode().to_string()),
-    ]);
+    table.add_row(vec![Cell::new("Kind"), Cell::new(account_kind_display_name(token_symbol))]);
+    table.add_row(vec![Cell::new("Type"), Cell::new(account.id().account_type().to_string())]);
     table.add_row(vec![
         Cell::new("Code Commitment"),
         Cell::new(account.code().commitment().to_string()),
@@ -288,67 +273,55 @@ fn print_summary_table(account: &Account, network_id: NetworkId, token_symbol: O
     println!("{table}\n");
 }
 
-/// Reads the token metadata via the [`AccountReader`]. Accesses the client's store to fetch the
-/// storage item.
+/// Loads the tracked account for `account_id` and reconstructs its [`FungibleFaucet`] component.
 ///
 /// # Errors
-/// Returns an error if the account is not tracked by the client, thus the storage item is not
-/// found.
-async fn get_token_metadata(
-    reader: &AccountReader,
+/// Returns an error if the account is not tracked by the client or its faucet metadata can't be
+/// read.
+async fn get_faucet_component<AUTH>(
+    client: &Client<AUTH>,
     account_id: AccountId,
-) -> Result<TokenMetadata, CliError> {
-    let word =
-        reader
-            .get_storage_item(TokenMetadata::metadata_slot().clone())
-            .await
-            .map_err(|err| {
-                CliError::Faucet(
-                    err.into(),
-                    format!("Failed to read token metadata for faucet {account_id}"),
-                )
-            })?;
-    parse_token_metadata(word, account_id)
+) -> Result<FungibleFaucet, CliError> {
+    let account = client.get_account(account_id).await?.ok_or_else(|| {
+        CliError::Input(format!("account {account_id} not tracked by the client"))
+    })?;
+
+    faucet_component_from_account(&account)
 }
 
-/// Reads the token metadata directly from an [`Account`]'s storage, without going through the
-/// client's store.
+/// Reconstructs the [`FungibleFaucet`] component from a materialized [`Account`].
 ///
 /// # Errors
-/// Returns an error if the storage item is not present in the Account's storage.
-fn get_token_metadata_from_account(account: &Account) -> Result<TokenMetadata, CliError> {
+/// Returns an error if the account's faucet metadata can't be read.
+fn faucet_component_from_account(account: &Account) -> Result<FungibleFaucet, CliError> {
     let account_id = account.id();
-    let word = account.storage().get_item(TokenMetadata::metadata_slot()).map_err(|err| {
-        CliError::Faucet(
-            err.into(),
-            format!("Failed to read token metadata for faucet {account_id}"),
-        )
-    })?;
-    parse_token_metadata(word, account_id)
-}
-
-/// Parses a raw storage [`Word`] into [`TokenMetadata`], wrapping errors with faucet context.
-fn parse_token_metadata(word: Word, account_id: AccountId) -> Result<TokenMetadata, CliError> {
-    TokenMetadata::try_from(word).map_err(|err| {
-        CliError::Faucet(
-            err.into(),
-            format!("Failed to parse token metadata for faucet {account_id}"),
-        )
+    FungibleFaucet::try_from(account).map_err(|err| {
+        CliError::Faucet(err.into(), format!("Failed to read faucet metadata for {account_id}"))
     })
 }
 
-/// Returns a display name for the account type. For fungible faucets, the token symbol is
-/// appended when available.
-fn account_type_display_name(account_id: AccountId, token_symbol: Option<&str>) -> String {
-    match account_id.account_type() {
-        AccountType::FungibleFaucet => {
-            let symbol = token_symbol.unwrap_or("Unknown");
-            format!("Fungible faucet (token symbol: {symbol})")
-        },
-        AccountType::NonFungibleFaucet => "Non-fungible faucet".to_string(),
-        AccountType::RegularAccountImmutableCode => "Regular".to_string(),
-        AccountType::RegularAccountUpdatableCode => "Regular (updatable)".to_string(),
+/// Returns the account's kind for display. If `token_symbol` is provided the account is rendered as
+/// a fungible faucet (the symbol is appended); otherwise it's labelled "Regular".
+///
+/// The on-chain `AccountType` only encodes account visibility (`public` / `private`), so
+/// faucet-vs-wallet has to be inferred by the caller from the attached components.
+fn account_kind_display_name(token_symbol: Option<&str>) -> String {
+    if let Some(symbol) = token_symbol {
+        format!("Fungible faucet (token symbol: {symbol})")
+    } else {
+        "Regular".to_string()
     }
+}
+
+/// Returns `true` if the account code exposes the [`BasicWallet`] component interface.
+///
+/// Takes the [`AccountCode`] rather than the full [`Account`] so callers can avoid loading the
+/// account's vault and storage just to inspect its interface.
+pub(crate) fn account_code_has_basic_wallet(account_id: AccountId, code: &AccountCode) -> bool {
+    AccountInterface::from_code(account_id, Vec::new(), code)
+        .components()
+        .iter()
+        .any(|c| matches!(c, AccountComponentInterface::BasicWallet))
 }
 
 /// Sets the provided account ID as the default account in the client's store, if not set already.

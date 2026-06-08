@@ -10,6 +10,7 @@ use miden_client::account::AccountId;
 use miden_client::note::{
     BlockNumber,
     NoteAssets,
+    NoteAttachments,
     NoteDetails,
     NoteMetadata,
     NoteRecipient,
@@ -43,7 +44,7 @@ mod filters;
 // ================================================================================================
 
 // SQLite limits statements to 999 parameters. Each batch size is chosen to stay under that
-// limit: input notes: 12 columns × 50 = 600, output notes: 8 × 80 = 640, scripts: 2 × 200 = 400.
+// limit: input notes: 13 columns × 50 = 650, output notes: 8 × 80 = 640, scripts: 2 × 200 = 400.
 const INPUT_NOTE_BATCH_SIZE: usize = 50;
 const OUTPUT_NOTE_BATCH_SIZE: usize = 80;
 const SCRIPT_BATCH_SIZE: usize = 200;
@@ -56,13 +57,15 @@ mod tests;
 
 /// Represents an `InputNoteRecord` serialized to be stored in the database.
 struct SerializedInputNoteData {
-    pub id: String,
+    pub details_commitment: String,
+    pub id: Option<String>,
     pub assets: Vec<u8>,
+    pub attachments: Vec<u8>,
     pub serial_number: Vec<u8>,
     pub inputs: Vec<u8>,
     pub script_root: String,
     pub script: Vec<u8>,
-    pub nullifier: String,
+    pub nullifier: Option<String>,
     pub state_discriminant: u8,
     pub state: Vec<u8>,
     pub created_at: u64,
@@ -73,6 +76,7 @@ struct SerializedInputNoteData {
 
 /// Represents an `OutputNoteRecord` serialized to be stored in the database.
 struct SerializedOutputNoteData {
+    pub details_commitment: String,
     pub id: String,
     pub assets: Vec<u8>,
     pub metadata: Vec<u8>,
@@ -81,6 +85,7 @@ struct SerializedOutputNoteData {
     pub expected_height: u32,
     pub state_discriminant: u8,
     pub state: Vec<u8>,
+    pub attachments: Vec<u8>,
 }
 
 /// Represents the parts retrieved from the database to build an `InputNoteRecord`.
@@ -91,6 +96,7 @@ struct SerializedInputNoteParts {
     pub script: Vec<u8>,
     pub state: Vec<u8>,
     pub created_at: u64,
+    pub attachments: Vec<u8>,
 }
 
 /// Represents the parts retrieved from the database to build an `OutputNoteRecord`.
@@ -100,11 +106,12 @@ struct SerializedOutputNoteParts {
     pub recipient_digest: String,
     pub expected_height: u32,
     pub state: Vec<u8>,
+    pub attachments: Vec<u8>,
 }
 
 /// Represents the fields needed to update an existing input note's state.
 struct SerializedInputNoteStateUpdate {
-    pub id: String,
+    pub details_commitment: String,
     pub state_discriminant: u8,
     pub state: Vec<u8>,
     pub consumed_block_height: Option<u32>,
@@ -114,7 +121,7 @@ struct SerializedInputNoteStateUpdate {
 
 /// Represents the fields needed to update an existing output note's state.
 struct SerializedOutputNoteStateUpdate {
-    pub id: String,
+    pub details_commitment: String,
     pub state_discriminant: u8,
     pub state: Vec<u8>,
 }
@@ -280,8 +287,10 @@ pub(super) fn upsert_input_note_tx(
     note: &InputNoteRecord,
 ) -> Result<(), StoreError> {
     let SerializedInputNoteData {
+        details_commitment,
         id,
         assets,
+        attachments,
         serial_number,
         inputs,
         script_root,
@@ -304,8 +313,10 @@ pub(super) fn upsert_input_note_tx(
 
     const NOTE_QUERY: &str = insert_sql!(
         input_notes {
+            details_commitment,
             note_id,
             assets,
+            attachments,
             serial_number,
             inputs,
             script_root,
@@ -322,8 +333,10 @@ pub(super) fn upsert_input_note_tx(
     tx.prepare_cached(NOTE_QUERY)
         .into_store_error()?
         .execute(params![
+            details_commitment,
             id,
             assets,
+            attachments,
             serial_number,
             inputs,
             script_root,
@@ -350,6 +363,7 @@ fn parse_input_note_columns(
     let script: Vec<u8> = row.get(3)?;
     let state: Vec<u8> = row.get(4)?;
     let created_at: u64 = row.get(5)?;
+    let attachments: Vec<u8> = row.get(6)?;
 
     Ok(SerializedInputNoteParts {
         assets,
@@ -358,6 +372,7 @@ fn parse_input_note_columns(
         script,
         state,
         created_at,
+        attachments,
     })
 }
 
@@ -372,6 +387,7 @@ fn parse_input_note(
         script,
         state,
         created_at,
+        attachments,
     } = serialized_input_note_parts;
 
     let assets = NoteAssets::read_from_bytes(&assets)?;
@@ -382,20 +398,28 @@ fn parse_input_note(
     let recipient = NoteRecipient::new(serial_number, script, inputs);
 
     let details = NoteDetails::new(assets, recipient);
+    let attachments = NoteAttachments::read_from_bytes(&attachments)?;
 
     let state = InputNoteState::read_from_bytes(&state)?;
 
-    Ok(InputNoteRecord::new(details, Some(created_at), state))
+    Ok(InputNoteRecord::new(details, attachments, Some(created_at), state))
 }
 
 /// Serialize the provided input note into database compatible types.
 fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
-    let id = note.id().as_word().to_string();
-    let nullifier = note.nullifier().to_hex();
+    let details_commitment = note.details_commitment().to_hex();
+    // `note_id` and `nullifier` require metadata, so they're only available when the record
+    // carries it. The columns are NULL-able and get populated once metadata arrives (via
+    // sync / inclusion proof).
+    let id = note.id().map(|id| id.as_word().to_string());
+    let nullifier = note.metadata().map(|metadata| {
+        miden_client::note::Nullifier::from_details_and_metadata(note.details(), metadata).to_hex()
+    });
     let created_at = note.created_at().unwrap_or(0);
 
     let details = note.details();
     let assets = details.assets().to_bytes();
+    let attachments = note.attachments().to_bytes();
     let recipient = details.recipient();
 
     let serial_number = recipient.serial_num().to_bytes();
@@ -412,8 +436,10 @@ fn serialize_input_note(note: &InputNoteRecord) -> SerializedInputNoteData {
     let consumer_account_id = note.consumer_account().map(AccountId::to_hex);
 
     SerializedInputNoteData {
+        details_commitment,
         id,
         assets,
+        attachments,
         serial_number,
         inputs,
         script_root,
@@ -437,6 +463,7 @@ fn parse_output_note_columns(
     let metadata: Vec<u8> = row.get(2)?;
     let expected_height: u32 = row.get(3)?;
     let state: Vec<u8> = row.get(4)?;
+    let attachments: Vec<u8> = row.get(5)?;
 
     Ok(SerializedOutputNoteParts {
         assets,
@@ -444,6 +471,7 @@ fn parse_output_note_columns(
         recipient_digest,
         expected_height,
         state,
+        attachments,
     })
 }
 
@@ -457,12 +485,14 @@ fn parse_output_note(
         metadata,
         expected_height,
         state,
+        attachments,
     } = serialized_output_note_parts;
 
     let recipient_digest = Word::try_from(recipient_digest)?;
     let assets = NoteAssets::read_from_bytes(&assets)?;
     let metadata = NoteMetadata::read_from_bytes(&metadata)?;
     let state = OutputNoteState::read_from_bytes(&state)?;
+    let attachments = NoteAttachments::read_from_bytes(&attachments)?;
 
     Ok(OutputNoteRecord::new(
         recipient_digest,
@@ -470,6 +500,7 @@ fn parse_output_note(
         metadata,
         state,
         BlockNumber::from(expected_height),
+        attachments,
     ))
 }
 
@@ -480,7 +511,7 @@ fn serialize_input_note_state(note: &InputNoteRecord) -> SerializedInputNoteStat
     let consumer_account_id = note.consumer_account().map(AccountId::to_hex);
 
     SerializedInputNoteStateUpdate {
-        id: note.id().as_word().to_string(),
+        details_commitment: note.details_commitment().to_hex(),
         state_discriminant: note.state().discriminant(),
         state: note.state().to_bytes(),
         consumed_block_height,
@@ -492,7 +523,7 @@ fn serialize_input_note_state(note: &InputNoteRecord) -> SerializedInputNoteStat
 /// Serialize the provided output note state into a lightweight state-only update.
 fn serialize_output_note_state(note: &OutputNoteRecord) -> SerializedOutputNoteStateUpdate {
     SerializedOutputNoteStateUpdate {
-        id: note.id().as_word().to_string(),
+        details_commitment: note.details_commitment().to_hex(),
         state_discriminant: note.state().discriminant(),
         state: note.state().to_bytes(),
     }
@@ -500,6 +531,7 @@ fn serialize_output_note_state(note: &OutputNoteRecord) -> SerializedOutputNoteS
 
 /// Serialize the provided output note into database compatible types.
 fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
+    let details_commitment = note.details_commitment().to_hex();
     let id = note.id().as_word().to_string();
     let assets = note.assets().to_bytes();
     let recipient_digest = note.recipient_digest().to_hex();
@@ -510,7 +542,10 @@ fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
     let state_discriminant = note.state().discriminant();
     let state = note.state().to_bytes();
 
+    let attachments = note.attachments().to_bytes();
+
     SerializedOutputNoteData {
+        details_commitment,
         id,
         assets,
         metadata,
@@ -519,6 +554,7 @@ fn serialize_output_note(note: &OutputNoteRecord) -> SerializedOutputNoteData {
         expected_height: note.expected_height().as_u32(),
         state_discriminant,
         state,
+        attachments,
     }
 }
 
@@ -533,7 +569,9 @@ pub(crate) fn apply_note_updates_tx(
 
     for input_note in note_updates.updated_input_notes() {
         match input_note.update_type() {
-            NoteUpdateType::Insert => {
+            // `InsertCommitted` is a previously-expected note that just gained its metadata, so it
+            // needs a full-row insert (to write `note_id`/`nullifier`), same as `Insert`.
+            NoteUpdateType::Insert | NoteUpdateType::InsertCommitted => {
                 let serialized = serialize_input_note(input_note.inner());
                 scripts.insert(serialized.script_root.clone(), serialized.script.clone());
                 input_inserts.push(serialized);
@@ -555,7 +593,9 @@ pub(crate) fn apply_note_updates_tx(
 
     for output_note in note_updates.updated_output_notes() {
         match output_note.update_type() {
-            NoteUpdateType::Insert => {
+            // Output notes are never assigned `InsertCommitted`, but it is insert-like for
+            // exhaustiveness.
+            NoteUpdateType::Insert | NoteUpdateType::InsertCommitted => {
                 output_inserts.push(serialize_output_note(output_note.inner()));
             },
             NoteUpdateType::Update => {
@@ -610,22 +650,31 @@ fn batch_insert_input_notes(
     }
 
     for chunk in notes.chunks(INPUT_NOTE_BATCH_SIZE) {
-        let placeholders = vec!["(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"; chunk.len()].join(", ");
+        let placeholders =
+            vec!["(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"; chunk.len()].join(", ");
         let query = format!(
             "INSERT OR REPLACE INTO `input_notes` \
-             (`note_id`, `assets`, `serial_number`, `inputs`, `script_root`, \
-              `nullifier`, `state_discriminant`, `state`, `created_at`, \
+             (`details_commitment`, `note_id`, `assets`, `attachments`, `serial_number`, \
+              `inputs`, `script_root`, `nullifier`, `state_discriminant`, `state`, `created_at`, \
               `consumed_block_height`, `consumed_tx_order`, `consumer_account_id`) \
              VALUES {placeholders}"
         );
-        let mut param_values: Vec<Value> = Vec::with_capacity(chunk.len() * 12);
+        let mut param_values: Vec<Value> = Vec::with_capacity(chunk.len() * 14);
         for note in chunk {
-            param_values.push(Value::Text(note.id.clone()));
+            param_values.push(Value::Text(note.details_commitment.clone()));
+            match &note.id {
+                Some(id) => param_values.push(Value::Text(id.clone())),
+                None => param_values.push(Value::Null),
+            }
             param_values.push(Value::Blob(note.assets.clone()));
+            param_values.push(Value::Blob(note.attachments.clone()));
             param_values.push(Value::Blob(note.serial_number.clone()));
             param_values.push(Value::Blob(note.inputs.clone()));
             param_values.push(Value::Text(note.script_root.clone()));
-            param_values.push(Value::Text(note.nullifier.clone()));
+            match &note.nullifier {
+                Some(n) => param_values.push(Value::Text(n.clone())),
+                None => param_values.push(Value::Null),
+            }
             param_values.push(Value::Integer(i64::from(note.state_discriminant)));
             param_values.push(Value::Blob(note.state.clone()));
             #[allow(clippy::cast_possible_wrap)]
@@ -662,7 +711,7 @@ fn batch_update_input_note_states(
         .prepare_cached(
             "UPDATE `input_notes` SET state_discriminant = ?, state = ?, \
              consumed_block_height = ?, consumed_tx_order = ?, consumer_account_id = ? \
-             WHERE note_id = ?",
+             WHERE details_commitment = ?",
         )
         .into_store_error()?;
 
@@ -673,7 +722,7 @@ fn batch_update_input_note_states(
             update.consumed_block_height,
             update.consumed_tx_order,
             update.consumer_account_id,
-            update.id,
+            update.details_commitment,
         ])
         .into_store_error()?;
     }
@@ -691,15 +740,16 @@ fn batch_insert_output_notes(
     }
 
     for chunk in notes.chunks(OUTPUT_NOTE_BATCH_SIZE) {
-        let placeholders = vec!["(?, ?, ?, ?, ?, ?, ?, ?)"; chunk.len()].join(", ");
+        let placeholders = vec!["(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"; chunk.len()].join(", ");
         let query = format!(
             "INSERT OR REPLACE INTO `output_notes` \
-             (`note_id`, `assets`, `recipient_digest`, `metadata`, \
-              `nullifier`, `expected_height`, `state_discriminant`, `state`) \
+             (`details_commitment`, `note_id`, `assets`, `recipient_digest`, `metadata`, \
+              `nullifier`, `expected_height`, `state_discriminant`, `state`, `attachments`) \
              VALUES {placeholders}"
         );
-        let mut param_values: Vec<Value> = Vec::with_capacity(chunk.len() * 8);
+        let mut param_values: Vec<Value> = Vec::with_capacity(chunk.len() * 10);
         for note in chunk {
+            param_values.push(Value::Text(note.details_commitment.clone()));
             param_values.push(Value::Text(note.id.clone()));
             param_values.push(Value::Blob(note.assets.clone()));
             param_values.push(Value::Text(note.recipient_digest.clone()));
@@ -711,6 +761,7 @@ fn batch_insert_output_notes(
             param_values.push(Value::Integer(i64::from(note.expected_height)));
             param_values.push(Value::Integer(i64::from(note.state_discriminant)));
             param_values.push(Value::Blob(note.state.clone()));
+            param_values.push(Value::Blob(note.attachments.clone()));
         }
         tx.execute(&query, params_from_iter(param_values)).into_store_error()?;
     }
@@ -729,12 +780,12 @@ fn batch_update_output_note_states(
 
     let mut stmt = tx
         .prepare_cached(
-            "UPDATE `output_notes` SET state_discriminant = ?, state = ? WHERE note_id = ?",
+            "UPDATE `output_notes` SET state_discriminant = ?, state = ? WHERE details_commitment = ?",
         )
         .into_store_error()?;
 
     for update in updates {
-        stmt.execute(params![update.state_discriminant, update.state, update.id])
+        stmt.execute(params![update.state_discriminant, update.state, update.details_commitment])
             .into_store_error()?;
     }
 

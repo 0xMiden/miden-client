@@ -10,15 +10,8 @@ use crate::rpc::generated::{self as proto};
 pub struct RpcStatusInfo {
     pub version: String,
     pub genesis_commitment: Option<Word>,
-    pub store: Option<StoreStatusInfo>,
-    pub block_producer: Option<BlockProducerStatusInfo>,
-}
-
-/// Represents store status info with fields converted into domain types.
-pub struct StoreStatusInfo {
-    pub version: String,
-    pub status: String,
     pub chain_tip: u32,
+    pub block_producer: Option<BlockProducerStatusInfo>,
 }
 
 /// Represents block producer status info with fields converted into domain types.
@@ -123,19 +116,9 @@ impl TryFrom<proto::rpc::RpcStatus> for RpcStatusInfo {
         Ok(Self {
             version: value.version,
             genesis_commitment,
-            store: value.store.map(Into::into),
+            chain_tip: value.chain_tip,
             block_producer: value.block_producer.map(Into::into),
         })
-    }
-}
-
-impl From<proto::rpc::StoreStatus> for StoreStatusInfo {
-    fn from(value: proto::rpc::StoreStatus) -> Self {
-        Self {
-            version: value.version,
-            status: value.status,
-            chain_tip: value.chain_tip,
-        }
     }
 }
 

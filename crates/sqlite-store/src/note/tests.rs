@@ -3,11 +3,13 @@ use std::sync::Arc;
 use miden_client::note::{
     InputNoteReader,
     NoteAssets,
+    NoteAttachments,
     NoteMetadata,
     NoteRecipient,
     NoteStorage,
     NoteTag,
     NoteType,
+    PartialNoteMetadata,
 };
 use miden_client::store::input_note_states::{
     ConsumedExternalNoteState,
@@ -39,7 +41,8 @@ fn create_consumed_external_input_note(
     block_height: u32,
     consumer_account: Option<AccountId>,
 ) -> InputNoteRecord {
-    let serial_number: Word = [Felt::new(u64::from(index) + 2000), ZERO, ZERO, ZERO].into();
+    let serial_number: Word =
+        [Felt::new_unchecked(u64::from(index) + 2000), ZERO, ZERO, ZERO].into();
     let assets = NoteAssets::new(vec![]).unwrap();
     let recipient = NoteRecipient::new(
         serial_number,
@@ -54,12 +57,13 @@ fn create_consumed_external_input_note(
         consumed_tx_order: None,
     };
 
-    InputNoteRecord::new(details, Some(0), state.into())
+    InputNoteRecord::new(details, NoteAttachments::empty(), Some(0), state.into())
 }
 
 /// Helper to create an expected (non-consumed) input note.
 fn create_expected_input_note(index: u32) -> InputNoteRecord {
-    let serial_number: Word = [Felt::new(u64::from(index) + 3000), ZERO, ZERO, ZERO].into();
+    let serial_number: Word =
+        [Felt::new_unchecked(u64::from(index) + 3000), ZERO, ZERO, ZERO].into();
     let assets = NoteAssets::new(vec![]).unwrap();
     let recipient = NoteRecipient::new(
         serial_number,
@@ -74,7 +78,7 @@ fn create_expected_input_note(index: u32) -> InputNoteRecord {
         tag: None,
     };
 
-    InputNoteRecord::new(details, Some(0), state.into())
+    InputNoteRecord::new(details, NoteAttachments::empty(), Some(0), state.into())
 }
 
 /// Helper to create a consumed-unauthenticated-local input note with a specific consumer.
@@ -84,7 +88,8 @@ fn create_consumed_input_note_with_consumer(
     block_height: u32,
     consumed_tx_order: u32,
 ) -> InputNoteRecord {
-    let serial_number: Word = [Felt::new(u64::from(index) + 5000), ZERO, ZERO, ZERO].into();
+    let serial_number: Word =
+        [Felt::new_unchecked(u64::from(index) + 5000), ZERO, ZERO, ZERO].into();
     let assets = NoteAssets::new(vec![]).unwrap();
     let recipient = NoteRecipient::new(
         serial_number,
@@ -93,7 +98,9 @@ fn create_consumed_input_note_with_consumer(
     );
     let details = NoteDetails::new(assets, recipient);
 
-    let metadata = NoteMetadata::new(consumer, NoteType::Public).with_tag(NoteTag::from(index));
+    let partial_metadata =
+        PartialNoteMetadata::new(consumer, NoteType::Public).with_tag(NoteTag::from(index));
+    let metadata = NoteMetadata::new(partial_metadata, &NoteAttachments::empty());
 
     let state = ConsumedUnauthenticatedLocalNoteState {
         metadata,
@@ -106,7 +113,7 @@ fn create_consumed_input_note_with_consumer(
         consumed_tx_order: Some(consumed_tx_order),
     };
 
-    InputNoteRecord::new(details, Some(0), state.into())
+    InputNoteRecord::new(details, NoteAttachments::empty(), Some(0), state.into())
 }
 
 // INPUT NOTE READER TESTS

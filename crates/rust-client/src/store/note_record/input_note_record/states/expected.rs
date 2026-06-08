@@ -82,7 +82,7 @@ impl NoteStateHandler for ExpectedNoteState {
 
                 Ok(Some(
                     ProcessingUnauthenticatedNoteState {
-                        metadata: metadata.clone(),
+                        metadata: *metadata,
                         after_block_num: self.after_block_num,
                         submission_data,
                     }

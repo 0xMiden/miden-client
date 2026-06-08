@@ -4,7 +4,11 @@
 
 ### Fixes
 
+* [FIX][rust] `Client::send_private_note` is now durable across transient NTL failures: the relay payload is persisted to a durable outbox (a `Vec<NoteInfo>` under the `note_transport_outbox` settings key) before the transport call, so a failed or interrupted `send_note` no longer drops the note. `Client::sync_note_transport` retries the outbox on each sync (the receiver dedupes by note id) and a failing relay no longer blocks the sync; the new `Client::flush_relay_outbox()` lets callers drive retries directly ([#2127](https://github.com/0xMiden/miden-client/pull/2127)).
 * [FIX] Fixed `derive_account_commitments` to return the final account commitment when multiple transactions for the same account are committed in the same block ([#2164](https://github.com/0xMiden/miden-client/pull/2164)).
+* [FIX] Preserve a fungible asset's callback flag when the store replays a vault delta, fixing a `ConflictingRoots` error when consuming callback-bearing (e.g. agglayer-minted) assets ([#2225](https://github.com/0xMiden/miden-client/pull/2225)).
+* [FIX] Fixed the `sync_notes_with_details` to fetch the attachments for private notes ([#2214](https://github.com/0xMiden/miden-client/pull/2214)).
+* [rust] Expanded validation for output notes before executing a `TransactionRequest`. ([#89](https://github.com/0xMiden/wallet-adapter/issues/89))
 
 ### Changes
 
@@ -13,6 +17,8 @@
 * [BREAKING][rust] Added `submit_proven_batch` to `NodeRpcClient` trait. ([#2075](https://github.com/0xMiden/miden-client/pull/2075))
 * [BREAKING][param][cli] `address add` now takes `<ACCOUNT_ID> <BECH32_ADDRESS>` instead of `<ACCOUNT_ID> <INTERFACE> [TAG_LEN]`. Use the new `address encode` subcommand to build a bech32 string from `<ACCOUNT_ID> <INTERFACE> [TAG_LEN]`. ([#2115](https://github.com/0xMiden/miden-client/pull/2115))
 * [BREAKING][rust] `StateSync` no longer takes an `Option<Arc<dyn Store>>`. `StateSyncInput::accounts` is now a `Vec<AccountSyncHint>` (header + `AccountStorageHeader`); when hints cover the account's map slots `StateSync` issues a single `get_account_proof` for non-oversized accounts, and when new map slots appear on-chain it only fetches the missing ones. The `Store` trait method `get_account_map_slot_names` was replaced with `get_account_storage_header`. ([#2132](https://github.com/0xMiden/miden-client/pull/2132))
+* [BREAKING] `NodeRpcClient::get_account_details` now fetches a public account's storage maps in a single `/GetAccount` request and returns `Option<Account>`. No longer returns data for private accounts; instead use `NodeRpcClient::get_account` to fetch private account's commitment. ([#2215](https://github.com/0xMiden/miden-client/pull/2215)).
+* [BREAKING] Removed the account storage-layout sync hints; `StateSyncInput::accounts` now takes a `Vec<AccountHeader>` ([#2215](https://github.com/0xMiden/miden-client/pull/2215)).
 * [BREAKING][type][rust] `BasicFungibleFaucet` is now a unit struct; token symbol/decimals/max-supply moved to a new `FungibleTokenMetadata` component built via `FungibleTokenMetadata::builder`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * [BREAKING][behavior][cli] `account new-faucet` now requires a `[fungible-faucet-metadata]` block (typed `symbol`, `decimals`, `max_supply`, optional `name`) in the init data file passed via `-i`, replacing the previous `["miden::standards::fungible_faucets::metadata"]` section with stringly-typed values. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * [BREAKING][behavior][all] Note scripts must now use the package-style header `@note_script` + `pub proc main … end` instead of the bare `begin … end`, following the upstream protocol bump. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
@@ -23,7 +29,19 @@
 * Added a `Client::import_watched_account_by_id` method to track an external account state without syncing notes ([#2143](https://github.com/0xMiden/miden-client/pull/2143)).
 * Removed limit on accounts and note tags that can be tracked by the client ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
 * [BREAKING] Updated the `sync_notes` and `sync_transactions` to return directly the fetched updates. Removed `TransactionsInfo` and `NoteSyncInfo` structs ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
+* [BREAKING][param][rust,store] `InputNoteRecord::new` takes a `NoteAttachments` argument; input notes persist attachments (new `attachments` column on `input_notes`) ([#2203](https://github.com/0xMiden/miden-client/pull/2203)).
+* [BREAKING][param][rust] `build_wallet_id` dropped its trailing `is_mutable: bool` (code mutability isn't encoded in the account ID) ([#2203](https://github.com/0xMiden/miden-client/pull/2203)).
+* [BREAKING][behavior][cli] `new-account`/`new-wallet` `--account-type` (`-t`) now accepts only `private`/`public`; legacy faucet/mutability values and `--mutable` are removed. Faucet-vs-regular is derived from packages — a `FungibleFaucet` component yields a fungible faucet with an implicit `TokenPolicyManager` ([#2203](https://github.com/0xMiden/miden-client/pull/2203)).
+* [BREAKING][type][rust] `Client::import_notes` and `sync_note_transport` return `Vec<NoteDetailsCommitment>` (was `Vec<NoteId>`); `SyncSummary::new_private_notes` too. Metadata-less imports have no `NoteId` yet — resolve via `Client::get_input_note_by_commitment` ([#2203](https://github.com/0xMiden/miden-client/pull/2203)).
+* [BREAKING] Reworked the `GetAccount` surface on `NodeRpcClient`: replaced `get_account_proof` with `get_account(account_id, GetAccountRequest)` and added `resolve_oversize_vault` / `resolve_oversize_storage_maps` helpers. `GetAccountRequest` bundles the previous positional args ([#2202](https://github.com/0xMiden/miden-client/pull/2202)).
 * [BREAKING][rust] `NodeRpcClient::get_note_script_by_root` now returns `Option<NoteScript>` (`None` when the node has no script for the requested root) instead of erroring when the script is absent ([#1840](https://github.com/0xMiden/miden-client/pull/1840)).
+* [BREAKING] `miden_client::note` re-exports updated to match the protocol's split of attachment data off `NoteMetadata`: removed `NoteAttachmentKind` and `NoteMetadataHeader`, added `NoteAttachmentHeader`, `NoteAttachments`, and `PartialNoteMetadata`. ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
+* [BREAKING] `CommittedNoteMetadata` simplified to a single `Full(NoteMetadata)` variant; the `Header { sender, note_type, tag, attachment_kind }` variant is removed because sync responses now always carry full metadata (attachment content is still fetched separately via `GetNotesById`, but is no longer part of `NoteMetadata`). Callers no longer need to handle the header-only case. ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
+* [BREAKING] `TransactionRequestBuilder::build_pswap_create` now takes `note_attachment: Option<NoteAttachment>` instead of `NoteAttachment`. Pass `None` when there is nothing to attach (previously `NoteAttachment::default()`). ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
+* [BREAKING] `account list`, `account show`, and `account new-faucet` now read and build the new `FungibleFaucet` component (multi-slot) instead of the standalone `TokenMetadata` storage item. Faucet accounts created with the previous component layout are no longer recognized; new faucets are constructed via `FungibleFaucet::builder` rather than the `basic-fungible-faucet` package. ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
+* [BREAKING] Note attachments are no longer carried on the note-transport wire format (only `NoteHeader` + serialized `NoteDetails`). ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
+* [BREAKING][rust] Removed the top-level `miden_client::standards` alias. Use the curated client paths as before, or the new raw upstream namespaces `miden_client::account::standards::*`, `miden_client::note::standards::*`, and `miden_client::testing::standards::*`. ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
+* Added a blanket implementation for `NodeRpcClient::get_account_details` ([#2196](https://github.com/0xMiden/miden-client/pull/2196)).
 
 ### Enhancements
 
@@ -41,6 +59,11 @@
 * [FEATURE][web] Added `StorageView` JS wrapper over WASM `AccountStorage`. `account.storage()` now returns a `StorageView` that makes `getItem()` work intuitively for both Value and StorageMap slots. WASM primitives are unchanged; the raw `AccountStorage` is accessible via `.raw` ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][web] Added `wordToBigInt()` utility export for losslessly converting a `Word`'s first felt to a `BigInt`. `StorageResult.toString()` is BigInt-backed, and `valueOf()` returns a JS number for values fitting in `Number.MAX_SAFE_INTEGER` and throws `RangeError` for larger u64 values — use `.toBigInt()` for exact access ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][rust,cli] Added partial swap (PSWAP) support: `TransactionRequestBuilder::build_pswap_create` / `build_pswap_consume` / `build_pswap_cancel` and a `miden-client pswap` CLI command (`create`, `consume`, `cancel`) for partially-fillable fungible swaps ([#2162](https://github.com/0xMiden/miden-client/pull/2162)).
+
+### Fixes
+
+* [FIX][rust] `Client::fetch_all_private_notes` now drains the full backlog across multiple server-paginated responses instead of returning after a single batch. Needed once the note-transport server (`0xMiden/note-transport-service#77`) caps each `fetch_notes` response at `FETCH_NOTES_BATCH_SIZE` rows — previously the function silently returned only the first batch, contradicting its documented "fetches all notes" semantics. Companion deterministic regression test (`fetch_all_private_notes_drains_across_batches`) uses a new `MockNoteTransportNode::with_max_batch(n)` constructor to exercise multi-batch drain. ([#2095](https://github.com/0xMiden/miden-client/pull/2095))
+* [FIX][rust] Fixed the `dap` feature build by bumping `miden-debug`/`miden-debug-engine` to 0.8.1 and `miden-core` to 0.23.2, aligning the debugger crates with the `miden-core` APIs they call. (#TBD)
 
 ## 0.14.9 (2026-05-19)
 
