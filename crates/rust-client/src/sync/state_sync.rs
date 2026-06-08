@@ -542,9 +542,6 @@ impl StateSync {
             }
         }
 
-        // All MMR checks passed; commit the working MMR back to the caller.
-        *current_partial_mmr = working_mmr;
-
         // Apply transaction and nullifier data.
         state_sync_update.note_updates.extend_nullifiers(nullifiers);
         self.transaction_state_sync(
@@ -565,6 +562,9 @@ impl StateSync {
             // Detect output notes erased by same-batch note erasure.
             Self::mark_erased_notes_as_consumed(state_sync_update, transaction);
         }
+
+        // Commit the working MMR back to the caller.
+        *current_partial_mmr = working_mmr;
 
         Ok(())
     }
