@@ -116,6 +116,8 @@ use crate::transaction::batch::InMemoryBatchDataStore;
 pub mod batch;
 pub use batch::{BatchBuilder, BatchBuilderError};
 
+#[cfg(feature = "dap")]
+mod dap_executor;
 mod prover;
 pub use prover::TransactionProver;
 
@@ -827,10 +829,12 @@ where
         &'auth self,
         data_store: &'store STORE,
     ) -> Result<
-        TransactionExecutor<'store, 'auth, STORE, AUTH, DapProgramExecutor>,
+        TransactionExecutor<'store, 'auth, STORE, AUTH, dap_executor::DapProgramExecutor>,
         TransactionExecutorError,
     > {
-        Ok(self.build_executor(data_store)?.with_program_executor::<DapProgramExecutor>())
+        Ok(self
+            .build_executor(data_store)?
+            .with_program_executor::<dap_executor::DapProgramExecutor>())
     }
 
     /// Loads the account and constructs an [`AccountInterface`] from it.
@@ -929,33 +933,6 @@ where
             updated_input_notes,
             new_output_notes,
         ))
-    }
-}
-
-/// Adapts [`miden_debug::DapExecutor`] (which exposes `new` + `execute_async`) to
-/// [`miden_tx::ProgramExecutor`]. `miden-debug` does not depend on `miden-tx`, so the impl
-/// must live here.
-#[cfg(feature = "dap")]
-pub(crate) struct DapProgramExecutor(miden_debug::DapExecutor);
-
-#[cfg(feature = "dap")]
-impl miden_tx::ProgramExecutor for DapProgramExecutor {
-    fn new(
-        stack_inputs: miden_processor::StackInputs,
-        advice_inputs: miden_processor::advice::AdviceInputs,
-        options: miden_processor::ExecutionOptions,
-    ) -> Self {
-        Self(miden_debug::DapExecutor::new(stack_inputs, advice_inputs, options))
-    }
-
-    fn execute<H: miden_processor::Host + Send>(
-        self,
-        program: &miden_processor::Program,
-        host: &mut H,
-    ) -> impl miden_processor::FutureMaybeSend<
-        Result<miden_processor::ExecutionOutput, miden_processor::ExecutionError>,
-    > {
-        self.0.execute_async(program, host)
     }
 }
 
