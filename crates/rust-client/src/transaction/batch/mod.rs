@@ -290,11 +290,11 @@ where
     let account_id = account.id();
     let prep = client.prepare_transaction(&account, transaction_request).await?;
 
-    data_store.register_foreign_account_inputs(prep.foreign_account_inputs.iter().cloned());
     data_store.register_note_scripts(prep.output_note_scripts());
     for fpi_account in &prep.foreign_account_inputs {
         data_store.mast_store().load_account_code(fpi_account.code());
     }
+    data_store.register_foreign_account_inputs(prep.foreign_account_inputs);
 
     data_store.mast_store().load_account_code(account.code());
 

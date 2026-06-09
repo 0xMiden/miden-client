@@ -332,32 +332,32 @@ impl DataStore for ClientDataStore {
             return Ok(witness);
         }
 
-        // Ensure the account inputs are cached before resolving the slot name.
-        let inputs = if let Some(inputs) = self.cache.get_foreign_account_inputs(account_id) {
-            inputs
+        // Resolve against the cached account inputs (without cloning them), fetching and caching
+        // the account first if it isn't cached yet.
+        let resolution = if let Some(resolution) =
+            self.cache.with_foreign_account_inputs(account_id, |inputs| {
+                resolve_witness_from_inputs(inputs, map_root, map_key)
+            }) {
+            resolution?
         } else {
             let account_state_at = self
                 .cache
                 .ref_block()
                 .map(AccountStateAt::Block)
                 .expect("reference block should be set");
-            self.fetch_and_cache_foreign_account(account_id, account_state_at).await?
+            let inputs = self.fetch_and_cache_foreign_account(account_id, account_state_at).await?;
+            resolve_witness_from_inputs(&inputs, map_root, map_key)?
         };
 
-        // Try to get the witness from the cached account inputs. It will miss if the account's
-        // storage is too big.
-        if let Some(partial_map) = inputs.storage().maps().find(|m| m.root() == map_root)
-            && let Ok(witness) = partial_map.open(&map_key)
-        {
-            return Ok(witness);
+        match resolution {
+            WitnessResolution::Witness(witness) => Ok(witness),
+            WitnessResolution::FetchParams(slot_name, known_code) => {
+                self.fetch_and_cache_storage_map_witness(
+                    account_id, map_root, slot_name, map_key, known_code,
+                )
+                .await
+            },
         }
-
-        let (slot_name, known_code) = resolve_slot_name_and_code(&inputs, map_root)?;
-
-        self.fetch_and_cache_storage_map_witness(
-            account_id, map_root, slot_name, map_key, known_code,
-        )
-        .await
     }
 
     /// Returns the [`AccountInputs`] for the given foreign account from the cache or alternatively
@@ -438,11 +438,27 @@ impl MastForestStore for ClientDataStore {
 // HELPER FUNCTIONS
 // ================================================================================================
 
-/// Resolves the slot name and account code for a map root from the given foreign account inputs.
-fn resolve_slot_name_and_code(
+/// Outcome of resolving a storage map witness against an account's inputs: either the witness
+/// itself, or the parameters needed to fetch it via RPC.
+enum WitnessResolution {
+    Witness(StorageMapWitness),
+    FetchParams(StorageSlotName, AccountCode),
+}
+
+/// Tries to open the witness from the inputs' partial storage maps (this can miss if the
+/// account's storage is too big); on a miss, resolves the slot name and account code needed to
+/// fetch the witness via RPC.
+fn resolve_witness_from_inputs(
     inputs: &AccountInputs,
     map_root: Word,
-) -> Result<(StorageSlotName, AccountCode), DataStoreError> {
+    map_key: StorageMapKey,
+) -> Result<WitnessResolution, DataStoreError> {
+    if let Some(partial_map) = inputs.storage().maps().find(|m| m.root() == map_root)
+        && let Ok(witness) = partial_map.open(&map_key)
+    {
+        return Ok(WitnessResolution::Witness(witness));
+    }
+
     let account_id = inputs.id();
     let slot_name = inputs
         .storage()
@@ -456,7 +472,7 @@ fn resolve_slot_name_and_code(
             ))
         })?;
 
-    Ok((slot_name, inputs.code().clone()))
+    Ok(WitnessResolution::FetchParams(slot_name, inputs.code().clone()))
 }
 
 /// Builds a [`PartialMmr`] from the given peaks and a list of blocks that should be

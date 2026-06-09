@@ -73,6 +73,15 @@ impl DataStoreCache {
         self.foreign_account_inputs.read().get(&account_id).cloned()
     }
 
+    /// Runs `f` against the cached inputs for the given foreign account, without cloning them.
+    pub(super) fn with_foreign_account_inputs<R>(
+        &self,
+        account_id: AccountId,
+        f: impl FnOnce(&AccountInputs) -> R,
+    ) -> Option<R> {
+        self.foreign_account_inputs.read().get(&account_id).map(f)
+    }
+
     /// Registers note scripts, keyed by their root. Scripts accumulate across calls.
     pub(super) fn insert_note_scripts(&self, note_scripts: impl IntoIterator<Item = NoteScript>) {
         let mut cache = self.note_scripts.write();

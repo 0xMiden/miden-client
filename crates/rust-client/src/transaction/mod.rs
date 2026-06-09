@@ -301,11 +301,11 @@ where
         let prep = self.prepare_transaction(&account, transaction_request).await?;
 
         let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
-        data_store.register_foreign_account_inputs(prep.foreign_account_inputs.iter().cloned());
         data_store.register_note_scripts(prep.output_note_scripts());
         for fpi_account in &prep.foreign_account_inputs {
             data_store.mast_store().load_account_code(fpi_account.code());
         }
+        data_store.register_foreign_account_inputs(prep.foreign_account_inputs);
 
         data_store.mast_store().load_account_code(account.code());
 
@@ -773,14 +773,14 @@ where
 
         let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
 
-        data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
-
         // Ensure code is loaded on MAST store
         data_store.mast_store().load_account_code(account.code());
 
         for fpi_account in &foreign_account_inputs {
             data_store.mast_store().load_account_code(fpi_account.code());
         }
+
+        data_store.register_foreign_account_inputs(foreign_account_inputs);
 
         Ok((data_store, block_ref))
     }
