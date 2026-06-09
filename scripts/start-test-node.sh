@@ -80,7 +80,10 @@ if node_binaries_installed; then
     echo "==> using cached node binaries ($NODE_URL @ $NODE_REV)"
 else
     echo "==> installing node binaries ($NODE_URL @ $NODE_REV)"
-    cargo install --locked --root "$CACHE/install" --target-dir "$BUILD" \
+    # Override the profile to drop debug info and strip symbols to reduce the size
+    CARGO_PROFILE_RELEASE_DEBUG=false \
+    CARGO_PROFILE_RELEASE_STRIP=symbols \
+        cargo install --locked --root "$CACHE/install" --target-dir "$BUILD" \
         --git "$NODE_URL" --rev "$NODE_REV" \
         miden-validator miden-node miden-ntx-builder miden-remote-prover
 fi
