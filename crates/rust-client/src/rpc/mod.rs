@@ -411,8 +411,9 @@ pub trait NodeRpcClient: Send + Sync {
     /// then `None` is returned.
     /// The `block_num` parameter is the block number to start the search from (inclusive).
     ///
-    /// The default implementation of this method uses
-    /// [`NodeRpcClient::sync_nullifiers`].
+    /// The default implementation of this method makes two RPC requests: one to
+    /// [`NodeRpcClient::get_block_header_by_number`] to resolve the chain tip, and one to
+    /// [`NodeRpcClient::sync_nullifiers`] to search up to that tip.
     async fn get_nullifier_commit_heights(
         &self,
         requested_nullifiers: BTreeSet<Nullifier>,
