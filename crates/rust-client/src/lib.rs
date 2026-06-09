@@ -479,7 +479,7 @@ where
     /// Reloads a source file from disk into the client's source manager.
     ///
     /// Source managers cache files by URI, so compiling a path that has already been loaded may
-    /// reuse the cached [`SourceFile`](assembly::SourceFile). This updates an existing entry for
+    /// reuse the cached `SourceFile`. This updates an existing entry for
     /// `path` in-place, or loads it if the source manager has not seen it yet.
     pub fn reload_source_file(&self, path: impl AsRef<std::path::Path>) -> Result<(), ClientError> {
         let path = path.as_ref();
