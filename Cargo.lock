@@ -3276,7 +3276,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client"
-version = "0.15.0-rc"
+version = "0.15.0-rc.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3315,7 +3315,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-bench"
-version = "0.15.0-rc"
+version = "0.15.0-rc.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -3331,7 +3331,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-cli"
-version = "0.15.0-rc"
+version = "0.15.0-rc.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -3358,7 +3358,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-integration-tests"
-version = "0.15.0-rc"
+version = "0.15.0-rc.0"
 dependencies = [
  "anyhow",
  "assert_matches",
@@ -3379,7 +3379,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-sqlite-store"
-version = "0.15.0-rc"
+version = "0.15.0-rc.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3397,7 +3397,7 @@ dependencies = [
 
 [[package]]
 name = "miden-client-unit-tests"
-version = "0.15.0-rc"
+version = "0.15.0-rc.0"
 dependencies = [
  "miden-client",
  "miden-client-sqlite-store",
@@ -3611,8 +3611,8 @@ dependencies = [
 
 [[package]]
 name = "miden-large-smt-backend-rocksdb"
-version = "0.15.0-rc.1"
-source = "git+https://github.com/0xMiden/node.git?rev=3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4#3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4"
+version = "0.15.0-rc.3"
+source = "git+https://github.com/0xMiden/node.git?tag=v0.15.0-rc.3#73b0eb9ed63321a74abead9e214559048d5bd9aa"
 dependencies = [
  "miden-crypto",
  "miden-node-rocksdb-cxx-linkage-fix",
@@ -3708,8 +3708,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-block-producer"
-version = "0.15.0-rc.1"
-source = "git+https://github.com/0xMiden/node.git?rev=3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4#3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4"
+version = "0.15.0-rc.3"
+source = "git+https://github.com/0xMiden/node.git?tag=v0.15.0-rc.3#73b0eb9ed63321a74abead9e214559048d5bd9aa"
 dependencies = [
  "anyhow",
  "futures",
@@ -3732,8 +3732,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-db"
-version = "0.15.0-rc.1"
-source = "git+https://github.com/0xMiden/node.git?rev=3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4#3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4"
+version = "0.15.0-rc.3"
+source = "git+https://github.com/0xMiden/node.git?tag=v0.15.0-rc.3#73b0eb9ed63321a74abead9e214559048d5bd9aa"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3752,8 +3752,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-grpc-error-macro"
-version = "0.15.0-rc.1"
-source = "git+https://github.com/0xMiden/node.git?rev=3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4#3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4"
+version = "0.15.0-rc.3"
+source = "git+https://github.com/0xMiden/node.git?tag=v0.15.0-rc.3#73b0eb9ed63321a74abead9e214559048d5bd9aa"
 dependencies = [
  "quote",
  "syn 2.0.117",
@@ -3761,8 +3761,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-proto"
-version = "0.15.0-rc.1"
-source = "git+https://github.com/0xMiden/node.git?rev=3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4#3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4"
+version = "0.15.0-rc.3"
+source = "git+https://github.com/0xMiden/node.git?tag=v0.15.0-rc.3#73b0eb9ed63321a74abead9e214559048d5bd9aa"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3787,8 +3787,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-proto-build"
-version = "0.15.0-rc.1"
-source = "git+https://github.com/0xMiden/node.git?rev=3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4#3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4"
+version = "0.15.0-rc.3"
+source = "git+https://github.com/0xMiden/node.git?tag=v0.15.0-rc.3#73b0eb9ed63321a74abead9e214559048d5bd9aa"
 dependencies = [
  "build-rs",
  "codegen",
@@ -3800,13 +3800,13 @@ dependencies = [
 
 [[package]]
 name = "miden-node-rocksdb-cxx-linkage-fix"
-version = "0.15.0-rc.1"
-source = "git+https://github.com/0xMiden/node.git?rev=3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4#3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4"
+version = "0.15.0-rc.3"
+source = "git+https://github.com/0xMiden/node.git?tag=v0.15.0-rc.3#73b0eb9ed63321a74abead9e214559048d5bd9aa"
 
 [[package]]
 name = "miden-node-rpc"
-version = "0.15.0-rc.1"
-source = "git+https://github.com/0xMiden/node.git?rev=3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4#3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4"
+version = "0.15.0-rc.3"
+source = "git+https://github.com/0xMiden/node.git?tag=v0.15.0-rc.3#73b0eb9ed63321a74abead9e214559048d5bd9aa"
 dependencies = [
  "anyhow",
  "futures",
@@ -3835,8 +3835,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-store"
-version = "0.15.0-rc.1"
-source = "git+https://github.com/0xMiden/node.git?rev=3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4#3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4"
+version = "0.15.0-rc.3"
+source = "git+https://github.com/0xMiden/node.git?tag=v0.15.0-rc.3#73b0eb9ed63321a74abead9e214559048d5bd9aa"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -3868,8 +3868,8 @@ dependencies = [
 
 [[package]]
 name = "miden-node-utils"
-version = "0.15.0-rc.1"
-source = "git+https://github.com/0xMiden/node.git?rev=3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4#3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4"
+version = "0.15.0-rc.3"
+source = "git+https://github.com/0xMiden/node.git?tag=v0.15.0-rc.3#73b0eb9ed63321a74abead9e214559048d5bd9aa"
 dependencies = [
  "anyhow",
  "backon",
@@ -3916,8 +3916,8 @@ dependencies = [
 
 [[package]]
 name = "miden-ntx-builder"
-version = "0.15.0-rc.1"
-source = "git+https://github.com/0xMiden/node.git?rev=3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4#3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4"
+version = "0.15.0-rc.3"
+source = "git+https://github.com/0xMiden/node.git?tag=v0.15.0-rc.3#73b0eb9ed63321a74abead9e214559048d5bd9aa"
 dependencies = [
  "anyhow",
  "backon",
@@ -4043,8 +4043,8 @@ dependencies = [
 
 [[package]]
 name = "miden-remote-prover-client"
-version = "0.15.0-rc.1"
-source = "git+https://github.com/0xMiden/node.git?rev=3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4#3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4"
+version = "0.15.0-rc.3"
+source = "git+https://github.com/0xMiden/node.git?tag=v0.15.0-rc.3#73b0eb9ed63321a74abead9e214559048d5bd9aa"
 dependencies = [
  "build-rs",
  "fs-err",
@@ -4205,8 +4205,8 @@ dependencies = [
 
 [[package]]
 name = "miden-validator"
-version = "0.15.0-rc.1"
-source = "git+https://github.com/0xMiden/node.git?rev=3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4#3a3ace2ca53bf0d0cc7c5647dfa27d95704eecb4"
+version = "0.15.0-rc.3"
+source = "git+https://github.com/0xMiden/node.git?tag=v0.15.0-rc.3#73b0eb9ed63321a74abead9e214559048d5bd9aa"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -4346,7 +4346,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "node-builder"
-version = "0.15.0-rc"
+version = "0.15.0-rc.0"
 dependencies = [
  "anyhow",
  "miden-node-block-producer",
@@ -6534,7 +6534,7 @@ checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
 
 [[package]]
 name = "testing-remote-prover"
-version = "0.15.0-rc"
+version = "0.15.0-rc.0"
 dependencies = [
  "anyhow",
  "async-trait",
