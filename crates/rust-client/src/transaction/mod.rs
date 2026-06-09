@@ -829,12 +829,12 @@ where
         &'auth self,
         data_store: &'store STORE,
     ) -> Result<
-        TransactionExecutor<'store, 'auth, STORE, AUTH, dap_executor::DapExecutor>,
+        TransactionExecutor<'store, 'auth, STORE, AUTH, dap_executor::DapProgramExecutor>,
         TransactionExecutorError,
     > {
         Ok(self
             .build_executor(data_store)?
-            .with_program_executor::<dap_executor::DapExecutor>())
+            .with_program_executor::<dap_executor::DapProgramExecutor>())
     }
 
     /// Loads the account and constructs an [`AccountInterface`] from it.

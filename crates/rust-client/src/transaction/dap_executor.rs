@@ -18,11 +18,10 @@ use miden_processor::{
 };
 use miden_tx::ProgramExecutor;
 
-/// Newtype wrapper around [`miden_debug::DapExecutor`] that implements
-/// [`miden_tx::ProgramExecutor`] by delegating to its `execute_async` method.
-pub struct DapExecutor(miden_debug::DapExecutor);
+/// [`ProgramExecutor`] adapter for [`miden_debug::DapExecutor`].
+pub struct DapProgramExecutor(miden_debug::DapExecutor);
 
-impl ProgramExecutor for DapExecutor {
+impl ProgramExecutor for DapProgramExecutor {
     fn new(
         stack_inputs: StackInputs,
         advice_inputs: AdviceInputs,
