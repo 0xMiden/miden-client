@@ -325,7 +325,7 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     // With the fix, lookback window catches it.
     let summary = client.sync_state().await.unwrap();
     assert!(
-        summary.new_private_notes.contains(&private_note.details_commitment()),
+        summary.new_private_notes.contains(&private_note.id()),
         "summary should report the NTL-imported note in new_private_notes"
     );
 
