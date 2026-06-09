@@ -291,6 +291,7 @@ where
     let prep = client.prepare_transaction(&account, transaction_request).await?;
 
     data_store.register_foreign_account_inputs(prep.foreign_account_inputs.iter().cloned());
+    data_store.register_note_scripts(prep.output_note_scripts());
     for fpi_account in &prep.foreign_account_inputs {
         data_store.mast_store().load_account_code(fpi_account.code());
     }
@@ -299,7 +300,9 @@ where
 
     let mut notes = prep.notes;
     if prep.ignore_invalid_notes {
-        notes = client.get_valid_input_notes(&account, notes, prep.tx_args.clone()).await?;
+        notes = client
+            .get_valid_input_notes(&account, notes, prep.tx_args.clone(), &prep.output_recipients)
+            .await?;
     }
 
     let executed_transaction = client

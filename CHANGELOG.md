@@ -4,6 +4,7 @@
 
 ### Fixes
 
+* [FIX][rust] `Client::execute_transaction` no longer writes to the store before execution: the request's input notes and output note scripts are persisted only after the transaction executes successfully and is applied, so a failed execution leaves the store unchanged ([#2221](https://github.com/0xMiden/miden-client/issues/2221)).
 * [FIX][rust] `Client::send_private_note` is now durable across transient NTL failures: the relay payload is persisted to a durable outbox (a `Vec<NoteInfo>` under the `note_transport_outbox` settings key) before the transport call, so a failed or interrupted `send_note` no longer drops the note. `Client::sync_note_transport` retries the outbox on each sync (the receiver dedupes by note id) and a failing relay no longer blocks the sync; the new `Client::flush_relay_outbox()` lets callers drive retries directly ([#2127](https://github.com/0xMiden/miden-client/pull/2127)).
 * [FIX] Fixed `derive_account_commitments` to return the final account commitment when multiple transactions for the same account are committed in the same block ([#2164](https://github.com/0xMiden/miden-client/pull/2164)).
 * [FIX] Preserve a fungible asset's callback flag when the store replays a vault delta, fixing a `ConflictingRoots` error when consuming callback-bearing (e.g. agglayer-minted) assets ([#2225](https://github.com/0xMiden/miden-client/pull/2225)).
