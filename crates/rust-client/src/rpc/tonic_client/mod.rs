@@ -305,6 +305,12 @@ impl GrpcClient {
             .map(tonic::Response::into_inner)
             .and_then(RpcStatusInfo::try_from)
     }
+
+    /// Fetches the latest block header and returns its block number.
+    async fn resolve_chain_tip(&self) -> Result<BlockNumber, RpcError> {
+        let (header, _) = self.get_block_header_by_number(None, false).await?;
+        Ok(header.block_num())
+    }
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
@@ -752,14 +758,18 @@ impl NodeRpcClient for GrpcClient {
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError> {
-        let mut pagination = BlockPagination::new(block_from, block_to);
+        let block_to = match block_to {
+            Some(block_to) => block_to,
+            None => self.resolve_chain_tip().await?,
+        };
+        let mut pagination = BlockPagination::new(block_from, Some(block_to));
         let mut updates = Vec::new();
 
         let (chain_tip, block_number) = loop {
             let request = proto::rpc::SyncAccountStorageMapsRequest {
                 block_range: Some(BlockRange {
                     block_from: pagination.current_block_from().as_u32(),
-                    block_to: pagination.block_to().map_or(u32::MAX, |block| block.as_u32()),
+                    block_to: block_to.as_u32(),
                 }),
                 account_id: Some(account_id.into()),
             };
@@ -800,14 +810,18 @@ impl NodeRpcClient for GrpcClient {
         block_to: Option<BlockNumber>,
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError> {
-        let mut pagination = BlockPagination::new(block_from, block_to);
+        let block_to = match block_to {
+            Some(block_to) => block_to,
+            None => self.resolve_chain_tip().await?,
+        };
+        let mut pagination = BlockPagination::new(block_from, Some(block_to));
         let mut updates = Vec::new();
 
         let (chain_tip, block_number) = loop {
             let request = proto::rpc::SyncAccountVaultRequest {
                 block_range: Some(BlockRange {
                     block_from: pagination.current_block_from().as_u32(),
-                    block_to: pagination.block_to().map_or(u32::MAX, |block| block.as_u32()),
+                    block_to: block_to.as_u32(),
                 }),
                 account_id: Some(account_id.into()),
             };
