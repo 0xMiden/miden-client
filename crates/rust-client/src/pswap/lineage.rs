@@ -114,10 +114,6 @@ impl PswapLineageRecord {
 pub struct PswapLineageRoundUpdate {
     pub order_id: Felt,
     pub round_depth: u32,
-    /// Previous-tip consumer (creator on reclaim).
-    pub consumer_account_id: AccountId,
-    pub fill_amount: FungibleAsset,
-    pub payout_amount: FungibleAsset,
     // Post-round state — all fields below describe the lineage AFTER this round.
     pub remaining_offered: FungibleAsset,
     pub remaining_requested: FungibleAsset,

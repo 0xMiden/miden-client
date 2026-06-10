@@ -516,9 +516,6 @@ mod tests {
         let order_id = record.order_id();
         store.upsert_pswap_lineage(&record).await?;
 
-        let consumer =
-            AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
-
         // `current_depth` is 0; only `round_depth == 1` should be accepted.
         // round_depth = 3 is a non-monotonic advance.
         let offered_faucet = pswap.offered_asset().faucet_id();
@@ -529,9 +526,6 @@ mod tests {
         let bad = PswapLineageRoundUpdate {
             order_id,
             round_depth: 3,
-            consumer_account_id: consumer,
-            fill_amount: fa(requested_faucet, 10),
-            payout_amount: fa(offered_faucet, 20),
             remaining_offered: fa(offered_faucet, 80),
             remaining_requested: fa(requested_faucet, 40),
             state: PswapLineageState::Active,
@@ -559,8 +553,6 @@ mod tests {
     #[tokio::test]
     async fn apply_pswap_round_rejects_unknown_order_id() -> anyhow::Result<()> {
         let store = create_test_store().await;
-        let consumer =
-            AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
         let phantom_order_id = miden_protocol::Felt::new(0xdead_beef).unwrap();
 
         // Use arbitrary fungible-asset faucets — the unknown-order check
@@ -570,9 +562,6 @@ mod tests {
         let bogus = PswapLineageRoundUpdate {
             order_id: phantom_order_id,
             round_depth: 1,
-            consumer_account_id: consumer,
-            fill_amount: fa(10),
-            payout_amount: fa(20),
             remaining_offered: fa(80),
             remaining_requested: fa(40),
             state: PswapLineageState::Active,
