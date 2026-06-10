@@ -55,11 +55,7 @@ use miden_client::testing::common::{
     wait_for_blocks,
     wait_for_tx,
 };
-use miden_client::transaction::{
-    TransactionKernel,
-    TransactionRequestBuilder,
-    TransactionScriptRoot,
-};
+use miden_client::transaction::{TransactionKernel, TransactionRequestBuilder};
 use miden_client::{Felt, Word, ZERO};
 use rand::{Rng, RngCore};
 
@@ -71,22 +67,6 @@ use crate::tests::config::ClientConfig;
 pub(crate) static COUNTER_SLOT_NAME: LazyLock<StorageSlotName> = LazyLock::new(|| {
     StorageSlotName::new("miden::testing::counter_contract::counter").expect("slot name is valid")
 });
-
-/// Root of the transaction-expiration script the node's network-transaction builder runs against
-/// every network account.
-pub(crate) static NTX_EXPIRATION_TX_SCRIPT_ROOT: LazyLock<TransactionScriptRoot> = LazyLock::new(
-    || {
-        // Mirrors the node ntx-builder's `DEFAULT_TX_EXPIRATION_DELTA`
-        const NTX_EXPIRATION_DELTA: u16 = 30;
-        let source = format!(
-            "begin\n    push.{NTX_EXPIRATION_DELTA} exec.::miden::protocol::tx::update_expiration_block_delta\nend"
-        );
-        CodeBuilder::new()
-            .compile_tx_script(source)
-            .expect("network-tx expiration script should compile")
-            .root()
-    },
-);
 
 const COUNTER_CONTRACT: &str = r#"
         use miden::protocol::active_account
@@ -141,11 +121,9 @@ pub(crate) async fn deploy_network_counter_contract(
     allowed_note_script_roots: &[NoteScriptRoot],
 ) -> Result<Account> {
     let roots = allowed_note_script_roots.iter().copied().collect::<BTreeSet<NoteScriptRoot>>();
-    let allowed_tx_scripts = BTreeSet::from_iter([*NTX_EXPIRATION_TX_SCRIPT_ROOT]);
     let auth = AuthNetworkAccount::with_allowed_notes(roots)
         .map_err(|err| anyhow::anyhow!(err))
-        .context("failed to build network account auth component")?
-        .with_allowed_tx_scripts(allowed_tx_scripts);
+        .context("failed to build network account auth component")?;
     deploy_counter_with_auth(client, auth).await
 }
 
@@ -500,10 +478,8 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
     // the node uses to route MINT notes to it and enforces that only allowlisted notes are consumed
     // with no tx script. The scriptless deploy transaction below is authorized by this same auth.
     let allowed_roots = [MintNote::script_root()].into_iter().collect::<BTreeSet<_>>();
-    let allowed_tx_scripts = BTreeSet::from_iter([*NTX_EXPIRATION_TX_SCRIPT_ROOT]);
     let network_auth = AuthNetworkAccount::with_allowed_notes(allowed_roots)
-        .map_err(|err| anyhow!("failed to build faucet network-account auth: {err}"))?
-        .with_allowed_tx_scripts(allowed_tx_scripts);
+        .map_err(|err| anyhow!("failed to build faucet network-account auth: {err}"))?;
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
