@@ -4,6 +4,8 @@ use alloc::sync::Arc;
 use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::keystore::Keystore;
+use miden_client::note::{NoteAttachments, P2idNote};
+use miden_client::store::NoteFilter;
 use miden_client::transaction::{
     ProvenTransaction,
     TransactionExecutorError,
@@ -25,7 +27,8 @@ use miden_protocol::account::{
 };
 use miden_protocol::assembly::diagnostics::miette::GraphicalReportHandler;
 use miden_protocol::asset::{Asset, FungibleAsset};
-use miden_protocol::note::NoteType;
+use miden_protocol::crypto::rand::FeltRng;
+use miden_protocol::note::{NoteRecipient, NoteStorage, NoteType};
 use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
@@ -130,6 +133,93 @@ async fn transaction_error_reports_source_line() {
         },
         other => panic!("unexpected error variant: {other:?}"),
     }
+}
+
+/// Regression test for #2221: a transaction request whose execution fails must leave the store
+/// unchanged — no orphaned input notes and no orphaned output note scripts.
+#[tokio::test]
+async fn execute_transaction_failure_leaves_store_unchanged() {
+    let (mut client, _, keystore) = Box::pin(create_test_client()).await;
+    let (wallet, faucet) =
+        setup_wallet_and_faucet(&mut client, AccountType::Private, &keystore, RPO_FALCON_SCHEME_ID)
+            .await
+            .unwrap();
+
+    // A note targeting the wallet that is not tracked by the store. Passing it as a request
+    // input note is what would trigger an input-note write during preparation.
+    let asset = FungibleAsset::new(faucet.id(), 100).unwrap();
+    let unauthenticated_note = P2idNote::create(
+        faucet.id(),
+        wallet.id(),
+        vec![asset.into()],
+        NoteType::Private,
+        NoteAttachments::empty(),
+        client.rng(),
+    )
+    .unwrap();
+    let note_id = unauthenticated_note.id();
+
+    // An expected output recipient with a non-standard script. Declaring it in the request is
+    // what would trigger a note-script write during preparation.
+    let output_note_script = client
+        .code_builder()
+        .compile_note_script(
+            "@note_script
+            pub proc main
+                nop
+            end",
+        )
+        .unwrap();
+    let script_root = output_note_script.root();
+    let serial_num = client.rng().draw_word();
+    let output_recipient =
+        NoteRecipient::new(serial_num, output_note_script, NoteStorage::new(vec![]).unwrap());
+
+    // A transaction script that always fails, forcing execution to error after preparation has
+    // succeeded.
+    let failing_script = client
+        .code_builder()
+        .compile_tx_script("begin push.0 push.2 assert_eq end")
+        .unwrap();
+
+    let tx_request = TransactionRequestBuilder::new()
+        .input_notes([(unauthenticated_note, None)])
+        .expected_output_recipients(vec![output_recipient])
+        .custom_script(failing_script)
+        .build()
+        .unwrap();
+
+    // Neither the note nor the script is tracked before execution.
+    assert!(
+        client
+            .get_input_notes(NoteFilter::List(vec![note_id]))
+            .await
+            .unwrap()
+            .is_empty(),
+        "note should not be tracked before execution"
+    );
+    assert!(
+        client.test_store().get_note_script(script_root.into()).await.is_err(),
+        "output note script should not be stored before execution"
+    );
+
+    Box::pin(client.execute_transaction(wallet.id(), tx_request))
+        .await
+        .expect_err("transaction execution should fail");
+
+    // The failed execution must leave the store unchanged.
+    assert!(
+        client
+            .get_input_notes(NoteFilter::List(vec![note_id]))
+            .await
+            .unwrap()
+            .is_empty(),
+        "execution failure must not persist the request's input notes"
+    );
+    assert!(
+        client.test_store().get_note_script(script_root.into()).await.is_err(),
+        "execution failure must not persist the request's output note scripts"
+    );
 }
 
 // MOCK PROVERS
