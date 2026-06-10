@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, LazyLock};
 use std::vec;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, ensure};
 use miden_client::account::component::{
     AccessControl,
     AccountComponent,
@@ -240,14 +240,12 @@ async fn deploy_counter_with_auth(
     Ok(acc)
 }
 
-/// Deploys a network-storage fungible faucet owned by `owner_id` and commits its initial state
-/// on-chain.
+/// Deploys a network fungible faucet owned by `owner_id` and commits its initial state on-chain.
 ///
-/// Minting is gated note-side (the `mint_and_send` procedure checks that the MINT note sender ==
-/// the `Ownable2Step` owner), so the faucet only needs a no-auth component that unconditionally
-/// increments its nonce — the same pattern `deploy_counter_contract` uses for network accounts.
-/// The trailing no-op tx is required so the node's NTX builder knows about the faucet before any
-/// MINT note runs against it.
+/// The faucet authenticates with `AuthNetworkAccount`, which carries the standardized allowlist
+/// slot the node's NTX builder uses to route MINT notes to it. Minting is additionally gated
+/// note-side: the `mint_and_send` procedure checks that the MINT note sender matches the
+/// `Ownable2Step` owner.
 async fn deploy_network_fungible_faucet(
     client: &mut TestClient,
     owner_id: AccountId,
@@ -291,6 +289,32 @@ async fn deploy_network_fungible_faucet(
     wait_for_tx(client, deploy_tx_id).await?;
 
     Ok(faucet)
+}
+
+/// Waits for a public note to be observed as `Committed` on `observer`.
+///
+/// Advances up to `max_blocks` blocks on `block_client`, syncing `observer` after each block and
+/// looking the note up by its details commitment. Returns `true` as soon as the note is observed
+/// as `Committed` and `false` if the window elapses first.
+async fn wait_for_committed_note(
+    block_client: &mut TestClient,
+    observer: &mut TestClient,
+    details_commitment: NoteDetailsCommitment,
+    max_blocks: u32,
+) -> Result<bool> {
+    for _ in 0..max_blocks {
+        wait_for_blocks(block_client, 1).await;
+        observer.sync_state().await?;
+        if let Some(rec) = observer
+            .get_input_notes(NoteFilter::DetailsCommitments(vec![details_commitment]))
+            .await?
+            .pop()
+            && matches!(rec.state(), InputNoteState::Committed { .. })
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Compiles the [`NON_STANDARD_CLAIM_NOTE_SCRIPT`] with a unique `nonce` and returns it together
@@ -654,43 +678,7 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
         insert_new_wallet(&mut client_2, AccountType::Public, &keystore_2, RPO_FALCON_SCHEME_ID)
             .await?;
 
-    // The faucet is a network account: `AuthNetworkAccount` carries the standardized allowlist slot
-    // the node uses to route MINT notes to it and enforces that only allowlisted notes are consumed
-    // with no tx script. The scriptless deploy transaction below is authorized by this same auth.
-    let allowed_roots = [MintNote::script_root()].into_iter().collect::<BTreeSet<_>>();
-    let network_auth = AuthNetworkAccount::with_allowlist(allowed_roots)
-        .map_err(|err| anyhow!("failed to build faucet network-account auth: {err}"))?;
-
-    let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
-    let symbol = TokenSymbol::new("MNT")?;
-    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
-    let faucet_component = FungibleFaucet::builder()
-        .name(name)
-        .symbol(symbol)
-        .decimals(10)
-        .max_supply(AssetAmount::new(9_999_999)?)
-        .build()
-        .map_err(|e| anyhow!("failed to build fungible faucet component: {e}"))?;
-    let policy_manager = TokenPolicyManager::new()
-        .with_mint_policy(MintPolicyConfig::OwnerOnly, PolicyRegistration::Active)?
-        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)?;
-    let faucet = AccountBuilder::new(init_seed)
-        .account_type(AccountType::Public)
-        .with_auth_component(network_auth)
-        .with_component(faucet_component)
-        .with_components(AccessControl::Ownable2Step { owner: alice.id() })
-        .with_components(policy_manager)
-        .with_component(PausableManager)
-        .build_with_schema_commitment()
-        .map_err(|e| anyhow!("failed to build network faucet: {e}"))?;
-    client.add_account(&faucet, false).await?;
-
-    // Scriptless deploy: `AuthNetworkAccount` forbids tx scripts and bumps the nonce on its own, so
-    // an empty transaction is enough to register the faucet on-chain.
-    let deploy_tx = TransactionRequestBuilder::new().build()?;
-    let deploy_tx_id = client.submit_new_transaction(faucet.id(), deploy_tx).await?;
-    wait_for_tx(&mut client, deploy_tx_id).await?;
+    let faucet = deploy_network_fungible_faucet(&mut client, alice.id()).await?;
 
     // Build the standard MINT note. Precompute Bob's P2ID recipient and details commitment so we
     // can poll for the emitted public note on client_2.
@@ -721,23 +709,12 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
     let mint_tx = TransactionRequestBuilder::new().own_output_notes(vec![mint_note]).build()?;
     execute_tx_and_sync(&mut client, alice.id(), mint_tx).await?;
 
-    for _ in 0..15 {
-        wait_for_blocks(&mut client, 1).await;
-
-        client_2.sync_state().await?;
-        if let Some(rec) = client_2
-            .get_input_notes(NoteFilter::DetailsCommitments(vec![expected_output_commitment]))
-            .await?
-            .pop()
-            && matches!(rec.state(), InputNoteState::Committed { .. })
-        {
-            return Ok(());
-        }
-    }
-
-    Err(anyhow!(
+    ensure!(
+        wait_for_committed_note(&mut client, &mut client_2, expected_output_commitment, 15).await?,
         "timed out waiting for committed P2ID note {expected_output_commitment:?} emitted by network faucet"
-    ))
+    );
+
+    Ok(())
 }
 
 /// End-to-end NTX integration test for public output notes carrying NON-STANDARD note scripts,
@@ -818,25 +795,11 @@ pub async fn test_ntx_mint_produces_public_note_with_non_standard_script(
 
     // The NTX builder resolves the registered script and emits the public note. Observe it
     // `Committed` on Bob's client.
-    let mut committed = false;
-    for _ in 0..15 {
-        wait_for_blocks(&mut client, 1).await;
-        client_2.sync_state().await?;
-        if let Some(rec) = client_2
-            .get_input_notes(NoteFilter::DetailsCommitments(vec![registered_output_commitment]))
-            .await?
-            .pop()
-            && matches!(rec.state(), InputNoteState::Committed { .. })
-        {
-            committed = true;
-            break;
-        }
-    }
-    if !committed {
-        return Err(anyhow!(
-            "timed out waiting for committed public note {registered_output_commitment:?} with a non-standard script"
-        ));
-    }
+    ensure!(
+        wait_for_committed_note(&mut client, &mut client_2, registered_output_commitment, 15)
+            .await?,
+        "timed out waiting for committed public note {registered_output_commitment:?} with a non-standard script"
+    );
 
     // Bob consumes the public note; the custom script moves the minted asset into his vault.
     let note: Note = client_2
@@ -869,20 +832,10 @@ pub async fn test_ntx_mint_produces_public_note_with_non_standard_script(
         .build()?;
     execute_tx_and_sync(&mut client, alice.id(), unregistered_mint_tx).await?;
 
-    for _ in 0..10 {
-        wait_for_blocks(&mut client, 1).await;
-        client_2.sync_state().await?;
-        if let Some(rec) = client_2
-            .get_input_notes(NoteFilter::DetailsCommitments(vec![unregistered_output_id]))
-            .await?
-            .pop()
-        {
-            assert!(
-                !matches!(rec.state(), InputNoteState::Committed { .. }),
-                "NTX must not produce a committed public note for an unregistered non-standard script",
-            );
-        }
-    }
+    ensure!(
+        !wait_for_committed_note(&mut client, &mut client_2, unregistered_output_id, 10).await?,
+        "NTX must not produce a committed public note for an unregistered non-standard script"
+    );
 
     Ok(())
 }
