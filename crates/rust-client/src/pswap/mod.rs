@@ -2,7 +2,7 @@
 //! creator can always see the current tip and reclaim the unfilled balance.
 //!
 //! Flow:
-//! 1. Create → [`PswapLineageRecord`] row + asset-pair tag subscription.
+//! 1. Create → persist a [`PswapLineageRecord`] + asset-pair tag subscription.
 //! 2. Sync → [`PswapChainObserver`] collects PSWAP-attachment notes;
 //!    `discovery::discover_pswap_rounds` correlates them with tracked-note consumption events and
 //!    emits one [`PswapLineageRoundUpdate`] per round.
@@ -17,7 +17,6 @@ pub mod errors;
 pub mod lineage;
 pub mod observer;
 pub(crate) mod store;
-mod types;
 
 // `PswapTransactionObserver` is defined inline below in this file.
 use alloc::boxed::Box;

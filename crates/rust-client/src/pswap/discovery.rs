@@ -9,6 +9,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use miden_protocol::Felt;
 use miden_protocol::asset::FungibleAsset;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::NoteId;
@@ -18,7 +19,6 @@ use super::errors::PswapLineageError;
 use super::lineage::{PswapLineageRecord, PswapLineageRoundUpdate, PswapLineageState};
 use super::observer::PswapChainNoteUpdate;
 use super::store;
-use super::types::OrderIdKey;
 use crate::store::Store;
 use crate::sync::StateSyncUpdate;
 
@@ -45,19 +45,19 @@ pub(crate) async fn discover_pswap_rounds(
     //   2. a chain note → carries its order_id on its attachment.
     // Both are needed: signal 2 catches a fill whose notes arrive before its
     // tip nullifier; signal 1 carries reclaim, which emits no chain notes.
-    let mut candidate_orders: BTreeSet<OrderIdKey> = BTreeSet::new();
+    let mut candidate_orders: BTreeSet<Felt> = BTreeSet::new();
     for note_id in &consumed_note_ids {
         if let Some(order_id) = store::resolve_order_by_tip(&store, *note_id).await? {
-            candidate_orders.insert(OrderIdKey::from(order_id));
+            candidate_orders.insert(order_id);
         }
     }
     for note in chain_note_updates {
-        candidate_orders.insert(OrderIdKey::from(note.attachment.order_id()));
+        candidate_orders.insert(note.attachment.order_id());
     }
 
     let mut active_lineages = Vec::new();
     for order_id in candidate_orders {
-        if let Some(record) = store::get_lineage(&store, order_id.into()).await?
+        if let Some(record) = store::get_lineage(&store, order_id).await?
             && record.state == PswapLineageState::Active
         {
             active_lineages.push(record);
@@ -68,11 +68,11 @@ pub(crate) async fn discover_pswap_rounds(
     }
 
     // Group notes by (order_id, depth) for O(1) per-round lookup.
-    let mut notes_by_order_depth: BTreeMap<(OrderIdKey, u32), Vec<&PswapChainNoteUpdate>> =
+    let mut notes_by_order_depth: BTreeMap<(Felt, u32), Vec<&PswapChainNoteUpdate>> =
         BTreeMap::new();
     for note in chain_note_updates {
         notes_by_order_depth
-            .entry((OrderIdKey::from(note.attachment.order_id()), note.attachment.depth()))
+            .entry((note.attachment.order_id(), note.attachment.depth()))
             .or_default()
             .push(note);
     }
@@ -98,7 +98,7 @@ pub(crate) async fn discover_pswap_rounds(
         while lineage.state == PswapLineageState::Active {
             let round_depth = lineage.current_depth + 1;
             let notes = notes_by_order_depth
-                .get(&(lineage.order_id_key(), round_depth))
+                .get(&(lineage.order_id(), round_depth))
                 .map_or(&[][..], Vec::as_slice);
 
             let tip_consumed = consumed_note_ids.contains(&lineage.current_tip_note_id);
@@ -154,7 +154,7 @@ impl PswapLineageRecord {
             0 => Ok(self.build_reclaim_round(round_depth, block_number)),
             1 => self.build_full_fill_round(round_depth, block_number, notes[0], block_headers),
             2 => self.build_partial_fill_round(round_depth, block_number, notes, block_headers),
-            _ => unreachable!("PSWAP emits ≤ 2 notes per (order_id, depth)"),
+            count => Err(PswapLineageError::AmbiguousRound { depth: round_depth, count }),
         }
     }
 
@@ -560,7 +560,7 @@ mod tests {
         assert_eq!(update.state, PswapLineageState::Reclaimed);
         assert_eq!(update.remaining_offered.amount(), AssetAmount::ZERO);
         // Regression: reclaim used to leak the pre-reclaim
-        // `remaining_requested` into the terminal row.
+        // `remaining_requested` into the terminal record.
         assert_eq!(update.remaining_requested.amount(), AssetAmount::ZERO);
         assert!(update.payback.is_none());
     }

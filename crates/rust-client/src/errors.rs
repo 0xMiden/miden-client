@@ -204,6 +204,22 @@ pub enum ClientError {
     Observer(Box<dyn core::error::Error + Send + Sync + 'static>),
 }
 
+// OBSERVER FAN-OUT
+// ================================================================================================
+
+/// Logs a non-fatal observer failure without propagating it, so one observer
+/// can't abort the others or the surrounding sync/transaction step. Shared by
+/// the `NoteObserver` and `TransactionObserver` fan-out loops.
+pub(crate) fn log_observer_failure(
+    observer: &'static str,
+    op: &str,
+    result: Result<(), ClientError>,
+) {
+    if let Err(err) = result {
+        tracing::warn!(observer, error = ?err, "{} failed; continuing with remaining observers", op);
+    }
+}
+
 // CONVERSIONS
 // ================================================================================================
 

@@ -19,7 +19,7 @@ use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError,
 // ================================================================================================
 
 /// Lifecycle state of a PSWAP order. Discriminants are part of the
-/// on-disk encoding — do not renumber.
+/// serialized encoding — do not renumber.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum PswapLineageState {
@@ -37,7 +37,7 @@ impl PswapLineageState {
     }
 
     /// Errors on unknown discriminants — guards against forward-
-    /// incompatible row encodings.
+    /// incompatible serialized encodings.
     pub fn try_from_u8(value: u8) -> Result<Self, PswapLineageError> {
         match value {
             0 => Ok(Self::Active),
@@ -76,11 +76,6 @@ impl PswapLineageRecord {
     /// note in the chain.
     pub fn order_id(&self) -> Felt {
         self.original_pswap.order_id()
-    }
-
-    /// `order_id()` wrapped as a `BTreeMap`-compatible key.
-    pub(crate) fn order_id_key(&self) -> super::types::OrderIdKey {
-        super::types::OrderIdKey::from(self.order_id())
     }
 
     /// Account that created the order (recipient of every payback).
@@ -149,9 +144,9 @@ pub enum PswapLineageFilter {
 // SERDE HELPERS
 // ================================================================================================
 
-/// Builds a [`PswapLineageRecord`] from raw column data. Lives here (not
-/// in the `SQLite` crate) so alternative backends can reuse it.
-pub fn build_record_from_columns(
+/// Builds a [`PswapLineageRecord`] from its decoded fields. Lives here (not
+/// in a store backend) so alternative backends can reuse it.
+pub fn build_record_from_fields(
     original_pswap: PswapNote,
     current_tip_note_id: NoteId,
     current_depth: u32,
@@ -161,16 +156,16 @@ pub fn build_record_from_columns(
     created_at_block: BlockNumber,
     updated_at_block: BlockNumber,
 ) -> Result<PswapLineageRecord, PswapLineageError> {
-    // Faucets live on `original_pswap` (chain-invariant); SQL stores only amounts.
+    // Faucets live on `original_pswap` (chain-invariant); the record stores only amounts.
     let offered_faucet = original_pswap.offered_asset().faucet_id();
     let requested_faucet = original_pswap.storage().requested_asset().faucet_id();
     let remaining_offered = FungibleAsset::new(offered_faucet, remaining_offered).map_err(|err| {
-        PswapLineageError::InconsistentRow(format!(
+        PswapLineageError::InconsistentRecord(format!(
             "remaining_offered = {remaining_offered} (faucet {offered_faucet}) failed FungibleAsset construction: {err}"
         ))
     })?;
     let remaining_requested = FungibleAsset::new(requested_faucet, remaining_requested).map_err(|err| {
-        PswapLineageError::InconsistentRow(format!(
+        PswapLineageError::InconsistentRecord(format!(
             "remaining_requested = {remaining_requested} (faucet {requested_faucet}) failed FungibleAsset construction: {err}"
         ))
     })?;
@@ -190,8 +185,8 @@ pub fn build_record_from_columns(
 // VALUE CODEC
 // ================================================================================================
 
-/// Encodes the same columns the `SQLite` backend persisted, in declaration
-/// order: the `original_pswap` blob first, then the mutable tip state. The
+/// Encodes the record's fields in declaration order: the `original_pswap`
+/// blob first, then the mutable tip state. The
 /// `Note` is written via the streaming `write_into`/`read_from` (not
 /// `read_from_bytes`) because more fields follow it in the stream.
 impl Serializable for PswapLineageRecord {
@@ -219,7 +214,7 @@ impl Deserializable for PswapLineageRecord {
         let state_byte = u8::read_from(source)?;
         let created_at_block = u32::read_from(source)?;
         let updated_at_block = u32::read_from(source)?;
-        build_record_from_columns(
+        build_record_from_fields(
             original_pswap,
             current_tip_note_id,
             current_depth,
@@ -303,8 +298,8 @@ mod tests {
     use super::*;
 
     /// Stable byte encoding of `PswapLineageState`. The values are
-    /// persisted in the `pswap_lineages.state` SQL column; reordering
-    /// would silently corrupt existing databases.
+    /// persisted in the serialized lineage record; reordering
+    /// would silently corrupt existing stores.
     #[test]
     fn state_byte_encoding_is_stable() {
         assert_eq!(PswapLineageState::Active.as_u8(), 0);
@@ -313,7 +308,7 @@ mod tests {
     }
 
     /// Round-trip every state via `try_from_u8`. Belt-and-suspenders
-    /// against a future renumbering breaking the on-disk format.
+    /// against a future renumbering breaking the serialized format.
     #[test]
     fn state_try_from_u8_round_trips_known_variants() {
         for state in [
@@ -335,14 +330,14 @@ mod tests {
         }
     }
 
-    /// Happy path for `build_record_from_columns` at depth 0.
+    /// Happy path for `build_record_from_fields` at depth 0.
     #[test]
-    fn build_record_from_columns_accepts_valid_depth_zero_row() {
+    fn build_record_from_fields_accepts_valid_depth_zero_record() {
         let (sender, creator, offered_faucet, requested_faucet) = fixed_account_ids();
         let pswap = build_test_pswap(sender, creator, offered_faucet, 100, requested_faucet, 50);
         let initial_note_id = miden_protocol::note::Note::from(pswap.clone()).id();
 
-        let record = build_record_from_columns(
+        let record = build_record_from_fields(
             pswap,
             initial_note_id,
             0,
@@ -362,11 +357,11 @@ mod tests {
 
     /// Happy path at `current_depth > 0`.
     #[test]
-    fn build_record_from_columns_accepts_valid_advanced_row() {
+    fn build_record_from_fields_accepts_valid_advanced_record() {
         let (sender, creator, offered_faucet, requested_faucet) = fixed_account_ids();
         let pswap = build_test_pswap(sender, creator, offered_faucet, 100, requested_faucet, 50);
         let note = miden_protocol::note::Note::from(pswap.clone());
-        let record = build_record_from_columns(
+        let record = build_record_from_fields(
             pswap,
             note.id(),
             3,
@@ -382,13 +377,13 @@ mod tests {
         assert_eq!(record.remaining_offered.amount(), AssetAmount::new(70).unwrap());
     }
 
-    /// Unknown state discriminant in the row bubbles up as `UnknownState`.
+    /// Unknown state discriminant in a stored record bubbles up as `UnknownState`.
     #[test]
-    fn build_record_from_columns_rejects_unknown_state() {
+    fn build_record_from_fields_rejects_unknown_state() {
         let (sender, creator, offered_faucet, requested_faucet) = fixed_account_ids();
         let pswap = build_test_pswap(sender, creator, offered_faucet, 100, requested_faucet, 50);
         let note = miden_protocol::note::Note::from(pswap.clone());
-        match build_record_from_columns(
+        match build_record_from_fields(
             pswap,
             note.id(),
             0,
@@ -405,7 +400,7 @@ mod tests {
 
     /// `asset_pair_tag()` and `order_id()` accessors delegate to the
     /// stored `PswapNote` rather than persisting the values
-    /// separately. Verifies the delegation is consistent (no column
+    /// separately. Verifies the delegation is consistent (no field
     /// duplication that could drift from the blob).
     #[test]
     fn accessors_delegate_to_stored_pswap_note() {
@@ -447,7 +442,7 @@ mod tests {
         let (sender, creator, offered_faucet, requested_faucet) = fixed_account_ids();
         let pswap = build_test_pswap(sender, creator, offered_faucet, 100, requested_faucet, 50);
         let note = miden_protocol::note::Note::from(pswap.clone());
-        let record = build_record_from_columns(
+        let record = build_record_from_fields(
             pswap,
             note.id(),
             3,

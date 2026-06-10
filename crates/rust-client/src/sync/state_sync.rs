@@ -207,13 +207,11 @@ impl StateSync {
         state_sync_update: &StateSyncUpdate,
     ) -> Result<(), ClientError> {
         for observer in &self.note_observers {
-            if let Err(err) = observer.apply(state_sync_update).await {
-                tracing::warn!(
-                    observer = observer.name(),
-                    error = ?err,
-                    "NoteObserver::apply failed; continuing with remaining observers",
-                );
-            }
+            crate::errors::log_observer_failure(
+                observer.name(),
+                "NoteObserver::apply",
+                observer.apply(state_sync_update).await,
+            );
         }
         Ok(())
     }

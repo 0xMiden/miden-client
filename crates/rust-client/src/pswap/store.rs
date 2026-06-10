@@ -1,5 +1,5 @@
 //! Client-side persistence for PSWAP lineages over the existing `settings`
-//! KV table — no PSWAP-specific `Store` trait methods. Two key families:
+//! KV store — no PSWAP-specific `Store` trait methods. Two key families:
 //!
 //! ```text
 //! pswap/order/{order_id_hex}    →  serialized PswapLineageRecord  (PRIMARY; stable, never re-keyed)
@@ -26,7 +26,7 @@ use super::lineage::{
     PswapLineageState,
 };
 use crate::store::input_note_states::{CommittedNoteState, UnverifiedNoteState};
-use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
+use crate::store::{InputNoteRecord, NoteFilter, SettingMutation, Store, StoreError};
 use crate::sync::{NoteTagRecord, NoteTagSource};
 use crate::utils::{Deserializable, Serializable, bytes_to_hex_string};
 
@@ -55,17 +55,25 @@ fn tip_key(tip: NoteId) -> String {
 // READ / WRITE HELPERS
 // ================================================================================================
 
-/// Persists a lineage record and its tip index. Used at creation and as the
+/// Persists a lineage record and its tip index in one atomic batch, so the
+/// record and its tip index can never diverge. Used at creation and as the
 /// building block for [`apply_round`].
 pub(crate) async fn put_lineage(
     store: &Arc<dyn Store>,
     record: &PswapLineageRecord,
 ) -> Result<(), StoreError> {
-    store.set_setting(order_key(record.order_id()), record.to_bytes()).await?;
     store
-        .set_setting(tip_key(record.current_tip_note_id), record.order_id().to_bytes())
-        .await?;
-    Ok(())
+        .apply_settings_mutations(vec![
+            SettingMutation::Set {
+                key: order_key(record.order_id()),
+                value: record.to_bytes(),
+            },
+            SettingMutation::Set {
+                key: tip_key(record.current_tip_note_id),
+                value: record.order_id().to_bytes(),
+            },
+        ])
+        .await
 }
 
 /// Point-get a lineage by its stable `order_id`.
@@ -130,9 +138,12 @@ pub(crate) async fn list_lineages(
 /// into `input_notes`, advances the lineage record, re-keys the tip index,
 /// and drops the asset-pair tag on terminal states.
 ///
-/// Writes are ordered note-first: a crash before the lineage advance leaves it
-/// at the old tip, and the next sync re-derives the round idempotently
-/// (`upsert_input_notes` is keyed on `note_id`; settings are last-writer-wins).
+/// The lineage-record advance and tip re-key are committed as one atomic
+/// settings batch, so the record and its tip index never diverge. The
+/// `input_notes` and tag writes target other tables and keep the note-first
+/// ordering: a crash before the settings batch leaves the lineage at the old
+/// tip, and the next sync re-derives the round idempotently (`upsert_input_notes`
+/// is keyed on `note_id`; settings are last-writer-wins).
 pub(crate) async fn apply_round(
     store: &Arc<dyn Store>,
     update: &PswapLineageRoundUpdate,
@@ -163,9 +174,11 @@ pub(crate) async fn apply_round(
         upsert_round_note(store, remainder_note, inclusion_proof, at_block_header).await?;
     }
 
-    // 2. Advance the lineage record under its stable order key. On terminal rounds `tip_note_id` is
-    //    `None`, so the tip stays frozen at the last live tip while `current_depth` advances to the
-    //    terminating round.
+    // 2. Advance the lineage record and re-key the tip index in one atomic batch, so the order
+    //    record and its tip index can never diverge. On terminal rounds `tip_note_id` is `None`, so
+    //    the tip stays frozen at the last live tip while `current_depth` advances to the
+    //    terminating round, and the live tip index is dropped (a terminal lineage has no tip to
+    //    resolve).
     let old_tip = record.current_tip_note_id;
     let new_record = PswapLineageRecord {
         original_pswap: record.original_pswap.clone(),
@@ -177,16 +190,22 @@ pub(crate) async fn apply_round(
         created_at_block: record.created_at_block,
         updated_at_block: update.at_block,
     };
-    store.set_setting(order_key(update.order_id), new_record.to_bytes()).await?;
-
-    // 3. Tip index maintenance: drop the old tip, point the new tip at this order while Active
-    //    (terminal lineages have no live tip to resolve).
-    store.remove_setting(tip_key(old_tip)).await?;
+    let mut mutations = vec![
+        SettingMutation::Set {
+            key: order_key(update.order_id),
+            value: new_record.to_bytes(),
+        },
+        SettingMutation::Remove { key: tip_key(old_tip) },
+    ];
     if update.state == PswapLineageState::Active
         && let Some(new_tip) = update.tip_note_id
     {
-        store.set_setting(tip_key(new_tip), update.order_id.to_bytes()).await?;
+        mutations.push(SettingMutation::Set {
+            key: tip_key(new_tip),
+            value: update.order_id.to_bytes(),
+        });
     }
+    store.apply_settings_mutations(mutations).await?;
 
     // 4. Terminal states no longer need the asset-pair subscription. The tag + original note id are
     //    recomputed from the persisted PSWAP (neither is carried on the round update).
@@ -203,8 +222,8 @@ pub(crate) async fn apply_round(
     Ok(())
 }
 
-/// Inserts a reconstructed payback or remainder into `input_notes`. Skips if a
-/// row already exists so we never downgrade an already-tracked note (e.g. a
+/// Inserts a reconstructed payback or remainder into `input_notes`. Skips if an
+/// entry already exists so we never downgrade an already-tracked note (e.g. a
 /// public payback the screener already inserted as `Committed` this same sync).
 /// With `at_block_header` the note lands as `Committed`, otherwise `Unverified`.
 async fn upsert_round_note(

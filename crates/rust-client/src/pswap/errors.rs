@@ -12,7 +12,7 @@ use crate::store::StoreError;
 /// Failures raised by the PSWAP chain-tracking subsystem.
 #[derive(Debug, thiserror::Error)]
 pub enum PswapLineageError {
-    /// No `pswap_lineages` row with the given `order_id`.
+    /// No tracked PSWAP lineage for the given `order_id`.
     #[error("no PSWAP lineage tracked for order_id {0}")]
     NotFound(Felt),
 
@@ -27,28 +27,35 @@ pub enum PswapLineageError {
     )]
     CreatorNotLocal(AccountId),
 
-    /// The current tip is missing from the store — `pswap_lineages` is
-    /// out of sync with `output_notes`/`input_notes`.
-    #[error("current tip note is missing from the local store; pswap_lineages is out of sync")]
+    /// The current tip is missing from the store — the tracked lineage is
+    /// out of sync with the stored notes.
+    #[error("current tip note is missing from the local store; the tracked lineage is out of sync")]
     TipMissing,
 
     /// `PswapNote::payback_note` / `remainder_note` reconstruction failed.
     #[error("PSWAP note reconstruction failed: {0}")]
     Reconstruction(#[source] NoteError),
 
-    /// `FungibleAsset::new` rejected an attachment-derived amount (the on-disk
+    /// `FungibleAsset::new` rejected an attachment-derived amount (the stored
     /// value exceeds the protocol's max). Indicates either a malformed
-    /// attachment from the network or a corrupted `pswap_lineages` row.
+    /// attachment from the network or a corrupted stored lineage record.
     #[error("PSWAP attachment amount is out of range for FungibleAsset: {0}")]
     AssetError(#[from] AssetError),
 
-    /// `SQLite` read a `state` byte with no matching [`PswapLineageState`] variant.
+    /// A stored lineage's `state` byte has no matching [`PswapLineageState`] variant.
     #[error("unknown PSWAP lineage state byte: {0}")]
     UnknownState(u8),
 
-    /// A stored row's columns are mutually inconsistent.
-    #[error("PSWAP lineage row is internally inconsistent: {0}")]
-    InconsistentRow(String),
+    /// A stored lineage record's fields are mutually inconsistent.
+    #[error("PSWAP lineage record is internally inconsistent: {0}")]
+    InconsistentRecord(String),
+
+    /// More chain notes share an `(order_id, depth)` than the protocol's
+    /// payback + remainder maximum of two. Reachable when an unrelated note
+    /// carries a colliding attachment, so it is handled (the round is skipped)
+    /// rather than asserted.
+    #[error("PSWAP round at depth {depth} has {count} candidate notes (expected at most 2)")]
+    AmbiguousRound { depth: u32, count: usize },
 
     /// A store call from the PSWAP layer failed.
     #[error("PSWAP store call failed: {0}")]

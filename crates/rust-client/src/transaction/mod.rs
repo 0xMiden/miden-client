@@ -289,13 +289,11 @@ where
         // logged and never propagate — they're feature-specific side-channels, not part of the
         // submit contract.
         for observer in &self.transaction_observers {
-            if let Err(err) = observer.apply(&tx_result, submission_height).await {
-                tracing::warn!(
-                    observer = observer.name(),
-                    error = ?err,
-                    "TransactionObserver::apply failed; continuing with remaining observers",
-                );
-            }
+            crate::errors::log_observer_failure(
+                observer.name(),
+                "TransactionObserver::apply",
+                observer.apply(&tx_result, submission_height).await,
+            );
         }
 
         Ok(tx_id)
@@ -1074,7 +1072,6 @@ pub(super) fn validate_account_request(
 /// P2IDE reclaim) authorize on that field, so an output note declaring a foreign sender can never
 /// be executed. Catching it here yields a clear, immediate error instead of a cryptic failure deep
 /// in transaction script building.
-#[allow(dead_code)]
 fn validate_output_note_senders(
     transaction_request: &TransactionRequest,
     account_id: AccountId,
