@@ -649,12 +649,12 @@ impl StateSync {
         // the block whose state we already have.
         let map_info = self
             .rpc_api
-            .sync_storage_maps(block_from + 1, Some(block_to), account_id)
+            .sync_storage_maps(block_from + 1, block_to, account_id)
             .await
             .map_err(ClientError::RpcError)?;
         let vault_info = self
             .rpc_api
-            .sync_account_vault(block_from + 1, Some(block_to), account_id)
+            .sync_account_vault(block_from + 1, block_to, account_id)
             .await
             .map_err(ClientError::RpcError)?;
 

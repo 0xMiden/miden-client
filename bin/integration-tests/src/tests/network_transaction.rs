@@ -121,7 +121,7 @@ pub(crate) async fn deploy_network_counter_contract(
     allowed_note_script_roots: &[NoteScriptRoot],
 ) -> Result<Account> {
     let roots = allowed_note_script_roots.iter().copied().collect::<BTreeSet<NoteScriptRoot>>();
-    let auth = AuthNetworkAccount::with_allowlist(roots)
+    let auth = AuthNetworkAccount::with_allowed_notes(roots)
         .map_err(|err| anyhow::anyhow!(err))
         .context("failed to build network account auth component")?;
     deploy_counter_with_auth(client, auth).await
@@ -478,7 +478,7 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
     // the node uses to route MINT notes to it and enforces that only allowlisted notes are consumed
     // with no tx script. The scriptless deploy transaction below is authorized by this same auth.
     let allowed_roots = [MintNote::script_root()].into_iter().collect::<BTreeSet<_>>();
-    let network_auth = AuthNetworkAccount::with_allowlist(allowed_roots)
+    let network_auth = AuthNetworkAccount::with_allowed_notes(allowed_roots)
         .map_err(|err| anyhow!("failed to build faucet network-account auth: {err}"))?;
 
     let mut init_seed = [0u8; 32];
