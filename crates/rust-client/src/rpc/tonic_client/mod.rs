@@ -56,7 +56,7 @@ use api_client::api_client_wrapper::ApiClient;
 /// Tracks the pagination state for block-driven endpoints.
 struct BlockPagination {
     current_block_from: BlockNumber,
-    block_to: Option<BlockNumber>,
+    block_to: BlockNumber,
     iterations: u32,
 }
 
@@ -75,7 +75,7 @@ impl BlockPagination {
     /// trigger an infinite loop.
     const MAX_ITERATIONS: u32 = 1000;
 
-    fn new(block_from: BlockNumber, block_to: Option<BlockNumber>) -> Self {
+    fn new(block_from: BlockNumber, block_to: BlockNumber) -> Self {
         Self {
             current_block_from: block_from,
             block_to,
@@ -87,7 +87,7 @@ impl BlockPagination {
         self.current_block_from
     }
 
-    fn block_to(&self) -> Option<BlockNumber> {
+    fn block_to(&self) -> BlockNumber {
         self.block_to
     }
 
@@ -109,7 +109,7 @@ impl BlockPagination {
             ));
         }
 
-        let target_block = self.block_to.map_or(chain_tip, |to| to.min(chain_tip));
+        let target_block = self.block_to.min(chain_tip);
 
         if block_num >= target_block {
             return Ok(PaginationResult::Done { chain_tip, block_num });
@@ -304,12 +304,6 @@ impl GrpcClient {
             .map_err(|status| self.rpc_error_from_status(RpcEndpoint::Status, status))
             .map(tonic::Response::into_inner)
             .and_then(RpcStatusInfo::try_from)
-    }
-
-    /// Fetches the latest block header and returns its block number.
-    async fn resolve_chain_tip(&self) -> Result<BlockNumber, RpcError> {
-        let (header, _) = self.get_block_header_by_number(None, false).await?;
-        Ok(header.block_num())
     }
 }
 
@@ -597,7 +591,7 @@ impl NodeRpcClient for GrpcClient {
 
         for chunk in tags.chunks(limits.note_tags_limit as usize) {
             let proto_tags: Vec<u32> = chunk.iter().map(|&t| t.into()).collect();
-            let mut pagination = BlockPagination::new(block_from, Some(block_to));
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
                 let request = proto::rpc::SyncNotesRequest {
@@ -657,7 +651,7 @@ impl NodeRpcClient for GrpcClient {
         // violating the RPC limit.
         for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
             let proto_prefixes: Vec<u32> = chunk.iter().map(|&x| u32::from(x)).collect();
-            let mut pagination = BlockPagination::new(block_from, Some(block_to));
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
                 let request = proto::rpc::SyncNullifiersRequest {
@@ -665,10 +659,7 @@ impl NodeRpcClient for GrpcClient {
                     prefix_len: 16,
                     block_range: Some(BlockRange {
                         block_from: pagination.current_block_from().as_u32(),
-                        block_to: pagination
-                            .block_to()
-                            .map(|b| b.as_u32())
-                            .expect("sync_nullifiers is paginated with a bounded block_to"),
+                        block_to: pagination.block_to().as_u32(),
                     }),
                 };
 
@@ -755,14 +746,10 @@ impl NodeRpcClient for GrpcClient {
     async fn sync_storage_maps(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError> {
-        let block_to = match block_to {
-            Some(block_to) => block_to,
-            None => self.resolve_chain_tip().await?,
-        };
-        let mut pagination = BlockPagination::new(block_from, Some(block_to));
+        let mut pagination = BlockPagination::new(block_from, block_to);
         let mut updates = Vec::new();
 
         let (chain_tip, block_number) = loop {
@@ -807,14 +794,10 @@ impl NodeRpcClient for GrpcClient {
     async fn sync_account_vault(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError> {
-        let block_to = match block_to {
-            Some(block_to) => block_to,
-            None => self.resolve_chain_tip().await?,
-        };
-        let mut pagination = BlockPagination::new(block_from, Some(block_to));
+        let mut pagination = BlockPagination::new(block_from, block_to);
         let mut updates = Vec::new();
 
         let (chain_tip, block_number) = loop {
@@ -876,7 +859,7 @@ impl NodeRpcClient for GrpcClient {
 
         for chunk in account_ids.chunks(limits.account_ids_limit as usize) {
             let proto_account_ids: Vec<_> = chunk.iter().map(|acc_id| (*acc_id).into()).collect();
-            let mut pagination = BlockPagination::new(block_from, Some(block_to));
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
                 let request = proto::rpc::SyncTransactionsRequest {
@@ -1025,7 +1008,7 @@ mod tests {
 
     #[test]
     fn block_pagination_errors_when_block_num_goes_backwards() {
-        let mut pagination = BlockPagination::new(10_u32.into(), None);
+        let mut pagination = BlockPagination::new(10_u32.into(), 20_u32.into());
 
         let res = pagination.advance(9_u32.into(), 20_u32.into());
         assert!(matches!(res, Err(RpcError::PaginationError(_))));
@@ -1033,7 +1016,7 @@ mod tests {
 
     #[test]
     fn block_pagination_errors_after_max_iterations() {
-        let mut pagination = BlockPagination::new(0_u32.into(), None);
+        let mut pagination = BlockPagination::new(0_u32.into(), 10_000_u32.into());
         let chain_tip: BlockNumber = 10_000_u32.into();
 
         for _ in 0..BlockPagination::MAX_ITERATIONS {
@@ -1051,7 +1034,7 @@ mod tests {
     #[test]
     fn block_pagination_stops_at_min_of_block_to_and_chain_tip() {
         // block_to is beyond chain tip, so target should be chain_tip.
-        let mut pagination = BlockPagination::new(0_u32.into(), Some(50_u32.into()));
+        let mut pagination = BlockPagination::new(0_u32.into(), 50_u32.into());
 
         let res = pagination
             .advance(30_u32.into(), 30_u32.into())
@@ -1068,7 +1051,7 @@ mod tests {
 
     #[test]
     fn block_pagination_advances_cursor_by_one() {
-        let mut pagination = BlockPagination::new(5_u32.into(), None);
+        let mut pagination = BlockPagination::new(5_u32.into(), 100_u32.into());
 
         let res = pagination
             .advance(5_u32.into(), 100_u32.into())

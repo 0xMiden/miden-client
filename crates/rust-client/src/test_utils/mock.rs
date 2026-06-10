@@ -141,11 +141,11 @@ impl MockRpcApi {
     fn get_sync_account_vault_request(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> AccountVaultInfo {
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+        let target_block = block_to.min(chain_tip);
 
         let page_end_block: BlockNumber = (block_from.as_u32() + Self::PAGINATION_BLOCK_LIMIT)
             .min(target_block.as_u32())
@@ -228,11 +228,11 @@ impl MockRpcApi {
     fn get_sync_storage_maps_request(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> StorageMapInfo {
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+        let target_block = block_to.min(chain_tip);
 
         let page_end_block: BlockNumber = (block_from.as_u32() + Self::PAGINATION_BLOCK_LIMIT)
             .min(target_block.as_u32())
@@ -627,13 +627,13 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_storage_maps(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError> {
         let mut all_updates = Vec::new();
         let mut current_block_from = block_from;
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+        let target_block = block_to.min(chain_tip);
 
         loop {
             let response =
@@ -655,13 +655,13 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_account_vault(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError> {
         let mut all_updates = Vec::new();
         let mut current_block_from = block_from;
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+        let target_block = block_to.min(chain_tip);
 
         loop {
             let response =
