@@ -442,6 +442,8 @@ impl MastForestStore for ClientDataStore {
 /// itself, or the parameters needed to fetch it via RPC.
 enum WitnessResolution {
     Witness(StorageMapWitness),
+    /// The [`AccountCode`] is not needed to build the witness: it is only sent along with the
+    /// RPC request so the node can omit the account code from its response.
     FetchParams(StorageSlotName, AccountCode),
 }
 
