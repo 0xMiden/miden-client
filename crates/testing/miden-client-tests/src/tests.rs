@@ -3391,7 +3391,7 @@ async fn sync_storage_maps_pagination() {
     assert!(chain_tip.as_u32() >= 12);
 
     let account_id = AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
-    let result = rpc_api.sync_storage_maps(0.into(), None, account_id).await.unwrap();
+    let result = rpc_api.sync_storage_maps(0.into(), chain_tip, account_id).await.unwrap();
 
     // Verify we got a response covering the full range
     assert_eq!(result.chain_tip, chain_tip);
@@ -3419,7 +3419,7 @@ async fn sync_account_vault_pagination() {
 
     // Sync from block 0 to chain tip - this should require multiple pagination calls internally
     let account_id = AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
-    let result = rpc_api.sync_account_vault(0.into(), None, account_id).await.unwrap();
+    let result = rpc_api.sync_account_vault(0.into(), chain_tip, account_id).await.unwrap();
 
     // Verify we got a response covering the full range
     assert_eq!(result.chain_tip, chain_tip);
@@ -3442,7 +3442,7 @@ async fn sync_storage_maps_pagination_with_block_to() {
     let rpc_api = MockRpcApi::new(mock_chain);
 
     let account_id = AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
-    let result = rpc_api.sync_storage_maps(0.into(), Some(10.into()), account_id).await.unwrap();
+    let result = rpc_api.sync_storage_maps(0.into(), 10.into(), account_id).await.unwrap();
 
     // Verifies we stopped at block 10, not chain tip
     assert_eq!(result.block_number.as_u32(), 10);
@@ -3464,7 +3464,7 @@ async fn sync_account_vault_pagination_with_block_to() {
     let rpc_api = MockRpcApi::new(mock_chain);
 
     let account_id = AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
-    let result = rpc_api.sync_account_vault(0.into(), Some(10.into()), account_id).await.unwrap();
+    let result = rpc_api.sync_account_vault(0.into(), 10.into(), account_id).await.unwrap();
 
     // Verify we stopped at block 10, not chain tip
     assert_eq!(result.block_number.as_u32(), 10);
@@ -3488,7 +3488,7 @@ async fn sync_storage_maps_pagination_from_middle() {
     let chain_tip = rpc_api.get_chain_tip_block_num();
 
     let account_id = AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
-    let result = rpc_api.sync_storage_maps(7.into(), None, account_id).await.unwrap();
+    let result = rpc_api.sync_storage_maps(7.into(), chain_tip, account_id).await.unwrap();
 
     assert_eq!(result.chain_tip, chain_tip);
     assert_eq!(result.block_number, chain_tip);

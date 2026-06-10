@@ -143,15 +143,10 @@ async fn batch_builder_submits_two_txs_on_one_account() {
     );
 }
 
-/// Verifies that `Store::apply_transaction_batch` is atomic: if any per-tx update in the batch
-/// fails, no earlier update is persisted.
-///
-/// Setup: build a 2-account mock chain, create a client backed by it, register only account A
-/// with the client. Both accounts have committed state on the mock chain, so we can execute
-/// a valid transaction against each. Because B was never added to the client's store, its
-/// roots aren't in the store's `AccountSmtForest` — `apply_account_delta` will fail for B's
-/// update with `StoreError::AccountDataNotFound`. Asserts that A's earlier update was also
-/// rolled back (no transactions in the store, account A unchanged).
+/// Verifies that `Store::apply_transaction_batch` is atomic across the SQL store AND the
+/// in-memory `AccountSmtForest`: if any per-tx update in the batch fails, no earlier update
+/// is persisted, and a follow-up `Store::update_account` on the affected account still
+/// works.
 #[tokio::test]
 async fn apply_transaction_batch_rolls_back_on_mid_batch_failure() {
     // Build a fresh mock chain with two existing accounts.
@@ -184,7 +179,7 @@ async fn apply_transaction_batch_rolls_back_on_mid_batch_failure() {
     client.add_account(&account_a, false).await.unwrap();
 
     // Execute a trivial transaction against A and another against B, both via the mock chain.
-    // Both produce valid `ExecutedTransaction`s — the failure happens only at store-apply time.
+    // Both produce valid `ExecutedTransaction`s; the failure happens only at store-apply time.
     // Build each `TxContext` in its own statement so the mock-chain read guard is dropped
     // before `.execute().await` is reached (otherwise clippy flags await_holding_lock).
     let tx_ctx_a = rpc_api
@@ -249,6 +244,15 @@ async fn apply_transaction_batch_rolls_back_on_mid_batch_failure() {
         a_commitment_before,
         "account A state must be unchanged after atomic rollback"
     );
+
+    // Forest rollback check. `update_account_state` calls `replace_roots`, which asserts
+    // that the forest has no staged-but-uncommitted roots for the account. Without the
+    // forest rollback, the failed batch above would have left A's previous roots sitting
+    // in `pending_old_roots`, and this call would trip the assertion.
+    store
+        .update_account(&account_a)
+        .await
+        .expect("update_account on A must succeed after the failed batch was rolled back");
 }
 
 /// `BatchBuilder::push` must validate each transaction against the in-batch (stacked)
