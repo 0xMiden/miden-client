@@ -14,6 +14,12 @@ impl From<Felt> for OrderIdKey {
     }
 }
 
+impl From<OrderIdKey> for Felt {
+    fn from(key: OrderIdKey) -> Self {
+        key.0
+    }
+}
+
 impl PartialEq for OrderIdKey {
     fn eq(&self, other: &Self) -> bool {
         self.0.as_canonical_u64() == other.0.as_canonical_u64()

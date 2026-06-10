@@ -110,7 +110,7 @@ impl NoteObserver for PswapChainObserver {
             discover_pswap_rounds(self.store.clone(), sync_update, &chain_note_updates).await?;
 
         for round_update in round_updates {
-            if let Err(err) = self.store.apply_pswap_round(&round_update).await {
+            if let Err(err) = crate::pswap::store::apply_round(&self.store, &round_update).await {
                 warn!(
                     order_id = round_update.order_id.as_canonical_u64(),
                     round_depth = round_update.round_depth,

@@ -16,6 +16,7 @@ pub mod discovery;
 pub mod errors;
 pub mod lineage;
 pub mod observer;
+pub(crate) mod store;
 mod types;
 
 // `PswapTransactionObserver` is defined inline below in this file.
@@ -102,7 +103,7 @@ impl TransactionObserver for PswapTransactionObserver {
                 updated_at_block: submission_height,
             };
 
-            self.store.upsert_pswap_lineage(&record).await?;
+            store::put_lineage(&self.store, &record).await?;
             self.store
                 .add_note_tag(NoteTagRecord {
                     tag: record.asset_pair_tag(),
@@ -122,8 +123,7 @@ impl TransactionObserver for PswapTransactionObserver {
 impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
     /// Returns every PSWAP lineage tracked by this client.
     pub async fn pswap_lineages(&self) -> Result<Vec<PswapLineageRecord>, ClientError> {
-        self.store
-            .list_pswap_lineages(PswapLineageFilter::All)
+        store::list_lineages(&self.store, PswapLineageFilter::All)
             .await
             .map_err(Into::into)
     }
@@ -133,8 +133,7 @@ impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
         &self,
         creator: AccountId,
     ) -> Result<Vec<PswapLineageRecord>, ClientError> {
-        self.store
-            .list_pswap_lineages(PswapLineageFilter::ByCreator(creator))
+        store::list_lineages(&self.store, PswapLineageFilter::ByCreator(creator))
             .await
             .map_err(Into::into)
     }
@@ -144,7 +143,7 @@ impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
         &self,
         order_id: Felt,
     ) -> Result<Option<PswapLineageRecord>, ClientError> {
-        self.store.get_pswap_lineage(order_id).await.map_err(Into::into)
+        store::get_lineage(&self.store, order_id).await.map_err(Into::into)
     }
 
     /// Builds a tx reclaiming the unfilled offered asset on the current
@@ -153,9 +152,7 @@ impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
         &self,
         order_id: Felt,
     ) -> Result<TransactionRequest, ClientError> {
-        let lineage = self
-            .store
-            .get_pswap_lineage(order_id)
+        let lineage = store::get_lineage(&self.store, order_id)
             .await?
             .ok_or(PswapLineageError::NotFound(order_id))?;
 

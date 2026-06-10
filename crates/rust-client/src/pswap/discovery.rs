@@ -15,25 +15,18 @@ use miden_protocol::note::NoteId;
 use tracing::error;
 
 use super::errors::PswapLineageError;
-use super::lineage::{
-    PswapLineageFilter,
-    PswapLineageRecord,
-    PswapLineageRoundUpdate,
-    PswapLineageState,
-};
+use super::lineage::{PswapLineageRecord, PswapLineageRoundUpdate, PswapLineageState};
 use super::observer::PswapChainNoteUpdate;
+use super::store;
 use super::types::OrderIdKey;
 use crate::store::Store;
 use crate::sync::StateSyncUpdate;
 
 /// Returns one [`PswapLineageRoundUpdate`] per round advanced this sync.
 ///
-/// Each active lineage is walked in memory across as many rounds as this sync window reveals.
-/// A round fires when either the current tip's consumption was observed (`consumed_note_ids`)
-/// or depth+1 chain notes exist for the order; the latter alone is a sound consumption proof,
-/// which is what carries a same-block multi-fill on a private chain (where the intermediate
-/// remainder is never tracked). Only the final tip's remainder is persisted into `input_notes`;
-/// intermediate remainders are dropped since they are already spent on-chain.
+/// Each active lineage is walked in memory across as many rounds as this sync
+/// window reveals. Only the final tip's remainder is persisted to `input_notes`;
+/// intermediate remainders are already spent on-chain.
 pub(crate) async fn discover_pswap_rounds(
     store: Arc<dyn Store>,
     state_sync_update: &StateSyncUpdate,
@@ -46,12 +39,30 @@ pub(crate) async fn discover_pswap_rounds(
         return Ok(Vec::new());
     }
 
-    // Load only lineages whose tip is in this sync window.
-    let active_lineages = store
-        .list_pswap_lineages(PswapLineageFilter::ActiveByTipNoteIds(
-            consumed_note_ids.iter().copied().collect(),
-        ))
-        .await?;
+    // Candidate orders from a union of two signals, each resolving to an
+    // order_id without scanning:
+    //   1. a consumed note id that is a tracked tip → via the tip index;
+    //   2. a chain note → carries its order_id on its attachment.
+    // Both are needed: signal 2 catches a fill whose notes arrive before its
+    // tip nullifier; signal 1 carries reclaim, which emits no chain notes.
+    let mut candidate_orders: BTreeSet<OrderIdKey> = BTreeSet::new();
+    for note_id in &consumed_note_ids {
+        if let Some(order_id) = store::resolve_order_by_tip(&store, *note_id).await? {
+            candidate_orders.insert(OrderIdKey::from(order_id));
+        }
+    }
+    for note in chain_note_updates {
+        candidate_orders.insert(OrderIdKey::from(note.attachment.order_id()));
+    }
+
+    let mut active_lineages = Vec::new();
+    for order_id in candidate_orders {
+        if let Some(record) = store::get_lineage(&store, order_id.into()).await?
+            && record.state == PswapLineageState::Active
+        {
+            active_lineages.push(record);
+        }
+    }
     if active_lineages.is_empty() {
         return Ok(Vec::new());
     }
@@ -79,13 +90,11 @@ pub(crate) async fn discover_pswap_rounds(
         let mut lineage = lineage_record;
         let mut lineage_rounds: Vec<PswapLineageRoundUpdate> = Vec::new();
 
-        // Advance round-by-round while the lineage is still live. A round fires when EITHER
-        // the current tip's consumption was observed this sync (`tip_consumed`) OR depth+1
-        // chain notes exist for this order. The latter is a sound consumption proof on its
-        // own: by protocol invariant a payback/remainder at depth N+1 can only be emitted by
-        // consuming the depth-N tip. This is what lets us follow a same-block multi-fill on a
-        // PRIVATE chain, where the intermediate remainder is never tracked and so never enters
-        // `consumed_note_ids`. The state guard terminates the loop on FullyFilled / Reclaimed.
+        // Advance round-by-round while live. A round fires when the tip's consumption was
+        // observed (`tip_consumed`) OR depth+1 chain notes exist: by protocol invariant a
+        // payback/remainder at depth N+1 can only come from consuming the depth-N tip, so notes
+        // alone prove consumption. That's what follows a same-block multi-fill on a private chain,
+        // whose intermediate remainder is never tracked. The state guard ends the loop on terminal.
         while lineage.state == PswapLineageState::Active {
             let round_depth = lineage.current_depth + 1;
             let notes = notes_by_order_depth
@@ -115,11 +124,10 @@ pub(crate) async fn discover_pswap_rounds(
             lineage_rounds.push(update);
         }
 
-        // Every intermediate remainder was already consumed on-chain by the following round, so
-        // inserting it into `input_notes` would leave a stale Unverified note whose consumption
-        // falls outside the next sync's nullifier window. Only the final tip is live, so keep
-        // its remainder insert and drop the intermediate ones. Paybacks are all kept — each is a
-        // distinct consumable note for the creator.
+        // Intermediate remainders are already spent on-chain; inserting them would leave stale
+        // Unverified notes whose consumption falls outside the next sync's window. Keep only the
+        // final (live) tip's remainder; drop the rest. Paybacks are all kept — each is a distinct
+        // consumable note for the creator.
         if let Some((_, intermediate_rounds)) = lineage_rounds.split_last_mut() {
             for round in intermediate_rounds {
                 round.remainder = None;

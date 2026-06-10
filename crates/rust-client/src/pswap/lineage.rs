@@ -3,7 +3,7 @@
 //! See module-level docs on [`crate::pswap`].
 
 use alloc::format;
-use alloc::vec::Vec;
+use alloc::string::ToString;
 
 use miden_protocol::Felt;
 use miden_protocol::account::AccountId;
@@ -13,6 +13,7 @@ use miden_protocol::note::{Note, NoteId, NoteInclusionProof, NoteTag, NoteType};
 use miden_standards::note::PswapNote;
 
 use super::errors::PswapLineageError;
+use crate::utils::{ByteReader, ByteWriter, Deserializable, DeserializationError, Serializable};
 
 // PSWAP LINEAGE STATE
 // ================================================================================================
@@ -136,16 +137,13 @@ pub struct PswapLineageRoundUpdate {
 // PSWAP LINEAGE FILTER
 // ================================================================================================
 
-/// Filter for [`crate::store::Store::list_pswap_lineages`].
+/// Client-side filter for [`crate::pswap::store::list_lineages`]. Applied in
+/// Rust after a prefix-scan of the `settings` KV — not a store-trait concept.
 #[derive(Debug, Clone)]
 pub enum PswapLineageFilter {
     All,
     Active,
     ByCreator(AccountId),
-    /// Active rows whose `current_tip_note_id` is in the given set.
-    /// Empty input returns no rows. Used by `discover_pswap_rounds` to
-    /// load only the lineages whose tip was consumed this sync.
-    ActiveByTipNoteIds(Vec<NoteId>),
 }
 
 // SERDE HELPERS
@@ -187,6 +185,52 @@ pub fn build_record_from_columns(
         created_at_block,
         updated_at_block,
     })
+}
+
+// VALUE CODEC
+// ================================================================================================
+
+/// Encodes the same columns the `SQLite` backend persisted, in declaration
+/// order: the `original_pswap` blob first, then the mutable tip state. The
+/// `Note` is written via the streaming `write_into`/`read_from` (not
+/// `read_from_bytes`) because more fields follow it in the stream.
+impl Serializable for PswapLineageRecord {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        Note::from(self.original_pswap.clone()).write_into(target);
+        self.current_tip_note_id.write_into(target);
+        self.current_depth.write_into(target);
+        u64::from(self.remaining_offered.amount()).write_into(target);
+        u64::from(self.remaining_requested.amount()).write_into(target);
+        self.state.as_u8().write_into(target);
+        self.created_at_block.as_u32().write_into(target);
+        self.updated_at_block.as_u32().write_into(target);
+    }
+}
+
+impl Deserializable for PswapLineageRecord {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let note = Note::read_from(source)?;
+        let original_pswap = PswapNote::try_from(&note)
+            .map_err(|err| DeserializationError::InvalidValue(err.to_string()))?;
+        let current_tip_note_id = NoteId::read_from(source)?;
+        let current_depth = u32::read_from(source)?;
+        let remaining_offered = u64::read_from(source)?;
+        let remaining_requested = u64::read_from(source)?;
+        let state_byte = u8::read_from(source)?;
+        let created_at_block = u32::read_from(source)?;
+        let updated_at_block = u32::read_from(source)?;
+        build_record_from_columns(
+            original_pswap,
+            current_tip_note_id,
+            current_depth,
+            remaining_offered,
+            remaining_requested,
+            state_byte,
+            BlockNumber::from(created_at_block),
+            BlockNumber::from(updated_at_block),
+        )
+        .map_err(|err| DeserializationError::InvalidValue(err.to_string()))
+    }
 }
 
 #[cfg(test)]
@@ -392,5 +436,41 @@ mod tests {
         assert_eq!(record.order_id(), expected_order_id);
         assert_eq!(record.asset_pair_tag(), expected_tag);
         assert_eq!(record.creator_account_id(), creator);
+    }
+
+    /// `Serializable`/`Deserializable` round-trip preserves every field,
+    /// including the faucets recovered (not stored) for the remaining
+    /// amounts. Exercised at an advanced depth with reduced amounts to
+    /// catch a faucet mix-up between offered/requested.
+    #[test]
+    fn value_codec_round_trips() {
+        let (sender, creator, offered_faucet, requested_faucet) = fixed_account_ids();
+        let pswap = build_test_pswap(sender, creator, offered_faucet, 100, requested_faucet, 50);
+        let note = miden_protocol::note::Note::from(pswap.clone());
+        let record = build_record_from_columns(
+            pswap,
+            note.id(),
+            3,
+            70,
+            35,
+            PswapLineageState::Active.as_u8(),
+            BlockNumber::from(7),
+            BlockNumber::from(12),
+        )
+        .unwrap();
+
+        let bytes = record.to_bytes();
+        let decoded = PswapLineageRecord::read_from_bytes(&bytes).unwrap();
+
+        assert_eq!(decoded.order_id(), record.order_id());
+        assert_eq!(decoded.current_tip_note_id, record.current_tip_note_id);
+        assert_eq!(decoded.current_depth, record.current_depth);
+        assert_eq!(decoded.remaining_offered, record.remaining_offered);
+        assert_eq!(decoded.remaining_requested, record.remaining_requested);
+        assert_eq!(decoded.remaining_offered.amount(), AssetAmount::new(70).unwrap());
+        assert_eq!(decoded.remaining_requested.amount(), AssetAmount::new(35).unwrap());
+        assert_eq!(decoded.state, record.state);
+        assert_eq!(decoded.created_at_block, record.created_at_block);
+        assert_eq!(decoded.updated_at_block, record.updated_at_block);
     }
 }
