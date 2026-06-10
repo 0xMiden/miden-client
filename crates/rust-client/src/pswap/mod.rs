@@ -4,7 +4,7 @@
 //! Flow:
 //! 1. Create → [`PswapLineageRecord`] row + asset-pair tag subscription.
 //! 2. Sync → [`PswapChainObserver`] collects PSWAP-attachment notes;
-//!    [`discovery::discover_pswap_rounds`] correlates them with tracked-note consumption events and
+//!    `discovery::discover_pswap_rounds` correlates them with tracked-note consumption events and
 //!    emits one [`PswapLineageRoundUpdate`] per round.
 //! 3. Reclaim → [`Client::build_pswap_cancel_by_order`].
 //!

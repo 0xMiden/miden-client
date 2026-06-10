@@ -137,7 +137,7 @@ pub struct PswapLineageRoundUpdate {
 // PSWAP LINEAGE FILTER
 // ================================================================================================
 
-/// Client-side filter for [`crate::pswap::store::list_lineages`]. Applied in
+/// Client-side filter for `crate::pswap::store::list_lineages`. Applied in
 /// Rust after a prefix-scan of the `settings` KV — not a store-trait concept.
 #[derive(Debug, Clone)]
 pub enum PswapLineageFilter {
