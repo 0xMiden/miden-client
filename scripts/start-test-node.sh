@@ -123,19 +123,33 @@ mkdir -p "$LOG_DIR" "$DATA/validator" "$DATA/node" "$DATA/ntx-builder"
 mkdir -p "$ROOT/data"
 cp "$DATA/genesis-config/tst_faucet.mac" "$ROOT/data/account.mac"
 
-"$BIN/miden-validator" bootstrap --data-directory "$DATA/validator" \
-    --genesis-block-directory "$DATA/genesis" --accounts-directory "$DATA/accounts" \
-    --genesis-config-file "$DATA/genesis-config/genesis.toml"
-"$BIN/miden-node" bootstrap --data-directory "$DATA/node" --file "$DATA/genesis/genesis.dat"
-"$BIN/miden-ntx-builder" bootstrap --data-directory "$DATA/ntx-builder" --file "$DATA/genesis/genesis.dat"
+{
+    "$BIN/miden-validator" bootstrap --data-directory "$DATA/validator" \
+        --genesis-block-directory "$DATA/genesis" --accounts-directory "$DATA/accounts" \
+        --genesis-config-file "$DATA/genesis-config/genesis.toml"
+    "$BIN/miden-node" bootstrap --data-directory "$DATA/node" --file "$DATA/genesis/genesis.dat"
+    "$BIN/miden-ntx-builder" bootstrap --data-directory "$DATA/ntx-builder" --file "$DATA/genesis/genesis.dat"
+} >"$LOG_DIR/bootstrap.log" 2>&1
 
 echo "==> starting components"
 : > "$PID_FILE"
 start() {
     local name="$1"; shift
-    RUST_LOG="${RUST_LOG:-info}" nohup "$@" >"$LOG_DIR/$name.log" 2>&1 &
+    # As async children the components would inherit an ignored SIGINT and survive Ctrl+C, so
+    # reset the disposition to default before exec'ing them; the terminal's Ctrl+C then kills
+    # them directly, without relying on this script's (racy) signal trap.
+    RUST_LOG="${RUST_LOG:-info}" nohup perl -e '$SIG{INT} = "DEFAULT"; exec @ARGV' "$@" \
+        >"$LOG_DIR/$name.log" 2>&1 &
     echo "$!" >> "$PID_FILE"
 }
+cleanup() {
+    trap - INT TERM
+    if [ -n "${TAIL_PID:-}" ]; then kill "$TAIL_PID" 2>/dev/null || true; fi
+    "$ROOT/scripts/stop-test-node.sh"
+}
+# Best-effort teardown for SIGTERM and for interrupts the components' own SIGINT death doesn't
+# cover (e.g. `kill <script>`); Ctrl+C teardown does not depend on this trap firing.
+trap 'echo; cleanup; exit 0' INT TERM
 start validator   "$BIN/miden-validator" start --listen "$VALIDATOR" --data-directory "$DATA/validator"
 # Let the validator bind before the sequencer starts producing blocks against it.
 sleep 2
@@ -184,16 +198,11 @@ if [ "$MODE" = "background" ]; then
     exit 0
 fi
 
-# Foreground: stream logs until Ctrl+C (which stops the node) or a component dies.
+# Foreground: stream logs until Ctrl+C (which stops the node) or a component dies. The tail gets
+# the same default-SIGINT treatment as the components so Ctrl+C kills it too.
 echo "==> streaming logs (Ctrl+C stops the node)"
-tail -n +1 -F "$LOG_DIR"/*.log &
+perl -e '$SIG{INT} = "DEFAULT"; exec @ARGV' tail -n +1 -F "$LOG_DIR"/*.log &
 TAIL_PID=$!
-cleanup() {
-    trap - INT TERM
-    kill "$TAIL_PID" 2>/dev/null || true
-    "$ROOT/scripts/stop-test-node.sh"
-}
-trap 'echo; cleanup; exit 0' INT TERM
 while check_components_alive; do
     sleep 1
 done
