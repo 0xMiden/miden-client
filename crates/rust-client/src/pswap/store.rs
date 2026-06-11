@@ -235,13 +235,24 @@ pub(crate) async fn apply_round(
     }
     store.apply_settings_mutations(mutations).await?;
 
-    // 4. Terminal states no longer need the asset-pair subscription. The tag is derived from the
-    //    mirrored order facts; the subscription is keyed by the stable `original_note_id` (the same
-    //    key used at creation).
+    // 4. Terminal states no longer need the asset-pair subscription. The tag's faucets ride on the
+    //    record's `remaining_*` fields; its `note_type` is recovered from the depth-0 note (one
+    //    fetch, fired once per lineage lifetime). The subscription is keyed by the stable
+    //    `original_note_id` (the same key used at creation).
     if matches!(update.state, PswapLineageState::FullyFilled | PswapLineageState::Reclaimed) {
+        let note_type = get_original_pswap(store, record.original_note_id)
+            .await
+            .map_err(|err| {
+                StoreError::DatabaseError(format!(
+                    "apply_round: cannot recover note_type to remove the asset-pair tag for \
+                     order_id {}: {err}",
+                    update.order_id
+                ))
+            })?
+            .note_type();
         store
             .remove_note_tag(NoteTagRecord {
-                tag: record.asset_pair_tag(),
+                tag: record.asset_pair_tag(note_type),
                 source: NoteTagSource::Subscription(record.original_note_id),
             })
             .await?;

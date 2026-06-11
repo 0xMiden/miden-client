@@ -213,14 +213,17 @@ impl PswapLineageRecord {
         original_pswap.ok_or(PswapLineageError::OriginalNoteUnavailable(self.original_note_id))
     }
 
-    /// Zero-amount asset for the order's offered faucet.
+    /// Zero-amount asset for the order's offered faucet (taken from the
+    /// chain-invariant faucet on `remaining_offered`).
     fn zero_offered(&self) -> FungibleAsset {
-        FungibleAsset::new(self.offered_asset().faucet_id(), 0).expect("FA(_, 0) is always valid")
+        FungibleAsset::new(self.remaining_offered.faucet_id(), 0).expect("FA(_, 0) is always valid")
     }
 
-    /// Zero-amount asset for the order's requested faucet.
+    /// Zero-amount asset for the order's requested faucet (taken from the
+    /// chain-invariant faucet on `remaining_requested`).
     fn zero_requested(&self) -> FungibleAsset {
-        FungibleAsset::new(self.requested_asset().faucet_id(), 0).expect("FA(_, 0) is always valid")
+        FungibleAsset::new(self.remaining_requested.faucet_id(), 0)
+            .expect("FA(_, 0) is always valid")
     }
 
     /// Reclaim — cancel branch emits no outputs; only the creator can hit it.

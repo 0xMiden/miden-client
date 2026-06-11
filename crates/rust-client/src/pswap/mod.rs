@@ -92,7 +92,9 @@ impl TransactionObserver for PswapTransactionObserver {
             store::put_lineage(&self.store, &record).await?;
             self.store
                 .add_note_tag(NoteTagRecord {
-                    tag: record.asset_pair_tag(),
+                    // `note_type` is read straight off the note we just parsed — no
+                    // need to mirror it on the record.
+                    tag: record.asset_pair_tag(pswap.note_type()),
                     source: NoteTagSource::Subscription(record.original_note_id),
                 })
                 .await?;

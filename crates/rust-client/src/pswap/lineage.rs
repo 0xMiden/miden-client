@@ -2,7 +2,6 @@
 //!
 //! See module-level docs on [`crate::pswap`].
 
-use alloc::format;
 use alloc::string::ToString;
 
 use miden_protocol::account::AccountId;
@@ -51,11 +50,13 @@ impl PswapLineageState {
 // PSWAP LINEAGE RECORD
 // ================================================================================================
 
-/// Persistent record of one PSWAP order's chain state. The immutable order
-/// facts (order id, creator, asset pair, note type) are mirrored here so the
-/// common read paths — keying, filtering, tag derivation — stay lookup-free.
-/// The full depth-0 note (script + recipient), needed only to reconstruct
-/// paybacks/remainders and to reclaim at depth 0, is fetched on demand from
+/// Persistent record of one PSWAP order's chain state. The order id and
+/// creator are mirrored here so the common read paths — keying, filtering —
+/// stay lookup-free. The asset pair's faucets ride on the `remaining_*` fields
+/// (chain-invariant; only the amounts move), so the asset-pair tag needs only a
+/// `note_type` supplied by the caller. The full depth-0 note (script +
+/// recipient), needed to reconstruct paybacks/remainders, to reclaim at depth 0,
+/// or to recover the `note_type` at a terminal round, is fetched on demand from
 /// `output_notes` by `original_note_id` (see `store::get_original_pswap`).
 #[derive(Debug, Clone)]
 pub struct PswapLineageRecord {
@@ -64,20 +65,22 @@ pub struct PswapLineageRecord {
     /// each round.
     pub original_note_id: NoteId,
 
-    // Immutable order facts, mirrored from the depth-0 note so accessors and
-    // the asset-pair tag need no store lookup.
+    // Immutable order facts, mirrored from the depth-0 note so keying and
+    // filtering need no store lookup.
     order_id: Felt,
     creator_account_id: AccountId,
-    offered_asset: FungibleAsset,
-    requested_asset: FungibleAsset,
-    note_type: NoteType,
 
     /// Current tip's note id. Equals `original_note_id` at depth 0; otherwise a
     /// remainder we didn't originate.
     pub current_tip_note_id: NoteId,
     /// 0 for the original tip; +1 per round. Matches `PswapNoteAttachment::depth()`.
     pub current_depth: u32,
+    /// Remaining offered balance. Its faucet is the order's offered faucet
+    /// (chain-invariant), so it doubles as the offered-faucet source for tag
+    /// derivation and zero-amount construction.
     pub remaining_offered: FungibleAsset,
+    /// Remaining requested balance. Its faucet is the order's requested faucet
+    /// (chain-invariant), used the same way as `remaining_offered`.
     pub remaining_requested: FungibleAsset,
     pub state: PswapLineageState,
     pub created_at_block: BlockNumber,
@@ -86,9 +89,9 @@ pub struct PswapLineageRecord {
 
 impl PswapLineageRecord {
     /// Builds the depth-0 record for a PSWAP the wallet has just emitted. Mirrors
-    /// the immutable order facts off the note and seeds the mutable tip state:
-    /// the tip is the original note, depth is 0, and `remaining_*` equal the
-    /// initial offered/requested amounts.
+    /// the order id and creator off the note and seeds the mutable tip state: the
+    /// tip is the original note, depth is 0, and `remaining_*` equal the initial
+    /// offered/requested assets (carrying the order's faucets).
     pub fn new_depth_zero(
         original_note_id: NoteId,
         pswap: &PswapNote,
@@ -98,9 +101,6 @@ impl PswapLineageRecord {
             original_note_id,
             order_id: pswap.order_id(),
             creator_account_id: pswap.storage().creator_account_id(),
-            offered_asset: *pswap.offered_asset(),
-            requested_asset: *pswap.storage().requested_asset(),
-            note_type: pswap.note_type(),
             current_tip_note_id: original_note_id,
             current_depth: 0,
             remaining_offered: *pswap.offered_asset(),
@@ -122,21 +122,14 @@ impl PswapLineageRecord {
         self.creator_account_id
     }
 
-    pub fn offered_asset(&self) -> &FungibleAsset {
-        &self.offered_asset
-    }
-
-    pub fn requested_asset(&self) -> &FungibleAsset {
-        &self.requested_asset
-    }
-
-    pub fn note_type(&self) -> NoteType {
-        self.note_type
-    }
-
     /// Asset-pair tag — sync returns every remainder in this chain via it.
-    pub fn asset_pair_tag(&self) -> NoteTag {
-        PswapNote::create_tag(self.note_type(), self.offered_asset(), self.requested_asset())
+    /// `create_tag` reads only the assets' faucet prefixes, so the `remaining_*`
+    /// fields (same faucets, any amount) stand in for the original pair. The
+    /// `note_type` is not mirrored here; the caller supplies it (cheaply from the
+    /// note in scope at creation, or via `store::get_original_pswap` at a terminal
+    /// round).
+    pub fn asset_pair_tag(&self, note_type: NoteType) -> NoteTag {
+        PswapNote::create_tag(note_type, &self.remaining_offered, &self.remaining_requested)
     }
 }
 
@@ -184,47 +177,26 @@ pub enum PswapLineageFilter {
 // ================================================================================================
 
 /// Builds a [`PswapLineageRecord`] from its decoded fields. Lives here (not
-/// in a store backend) so alternative backends can reuse it. The two
-/// `remaining_*` amounts are paired with their faucets (taken from
-/// `offered_asset`/`requested_asset`) to rebuild the `FungibleAsset`s the
-/// record stores only as amounts.
+/// in a store backend) so alternative backends can reuse it. The `remaining_*`
+/// assets arrive whole (faucet + amount), so the only validation is decoding the
+/// `state_byte` into a known [`PswapLineageState`].
 #[allow(clippy::too_many_arguments)]
 pub fn build_record_from_fields(
     original_note_id: NoteId,
     order_id: Felt,
     creator_account_id: AccountId,
-    offered_asset: FungibleAsset,
-    requested_asset: FungibleAsset,
-    note_type: NoteType,
     current_tip_note_id: NoteId,
     current_depth: u32,
-    remaining_offered: u64,
-    remaining_requested: u64,
+    remaining_offered: FungibleAsset,
+    remaining_requested: FungibleAsset,
     state_byte: u8,
     created_at_block: BlockNumber,
     updated_at_block: BlockNumber,
 ) -> Result<PswapLineageRecord, PswapLineageError> {
-    // Faucets are chain-invariant (carried on the asset pair); the record stores only amounts.
-    let offered_faucet = offered_asset.faucet_id();
-    let requested_faucet = requested_asset.faucet_id();
-    let remaining_offered = FungibleAsset::new(offered_faucet, remaining_offered).map_err(|err| {
-        PswapLineageError::InconsistentRecord(format!(
-            "remaining_offered = {remaining_offered} (faucet {offered_faucet}) failed FungibleAsset construction: {err}"
-        ))
-    })?;
-    let remaining_requested = FungibleAsset::new(requested_faucet, remaining_requested).map_err(|err| {
-        PswapLineageError::InconsistentRecord(format!(
-            "remaining_requested = {remaining_requested} (faucet {requested_faucet}) failed FungibleAsset construction: {err}"
-        ))
-    })?;
-
     Ok(PswapLineageRecord {
         original_note_id,
         order_id,
         creator_account_id,
-        offered_asset,
-        requested_asset,
-        note_type,
         current_tip_note_id,
         current_depth,
         remaining_offered,
@@ -239,21 +211,20 @@ pub fn build_record_from_fields(
 // ================================================================================================
 
 /// Encodes the record's fields in declaration order: the `original_note_id`
-/// fetch handle and the mirrored immutable order facts, then the mutable tip
-/// state. The full depth-0 note is no longer inlined — it is recovered from
-/// `output_notes` via `original_note_id` when reconstruction needs it.
+/// fetch handle, the mirrored order id and creator, then the mutable tip state.
+/// The `remaining_*` assets are written whole so their faucets survive the
+/// round-trip (the record no longer mirrors the asset pair separately). The full
+/// depth-0 note is not inlined — it is recovered from `output_notes` via
+/// `original_note_id` when reconstruction or `note_type` recovery needs it.
 impl Serializable for PswapLineageRecord {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         self.original_note_id.write_into(target);
         self.order_id.write_into(target);
         self.creator_account_id.write_into(target);
-        self.offered_asset.write_into(target);
-        self.requested_asset.write_into(target);
-        self.note_type.write_into(target);
         self.current_tip_note_id.write_into(target);
         self.current_depth.write_into(target);
-        u64::from(self.remaining_offered.amount()).write_into(target);
-        u64::from(self.remaining_requested.amount()).write_into(target);
+        self.remaining_offered.write_into(target);
+        self.remaining_requested.write_into(target);
         self.state.as_u8().write_into(target);
         self.created_at_block.as_u32().write_into(target);
         self.updated_at_block.as_u32().write_into(target);
@@ -265,13 +236,10 @@ impl Deserializable for PswapLineageRecord {
         let original_note_id = NoteId::read_from(source)?;
         let order_id = Felt::read_from(source)?;
         let creator_account_id = AccountId::read_from(source)?;
-        let offered_asset = FungibleAsset::read_from(source)?;
-        let requested_asset = FungibleAsset::read_from(source)?;
-        let note_type = NoteType::read_from(source)?;
         let current_tip_note_id = NoteId::read_from(source)?;
         let current_depth = u32::read_from(source)?;
-        let remaining_offered = u64::read_from(source)?;
-        let remaining_requested = u64::read_from(source)?;
+        let remaining_offered = FungibleAsset::read_from(source)?;
+        let remaining_requested = FungibleAsset::read_from(source)?;
         let state_byte = u8::read_from(source)?;
         let created_at_block = u32::read_from(source)?;
         let updated_at_block = u32::read_from(source)?;
@@ -279,9 +247,6 @@ impl Deserializable for PswapLineageRecord {
             original_note_id,
             order_id,
             creator_account_id,
-            offered_asset,
-            requested_asset,
-            note_type,
             current_tip_note_id,
             current_depth,
             remaining_offered,
@@ -378,13 +343,17 @@ mod tests {
         updated_at_block: BlockNumber,
     ) -> Result<PswapLineageRecord, PswapLineageError> {
         let original_note_id = miden_protocol::note::Note::from(pswap.clone()).id();
+        // Pair the amounts with the order's faucets — the record now stores the
+        // `remaining_*` assets whole rather than recovering their faucets.
+        let remaining_offered =
+            FungibleAsset::new(pswap.offered_asset().faucet_id(), remaining_offered).unwrap();
+        let remaining_requested =
+            FungibleAsset::new(pswap.storage().requested_asset().faucet_id(), remaining_requested)
+                .unwrap();
         build_record_from_fields(
             original_note_id,
             pswap.order_id(),
             pswap.storage().creator_account_id(),
-            *pswap.offered_asset(),
-            *pswap.storage().requested_asset(),
-            pswap.note_type(),
             current_tip_note_id,
             current_depth,
             remaining_offered,
@@ -496,9 +465,10 @@ mod tests {
         }
     }
 
-    /// The mirrored scalars back the accessors with the same values the
-    /// depth-0 note would yield, so `order_id()`, `asset_pair_tag()` and
-    /// `creator_account_id()` stay correct without re-fetching the note.
+    /// The mirrored scalars and the `remaining_*` faucets back the accessors with
+    /// the same values the depth-0 note would yield, so `order_id()`,
+    /// `asset_pair_tag()` and `creator_account_id()` stay correct without
+    /// re-fetching the note (the caller supplies `note_type`).
     #[test]
     fn accessors_mirror_depth_zero_note() {
         let (sender, creator, offered_faucet, requested_faucet) = fixed_account_ids();
@@ -526,14 +496,14 @@ mod tests {
 
         assert_eq!(record.original_note_id, note.id());
         assert_eq!(record.order_id(), expected_order_id);
-        assert_eq!(record.asset_pair_tag(), expected_tag);
+        assert_eq!(record.asset_pair_tag(pswap.note_type()), expected_tag);
         assert_eq!(record.creator_account_id(), creator);
     }
 
     /// `Serializable`/`Deserializable` round-trip preserves every field,
-    /// including the faucets recovered (not stored) for the remaining
-    /// amounts. Exercised at an advanced depth with reduced amounts to
-    /// catch a faucet mix-up between offered/requested.
+    /// including the faucets carried on the `remaining_*` assets. Exercised at an
+    /// advanced depth with reduced amounts to catch a faucet mix-up between
+    /// offered/requested.
     #[test]
     fn value_codec_round_trips() {
         let (sender, creator, offered_faucet, requested_faucet) = fixed_account_ids();
@@ -556,12 +526,10 @@ mod tests {
 
         assert_eq!(decoded.original_note_id, record.original_note_id);
         assert_eq!(decoded.creator_account_id(), record.creator_account_id());
-        assert_eq!(decoded.offered_asset(), record.offered_asset());
-        assert_eq!(decoded.requested_asset(), record.requested_asset());
-        assert_eq!(decoded.note_type(), record.note_type());
         assert_eq!(decoded.order_id(), record.order_id());
         assert_eq!(decoded.current_tip_note_id, record.current_tip_note_id);
         assert_eq!(decoded.current_depth, record.current_depth);
+        // Full-asset equality covers both amount and faucet round-trip.
         assert_eq!(decoded.remaining_offered, record.remaining_offered);
         assert_eq!(decoded.remaining_requested, record.remaining_requested);
         assert_eq!(decoded.remaining_offered.amount(), AssetAmount::new(70).unwrap());

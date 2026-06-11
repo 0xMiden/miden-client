@@ -1,7 +1,5 @@
 //! Errors specific to PSWAP chain tracking.
 
-use alloc::string::String;
-
 use miden_protocol::Felt;
 use miden_protocol::account::AccountId;
 use miden_protocol::errors::{AssetError, NoteError};
@@ -56,10 +54,6 @@ pub enum PswapLineageError {
     /// A stored lineage's `state` byte has no matching [`PswapLineageState`] variant.
     #[error("unknown PSWAP lineage state byte: {0}")]
     UnknownState(u8),
-
-    /// A stored lineage record's fields are mutually inconsistent.
-    #[error("PSWAP lineage record is internally inconsistent: {0}")]
-    InconsistentRecord(String),
 
     /// More chain notes share an `(order_id, depth)` than the protocol's
     /// payback + remainder maximum of two. Reachable when an unrelated note
