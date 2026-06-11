@@ -785,7 +785,39 @@ pub async fn test_ntx_mint_produces_public_note_with_non_standard_script(
         .custom_script(noop_script)
         .expected_ntx_scripts(vec![registered_script])
         .build()?;
-    execute_tx_and_sync(&mut client, alice.id(), register_tx).await?;
+
+    // Submitting a request with `expected_ntx_scripts` chains two transactions on Alice: the
+    // implicit script-registration transaction and the no-op transaction on top of it. Both are
+    // applied to Alice's local state on submission, so until the second one commits, her on-chain
+    // state lags her local header. A sync issued in that window fetches the on-chain state and
+    // fails with a nonce regression when storing it. Poll the node directly (without syncing)
+    // until Alice's on-chain nonce catches up with her local nonce, and only then sync to mark
+    // the transactions as committed.
+    let register_tx_id = client.submit_new_transaction(alice.id(), register_tx).await?;
+    let local_nonce = client
+        .get_account(alice.id())
+        .await?
+        .context("alice's account should be tracked by the client")?
+        .nonce();
+    let mut chain_caught_up = false;
+    for _ in 0..60 {
+        // Before the first transaction commits the account is unknown on-chain and the request
+        // errors, so failures count as "not caught up yet" rather than aborting the poll.
+        if let Ok(Some(account)) = client.test_rpc_api().get_account_details(alice.id()).await
+            && account.nonce() == local_nonce
+        {
+            chain_caught_up = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+    ensure!(
+        chain_caught_up,
+        "timed out waiting for the script registration transactions to commit on-chain"
+    );
+    wait_for_tx(&mut client, register_tx_id).await?;
+    // The extra block adds an indexing margin, so the script is resolvable before the MINT's
+    // network transaction runs.
     wait_for_blocks(&mut client, 1).await;
 
     let registered_mint_tx = TransactionRequestBuilder::new()
