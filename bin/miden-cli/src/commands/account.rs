@@ -58,7 +58,7 @@ impl AccountCmd {
                 ..
             } => {
                 let account_id = parse_account_id(&client, id).await?;
-                show_account(client, account_id, &cli_config.rpc, self.with_code).await?;
+                show_account(&client, account_id, &cli_config.rpc, self.with_code).await?;
             },
             AccountCmd {
                 list: false,
@@ -134,7 +134,7 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
 // ================================================================================================
 
 async fn show_account<AUTH>(
-    client: Client<AUTH>,
+    client: &Client<AUTH>,
     account_id: AccountId,
     rpc_config: &RpcConfig,
     with_code: bool,
@@ -173,7 +173,7 @@ async fn show_account<AUTH>(
                 Asset::Fungible(fungible_asset) => {
                     let faucet_id = fungible_asset.faucet_id();
                     let amount_u64 = fungible_asset.amount().as_u64();
-                    let (faucet, amount) = match get_faucet_component(&client, faucet_id).await {
+                    let (faucet, amount) = match get_faucet_component(client, faucet_id).await {
                         Ok(faucet_component) => (
                             faucet_component.symbol().to_string(),
                             base_units_to_tokens(amount_u64, faucet_component.decimals()),
