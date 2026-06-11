@@ -182,6 +182,36 @@ impl NoteScreener {
             .await?
             .ok_or(NoteScreenerError::AccountDataNotFound(account_id))
     }
+
+    /// Returns `true` if the committed note is already being tracked as an input note, matching by
+    /// id. Tracked records imported without metadata have a NULL `note_id`, so for those the id is
+    /// reconstructed from the committed metadata.
+    async fn committed_input_note_is_tracked(
+        &self,
+        committed_note: &CommittedNote,
+    ) -> Result<bool, ClientError> {
+        let note_id = *committed_note.note_id();
+
+        if !self
+            .store
+            .get_input_notes(NoteFilter::Unique(NoteRef::Id(note_id)))
+            .await?
+            .is_empty()
+        {
+            return Ok(true);
+        }
+
+        let metadata = committed_note.metadata();
+        let matched = self
+            .store
+            .get_input_notes(NoteFilter::Expected)
+            .await?
+            .iter()
+            .filter(|note| note.metadata().is_none())
+            .any(|note| NoteId::new(note.details_commitment(), metadata) == note_id);
+
+        Ok(matched)
+    }
 }
 
 // DEFAULT CALLBACK IMPLEMENTATIONS
@@ -200,27 +230,7 @@ impl OnNoteReceived for NoteScreener {
     ) -> Result<NoteUpdateAction, ClientError> {
         let note_id = *committed_note.note_id();
 
-        let mut input_note_present = !self
-            .store
-            .get_input_notes(NoteFilter::Unique(NoteRef::Id(note_id)))
-            .await?
-            .is_empty();
-
-        // Notes imported without metadata (e.g. via `NoteFile::NoteDetails`) have a NULL `note_id`
-        // and so can't be matched by id. Recognize them by reconstructing their id from the
-        // committed metadata: `NoteId::new(details_commitment, metadata)`.
-        // TODO: revisit
-        if !input_note_present {
-            input_note_present = self
-                .store
-                .get_input_notes(NoteFilter::Expected)
-                .await?
-                .iter()
-                .filter(|note| note.metadata().is_none())
-                .any(|note| {
-                    NoteId::new(note.details_commitment(), committed_note.metadata()) == note_id
-                });
-        }
+        let input_note_present = self.committed_input_note_is_tracked(&committed_note).await?;
 
         let output_note_present = !self
             .store
