@@ -19,7 +19,7 @@ use crate::ClientError;
 use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::note::CommittedNote;
 use crate::store::data_store::ClientDataStore;
-use crate::store::{InputNoteRecord, NoteFilter, Store, StoreError};
+use crate::store::{InputNoteRecord, NoteFilter, NoteRef, Store, StoreError};
 use crate::sync::{NoteUpdateAction, OnNoteReceived};
 use crate::transaction::{AdviceMap, InputNote, TransactionArgs, TransactionRequestError};
 
@@ -200,8 +200,11 @@ impl OnNoteReceived for NoteScreener {
     ) -> Result<NoteUpdateAction, ClientError> {
         let note_id = *committed_note.note_id();
 
-        let mut input_note_present =
-            !self.store.get_input_notes(NoteFilter::Unique(note_id)).await?.is_empty();
+        let mut input_note_present = !self
+            .store
+            .get_input_notes(NoteFilter::Unique(NoteRef::Id(note_id)))
+            .await?
+            .is_empty();
 
         // Notes imported without metadata (e.g. via `NoteFile::NoteDetails`) have a NULL `note_id`
         // and so can't be matched by id. Recognize them by reconstructing their id from the
@@ -219,8 +222,11 @@ impl OnNoteReceived for NoteScreener {
                 });
         }
 
-        let output_note_present =
-            !self.store.get_output_notes(NoteFilter::Unique(note_id)).await?.is_empty();
+        let output_note_present = !self
+            .store
+            .get_output_notes(NoteFilter::Unique(NoteRef::Id(note_id)))
+            .await?
+            .is_empty();
 
         if input_note_present || output_note_present {
             // The note is being tracked by the client so it is relevant

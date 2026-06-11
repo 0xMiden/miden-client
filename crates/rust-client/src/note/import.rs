@@ -29,7 +29,7 @@ use miden_tx::auth::TransactionAuthenticator;
 use crate::rpc::RpcError;
 use crate::rpc::domain::note::FetchedNote;
 use crate::store::input_note_states::ExpectedNoteState;
-use crate::store::{InputNoteRecord, InputNoteState, NoteFilter};
+use crate::store::{InputNoteRecord, InputNoteState, NoteFilter, NoteRef};
 use crate::sync::NoteTagRecord;
 use crate::{Client, ClientError};
 
@@ -90,14 +90,14 @@ where
         // Resolve previously stored versions: by id for `NoteFile::NoteId`, by details commitment
         // otherwise (which also matches metadata-less records, whose `note_id` is NULL).
         let previous_by_id: BTreeMap<NoteId, InputNoteRecord> = self
-            .get_input_notes(NoteFilter::List(ids.iter().copied().collect()))
+            .get_input_notes(NoteFilter::List(ids.iter().copied().map(NoteRef::Id).collect()))
             .await?
             .into_iter()
             .filter_map(|note| note.id().map(|id| (id, note)))
             .collect();
         let previous_by_commitment: BTreeMap<NoteDetailsCommitment, InputNoteRecord> = self
-            .get_input_notes(NoteFilter::DetailsCommitments(
-                files_by_commitment.keys().copied().collect(),
+            .get_input_notes(NoteFilter::List(
+                files_by_commitment.keys().copied().map(NoteRef::Commitment).collect(),
             ))
             .await?
             .into_iter()

@@ -128,7 +128,9 @@ async fn export_note<AUTH: Keystore + Sync>(
         .id();
 
     let output_note = client
-        .get_output_notes(miden_client::store::NoteFilter::Unique(note_id))
+        .get_output_notes(miden_client::store::NoteFilter::Unique(
+            miden_client::store::NoteRef::Id(note_id),
+        ))
         .await?
         .pop()
         .expect("should have an output note");

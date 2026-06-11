@@ -731,6 +731,39 @@ impl TransactionFilter {
     }
 }
 
+// NOTE REFERENCE
+// ================================================================================================
+
+/// A reference to a note by one of its two identity keys. Callers pass whichever they hold.
+///
+/// The keys differ in what they commit to. The details commitment covers only the note's contents
+/// and spend path (serial number, script, inputs, assets); the same details paired with different
+/// metadata yield distinct notes with distinct [`NoteId`]s and nullifiers. The `NoteId` is the
+/// canonical protocol identity because it additionally binds the metadata. In practice a note's
+/// serial number is unique, so its details commitment is a reliable local handle — and the only one
+/// available before metadata arrives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum NoteRef {
+    /// Reference a note by its [`NoteId`], the canonical identity binding details and metadata.
+    /// Known only once the note's metadata is available (for imported notes, on commit).
+    Id(NoteId),
+    /// Reference a note by its metadata-independent [`NoteDetailsCommitment`]. Always available,
+    /// including for metadata-less notes (whose `note_id` is NULL until metadata arrives).
+    Commitment(NoteDetailsCommitment),
+}
+
+impl From<NoteId> for NoteRef {
+    fn from(id: NoteId) -> Self {
+        NoteRef::Id(id)
+    }
+}
+
+impl From<NoteDetailsCommitment> for NoteRef {
+    fn from(commitment: NoteDetailsCommitment) -> Self {
+        NoteRef::Commitment(commitment)
+    }
+}
+
 // NOTE FILTER
 // ================================================================================================
 
@@ -748,21 +781,19 @@ pub enum NoteFilter {
     /// Return a list of expected notes ([`InputNoteRecord`] or [`OutputNoteRecord`]). These
     /// represent notes for which the store doesn't have anchor data.
     Expected,
-    /// Return a list containing any notes that match with the provided [`NoteId`] vector.
-    List(Vec<NoteId>),
-    /// Return a list containing any notes whose details commitment matches one of the provided
-    /// [`NoteDetailsCommitment`] vector. Unlike [`NoteFilter::List`], this matches the
-    /// metadata-independent details commitment, so it also resolves metadata-less notes (which
-    /// have a NULL `note_id`).
-    DetailsCommitments(Vec<NoteDetailsCommitment>),
+    /// Return a list containing any notes matching one of the provided [`NoteRef`]s. A
+    /// [`NoteRef::Id`] matches against the note ID; a [`NoteRef::Commitment`] matches against the
+    /// metadata-independent details commitment, which also resolves metadata-less notes (whose
+    /// `note_id` is NULL).
+    List(Vec<NoteRef>),
     /// Return a list containing any notes that match the provided [`Nullifier`] vector.
     Nullifiers(Vec<Nullifier>),
     /// Return a list of notes that are currently being processed. This filter doesn't apply to
     /// output notes.
     Processing,
-    /// Return a list containing the note that matches with the provided [`NoteId`]. The query will
-    /// return an error if the note isn't found.
-    Unique(NoteId),
+    /// Return a list containing the note matching the provided [`NoteRef`], or an empty list if no
+    /// note matches. A single-note convenience equivalent to [`NoteFilter::List`] with one element.
+    Unique(NoteRef),
     /// Return a list containing notes that haven't been nullified yet, this includes expected,
     /// committed, processing and unverified notes.
     Unspent,

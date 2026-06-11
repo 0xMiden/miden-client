@@ -46,7 +46,7 @@ use miden_client::note::{
     P2idNoteStorage,
     PartialNoteMetadata,
 };
-use miden_client::store::{InputNoteState, NoteFilter};
+use miden_client::store::{InputNoteState, NoteFilter, NoteRef};
 use miden_client::sync::NoteTagSource;
 use miden_client::testing::common::{
     TestClient,
@@ -439,7 +439,7 @@ pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> R
     for _ in 0..10 {
         client.sync_state().await?;
         if let Some(record) = client
-            .get_input_notes(NoteFilter::DetailsCommitments(vec![details_commitment]))
+            .get_input_notes(NoteFilter::List(vec![NoteRef::Commitment(details_commitment)]))
             .await?
             .pop()
             && record.is_consumed()
@@ -546,7 +546,9 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
 
         client_2.sync_state().await?;
         if let Some(rec) = client_2
-            .get_input_notes(NoteFilter::DetailsCommitments(vec![expected_output_commitment]))
+            .get_input_notes(NoteFilter::List(vec![NoteRef::Commitment(
+                expected_output_commitment,
+            )]))
             .await?
             .pop()
             && matches!(rec.state(), InputNoteState::Committed { .. })

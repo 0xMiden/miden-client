@@ -4,10 +4,44 @@
 use std::rc::Rc;
 
 use miden_client::note::BlockNumber;
-use miden_client::store::{InputNoteState, NoteFilter, OutputNoteState};
+use miden_client::store::{InputNoteState, NoteFilter, NoteRef, OutputNoteState};
 use rusqlite::types::Value;
 
 type NoteQueryParams = Vec<Rc<Vec<Value>>>;
+
+/// Builds the WHERE condition for a [`NoteFilter::List`]. [`NoteRef::Id`]s are matched against the
+/// `note_id` column and [`NoteRef::Commitment`]s against the `details_commitment` column, OR'd
+/// together. An empty ref list matches nothing.
+fn note_refs_condition(refs: &[NoteRef]) -> (String, NoteQueryParams) {
+    let mut ids = Vec::new();
+    let mut commitments = Vec::new();
+    for note_ref in refs {
+        match note_ref {
+            NoteRef::Id(id) => ids.push(Value::Text(id.as_word().to_string())),
+            NoteRef::Commitment(commitment) => commitments.push(Value::Text(commitment.to_hex())),
+        }
+    }
+
+    let mut params: NoteQueryParams = Vec::new();
+    let mut clauses = Vec::new();
+    // Params are pushed in the same order as their `?` placeholders so positional binding lines up.
+    if !ids.is_empty() {
+        params.push(Rc::new(ids));
+        clauses.push("note.note_id IN rarray(?)");
+    }
+    if !commitments.is_empty() {
+        params.push(Rc::new(commitments));
+        clauses.push("note.details_commitment IN rarray(?)");
+    }
+
+    let condition = if clauses.is_empty() {
+        "(1 = 0)".to_string()
+    } else {
+        format!("({})", clauses.join(" OR "))
+    };
+
+    (condition, params)
+}
 
 /// Returns the output notes query for a specific `NoteFilter`
 pub(super) fn note_filter_to_query_output_notes(filter: &NoteFilter) -> (String, NoteQueryParams) {
@@ -49,28 +83,15 @@ pub(super) fn note_filter_output_notes_condition(filter: &NoteFilter) -> (String
             )
         },
         NoteFilter::Processing | NoteFilter::Unverified => "1 = 0".to_string(),
-        NoteFilter::Unique(note_id) => {
-            let note_ids_list = vec![Value::Text(note_id.as_word().to_string())];
-            params.push(Rc::new(note_ids_list));
-            "note.note_id IN rarray(?)".to_string()
+        NoteFilter::List(refs) => {
+            let (condition, ref_params) = note_refs_condition(refs);
+            params.extend(ref_params);
+            condition
         },
-        NoteFilter::List(note_ids) => {
-            let note_ids_list = note_ids
-                .iter()
-                .map(|note_id| Value::Text(note_id.as_word().to_string()))
-                .collect::<Vec<Value>>();
-
-            params.push(Rc::new(note_ids_list));
-            "note.note_id IN rarray(?)".to_string()
-        },
-        NoteFilter::DetailsCommitments(commitments) => {
-            let commitments_list = commitments
-                .iter()
-                .map(|commitment| Value::Text(commitment.to_hex()))
-                .collect::<Vec<Value>>();
-
-            params.push(Rc::new(commitments_list));
-            "note.details_commitment IN rarray(?)".to_string()
+        NoteFilter::Unique(note_ref) => {
+            let (condition, ref_params) = note_refs_condition(core::slice::from_ref(note_ref));
+            params.extend(ref_params);
+            condition
         },
         NoteFilter::Nullifiers(nullifiers) => {
             let nullifiers_list = nullifiers
@@ -184,28 +205,15 @@ pub(super) fn note_filter_input_notes_condition(filter: &NoteFilter) -> (String,
                 InputNoteState::STATE_PROCESSING_UNAUTHENTICATED
             )
         },
-        NoteFilter::Unique(note_id) => {
-            let note_ids_list = vec![Value::Text(note_id.as_word().to_string())];
-            params.push(Rc::new(note_ids_list));
-            "(note.note_id IN rarray(?))".to_string()
+        NoteFilter::List(refs) => {
+            let (condition, ref_params) = note_refs_condition(refs);
+            params.extend(ref_params);
+            condition
         },
-        NoteFilter::List(note_ids) => {
-            let note_ids_list = note_ids
-                .iter()
-                .map(|note_id| Value::Text(note_id.as_word().to_string()))
-                .collect::<Vec<Value>>();
-
-            params.push(Rc::new(note_ids_list));
-            "(note.note_id IN rarray(?))".to_string()
-        },
-        NoteFilter::DetailsCommitments(commitments) => {
-            let commitments_list = commitments
-                .iter()
-                .map(|commitment| Value::Text(commitment.to_hex()))
-                .collect::<Vec<Value>>();
-
-            params.push(Rc::new(commitments_list));
-            "(note.details_commitment IN rarray(?))".to_string()
+        NoteFilter::Unique(note_ref) => {
+            let (condition, ref_params) = note_refs_condition(core::slice::from_ref(note_ref));
+            params.extend(ref_params);
+            condition
         },
         NoteFilter::Nullifiers(nullifiers) => {
             let nullifiers_list = nullifiers

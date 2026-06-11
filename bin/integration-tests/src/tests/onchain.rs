@@ -15,7 +15,7 @@ use miden_client::note::{
     P2idNote,
 };
 use miden_client::rpc::{AcceptHeaderError, RpcError};
-use miden_client::store::{InputNoteState, NoteFilter, TransactionFilter};
+use miden_client::store::{InputNoteState, NoteFilter, NoteRef, TransactionFilter};
 use miden_client::sync::NoteTagSource;
 use miden_client::testing::common::*;
 use miden_client::transaction::{
@@ -320,7 +320,7 @@ pub async fn test_onchain_accounts(client_config: ClientConfig) -> Result<()> {
     // metadata, so look it up by its details commitment rather than its note ID.
     let details_commitment = notes[0].details_commitment();
     let input_note = client_1
-        .get_input_notes(NoteFilter::DetailsCommitments(vec![details_commitment]))
+        .get_input_notes(NoteFilter::List(vec![NoteRef::Commitment(details_commitment)]))
         .await?
         .pop()
         .with_context(|| format!("input note {note_id} not found"))?;

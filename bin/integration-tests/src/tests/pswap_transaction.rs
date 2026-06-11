@@ -3,7 +3,7 @@ use miden_client::account::AccountType;
 use miden_client::asset::FungibleAsset;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::note::{Note, NoteDetails, NoteType, PswapNote};
-use miden_client::store::NoteFilter;
+use miden_client::store::{NoteFilter, NoteRef};
 use miden_client::testing::common::*;
 use miden_client::transaction::{PswapTransactionData, TransactionRequestBuilder};
 use tracing::info;
@@ -122,7 +122,7 @@ pub async fn test_pswap_full_fill_onchain(client_config: ClientConfig) -> Result
     alice_client.sync_state().await?;
     let payback_commitment = payback_note_details[0].commitment();
     let payback_note: Note = alice_client
-        .get_input_notes(NoteFilter::DetailsCommitments(vec![payback_commitment]))
+        .get_input_notes(NoteFilter::List(vec![NoteRef::Commitment(payback_commitment)]))
         .await?
         .pop()
         .with_context(|| format!("Payback note {} not found", payback_commitment.to_hex()))?
@@ -271,9 +271,11 @@ pub async fn test_pswap_partial_fill_onchain(client_config: ClientConfig) -> Res
     );
 
     // Locate the remainder PSWAP note among Bob's tracked input notes and verify its amounts.
-    let commitments = future_notes.iter().map(|details| details.commitment()).collect();
-    let bob_input_notes =
-        bob_client.get_input_notes(NoteFilter::DetailsCommitments(commitments)).await?;
+    let refs = future_notes
+        .iter()
+        .map(|details| NoteRef::Commitment(details.commitment()))
+        .collect();
+    let bob_input_notes = bob_client.get_input_notes(NoteFilter::List(refs)).await?;
     let mut remainder_pswap = None;
     for record in &bob_input_notes {
         if let Ok(note) = TryInto::<Note>::try_into(record.clone())

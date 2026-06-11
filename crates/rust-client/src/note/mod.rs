@@ -65,7 +65,7 @@ use alloc::vec::Vec;
 use miden_protocol::account::AccountId;
 use miden_tx::auth::TransactionAuthenticator;
 
-use crate::store::{InputNoteRecord, NoteFilter, OutputNoteRecord};
+use crate::store::{InputNoteRecord, NoteFilter, NoteRef, OutputNoteRecord};
 use crate::{Client, ClientError, IdPrefixFetchError};
 
 mod import;
@@ -140,11 +140,6 @@ where
     // --------------------------------------------------------------------------------------------
 
     /// Retrieves the input notes managed by the client from the store.
-    ///
-    /// # Errors
-    ///
-    /// Returns a [`ClientError::StoreError`] if the filter is [`NoteFilter::Unique`] and there is
-    /// no Note with the provided ID.
     pub async fn get_input_notes(
         &self,
         filter: NoteFilter,
@@ -212,7 +207,11 @@ where
         &self,
         note_id: NoteId,
     ) -> Result<Option<InputNoteRecord>, ClientError> {
-        Ok(self.store.get_input_notes(NoteFilter::Unique(note_id)).await?.pop())
+        Ok(self
+            .store
+            .get_input_notes(NoteFilter::Unique(NoteRef::Id(note_id)))
+            .await?
+            .pop())
     }
 
     // OUTPUT NOTE DATA RETRIEVAL
@@ -231,7 +230,11 @@ where
         &self,
         note_id: NoteId,
     ) -> Result<Option<OutputNoteRecord>, ClientError> {
-        Ok(self.store.get_output_notes(NoteFilter::Unique(note_id)).await?.pop())
+        Ok(self
+            .store
+            .get_output_notes(NoteFilter::Unique(NoteRef::Id(note_id)))
+            .await?
+            .pop())
     }
 
     /// Returns an [`InputNoteReader`] that lazily iterates over consumed input notes

@@ -105,6 +105,7 @@ use crate::store::{
     InputNoteState,
     NoteFilter,
     NoteRecordError,
+    NoteRef,
     OutputNoteRecord,
     Store,
     StoreError,
@@ -345,7 +346,9 @@ where
         // Retrieve all input notes from the store.
         let mut stored_note_records = self
             .store
-            .get_input_notes(NoteFilter::List(transaction_request.input_note_ids().collect()))
+            .get_input_notes(NoteFilter::List(
+                transaction_request.input_note_ids().map(NoteRef::Id).collect(),
+            ))
             .await?;
 
         // Verify that none of the authenticated input notes are already consumed.
@@ -910,11 +913,15 @@ where
         }));
 
         // Locally consumed notes
-        let consumed_note_ids =
-            executed_tx.tx_inputs().input_notes().iter().map(InputNote::id).collect();
+        let consumed_note_refs = executed_tx
+            .tx_inputs()
+            .input_notes()
+            .iter()
+            .map(|n| NoteRef::Id(n.id()))
+            .collect();
 
         let consumed_notes =
-            self.store.get_input_notes(NoteFilter::List(consumed_note_ids)).await?;
+            self.store.get_input_notes(NoteFilter::List(consumed_note_refs)).await?;
 
         let mut updated_input_notes = vec![];
 

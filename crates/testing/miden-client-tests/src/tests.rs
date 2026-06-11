@@ -27,6 +27,7 @@ use miden_client::store::{
     InputNoteRecord,
     InputNoteState,
     NoteFilter,
+    NoteRef,
     OutputNoteState,
     TransactionFilter,
 };
@@ -215,7 +216,9 @@ async fn get_input_note() {
 
     // The note is imported without metadata, so it's retrieved by its details commitment.
     let retrieved_note = client
-        .get_input_notes(NoteFilter::DetailsCommitments(vec![original_note.details_commitment()]))
+        .get_input_notes(NoteFilter::List(vec![NoteRef::Commitment(
+            original_note.details_commitment(),
+        )]))
         .await
         .unwrap()
         .pop()
@@ -901,20 +904,21 @@ async fn import_note_validation() {
         .unwrap();
 
     // The expected note was imported without metadata, so it's retrieved by its details commitment.
-    let expected_note = Box::pin(client.get_input_notes(NoteFilter::DetailsCommitments(vec![
-        expected_note.note().unwrap().details_commitment(),
-    ])))
-    .await
-    .unwrap()
-    .pop()
-    .unwrap();
+    let expected_note =
+        Box::pin(client.get_input_notes(NoteFilter::List(vec![NoteRef::Commitment(
+            expected_note.note().unwrap().details_commitment(),
+        )])))
+        .await
+        .unwrap()
+        .pop()
+        .unwrap();
 
     // The consumed note is in `ConsumedExternal` state (no metadata), so it's retrieved by its
     // details commitment rather than by `NoteId`.
     let consumed_note = client
-        .get_input_notes(NoteFilter::DetailsCommitments(vec![
+        .get_input_notes(NoteFilter::List(vec![NoteRef::Commitment(
             consumed_note.note().unwrap().details_commitment(),
-        ]))
+        )]))
         .await
         .unwrap()
         .pop()
@@ -1392,7 +1396,7 @@ async fn input_note_reader_finds_externally_consumed_notes() {
     // The note is in ConsumedExternal state (no metadata), so it's retrieved by its details
     // commitment rather than by `NoteId`.
     let input_note = client
-        .get_input_notes(NoteFilter::DetailsCommitments(vec![p2id_details_commitment]))
+        .get_input_notes(NoteFilter::List(vec![NoteRef::Commitment(p2id_details_commitment)]))
         .await
         .unwrap()
         .pop()
@@ -3585,7 +3589,9 @@ async fn sync_stores_private_note_attachments() {
         .unwrap();
 
     let expected = client
-        .get_input_notes(NoteFilter::DetailsCommitments(vec![private_note.details_commitment()]))
+        .get_input_notes(NoteFilter::List(vec![NoteRef::Commitment(
+            private_note.details_commitment(),
+        )]))
         .await
         .unwrap()
         .pop()
