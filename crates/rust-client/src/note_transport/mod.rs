@@ -4,6 +4,7 @@ pub mod generated;
 pub mod grpc;
 
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -17,6 +18,7 @@ use miden_protocol::note::{
     NoteDetailsCommitment,
     NoteFile,
     NoteHeader,
+    NoteId,
     NoteTag,
 };
 use miden_protocol::utils::serde::Serializable;
@@ -268,26 +270,23 @@ where
         )))
     }
 
-    /// Fetch one batch of notes from the note transport network for the
-    /// provided tags.
+    /// Fetch one batch of notes from the note transport network for the provided tags.
     ///
-    /// The server paginates; this method issues one RPC and returns the
-    /// imported details commitments together with the new cursor. The returned
-    /// cursor equals the input cursor when the batch was empty (i.e. no new
-    /// notes). Callers that want to drain the full backlog should loop until
-    /// `new_cursor == cursor` (see [`Client::fetch_all_private_notes`]).
-    /// Callers that do steady-state polling (see [`Client::sync_state`] /
-    /// [`Client::fetch_private_notes`]) should call this once per tick with
-    /// the stored cursor.
+    /// The server paginates; this method issues one RPC and returns the imported details
+    /// commitments together with the new cursor. The returned cursor equals the input cursor when
+    /// the batch was empty (i.e. no new notes). Callers that want to drain the full backlog should
+    /// loop until `new_cursor == cursor` (see [`Client::fetch_all_private_notes`]). Callers that do
+    /// steady-state polling (see [`Client::sync_state`] / [`Client::fetch_private_notes`]) should
+    /// call this once per tick with the stored cursor.
     ///
-    /// Downloaded notes are imported into the local store. Persistence of the
-    /// returned cursor is left to the caller so that drain loops can guard
-    /// against regression of an already-advanced stored cursor.
+    /// Downloaded notes are imported into the local store. Persistence of the returned cursor is
+    /// left to the caller so that drain loops can guard against regression of an already-advanced
+    /// stored cursor.
     pub(crate) async fn fetch_transport_notes(
         &mut self,
         cursor: NoteTransportCursor,
         tags: &[NoteTag],
-    ) -> Result<(Vec<NoteDetailsCommitment>, NoteTransportCursor), ClientError> {
+    ) -> Result<(Vec<NoteId>, NoteTransportCursor), ClientError> {
         // Number of blocks to look back from sync height when scanning for committed notes.
         // Handles the race where a note is committed on-chain just before the NTL delivers
         // its data — without this, check_expected_notes would scan from sync_height forward
@@ -309,6 +308,9 @@ where
         let after_block_num =
             BlockNumber::from(sync_height.as_u32().saturating_sub(NOTE_LOOKBACK_BLOCKS));
 
+        let id_by_commitment: BTreeMap<NoteDetailsCommitment, NoteId> =
+            notes.iter().map(|note| (note.details_commitment(), note.id())).collect();
+
         let mut note_requests = Vec::with_capacity(notes.len());
         for note in notes {
             let tag = note.metadata().tag();
@@ -320,8 +322,12 @@ where
             note_requests.push(note_file);
         }
         let imported_commitments = self.import_notes(&note_requests).await?;
+        let imported_ids = imported_commitments
+            .into_iter()
+            .filter_map(|commitment| id_by_commitment.get(&commitment).copied())
+            .collect();
 
-        Ok((imported_commitments, rcursor))
+        Ok((imported_ids, rcursor))
     }
 }
 
