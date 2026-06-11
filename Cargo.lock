@@ -2729,7 +2729,8 @@ dependencies = [
 [[package]]
 name = "miden-node-grpc-error-macro"
 version = "0.15.0"
-source = "git+https://github.com/0xMiden/node.git?rev=6649a4ce774bc842c08e6bdc314f6ddafb816282#6649a4ce774bc842c08e6bdc314f6ddafb816282"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3eddc5adf6c7b45eb1cdb79efbe30aeb40d0f993e31926f550401a32b52fb316"
 dependencies = [
  "quote",
  "syn 2.0.117",
@@ -2738,7 +2739,8 @@ dependencies = [
 [[package]]
 name = "miden-node-proto"
 version = "0.15.0"
-source = "git+https://github.com/0xMiden/node.git?rev=6649a4ce774bc842c08e6bdc314f6ddafb816282#6649a4ce774bc842c08e6bdc314f6ddafb816282"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1106f2d9e91c3f164d59ee9449307163265e98f7849d80c5a9ea090a7c063e38"
 dependencies = [
  "anyhow",
  "build-rs",
@@ -2764,7 +2766,8 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.15.0"
-source = "git+https://github.com/0xMiden/node.git?rev=6649a4ce774bc842c08e6bdc314f6ddafb816282#6649a4ce774bc842c08e6bdc314f6ddafb816282"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef3b301741cedd6d0b532583690bc21dbf856d4e14218c591f3924bc905c660a"
 dependencies = [
  "build-rs",
  "codegen",
@@ -2777,7 +2780,8 @@ dependencies = [
 [[package]]
 name = "miden-node-utils"
 version = "0.15.0"
-source = "git+https://github.com/0xMiden/node.git?rev=6649a4ce774bc842c08e6bdc314f6ddafb816282#6649a4ce774bc842c08e6bdc314f6ddafb816282"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebb0f721bd2c51ea932b599ba333d393afde1d01ffa6b07a19f67cca8c865a7d"
 dependencies = [
  "anyhow",
  "backon",
@@ -2919,7 +2923,8 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.15.0"
-source = "git+https://github.com/0xMiden/node.git?rev=6649a4ce774bc842c08e6bdc314f6ddafb816282#6649a4ce774bc842c08e6bdc314f6ddafb816282"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2acdb9494689feeec0f60e3b61901b5eb2362b49b993b4cbc3eb75ad83514dd"
 dependencies = [
  "build-rs",
  "fs-err",

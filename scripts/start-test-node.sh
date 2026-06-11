@@ -5,10 +5,9 @@
 # mirrors the node repo's own `scripts/run-node.sh` wiring, so network transactions work without
 # any external service.
 #
-# Binaries are built with `cargo install` from the exact git rev our workspace pins for the
-# `miden-node-*` crates (read from Cargo.lock), so they stay in lockstep with our library deps —
-# including unreleased revs, which have no published binaries to download. `cargo install` is a
-# no-op when that rev is already installed.
+# Binaries are installed with `cargo install` from the node source pinned in Cargo.lock — a git
+# rev if one is pinned (covers unreleased revs), otherwise crates.io at the locked version — so
+# they stay in lockstep with our library deps.
 #
 # To keep the compile cheap, the install reuses a persistent `--target-dir` ($CACHE/build) so
 # only crates that changed between revs recompile. In CI a dedicated `build-test-node` job builds
@@ -19,7 +18,7 @@
 # Modes:
 #   (no args)        build/install if needed, then bootstrap and start the node (default)
 #   --install-only   build/install the node binaries and exit (used by the CI build job)
-#   --print-rev      print the pinned node rev resolved from Cargo.lock and exit
+#   --print-rev      print the pinned node rev or version (CI cache key) and exit
 
 set -euo pipefail
 
@@ -51,13 +50,28 @@ PROVER="127.0.0.1:$PROVER_PORT"
 # "Network transactions may not be submitted by users yet".
 NETWORK_TX_AUTH="${MIDEN_NETWORK_TX_AUTH:-miden-client-testing-ntx-secret}"
 
-# Resolve the pinned node url + rev from Cargo.lock.
-# Example: source = "git+https://github.com/0xMiden/node.git?branch=<b>#<sha>"
+NODE_BINS=(miden-validator miden-node miden-ntx-builder miden-remote-prover)
+
+# Resolve the pinned node source from Cargo.lock: a git pin
+# (source = "git+https://github.com/0xMiden/node.git?<ref>#<sha>") takes precedence,
+# otherwise use the crates.io version locked for `miden-node-proto`.
 SRC_LINE="$(grep -m1 'source = "git+https://github.com/0xMiden/node' "$ROOT/Cargo.lock" || true)"
-[ -n "$SRC_LINE" ] || { echo "error: no 0xMiden/node git source in Cargo.lock" >&2; exit 1; }
-SRC="${SRC_LINE#*\"git+}"; SRC="${SRC%\"}"
-NODE_REV="${SRC##*#}"
-NODE_URL="${SRC%%#*}"; NODE_URL="${NODE_URL%%\?*}"
+if [ -n "$SRC_LINE" ]; then
+    NODE_SOURCE="git"
+    SRC="${SRC_LINE#*\"git+}"; SRC="${SRC%\"}"
+    NODE_REV="${SRC##*#}"
+    NODE_URL="${SRC%%#*}"; NODE_URL="${NODE_URL%%\?*}"
+    NODE_DESC="$NODE_URL @ $NODE_REV"
+else
+    NODE_SOURCE="registry"
+    NODE_VERSION="$(awk -F'"' '/^name = "miden-node-proto"$/ { getline; print $2; exit }' "$ROOT/Cargo.lock")"
+    [ -n "$NODE_VERSION" ] || {
+        echo "error: no 0xMiden/node git source and no miden-node-proto version in Cargo.lock" >&2
+        exit 1
+    }
+    NODE_REV="v$NODE_VERSION"
+    NODE_DESC="crates.io @ $NODE_VERSION"
+fi
 
 if [ "$MODE" = "print-rev" ]; then
     echo "$NODE_REV"
@@ -68,24 +82,35 @@ node_binaries_installed() {
     local metadata="$CACHE/install/.crates.toml"
     [ -f "$metadata" ] || return 1
 
-    for bin in miden-validator miden-node miden-ntx-builder miden-remote-prover; do
+    # `.crates.toml` records each install as `"<bin> <version> (<source>)"`.
+    for bin in "${NODE_BINS[@]}"; do
         [ -x "$BIN/$bin" ] || return 1
-        if ! grep -F "\"$bin " "$metadata" | grep -Fq "#$NODE_REV)"; then
-            return 1
+        if [ "$NODE_SOURCE" = "git" ]; then
+            grep -F "\"$bin " "$metadata" | grep -Fq "#$NODE_REV)" || return 1
+        else
+            grep -Fq "\"$bin $NODE_VERSION (registry+" "$metadata" || return 1
         fi
     done
 }
 
 if node_binaries_installed; then
-    echo "==> using cached node binaries ($NODE_URL @ $NODE_REV)"
+    echo "==> using cached node binaries ($NODE_DESC)"
 else
-    echo "==> installing node binaries ($NODE_URL @ $NODE_REV)"
+    echo "==> installing node binaries ($NODE_DESC)"
+    INSTALL_SPECS=("${NODE_BINS[@]}")
+    if [ "$NODE_SOURCE" = "git" ]; then
+        INSTALL_FLAGS=(--git "$NODE_URL" --rev "$NODE_REV")
+    else
+        INSTALL_FLAGS=()
+        INSTALL_SPECS=()
+        for bin in "${NODE_BINS[@]}"; do INSTALL_SPECS+=("$bin@$NODE_VERSION"); done
+    fi
     # Override the profile to drop debug info and strip symbols to reduce the size
     CARGO_PROFILE_RELEASE_DEBUG=false \
     CARGO_PROFILE_RELEASE_STRIP=symbols \
         cargo install --locked --root "$CACHE/install" --target-dir "$BUILD" \
-        --git "$NODE_URL" --rev "$NODE_REV" \
-        miden-validator miden-node miden-ntx-builder miden-remote-prover
+        ${INSTALL_FLAGS[@]+"${INSTALL_FLAGS[@]}"} \
+        "${INSTALL_SPECS[@]}"
 fi
 
 if [ "$MODE" = "install-only" ]; then
