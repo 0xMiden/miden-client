@@ -54,7 +54,8 @@ NODE_BINS=(miden-validator miden-node miden-ntx-builder miden-remote-prover)
 
 # Resolve the pinned node source from Cargo.lock: a git pin
 # (source = "git+https://github.com/0xMiden/node.git?<ref>#<sha>") takes precedence,
-# otherwise use the crates.io version locked for `miden-node-proto`.
+# otherwise use the crates.io version locked for `miden-node-proto-build` (the only node
+# crate the client always depends on).
 SRC_LINE="$(grep -m1 'source = "git+https://github.com/0xMiden/node' "$ROOT/Cargo.lock" || true)"
 if [ -n "$SRC_LINE" ]; then
     NODE_SOURCE="git"
@@ -64,9 +65,9 @@ if [ -n "$SRC_LINE" ]; then
     NODE_DESC="$NODE_URL @ $NODE_REV"
 else
     NODE_SOURCE="registry"
-    NODE_VERSION="$(awk -F'"' '/^name = "miden-node-proto"$/ { getline; print $2; exit }' "$ROOT/Cargo.lock")"
+    NODE_VERSION="$(awk -F'"' '/^name = "miden-node-proto-build"$/ { getline; print $2; exit }' "$ROOT/Cargo.lock")"
     [ -n "$NODE_VERSION" ] || {
-        echo "error: no 0xMiden/node git source and no miden-node-proto version in Cargo.lock" >&2
+        echo "error: no 0xMiden/node git source and no miden-node-proto-build version in Cargo.lock" >&2
         exit 1
     }
     NODE_REV="v$NODE_VERSION"
