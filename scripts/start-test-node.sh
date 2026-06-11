@@ -122,7 +122,8 @@ start validator   "$BIN/miden-validator" start --listen "$VALIDATOR" --data-dire
 sleep 2
 start sequencer   "$BIN/miden-node" sequencer --rpc.listen "$RPC" --data-directory "$DATA/node" \
     --validator.url "http://$VALIDATOR" --ntx-builder.url "http://$NTX" \
-    --rpc.network-tx-auth-header-value "$NETWORK_TX_AUTH"
+    --rpc.network-tx-auth-header-value "$NETWORK_TX_AUTH" \
+    --rpc.rate-limit.burst-size 10000 --rpc.rate-limit.replenish-per-second 10000
 start prover      "$BIN/miden-remote-prover" --kind=transaction --port="$PROVER_PORT"
 # Let the sequencer bind its RPC before the ntx-builder dials it.
 sleep 2
