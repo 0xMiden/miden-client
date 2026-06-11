@@ -25,7 +25,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CACHE="$ROOT/target/test-node"
 BIN="$CACHE/install/bin"
 BUILD="$CACHE/build"
-GEN_GENESIS="$ROOT/target/release/gen-genesis"
+GEN_GENESIS="${CARGO_TARGET_DIR:-$ROOT/target}/release/gen-genesis"
 DATA="$CACHE/data"
 LOG_DIR="$DATA/logs"
 PID_FILE="$CACHE/pids"
@@ -104,6 +104,12 @@ fi
 if [ "$MODE" = "install-only" ]; then
     echo "==> install-only: node binaries ready in $BIN"
     exit 0
+fi
+
+if (exec 3<>"/dev/tcp/${RPC%:*}/${RPC##*:}") 2>/dev/null; then
+    exec 3>&- 3<&-
+    echo "error: something is already listening on $RPC; run stop-test-node.sh first" >&2
+    exit 1
 fi
 
 echo "==> building gen-genesis"
