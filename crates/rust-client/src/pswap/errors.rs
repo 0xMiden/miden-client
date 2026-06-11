@@ -5,6 +5,7 @@ use alloc::string::String;
 use miden_protocol::Felt;
 use miden_protocol::account::AccountId;
 use miden_protocol::errors::{AssetError, NoteError};
+use miden_protocol::note::NoteId;
 
 use super::lineage::PswapLineageState;
 use crate::store::StoreError;
@@ -31,6 +32,16 @@ pub enum PswapLineageError {
     /// out of sync with the stored notes.
     #[error("current tip note is missing from the local store; the tracked lineage is out of sync")]
     TipMissing,
+
+    /// The depth-0 note referenced by `original_note_id` could not be fetched
+    /// from `output_notes`, or was stored without the recipient needed to
+    /// reconstruct it. The note is written before the lineage record, so this
+    /// signals a broken invariant (e.g. the output note was pruned) rather than
+    /// an expected race.
+    #[error(
+        "PSWAP original note {0} is unavailable in the output-note store or lacks recipient details"
+    )]
+    OriginalNoteUnavailable(NoteId),
 
     /// `PswapNote::payback_note` / `remainder_note` reconstruction failed.
     #[error("PSWAP note reconstruction failed: {0}")]

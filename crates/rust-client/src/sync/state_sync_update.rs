@@ -156,11 +156,6 @@ impl PartialBlockchainUpdates {
         self.block_headers.values()
     }
 
-    /// Returns the block header for `block_num` if it's in this sync window.
-    pub fn block_header_for(&self, block_num: BlockNumber) -> Option<&BlockHeader> {
-        self.block_headers.get(&block_num).map(|(header, _)| header)
-    }
-
     /// Returns the new authentication nodes that are meant to be stored in order to authenticate
     /// block headers.
     pub fn new_authentication_nodes(&self) -> &[(InOrderIndex, Word)] {

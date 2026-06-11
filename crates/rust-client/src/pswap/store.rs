@@ -1,5 +1,5 @@
 //! Client-side persistence for PSWAP lineages over the existing `settings`
-//! KV store — no PSWAP-specific `Store` trait methods. Two key families:
+//! KV store, using two key families:
 //!
 //! ```text
 //! pswap/order/{order_id_hex}    →  serialized PswapLineageRecord  (PRIMARY; stable, never re-keyed)
@@ -15,10 +15,11 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::{format, vec};
 
-use miden_protocol::Felt;
-use miden_protocol::block::BlockHeader;
 use miden_protocol::note::{Note, NoteDetails, NoteId, NoteInclusionProof};
+use miden_protocol::{Felt, Word};
+use miden_standards::note::PswapNote;
 
+use super::errors::PswapLineageError;
 use super::lineage::{
     PswapLineageFilter,
     PswapLineageRecord,
@@ -102,6 +103,34 @@ pub(crate) async fn resolve_order_by_tip(
     Ok(Some(order_id))
 }
 
+/// Fetches and reconstructs the immutable depth-0 PSWAP note from `output_notes`
+/// by its stable id. The lineage record stores only `original_note_id` and the
+/// cheap order facts; the full note (script + recipient) is recovered here when
+/// reconstruction (payback/remainder rebuild) or a depth-0 reclaim needs it.
+///
+/// The output note is persisted before the lineage record that points at it, so
+/// a miss — or a record lacking the recipient — means a broken invariant (e.g.
+/// the note was pruned), surfaced as [`PswapLineageError::OriginalNoteUnavailable`]
+/// rather than silently dropping work.
+pub(crate) async fn get_original_pswap(
+    store: &Arc<dyn Store>,
+    original_note_id: NoteId,
+) -> Result<PswapNote, PswapLineageError> {
+    let record = store
+        .get_output_notes(NoteFilter::List(vec![original_note_id]))
+        .await?
+        .into_iter()
+        .next()
+        .ok_or(PswapLineageError::OriginalNoteUnavailable(original_note_id))?;
+    // `TryFrom<OutputNoteRecord> for Note` errors when the record carries no
+    // recipient (a `*Partial` state); our depth-0 notes are always `Full`.
+    let note: Note = record
+        .try_into()
+        .map_err(|_| PswapLineageError::OriginalNoteUnavailable(original_note_id))?;
+    PswapNote::try_from(&note)
+        .map_err(|_| PswapLineageError::OriginalNoteUnavailable(original_note_id))
+}
+
 /// Prefix-scans the `pswap/order/` family and applies the (client-side)
 /// filter. `pswap/tip/` and non-PSWAP settings keys are excluded by the
 /// full-prefix check. Rare path (a client's own open orders).
@@ -153,25 +182,25 @@ pub(crate) async fn apply_round(
     // off-by-ones / duplicate deliveries.
     let record = get_lineage(store, update.order_id).await?.ok_or_else(|| {
         StoreError::DatabaseError(format!(
-            "apply_pswap_round: no lineage for order_id {}",
+            "apply_round: no lineage for order_id {}",
             update.order_id
         ))
     })?;
     if update.round_depth != record.current_depth + 1 {
         return Err(StoreError::DatabaseError(format!(
-            "apply_pswap_round: round_depth {} for order_id {} does not advance by 1 \
+            "apply_round: round_depth {} for order_id {} does not advance by 1 \
              (current_depth {}); refusing to corrupt the reconstruction chain",
             update.round_depth, update.order_id, record.current_depth,
         )));
     }
 
     // 1. Notes first (see the note-first rationale above).
-    let at_block_header = update.at_block_header.as_ref();
+    let at_block_note_root = update.at_block_note_root;
     if let Some((payback_note, inclusion_proof)) = &update.payback {
-        upsert_round_note(store, payback_note, inclusion_proof, at_block_header).await?;
+        upsert_round_note(store, payback_note, inclusion_proof, at_block_note_root).await?;
     }
     if let Some((remainder_note, inclusion_proof)) = &update.remainder {
-        upsert_round_note(store, remainder_note, inclusion_proof, at_block_header).await?;
+        upsert_round_note(store, remainder_note, inclusion_proof, at_block_note_root).await?;
     }
 
     // 2. Advance the lineage record and re-key the tip index in one atomic batch, so the order
@@ -180,16 +209,15 @@ pub(crate) async fn apply_round(
     //    terminating round, and the live tip index is dropped (a terminal lineage has no tip to
     //    resolve).
     let old_tip = record.current_tip_note_id;
-    let new_record = PswapLineageRecord {
-        original_pswap: record.original_pswap.clone(),
-        current_tip_note_id: update.tip_note_id.unwrap_or(old_tip),
-        current_depth: update.round_depth,
-        remaining_offered: update.remaining_offered,
-        remaining_requested: update.remaining_requested,
-        state: update.state,
-        created_at_block: record.created_at_block,
-        updated_at_block: update.at_block,
-    };
+    // Carry over the immutable order facts (and `original_note_id`) by cloning,
+    // then advance only the mutable tip state.
+    let mut new_record = record.clone();
+    new_record.current_tip_note_id = update.tip_note_id.unwrap_or(old_tip);
+    new_record.current_depth = update.round_depth;
+    new_record.remaining_offered = update.remaining_offered;
+    new_record.remaining_requested = update.remaining_requested;
+    new_record.state = update.state;
+    new_record.updated_at_block = update.at_block;
     let mut mutations = vec![
         SettingMutation::Set {
             key: order_key(update.order_id),
@@ -207,14 +235,14 @@ pub(crate) async fn apply_round(
     }
     store.apply_settings_mutations(mutations).await?;
 
-    // 4. Terminal states no longer need the asset-pair subscription. The tag + original note id are
-    //    recomputed from the persisted PSWAP (neither is carried on the round update).
+    // 4. Terminal states no longer need the asset-pair subscription. The tag is derived from the
+    //    mirrored order facts; the subscription is keyed by the stable `original_note_id` (the same
+    //    key used at creation).
     if matches!(update.state, PswapLineageState::FullyFilled | PswapLineageState::Reclaimed) {
-        let original_note_id = Note::from(record.original_pswap.clone()).id();
         store
             .remove_note_tag(NoteTagRecord {
                 tag: record.asset_pair_tag(),
-                source: NoteTagSource::Subscription(original_note_id),
+                source: NoteTagSource::Subscription(record.original_note_id),
             })
             .await?;
     }
@@ -225,12 +253,12 @@ pub(crate) async fn apply_round(
 /// Inserts a reconstructed payback or remainder into `input_notes`. Skips if an
 /// entry already exists so we never downgrade an already-tracked note (e.g. a
 /// public payback the screener already inserted as `Committed` this same sync).
-/// With `at_block_header` the note lands as `Committed`, otherwise `Unverified`.
+/// With `at_block_note_root` the note lands as `Committed`, otherwise `Unverified`.
 async fn upsert_round_note(
     store: &Arc<dyn Store>,
     note: &Note,
     inclusion_proof: &NoteInclusionProof,
-    at_block_header: Option<&BlockHeader>,
+    at_block_note_root: Option<Word>,
 ) -> Result<(), StoreError> {
     let note_id = note.id();
     if !store.get_input_notes(NoteFilter::List(vec![note_id])).await?.is_empty() {
@@ -241,11 +269,11 @@ async fn upsert_round_note(
     let details = NoteDetails::from(note.clone());
     let attachments = note.attachments().clone();
 
-    let state = match at_block_header {
-        Some(header) => CommittedNoteState {
+    let state = match at_block_note_root {
+        Some(note_root) => CommittedNoteState {
             inclusion_proof: inclusion_proof.clone(),
             metadata,
-            block_note_root: header.note_root(),
+            block_note_root: note_root,
         }
         .into(),
         None => UnverifiedNoteState {

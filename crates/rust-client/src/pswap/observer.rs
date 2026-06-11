@@ -27,7 +27,7 @@ use crate::utils::RwLock;
 /// `order_id`, `depth`, and amount (fill on payback, payout on remainder)
 /// — role distinguished by [`Self::tag`].
 #[derive(Debug, Clone)]
-pub struct PswapChainNoteUpdate {
+pub(crate) struct PswapChainNoteUpdate {
     pub note_id: NoteId,
     pub attachment: PswapNoteAttachment,
     pub sender: AccountId,
@@ -43,21 +43,24 @@ pub struct PswapChainNoteUpdate {
 /// Per-sync collector of PSWAP-attachment notes seen this sync.
 ///
 /// - `observe()` runs per-note during sync: reads the PSWAP attachment word straight off the note's
-///   resolved attachments (carried inline on the sync window) and records a
-///   [`PswapChainNoteUpdate`]. No RPC round trip, no DB write.
+///   resolved attachments (carried inline on the sync window) and records a `PswapChainNoteUpdate`.
+///   No RPC round trip, no DB write.
 /// - `apply()` runs once post-sync: drains the collector, runs the correlator, applies round
 ///   updates.
 pub struct PswapChainObserver {
     store: Arc<dyn Store>,
-    /// `observe()` writes, `apply()` drains; never concurrent.
-    chain_note_updates: Arc<RwLock<Vec<PswapChainNoteUpdate>>>,
+    /// `observe()` writes, `apply()` drains; never concurrent. The observer is
+    /// shared via the outer `Arc<dyn NoteObserver>` and only ever touched
+    /// through `&self`, so the `RwLock` alone provides the needed interior
+    /// mutability — no inner `Arc`.
+    chain_note_updates: RwLock<Vec<PswapChainNoteUpdate>>,
 }
 
 impl PswapChainObserver {
     pub fn new(store: Arc<dyn Store>) -> Self {
         Self {
             store,
-            chain_note_updates: Arc::new(RwLock::new(Vec::new())),
+            chain_note_updates: RwLock::new(Vec::new()),
         }
     }
 }
@@ -115,7 +118,7 @@ impl NoteObserver for PswapChainObserver {
                     order_id = round_update.order_id.as_canonical_u64(),
                     round_depth = round_update.round_depth,
                     error = ?err,
-                    "apply_pswap_round failed; lineage left at previous tip",
+                    "apply_round failed; lineage left at previous tip",
                 );
             }
         }

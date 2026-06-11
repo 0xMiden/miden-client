@@ -1,7 +1,7 @@
 //! Post-sync correlator: joins tracked-note consumption events from
 //! `NoteUpdateTracker::consumed_note_ids()` with the PSWAP-attachment
 //! notes collected by [`super::observer::PswapChainObserver`], emitting
-//! one [`super::lineage::PswapLineageRoundUpdate`] per round transition.
+//! one `PswapLineageRoundUpdate` per round transition.
 //!
 //! See [`crate::pswap`] for the overall design.
 
@@ -13,6 +13,7 @@ use miden_protocol::Felt;
 use miden_protocol::asset::FungibleAsset;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::NoteId;
+use miden_standards::note::PswapNote;
 use tracing::error;
 
 use super::errors::PswapLineageError;
@@ -89,6 +90,10 @@ pub(crate) async fn discover_pswap_rounds(
     for lineage_record in active_lineages {
         let mut lineage = lineage_record;
         let mut lineage_rounds: Vec<PswapLineageRoundUpdate> = Vec::new();
+        // The depth-0 note is immutable across rounds and only fills (not reclaim)
+        // need it to reconstruct outputs. Fetched lazily from `output_notes` on the
+        // first fill and cached for the rest of this lineage's rounds.
+        let mut original_pswap: Option<PswapNote> = None;
 
         // Advance round-by-round while live. A round fires when the tip's consumption was
         // observed (`tip_consumed`) OR depth+1 chain notes exist: by protocol invariant a
@@ -106,19 +111,41 @@ pub(crate) async fn discover_pswap_rounds(
                 break;
             }
 
-            let update =
-                match lineage.build_round_update(round_depth, sync_block, notes, &block_headers) {
-                    Ok(u) => u,
+            // Fills (notes present) reconstruct payback/remainder from the original note;
+            // fetch it once. A reclaim round (no notes) needs nothing from the note.
+            if !notes.is_empty() && original_pswap.is_none() {
+                match store::get_original_pswap(&store, lineage.original_note_id).await {
+                    Ok(pswap) => original_pswap = Some(pswap),
                     Err(err) => {
                         error!(
                             order_id = ?lineage.order_id(),
-                            round_depth,
+                            original_note_id = ?lineage.original_note_id,
                             error = ?err,
-                            "discover_pswap_rounds: round build failed; skipping lineage",
+                            "discover_pswap_rounds: original note unavailable; skipping lineage",
                         );
                         break;
                     },
-                };
+                }
+            }
+
+            let update = match lineage.build_round_update(
+                round_depth,
+                sync_block,
+                notes,
+                &block_headers,
+                original_pswap.as_ref(),
+            ) {
+                Ok(u) => u,
+                Err(err) => {
+                    error!(
+                        order_id = ?lineage.order_id(),
+                        round_depth,
+                        error = ?err,
+                        "discover_pswap_rounds: round build failed; skipping lineage",
+                    );
+                    break;
+                },
+            };
 
             lineage = lineage.apply_round_in_memory(&update);
             lineage_rounds.push(update);
@@ -149,25 +176,51 @@ impl PswapLineageRecord {
         block_number: BlockNumber,
         notes: &[&PswapChainNoteUpdate],
         block_headers: &BTreeMap<BlockNumber, BlockHeader>,
+        original_pswap: Option<&PswapNote>,
     ) -> Result<PswapLineageRoundUpdate, PswapLineageError> {
         match notes.len() {
             0 => Ok(self.build_reclaim_round(round_depth, block_number)),
-            1 => self.build_full_fill_round(round_depth, block_number, notes[0], block_headers),
-            2 => self.build_partial_fill_round(round_depth, block_number, notes, block_headers),
+            1 => {
+                let pswap = self.require_original(original_pswap)?;
+                self.build_full_fill_round(
+                    round_depth,
+                    block_number,
+                    notes[0],
+                    block_headers,
+                    pswap,
+                )
+            },
+            2 => {
+                let pswap = self.require_original(original_pswap)?;
+                self.build_partial_fill_round(
+                    round_depth,
+                    block_number,
+                    notes,
+                    block_headers,
+                    pswap,
+                )
+            },
             count => Err(PswapLineageError::AmbiguousRound { depth: round_depth, count }),
         }
     }
 
+    /// The caller fetches the original note before any fill round, so a missing
+    /// note here is a broken invariant rather than an expected branch.
+    fn require_original<'a>(
+        &self,
+        original_pswap: Option<&'a PswapNote>,
+    ) -> Result<&'a PswapNote, PswapLineageError> {
+        original_pswap.ok_or(PswapLineageError::OriginalNoteUnavailable(self.original_note_id))
+    }
+
     /// Zero-amount asset for the order's offered faucet.
     fn zero_offered(&self) -> FungibleAsset {
-        FungibleAsset::new(self.original_pswap.offered_asset().faucet_id(), 0)
-            .expect("FA(_, 0) is always valid")
+        FungibleAsset::new(self.offered_asset().faucet_id(), 0).expect("FA(_, 0) is always valid")
     }
 
     /// Zero-amount asset for the order's requested faucet.
     fn zero_requested(&self) -> FungibleAsset {
-        FungibleAsset::new(self.original_pswap.storage().requested_asset().faucet_id(), 0)
-            .expect("FA(_, 0) is always valid")
+        FungibleAsset::new(self.requested_asset().faucet_id(), 0).expect("FA(_, 0) is always valid")
     }
 
     /// Reclaim — cancel branch emits no outputs; only the creator can hit it.
@@ -184,7 +237,7 @@ impl PswapLineageRecord {
             state: PswapLineageState::Reclaimed,
             tip_note_id: None,
             at_block: block_number,
-            at_block_header: None,
+            at_block_note_root: None,
             payback: None,
             remainder: None,
         }
@@ -197,8 +250,8 @@ impl PswapLineageRecord {
         block_number: BlockNumber,
         payback_note_update: &PswapChainNoteUpdate,
         block_headers: &BTreeMap<BlockNumber, BlockHeader>,
+        pswap: &PswapNote,
     ) -> Result<PswapLineageRoundUpdate, PswapLineageError> {
-        let pswap = &self.original_pswap;
         let payback = pswap
             .payback_note(payback_note_update.sender, &payback_note_update.attachment)
             .map_err(PswapLineageError::Reconstruction)?;
@@ -211,7 +264,9 @@ impl PswapLineageRecord {
             state: PswapLineageState::FullyFilled,
             tip_note_id: None,
             at_block: block_number,
-            at_block_header: block_headers.get(&payback_note_update.block_num).cloned(),
+            at_block_note_root: block_headers
+                .get(&payback_note_update.block_num)
+                .map(BlockHeader::note_root),
             payback: Some((payback, payback_note_update.inclusion_proof.clone())),
             remainder: None,
         })
@@ -224,8 +279,8 @@ impl PswapLineageRecord {
         block_number: BlockNumber,
         notes: &[&PswapChainNoteUpdate],
         block_headers: &BTreeMap<BlockNumber, BlockHeader>,
+        pswap: &PswapNote,
     ) -> Result<PswapLineageRoundUpdate, PswapLineageError> {
-        let pswap = &self.original_pswap;
         let offered_faucet = pswap.offered_asset().faucet_id();
         let requested_faucet = pswap.storage().requested_asset().faucet_id();
 
@@ -277,7 +332,9 @@ impl PswapLineageRecord {
             state: PswapLineageState::Active,
             tip_note_id: Some(remainder_note_update.note_id),
             at_block: block_number,
-            at_block_header: block_headers.get(&payback_note_update.block_num).cloned(),
+            at_block_note_root: block_headers
+                .get(&payback_note_update.block_num)
+                .map(BlockHeader::note_root),
             payback: Some((payback_note, payback_note_update.inclusion_proof.clone())),
             remainder: Some((remainder_note, remainder_note_update.inclusion_proof.clone())),
         })
@@ -298,347 +355,4 @@ impl PswapLineageRecord {
 }
 
 #[cfg(test)]
-mod tests {
-    //! Correlator tests — exercise `build_round_update` + multi-fill advance.
-    use alloc::vec::Vec;
-
-    use miden_protocol::account::AccountId;
-    use miden_protocol::asset::AssetAmount;
-    use miden_protocol::crypto::merkle::SparseMerklePath;
-    use miden_protocol::note::{Note, NoteInclusionProof};
-    use miden_standards::note::{PswapNote, PswapNoteAttachment};
-
-    use super::super::lineage::test_helpers::{build_test_pswap, fixed_account_ids};
-    use super::*;
-
-    /// Minimum-valid inclusion proof — correlator never inspects the path.
-    fn dummy_inclusion_proof(block: u32) -> NoteInclusionProof {
-        let path =
-            SparseMerklePath::from_parts(0, Vec::new()).expect("empty SparseMerklePath is valid");
-        NoteInclusionProof::new(BlockNumber::from(block), 0, path)
-            .expect("zero index is well below the per-block notes ceiling")
-    }
-
-    /// Empty header map — these tests don't assert on inserted-note state.
-    fn no_block_headers() -> BTreeMap<BlockNumber, BlockHeader> {
-        BTreeMap::new()
-    }
-
-    /// Active lineage at depth 0 built from a fresh test PSWAP.
-    fn initial_record(pswap: PswapNote, offered: u64, requested: u64) -> PswapLineageRecord {
-        let note = Note::from(pswap.clone());
-        let offered_faucet = pswap.offered_asset().faucet_id();
-        let requested_faucet = pswap.storage().requested_asset().faucet_id();
-        PswapLineageRecord {
-            original_pswap: pswap,
-            current_tip_note_id: note.id(),
-            current_depth: 0,
-            remaining_offered: FungibleAsset::new(offered_faucet, offered)
-                .expect("test value fits in FungibleAsset"),
-            remaining_requested: FungibleAsset::new(requested_faucet, requested)
-                .expect("test value fits in FungibleAsset"),
-            state: PswapLineageState::Active,
-            created_at_block: BlockNumber::from(0),
-            updated_at_block: BlockNumber::from(0),
-        }
-    }
-
-    /// `PswapChainNoteUpdate` mirroring `note` (id + tag) so the
-    /// correlator's tag-based payback/remainder split works.
-    fn chain_update_from(
-        note: &Note,
-        attachment: PswapNoteAttachment,
-        sender: AccountId,
-        block: u32,
-    ) -> PswapChainNoteUpdate {
-        PswapChainNoteUpdate {
-            note_id: note.id(),
-            attachment,
-            sender,
-            tag: note.metadata().tag(),
-            block_num: BlockNumber::from(block),
-            inclusion_proof: dummy_inclusion_proof(block),
-        }
-    }
-
-    /// 2-candidate partial fill → `Active`, both `remaining_*` reduced.
-    #[test]
-    fn build_round_update_partial_fill_advances_active() {
-        let (_sender, _creator, offered_faucet, requested_faucet) = fixed_account_ids();
-        let consumer = AccountId::try_from(
-            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
-        )
-        .unwrap();
-        let creator = AccountId::try_from(
-            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE_2,
-        )
-        .unwrap();
-
-        let pswap = build_test_pswap(consumer, creator, offered_faucet, 100, requested_faucet, 50);
-        let record = initial_record(pswap.clone(), 100, 50);
-
-        let fill_amount = 20;
-        let payout_amount = 40;
-        let new_off = 100 - payout_amount;
-        let new_req = 50 - fill_amount;
-
-        let payback_att =
-            PswapNoteAttachment::new(AssetAmount::new(fill_amount).unwrap(), pswap.order_id(), 1);
-        let remainder_att =
-            PswapNoteAttachment::new(AssetAmount::new(payout_amount).unwrap(), pswap.order_id(), 1);
-        let payback = pswap.payback_note(consumer, &payback_att).unwrap();
-        let remainder = pswap
-            .remainder_note(
-                consumer,
-                &remainder_att,
-                AssetAmount::new(new_off).unwrap(),
-                AssetAmount::new(new_req).unwrap(),
-            )
-            .unwrap();
-
-        let cand_payback = chain_update_from(&payback, payback_att, consumer, 7);
-        let cand_remainder = chain_update_from(&remainder, remainder_att, consumer, 7);
-
-        let update = record
-            .build_round_update(
-                1,
-                BlockNumber::from(7),
-                &[&cand_payback, &cand_remainder],
-                &no_block_headers(),
-            )
-            .expect("partial fill must produce a round update");
-
-        assert_eq!(update.round_depth, 1);
-        assert_eq!(update.remaining_offered.amount(), AssetAmount::new(new_off).unwrap());
-        assert_eq!(update.remaining_requested.amount(), AssetAmount::new(new_req).unwrap());
-        assert_eq!(update.state, PswapLineageState::Active);
-        assert_eq!(update.tip_note_id, Some(remainder.id()));
-        // Each side carries its note paired with its inclusion proof.
-        assert!(update.payback.is_some());
-        assert!(update.remainder.is_some());
-    }
-
-    /// Note order within a round must not change classification: passing
-    /// `[remainder, payback]` (the reverse of the natural ordering) yields the
-    /// same result as `[payback, remainder]`. Covers the tag-split else-branch.
-    #[test]
-    fn build_round_update_partial_fill_classifies_regardless_of_note_order() {
-        let (_sender, _creator, offered_faucet, requested_faucet) = fixed_account_ids();
-        let consumer = AccountId::try_from(
-            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
-        )
-        .unwrap();
-        let creator = AccountId::try_from(
-            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE_2,
-        )
-        .unwrap();
-
-        let pswap = build_test_pswap(consumer, creator, offered_faucet, 100, requested_faucet, 50);
-        let record = initial_record(pswap.clone(), 100, 50);
-
-        let fill_amount = 20;
-        let payout_amount = 40;
-        let new_off = 100 - payout_amount;
-        let new_req = 50 - fill_amount;
-
-        let payback_att =
-            PswapNoteAttachment::new(AssetAmount::new(fill_amount).unwrap(), pswap.order_id(), 1);
-        let remainder_att =
-            PswapNoteAttachment::new(AssetAmount::new(payout_amount).unwrap(), pswap.order_id(), 1);
-        let payback = pswap.payback_note(consumer, &payback_att).unwrap();
-        let remainder = pswap
-            .remainder_note(
-                consumer,
-                &remainder_att,
-                AssetAmount::new(new_off).unwrap(),
-                AssetAmount::new(new_req).unwrap(),
-            )
-            .unwrap();
-
-        let cand_payback = chain_update_from(&payback, payback_att, consumer, 7);
-        let cand_remainder = chain_update_from(&remainder, remainder_att, consumer, 7);
-
-        // Reverse the input order — remainder first.
-        let update = record
-            .build_round_update(
-                1,
-                BlockNumber::from(7),
-                &[&cand_remainder, &cand_payback],
-                &no_block_headers(),
-            )
-            .expect("partial fill must classify regardless of input order");
-
-        assert_eq!(update.tip_note_id, Some(remainder.id()));
-        assert_eq!(update.state, PswapLineageState::Active);
-    }
-
-    /// A malformed attachment (`depth == 0`) makes `PswapNote::payback_note`
-    /// reject reconstruction; `build_round_update` surfaces the error rather
-    /// than panicking. In `discover_pswap_rounds` this is caught, logged via
-    /// `error!`, and the lineage is left at its previous tip.
-    #[test]
-    fn build_round_update_propagates_reconstruction_error() {
-        let (_sender, _creator, offered_faucet, requested_faucet) = fixed_account_ids();
-        let consumer = AccountId::try_from(
-            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
-        )
-        .unwrap();
-        let creator = AccountId::try_from(
-            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE_2,
-        )
-        .unwrap();
-
-        let pswap = build_test_pswap(consumer, creator, offered_faucet, 100, requested_faucet, 50);
-        let record = initial_record(pswap.clone(), 100, 50);
-
-        // `depth == 0` trips `payback_note`'s "depth must be >= 1" guard.
-        let bad_attachment =
-            PswapNoteAttachment::new(AssetAmount::new(20).unwrap(), pswap.order_id(), 0);
-        let dummy_note = Note::from(pswap);
-        let cand = chain_update_from(&dummy_note, bad_attachment, consumer, 5);
-
-        let result =
-            record.build_round_update(1, BlockNumber::from(5), &[&cand], &no_block_headers());
-        assert!(result.is_err(), "depth-0 attachment must fail reconstruction");
-    }
-
-    /// 1-candidate full fill → `FullyFilled`, no remainder, both zeros.
-    #[test]
-    fn build_round_update_full_fill_marks_fully_filled() {
-        let (_sender, _creator, offered_faucet, requested_faucet) = fixed_account_ids();
-        let consumer = AccountId::try_from(
-            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
-        )
-        .unwrap();
-        let creator = AccountId::try_from(
-            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE_2,
-        )
-        .unwrap();
-
-        // Smaller initial sizes so the single fill exhausts both sides.
-        let pswap = build_test_pswap(consumer, creator, offered_faucet, 30, requested_faucet, 50);
-        let record = initial_record(pswap.clone(), 30, 50);
-
-        let fill_amount = 50; // exhausts requested side
-        let payback_att =
-            PswapNoteAttachment::new(AssetAmount::new(fill_amount).unwrap(), pswap.order_id(), 1);
-        let payback = pswap.payback_note(consumer, &payback_att).unwrap();
-        let cand = chain_update_from(&payback, payback_att, consumer, 9);
-
-        let update = record
-            .build_round_update(1, BlockNumber::from(9), &[&cand], &no_block_headers())
-            .expect("full fill must produce a round update");
-
-        assert_eq!(update.state, PswapLineageState::FullyFilled);
-        assert_eq!(update.remaining_offered.amount(), AssetAmount::ZERO);
-        assert_eq!(update.remaining_requested.amount(), AssetAmount::ZERO);
-        assert_eq!(update.tip_note_id, None);
-        assert!(update.remainder.is_none());
-    }
-
-    /// 0-candidate consumption → `Reclaimed`, both `remaining_*` zeroed.
-    /// Regression guard.
-    #[test]
-    fn build_round_update_zero_outputs_marks_reclaimed_with_remaining_zero() {
-        let (_sender, _creator, offered_faucet, requested_faucet) = fixed_account_ids();
-        let consumer = AccountId::try_from(
-            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
-        )
-        .unwrap();
-        let creator = AccountId::try_from(
-            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE_2,
-        )
-        .unwrap();
-
-        let pswap = build_test_pswap(consumer, creator, offered_faucet, 80, requested_faucet, 40);
-        let record = initial_record(pswap, 80, 40);
-
-        let update = record
-            .build_round_update(1, BlockNumber::from(5), &[], &no_block_headers())
-            .expect("zero-output consumption must produce a round update");
-
-        assert_eq!(update.state, PswapLineageState::Reclaimed);
-        assert_eq!(update.remaining_offered.amount(), AssetAmount::ZERO);
-        // Regression: reclaim used to leak the pre-reclaim
-        // `remaining_requested` into the terminal record.
-        assert_eq!(update.remaining_requested.amount(), AssetAmount::ZERO);
-        assert!(update.payback.is_none());
-    }
-
-    /// Same-block multi-fill: round 2 must build against round 1's
-    /// in-memory-advanced lineage, not the original.
-    #[test]
-    fn apply_round_in_memory_chains_correctly_for_multi_fill() {
-        let (_sender, _creator, offered_faucet, requested_faucet) = fixed_account_ids();
-        let consumer = AccountId::try_from(
-            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
-        )
-        .unwrap();
-        let creator = AccountId::try_from(
-            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE_2,
-        )
-        .unwrap();
-
-        let pswap = build_test_pswap(consumer, creator, offered_faucet, 100, requested_faucet, 50);
-        let record0 = initial_record(pswap.clone(), 100, 50);
-
-        // ── Round 1: partial fill, 20 requested for 40 offered.
-        let fill1 = 20;
-        let payout1 = 40;
-        let new_off1 = 100 - payout1;
-        let new_req1 = 50 - fill1;
-        let payback_att1 =
-            PswapNoteAttachment::new(AssetAmount::new(fill1).unwrap(), pswap.order_id(), 1);
-        let remainder_att1 =
-            PswapNoteAttachment::new(AssetAmount::new(payout1).unwrap(), pswap.order_id(), 1);
-        let payback1 = pswap.payback_note(consumer, &payback_att1).unwrap();
-        let remainder1 = pswap
-            .remainder_note(
-                consumer,
-                &remainder_att1,
-                AssetAmount::new(new_off1).unwrap(),
-                AssetAmount::new(new_req1).unwrap(),
-            )
-            .unwrap();
-        let payback_cand = chain_update_from(&payback1, payback_att1, consumer, 11);
-        let remainder_cand = chain_update_from(&remainder1, remainder_att1, consumer, 11);
-
-        let update1 = record0
-            .build_round_update(
-                1,
-                BlockNumber::from(11),
-                &[&payback_cand, &remainder_cand],
-                &no_block_headers(),
-            )
-            .unwrap();
-
-        // Mirrors `discover_pswap_rounds`'s inner loop.
-        let record1 = record0.apply_round_in_memory(&update1);
-        assert_eq!(record1.current_depth, 1);
-        assert_eq!(record1.remaining_offered.amount(), AssetAmount::new(new_off1).unwrap());
-        assert_eq!(record1.remaining_requested.amount(), AssetAmount::new(new_req1).unwrap());
-        assert_eq!(record1.current_tip_note_id, remainder1.id());
-        assert_eq!(record1.state, PswapLineageState::Active);
-
-        // ── Round 2: full fill of the remainder, exhausts requested side.
-        let fill2 = new_req1; // = 30
-        let payback_att2 =
-            PswapNoteAttachment::new(AssetAmount::new(fill2).unwrap(), pswap.order_id(), 2);
-        let payback2 = pswap.payback_note(consumer, &payback_att2).unwrap();
-        let cand_p2 = chain_update_from(&payback2, payback_att2, consumer, 11);
-
-        let update2 = record1
-            .build_round_update(2, BlockNumber::from(11), &[&cand_p2], &no_block_headers())
-            .unwrap();
-
-        assert_eq!(update2.round_depth, 2);
-        assert_eq!(update2.state, PswapLineageState::FullyFilled);
-        assert_eq!(update2.remaining_offered.amount(), AssetAmount::ZERO);
-        assert_eq!(update2.remaining_requested.amount(), AssetAmount::ZERO);
-
-        let record2 = record1.apply_round_in_memory(&update2);
-        assert_eq!(record2.state, PswapLineageState::FullyFilled);
-        let emitted = [update1, update2];
-        assert_eq!(emitted.len(), 2);
-    }
-}
+mod tests;

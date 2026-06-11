@@ -5,7 +5,7 @@
 //! 1. Create → persist a [`PswapLineageRecord`] + asset-pair tag subscription.
 //! 2. Sync → [`PswapChainObserver`] collects PSWAP-attachment notes;
 //!    `discovery::discover_pswap_rounds` correlates them with tracked-note consumption events and
-//!    emits one [`PswapLineageRoundUpdate`] per round.
+//!    emits one `PswapLineageRoundUpdate` per round.
 //! 3. Reclaim → [`Client::build_pswap_cancel_by_order`].
 //!
 //! Protocol invariants (≤1 payback + ≤1 remainder per round, attachment
@@ -26,19 +26,14 @@ use alloc::vec::Vec;
 
 use async_trait::async_trait;
 pub use errors::PswapLineageError;
-pub use lineage::{
-    PswapLineageFilter,
-    PswapLineageRecord,
-    PswapLineageRoundUpdate,
-    PswapLineageState,
-};
+pub use lineage::{PswapLineageFilter, PswapLineageRecord, PswapLineageState};
 use miden_protocol::Felt;
 use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::Note;
 use miden_standards::note::PswapNote;
 use miden_tx::auth::TransactionAuthenticator;
-pub use observer::{PswapChainNoteUpdate, PswapChainObserver};
+pub use observer::PswapChainObserver;
 
 use crate::store::{NoteFilter, Store};
 use crate::sync::{NoteTagRecord, NoteTagSource};
@@ -90,23 +85,15 @@ impl TransactionObserver for PswapTransactionObserver {
                 continue;
             }
 
-            // At depth 0, remaining_* == initial offered/requested.
-            let record = PswapLineageRecord {
-                original_pswap: pswap.clone(),
-                current_tip_note_id: note.id(),
-                current_depth: 0,
-                remaining_offered: *pswap.offered_asset(),
-                remaining_requested: *pswap.storage().requested_asset(),
-                state: PswapLineageState::Active,
-                created_at_block: submission_height,
-                updated_at_block: submission_height,
-            };
+            // The full note lives in `output_notes`; the record keeps only its id
+            // plus the immutable order facts (see `PswapLineageRecord`).
+            let record = PswapLineageRecord::new_depth_zero(note.id(), &pswap, submission_height);
 
             store::put_lineage(&self.store, &record).await?;
             self.store
                 .add_note_tag(NoteTagRecord {
                     tag: record.asset_pair_tag(),
-                    source: NoteTagSource::Subscription(record.current_tip_note_id),
+                    source: NoteTagSource::Subscription(record.original_note_id),
                 })
                 .await?;
         }
@@ -166,11 +153,11 @@ impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
             return Err(PswapLineageError::CreatorNotLocal(creator).into());
         }
 
-        // At depth 0 the tip is the original PSWAP, already held on the
-        // lineage record — no store lookup needed. At depth > 0 the tip is a
-        // remainder discovered during sync and persisted to `input_notes`.
+        // At depth 0 the tip is the original PSWAP, fetched from `output_notes`
+        // by its id. At depth > 0 the tip is a remainder discovered during sync
+        // and persisted to `input_notes`.
         let tip_note: Note = if lineage.current_depth == 0 {
-            Note::from(lineage.original_pswap.clone())
+            Note::from(store::get_original_pswap(&self.store, lineage.original_note_id).await?)
         } else {
             let record = self
                 .store

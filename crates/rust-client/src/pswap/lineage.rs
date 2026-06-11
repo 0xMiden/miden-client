@@ -5,11 +5,11 @@
 use alloc::format;
 use alloc::string::ToString;
 
-use miden_protocol::Felt;
 use miden_protocol::account::AccountId;
 use miden_protocol::asset::FungibleAsset;
-use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{Note, NoteId, NoteInclusionProof, NoteTag, NoteType};
+use miden_protocol::{Felt, Word};
 use miden_standards::note::PswapNote;
 
 use super::errors::PswapLineageError;
@@ -51,16 +51,29 @@ impl PswapLineageState {
 // PSWAP LINEAGE RECORD
 // ================================================================================================
 
-/// Persistent record of one PSWAP order's chain state. Immutable details
-/// (creator, assets, serial number, note types) live on `original_pswap`;
-/// the accessors below delegate to it.
+/// Persistent record of one PSWAP order's chain state. The immutable order
+/// facts (order id, creator, asset pair, note type) are mirrored here so the
+/// common read paths — keying, filtering, tag derivation — stay lookup-free.
+/// The full depth-0 note (script + recipient), needed only to reconstruct
+/// paybacks/remainders and to reclaim at depth 0, is fetched on demand from
+/// `output_notes` by `original_note_id` (see `store::get_original_pswap`).
 #[derive(Debug, Clone)]
 pub struct PswapLineageRecord {
-    /// Source of truth for every immutable "initial" field.
-    pub original_pswap: PswapNote,
+    /// Fetch handle for the depth-0 PSWAP note in `output_notes`. Stable for the
+    /// order's lifetime; distinct from `current_tip_note_id`, which advances
+    /// each round.
+    pub original_note_id: NoteId,
 
-    /// Current tip's note id. Equals `original_pswap.id()` at depth 0;
-    /// otherwise a remainder we didn't originate.
+    // Immutable order facts, mirrored from the depth-0 note so accessors and
+    // the asset-pair tag need no store lookup.
+    order_id: Felt,
+    creator_account_id: AccountId,
+    offered_asset: FungibleAsset,
+    requested_asset: FungibleAsset,
+    note_type: NoteType,
+
+    /// Current tip's note id. Equals `original_note_id` at depth 0; otherwise a
+    /// remainder we didn't originate.
     pub current_tip_note_id: NoteId,
     /// 0 for the original tip; +1 per round. Matches `PswapNoteAttachment::depth()`.
     pub current_depth: u32,
@@ -72,27 +85,53 @@ pub struct PswapLineageRecord {
 }
 
 impl PswapLineageRecord {
-    /// Stable identifier (== `original_pswap.serial[1]`) shared by every
+    /// Builds the depth-0 record for a PSWAP the wallet has just emitted. Mirrors
+    /// the immutable order facts off the note and seeds the mutable tip state:
+    /// the tip is the original note, depth is 0, and `remaining_*` equal the
+    /// initial offered/requested amounts.
+    pub fn new_depth_zero(
+        original_note_id: NoteId,
+        pswap: &PswapNote,
+        created_at_block: BlockNumber,
+    ) -> Self {
+        Self {
+            original_note_id,
+            order_id: pswap.order_id(),
+            creator_account_id: pswap.storage().creator_account_id(),
+            offered_asset: *pswap.offered_asset(),
+            requested_asset: *pswap.storage().requested_asset(),
+            note_type: pswap.note_type(),
+            current_tip_note_id: original_note_id,
+            current_depth: 0,
+            remaining_offered: *pswap.offered_asset(),
+            remaining_requested: *pswap.storage().requested_asset(),
+            state: PswapLineageState::Active,
+            created_at_block,
+            updated_at_block: created_at_block,
+        }
+    }
+
+    /// Stable identifier (== the depth-0 note's `serial[1]`) shared by every
     /// note in the chain.
     pub fn order_id(&self) -> Felt {
-        self.original_pswap.order_id()
+        self.order_id
     }
 
     /// Account that created the order (recipient of every payback).
     pub fn creator_account_id(&self) -> AccountId {
-        self.original_pswap.storage().creator_account_id()
+        self.creator_account_id
     }
 
     pub fn offered_asset(&self) -> &FungibleAsset {
-        self.original_pswap.offered_asset()
+        &self.offered_asset
     }
 
     pub fn requested_asset(&self) -> &FungibleAsset {
-        self.original_pswap.storage().requested_asset()
+        &self.requested_asset
     }
 
     pub fn note_type(&self) -> NoteType {
-        self.original_pswap.note_type()
+        self.note_type
     }
 
     /// Asset-pair tag — sync returns every remainder in this chain via it.
@@ -105,9 +144,9 @@ impl PswapLineageRecord {
 // ================================================================================================
 
 /// One round's transition. Fill = payback + remainder (≤1 each); reclaim
-/// = no outputs. Applied atomically by `Store::apply_pswap_round`.
+/// = no outputs. Applied atomically by `apply_round`.
 #[derive(Debug, Clone)]
-pub struct PswapLineageRoundUpdate {
+pub(crate) struct PswapLineageRoundUpdate {
     pub order_id: Felt,
     pub round_depth: u32,
     // Post-round state — all fields below describe the lineage AFTER this round.
@@ -117,9 +156,9 @@ pub struct PswapLineageRoundUpdate {
     /// New tip; `None` for terminal rounds.
     pub tip_note_id: Option<NoteId>,
     pub at_block: BlockNumber,
-    /// Header for the commit block, used by `apply_pswap_round` to insert payback/remainder as
-    /// `Committed`. `None` only in store-tier fixtures.
-    pub at_block_header: Option<BlockHeader>,
+    /// Commit block's note root, used by `apply_round` to insert payback/remainder as
+    /// `Committed`. `None` on reclaim rounds (no note to insert) and in store-tier fixtures.
+    pub at_block_note_root: Option<Word>,
     /// Reconstructed payback and its inclusion proof. `None` only on
     /// reclaim. The note and proof are always observed together in the
     /// same sync window, so they live or die as a pair.
@@ -145,9 +184,18 @@ pub enum PswapLineageFilter {
 // ================================================================================================
 
 /// Builds a [`PswapLineageRecord`] from its decoded fields. Lives here (not
-/// in a store backend) so alternative backends can reuse it.
+/// in a store backend) so alternative backends can reuse it. The two
+/// `remaining_*` amounts are paired with their faucets (taken from
+/// `offered_asset`/`requested_asset`) to rebuild the `FungibleAsset`s the
+/// record stores only as amounts.
+#[allow(clippy::too_many_arguments)]
 pub fn build_record_from_fields(
-    original_pswap: PswapNote,
+    original_note_id: NoteId,
+    order_id: Felt,
+    creator_account_id: AccountId,
+    offered_asset: FungibleAsset,
+    requested_asset: FungibleAsset,
+    note_type: NoteType,
     current_tip_note_id: NoteId,
     current_depth: u32,
     remaining_offered: u64,
@@ -156,9 +204,9 @@ pub fn build_record_from_fields(
     created_at_block: BlockNumber,
     updated_at_block: BlockNumber,
 ) -> Result<PswapLineageRecord, PswapLineageError> {
-    // Faucets live on `original_pswap` (chain-invariant); the record stores only amounts.
-    let offered_faucet = original_pswap.offered_asset().faucet_id();
-    let requested_faucet = original_pswap.storage().requested_asset().faucet_id();
+    // Faucets are chain-invariant (carried on the asset pair); the record stores only amounts.
+    let offered_faucet = offered_asset.faucet_id();
+    let requested_faucet = requested_asset.faucet_id();
     let remaining_offered = FungibleAsset::new(offered_faucet, remaining_offered).map_err(|err| {
         PswapLineageError::InconsistentRecord(format!(
             "remaining_offered = {remaining_offered} (faucet {offered_faucet}) failed FungibleAsset construction: {err}"
@@ -171,7 +219,12 @@ pub fn build_record_from_fields(
     })?;
 
     Ok(PswapLineageRecord {
-        original_pswap,
+        original_note_id,
+        order_id,
+        creator_account_id,
+        offered_asset,
+        requested_asset,
+        note_type,
         current_tip_note_id,
         current_depth,
         remaining_offered,
@@ -185,13 +238,18 @@ pub fn build_record_from_fields(
 // VALUE CODEC
 // ================================================================================================
 
-/// Encodes the record's fields in declaration order: the `original_pswap`
-/// blob first, then the mutable tip state. The
-/// `Note` is written via the streaming `write_into`/`read_from` (not
-/// `read_from_bytes`) because more fields follow it in the stream.
+/// Encodes the record's fields in declaration order: the `original_note_id`
+/// fetch handle and the mirrored immutable order facts, then the mutable tip
+/// state. The full depth-0 note is no longer inlined — it is recovered from
+/// `output_notes` via `original_note_id` when reconstruction needs it.
 impl Serializable for PswapLineageRecord {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        Note::from(self.original_pswap.clone()).write_into(target);
+        self.original_note_id.write_into(target);
+        self.order_id.write_into(target);
+        self.creator_account_id.write_into(target);
+        self.offered_asset.write_into(target);
+        self.requested_asset.write_into(target);
+        self.note_type.write_into(target);
         self.current_tip_note_id.write_into(target);
         self.current_depth.write_into(target);
         u64::from(self.remaining_offered.amount()).write_into(target);
@@ -204,9 +262,12 @@ impl Serializable for PswapLineageRecord {
 
 impl Deserializable for PswapLineageRecord {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
-        let note = Note::read_from(source)?;
-        let original_pswap = PswapNote::try_from(&note)
-            .map_err(|err| DeserializationError::InvalidValue(err.to_string()))?;
+        let original_note_id = NoteId::read_from(source)?;
+        let order_id = Felt::read_from(source)?;
+        let creator_account_id = AccountId::read_from(source)?;
+        let offered_asset = FungibleAsset::read_from(source)?;
+        let requested_asset = FungibleAsset::read_from(source)?;
+        let note_type = NoteType::read_from(source)?;
         let current_tip_note_id = NoteId::read_from(source)?;
         let current_depth = u32::read_from(source)?;
         let remaining_offered = u64::read_from(source)?;
@@ -215,7 +276,12 @@ impl Deserializable for PswapLineageRecord {
         let created_at_block = u32::read_from(source)?;
         let updated_at_block = u32::read_from(source)?;
         build_record_from_fields(
-            original_pswap,
+            original_note_id,
+            order_id,
+            creator_account_id,
+            offered_asset,
+            requested_asset,
+            note_type,
             current_tip_note_id,
             current_depth,
             remaining_offered,
@@ -297,6 +363,38 @@ mod tests {
     use super::test_helpers::{build_test_pswap, fixed_account_ids};
     use super::*;
 
+    /// Builds a record from a test `PswapNote`, mirroring the immutable scalars
+    /// the observer would extract. Keeps the codec/accessor tests focused on the
+    /// fields they exercise instead of the new wide constructor signature.
+    #[allow(clippy::too_many_arguments)]
+    fn record_from_test_pswap(
+        pswap: &PswapNote,
+        current_tip_note_id: NoteId,
+        current_depth: u32,
+        remaining_offered: u64,
+        remaining_requested: u64,
+        state_byte: u8,
+        created_at_block: BlockNumber,
+        updated_at_block: BlockNumber,
+    ) -> Result<PswapLineageRecord, PswapLineageError> {
+        let original_note_id = miden_protocol::note::Note::from(pswap.clone()).id();
+        build_record_from_fields(
+            original_note_id,
+            pswap.order_id(),
+            pswap.storage().creator_account_id(),
+            *pswap.offered_asset(),
+            *pswap.storage().requested_asset(),
+            pswap.note_type(),
+            current_tip_note_id,
+            current_depth,
+            remaining_offered,
+            remaining_requested,
+            state_byte,
+            created_at_block,
+            updated_at_block,
+        )
+    }
+
     /// Stable byte encoding of `PswapLineageState`. The values are
     /// persisted in the serialized lineage record; reordering
     /// would silently corrupt existing stores.
@@ -337,8 +435,8 @@ mod tests {
         let pswap = build_test_pswap(sender, creator, offered_faucet, 100, requested_faucet, 50);
         let initial_note_id = miden_protocol::note::Note::from(pswap.clone()).id();
 
-        let record = build_record_from_fields(
-            pswap,
+        let record = record_from_test_pswap(
+            &pswap,
             initial_note_id,
             0,
             100,
@@ -361,8 +459,8 @@ mod tests {
         let (sender, creator, offered_faucet, requested_faucet) = fixed_account_ids();
         let pswap = build_test_pswap(sender, creator, offered_faucet, 100, requested_faucet, 50);
         let note = miden_protocol::note::Note::from(pswap.clone());
-        let record = build_record_from_fields(
-            pswap,
+        let record = record_from_test_pswap(
+            &pswap,
             note.id(),
             3,
             70,
@@ -383,8 +481,8 @@ mod tests {
         let (sender, creator, offered_faucet, requested_faucet) = fixed_account_ids();
         let pswap = build_test_pswap(sender, creator, offered_faucet, 100, requested_faucet, 50);
         let note = miden_protocol::note::Note::from(pswap.clone());
-        match build_record_from_fields(
-            pswap,
+        match record_from_test_pswap(
+            &pswap,
             note.id(),
             0,
             100,
@@ -398,12 +496,11 @@ mod tests {
         }
     }
 
-    /// `asset_pair_tag()` and `order_id()` accessors delegate to the
-    /// stored `PswapNote` rather than persisting the values
-    /// separately. Verifies the delegation is consistent (no field
-    /// duplication that could drift from the blob).
+    /// The mirrored scalars back the accessors with the same values the
+    /// depth-0 note would yield, so `order_id()`, `asset_pair_tag()` and
+    /// `creator_account_id()` stay correct without re-fetching the note.
     #[test]
-    fn accessors_delegate_to_stored_pswap_note() {
+    fn accessors_mirror_depth_zero_note() {
         let (sender, creator, offered_faucet, requested_faucet) = fixed_account_ids();
         let pswap = build_test_pswap(sender, creator, offered_faucet, 100, requested_faucet, 50);
 
@@ -415,19 +512,19 @@ mod tests {
         );
 
         let note = miden_protocol::note::Note::from(pswap.clone());
-        let remaining_offered = *pswap.offered_asset();
-        let remaining_requested = *pswap.storage().requested_asset();
-        let record = PswapLineageRecord {
-            original_pswap: pswap,
-            current_tip_note_id: note.id(),
-            current_depth: 0,
-            remaining_offered,
-            remaining_requested,
-            state: PswapLineageState::Active,
-            created_at_block: BlockNumber::from(0),
-            updated_at_block: BlockNumber::from(0),
-        };
+        let record = record_from_test_pswap(
+            &pswap,
+            note.id(),
+            0,
+            100,
+            50,
+            PswapLineageState::Active.as_u8(),
+            BlockNumber::from(0),
+            BlockNumber::from(0),
+        )
+        .unwrap();
 
+        assert_eq!(record.original_note_id, note.id());
         assert_eq!(record.order_id(), expected_order_id);
         assert_eq!(record.asset_pair_tag(), expected_tag);
         assert_eq!(record.creator_account_id(), creator);
@@ -442,8 +539,8 @@ mod tests {
         let (sender, creator, offered_faucet, requested_faucet) = fixed_account_ids();
         let pswap = build_test_pswap(sender, creator, offered_faucet, 100, requested_faucet, 50);
         let note = miden_protocol::note::Note::from(pswap.clone());
-        let record = build_record_from_fields(
-            pswap,
+        let record = record_from_test_pswap(
+            &pswap,
             note.id(),
             3,
             70,
@@ -457,6 +554,11 @@ mod tests {
         let bytes = record.to_bytes();
         let decoded = PswapLineageRecord::read_from_bytes(&bytes).unwrap();
 
+        assert_eq!(decoded.original_note_id, record.original_note_id);
+        assert_eq!(decoded.creator_account_id(), record.creator_account_id());
+        assert_eq!(decoded.offered_asset(), record.offered_asset());
+        assert_eq!(decoded.requested_asset(), record.requested_asset());
+        assert_eq!(decoded.note_type(), record.note_type());
         assert_eq!(decoded.order_id(), record.order_id());
         assert_eq!(decoded.current_tip_note_id, record.current_tip_note_id);
         assert_eq!(decoded.current_depth, record.current_depth);
