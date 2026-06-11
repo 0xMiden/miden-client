@@ -1678,6 +1678,16 @@ fn build_call_test_masp(out_path: &Path) {
             dropw
             exec.sys::truncate_stack
         end
+
+        pub proc read_advice
+            # Look up a fixed key in the advice map and return the sum of its two values.
+            push.268435456.0.0.0
+            adv.push_mapval
+            dropw
+            adv_push adv_push
+            add
+            exec.sys::truncate_stack
+        end
     "#;
 
     let library: Library = CodeBuilder::default()
@@ -1703,12 +1713,13 @@ fn build_call_test_masp(out_path: &Path) {
 
     let metadata = AccountComponentMetadata::new("call-test").with_storage_schema(storage_schema);
 
-    let signature_overrides: [(&str, FunctionType); 2] = [
+    let signature_overrides: [(&str, FunctionType); 3] = [
         ("add", FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt], [Type::Felt])),
         (
             "set_value",
             FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt, Type::Felt, Type::Felt], []),
         ),
+        ("read_advice", FunctionType::new(CallConv::Fast, [], [Type::Felt])),
     ];
 
     let mut exports: Vec<PackageExport> = Vec::new();
@@ -1870,6 +1881,40 @@ fn call_set_value_shows_storage_delta() {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Storage Slot"), "Expected storage delta in output:\n{stdout}");
+}
+
+/// Tests that advice map entries supplied via `--inputs-path` reach the called procedure.
+/// `read_advice` looks up a fixed key in the advice map and returns the sum of the two mapped
+/// values (13 + 9 = 22).
+#[test]
+fn call_with_advice_inputs() {
+    let (temp_dir, account_id, masp_path) = setup_call_test_account();
+
+    let advice_path = fs::canonicalize("tests/files/test_cli_advice_inputs_input.toml").unwrap();
+
+    let mut cmd = cargo_bin_cmd!("miden-client");
+    cmd.args([
+        "call",
+        &format!("{account_id}:read_advice"),
+        "--package",
+        masp_path.to_str().unwrap(),
+        "-i",
+        advice_path.to_str().unwrap(),
+    ]);
+
+    let output = cmd.current_dir(&temp_dir).output().unwrap();
+    assert!(
+        output.status.success(),
+        "Call with advice inputs failed.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Result: 22"),
+        "Expected advice-derived result in output:\n{stdout}"
+    );
 }
 
 /// Tests that calling a `add` with the wrong number of arguments fails

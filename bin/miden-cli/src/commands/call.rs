@@ -9,6 +9,7 @@ use miden_client::transaction::{AdviceInputs, TransactionRequestBuilder, Transac
 use miden_client::vm::{Package, PackageExport};
 use miden_client::{Client, Deserializable, Felt, Word};
 
+use crate::advice_inputs::load_advice_map_from_file;
 use crate::errors::CliError;
 use crate::utils::{parse_account_id, print_executed_program_stack, print_executed_transaction};
 
@@ -29,6 +30,10 @@ pub struct CallCmd {
     /// Path to the package (.masp) file containing the procedure.
     #[arg(long, short)]
     package: PathBuf,
+
+    /// Path to a TOML file with advice map entries, in the same format as the `exec` command.
+    #[arg(long, short)]
+    inputs_path: Option<PathBuf>,
 }
 
 impl CallCmd {
@@ -60,6 +65,11 @@ impl CallCmd {
 
         let args = parse_args(&self.args)?;
 
+        let advice_entries = match &self.inputs_path {
+            Some(path) => load_advice_map_from_file(path)?,
+            None => vec![],
+        };
+
         match param_count {
             Some(expected) if args.len() != expected => {
                 return Err(CliError::InvalidArgument(format!(
@@ -90,8 +100,10 @@ impl CallCmd {
         let read_tx_script =
             generate_tx_script(linked_builder.clone(), &digest, &args, result_count)?;
 
+        let advice_inputs = AdviceInputs::default().with_map(advice_entries.clone());
+
         let output_stack = client
-            .execute_program(account_id, read_tx_script, AdviceInputs::default(), BTreeMap::new())
+            .execute_program(account_id, read_tx_script, advice_inputs, BTreeMap::new())
             .await?;
 
         print_executed_program_stack(&output_stack, result_count);
@@ -101,6 +113,7 @@ impl CallCmd {
 
         let tx_request = TransactionRequestBuilder::new()
             .custom_script(delta_tx_script)
+            .extend_advice_map(advice_entries)
             .build()
             .map_err(|err| {
                 CliError::Transaction(err.into(), "Failed to build transaction".to_string())
