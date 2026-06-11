@@ -4,6 +4,7 @@
 
 ### Fixes
 
+* [FIX][rust] `Client::execute_transaction` no longer writes to the store before execution: the request's input notes and output note scripts are persisted only after the transaction executes successfully and is applied, so a failed execution leaves the store unchanged ([#2222](https://github.com/0xMiden/miden-client/pull/2222)).
 * [FIX][rust] `Client::send_private_note` is now durable across transient NTL failures: the relay payload is persisted to a durable outbox (a `Vec<NoteInfo>` under the `note_transport_outbox` settings key) before the transport call, so a failed or interrupted `send_note` no longer drops the note. `Client::sync_note_transport` retries the outbox on each sync (the receiver dedupes by note id) and a failing relay no longer blocks the sync; the new `Client::flush_relay_outbox()` lets callers drive retries directly ([#2127](https://github.com/0xMiden/miden-client/pull/2127)).
 * [FIX] Fixed `derive_account_commitments` to return the final account commitment when multiple transactions for the same account are committed in the same block ([#2164](https://github.com/0xMiden/miden-client/pull/2164)).
 * [FIX] Stopped state sync from aborting when the node reports a stale (non-monotonic) header for a rapidly-advancing account: such updates are now skipped instead of failing with a nonce error ([#2216](https://github.com/0xMiden/miden-client/pull/2216)).
@@ -27,6 +28,7 @@
 * [BREAKING][type][rust] `NoteScript::root()` now returns `NoteScriptRoot` instead of `Word`. Use `Word::from(root)` (or `root.into()`) where a `Word` is required. `NoteScriptRoot` is re-exported from `miden_client::note`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * [BREAKING][rename][rust] `FeeParameters::native_asset_id()` renamed to `fee_faucet_id()`. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
 * [BREAKING][rust] Removed `NodeRpcClient::check_nullifiers`, `RpcEndpoint::CheckNullifiers`, `EndpointError::CheckNullifiers`, and `CheckNullifiersError` after the upstream node dropped the `CheckNullifiers` gRPC method. Use `NodeRpcClient::sync_nullifiers` to retrieve nullifier updates. ([#2145](https://github.com/0xMiden/miden-client/pull/2145))
+* [BREAKING][behavior][cli] `token_symbol_map.toml` requires the `id` field to be a bech32 address; hex `AccountId`s are no longer accepted. Convert existing entries by copying the bech32 address from `account list`. ([#2159](https://github.com/0xMiden/miden-client/pull/2159))
 * Added a `Client::import_watched_account_by_id` method to track an external account state without syncing notes ([#2143](https://github.com/0xMiden/miden-client/pull/2143)).
 * Removed limit on accounts and note tags that can be tracked by the client ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
 * [BREAKING] Updated the `sync_notes` and `sync_transactions` to return directly the fetched updates. Removed `TransactionsInfo` and `NoteSyncInfo` structs ([#2170](https://github.com/0xMiden/miden-client/pull/2170)).
@@ -43,6 +45,7 @@
 * [BREAKING] Note attachments are no longer carried on the note-transport wire format (only `NoteHeader` + serialized `NoteDetails`). ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
 * [BREAKING][rust] Removed the top-level `miden_client::standards` alias. Use the curated client paths as before, or the new raw upstream namespaces `miden_client::account::standards::*`, `miden_client::note::standards::*`, and `miden_client::testing::standards::*`. ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
 * Added a blanket implementation for `NodeRpcClient::get_account_details` ([#2196](https://github.com/0xMiden/miden-client/pull/2196)).
+* [BREAKING][param][rust] `NodeRpcClient::sync_storage_maps` and `NodeRpcClient::sync_account_vault` now take a required `block_to: BlockNumber` instead of `Option<BlockNumber>`. The node rejects ranges that extend beyond the chain tip, so callers must pass an explicit upper bound (e.g. the client's sync height). ([#2229](https://github.com/0xMiden/miden-client/pull/2229))
 
 ### Enhancements
 
@@ -56,7 +59,10 @@
 * [FEATURE][rust,store] Added `BatchBuilder` for stacking multiple transactions against multiple local accounts and submitting them as one proven batch via `SubmitProvenBatch`. Also adds `Store::apply_transaction_batch` (atomic multi-tx apply) with a `SqliteStore` implementation. ([#2109](https://github.com/0xMiden/miden-client/pull/2109), [#2160](https://github.com/0xMiden/miden-client/issues/2160))
 * Made `TransactionStoreUpdate` serialization lossless ([#2112](https://github.com/0xMiden/miden-client/pull/2112)).
 * [FEATURE][cli] Added `address encode <ACCOUNT_ID> <INTERFACE> [TAG_LEN]` subcommand that prints the bech32 encoding of an address built from the given fields (useful for producing the input to `address add`). ([#2115](https://github.com/0xMiden/miden-client/pull/2115))
+* [FEATURE][cli] On asset display, the CLI now lazily fetches on-chain `TokenMetadata` for untracked public faucets via RPC and persists the result in the client's settings store. ([#2159](https://github.com/0xMiden/miden-client/pull/2159))
+* [FEATURE][cli] Faucet/account IDs in human-facing CLI output (account list, `notes -s`, transaction summaries) are now rendered as bech32 addresses using the configured network instead of hex IDs. Hex remains in error messages and debug output. ([#2159](https://github.com/0xMiden/miden-client/pull/2159))
 * Added an integration test for network-transaction public output note creation ([#2073](https://github.com/0xMiden/miden-client/pull/2073)).
+* [FEATURE][rust,cli] Added DAP-backed transaction execution support through `DapProgramExecutor`/`ProgramExecutor`, and made `miden-client exec --start-debug-adapter` compile source scripts so DAP clients can resolve source locations. ([#2189](https://github.com/0xMiden/miden-client/pull/2189))
 * [FEATURE][web] Added `StorageView` JS wrapper over WASM `AccountStorage`. `account.storage()` now returns a `StorageView` that makes `getItem()` work intuitively for both Value and StorageMap slots. WASM primitives are unchanged; the raw `AccountStorage` is accessible via `.raw` ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][web] Added `wordToBigInt()` utility export for losslessly converting a `Word`'s first felt to a `BigInt`. `StorageResult.toString()` is BigInt-backed, and `valueOf()` returns a JS number for values fitting in `Number.MAX_SAFE_INTEGER` and throws `RangeError` for larger u64 values — use `.toBigInt()` for exact access ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][rust,cli] Added partial swap (PSWAP) support: `TransactionRequestBuilder::build_pswap_create` / `build_pswap_consume` / `build_pswap_cancel` and a `miden-client pswap` CLI command (`create`, `consume`, `cancel`) for partially-fillable fungible swaps ([#2162](https://github.com/0xMiden/miden-client/pull/2162)).
@@ -64,7 +70,7 @@
 ### Fixes
 
 * [FIX][rust] `Client::fetch_all_private_notes` now drains the full backlog across multiple server-paginated responses instead of returning after a single batch. Needed once the note-transport server (`0xMiden/note-transport-service#77`) caps each `fetch_notes` response at `FETCH_NOTES_BATCH_SIZE` rows — previously the function silently returned only the first batch, contradicting its documented "fetches all notes" semantics. Companion deterministic regression test (`fetch_all_private_notes_drains_across_batches`) uses a new `MockNoteTransportNode::with_max_batch(n)` constructor to exercise multi-batch drain. ([#2095](https://github.com/0xMiden/miden-client/pull/2095))
-* [FIX][rust] Fixed the `dap` feature build by bumping `miden-debug`/`miden-debug-engine` to 0.8.1 and `miden-core` to 0.23.2, aligning the debugger crates with the `miden-core` APIs they call. (#TBD)
+* [FIX][rust] Fixed the `dap` feature build by bumping `miden-debug`/`miden-debug-engine` to 0.8.1 and `miden-core` to 0.23.2, aligning the debugger crates with the `miden-core` APIs they call. ([#2189](https://github.com/0xMiden/miden-client/pull/2189))
 
 ## 0.14.9 (2026-05-19)
 

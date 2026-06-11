@@ -3,7 +3,6 @@ use miden_client::Client;
 use miden_client::account::AccountId;
 use miden_client::address::{Address, AddressId, AddressInterface, NetworkId, RoutingParameters};
 
-use crate::config::CliConfig;
 use crate::errors::CliError;
 use crate::utils::parse_account_id;
 use crate::{Parser, Subcommand, create_dynamic_table};
@@ -68,8 +67,7 @@ pub struct AddressCmd {
 
 impl AddressCmd {
     pub async fn execute<AUTH>(&self, client: Client<AUTH>) -> Result<(), CliError> {
-        let cli_config = CliConfig::load()?;
-        let network_id = cli_config.rpc.endpoint.0.to_network_id();
+        let network_id = client.network_id().await?;
         match &self.command {
             Some(AddressSubCommand::List { account_id: Some(account_id) }) => {
                 list_account_addresses(client, account_id, network_id).await?;

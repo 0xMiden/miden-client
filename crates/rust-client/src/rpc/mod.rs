@@ -354,9 +354,8 @@ pub trait NodeRpcClient: Send + Sync {
         if !details.vault_details.too_many_assets {
             return Ok(());
         }
-        let vault_info = self
-            .sync_account_vault(BlockNumber::GENESIS, Some(block_to), account_id)
-            .await?;
+        let vault_info =
+            self.sync_account_vault(BlockNumber::GENESIS, block_to, account_id).await?;
         let mut updates = vault_info.updates;
         // The node returns the full history of vault entries, so a given key may appear in more
         // than one block. Sort by block so the BTreeMap keeps the latest value per key.
@@ -384,7 +383,7 @@ pub trait NodeRpcClient: Send + Sync {
         if !details.storage_details.map_details.iter().any(|m| m.too_many_entries) {
             return Ok(());
         }
-        let info = self.sync_storage_maps(BlockNumber::GENESIS, Some(block_to), account_id).await?;
+        let info = self.sync_storage_maps(BlockNumber::GENESIS, block_to, account_id).await?;
         for map_details in &mut details.storage_details.map_details {
             if !map_details.too_many_entries {
                 continue;
@@ -511,13 +510,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// using the `/SyncStorageMaps` RPC endpoint.
     ///
     /// - `block_from`: The starting block number for the range (inclusive).
-    /// - `block_to`: The ending block number for the range (inclusive). If `None`, syncs up to the
-    ///   chain tip.
+    /// - `block_to`: The ending block number for the range (inclusive). The node rejects values
+    ///   greater than the chain tip.
     /// - `account_id`: The account ID for which to fetch storage map updates.
     async fn sync_storage_maps(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError>;
 
@@ -525,13 +524,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// using the `/SyncAccountVault` RPC endpoint.
     ///
     /// - `block_from`: The starting block number for the range (inclusive).
-    /// - `block_to`: The ending block number for the range (inclusive). If `None`, syncs up to the
-    ///   chain tip.
+    /// - `block_to`: The ending block number for the range (inclusive). The node rejects values
+    ///   greater than the chain tip.
     /// - `account_id`: The account ID for which to fetch storage map updates.
     async fn sync_account_vault(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError>;
 
