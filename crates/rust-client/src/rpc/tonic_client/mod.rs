@@ -26,7 +26,12 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{AccountProof, GetAccountRequest, VaultFetch};
+use super::domain::account::{
+    AccountProof,
+    AccountStorageRequirements,
+    GetAccountRequest,
+    StorageMapFetch,
+};
 use super::domain::note::{FetchedNote, NoteSyncBlock};
 use super::domain::nullifier::NullifierUpdate;
 use super::generated::rpc::AccountRequest;
@@ -41,11 +46,6 @@ use crate::rpc::domain::transaction::TransactionRecord;
 use crate::rpc::errors::node::parse_node_error;
 use crate::rpc::errors::{AcceptHeaderContext, AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::BlockRange;
-use crate::rpc::generated::rpc::account_request::account_detail_request::{
-    StorageMapDetailRequest,
-    StorageMapDetailRequests,
-    StorageRequest,
-};
 use crate::rpc::{AccountStateAt, generated as proto};
 
 mod api_client;
@@ -56,7 +56,7 @@ use api_client::api_client_wrapper::ApiClient;
 /// Tracks the pagination state for block-driven endpoints.
 struct BlockPagination {
     current_block_from: BlockNumber,
-    block_to: Option<BlockNumber>,
+    block_to: BlockNumber,
     iterations: u32,
 }
 
@@ -75,7 +75,7 @@ impl BlockPagination {
     /// trigger an infinite loop.
     const MAX_ITERATIONS: u32 = 1000;
 
-    fn new(block_from: BlockNumber, block_to: Option<BlockNumber>) -> Self {
+    fn new(block_from: BlockNumber, block_to: BlockNumber) -> Self {
         Self {
             current_block_from: block_from,
             block_to,
@@ -87,7 +87,7 @@ impl BlockPagination {
         self.current_block_from
     }
 
-    fn block_to(&self) -> Option<BlockNumber> {
+    fn block_to(&self) -> BlockNumber {
         self.block_to
     }
 
@@ -109,7 +109,7 @@ impl BlockPagination {
             ));
         }
 
-        let target_block = self.block_to.map_or(chain_tip, |to| to.min(chain_tip));
+        let target_block = self.block_to.min(chain_tip);
 
         if block_num >= target_block {
             return Ok(PaginationResult::Done { chain_tip, block_num });
@@ -501,12 +501,10 @@ impl NodeRpcClient for GrpcClient {
             known_codes_by_commitment.insert(account_code.commitment(), account_code);
         }
 
-        let storage_maps: Vec<StorageMapDetailRequest> = storage.clone().into();
-
-        let asset_vault_commitment = match vault {
-            VaultFetch::Skip => None,
-            VaultFetch::Always => Some(EMPTY_WORD.into()),
-            VaultFetch::IfChangedFrom(commitment) => Some(commitment.into()),
+        // We need the requested slots to interpret the node response.
+        let requirements = match storage.clone() {
+            StorageMapFetch::Slots(reqs) => reqs,
+            StorageMapFetch::Skip | StorageMapFetch::All => AccountStorageRequirements::default(),
         };
 
         // Only request details for accounts with public state (Public or Network), passing the
@@ -514,10 +512,8 @@ impl NodeRpcClient for GrpcClient {
         let account_details = if account_id.is_public() {
             Some(AccountDetailRequest {
                 code_commitment: Some(known_code_commitment.into()),
-                asset_vault_commitment,
-                storage_request: Some(StorageRequest::StorageMaps(StorageMapDetailRequests {
-                    storage_maps,
-                })),
+                asset_vault_commitment: vault.into(),
+                storage_request: storage.into(),
             })
         } else {
             None
@@ -558,7 +554,7 @@ impl NodeRpcClient for GrpcClient {
             let details = response
                 .details
                 .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                .into_domain(&known_codes_by_commitment, &storage)?;
+                .into_domain(&known_codes_by_commitment, &requirements)?;
 
             Some(details)
         } else {
@@ -595,7 +591,7 @@ impl NodeRpcClient for GrpcClient {
 
         for chunk in tags.chunks(limits.note_tags_limit as usize) {
             let proto_tags: Vec<u32> = chunk.iter().map(|&t| t.into()).collect();
-            let mut pagination = BlockPagination::new(block_from, Some(block_to));
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
                 let request = proto::rpc::SyncNotesRequest {
@@ -655,7 +651,7 @@ impl NodeRpcClient for GrpcClient {
         // violating the RPC limit.
         for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
             let proto_prefixes: Vec<u32> = chunk.iter().map(|&x| u32::from(x)).collect();
-            let mut pagination = BlockPagination::new(block_from, Some(block_to));
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
                 let request = proto::rpc::SyncNullifiersRequest {
@@ -663,10 +659,7 @@ impl NodeRpcClient for GrpcClient {
                     prefix_len: 16,
                     block_range: Some(BlockRange {
                         block_from: pagination.current_block_from().as_u32(),
-                        block_to: pagination
-                            .block_to()
-                            .map(|b| b.as_u32())
-                            .expect("sync_nullifiers is paginated with a bounded block_to"),
+                        block_to: pagination.block_to().as_u32(),
                     }),
                 };
 
@@ -753,7 +746,7 @@ impl NodeRpcClient for GrpcClient {
     async fn sync_storage_maps(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError> {
         let mut pagination = BlockPagination::new(block_from, block_to);
@@ -763,7 +756,7 @@ impl NodeRpcClient for GrpcClient {
             let request = proto::rpc::SyncAccountStorageMapsRequest {
                 block_range: Some(BlockRange {
                     block_from: pagination.current_block_from().as_u32(),
-                    block_to: pagination.block_to().map_or(u32::MAX, |block| block.as_u32()),
+                    block_to: block_to.as_u32(),
                 }),
                 account_id: Some(account_id.into()),
             };
@@ -801,7 +794,7 @@ impl NodeRpcClient for GrpcClient {
     async fn sync_account_vault(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError> {
         let mut pagination = BlockPagination::new(block_from, block_to);
@@ -811,7 +804,7 @@ impl NodeRpcClient for GrpcClient {
             let request = proto::rpc::SyncAccountVaultRequest {
                 block_range: Some(BlockRange {
                     block_from: pagination.current_block_from().as_u32(),
-                    block_to: pagination.block_to().map_or(u32::MAX, |block| block.as_u32()),
+                    block_to: block_to.as_u32(),
                 }),
                 account_id: Some(account_id.into()),
             };
@@ -866,7 +859,7 @@ impl NodeRpcClient for GrpcClient {
 
         for chunk in account_ids.chunks(limits.account_ids_limit as usize) {
             let proto_account_ids: Vec<_> = chunk.iter().map(|acc_id| (*acc_id).into()).collect();
-            let mut pagination = BlockPagination::new(block_from, Some(block_to));
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
                 let request = proto::rpc::SyncTransactionsRequest {
@@ -1015,7 +1008,7 @@ mod tests {
 
     #[test]
     fn block_pagination_errors_when_block_num_goes_backwards() {
-        let mut pagination = BlockPagination::new(10_u32.into(), None);
+        let mut pagination = BlockPagination::new(10_u32.into(), 20_u32.into());
 
         let res = pagination.advance(9_u32.into(), 20_u32.into());
         assert!(matches!(res, Err(RpcError::PaginationError(_))));
@@ -1023,7 +1016,7 @@ mod tests {
 
     #[test]
     fn block_pagination_errors_after_max_iterations() {
-        let mut pagination = BlockPagination::new(0_u32.into(), None);
+        let mut pagination = BlockPagination::new(0_u32.into(), 10_000_u32.into());
         let chain_tip: BlockNumber = 10_000_u32.into();
 
         for _ in 0..BlockPagination::MAX_ITERATIONS {
@@ -1041,7 +1034,7 @@ mod tests {
     #[test]
     fn block_pagination_stops_at_min_of_block_to_and_chain_tip() {
         // block_to is beyond chain tip, so target should be chain_tip.
-        let mut pagination = BlockPagination::new(0_u32.into(), Some(50_u32.into()));
+        let mut pagination = BlockPagination::new(0_u32.into(), 50_u32.into());
 
         let res = pagination
             .advance(30_u32.into(), 30_u32.into())
@@ -1058,7 +1051,7 @@ mod tests {
 
     #[test]
     fn block_pagination_advances_cursor_by_one() {
-        let mut pagination = BlockPagination::new(5_u32.into(), None);
+        let mut pagination = BlockPagination::new(5_u32.into(), 100_u32.into());
 
         let res = pagination
             .advance(5_u32.into(), 100_u32.into())

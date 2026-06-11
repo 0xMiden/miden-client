@@ -24,9 +24,9 @@ use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{BlockNumber, NoteFile, NoteTag, NoteType};
 use miden_client::rpc::domain::account::{
     AccountStorageRequirements,
-    FetchedAccount,
     GetAccountRequest,
     StorageMapEntries,
+    StorageMapFetch,
     VaultFetch,
 };
 use miden_client::rpc::{GrpcClient, NodeRpcClient};
@@ -493,8 +493,8 @@ pub async fn test_get_account_update(client_config: ClientConfig) -> Result<()> 
     let details1 = rpc_api.get_account_details(basic_wallet_1.id()).await.unwrap();
     let details2 = rpc_api.get_account_details(basic_wallet_2.id()).await.unwrap();
 
-    assert!(matches!(details1, FetchedAccount::Private(_, _)));
-    assert_matches!(details2, FetchedAccount::Public(account, _) if {
+    assert!(details1.is_none());
+    assert_matches!(details2, Some(account) if {
         account.vault().assets().any(|asset| matches!(
             asset,
             miden_client::asset::Asset::Fungible(fa)
@@ -1590,12 +1590,12 @@ pub async fn test_unused_rpc_api(client_config: ClientConfig) -> Result<()> {
         .expect("node should have the note script registered");
     let sync_storage_maps = client
         .test_rpc_api()
-        .sync_storage_maps(0.into(), None, account_with_map_item.id())
+        .sync_storage_maps(0.into(), sync_height, account_with_map_item.id())
         .await
         .unwrap();
     let account_vault_info = client
         .test_rpc_api()
-        .sync_account_vault(0.into(), None, first_basic_account.id())
+        .sync_account_vault(0.into(), sync_height, first_basic_account.id())
         .await
         .unwrap();
     let transactions = client
@@ -1768,7 +1768,7 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
         .get_account(
             account_id,
             GetAccountRequest {
-                storage: requirements_all,
+                storage: StorageMapFetch::Slots(requirements_all),
                 ..Default::default()
             },
         )
@@ -1789,7 +1789,7 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
         .get_account(
             account_id,
             GetAccountRequest {
-                storage: requirements_one,
+                storage: StorageMapFetch::Slots(requirements_one),
                 ..Default::default()
             },
         )

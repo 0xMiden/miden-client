@@ -29,10 +29,11 @@ use miden_client::asset::{
     NonFungibleAssetDetails,
 };
 use miden_client::auth::{AuthSchemeId, AuthSingleSig, PublicKeyCommitment};
-use miden_client::store::{ClientAccountType, Store};
+use miden_client::store::{ClientAccountType, Store, StoreError};
 use miden_client::testing::common::ACCOUNT_ID_REGULAR;
 use miden_client::{EMPTY_WORD, Felt, ONE, ZERO};
 use miden_protocol::account::AccountComponentMetadata;
+use miden_protocol::asset::AssetCallbackFlag;
 use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
@@ -43,6 +44,7 @@ use rusqlite::params;
 use crate::SqliteStore;
 use crate::sql_error::SqlResultExt;
 use crate::tests::create_test_store;
+use crate::transaction::with_forest_snapshot;
 
 #[tokio::test]
 async fn account_code_insertion_no_duplicates() -> anyhow::Result<()> {
@@ -198,6 +200,88 @@ async fn apply_account_delta_additions() -> anyhow::Result<()> {
         panic!("Expected map slot content");
     };
     assert_eq!(map_b.entries().count(), 0);
+
+    Ok(())
+}
+
+/// Regression test: applying a fungible vault delta must preserve the asset's
+/// [`AssetCallbackFlag`].
+///
+/// The callback flag is part of an asset's vault key *and* value encoding, so if the store
+/// drops it while replaying a delta, the locally recomputed vault root diverges from the one
+/// the transaction kernel produced (which carries the flag, exactly as
+/// `AssetVault::apply_delta` does in miden-protocol). That divergence surfaces as a
+/// `MerkleStoreError`/`ConflictingRoots` when `apply_account_vault_delta` compares the
+/// recomputed root against `final_account_state.vault_root()`.
+///
+/// Callback-bearing fungible assets are produced by agglayer faucets (B2AGG), so this path
+/// is exercised when a wallet consumes an agglayer-minted note. Ordinary assets use the
+/// disabled flag, where preserving it is a no-op — which is why only agglayer hit the bug.
+#[tokio::test]
+async fn apply_account_delta_preserves_fungible_callback_flag() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+
+    // Create and insert an account with an empty vault.
+    let account = AccountBuilder::new([7; 32])
+        .account_type(AccountType::Private)
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Poseidon2,
+        ))
+        .with_component(BasicWallet)
+        .build_existing()?;
+    store
+        .insert_account(&account, Address::new(account.id()), ClientAccountType::Native)
+        .await?;
+
+    // A fungible asset that carries an *enabled* callback flag (as agglayer-minted assets do).
+    let callback_asset: Asset =
+        FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?, 100)?
+            .with_callbacks(AssetCallbackFlag::Enabled)
+            .into();
+
+    let vault_delta = AccountVaultDelta::from_iters(vec![callback_asset], []);
+    let delta = AccountDelta::new(account.id(), AccountStorageDelta::new(), vault_delta, ONE)?;
+
+    // `apply_delta` uses miden-protocol's `AssetVault::apply_delta`, which preserves the
+    // callback flag; the resulting header carries the authoritative (with-callback) vault root.
+    let mut account_after_delta = account.clone();
+    account_after_delta.apply_delta(&delta)?;
+
+    let account_id = account.id();
+    let final_state: AccountHeader = (&account_after_delta).into();
+    let expected_vault_root = final_state.vault_root();
+    let smt_forest = store.smt_forest.clone();
+    store
+        .interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+
+            // Without preserving the callback flag this fails with a `ConflictingRoots`
+            // merkle store error (recomputed root != final_state.vault_root()).
+            SqliteStore::apply_account_delta(
+                &tx,
+                &mut smt_forest,
+                &account.into(),
+                &final_state,
+                BTreeMap::default(),
+                &BTreeMap::new(),
+                &delta,
+            )?;
+
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await?;
+
+    let updated_account: Account = store
+        .get_account(account_id)
+        .await?
+        .context("failed to find inserted account")?
+        .try_into()?;
+
+    assert_eq!(updated_account, account_after_delta);
+    assert_eq!(updated_account.vault().root(), expected_vault_root);
 
     Ok(())
 }
@@ -1865,6 +1949,172 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
         .await?
         .expect("account should exist after undo");
     assert_eq!(header.nonce().as_canonical_u64(), 0);
+
+    Ok(())
+}
+
+// SMT FOREST SNAPSHOT ROLLBACK
+// ================================================================================================
+
+/// Builds a non-trivial delta over a freshly inserted account: a value-slot write, a map-slot
+/// write, and a vault addition. Sufficient to drive `stage_roots` + multiple SMT mutations in
+/// `apply_account_delta`.
+fn build_delta_for_snapshot_test(
+    account: &Account,
+    value_slot_name: StorageSlotName,
+    map_slot_name: StorageSlotName,
+) -> anyhow::Result<(AccountDelta, Account)> {
+    let mut storage_delta = AccountStorageDelta::new();
+    storage_delta.set_item(value_slot_name, [ZERO, ZERO, ZERO, ONE].into())?;
+    storage_delta.set_map_item(
+        map_slot_name,
+        StorageMapKey::new([ONE, ZERO, ZERO, ZERO].into()),
+        [ONE, ONE, ONE, ONE].into(),
+    )?;
+
+    let vault_delta = AccountVaultDelta::from_iters(
+        vec![
+            FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?, 100)?
+                .into(),
+        ],
+        [],
+    );
+
+    let delta = AccountDelta::new(account.id(), storage_delta, vault_delta, ONE)?;
+
+    let mut account_after_delta = account.clone();
+    account_after_delta.apply_delta(&delta)?;
+    Ok((delta, account_after_delta))
+}
+
+async fn insert_account_with_storage_for_snapshot_test()
+-> anyhow::Result<(SqliteStore, Account, StorageSlotName, StorageSlotName)> {
+    let store = create_test_store().await;
+
+    let value_slot_name =
+        StorageSlotName::new("miden::testing::sqlite_store::value").expect("valid slot name");
+    let map_slot_name =
+        StorageSlotName::new("miden::testing::sqlite_store::map").expect("valid slot name");
+
+    let dummy_component = AccountComponent::new(
+        BasicWallet::code().as_library().clone(),
+        vec![
+            StorageSlot::with_empty_value(value_slot_name.clone()),
+            StorageSlot::with_empty_map(map_slot_name.clone()),
+        ],
+        AccountComponentMetadata::new("miden::testing::dummy_component"),
+    )?;
+
+    let account = AccountBuilder::new([0; 32])
+        .account_type(AccountType::Private)
+        .with_auth_component(AuthSingleSig::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Poseidon2,
+        ))
+        .with_component(dummy_component)
+        .build_with_schema_commitment()?;
+
+    let default_address = Address::new(account.id());
+    store
+        .insert_account(&account, default_address, ClientAccountType::Native)
+        .await?;
+
+    Ok((store, account, value_slot_name, map_slot_name))
+}
+
+/// `with_forest_snapshot` must leave the in-memory `AccountSmtForest` unchanged when the
+/// closure returns an error, even after `apply_account_delta` has already mutated the
+/// working clone (vault tree, storage map tree, and staged roots).
+#[tokio::test]
+async fn with_forest_snapshot_leaves_forest_unchanged_on_error() -> anyhow::Result<()> {
+    let (store, account, value_slot_name, map_slot_name) =
+        insert_account_with_storage_for_snapshot_test().await?;
+
+    let (delta, account_after_delta) =
+        build_delta_for_snapshot_test(&account, value_slot_name, map_slot_name)?;
+    let final_state: AccountHeader = (&account_after_delta).into();
+
+    let forest_arc = store.smt_forest.clone();
+    let forest_before = forest_arc.read().expect("read lock").clone();
+
+    let init_header: AccountHeader = (&account).into();
+    let smt_forest = forest_arc.clone();
+    let outcome = store
+        .interact_with_connection(move |conn| {
+            with_forest_snapshot(conn, &smt_forest, |tx, forest| {
+                SqliteStore::apply_account_delta(
+                    tx,
+                    forest,
+                    &init_header,
+                    &final_state,
+                    BTreeMap::default(),
+                    &BTreeMap::new(),
+                    &delta,
+                )?;
+                Err::<(), _>(StoreError::DatabaseError("forced rollback".to_string()))
+            })
+        })
+        .await;
+
+    assert!(matches!(outcome, Err(StoreError::DatabaseError(_))));
+
+    let forest_after = forest_arc.read().expect("read lock").clone();
+    assert_eq!(forest_after, forest_before, "forest must be unchanged after a failed closure");
+
+    // The DB transaction was rolled back too; account state is still at nonce 0.
+    let (header, _) = store
+        .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account.id()))
+        .await?
+        .expect("account header present");
+    assert_eq!(header.nonce().as_canonical_u64(), 0);
+
+    Ok(())
+}
+
+/// `with_forest_snapshot` must NOT touch the forest when the closure returns `Ok` and the
+/// SQL commit succeeds. Mutations made inside the closure persist.
+#[tokio::test]
+async fn with_forest_snapshot_persists_forest_on_success() -> anyhow::Result<()> {
+    let (store, account, value_slot_name, map_slot_name) =
+        insert_account_with_storage_for_snapshot_test().await?;
+
+    let (delta, account_after_delta) =
+        build_delta_for_snapshot_test(&account, value_slot_name, map_slot_name)?;
+    let final_state: AccountHeader = (&account_after_delta).into();
+
+    let forest_arc = store.smt_forest.clone();
+    let forest_before = forest_arc.read().expect("read lock").clone();
+
+    let init_header: AccountHeader = (&account).into();
+    let account_id = account.id();
+    let smt_forest = forest_arc.clone();
+    store
+        .interact_with_connection(move |conn| {
+            with_forest_snapshot(conn, &smt_forest, |tx, forest| {
+                SqliteStore::apply_account_delta(
+                    tx,
+                    forest,
+                    &init_header,
+                    &final_state,
+                    BTreeMap::default(),
+                    &BTreeMap::new(),
+                    &delta,
+                )
+            })
+        })
+        .await?;
+
+    let forest_after = forest_arc.read().expect("read lock").clone();
+    assert_ne!(
+        forest_after, forest_before,
+        "forest must reflect the staged delta after a successful closure"
+    );
+
+    let (header, _) = store
+        .interact_with_connection(move |conn| SqliteStore::get_account_header(conn, account_id))
+        .await?
+        .expect("account header present");
+    assert_eq!(header.nonce().as_canonical_u64(), 1);
 
     Ok(())
 }

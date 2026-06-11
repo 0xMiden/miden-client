@@ -77,8 +77,6 @@ impl ExecCmd {
             ));
         }
 
-        let program = fs::read_to_string(script_path)?;
-
         let account_id =
             get_input_acc_id_by_prefix_or_default(&client, self.account_id.clone()).await?;
 
@@ -100,7 +98,11 @@ impl ExecCmd {
 
         let advice_inputs = AdviceInputs::default().with_map(inputs);
 
-        let tx_script = client.code_builder().compile_tx_script(&program)?;
+        // Pass the path rather than the source string so the assembler's source manager
+        // records the real filesystem URI in every `AssemblyOp`'s location. Without this,
+        // DAP clients (VS Code, Zed) get `Source { path: None }` in stack traces and can't
+        // highlight the current line or open the file.
+        let tx_script = client.code_builder().compile_tx_script(script_path.as_path())?;
 
         let output_stack =
             self.execute_program(&mut client, account_id, tx_script, advice_inputs).await?;
@@ -131,8 +133,16 @@ impl ExecCmd {
 
             let script_path = PathBuf::from(&self.script_path);
             loop {
-                let program = fs::read_to_string(&script_path)?;
-                let tx_script = client.code_builder().compile_tx_script(&program)?;
+                // DAP restart can happen after the user edits the script. Refresh the cached
+                // source before compiling again so execution uses the current file contents.
+                client.reload_source_file(script_path.as_path()).map_err(|err| {
+                    CliError::Exec(
+                        err.into(),
+                        "error reloading the program source file".to_string(),
+                    )
+                })?;
+
+                let tx_script = client.code_builder().compile_tx_script(script_path.as_path())?;
 
                 let result = client
                     .execute_program_with_dap(

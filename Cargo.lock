@@ -2299,9 +2299,9 @@ dependencies = [
 
 [[package]]
 name = "miden-block-prover"
-version = "0.15.0"
+version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf1829e10ccf220c6052cdcc4181c820307f177612e070623213c8670766de64"
+checksum = "292ded918a0ddd056dc34db471f0bef6ac7991467d513ba505a4fcc0b1ecfac4"
 dependencies = [
  "miden-protocol",
  "thiserror 2.0.18",
@@ -2873,9 +2873,9 @@ dependencies = [
 
 [[package]]
 name = "miden-protocol"
-version = "0.15.0"
+version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b70acd2c57f7f9185c5174966dd47080389271410f25f6a3539970a4474fd440"
+checksum = "66340243e37da5936cb278a8dd11037813f1dc6731c2fc866703b76ed465ebc3"
 dependencies = [
  "bech32",
  "fs-err",
@@ -2949,9 +2949,9 @@ dependencies = [
 
 [[package]]
 name = "miden-standards"
-version = "0.15.0"
+version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc788da5d0dc43f93d6489a302d453cc6c67a12923208c9c8963e43073db0b3b"
+checksum = "c7c7146b028e637f4079b5bdefeefc54d7d6e47a805451fa0a18859d19efa2ff"
 dependencies = [
  "bon",
  "fs-err",
@@ -2988,9 +2988,9 @@ dependencies = [
 
 [[package]]
 name = "miden-testing"
-version = "0.15.0"
+version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10f8cdaa93307907537ae95f3c30efbba94ed9d393bbc75c057c763cceff8599"
+checksum = "d4096fc44a4c88f37405be284e25efdce194d6051e9472ae136ab9249659433c"
 dependencies = [
  "anyhow",
  "itertools",
@@ -3009,9 +3009,9 @@ dependencies = [
 
 [[package]]
 name = "miden-tx"
-version = "0.15.0"
+version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d3cfee228a8b02efa9130bbe6ea086d1c8ffc1b4c93df10f880c9a9a3dfe634"
+checksum = "94092b45bc0abc656af25473c9807d1e6cee8e682c58d3b1186f0bd0fb6471fb"
 dependencies = [
  "miden-processor",
  "miden-protocol",
@@ -3023,9 +3023,9 @@ dependencies = [
 
 [[package]]
 name = "miden-tx-batch-prover"
-version = "0.15.0"
+version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ff829d060dc0cf38816fbe179fe22f0916d2a141974b2518606d58fe0bd1b37"
+checksum = "f60add2b40559352661bc86970541f88ffcf98c528f301295f9dc3bf15481b46"
 dependencies = [
  "miden-protocol",
  "miden-tx",

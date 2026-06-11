@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 
 use miden_protocol::Word;
 use miden_protocol::account::delta::AccountUpdateDetails;
-use miden_protocol::account::{AccountId, StorageSlot, StorageSlotContent};
+use miden_protocol::account::{AccountId, StorageSlot, StorageSlotContent, StorageSlotType};
 use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
@@ -25,6 +25,7 @@ use crate::rpc::domain::account::{
     GetAccountRequest,
     StorageMapEntries,
     StorageMapEntry,
+    StorageMapFetch,
 };
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
 use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncBlock};
@@ -140,11 +141,11 @@ impl MockRpcApi {
     fn get_sync_account_vault_request(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> AccountVaultInfo {
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+        let target_block = block_to.min(chain_tip);
 
         let page_end_block: BlockNumber = (block_from.as_u32() + Self::PAGINATION_BLOCK_LIMIT)
             .min(target_block.as_u32())
@@ -227,11 +228,11 @@ impl MockRpcApi {
     fn get_sync_storage_maps_request(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> StorageMapInfo {
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+        let target_block = block_to.min(chain_tip);
 
         let page_end_block: BlockNumber = (block_from.as_u32() + Self::PAGINATION_BLOCK_LIMIT)
             .min(target_block.as_u32())
@@ -498,8 +499,22 @@ impl NodeRpcClient for MockRpcApi {
         let headers = if account_id.is_public() {
             let account = mock_chain.committed_account(account_id).unwrap();
 
+            // `All` enumerates the account's map slots directly — the mock can introspect the
+            // account, so it simulates the (not-yet-on-the-wire) "all storage maps" request.
+            let requested_slots: Vec<_> = match &request.storage {
+                StorageMapFetch::Skip => Vec::new(),
+                StorageMapFetch::Slots(reqs) => reqs.inner().keys().cloned().collect(),
+                StorageMapFetch::All => account
+                    .storage()
+                    .to_header()
+                    .slots()
+                    .filter(|slot| slot.slot_type() == StorageSlotType::Map)
+                    .map(|slot| slot.name().clone())
+                    .collect(),
+            };
+
             let mut map_details = vec![];
-            for slot_name in request.storage.inner().keys() {
+            for slot_name in &requested_slots {
                 if let Some(StorageSlotContent::Map(storage_map)) =
                     account.storage().get(slot_name).map(StorageSlot::content)
                 {
@@ -612,13 +627,13 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_storage_maps(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError> {
         let mut all_updates = Vec::new();
         let mut current_block_from = block_from;
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+        let target_block = block_to.min(chain_tip);
 
         loop {
             let response =
@@ -640,13 +655,13 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_account_vault(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError> {
         let mut all_updates = Vec::new();
         let mut current_block_from = block_from;
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+        let target_block = block_to.min(chain_tip);
 
         loop {
             let response =

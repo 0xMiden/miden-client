@@ -151,9 +151,7 @@ async fn show_account<AUTH>(
             CliError::Input(format!("Unable to fetch account {account_id} from the network: {err}"))
         })?;
 
-        let account: Option<Account> = fetched_account.into();
-
-        account.ok_or(CliError::Input(format!(
+        fetched_account.ok_or(CliError::Input(format!(
             "Account {account_id} is private and not tracked by the client",
         )))?
     };
