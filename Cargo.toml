@@ -8,7 +8,6 @@ members = [
   "crates/rust-client",
   "crates/sqlite-store",
   "crates/testing/miden-client-tests",
-  "crates/testing/prover",
   "crates/testing/test-node-genesis",
 ]
 

@@ -44,7 +44,7 @@
 * [BREAKING][rust] Removed the top-level `miden_client::standards` alias. Use the curated client paths as before, or the new raw upstream namespaces `miden_client::account::standards::*`, `miden_client::note::standards::*`, and `miden_client::testing::standards::*`. ([#2185](https://github.com/0xMiden/miden-client/pull/2185))
 * Added a blanket implementation for `NodeRpcClient::get_account_details` ([#2196](https://github.com/0xMiden/miden-client/pull/2196)).
 * [BREAKING][param][rust] `NodeRpcClient::sync_storage_maps` and `NodeRpcClient::sync_account_vault` now take a required `block_to: BlockNumber` instead of `Option<BlockNumber>`. The node rejects ranges that extend beyond the chain tip, so callers must pass an explicit upper bound (e.g. the client's sync height). ([#2229](https://github.com/0xMiden/miden-client/pull/2229))
-* Replaced `node-builder` crate with a leaner `test-node-genesis` crate ([#2232](https://github.com/0xMiden/miden-client/pull/2232)).
+* Replaced `node-builder` crate with a leaner `test-node-genesis` crate and removed the `testing-remote-prover` crate; the testing node now runs the node's own `miden-remote-prover` ([#2232](https://github.com/0xMiden/miden-client/pull/2232)).
 
 ### Enhancements
 

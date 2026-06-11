@@ -145,15 +145,19 @@ start() {
 start validator   "$BIN/miden-validator" start --listen "$VALIDATOR" --data-directory "$DATA/validator"
 # Let the validator bind before the sequencer starts producing blocks against it.
 sleep 2
+# Block/batch intervals and the ntx-builder cycle limit are pinned explicitly so a change in the
+# node binaries' defaults can't silently alter test timing or make network-tx tests fail.
 start sequencer   "$BIN/miden-node" sequencer --rpc.listen "$RPC" --data-directory "$DATA/node" \
     --validator.url "http://$VALIDATOR" --ntx-builder.url "http://$NTX" \
     --rpc.network-tx-auth-header-value "$NETWORK_TX_AUTH" \
+    --block.interval 3s --batch.interval 1s \
     --rpc.rate-limit.burst-size 10000 --rpc.rate-limit.replenish-per-second 10000
 start prover      "$BIN/miden-remote-prover" --kind=transaction --port="$PROVER_PORT"
 # Let the sequencer bind its RPC before the ntx-builder dials it.
 sleep 2
 start ntx-builder "$BIN/miden-ntx-builder" start --listen "$NTX" --rpc.url "http://$RPC" \
     --rpc.auth-header-value "$NETWORK_TX_AUTH" --tx-prover.url "http://$PROVER" \
+    --max-cycles "$((1 << 18))" \
     --data-directory "$DATA/ntx-builder"
 
 echo "==> waiting for RPC on $RPC"
