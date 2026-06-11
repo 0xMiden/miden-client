@@ -45,8 +45,8 @@ jobs:
       - name: make - build
         run: make build
 
-  build-no-std:
-    name: Build no_std (wasm32)
+  build-wasm:
+    name: Build wasm32 (no_std)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -64,8 +64,8 @@ jobs:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: false
-      - name: make - build-no-std
-        run: make build-no-std
+      - name: make - build-wasm
+        run: make build-wasm
 
   install:
     name: Install ${{ matrix.target }}
