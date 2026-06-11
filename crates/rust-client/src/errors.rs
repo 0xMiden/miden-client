@@ -2,7 +2,6 @@ use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
-use std::path::PathBuf;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
@@ -157,12 +156,6 @@ pub enum ClientError {
     RecencyConditionError(&'static str),
     #[error("note relevance check failed")]
     NoteScreenerError(#[from] NoteScreenerError),
-    #[error("failed to reload source file `{path}`")]
-    SourceFileReloadError {
-        path: PathBuf,
-        #[source]
-        source: Box<dyn std::error::Error + Send + Sync>,
-    },
     #[error("storage error")]
     StoreError(#[from] StoreError),
     #[error("transaction execution failed")]

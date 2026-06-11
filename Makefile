@@ -166,6 +166,10 @@ install-tests: ## Install the tests binary
 build: ## Build the CLI binary, client library and tests binary in release mode
 	cargo build --workspace $(TARGET_FLAG) --release --locked
 
+.PHONY: build-no-std
+build-no-std: ## Build the client library for wasm32 with no_std (no default features)
+	cargo build --package miden-client --target wasm32-unknown-unknown --no-default-features --locked
+
 # --- Check ---------------------------------------------------------------------------------------
 
 .PHONY: check
