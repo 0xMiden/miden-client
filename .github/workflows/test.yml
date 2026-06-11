@@ -70,48 +70,6 @@ jobs:
       - name: Run doc-tests
         run: make test-docs
 
-  build-node-builder:
-    name: Build node-builder
-    runs-on: warp-ubuntu-latest-x64-8x
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          persist-credentials: false
-      - name: Cleanup large tools for build space
-        uses: ./.github/actions/cleanup-runner
-      - name: Restore node-builder binary
-        id: cache-node-builder
-        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-        with:
-          path: target/release/testing-node-builder
-          key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
-      - name: Install Rust
-        if: steps.cache-node-builder.outputs.cache-hit != 'true'
-        run: rustup update --no-self-update
-      - name: Add Rust Cache
-        if: steps.cache-node-builder.outputs.cache-hit != 'true'
-        uses: WarpBuilds/rust-cache@9d0cc3090d9c87de74ea67617b246e978735b1a1 # v2.9.1
-        with:
-          shared-key: rust-release
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: false
-      - name: Build node-builder
-        if: steps.cache-node-builder.outputs.cache-hit != 'true'
-        run: cargo build --release --package node-builder --locked
-      - name: Save node-builder binary
-        if: steps.cache-node-builder.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/next'
-        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-        with:
-          path: target/release/testing-node-builder
-          key: ${{ runner.os }}-node-builder-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/node-builder/**/*') }}
-      - name: Upload node-builder binary
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: node-builder-artifact
-          path: target/release/testing-node-builder
-      - name: Check binary existance
-        run: file -E target/release/testing-node-builder
-
   build-note-transport:
     name: Build note-transport
     runs-on: warp-ubuntu-latest-x64-8x
@@ -161,8 +119,8 @@ jobs:
           name: note-transport-artifact
           path: target/release/miden-note-transport-node-bin
 
-  build-remote-prover:
-    name: Build remote-prover
+  build-test-node:
+    name: Build test node
     runs-on: warp-ubuntu-latest-x64-8x
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -170,43 +128,61 @@ jobs:
           persist-credentials: false
       - name: Cleanup large tools for build space
         uses: ./.github/actions/cleanup-runner
-      - name: Restore remote-prover binary
-        id: cache-remote-prover
+      - name: Resolve node revision
+        id: node-rev
+        run: echo "rev=$(./scripts/start-test-node.sh --print-rev)" >> "$GITHUB_OUTPUT"
+      - name: Restore test node binaries
+        id: cache-test-node
         uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
-          path: target/release/testing-remote-prover
-          key: ${{ runner.os }}-prover-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/prover/**/*') }}
-      - name: Install Rust
-        if: steps.cache-remote-prover.outputs.cache-hit != 'true'
-        run: rustup update --no-self-update
-      - name: Add Rust Cache
-        if: steps.cache-remote-prover.outputs.cache-hit != 'true'
-        uses: WarpBuilds/rust-cache@9d0cc3090d9c87de74ea67617b246e978735b1a1 # v2.9.1
+          path: target/test-node/install
+          key: ${{ runner.os }}-test-node-${{ steps.node-rev.outputs.rev }}
+      # Persistent build dir so a rev bump recompiles only the crates that changed. The restore-key
+      # prefix falls back to the previous rev's build dir to seed the incremental build.
+      - name: Restore test node build cache
+        if: steps.cache-test-node.outputs.cache-hit != 'true'
+        id: cache-test-node-build
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
-          shared-key: rust-release
-          prefix-key: ${{ env.RUST_CACHE_KEY }}
-          save-if: false
-      - name: Build remote-prover
-        if: steps.cache-remote-prover.outputs.cache-hit != 'true'
-        run: cargo build --release --package testing-remote-prover --locked
-      - name: Save remote-prover binary
-        if: steps.cache-remote-prover.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/next'
+          path: target/test-node/build
+          key: ${{ runner.os }}-test-node-build-${{ steps.node-rev.outputs.rev }}
+          restore-keys: |
+            ${{ runner.os }}-test-node-build-
+      - name: Install Rust
+        if: steps.cache-test-node.outputs.cache-hit != 'true'
+        run: rustup update --no-self-update
+      - name: Build node binaries
+        if: steps.cache-test-node.outputs.cache-hit != 'true'
+        run: ./scripts/start-test-node.sh --install-only
+      # Saved on every branch (not just `next`) so a PR's later pushes reuse its first build instead
+      # of recompiling the node from scratch each push. Keyed on the node rev.
+      - name: Save test node build cache
+        if: steps.cache-test-node.outputs.cache-hit != 'true' && steps.cache-test-node-build.outputs.cache-hit != 'true'
         uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
-          path: target/release/testing-remote-prover
-          key: ${{ runner.os }}-prover-${{ hashFiles('.cargo/config.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/testing/prover/**/*') }}
-      - name: Upload remote-prover binary
+          path: target/test-node/build
+          key: ${{ runner.os }}-test-node-build-${{ steps.node-rev.outputs.rev }}
+      - name: Save test node binaries
+        if: steps.cache-test-node.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: target/test-node/install
+          key: ${{ runner.os }}-test-node-${{ steps.node-rev.outputs.rev }}
+      - name: Upload test node binaries
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: remote-prover-artifact
-          path: target/release/testing-remote-prover
+          name: test-node-artifact
+          # `.crates.toml` is hidden and records the installed rev; the consumer jobs read it to
+          # confirm the cached binaries match the pinned rev, so it must be uploaded.
+          include-hidden-files: true
+          path: target/test-node/install
       - name: Check binary existance
-        run: file -E target/release/testing-remote-prover
+        run: file -E target/test-node/install/bin/miden-validator
 
   miden-bench:
     name: miden-bench smoke tests
     runs-on: warp-ubuntu-latest-x64-8x
-    needs: [build-node-builder]
+    needs: [build-test-node]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -228,15 +204,15 @@ jobs:
           save-if: false
       - name: Run miden-bench CLI tests
         run: make test-miden-bench
-      - name: Fetch node-builder binary
+      - name: Fetch test node binaries
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: node-builder-artifact
-          path: target/release
-      - name: Restore node-builder permissions
-        run: chmod +x target/release/testing-node-builder
+          name: test-node-artifact
+          path: target/test-node/install
+      - name: Restore test node permissions
+        run: chmod +x target/test-node/install/bin/*
       - name: Start test node
-        run: ./scripts/start-ci-service.sh testing-node-builder 57291 target/release/testing-node-builder
+        run: make start-node-background
       - name: Run miden-bench smoke tests
         run: make integration-test-miden-bench
       - name: Stop test node
@@ -246,7 +222,7 @@ jobs:
   integration-tests:
     name: Integration tests
     runs-on: warp-ubuntu-latest-x64-8x
-    needs: [build-node-builder, build-note-transport, build-remote-prover]
+    needs: [build-note-transport, build-test-node]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -266,13 +242,13 @@ jobs:
           shared-key: rust-release
           prefix-key: ${{ env.RUST_CACHE_KEY }}
           save-if: false
-      - name: Fetch node-builder binary
+      - name: Fetch test node binaries
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: node-builder-artifact
-          path: target/release
-      - name: Restore node-builder permissions
-        run: chmod +x target/release/testing-node-builder
+          name: test-node-artifact
+          path: target/test-node/install
+      - name: Restore test node permissions
+        run: chmod +x target/test-node/install/bin/*
       - name: Fetch note-transport binary
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -280,17 +256,10 @@ jobs:
           path: target/release
       - name: Restore note-transport permissions
         run: chmod +x target/release/miden-note-transport-node-bin
-      - name: Fetch remote-prover binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: remote-prover-artifact
-          path: target/release
-      - name: Restore remote-prover permissions
-        run: chmod +x target/release/testing-remote-prover
-      - name: Start remote prover
-        run: ./scripts/start-ci-service.sh testing-remote-prover 50051 target/release/testing-remote-prover
+      # The test node now runs its own transaction prover (miden-remote-prover) for the ntx-builder;
+      # see scripts/start-test-node.sh.
       - name: Start test node
-        run: ./scripts/start-ci-service.sh testing-node-builder 57291 target/release/testing-node-builder
+        run: make start-node-background
       - name: Start note transport
         run: ./scripts/start-ci-service.sh miden-note-transport-node-bin 57292 target/release/miden-note-transport-node-bin
       - name: Run integration tests
@@ -301,6 +270,3 @@ jobs:
       - name: Stop note transport
         if: always()
         run: make stop-note-transport
-      - name: Stop remote prover
-        if: always()
-        run: make stop-prover

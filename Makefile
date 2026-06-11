@@ -16,7 +16,6 @@ endif
 FEATURES_CLIENT=--features "std"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
-PROVER_DIR="crates/testing/prover"
 TEST_MIDEN_NOTE_TRANSPORT_URL?=http://127.0.0.1:57292
 
 # --- Linting -------------------------------------------------------------------------------------
@@ -75,7 +74,7 @@ serve-docs: ## Serves the docs
 
 .PHONY: test
 test: ## Run tests
-	cargo nextest run --workspace --exclude testing-remote-prover --release --lib $(FEATURES_CLIENT)
+	cargo nextest run --workspace --release --lib $(FEATURES_CLIENT)
 
 .PHONY: test-miden-bench
 test-miden-bench: ## Run miden-bench CLI tests
@@ -88,17 +87,16 @@ test-docs: ## Run documentation tests
 # --- Integration testing -------------------------------------------------------------------------
 
 .PHONY: start-node
-start-node: ## Start the testing node server
-	RUST_LOG=info cargo run --release --package node-builder --locked
+start-node: ## Start the testing node in the foreground, streaming logs (Ctrl+C stops it)
+	./scripts/start-test-node.sh
 
 .PHONY: start-node-background
-start-node-background: ## Start the testing node server in background
-	./scripts/start-binary-bg.sh node-builder
+start-node-background: ## Start the testing node in the background
+	./scripts/start-test-node.sh --background
 
 .PHONY: stop-node
-stop-node: ## Stop the testing node server
-	-pkill -f "node-builder"
-	sleep 1
+stop-node: ## Stop the testing node
+	./scripts/stop-test-node.sh
 
 .PHONY: start-note-transport-background
 start-note-transport-background: ## Start the note transport service in background
@@ -114,12 +112,12 @@ start-note-transport:
 
 .PHONY: integration-test
 integration-test: ## Run integration tests
-	cargo nextest run --workspace --exclude testing-remote-prover --release --test=integration
+	cargo nextest run --workspace --release --test=integration
 
 .PHONY: integration-test-full
 integration-test-full: ## Run the integration test binary with ignored tests included (requires note transport service)
-	TEST_MIDEN_NOTE_TRANSPORT_URL=$(TEST_MIDEN_NOTE_TRANSPORT_URL) cargo nextest run --workspace --exclude testing-remote-prover --release --test=integration
-	cargo nextest run --workspace --exclude testing-remote-prover --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
+	TEST_MIDEN_NOTE_TRANSPORT_URL=$(TEST_MIDEN_NOTE_TRANSPORT_URL) cargo nextest run --workspace --release --test=integration
+	cargo nextest run --workspace --release --test=integration --run-ignored ignored-only -- import_genesis_accounts_can_be_used_for_transactions
 
 .PHONY: integration-test-miden-bench
 integration-test-miden-bench: install-bench ## Run miden-bench smoke tests
@@ -127,28 +125,15 @@ integration-test-miden-bench: install-bench ## Run miden-bench smoke tests
 
 .PHONY: test-dev
 test-dev: ## Run tests with debug assertions enabled via test-dev profile
-	cargo nextest run --workspace --exclude testing-remote-prover --cargo-profile test-dev --lib $(FEATURES_CLIENT)
+	cargo nextest run --workspace --cargo-profile test-dev --lib $(FEATURES_CLIENT)
 
 .PHONY: integration-test-dev
 integration-test-dev: ## Run integration tests with debug assertions enabled via test-dev profile
-	cargo nextest run --workspace --exclude testing-remote-prover --cargo-profile test-dev --test=integration
+	cargo nextest run --workspace --cargo-profile test-dev --test=integration
 
 .PHONY: integration-test-binary
 integration-test-binary: ## Run the integration tests using the standalone binary (requires note transport service)
 	TEST_MIDEN_NOTE_TRANSPORT_URL=$(TEST_MIDEN_NOTE_TRANSPORT_URL) cargo run --package miden-client-integration-tests --release --locked
-
-.PHONY: start-prover
-start-prover: ## Start the remote prover
-	cd $(PROVER_DIR) && RUST_LOG=info cargo run --release --locked
-
-.PHONY: start-prover-background
-start-prover-background: ## Start the remote prover in background
-	cd $(PROVER_DIR) && ../../../scripts/start-binary-bg.sh testing-remote-prover
-
-.PHONY: stop-prover
-stop-prover: ## Stop prover process
-	-pkill -f "testing-remote-prover"
-	sleep 1
 
 # --- Installing ----------------------------------------------------------------------------------
 
@@ -170,7 +155,7 @@ build: ## Build the CLI binary, client library and tests binary in release mode
 
 .PHONY: check
 check: ## Build the CLI binary and client library in release mode
-	cargo check --workspace --exclude testing-remote-prover --release
+	cargo check --workspace --release
 
 ## --- Setup --------------------------------------------------------------------------------------
 
