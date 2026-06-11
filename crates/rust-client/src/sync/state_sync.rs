@@ -24,7 +24,7 @@ use crate::note::{NoteConsumption, NoteUpdateTracker};
 use crate::rpc::NodeRpcClient;
 use crate::rpc::domain::account::{AccountDetails, GetAccountRequest, StorageMapFetch, VaultFetch};
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock, SyncedNoteDetails};
-use crate::rpc::domain::sync::SyncTarget;
+use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::transaction::TransactionRecord as RpcTransactionRecord;
 use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
 use crate::transaction::TransactionRecord;
@@ -265,6 +265,9 @@ impl StateSync {
             .await?;
         let chain_tip = chain_mmr_info.block_to;
 
+        // Validate the response covers the range we requested.
+        Self::validate_chain_mmr_response(&chain_mmr_info, current_block_num)?;
+
         // No progress — already at the tip.
         if chain_tip == current_block_num {
             info!(block_num = %current_block_num, "Already at chain tip, nothing to sync.");
@@ -288,6 +291,9 @@ impl StateSync {
                 .sync_notes_with_details(current_block_num + 1, chain_tip, note_tags.as_ref())
                 .await?
         };
+
+        // Validate every returned note block falls in (current_block_num, chain_tip].
+        Self::validate_note_blocks_range(&note_blocks, current_block_num, chain_tip)?;
 
         let note_count: usize = note_blocks.iter().map(|b| b.notes.len()).sum();
         info!(
@@ -339,14 +345,18 @@ impl StateSync {
             transactions,
         } = sync_data;
 
+        // Operate on a clone so any validation failure leaves `current_partial_mmr` untouched.
+        // The clone is committed back at the end of the function once all checks pass.
+        let mut working_mmr = current_partial_mmr.clone();
+
         Self::advance_mmr(
             mmr_delta,
             &chain_tip_header,
-            current_partial_mmr,
+            &mut working_mmr,
             &mut state_sync_update.partial_blockchain_updates,
         )?;
 
-        self.screen_note_blocks(note_blocks, synced_notes, state_sync_update, current_partial_mmr)
+        self.screen_note_blocks(note_blocks, synced_notes, state_sync_update, &mut working_mmr)
             .await?;
 
         self.apply_transactions_and_nullifiers(
@@ -355,12 +365,63 @@ impl StateSync {
             state_sync_update,
         )?;
 
+        // Commit the working MMR back to the caller once all checks pass.
+        *current_partial_mmr = working_mmr;
+
+        Ok(())
+    }
+
+    /// Validates that a `sync_chain_mmr` response covers the requested range.
+    fn validate_chain_mmr_response(
+        chain_mmr_info: &ChainMmrInfo,
+        current_block_num: BlockNumber,
+    ) -> Result<(), ClientError> {
+        if chain_mmr_info.block_header.block_num() != chain_mmr_info.block_to {
+            return Err(ClientError::ChainValidationError(format!(
+                "sync_chain_mmr block_header.block_num ({}) does not match block_to ({})",
+                chain_mmr_info.block_header.block_num(),
+                chain_mmr_info.block_to
+            )));
+        }
+        if chain_mmr_info.block_from != current_block_num {
+            return Err(ClientError::ChainValidationError(format!(
+                "sync_chain_mmr block_from mismatch: expected {current_block_num}, got {}",
+                chain_mmr_info.block_from
+            )));
+        }
+        if chain_mmr_info.block_to < current_block_num {
+            return Err(ClientError::ChainValidationError(format!(
+                "sync_chain_mmr block_to ({}) is behind current block {current_block_num}",
+                chain_mmr_info.block_to
+            )));
+        }
+        Ok(())
+    }
+
+    /// Validates that every block returned by `sync_notes` falls in the requested range
+    /// `(current_block_num, chain_tip]`.
+    fn validate_note_blocks_range(
+        note_blocks: &[NoteSyncBlock],
+        current_block_num: BlockNumber,
+        chain_tip: BlockNumber,
+    ) -> Result<(), ClientError> {
+        for block in note_blocks {
+            let block_num = block.block_header.block_num();
+            if block_num <= current_block_num || block_num > chain_tip {
+                return Err(ClientError::ChainValidationError(format!(
+                    "sync_notes returned block {block_num} outside requested range ({current_block_num}, {chain_tip}]"
+                )));
+            }
+        }
         Ok(())
     }
 
     /// Applies the MMR delta and inserts the chain-tip leaf into the partial blockchain
     /// updates. The delta excludes the chain-tip leaf because of the one-block lag in block
     /// header MMR commitments, so the tip leaf has to be added separately.
+    ///
+    /// Before adding the chain-tip leaf, the post-delta peaks are checked against the chain
+    /// tip header's chain commitment to ensure the delta advanced the MMR to the expected state.
     fn advance_mmr(
         mmr_delta: MmrDelta,
         chain_tip_header: &BlockHeader,
@@ -369,7 +430,26 @@ impl StateSync {
     ) -> Result<(), ClientError> {
         let mut new_authentication_nodes =
             current_partial_mmr.apply(mmr_delta).map_err(StoreError::MmrError)?;
-        partial_blockchain_updates.new_peaks = current_partial_mmr.peaks();
+        let new_peaks = current_partial_mmr.peaks();
+
+        // Verify that post-delta peaks match the block header's chain commitment.
+        // chain_commitment is the hash of MMR peaks for blocks 0..block_num-1,
+        // which is exactly the state after applying the delta.
+        let peaks_commitment = new_peaks.hash_peaks();
+        if peaks_commitment != chain_tip_header.chain_commitment() {
+            return Err(ClientError::ChainValidationError(format!(
+                "MMR peaks commitment is {} and does not match block header chain commitment {}",
+                peaks_commitment.to_hex(),
+                chain_tip_header.chain_commitment().to_hex()
+            )));
+        }
+
+        partial_blockchain_updates.new_peaks = new_peaks;
+
+        // Note: we add the chain tip leaf to our MMR, but we cannot prove that it is effectively
+        // the chain tip. In the current context of centralized trusted node, we assume it
+        // is valid. Eventually, we will be able to validate that the resulting MMR root is
+        // "canonical".
         new_authentication_nodes.append(
             &mut current_partial_mmr
                 .add(chain_tip_header.commitment(), false)
@@ -939,6 +1019,7 @@ mod tests {
     use miden_protocol::assembly::DefaultSourceManager;
     use miden_protocol::asset::{Asset, FungibleAsset};
     use miden_protocol::block::BlockNumber;
+    use miden_protocol::crypto::merkle::MerklePath;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, PartialMmr};
     use miden_protocol::note::{
         Note,
@@ -1770,5 +1851,109 @@ mod tests {
             Some(network_account_id),
             "consumer should be the tracked network account"
         );
+    }
+
+    /// Verifies the validations performed on `sync_chain_mmr` responses: a genuine mock-chain
+    /// response passes, while each tampered variant is rejected with a `ChainValidationError`.
+    #[tokio::test]
+    async fn validate_chain_mmr_response_rejects_tampered_responses() {
+        let mock_rpc = MockRpcApi::default();
+        mock_rpc.advance_blocks(3);
+        let chain_tip = mock_rpc.get_chain_tip_block_num();
+        let current = BlockNumber::GENESIS;
+
+        let header_of =
+            |block_num: u32| mock_rpc.mock_chain.read().block_header(block_num as usize);
+        let chain_mmr_response = || async {
+            mock_rpc.sync_chain_mmr(current, SyncTarget::CommittedChainTip).await.unwrap()
+        };
+
+        // Sanity check: the untampered response passes validation.
+        let response = chain_mmr_response().await;
+        StateSync::validate_chain_mmr_response(&response, current).unwrap();
+
+        // The returned block header doesn't correspond to `block_to`.
+        let mut response = chain_mmr_response().await;
+        response.block_header = header_of(chain_tip.as_u32() - 1);
+        let result = StateSync::validate_chain_mmr_response(&response, current);
+        assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
+
+        // `block_from` doesn't match the block the sync was requested from.
+        let mut response = chain_mmr_response().await;
+        response.block_from = current + 1;
+        let result = StateSync::validate_chain_mmr_response(&response, current);
+        assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
+
+        // `block_to` (and its header) regress behind the client's current block.
+        let mut response = chain_mmr_response().await;
+        response.block_from = chain_tip;
+        response.block_to = BlockNumber::GENESIS;
+        response.block_header = header_of(0);
+        let result = StateSync::validate_chain_mmr_response(&response, chain_tip);
+        assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
+    }
+
+    /// Verifies that `sync_notes` blocks outside the requested range `(current, chain_tip]`
+    /// are rejected with a `ChainValidationError`.
+    #[test]
+    fn validate_note_blocks_range_rejects_out_of_range_blocks() {
+        let mock_rpc = MockRpcApi::default();
+        mock_rpc.advance_blocks(3);
+        let chain_tip = mock_rpc.get_chain_tip_block_num();
+        let current = BlockNumber::GENESIS;
+
+        // Sanity check: an empty block list passes validation.
+        StateSync::validate_note_blocks_range(&[], current, chain_tip).unwrap();
+
+        // A note block outside the requested range: genesis is always outside it.
+        let genesis_note_block = NoteSyncBlock {
+            block_header: mock_rpc.mock_chain.read().block_header(0),
+            mmr_path: MerklePath::new(Vec::new()),
+            notes: BTreeMap::new(),
+        };
+        let result =
+            StateSync::validate_note_blocks_range(&[genesis_note_block], current, chain_tip);
+        assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
+    }
+
+    /// Verifies that `advance_mmr` rejects an MMR delta whose post-apply peaks don't match the
+    /// chain tip header's chain commitment.
+    #[test]
+    fn advance_mmr_rejects_delta_inconsistent_with_chain_commitment() {
+        let mock_rpc = MockRpcApi::default();
+        mock_rpc.advance_blocks(3);
+        let chain_tip = mock_rpc.get_chain_tip_block_num();
+
+        let chain_tip_header = mock_rpc.mock_chain.read().block_header(chain_tip.as_usize());
+        let genesis_partial_mmr = || {
+            let peaks = mock_rpc.get_mmr().peaks_at(Forest::new(1).expect("valid forest")).unwrap();
+            PartialMmr::from_peaks(peaks)
+        };
+
+        // An MMR delta consistent with the chain tip header advances the MMR...
+        let full_delta = mock_rpc
+            .get_mmr()
+            .get_delta(Forest::new(1).unwrap(), Forest::new(chain_tip.as_usize()).unwrap())
+            .unwrap();
+        StateSync::advance_mmr(
+            full_delta,
+            &chain_tip_header,
+            &mut genesis_partial_mmr(),
+            &mut PartialBlockchainUpdates::default(),
+        )
+        .unwrap();
+
+        // ...but one that stops short of the chain tip fails the chain commitment check.
+        let truncated_delta = mock_rpc
+            .get_mmr()
+            .get_delta(Forest::new(1).unwrap(), Forest::new(chain_tip.as_usize() - 1).unwrap())
+            .unwrap();
+        let result = StateSync::advance_mmr(
+            truncated_delta,
+            &chain_tip_header,
+            &mut genesis_partial_mmr(),
+            &mut PartialBlockchainUpdates::default(),
+        );
+        assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
     }
 }
