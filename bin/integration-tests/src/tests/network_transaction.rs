@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, LazyLock};
 use std::vec;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, ensure};
 use miden_client::account::component::{
     AccessControl,
     AccountComponent,
@@ -37,19 +37,24 @@ use miden_client::note::{
     NoteAssets,
     NoteAttachment,
     NoteAttachments,
+    NoteDetailsCommitment,
     NoteExecutionHint,
     NoteRecipient,
+    NoteScript,
     NoteScriptRoot,
     NoteStorage,
     NoteTag,
     NoteType,
     P2idNoteStorage,
     PartialNoteMetadata,
+    StandardNote,
 };
 use miden_client::store::{InputNoteState, NoteFilter};
 use miden_client::sync::NoteTagSource;
 use miden_client::testing::common::{
     TestClient,
+    assert_account_has_single_asset,
+    consume_notes,
     execute_tx_and_sync,
     insert_new_wallet,
     wait_for_blocks,
@@ -111,6 +116,61 @@ const INCR_NOTE_SCRIPT_CODE: &str = "
         call.counter_contract::increment_count
     end
 ";
+
+// Minimal no-op tx script: the faucet's `INCR_NONCE_AUTH_CODE` auth
+// procedure already increments the nonce, so the script itself needs
+// only to satisfy the builder's requirement that _some_ user code runs.
+const NOOP_TX_SCRIPT: &str = "
+    begin
+        push.0 drop
+    end
+";
+
+// A non-standard "claim to target" note script: it asserts the consuming account is the note's
+// target (read from the note's storage) and then moves all of the note's assets into that
+// account's vault. It is functionally similar to P2ID but hand-written, so its MAST root differs
+// from every standard note script — exactly the case the node's NTX builder cannot resolve without
+// the script being pre-registered. The `{nonce}` placeholder is replaced with a per-test value so
+// the compiled root is unique per run and can never collide with a previously registered script on
+// a shared node.
+const NON_STANDARD_CLAIM_NOTE_SCRIPT: &str = r#"
+    use miden::protocol::active_account
+    use miden::protocol::account_id
+    use miden::protocol::active_note
+    use miden::standards::wallets::basic->basic_wallet
+
+    @note_script
+    pub proc main
+        # drop the note arguments
+        dropw
+
+        # mix in a per-test nonce so this script's MAST root is unique per run
+        push.{nonce} drop
+
+        # write the note storage to memory starting at address 0
+        push.0 exec.active_note::get_storage
+        # => [num_storage_items]
+
+        # this script expects exactly the 2 storage items of an account id (suffix, prefix)
+        eq.2 assert.err="non-standard claim note expects exactly 2 storage items"
+        # => []
+
+        # read the target account id from note storage: address 0 holds the suffix and address 1
+        # holds the prefix, so load prefix first to leave [suffix, prefix] on the stack
+        mem_load.1 mem_load.0
+        # => [target_account_id_suffix, target_account_id_prefix]
+
+        exec.active_account::get_id
+        # => [account_id_suffix, account_id_prefix, target_account_id_suffix, target_account_id_prefix]
+
+        exec.account_id::is_equal assert.err="consumer is not the note's target account"
+        # => []
+
+        # move all of the note's assets into the consuming account's vault
+        exec.basic_wallet::add_assets_to_account
+        # => []
+    end
+"#;
 
 /// Deploys a counter contract as a network account that allowlists `allowed_note_script_roots`.
 ///
@@ -178,6 +238,150 @@ async fn deploy_counter_with_auth(
         .await?;
     wait_for_tx(client, tx_id).await?;
     Ok(acc)
+}
+
+/// Deploys a network fungible faucet owned by `owner_id` and commits its initial state on-chain.
+///
+/// The faucet authenticates with `AuthNetworkAccount`, which carries the standardized allowlist
+/// slot the node's NTX builder uses to route MINT notes to it. Minting is additionally gated
+/// note-side: the `mint_and_send` procedure checks that the MINT note sender matches the
+/// `Ownable2Step` owner.
+async fn deploy_network_fungible_faucet(
+    client: &mut TestClient,
+    owner_id: AccountId,
+) -> Result<Account> {
+    // The faucet is a network account: `AuthNetworkAccount` carries the standardized allowlist slot
+    // the node uses to route MINT notes to it and enforces that only allowlisted notes are consumed
+    // with no tx script. The scriptless deploy transaction below is authorized by this same auth.
+    let allowed_roots = [MintNote::script_root()].into_iter().collect::<BTreeSet<_>>();
+    let network_auth = AuthNetworkAccount::with_allowed_notes(allowed_roots)
+        .map_err(|err| anyhow!("failed to build faucet network-account auth: {err}"))?;
+
+    let mut init_seed = [0u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+    let symbol = TokenSymbol::new("MNT")?;
+    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
+    let faucet_component = FungibleFaucet::builder()
+        .name(name)
+        .symbol(symbol)
+        .decimals(10)
+        .max_supply(AssetAmount::new(9_999_999)?)
+        .build()
+        .map_err(|e| anyhow!("failed to build fungible faucet component: {e}"))?;
+    let policy_manager = TokenPolicyManager::new()
+        .with_mint_policy(MintPolicyConfig::OwnerOnly, PolicyRegistration::Active)?
+        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)?;
+    let faucet = AccountBuilder::new(init_seed)
+        .account_type(AccountType::Public)
+        .with_auth_component(network_auth)
+        .with_component(faucet_component)
+        .with_components(AccessControl::Ownable2Step { owner: owner_id })
+        .with_components(policy_manager)
+        .with_component(PausableManager)
+        .build_with_schema_commitment()
+        .map_err(|e| anyhow!("failed to build network faucet: {e}"))?;
+    client.add_account(&faucet, false).await?;
+
+    // Scriptless deploy: `AuthNetworkAccount` forbids tx scripts and bumps the nonce on its own, so
+    // an empty transaction is enough to register the faucet on-chain.
+    let deploy_tx = TransactionRequestBuilder::new().build()?;
+    let deploy_tx_id = client.submit_new_transaction(faucet.id(), deploy_tx).await?;
+    wait_for_tx(client, deploy_tx_id).await?;
+
+    Ok(faucet)
+}
+
+/// Waits for a public note to be observed as `Committed` on `observer`.
+///
+/// Advances up to `max_blocks` blocks on `block_client`, syncing `observer` after each block and
+/// looking the note up by its details commitment. Returns `true` as soon as the note is observed
+/// as `Committed` and `false` if the window elapses first.
+async fn wait_for_committed_note(
+    block_client: &mut TestClient,
+    observer: &mut TestClient,
+    details_commitment: NoteDetailsCommitment,
+    max_blocks: u32,
+) -> Result<bool> {
+    for _ in 0..max_blocks {
+        wait_for_blocks(block_client, 1).await;
+        observer.sync_state().await?;
+        if let Some(rec) = observer
+            .get_input_notes(NoteFilter::DetailsCommitments(vec![details_commitment]))
+            .await?
+            .pop()
+            && matches!(rec.state(), InputNoteState::Committed { .. })
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Compiles the [`NON_STANDARD_CLAIM_NOTE_SCRIPT`] with a unique `nonce` and returns it together
+/// with the note storage encoding `target`'s account id (the script asserts the consumer matches
+/// it). The compiled script is guaranteed non-standard; callers assert that before relying on the
+/// script-registration path.
+fn build_non_standard_claim_note(
+    client: &TestClient,
+    target: AccountId,
+    nonce: u32,
+) -> Result<(NoteScript, NoteStorage)> {
+    let script_src = NON_STANDARD_CLAIM_NOTE_SCRIPT.replace("{nonce}", &nonce.to_string());
+    let script = client
+        .code_builder()
+        .compile_note_script(script_src.as_str())
+        .context("failed to compile non-standard claim note script")?;
+    let storage = NoteStorage::new(vec![target.suffix(), target.prefix().as_felt()])
+        .context("failed to build non-standard claim note storage")?;
+    Ok((script, storage))
+}
+
+/// Builds a MINT note routed to `faucet` whose public output recipient uses the non-standard claim
+/// script for `nonce` and targets `target`. Returns the compiled (guaranteed non-standard) script,
+/// the MINT note, and the `NoteId` the network transaction is expected to emit for it.
+fn build_non_standard_mint(
+    client: &mut TestClient,
+    faucet: &Account,
+    faucet_owner: AccountId,
+    target: AccountId,
+    amount: Felt,
+    nonce: u32,
+) -> Result<(NoteScript, Note, NoteDetailsCommitment)> {
+    let serial_num = client.rng().draw_word();
+    let (custom_script, custom_storage) = build_non_standard_claim_note(client, target, nonce)?;
+    assert!(
+        StandardNote::from_script(&custom_script).is_none(),
+        "the claim script must be non-standard for this test to exercise script pre-registration",
+    );
+    let recipient = NoteRecipient::new(serial_num, custom_script.clone(), custom_storage);
+
+    let expected_asset = FungibleAsset::new(faucet.id(), amount.as_canonical_u64())?;
+    let expected_assets = NoteAssets::new(vec![expected_asset.into()])?;
+    let expected_output_commitment = Note::with_attachments(
+        expected_assets,
+        PartialNoteMetadata::new(faucet.id(), NoteType::Public)
+            .with_tag(NoteTag::with_account_target(target)),
+        recipient.clone(),
+        NoteAttachments::default(),
+    )
+    .details_commitment();
+
+    let mint_storage = MintNoteStorage::new_public(
+        recipient,
+        expected_asset,
+        NoteTag::with_account_target(target).into(),
+    )?;
+    let target_ntx = NetworkAccountTarget::new(faucet.id(), NoteExecutionHint::Always)?;
+    let attachments = NoteAttachments::new(vec![target_ntx.into()])?;
+    let mint_note = MintNote::create(
+        faucet.id(),
+        faucet_owner, // must equal the faucet owner, checked by mint_and_send
+        mint_storage,
+        attachments,
+        client.rng(),
+    )?;
+
+    Ok((custom_script, mint_note, expected_output_commitment))
 }
 
 // TESTS
@@ -474,43 +678,7 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
         insert_new_wallet(&mut client_2, AccountType::Public, &keystore_2, RPO_FALCON_SCHEME_ID)
             .await?;
 
-    // The faucet is a network account: `AuthNetworkAccount` carries the standardized allowlist slot
-    // the node uses to route MINT notes to it and enforces that only allowlisted notes are consumed
-    // with no tx script. The scriptless deploy transaction below is authorized by this same auth.
-    let allowed_roots = [MintNote::script_root()].into_iter().collect::<BTreeSet<_>>();
-    let network_auth = AuthNetworkAccount::with_allowed_notes(allowed_roots)
-        .map_err(|err| anyhow!("failed to build faucet network-account auth: {err}"))?;
-
-    let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
-    let symbol = TokenSymbol::new("MNT")?;
-    let name = TokenName::new(&symbol.to_string()).expect("token symbol is a valid token name");
-    let faucet_component = FungibleFaucet::builder()
-        .name(name)
-        .symbol(symbol)
-        .decimals(10)
-        .max_supply(AssetAmount::new(9_999_999)?)
-        .build()
-        .map_err(|e| anyhow!("failed to build fungible faucet component: {e}"))?;
-    let policy_manager = TokenPolicyManager::new()
-        .with_mint_policy(MintPolicyConfig::OwnerOnly, PolicyRegistration::Active)?
-        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)?;
-    let faucet = AccountBuilder::new(init_seed)
-        .account_type(AccountType::Public)
-        .with_auth_component(network_auth)
-        .with_component(faucet_component)
-        .with_components(AccessControl::Ownable2Step { owner: alice.id() })
-        .with_components(policy_manager)
-        .with_component(PausableManager)
-        .build_with_schema_commitment()
-        .map_err(|e| anyhow!("failed to build network faucet: {e}"))?;
-    client.add_account(&faucet, false).await?;
-
-    // Scriptless deploy: `AuthNetworkAccount` forbids tx scripts and bumps the nonce on its own, so
-    // an empty transaction is enough to register the faucet on-chain.
-    let deploy_tx = TransactionRequestBuilder::new().build()?;
-    let deploy_tx_id = client.submit_new_transaction(faucet.id(), deploy_tx).await?;
-    wait_for_tx(&mut client, deploy_tx_id).await?;
+    let faucet = deploy_network_fungible_faucet(&mut client, alice.id()).await?;
 
     // Build the standard MINT note. Precompute Bob's P2ID recipient and details commitment so we
     // can poll for the emitted public note on client_2.
@@ -541,23 +709,135 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
     let mint_tx = TransactionRequestBuilder::new().own_output_notes(vec![mint_note]).build()?;
     execute_tx_and_sync(&mut client, alice.id(), mint_tx).await?;
 
-    for _ in 0..15 {
-        wait_for_blocks(&mut client, 1).await;
-
-        client_2.sync_state().await?;
-        if let Some(rec) = client_2
-            .get_input_notes(NoteFilter::DetailsCommitments(vec![expected_output_commitment]))
-            .await?
-            .pop()
-            && matches!(rec.state(), InputNoteState::Committed { .. })
-        {
-            return Ok(());
-        }
-    }
-
-    Err(anyhow!(
+    ensure!(
+        wait_for_committed_note(&mut client, &mut client_2, expected_output_commitment, 15).await?,
         "timed out waiting for committed P2ID note {expected_output_commitment:?} emitted by network faucet"
-    ))
+    );
+
+    Ok(())
+}
+
+/// End-to-end NTX integration test for public output notes carrying NON-STANDARD note scripts,
+/// covering both the registered (built) and the unregistered (never built) case.
+///
+/// This is the general case of [`test_ntx_mint_produces_public_p2id`]. There the output is a
+/// standard P2ID note, which the node's NTX builder resolves directly, so no script
+/// pre-registration is needed. Here an output note uses a custom (non-standard) script, which the
+/// NTX builder must resolve from its registry when it builds the public output note, so the script
+/// has to be registered on the node first.
+///
+/// Both cases share one network faucet and one pair of wallets, and each uses its own MINT note
+/// with a distinct per-run script nonce so the registered case cannot accidentally satisfy the
+/// unregistered one. A network transaction that fails because its output script is missing is not
+/// reprocessed once that script is registered later, so the registered case uses a fresh note
+/// rather than reusing the unregistered one.
+///
+/// Flow:
+///   1. Alice owns a network `NetworkFungibleFaucet`.
+///   2. Registered case: Alice pre-registers a non-standard script via
+///      [`TransactionRequestBuilder::expected_ntx_scripts`], waits for it to commit, then mints a
+///      note whose public output uses that script. The NTX builder resolves it and emits the public
+///      note. Bob imports the expected `NoteId`, observes it `Committed`, consumes it, and ends up
+///      holding the minted asset.
+///   3. Unregistered case: Alice mints a note whose public output uses a different,
+///      never-registered non-standard script. The NTX builder cannot build the public output note,
+///      so it never reaches `Committed` on Bob's client over a bounded window.
+pub async fn test_ntx_mint_produces_public_note_with_non_standard_script(
+    client_config: ClientConfig,
+) -> Result<()> {
+    let (mut client, keystore) = client_config.clone().into_client().await?;
+    let (mut client_2, keystore_2) = ClientConfig::default()
+        .with_rpc_endpoint(client_config.rpc_endpoint())
+        .into_client()
+        .await?;
+
+    let (alice, ..) =
+        insert_new_wallet(&mut client, AccountType::Public, &keystore, RPO_FALCON_SCHEME_ID)
+            .await?;
+    let (bob, ..) =
+        insert_new_wallet(&mut client_2, AccountType::Public, &keystore_2, RPO_FALCON_SCHEME_ID)
+            .await?;
+
+    let faucet = deploy_network_fungible_faucet(&mut client, alice.id()).await?;
+    let amount = Felt::new_unchecked(100);
+
+    // Registered case: pre-register a non-standard output script via `expected_ntx_scripts` on a
+    // trivial no-op tx, then wait for the registration to commit. `execute_tx_and_sync` waits
+    // for the no-op tx (committed alongside the registration note) and the extra block adds
+    // an indexing margin, so the script is resolvable before the MINT's network transaction
+    // runs.
+    let registered_nonce: u32 = client.rng().random();
+    let (registered_script, registered_mint, registered_output_commitment) =
+        build_non_standard_mint(
+            &mut client,
+            &faucet,
+            alice.id(),
+            bob.id(),
+            amount,
+            registered_nonce,
+        )?;
+
+    let noop_script = client
+        .code_builder()
+        .compile_tx_script(NOOP_TX_SCRIPT)
+        .context("failed to compile no-op registration tx script")?;
+    let register_tx = TransactionRequestBuilder::new()
+        .custom_script(noop_script)
+        .expected_ntx_scripts(vec![registered_script])
+        .build()?;
+    execute_tx_and_sync(&mut client, alice.id(), register_tx).await?;
+    wait_for_blocks(&mut client, 1).await;
+
+    let registered_mint_tx = TransactionRequestBuilder::new()
+        .own_output_notes(vec![registered_mint])
+        .build()?;
+    execute_tx_and_sync(&mut client, alice.id(), registered_mint_tx).await?;
+
+    // The NTX builder resolves the registered script and emits the public note. Observe it
+    // `Committed` on Bob's client.
+    ensure!(
+        wait_for_committed_note(&mut client, &mut client_2, registered_output_commitment, 15)
+            .await?,
+        "timed out waiting for committed public note {registered_output_commitment:?} with a non-standard script"
+    );
+
+    // Bob consumes the public note; the custom script moves the minted asset into his vault.
+    let note: Note = client_2
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![registered_output_commitment]))
+        .await?
+        .pop()
+        .context("expected the committed public note to be present on Bob's client")?
+        .try_into()?;
+    let consume_tx_id = consume_notes(&mut client_2, bob.id(), &[note]).await;
+    wait_for_tx(&mut client_2, consume_tx_id).await?;
+
+    assert_account_has_single_asset(&client_2, bob.id(), faucet.id(), amount.as_canonical_u64())
+        .await;
+
+    // Unregistered case: mint a note whose public output uses a different non-standard script
+    // that is never registered. The NTX builder cannot build the public output note, so it
+    // never reaches `Committed` over a bounded window.
+    let unregistered_nonce: u32 = client.rng().random();
+    let (_unregistered_script, unregistered_mint, unregistered_output_id) =
+        build_non_standard_mint(
+            &mut client,
+            &faucet,
+            alice.id(),
+            bob.id(),
+            amount,
+            unregistered_nonce,
+        )?;
+    let unregistered_mint_tx = TransactionRequestBuilder::new()
+        .own_output_notes(vec![unregistered_mint])
+        .build()?;
+    execute_tx_and_sync(&mut client, alice.id(), unregistered_mint_tx).await?;
+
+    ensure!(
+        !wait_for_committed_note(&mut client, &mut client_2, unregistered_output_id, 10).await?,
+        "NTX must not produce a committed public note for an unregistered non-standard script"
+    );
+
+    Ok(())
 }
 
 /// Compiles the counter contract library using the provided source manager so that all source

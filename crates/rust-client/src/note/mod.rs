@@ -87,6 +87,7 @@ pub use miden_protocol::note::{
     NoteAttachmentScheme,
     NoteAttachments,
     NoteDetails,
+    NoteDetailsCommitment,
     NoteFile,
     NoteHeader,
     NoteId,
