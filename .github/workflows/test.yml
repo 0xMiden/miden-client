@@ -212,7 +212,7 @@ jobs:
       - name: Restore test node permissions
         run: chmod +x target/test-node/install/bin/*
       - name: Start test node
-        run: make start-node
+        run: make start-node-background
       - name: Run miden-bench smoke tests
         run: make integration-test-miden-bench
       - name: Stop test node
@@ -259,7 +259,7 @@ jobs:
       # The test node now runs its own transaction prover (miden-remote-prover) for the ntx-builder;
       # see scripts/start-test-node.sh.
       - name: Start test node
-        run: make start-node
+        run: make start-node-background
       - name: Start note transport
         run: ./scripts/start-ci-service.sh miden-note-transport-node-bin 57292 target/release/miden-note-transport-node-bin
       - name: Run integration tests

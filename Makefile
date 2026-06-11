@@ -87,12 +87,12 @@ test-docs: ## Run documentation tests
 # --- Integration testing -------------------------------------------------------------------------
 
 .PHONY: start-node
-start-node: ## Start the testing node (standalone node executables, runs in background)
+start-node: ## Start the testing node in the foreground, streaming logs (Ctrl+C stops it)
 	./scripts/start-test-node.sh
 
 .PHONY: start-node-background
-start-node-background: ## Start the testing node in background (alias for start-node)
-	./scripts/start-test-node.sh
+start-node-background: ## Start the testing node in the background
+	./scripts/start-test-node.sh --background
 
 .PHONY: stop-node
 stop-node: ## Stop the testing node

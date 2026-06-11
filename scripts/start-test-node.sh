@@ -1,29 +1,20 @@
 #!/usr/bin/env bash
 #
-# Starts a self-contained testing node from the standalone Miden node executables: validator,
-# sequencer, network-transaction builder, and a transaction prover (`miden-remote-prover`). This
-# mirrors the node repo's own `scripts/run-node.sh` wiring, so network transactions work without
-# any external service.
-#
-# Binaries are installed with `cargo install` from the node source pinned in Cargo.lock — a git
-# rev if one is pinned (covers unreleased revs), otherwise crates.io at the locked version — so
-# they stay in lockstep with our library deps.
-#
-# To keep the compile cheap, the install reuses a persistent `--target-dir` ($CACHE/build) so
-# only crates that changed between revs recompile. In CI a dedicated `build-test-node` job builds
-# the binaries once (caching both the install dir and the build dir, keyed on the node rev) and
-# shares them with the test jobs as an artifact; see `.github/workflows/test.yml`. Genesis content
-# comes from the `gen-genesis` helper.
+# Starts a self-contained testing node (validator, sequencer, ntx-builder, and tx prover) from
+# the standalone node executables, installed with `cargo install` at the node source pinned in
+# Cargo.lock.
 #
 # Modes:
-#   (no args)        build/install if needed, then bootstrap and start the node (default)
-#   --install-only   build/install the node binaries and exit (used by the CI build job)
+#   (no args)        start the node and stream its logs; Ctrl+C stops it
+#   --background     return once the node's RPC is ready, leaving it running (used by CI)
+#   --install-only   install the node binaries and exit (used by the CI build job)
 #   --print-rev      print the pinned node rev or version (CI cache key) and exit
 
 set -euo pipefail
 
-MODE="run"
+MODE="foreground"
 case "${1:-}" in
+    --background)   MODE="background" ;;
     --install-only) MODE="install-only" ;;
     --print-rev)    MODE="print-rev" ;;
     "")             ;;
@@ -44,18 +35,14 @@ VALIDATOR="127.0.0.1:50101"
 NTX="127.0.0.1:50301"
 PROVER_PORT=50051
 PROVER="127.0.0.1:$PROVER_PORT"
-# Shared secret authorizing the ntx-builder to submit network transactions to the sequencer's RPC.
-# Must match on the sequencer (--rpc.network-tx-auth-header-value) and the ntx-builder
-# (--rpc.auth-header-value); otherwise the sequencer rejects network transactions with
-# "Network transactions may not be submitted by users yet".
+# Shared secret authorizing the ntx-builder to submit network transactions; the sequencer rejects
+# them unless both sides agree on it.
 NETWORK_TX_AUTH="${MIDEN_NETWORK_TX_AUTH:-miden-client-testing-ntx-secret}"
 
 NODE_BINS=(miden-validator miden-node miden-ntx-builder miden-remote-prover)
 
-# Resolve the pinned node source from Cargo.lock: a git pin
-# (source = "git+https://github.com/0xMiden/node.git?<ref>#<sha>") takes precedence,
-# otherwise use the crates.io version locked for `miden-node-proto-build` (the only node
-# crate the client always depends on).
+# Resolve the pinned node source from Cargo.lock: a git pin takes precedence, otherwise use the
+# crates.io version locked for `miden-node-proto-build`.
 SRC_LINE="$(grep -m1 'source = "git+https://github.com/0xMiden/node' "$ROOT/Cargo.lock" || true)"
 if [ -n "$SRC_LINE" ]; then
     NODE_SOURCE="git"
@@ -146,8 +133,6 @@ start() {
 start validator   "$BIN/miden-validator" start --listen "$VALIDATOR" --data-directory "$DATA/validator"
 # Let the validator bind before the sequencer starts producing blocks against it.
 sleep 2
-# Block/batch intervals and the ntx-builder cycle limit are pinned explicitly so a change in the
-# node binaries' defaults can't silently alter test timing or make network-tx tests fail.
 start sequencer   "$BIN/miden-node" sequencer --rpc.listen "$RPC" --data-directory "$DATA/node" \
     --validator.url "http://$VALIDATOR" --ntx-builder.url "http://$NTX" \
     --rpc.network-tx-auth-header-value "$NETWORK_TX_AUTH" \
@@ -161,21 +146,50 @@ start ntx-builder "$BIN/miden-ntx-builder" start --listen "$NTX" --rpc.url "http
     --max-cycles "$((1 << 18))" \
     --data-directory "$DATA/ntx-builder"
 
-echo "==> waiting for RPC on $RPC"
-for _ in $(seq 1 60); do
-    if (exec 3<>"/dev/tcp/${RPC%:*}/${RPC##*:}") 2>/dev/null; then
-        exec 3>&- 3<&-
-        echo "==> node is up (RPC on http://$RPC); logs in $LOG_DIR"
-        exit 0
-    fi
+# Returns non-zero (with a message) if any started component is no longer running.
+check_components_alive() {
     while read -r pid; do
         [ -n "$pid" ] || continue
         if ! kill -0 "$pid" 2>/dev/null; then
-            echo "error: a node service exited during startup; see $LOG_DIR" >&2
-            exit 1
+            echo "error: a node service exited; see $LOG_DIR" >&2
+            return 1
         fi
     done < "$PID_FILE"
+}
+
+echo "==> waiting for RPC on $RPC"
+READY=""
+for _ in $(seq 1 60); do
+    if (exec 3<>"/dev/tcp/${RPC%:*}/${RPC##*:}") 2>/dev/null; then
+        exec 3>&- 3<&-
+        READY=1
+        break
+    fi
+    check_components_alive || exit 1
     sleep 1
 done
-echo "error: RPC did not become ready within 60s; see $LOG_DIR" >&2
+if [ -z "$READY" ]; then
+    echo "error: RPC did not become ready within 60s; see $LOG_DIR" >&2
+    exit 1
+fi
+echo "==> node is up (RPC on http://$RPC); logs in $LOG_DIR"
+
+if [ "$MODE" = "background" ]; then
+    exit 0
+fi
+
+# Foreground: stream logs until Ctrl+C (which stops the node) or a component dies.
+echo "==> streaming logs (Ctrl+C stops the node)"
+tail -n +1 -F "$LOG_DIR"/*.log &
+TAIL_PID=$!
+cleanup() {
+    trap - INT TERM
+    kill "$TAIL_PID" 2>/dev/null || true
+    "$ROOT/scripts/stop-test-node.sh"
+}
+trap 'echo; cleanup; exit 0' INT TERM
+while check_components_alive; do
+    sleep 1
+done
+cleanup
 exit 1
