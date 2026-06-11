@@ -149,11 +149,14 @@ const TEST_ACCOUNT_ID: &str = "0x0a0a0a0a0a0a0a110a0a0a0a0a0a0a";
 /// Deterministic seed used for the test account to ensure reproducible account IDs.
 const TEST_ACCOUNT_SEED: [u8; 32] = [0xa; 32];
 
-/// Number of faucets to create. This value is chosen to exceed typical limits
-/// and trigger the `too_many_assets` flag during testing.
-const NUM_TEST_FAUCETS: u128 = 1501;
+/// Number of faucets to create. This should exceed the `AccountVaultDetails::MAX_RETURN_ENTRIES`
+/// limit defined in the node, so the account triggers `too_many_assets` flag during testing.
+const NUM_TEST_FAUCETS: u128 = 1001;
 
-const NUM_STORAGE_MAP_ENTRIES: u32 = 200;
+/// Number storage map entries to create. This should exceed the
+/// `AccountStorageMapDetails::MAX_RETURN_ENTRIES` limit defined in the node, so the slot
+/// triggers `too_many_entries` flag during testing.
+const NUM_STORAGE_MAP_ENTRIES: u32 = 1001;
 
 const FAUCET_DECIMALS: u8 = 12;
 const FAUCET_MAX_SUPPLY: u32 = 1 << 30;
