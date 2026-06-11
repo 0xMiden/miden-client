@@ -59,6 +59,7 @@
 * [FEATURE][web] Added `StorageView` JS wrapper over WASM `AccountStorage`. `account.storage()` now returns a `StorageView` that makes `getItem()` work intuitively for both Value and StorageMap slots. WASM primitives are unchanged; the raw `AccountStorage` is accessible via `.raw` ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][web] Added `wordToBigInt()` utility export for losslessly converting a `Word`'s first felt to a `BigInt`. `StorageResult.toString()` is BigInt-backed, and `valueOf()` returns a JS number for values fitting in `Number.MAX_SAFE_INTEGER` and throws `RangeError` for larger u64 values — use `.toBigInt()` for exact access ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][rust,cli] Added partial swap (PSWAP) support: `TransactionRequestBuilder::build_pswap_create` / `build_pswap_consume` / `build_pswap_cancel` and a `miden-client pswap` CLI command (`create`, `consume`, `cancel`) for partially-fillable fungible swaps ([#2162](https://github.com/0xMiden/miden-client/pull/2162)).
+* Added verification of MMR responses during state sync: validated the returned block range matches the requested range and checked that post-delta MMR peaks match the block header's chain commitment ([#1887](https://github.com/0xMiden/miden-client/pull/1887)).
 
 ### Fixes
 
@@ -216,7 +217,6 @@
 * [FIX][rust] Fixed `get_vault_asset_witnesses` failing with `MerkleError::RootNotInStore` when the vault root is missing from the `AccountSmtForest`. The error is now caught and falls back to loading the full vault from the store ([#1890](https://github.com/0xMiden/miden-client/pull/1890)).
 * [FIX][web] Fixed the error `TypeError: parameter 1 is not of type 'ArrayBuffer'` when re-initializing a client with an imported database. `Uint8Array` fields (e.g. the client version setting) were exported as plain arrays and not restored to `Uint8Array` on import, causing `TextDecoder.decode()` to fail. Export now tags `Uint8Array` values for correct round-trip. ([#1952](https://github.com/0xMiden/miden-client/pull/1952))
 * [FIX][rust] Replaced `.expect()` panics on RPC response data with proper error propagation ([#1833](https://github.com/0xMiden/miden-client/pull/1833)).
-* [FIX][rust] Added verification of MMR responses during state sync: validated the returned block range matches the requested range and checked that post-delta MMR peaks match the block header's chain commitment ([#1887](https://github.com/0xMiden/miden-client/pull/1887)).
 
 ## 0.13.4 (2026-03-23)
 
