@@ -1626,6 +1626,60 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     Ok(())
 }
 
+/// Verifies that stale full-account snapshots don't roll a locally newer state back.
+#[tokio::test]
+async fn update_account_state_rejects_stale_full_snapshot_without_mutating() -> anyhow::Result<()> {
+    let store = create_test_store().await;
+    let map_slot_name = StorageSlotName::new("test::stale_update::map").expect("valid slot name");
+
+    // Insert nonce-0 account, then advance the persisted state to nonce 1.
+    let stale_account = setup_account_with_map(&store, 3, &map_slot_name).await?;
+    let account_id = stale_account.id();
+    let mut current_account = stale_account.clone();
+    apply_single_entry_update(&store, &mut current_account, &map_slot_name, 1).await?;
+    assert!(stale_account.nonce().as_canonical_u64() < current_account.nonce().as_canonical_u64());
+    assert_ne!(stale_account.to_commitment(), current_account.to_commitment());
+
+    let metrics_before_stale_update = get_storage_metrics(&store).await;
+
+    // Feed the older nonce-0 full snapshot through the same path used for public account sync.
+    let smt_forest = store.smt_forest.clone();
+    let result = store
+        .interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
+            SqliteStore::update_account_state(&tx, &mut smt_forest, &stale_account)?;
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await;
+    assert!(
+        matches!(&result, Err(StoreError::DatabaseError(err)) if err.contains("new nonce 0 is less than old nonce 1")),
+        "expected stale update to be rejected before mutating state, got {result:?}"
+    );
+
+    let persisted: Account = store
+        .get_account(account_id)
+        .await?
+        .context("account should exist after stale update")?
+        .try_into()?;
+    assert_eq!(persisted, current_account);
+
+    let metrics_after_stale_update = get_storage_metrics(&store).await;
+    assert_eq!(
+        metrics_after_stale_update.historical_account_headers,
+        metrics_before_stale_update.historical_account_headers,
+        "stale update must not archive the current header"
+    );
+    assert_eq!(
+        metrics_after_stale_update.historical_storage_map_entries,
+        metrics_before_stale_update.historical_storage_map_entries,
+        "stale update must not archive storage entries"
+    );
+
+    Ok(())
+}
+
 /// Verifies that `get_account_header_by_commitment` retrieves historical states by commitment.
 #[tokio::test]
 async fn get_account_header_by_commitment_returns_historical() -> anyhow::Result<()> {

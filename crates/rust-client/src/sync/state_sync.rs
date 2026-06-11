@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::cmp::Ordering;
 
 use async_trait::async_trait;
 use miden_protocol::Word;
@@ -31,6 +32,16 @@ use crate::transaction::TransactionRecord;
 
 // STATE UPDATE DATA
 // ================================================================================================
+
+/// How a node snapshot of a public account should be reconciled against the local state.
+enum PublicAccountSync {
+    /// Node is newer — apply its state to the store.
+    Apply(PublicAccountUpdate),
+    /// Same nonce but different state — the local transaction lost the race and must be discarded.
+    Superseded,
+    /// Node is behind the local (potentially optimistic) state — leave the local state untouched.
+    Ignore,
+}
 
 /// Data fetched from the node needed to sync the client to the chain tip.
 ///
@@ -225,13 +236,21 @@ impl StateSync {
         state_sync_update.block_num = sync_data.chain_tip_header.block_num();
 
         let new_commitments = derive_account_commitments(&sync_data.transactions);
-        self.account_state_sync(
-            &mut state_sync_update.account_updates,
-            &accounts,
-            &new_commitments,
-            block_num,
-        )
-        .await?;
+        let superseded_states = self
+            .account_state_sync(
+                &mut state_sync_update.account_updates,
+                &accounts,
+                &new_commitments,
+                block_num,
+            )
+            .await?;
+
+        // Discard the local transactions whose result lost a same-nonce race against the network.
+        for superseded_state in superseded_states {
+            state_sync_update
+                .transaction_updates
+                .apply_superseded_account_state(superseded_state);
+        }
 
         // Apply local changes: update the MMR, screen notes, and apply state transitions.
         self.apply_sync_result(sync_data, &mut state_sync_update, current_partial_mmr)
@@ -593,25 +612,29 @@ impl StateSync {
     /// * Private accounts that have been marked as mismatched because the current commitment
     ///   doesn't match the one received from the node. The client will need to handle these cases
     ///   as they could be a stale account state or a reason to lock the account.
+    ///
+    /// Returns the local states that were superseded by a same-nonce network transaction; the
+    /// caller must discard the transactions that produced them.
     async fn account_state_sync(
         &self,
         account_updates: &mut AccountUpdates,
         accounts: &[AccountHeader],
         account_commitment_updates: &[(AccountId, Word)],
         block_from: BlockNumber,
-    ) -> Result<(), ClientError> {
+    ) -> Result<Vec<Word>, ClientError> {
         // "Public" here includes both Public and Network accounts, since both have
         // their state stored on-chain and follow the same sync path.
         let (public_accounts, private_accounts): (Vec<_>, Vec<_>) =
             accounts.iter().partition(|header| !header.id().is_private());
 
-        self.sync_public_accounts(
-            account_updates,
-            account_commitment_updates,
-            &public_accounts,
-            block_from,
-        )
-        .await?;
+        let superseded_states = self
+            .sync_public_accounts(
+                account_updates,
+                account_commitment_updates,
+                &public_accounts,
+                block_from,
+            )
+            .await?;
 
         let mismatched_private_accounts = account_commitment_updates
             .iter()
@@ -625,7 +648,7 @@ impl StateSync {
 
         account_updates.extend(AccountUpdates::new(Vec::new(), mismatched_private_accounts));
 
-        Ok(())
+        Ok(superseded_states)
     }
 
     /// Queries the node for updated public accounts and populates `account_updates`.
@@ -642,27 +665,42 @@ impl StateSync {
         commitment_updates: &[(AccountId, Word)],
         current_public_accounts: &[&AccountHeader],
         block_from: BlockNumber,
-    ) -> Result<(), ClientError> {
-        let local_commitments: BTreeMap<AccountId, Word> = current_public_accounts
-            .iter()
-            .map(|header| (header.id(), header.to_commitment()))
-            .collect();
+    ) -> Result<Vec<Word>, ClientError> {
+        let local_headers: BTreeMap<AccountId, &AccountHeader> =
+            current_public_accounts.iter().map(|header| (header.id(), *header)).collect();
+        // Local states that lost a same-nonce race; their transactions must be discarded.
+        let mut superseded_states = Vec::new();
         for (id, commitment) in commitment_updates {
-            if local_commitments.get(id).is_none_or(|local| local == commitment) {
+            let Some(local_header) = local_headers.get(id).copied() else {
+                continue;
+            };
+
+            if local_header.to_commitment() == *commitment {
                 continue;
             }
 
-            let public_update = self.sync_public_account(*id, block_from).await?;
-            account_updates.extend(AccountUpdates::new(vec![public_update], Vec::new()));
+            match self.sync_public_account(*id, local_header, block_from).await? {
+                PublicAccountSync::Apply(public_update) => {
+                    account_updates.extend(AccountUpdates::new(vec![public_update], Vec::new()));
+                },
+                PublicAccountSync::Superseded => {
+                    superseded_states.push(local_header.to_commitment());
+                },
+                PublicAccountSync::Ignore => {},
+            }
         }
 
-        Ok(())
+        Ok(superseded_states)
     }
 
-    /// Fetches an updated snapshot for a single public account.
+    // SYNC PUBLIC ACCOUNTS HELPERS
+    // --------------------------------------------------------------------------------------------
+
+    /// Fetches an updated snapshot for a single public account and decides how to reconcile it
+    /// against the local state.
     ///
     /// Must only be called when the local commitment for the account is known to differ from the
-    /// network's, which guarantees the node returns updated details with a newer nonce.
+    /// network's, so an equal nonce always means a genuine fork.
     ///
     /// # Panics
     ///
@@ -671,8 +709,9 @@ impl StateSync {
     async fn sync_public_account(
         &self,
         account_id: AccountId,
+        local_header: &AccountHeader,
         block_from: BlockNumber,
-    ) -> Result<PublicAccountUpdate, ClientError> {
+    ) -> Result<PublicAccountSync, ClientError> {
         // A single request fetches the full snapshot: every storage map's entries plus the vault,
         // with the storage layout discovered server-side.
         let (proof_block_num, proof) = self
@@ -687,6 +726,20 @@ impl StateSync {
             .map_err(ClientError::RpcError)?;
 
         let details = proof.into_details().expect("node returned no details for a public account");
+        match details
+            .header
+            .nonce()
+            .as_canonical_u64()
+            .cmp(&local_header.nonce().as_canonical_u64())
+        {
+            // Node is behind us: our own transaction was committed yet (will expire naturally
+            // eventually).
+            Ordering::Less => return Ok(PublicAccountSync::Ignore),
+            // Same height but different state: our transaction definitively lost, drop it.
+            Ordering::Equal => return Ok(PublicAccountSync::Superseded),
+            // Node moved past us: adopt its state, built below.
+            Ordering::Greater => {},
+        }
 
         let vault_oversized = details.vault_details.too_many_assets;
         let any_map_oversized =
@@ -705,7 +758,7 @@ impl StateSync {
             PublicAccountUpdate::Full(account)
         };
 
-        Ok(public_update)
+        Ok(PublicAccountSync::Apply(public_update))
     }
 
     /// Builds a [`PublicAccountUpdate::Delta`] by fetching incremental storage map and vault
@@ -1086,6 +1139,77 @@ mod tests {
             ZERO,
         ]
         .into()
+    }
+
+    #[tokio::test]
+    async fn sync_public_accounts_ignores_older_node_snapshot() {
+        let mut builder = MockChainBuilder::new();
+        let account = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
+        let rpc_api = MockRpcApi::new(builder.build().unwrap());
+        let state_sync = StateSync::new(Arc::new(rpc_api), Arc::new(MockScreener), None);
+
+        // Local state is at a higher nonce than the node's snapshot (our own tx isn't committed
+        // there yet), so the node snapshot must be ignored.
+        let local_header =
+            AccountHeader::new(account.id(), Felt::from(2u32), EMPTY_WORD, EMPTY_WORD, EMPTY_WORD);
+        let current_public_accounts = vec![&local_header];
+        let commitment_updates = vec![(account.id(), account.to_commitment())];
+        let mut account_updates = AccountUpdates::default();
+
+        let superseded = state_sync
+            .sync_public_accounts(
+                &mut account_updates,
+                &commitment_updates,
+                &current_public_accounts,
+                BlockNumber::GENESIS,
+            )
+            .await
+            .unwrap();
+
+        assert!(
+            account_updates.updated_public_accounts().is_empty(),
+            "public account sync should ignore node snapshots that are older than local"
+        );
+        assert!(
+            superseded.is_empty(),
+            "an older node snapshot must not supersede the local state"
+        );
+    }
+
+    #[tokio::test]
+    async fn sync_public_accounts_marks_same_nonce_mismatch_as_superseded() {
+        let mut builder = MockChainBuilder::new();
+        let account = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
+        let rpc_api = MockRpcApi::new(builder.build().unwrap());
+        let state_sync = StateSync::new(Arc::new(rpc_api), Arc::new(MockScreener), None);
+
+        // Local state is at the same nonce as the node's but with a different commitment: a fork
+        // where the local transaction lost the race and must be discarded.
+        let local_header =
+            AccountHeader::new(account.id(), account.nonce(), EMPTY_WORD, EMPTY_WORD, EMPTY_WORD);
+        let current_public_accounts = vec![&local_header];
+        let commitment_updates = vec![(account.id(), account.to_commitment())];
+        let mut account_updates = AccountUpdates::default();
+
+        let superseded = state_sync
+            .sync_public_accounts(
+                &mut account_updates,
+                &commitment_updates,
+                &current_public_accounts,
+                BlockNumber::GENESIS,
+            )
+            .await
+            .unwrap();
+
+        assert!(
+            account_updates.updated_public_accounts().is_empty(),
+            "a same-nonce fork must not overwrite the account while its tx is still pending"
+        );
+        assert_eq!(
+            superseded,
+            vec![local_header.to_commitment()],
+            "the superseded local state should be reported so its transaction is discarded"
+        );
     }
 
     // COMPUTE NULLIFIER TX ORDER TESTS
