@@ -54,6 +54,9 @@ async fn list_tags<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
                 format!("Note({})", details_commitment.to_hex())
             },
             miden_client::sync::NoteTagSource::User => "User".to_string(),
+            miden_client::sync::NoteTagSource::Subscription(key) => {
+                format!("Subscription({})", key.to_hex())
+            },
         };
 
         table.add_row(vec![tag.tag.to_string(), source]);
