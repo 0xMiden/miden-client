@@ -253,10 +253,7 @@ pub(crate) async fn apply_round(
         store
             .remove_note_tag(NoteTagRecord {
                 tag: record.asset_pair_tag(note_type),
-                source: NoteTagSource::Subscription(
-                    Word::read_from_bytes(&record.original_note_id.to_bytes())
-                        .expect("NoteId and Word share identical serialization"),
-                ),
+                source: NoteTagSource::Subscription(record.original_note_id.as_word()),
             })
             .await?;
     }

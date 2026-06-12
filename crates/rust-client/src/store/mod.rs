@@ -91,8 +91,8 @@ pub use note_record::{
 // SETTING MUTATION
 // ================================================================================================
 
-/// A single mutation against the `settings` KV store, applied as part of an
-/// atomic batch via [`Store::apply_settings_mutations`].
+/// A single mutation against the `settings` KV store, applied as part of an atomic batch via
+/// [`Store::apply_settings_mutations`].
 #[derive(Debug, Clone)]
 pub enum SettingMutation {
     /// Insert or overwrite `key` with `value`.
@@ -437,8 +437,7 @@ pub trait Store: Send + Sync {
     /// Returns all the keys from the `settings` table.
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError>;
 
-    /// Atomically applies a batch of [`SettingMutation`]s: either all of them
-    /// commit or none do. Use this when several `settings` entries must stay
+    /// Applies a batch of [`SettingMutation`]s. Use this when several `settings` entries must stay
     /// mutually consistent (e.g. a record and its secondary index).
     async fn apply_settings_mutations(
         &self,
