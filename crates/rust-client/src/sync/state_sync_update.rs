@@ -290,6 +290,14 @@ impl TransactionUpdateTracker {
         );
     }
 
+    /// Discards the local transaction that produced this now-superseded account state.
+    pub fn apply_superseded_account_state(&mut self, superseded_account_state: Word) {
+        self.discard_transaction_with_predicate(
+            |transaction| transaction.details.final_account_state == superseded_account_state,
+            DiscardCause::Superseded,
+        );
+    }
+
     /// Discards transactions that have the same initial account state as the provided one.
     pub fn apply_invalid_initial_account_state(&mut self, invalid_account_state: Word) {
         self.discard_transaction_with_predicate(
