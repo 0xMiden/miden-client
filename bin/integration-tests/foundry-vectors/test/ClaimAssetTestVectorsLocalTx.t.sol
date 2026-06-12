@@ -23,8 +23,9 @@ import "../src/DepositContractTestHelpers.sol";
  *
  * The output can be used to verify Miden's ability to process L1 bridge transactions.
  */
-/// @dev Miden network ID used as the bridge destination.
-uint32 constant MIDEN_NETWORK_ID = 20;
+/// @dev Miden network ID used as the bridge destination. Must match the agglayer bridge's
+/// `MIDEN_NETWORK_ID` MASM constant (77 as of miden-protocol 0.15; was 20 in 0.14).
+uint32 constant MIDEN_NETWORK_ID = 77;
 
 /// @dev Default bridge amount in wei for test vectors.
 uint256 constant DEFAULT_BRIDGE_AMOUNT = 100_000_000;

@@ -10,10 +10,12 @@ pub use miden_protocol::errors::{AccountError, AccountIdError, AssetError, Netwo
 use miden_protocol::errors::{
     NoteError,
     PartialBlockchainError,
+    ProposedBatchError,
+    ProvenBatchError,
     TransactionInputError,
     TransactionScriptError,
 };
-use miden_protocol::note::{NoteId, NoteTag};
+use miden_protocol::note::NoteId;
 use miden_standards::account::interface::AccountInterfaceError;
 // RE-EXPORTS
 // ================================================================================================
@@ -21,14 +23,19 @@ pub use miden_standards::errors::CodeBuilderError;
 pub use miden_tx::AuthenticationError;
 use miden_tx::utils::HexParseError;
 use miden_tx::utils::serde::DeserializationError;
-use miden_tx::{NoteCheckerError, TransactionExecutorError, TransactionProverError};
+use miden_tx::{
+    DataStoreError,
+    NoteCheckerError,
+    TransactionExecutorError,
+    TransactionProverError,
+};
 use thiserror::Error;
 
 use crate::note::NoteScreenerError;
 use crate::note_transport::NoteTransportError;
 use crate::rpc::RpcError;
 use crate::store::{NoteRecordError, StoreError};
-use crate::transaction::TransactionRequestError;
+use crate::transaction::{BatchBuilderError, TransactionRequestError, TransactionStoreUpdateError};
 
 // ACTIONABLE HINTS
 // ================================================================================================
@@ -56,7 +63,8 @@ impl fmt::Display for ErrorHint {
 
 // TODO: This is mostly illustrative but we could add a URL with fragemtn identifiers
 // for each error
-const TROUBLESHOOTING_DOC: &str = "https://0xmiden.github.io/miden-client/cli-troubleshooting.html";
+const TROUBLESHOOTING_DOC: &str =
+    "https://docs.miden.xyz/builder/tools/clients/rust-client/cli/cli-troubleshooting";
 
 // CLIENT ERROR
 // ================================================================================================
@@ -68,10 +76,6 @@ pub enum ClientError {
     AddressAlreadyTracked(String),
     #[error("account with id {0} is already being tracked")]
     AccountAlreadyTracked(AccountId),
-    #[error(
-        "address {0} cannot be tracked: its derived note tag {1} is already associated with another tracked address"
-    )]
-    NoteTagDerivedAddressAlreadyTracked(String, NoteTag),
     #[error("account error")]
     AccountError(#[from] AccountError),
     #[error("account {0} is locked because the local state may be out of date with the network")]
@@ -82,6 +86,12 @@ pub enum ClientError {
     AccountCommitmentMismatch(Word),
     #[error("account {0} is private and its details cannot be retrieved from the network")]
     AccountIsPrivate(AccountId),
+    #[error("account {0} is watched and cannot be used to execute transactions")]
+    AccountIsWatched(AccountId),
+    #[error(
+        "account {0} is already tracked with a different ClientAccountType; switching between Native and Watched is not supported"
+    )]
+    AccountWatchedMismatch(AccountId),
     #[error("account with id {0} not found on the network")]
     AccountNotFoundOnChain(AccountId),
     #[error(
@@ -92,8 +102,16 @@ pub enum ClientError {
     AssetError(#[from] AssetError),
     #[error("account data wasn't found for account id {0}")]
     AccountDataNotFound(AccountId),
+    #[error(transparent)]
+    BatchBuilder(#[from] BatchBuilderError),
+    #[error("data store error")]
+    DataStoreError(#[from] DataStoreError),
     #[error("failed to construct the partial blockchain")]
     PartialBlockchainError(#[from] PartialBlockchainError),
+    #[error("failed to build proposed batch")]
+    ProposedBatchError(#[from] ProposedBatchError),
+    #[error("failed to prove batch")]
+    ProvenBatchError(#[from] ProvenBatchError),
     #[error("failed to deserialize data")]
     DataDeserializationError(#[from] DeserializationError),
     #[error("note with id {0} not found on chain")]
@@ -104,6 +122,8 @@ pub enum ClientError {
         "the chain Merkle Mountain Range (MMR) forest value exceeds the supported range (must fit in a u32)"
     )]
     InvalidPartialMmrForest,
+    #[error("chain validation error: {0}")]
+    ChainValidationError(String),
     #[error(
         "cannot track a new account without its seed; the seed is required to validate the account ID's correctness"
     )]
@@ -152,10 +172,6 @@ pub enum ClientError {
     TransactionScriptError(#[source] TransactionScriptError),
     #[error("client initialization error: {0}")]
     ClientInitializationError(String),
-    #[error("cannot track more note tags: the maximum of {0} tracked tags has been reached")]
-    NoteTagsLimitExceeded(u32),
-    #[error("cannot track more accounts: the maximum of {0} tracked accounts has been reached")]
-    AccountsLimitExceeded(u32),
     #[error("expected full account data for account {0}, but only partial data is available")]
     AccountRecordNotFull(AccountId),
     #[error("expected partial account data for account {0}, but full data was found")]
@@ -188,6 +204,16 @@ pub enum ClientError {
 impl From<ClientError> for String {
     fn from(err: ClientError) -> String {
         err.to_string()
+    }
+}
+
+impl From<TransactionStoreUpdateError> for ClientError {
+    fn from(err: TransactionStoreUpdateError) -> Self {
+        match err {
+            TransactionStoreUpdateError::Store(e) => ClientError::StoreError(e),
+            TransactionStoreUpdateError::NoteScreener(e) => ClientError::NoteScreenerError(e),
+            TransactionStoreUpdateError::NoteRecord(e) => ClientError::NoteRecordConversionError(e),
+        }
     }
 }
 
@@ -292,13 +318,17 @@ impl From<&TransactionRequestError> for Option<ErrorHint> {
                           Add at least one fungible or non-fungible asset to the note.".to_string(),
                 docs_url: Some(TROUBLESHOOTING_DOC),
             }),
-            TransactionRequestError::InvalidSenderAccount(account_id) => Some(ErrorHint {
-                message: format!(
-                    "Account {account_id} is not tracked by this client. Import or create the \
-                     account first, then retry the transaction."
-                ),
-                docs_url: Some(TROUBLESHOOTING_DOC),
-            }),
+            TransactionRequestError::OutputNoteSenderMismatch { expected, actual } => {
+                Some(ErrorHint {
+                    message: format!(
+                        "A note's sender is the account that emits it: it must be the account \
+                         executing the transaction. This transaction runs as account {expected}, \
+                         but one of its output notes declares sender {actual}. Rebuild the note \
+                         with {expected} as its sender, or execute the transaction from {actual}."
+                    ),
+                    docs_url: Some(TROUBLESHOOTING_DOC),
+                })
+            },
             _ => None,
         }
     }

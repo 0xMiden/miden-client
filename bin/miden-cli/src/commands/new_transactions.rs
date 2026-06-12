@@ -1,21 +1,20 @@
 use std::io;
 use std::sync::Arc;
 
-use clap::{Parser, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum};
 use miden_client::account::AccountId;
-use miden_client::asset::{FungibleAsset, NonFungibleDeltaAction};
 use miden_client::keystore::Keystore;
 use miden_client::note::{
     BlockNumber,
+    Note,
     NoteType as MidenNoteType,
     SwapNote,
     get_input_note_with_id_prefix,
 };
 use miden_client::store::NoteRecordError;
 use miden_client::transaction::{
-    ExecutedTransaction,
-    InputNote,
     PaymentNoteDescription,
+    PswapTransactionData,
     RawOutputNote,
     SwapTransactionData,
     TransactionRequest,
@@ -25,13 +24,13 @@ use miden_client::{Client, RemoteTransactionProver};
 use tracing::info;
 
 use crate::config::CliConfig;
-use crate::create_dynamic_table;
 use crate::errors::CliError;
 use crate::utils::{
     SHARED_TOKEN_DOCUMENTATION,
     get_input_acc_id_by_prefix_or_default,
-    load_faucet_details_map,
+    load_faucet_metadata_resolver,
     parse_account_id,
+    print_executed_transaction,
 };
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -77,9 +76,9 @@ impl MintCmd {
         mut client: Client<AUTH>,
     ) -> Result<(), CliError> {
         let force = self.force;
-        let faucet_details_map = load_faucet_details_map()?;
+        let resolver = load_faucet_metadata_resolver()?;
 
-        let fungible_asset = faucet_details_map.parse_fungible_asset(&client, &self.asset).await?;
+        let fungible_asset = resolver.parse_fungible_asset(&client, &self.asset).await?;
 
         let target_account_id = parse_account_id(&client, self.target_account_id.as_str()).await?;
 
@@ -149,9 +148,9 @@ impl SendCmd {
     ) -> Result<(), CliError> {
         let force = self.force;
 
-        let faucet_details_map = load_faucet_details_map()?;
+        let resolver = load_faucet_metadata_resolver()?;
 
-        let fungible_asset = faucet_details_map.parse_fungible_asset(&client, &self.asset).await?;
+        let fungible_asset = resolver.parse_fungible_asset(&client, &self.asset).await?;
 
         // try to use either the provided argument or the default account
         let sender_account_id =
@@ -227,12 +226,12 @@ impl SwapCmd {
     ) -> Result<(), CliError> {
         let force = self.force;
 
-        let faucet_details_map = load_faucet_details_map()?;
+        let resolver = load_faucet_metadata_resolver()?;
 
         let offered_fungible_asset =
-            faucet_details_map.parse_fungible_asset(&client, &self.offered_asset).await?;
+            resolver.parse_fungible_asset(&client, &self.offered_asset).await?;
         let requested_fungible_asset =
-            faucet_details_map.parse_fungible_asset(&client, &self.requested_asset).await?;
+            resolver.parse_fungible_asset(&client, &self.requested_asset).await?;
 
         // try to use either the provided argument or the default account
         let sender_account_id =
@@ -308,16 +307,7 @@ impl ConsumeNotesCmd {
         let mut input_notes = Vec::new();
 
         for note_id in &self.list_of_notes {
-            let note_record = get_input_note_with_id_prefix(&client, note_id)
-                .await
-                .map_err(|_| CliError::Input(format!("Input note ID {note_id} is neither a valid Note ID nor a prefix of a known Note ID")))?;
-
-            input_notes.push((
-                note_record.try_into().map_err(|err: NoteRecordError| {
-                    CliError::Transaction(err.into(), "Failed to convert note record".to_string())
-                })?,
-                None,
-            ));
+            input_notes.push((resolve_input_note(&client, note_id).await?, None));
         }
 
         let account_id =
@@ -340,10 +330,8 @@ impl ConsumeNotesCmd {
         }
 
         if input_notes.is_empty() {
-            return Err(CliError::Transaction(
-                "No input notes were provided and the store does not contain any notes consumable by {account_id}".into(),
-                "Input notes check failed".to_string(),
-            ));
+            println!("Did not find any consumable notes for {account_id}.");
+            return Ok(());
         }
 
         let transaction_request = TransactionRequestBuilder::new()
@@ -367,6 +355,226 @@ impl ConsumeNotesCmd {
     }
 }
 
+// PSWAP COMMANDS
+// ================================================================================================
+
+/// Partial swap (PSWAP) commands.
+#[derive(Debug, Parser, Clone)]
+#[command(about = "Create, consume, or cancel partial swap notes")]
+pub struct PswapCmd {
+    #[command(subcommand)]
+    action: PswapAction,
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum PswapAction {
+    /// Create a new partial swap note.
+    Create(PswapCreateCmd),
+
+    /// Consume (fill) an existing partial swap note.
+    Consume(PswapConsumeCmd),
+
+    /// Cancel an existing partial swap note.
+    Cancel(PswapCancelCmd),
+}
+
+impl PswapCmd {
+    pub async fn execute<AUTH: Keystore + Sync + 'static>(
+        &self,
+        client: Client<AUTH>,
+    ) -> Result<(), CliError> {
+        match &self.action {
+            PswapAction::Create(cmd) => cmd.execute(client).await,
+            PswapAction::Consume(cmd) => cmd.execute(client).await,
+            PswapAction::Cancel(cmd) => cmd.execute(client).await,
+        }
+    }
+}
+
+/// Create a partial swap note offering one fungible asset in exchange for another.
+#[derive(Debug, Parser, Clone)]
+pub struct PswapCreateCmd {
+    /// Sender account ID or its hex prefix. If none is provided, the default account is used.
+    #[arg(short = 's', long = "sender")]
+    sender_account_id: Option<String>,
+
+    /// Asset offered.
+    #[arg(short = 'o', long = "offered-asset", help=format!("Asset offered.\n{SHARED_TOKEN_DOCUMENTATION}"))]
+    offered_asset: String,
+
+    /// Asset requested.
+    #[arg(short, long, help=format!("Asset requested.\n{SHARED_TOKEN_DOCUMENTATION}"))]
+    requested_asset: String,
+
+    /// Visibility of the PSWAP note to be created.
+    #[arg(short, long, value_enum)]
+    note_type: NoteType,
+
+    /// Visibility of the payback note produced when the PSWAP is filled. Defaults
+    /// to private (cheaper, and the fill amount is already recorded in the
+    /// executing transaction).
+    #[arg(long, value_enum, default_value_t = NoteType::Private)]
+    payback_note_type: NoteType,
+
+    /// Flag to submit the executed transaction without asking for confirmation.
+    #[arg(long, default_value_t = false)]
+    force: bool,
+
+    /// Flag to delegate proving to the remote prover specified in the config file.
+    #[arg(long, default_value_t = false)]
+    delegate_proving: bool,
+}
+
+impl PswapCreateCmd {
+    pub async fn execute<AUTH: Keystore + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
+        let sender_id =
+            get_input_acc_id_by_prefix_or_default(&client, self.sender_account_id.clone()).await?;
+
+        let resolver = load_faucet_metadata_resolver()?;
+        let offered_fungible_asset =
+            resolver.parse_fungible_asset(&client, &self.offered_asset).await?;
+        let requested_fungible_asset =
+            resolver.parse_fungible_asset(&client, &self.requested_asset).await?;
+
+        let pswap_data =
+            PswapTransactionData::new(sender_id, offered_fungible_asset, requested_fungible_asset);
+
+        let tx_request = TransactionRequestBuilder::new()
+            .build_pswap_create(
+                &pswap_data,
+                (&self.note_type).into(),
+                (&self.payback_note_type).into(),
+                None,
+                client.rng(),
+            )
+            .map_err(|err| {
+                CliError::Transaction(
+                    err.into(),
+                    "Failed to build PSWAP create transaction".to_string(),
+                )
+            })?;
+
+        execute_transaction(&mut client, sender_id, tx_request, self.force, self.delegate_proving)
+            .await
+    }
+}
+
+/// Consume (partially fill) an existing partial swap note.
+#[derive(Debug, Parser, Clone)]
+pub struct PswapConsumeCmd {
+    /// Consumer account ID or its hex prefix.
+    #[arg(short = 'a', long = "account")]
+    account: String,
+
+    /// Note ID or hex prefix of the PSWAP note to consume.
+    #[arg(long)]
+    note: String,
+
+    /// Amount of the requested asset the consumer account is providing to fill the swap.
+    #[arg(long)]
+    fill_amount: u64,
+
+    /// Flag to submit the executed transaction without asking for confirmation.
+    #[arg(long, default_value_t = false)]
+    force: bool,
+
+    /// Flag to delegate proving to the remote prover specified in the config file.
+    #[arg(long, default_value_t = false)]
+    delegate_proving: bool,
+}
+
+impl PswapConsumeCmd {
+    pub async fn execute<AUTH: Keystore + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
+        let consumer_id = parse_account_id(&client, &self.account).await?;
+        let note = resolve_input_note(&client, &self.note).await?;
+
+        // The CLI does not yet support note-supplied fills (in-flight fills routed through
+        // other notes), so pass 0 for `note_fill_amount`.
+        let tx_request = TransactionRequestBuilder::new()
+            .build_pswap_consume(&note, consumer_id, self.fill_amount, 0)
+            .map_err(|err| {
+                CliError::Transaction(
+                    err.into(),
+                    "Failed to build PSWAP consume transaction".to_string(),
+                )
+            })?;
+
+        execute_transaction(&mut client, consumer_id, tx_request, self.force, self.delegate_proving)
+            .await
+    }
+}
+
+/// Cancel an existing partial swap note, reclaiming the offered asset.
+#[derive(Debug, Parser, Clone)]
+pub struct PswapCancelCmd {
+    /// Account ID or its hex prefix of the note creator. If none is provided, the default
+    /// account is used.
+    #[arg(short = 's', long = "sender")]
+    sender_account_id: Option<String>,
+
+    /// Note ID or hex prefix of the PSWAP note to cancel.
+    #[arg(long)]
+    note: String,
+
+    /// Flag to submit the executed transaction without asking for confirmation.
+    #[arg(long, default_value_t = false)]
+    force: bool,
+
+    /// Flag to delegate proving to the remote prover specified in the config file.
+    #[arg(long, default_value_t = false)]
+    delegate_proving: bool,
+}
+
+impl PswapCancelCmd {
+    pub async fn execute<AUTH: Keystore + Sync + 'static>(
+        &self,
+        mut client: Client<AUTH>,
+    ) -> Result<(), CliError> {
+        let sender_id =
+            get_input_acc_id_by_prefix_or_default(&client, self.sender_account_id.clone()).await?;
+        let note = resolve_input_note(&client, &self.note).await?;
+
+        let tx_request = TransactionRequestBuilder::new()
+            .build_pswap_cancel(note, sender_id)
+            .map_err(|err| {
+                CliError::Transaction(
+                    err.into(),
+                    "Failed to build PSWAP cancel transaction".to_string(),
+                )
+            })?;
+
+        execute_transaction(&mut client, sender_id, tx_request, self.force, self.delegate_proving)
+            .await
+    }
+}
+
+// HELPERS
+// ================================================================================================
+
+/// Resolves a note ID prefix to a fully-qualified [`Note`].
+async fn resolve_input_note<AUTH: Keystore + Sync>(
+    client: &Client<AUTH>,
+    note_id_prefix: &str,
+) -> Result<Note, CliError> {
+    let note_record = get_input_note_with_id_prefix(client, note_id_prefix)
+        .await
+        .map_err(|_| {
+            CliError::Input(format!(
+                "Input note ID {note_id_prefix} is neither a valid Note ID nor a prefix of a known Note ID"
+            ))
+        })?;
+
+    note_record.try_into().map_err(|err: NoteRecordError| {
+        CliError::Transaction(err.into(), "Failed to convert note record".to_string())
+    })
+}
+
 // EXECUTE TRANSACTION
 // ================================================================================================
 
@@ -383,7 +591,7 @@ async fn execute_transaction<AUTH: Keystore + Sync + 'static>(
     let executed_transaction = transaction_result.executed_transaction().clone();
 
     // Show delta and ask for confirmation
-    print_transaction_details(&executed_transaction)?;
+    print_executed_transaction(client, &executed_transaction).await?;
     if !force {
         println!(
             "\nContinue with proving and submission? Changes will be irreversible once the proof is finalized on the network (y/N)"
@@ -443,98 +651,6 @@ async fn execute_transaction<AUTH: Keystore + Sync + 'static>(
             println!("\t- {note_id}");
         }
     }
-
-    Ok(())
-}
-
-fn print_transaction_details(executed_tx: &ExecutedTransaction) -> Result<(), CliError> {
-    println!("The transaction will have the following effects:\n");
-
-    // INPUT NOTES
-    let input_note_ids = executed_tx.input_notes().iter().map(InputNote::id).collect::<Vec<_>>();
-    if input_note_ids.is_empty() {
-        println!("No notes will be consumed.");
-    } else {
-        println!("The following notes will be consumed:");
-        for input_note_id in input_note_ids {
-            println!("\t- {}", input_note_id.to_hex());
-        }
-    }
-    println!();
-
-    // OUTPUT NOTES
-    let output_note_count = executed_tx.output_notes().iter().count();
-    if output_note_count == 0 {
-        println!("No notes will be created as a result of this transaction.");
-    } else {
-        println!("{output_note_count} notes will be created as a result of this transaction.");
-    }
-    println!();
-
-    // ACCOUNT CHANGES
-    println!("The account with ID {} will be modified as follows:", executed_tx.account_id());
-
-    let account_delta = executed_tx.account_delta();
-
-    let has_storage_changes = !account_delta.storage().is_empty();
-    if has_storage_changes {
-        let mut table = create_dynamic_table(&["Storage Slot", "Effect"]);
-
-        for (updated_item_slot, new_value) in account_delta.storage().values() {
-            table.add_row(vec![
-                updated_item_slot.to_string(),
-                format!("Updated ({})", new_value.to_hex()),
-            ]);
-        }
-
-        println!("Storage changes:");
-        println!("{table}");
-    } else {
-        println!("Account Storage will not be changed.");
-    }
-
-    if account_delta.vault().is_empty() {
-        println!("Account Vault will not be changed.");
-    } else {
-        let faucet_details_map = load_faucet_details_map()?;
-        let mut table = create_dynamic_table(&["Asset Type", "Faucet ID", "Amount"]);
-
-        for (vault_key, amount) in account_delta.vault().fungible().iter() {
-            let asset = FungibleAsset::new(vault_key.faucet_id(), amount.unsigned_abs())
-                .map_err(CliError::Asset)?;
-            let (faucet_fmt, amount_fmt) = faucet_details_map.format_fungible_asset(&asset)?;
-
-            if amount.is_positive() {
-                table.add_row(vec!["Fungible Asset", &faucet_fmt, &format!("+{amount_fmt}")]);
-            } else {
-                table.add_row(vec!["Fungible Asset", &faucet_fmt, &format!("-{amount_fmt}")]);
-            }
-        }
-
-        for (asset, action) in account_delta.vault().non_fungible().iter() {
-            match action {
-                NonFungibleDeltaAction::Add => {
-                    table.add_row(vec![
-                        "Non Fungible Asset",
-                        &asset.faucet_id().prefix().to_hex(),
-                        "1",
-                    ]);
-                },
-                NonFungibleDeltaAction::Remove => {
-                    table.add_row(vec![
-                        "Non Fungible Asset",
-                        &asset.faucet_id().prefix().to_hex(),
-                        "-1",
-                    ]);
-                },
-            }
-        }
-
-        println!("Vault changes:");
-        println!("{table}");
-    }
-
-    println!("Nonce incremented by: {}.", account_delta.nonce_delta());
 
     Ok(())
 }

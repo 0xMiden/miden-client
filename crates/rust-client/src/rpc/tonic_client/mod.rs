@@ -6,21 +6,18 @@ use alloc::vec::Vec;
 use core::error::Error;
 use core::pin::Pin;
 
-use miden_protocol::asset::{Asset, AssetVault};
 use miden_protocol::vm::FutureMaybeSend;
 
 type RpcFuture<T> = Pin<Box<dyn FutureMaybeSend<T>>>;
 
-use miden_protocol::account::{
-    Account, AccountCode, AccountId, AccountStorage, StorageMap, StorageSlot, StorageSlotType,
-};
+use miden_protocol::account::{AccountCode, AccountId};
 use miden_protocol::address::NetworkId;
+use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::account_tree::AccountWitness;
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::crypto::merkle::mmr::{Forest, MmrPath, MmrProof};
-use miden_protocol::crypto::merkle::smt::SmtProof;
-use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::note::{NoteId, NoteScript, NoteTag};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_protocol::utils::serde::Deserializable;
 use miden_protocol::{EMPTY_WORD, Word};
@@ -30,25 +27,25 @@ use tonic::Status;
 use tracing::info;
 
 use super::domain::account::{
-    AccountProof, AccountStorageDetails, AccountStorageRequirements, AccountUpdateSummary,
+    AccountProof,
+    AccountStorageRequirements,
+    GetAccountRequest,
+    StorageMapFetch,
 };
-use super::domain::{note::FetchedNote, nullifier::NullifierUpdate};
-use super::generated::rpc::account_request::AccountDetailRequest;
+use super::domain::note::{FetchedNote, NoteSyncBlock};
+use super::domain::nullifier::NullifierUpdate;
 use super::generated::rpc::AccountRequest;
-use super::{
-    Endpoint, FetchedAccount, NodeRpcClient, RpcEndpoint, NoteSyncInfo, RpcError,
-    RpcStatusInfo,
-};
-use crate::rpc::domain::sync::ChainMmrInfo;
+use super::generated::rpc::account_request::AccountDetailRequest;
+use super::{Endpoint, NodeRpcClient, RpcEndpoint, RpcError, RpcStatusInfo};
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
+use crate::rpc::domain::limits::RpcLimits;
+use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
-use crate::rpc::domain::transaction::TransactionsInfo;
+use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
+use crate::rpc::domain::transaction::TransactionRecord;
 use crate::rpc::errors::node::parse_node_error;
 use crate::rpc::errors::{AcceptHeaderContext, AcceptHeaderError, GrpcError, RpcConversionError};
-use crate::rpc::generated::rpc::account_request::account_detail_request::storage_map_detail_request::SlotData;
-use crate::rpc::generated::rpc::account_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::generated::rpc::BlockRange;
-use crate::rpc::domain::limits::RpcLimits;
 use crate::rpc::{AccountStateAt, generated as proto};
 
 mod api_client;
@@ -59,7 +56,7 @@ use api_client::api_client_wrapper::ApiClient;
 /// Tracks the pagination state for block-driven endpoints.
 struct BlockPagination {
     current_block_from: BlockNumber,
-    block_to: Option<BlockNumber>,
+    block_to: BlockNumber,
     iterations: u32,
 }
 
@@ -78,7 +75,7 @@ impl BlockPagination {
     /// trigger an infinite loop.
     const MAX_ITERATIONS: u32 = 1000;
 
-    fn new(block_from: BlockNumber, block_to: Option<BlockNumber>) -> Self {
+    fn new(block_from: BlockNumber, block_to: BlockNumber) -> Self {
         Self {
             current_block_from: block_from,
             block_to,
@@ -90,7 +87,7 @@ impl BlockPagination {
         self.current_block_from
     }
 
-    fn block_to(&self) -> Option<BlockNumber> {
+    fn block_to(&self) -> BlockNumber {
         self.block_to
     }
 
@@ -112,7 +109,7 @@ impl BlockPagination {
             ));
         }
 
-        let target_block = self.block_to.map_or(chain_tip, |to| to.min(chain_tip));
+        let target_block = self.block_to.min(chain_tip);
 
         if block_num >= target_block {
             return Ok(PaginationResult::Done { chain_tip, block_num });
@@ -308,196 +305,6 @@ impl GrpcClient {
             .map(tonic::Response::into_inner)
             .and_then(RpcStatusInfo::try_from)
     }
-
-    // GET ACCOUNT HELPERS
-    // ============================================================================================
-
-    /// Given an [`AccountId`], return the proof for the account.
-    ///
-    /// If the account also has public state, its details will also be retrieved
-    pub async fn fetch_full_account_proof(
-        &self,
-        account_id: AccountId,
-    ) -> Result<(BlockNumber, AccountProof), RpcError> {
-        let has_public_state = account_id.has_public_state();
-        let account_request = {
-            AccountRequest {
-                account_id: Some(account_id.into()),
-                block_num: None,
-                details: {
-                    if has_public_state {
-                        // Since we have to request the storage maps for an account
-                        // we *dont know* anything about, we'll have to do first this
-                        // request, which will tell us about the account's storage slots,
-                        // and then, request the slots in another request.
-                        Some(AccountDetailRequest {
-                            code_commitment: Some(EMPTY_WORD.into()),
-                            asset_vault_commitment: Some(EMPTY_WORD.into()),
-                            storage_maps: vec![],
-                        })
-                    } else {
-                        None
-                    }
-                },
-            }
-        };
-        let account_response = self
-            .call_with_retry(RpcEndpoint::GetAccount, |mut rpc_api| {
-                let request = account_request.clone();
-                Box::pin(async move { rpc_api.get_account(request).await })
-            })
-            .await?
-            .into_inner();
-        let block_number = account_response.block_num.ok_or(RpcError::ExpectedDataMissing(
-            "GetAccountDetails returned an account without a matching block number for the witness"
-                .to_owned(),
-        ))?;
-        let account_proof = {
-            if has_public_state {
-                let account_details = account_response
-                    .details
-                    .ok_or(RpcError::ExpectedDataMissing("details in public account".to_owned()))?
-                    .into_domain(&BTreeMap::new(), &AccountStorageRequirements::default())?;
-                let storage_header = account_details.storage_details.header;
-                // This variable will hold the storage slots that are maps, below we will use it to
-                // actually fetch the storage maps details, since we now know the names of each
-                // storage slot.
-                let maps_to_request = storage_header
-                    .slots()
-                    .filter(|header| header.slot_type().is_map())
-                    .map(|map| map.name().to_string());
-                let account_request = AccountRequest {
-                    account_id: Some(account_id.into()),
-                    block_num: Some(block_number),
-                    details: Some(AccountDetailRequest {
-                        code_commitment: Some(EMPTY_WORD.into()),
-                        asset_vault_commitment: Some(EMPTY_WORD.into()),
-                        storage_maps: maps_to_request
-                            .map(|slot_name| StorageMapDetailRequest {
-                                slot_name,
-                                slot_data: Some(SlotData::AllEntries(true)),
-                            })
-                            .collect(),
-                    }),
-                };
-                let response = self
-                    .call_with_retry(RpcEndpoint::GetAccount, |mut rpc_api| {
-                        let request = account_request.clone();
-                        Box::pin(async move { rpc_api.get_account(request).await })
-                    })
-                    .await?;
-                response.into_inner().try_into()
-            } else {
-                account_response.try_into()
-            }
-        };
-        Ok((block_number.block_num.into(), account_proof?))
-    }
-
-    /// Given the storage details for an account and its id, returns a vector with all of its
-    /// storage slots. Keep in mind that if an account triggers the `too_many_entries` flag, there
-    /// will potentially be multiple requests.
-    async fn build_storage_slots(
-        &self,
-        account_id: AccountId,
-        storage_details: &AccountStorageDetails,
-        block_to: Option<BlockNumber>,
-    ) -> Result<Vec<StorageSlot>, RpcError> {
-        let mut slots = vec![];
-        // `SyncStorageMaps` will return information for *every* map for a given account, so this
-        // map_cache value should be fetched only once, hence the None placeholder
-        let mut map_cache: Option<StorageMapInfo> = None;
-        for slot_header in storage_details.header.slots() {
-            // We have two cases for each slot:
-            // - Slot is a value => We simply instance a StorageSlot
-            // - Slot is a map => If the map is 'small', we can simply
-            // build the map from the given entries. Otherwise we will have to
-            // call the SyncStorageMaps RPC method to obtain the data for the map.
-            // With the current setup, one RPC call should be enough.
-            match slot_header.slot_type() {
-                StorageSlotType::Value => {
-                    slots.push(miden_protocol::account::StorageSlot::with_value(
-                        slot_header.name().clone(),
-                        slot_header.value(),
-                    ));
-                },
-                StorageSlotType::Map => {
-                    let map_details = storage_details.find_map_details(slot_header.name()).ok_or(
-                        RpcError::ExpectedDataMissing(format!(
-                            "slot named '{}' was reported as a map, but it does not have a matching map_detail entry",
-                            slot_header.name(),
-                        )),
-                    )?;
-
-                    let storage_map = if map_details.too_many_entries {
-                        let map_info = if let Some(ref info) = map_cache {
-                            info
-                        } else {
-                            let fetched_data =
-                                self.sync_storage_maps(0_u32.into(), block_to, account_id).await?;
-                            map_cache.insert(fetched_data)
-                        };
-                        // The sync endpoint may return multiple updates for the same key
-                        // across different blocks. We sort by block number so that
-                        // inserting into the map keeps only the latest value per key.
-                        let mut sorted_updates: Vec<_> = map_info
-                            .updates
-                            .iter()
-                            .filter(|slot_info| slot_info.slot_name == *slot_header.name())
-                            .collect();
-                        sorted_updates.sort_by_key(|u| u.block_num);
-                        let map_entries: Vec<_> = sorted_updates
-                            .into_iter()
-                            .map(|u| (u.key, u.value))
-                            .collect::<BTreeMap<_, _>>()
-                            .into_iter()
-                            .collect();
-                        StorageMap::with_entries(map_entries)
-                    } else {
-                        map_details.entries.clone().into_storage_map().ok_or_else(|| {
-                            RpcError::ExpectedDataMissing(
-                                "expected AllEntries for full account fetch, got EntriesWithProofs"
-                                    .into(),
-                            )
-                        })?
-                    }
-                    .map_err(|err| {
-                        RpcError::InvalidResponse(format!(
-                            "the rpc api returned a non-valid map entry: {err}"
-                        ))
-                    })?;
-
-                    slots.push(miden_protocol::account::StorageSlot::with_map(
-                        slot_header.name().clone(),
-                        storage_map,
-                    ));
-                },
-            }
-        }
-        Ok(slots)
-    }
-
-    /// Fetches the full vault assets via `SyncAccountVault`.
-    ///
-    /// Used when `too_many_assets` is set in the response. Deduplicates updates by
-    /// vault key, keeping only the latest value per key.
-    async fn fetch_full_vault(
-        &self,
-        account_id: AccountId,
-        block_to: Option<BlockNumber>,
-    ) -> Result<Vec<Asset>, RpcError> {
-        let vault_info =
-            self.sync_account_vault(BlockNumber::from(0), block_to, account_id).await?;
-        let mut updates = vault_info.updates;
-        updates.sort_by_key(|u| u.block_num);
-        Ok(updates
-            .into_iter()
-            .map(|u| (u.vault_key, u.asset))
-            .collect::<BTreeMap<_, _>>()
-            .into_values()
-            .flatten()
-            .collect())
-    }
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
@@ -544,7 +351,29 @@ impl NodeRpcClient for GrpcClient {
         let api_response = self
             .call_with_retry(RpcEndpoint::SubmitProvenTx, |mut rpc_api| {
                 let request = request.clone();
-                Box::pin(async move { rpc_api.submit_proven_transaction(request).await })
+                Box::pin(async move { rpc_api.submit_proven_tx(request).await })
+            })
+            .await?;
+
+        Ok(BlockNumber::from(api_response.into_inner().block_num))
+    }
+
+    async fn submit_proven_batch(
+        &self,
+        proven_batch: ProvenBatch,
+        proposed_batch: ProposedBatch,
+        transaction_inputs: Vec<TransactionInputs>,
+    ) -> Result<BlockNumber, RpcError> {
+        let request = proto::transaction::TransactionBatch {
+            batch_proof: proven_batch.to_bytes(),
+            proposed_batch: Some(proposed_batch.to_bytes()),
+            transaction_inputs: transaction_inputs.iter().map(Serializable::to_bytes).collect(),
+        };
+
+        let api_response = self
+            .call_with_retry(RpcEndpoint::SubmitProvenBatch, |mut rpc_api| {
+                let request = request.clone();
+                Box::pin(async move { rpc_api.submit_proven_tx_batch(request).await })
             })
             .await?;
 
@@ -585,12 +414,12 @@ impl NodeRpcClient for GrpcClient {
                 .ok_or(RpcError::ExpectedDataMissing("MmrPath".into()))?
                 .try_into()?;
 
+            let forest_size = usize::try_from(forest).expect("u64 should fit in usize");
+            let forest = Forest::new(forest_size).map_err(|_| {
+                RpcError::InvalidResponse(format!("invalid forest size: {forest_size}"))
+            })?;
             Some(MmrProof::new(
-                MmrPath::new(
-                    Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
-                    block_header.block_num().as_usize(),
-                    merkle_path,
-                ),
+                MmrPath::new(forest, block_header.block_num().as_usize(), merkle_path),
                 block_header.commitment(),
             ))
         } else {
@@ -629,17 +458,14 @@ impl NodeRpcClient for GrpcClient {
 
     async fn sync_chain_mmr(
         &self,
-        block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        current_block_height: BlockNumber,
+        upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError> {
-        let block_range = Some(BlockRange {
-            block_from: block_from.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        });
+        let finality_level: proto::rpc::FinalityLevel = upper_bound.into();
 
         let request = proto::rpc::SyncChainMmrRequest {
-            block_range,
-            finality: proto::rpc::Finality::Committed as i32,
+            current_client_block_height: current_block_height.as_u32(),
+            finality_level: finality_level.into(),
         };
 
         let response = self
@@ -651,68 +477,7 @@ impl NodeRpcClient for GrpcClient {
         response.into_inner().try_into()
     }
 
-    /// Sends a `GetAccountDetailsRequest` to the Miden node, and extracts an [`FetchedAccount`]
-    /// from the `GetAccountDetailsResponse` response.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if:
-    ///
-    /// - There was an error sending the request to the node.
-    /// - The answer had a `None` for one of the expected fields (`account`, `summary`,
-    ///   `account_commitment`, `details`).
-    /// - There is an error during [Account] deserialization.
-    async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        let (block_number, full_account_proof) = self.fetch_full_account_proof(account_id).await?;
-        let update_summary =
-            AccountUpdateSummary::new(full_account_proof.account_commitment(), block_number);
-
-        // The case for a private account is simple,
-        // we simple use the commitment and its id.
-        if account_id.is_private() {
-            Ok(FetchedAccount::new_private(account_id, update_summary))
-        } else {
-            let details =
-                full_account_proof.into_parts().1.ok_or(RpcError::ExpectedDataMissing(
-                    "GetAccountDetails returned a public account without details".to_owned(),
-                ))?;
-
-            let account_id = details.header.id();
-            let nonce = details.header.nonce();
-
-            // If the vault exceeds the node's size threshold, download the full vault
-            // via the sync endpoint; otherwise use the assets from the response directly.
-            let assets = if details.vault_details.too_many_assets {
-                self.fetch_full_vault(account_id, Some(block_number)).await?
-            } else {
-                details.vault_details.assets
-            };
-
-            // build_storage_slots handles too_many_entries maps internally via
-            // sync_storage_maps.
-            let slots = self
-                .build_storage_slots(account_id, &details.storage_details, Some(block_number))
-                .await?;
-            let asset_vault = AssetVault::new(&assets).map_err(|err| {
-                RpcError::InvalidResponse(format!("api rpc returned non-valid assets: {err}"))
-            })?;
-            let account_storage = AccountStorage::new(slots).map_err(|err| {
-                RpcError::InvalidResponse(format!(
-                    "api rpc returned non-valid storage slots: {err}"
-                ))
-            })?;
-            let account =
-                Account::new(account_id, asset_vault, account_storage, details.code, nonce, None)
-                    .map_err(|err| {
-                    RpcError::InvalidResponse(format!(
-                        "failed to instance an account from the rpc api response: {err}"
-                    ))
-                })?;
-            Ok(FetchedAccount::new_public(account, update_summary))
-        }
-    }
-
-    /// Sends a `GetAccountProof` request to the Miden node, and extracts the [AccountProof]
+    /// Sends a `GetAccount` request to the Miden node, and extracts the [`AccountProof`]
     /// from the response, as well as the block number that it was retrieved for.
     ///
     /// # Errors
@@ -723,39 +488,43 @@ impl NodeRpcClient for GrpcClient {
     /// - There was an error sending the request to the node.
     /// - The answer had a `None` for one of the expected fields.
     /// - There is an error during storage deserialization.
-    async fn get_account_proof(
+    async fn get_account(
         &self,
         account_id: AccountId,
-        storage_requirements: AccountStorageRequirements,
-        account_state: AccountStateAt,
-        known_account_code: Option<AccountCode>,
-        known_vault_commitment: Option<Word>,
+        request: GetAccountRequest,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
+        let GetAccountRequest { storage, at, known_code, vault } = request;
+
+        let known_code_commitment = known_code.as_ref().map_or(EMPTY_WORD, AccountCode::commitment);
         let mut known_codes_by_commitment: BTreeMap<Word, AccountCode> = BTreeMap::new();
-        if let Some(account_code) = known_account_code {
+        if let Some(account_code) = known_code {
             known_codes_by_commitment.insert(account_code.commitment(), account_code);
         }
 
-        let storage_maps: Vec<StorageMapDetailRequest> = storage_requirements.clone().into();
+        // We need the requested slots to interpret the node response.
+        let requirements = match storage.clone() {
+            StorageMapFetch::Slots(reqs) => reqs,
+            StorageMapFetch::Skip | StorageMapFetch::All => AccountStorageRequirements::default(),
+        };
 
-        // Only request details for accounts with public state (Public or Network);
-        // include known code commitment for this account when available
-        let account_details = if account_id.has_public_state() {
+        // Only request details for accounts with public state (Public or Network), passing the
+        // known code commitment so the node can skip re-sending code we already hold.
+        let account_details = if account_id.is_public() {
             Some(AccountDetailRequest {
-                code_commitment: Some(EMPTY_WORD.into()),
-                asset_vault_commitment: known_vault_commitment.map(Into::into),
-                storage_maps,
+                code_commitment: Some(known_code_commitment.into()),
+                asset_vault_commitment: vault.into(),
+                storage_request: storage.into(),
             })
         } else {
             None
         };
 
-        let block_num = match account_state {
+        let block_num = match at {
             AccountStateAt::Block(number) => Some(number.into()),
             AccountStateAt::ChainTip => None,
         };
 
-        let request = AccountRequest {
+        let proto_request = AccountRequest {
             account_id: Some(account_id.into()),
             block_num,
             details: account_details,
@@ -763,7 +532,7 @@ impl NodeRpcClient for GrpcClient {
 
         let response = self
             .call_with_retry(RpcEndpoint::GetAccount, |mut rpc_api| {
-                let request = request.clone();
+                let request = proto_request.clone();
                 Box::pin(async move { rpc_api.get_account(request).await })
             })
             .await?
@@ -781,16 +550,11 @@ impl NodeRpcClient for GrpcClient {
             .into();
 
         // For accounts with public state, details should be present when requested
-        let headers = if account_witness.id().has_public_state() {
-            let mut details = response
+        let headers = if account_witness.id().is_public() {
+            let details = response
                 .details
                 .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                .into_domain(&known_codes_by_commitment, &storage_requirements)?;
-
-            if details.vault_details.too_many_assets {
-                details.vault_details.assets =
-                    self.fetch_full_vault(account_id, Some(block_num)).await?;
-            }
+                .into_domain(&known_codes_by_commitment, &requirements)?;
 
             Some(details)
         } else {
@@ -803,56 +567,99 @@ impl NodeRpcClient for GrpcClient {
         Ok((block_num, proof))
     }
 
-    /// Sends a `SyncNoteRequest` to the Miden node, and extracts a [`NoteSyncInfo`] from the
-    /// response.
+    /// Sends one or more `SyncNoteRequest`s to the node and merges the responses into a list of
+    /// [`NoteSyncBlock`]s.
+    ///
+    /// Chunks `note_tags` by [`RpcLimits::note_tags_limit`] and paginates each chunk across the
+    /// requested block range.
     async fn sync_notes(
         &self,
-        block_num: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<NoteSyncInfo, RpcError> {
-        let note_tags = note_tags.iter().map(|&note_tag| note_tag.into()).collect();
+    ) -> Result<Vec<NoteSyncBlock>, RpcError> {
+        if note_tags.is_empty() {
+            return Ok(Vec::new());
+        }
 
-        let block_range = Some(BlockRange {
-            block_from: block_num.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        });
+        let limits = self.get_rpc_limits().await?;
+        let tags: Vec<NoteTag> = note_tags.iter().copied().collect();
 
-        let request = proto::rpc::SyncNotesRequest { block_range, note_tags };
+        // Merge blocks across tag-chunks: a single block can hold notes whose tags fall into
+        // different chunks, so the same block can appear in multiple chunks' responses.
+        let mut merged_blocks: BTreeMap<BlockNumber, NoteSyncBlock> = BTreeMap::new();
 
-        let response = self
-            .call_with_retry(RpcEndpoint::SyncNotes, |mut rpc_api| {
-                let request = request.clone();
-                Box::pin(async move { rpc_api.sync_notes(request).await })
-            })
-            .await?;
+        for chunk in tags.chunks(limits.note_tags_limit as usize) {
+            let proto_tags: Vec<u32> = chunk.iter().map(|&t| t.into()).collect();
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
-        response.into_inner().try_into()
+            loop {
+                let request = proto::rpc::SyncNotesRequest {
+                    block_range: Some(BlockRange {
+                        block_from: pagination.current_block_from().as_u32(),
+                        block_to: block_to.as_u32(),
+                    }),
+                    note_tags: proto_tags.clone(),
+                };
+
+                let response = self
+                    .call_with_retry(RpcEndpoint::SyncNotes, |mut rpc_api| {
+                        let request = request.clone();
+                        Box::pin(async move { rpc_api.sync_notes(request).await })
+                    })
+                    .await?
+                    .into_inner();
+
+                let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
+                    "SyncNotesResponse.pagination_info".to_owned(),
+                ))?;
+                let page_chain_tip = BlockNumber::from(page.chain_tip);
+                let page_block_to = BlockNumber::from(page.block_num);
+
+                for proto_block in response.blocks {
+                    let block: NoteSyncBlock = proto_block.try_into()?;
+                    let bn = block.block_header.block_num();
+                    if let Some(existing) = merged_blocks.get_mut(&bn) {
+                        for (id, note) in block.notes {
+                            existing.notes.entry(id).or_insert(note);
+                        }
+                    } else {
+                        merged_blocks.insert(bn, block);
+                    }
+                }
+
+                match pagination.advance(page_block_to, page_chain_tip)? {
+                    PaginationResult::Continue => {},
+                    PaginationResult::Done { .. } => break,
+                }
+            }
+        }
+
+        Ok(merged_blocks.into_values().collect())
     }
 
     async fn sync_nullifiers(
         &self,
         prefixes: &[u16],
-        block_num: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
-        const MAX_ITERATIONS: u32 = 1000; // Safety limit to prevent infinite loops
-
         let limits = self.get_rpc_limits().await?;
         let mut all_nullifiers = BTreeSet::new();
 
         // If the prefixes are too many, we need to chunk them into smaller groups to avoid
         // violating the RPC limit.
-        'chunk_nullifiers: for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
-            let mut current_block_from = block_num.as_u32();
+        for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
+            let proto_prefixes: Vec<u32> = chunk.iter().map(|&x| u32::from(x)).collect();
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
-            for _ in 0..MAX_ITERATIONS {
+            loop {
                 let request = proto::rpc::SyncNullifiersRequest {
-                    nullifiers: chunk.iter().map(|&x| u32::from(x)).collect(),
+                    nullifiers: proto_prefixes.clone(),
                     prefix_len: 16,
                     block_range: Some(BlockRange {
-                        block_from: current_block_from,
-                        block_to: block_to.map(|b| b.as_u32()),
+                        block_from: pagination.current_block_from().as_u32(),
+                        block_to: pagination.block_to().as_u32(),
                     }),
                 };
 
@@ -861,10 +668,9 @@ impl NodeRpcClient for GrpcClient {
                         let request = request.clone();
                         Box::pin(async move { rpc_api.sync_nullifiers(request).await })
                     })
-                    .await?;
-                let response = response.into_inner();
+                    .await?
+                    .into_inner();
 
-                // Convert nullifiers for this batch
                 let batch_nullifiers = response
                     .nullifiers
                     .iter()
@@ -874,62 +680,28 @@ impl NodeRpcClient for GrpcClient {
 
                 all_nullifiers.extend(batch_nullifiers);
 
-                // Check if we need to fetch more pages
-                if let Some(page) = response.pagination_info {
-                    // Ensure we're making progress to avoid infinite loops
-                    if page.block_num < current_block_from {
-                        return Err(RpcError::PaginationError(
-                            "invalid pagination: block_num went backwards".to_string(),
-                        ));
-                    }
+                let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
+                    "SyncNullifiersResponse.pagination_info".to_owned(),
+                ))?;
 
-                    // Calculate target block as minimum between block_to and chain_tip
-                    let target_block =
-                        block_to.map_or(page.chain_tip, |b| b.as_u32().min(page.chain_tip));
-
-                    if page.block_num >= target_block {
-                        // No pagination info or we've reached/passed the target so we're done
-                        continue 'chunk_nullifiers;
-                    }
-                    current_block_from = page.block_num + 1;
+                match pagination.advance(page.block_num.into(), page.chain_tip.into())? {
+                    PaginationResult::Continue => {},
+                    PaginationResult::Done { .. } => break,
                 }
             }
-            // If we exit the loop, we've hit the iteration limit
-            return Err(RpcError::PaginationError(
-                "too many pagination iterations, possible infinite loop".to_string(),
-            ));
         }
         Ok(all_nullifiers.into_iter().collect::<Vec<_>>())
     }
 
-    async fn check_nullifiers(&self, nullifiers: &[Nullifier]) -> Result<Vec<SmtProof>, RpcError> {
-        let limits = self.get_rpc_limits().await?;
-        let mut proofs: Vec<SmtProof> = Vec::with_capacity(nullifiers.len());
-        for chunk in nullifiers.chunks(limits.nullifiers_limit as usize) {
-            let request = proto::rpc::NullifierList {
-                nullifiers: chunk.iter().map(|nul| nul.as_word().into()).collect(),
-            };
-
-            let response = self
-                .call_with_retry(RpcEndpoint::CheckNullifiers, |mut rpc_api| {
-                    let request = request.clone();
-                    Box::pin(async move { rpc_api.check_nullifiers(request).await })
-                })
-                .await?;
-
-            let mut response = response.into_inner();
-            let chunk_proofs = response
-                .proofs
-                .iter_mut()
-                .map(|r| r.to_owned().try_into())
-                .collect::<Result<Vec<SmtProof>, RpcConversionError>>()?;
-            proofs.extend(chunk_proofs);
-        }
-        Ok(proofs)
-    }
-
-    async fn get_block_by_number(&self, block_num: BlockNumber) -> Result<ProvenBlock, RpcError> {
-        let request = proto::blockchain::BlockNumber { block_num: block_num.as_u32() };
+    async fn get_block_by_number(
+        &self,
+        block_num: BlockNumber,
+        include_proof: bool,
+    ) -> Result<ProvenBlock, RpcError> {
+        let request = proto::blockchain::BlockRequest {
+            block_num: block_num.as_u32(),
+            include_proof: Some(include_proof),
+        };
 
         let response = self
             .call_with_retry(RpcEndpoint::GetBlockByNumber, |mut rpc_api| {
@@ -946,7 +718,7 @@ impl NodeRpcClient for GrpcClient {
         Ok(block)
     }
 
-    async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError> {
+    async fn get_note_script_by_root(&self, root: Word) -> Result<Option<NoteScript>, RpcError> {
         let request = proto::note::NoteScriptRoot { root: Some(root.into()) };
 
         let response = self
@@ -955,20 +727,26 @@ impl NodeRpcClient for GrpcClient {
             })
             .await?;
 
-        let response = response.into_inner();
-        let note_script = NoteScript::try_from(
-            response
-                .script
-                .ok_or(RpcError::ExpectedDataMissing("GetNoteScriptByRoot.script".to_string()))?,
-        )?;
+        // The node returns an empty payload when it has no script registered for the root.
+        let Some(script) = response.into_inner().script else {
+            return Ok(None);
+        };
+        let note_script = NoteScript::try_from(script)?;
 
-        Ok(note_script)
+        let fetched_root = note_script.root();
+        if Word::from(fetched_root) != root {
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned note script with root {fetched_root} for requested root {root}",
+            )));
+        }
+
+        Ok(Some(note_script))
     }
 
     async fn sync_storage_maps(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError> {
         let mut pagination = BlockPagination::new(block_from, block_to);
@@ -978,7 +756,7 @@ impl NodeRpcClient for GrpcClient {
             let request = proto::rpc::SyncAccountStorageMapsRequest {
                 block_range: Some(BlockRange {
                     block_from: pagination.current_block_from().as_u32(),
-                    block_to: pagination.block_to().map(|block| block.as_u32()),
+                    block_to: block_to.as_u32(),
                 }),
                 account_id: Some(account_id.into()),
             };
@@ -1016,7 +794,7 @@ impl NodeRpcClient for GrpcClient {
     async fn sync_account_vault(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError> {
         let mut pagination = BlockPagination::new(block_from, block_to);
@@ -1026,7 +804,7 @@ impl NodeRpcClient for GrpcClient {
             let request = proto::rpc::SyncAccountVaultRequest {
                 block_range: Some(BlockRange {
                     block_from: pagination.current_block_from().as_u32(),
-                    block_to: pagination.block_to().map(|block| block.as_u32()),
+                    block_to: block_to.as_u32(),
                 }),
                 account_id: Some(account_id.into()),
             };
@@ -1061,29 +839,63 @@ impl NodeRpcClient for GrpcClient {
         Ok(AccountVaultInfo { chain_tip, block_number, updates })
     }
 
+    /// Sends one or more `SyncTransactions` requests to the node and concatenates the responses
+    /// into a flat list of [`TransactionRecord`]s.
+    ///
+    /// Chunks `account_ids` by [`RpcLimits::account_ids_limit`] and paginates each chunk across the
+    /// requested block range.
     async fn sync_transactions(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_ids: Vec<AccountId>,
-    ) -> Result<TransactionsInfo, RpcError> {
-        let block_range = Some(BlockRange {
-            block_from: block_from.as_u32(),
-            block_to: block_to.map(|b| b.as_u32()),
-        });
+    ) -> Result<Vec<TransactionRecord>, RpcError> {
+        if account_ids.is_empty() {
+            return Ok(Vec::new());
+        }
 
-        let account_ids = account_ids.iter().map(|acc_id| (*acc_id).into()).collect();
+        let limits = self.get_rpc_limits().await?;
+        let mut transactions: Vec<TransactionRecord> = Vec::new();
 
-        let request = proto::rpc::SyncTransactionsRequest { block_range, account_ids };
+        for chunk in account_ids.chunks(limits.account_ids_limit as usize) {
+            let proto_account_ids: Vec<_> = chunk.iter().map(|acc_id| (*acc_id).into()).collect();
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
-        let response = self
-            .call_with_retry(RpcEndpoint::SyncTransactions, |mut rpc_api| {
-                let request = request.clone();
-                Box::pin(async move { rpc_api.sync_transactions(request).await })
-            })
-            .await?;
+            loop {
+                let request = proto::rpc::SyncTransactionsRequest {
+                    block_range: Some(BlockRange {
+                        block_from: pagination.current_block_from().as_u32(),
+                        block_to: block_to.as_u32(),
+                    }),
+                    account_ids: proto_account_ids.clone(),
+                };
 
-        response.into_inner().try_into()
+                let response = self
+                    .call_with_retry(RpcEndpoint::SyncTransactions, |mut rpc_api| {
+                        let request = request.clone();
+                        Box::pin(async move { rpc_api.sync_transactions(request).await })
+                    })
+                    .await?
+                    .into_inner();
+
+                let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
+                    "SyncTransactionsResponse.pagination_info".to_owned(),
+                ))?;
+                let page_chain_tip = BlockNumber::from(page.chain_tip);
+                let page_block_to = BlockNumber::from(page.block_num);
+
+                for proto_tx in response.transactions {
+                    transactions.push(TransactionRecord::try_from(proto_tx)?);
+                }
+
+                match pagination.advance(page_block_to, page_chain_tip)? {
+                    PaginationResult::Continue => {},
+                    PaginationResult::Done { .. } => break,
+                }
+            }
+        }
+
+        Ok(transactions)
     }
 
     async fn get_network_id(&self) -> Result<NetworkId, RpcError> {
@@ -1121,6 +933,21 @@ impl NodeRpcClient for GrpcClient {
 
     async fn get_status_unversioned(&self) -> Result<RpcStatusInfo, RpcError> {
         GrpcClient::get_status_unversioned(self).await
+    }
+
+    async fn get_network_note_status(
+        &self,
+        note_id: NoteId,
+    ) -> Result<NetworkNoteStatusInfo, RpcError> {
+        let request = proto::note::NoteId { id: Some(note_id.into()) };
+
+        let response = self
+            .call_with_retry(RpcEndpoint::GetNetworkNoteStatus, |mut rpc_api| {
+                Box::pin(async move { rpc_api.get_network_note_status(request).await })
+            })
+            .await?;
+
+        response.into_inner().try_into()
     }
 }
 
@@ -1181,7 +1008,7 @@ mod tests {
 
     #[test]
     fn block_pagination_errors_when_block_num_goes_backwards() {
-        let mut pagination = BlockPagination::new(10_u32.into(), None);
+        let mut pagination = BlockPagination::new(10_u32.into(), 20_u32.into());
 
         let res = pagination.advance(9_u32.into(), 20_u32.into());
         assert!(matches!(res, Err(RpcError::PaginationError(_))));
@@ -1189,7 +1016,7 @@ mod tests {
 
     #[test]
     fn block_pagination_errors_after_max_iterations() {
-        let mut pagination = BlockPagination::new(0_u32.into(), None);
+        let mut pagination = BlockPagination::new(0_u32.into(), 10_000_u32.into());
         let chain_tip: BlockNumber = 10_000_u32.into();
 
         for _ in 0..BlockPagination::MAX_ITERATIONS {
@@ -1207,7 +1034,7 @@ mod tests {
     #[test]
     fn block_pagination_stops_at_min_of_block_to_and_chain_tip() {
         // block_to is beyond chain tip, so target should be chain_tip.
-        let mut pagination = BlockPagination::new(0_u32.into(), Some(50_u32.into()));
+        let mut pagination = BlockPagination::new(0_u32.into(), 50_u32.into());
 
         let res = pagination
             .advance(30_u32.into(), 30_u32.into())
@@ -1224,7 +1051,7 @@ mod tests {
 
     #[test]
     fn block_pagination_advances_cursor_by_one() {
-        let mut pagination = BlockPagination::new(5_u32.into(), None);
+        let mut pagination = BlockPagination::new(5_u32.into(), 100_u32.into());
 
         let res = pagination
             .advance(5_u32.into(), 100_u32.into())
@@ -1263,15 +1090,13 @@ mod tests {
 
     #[tokio::test]
     async fn set_genesis_commitment_does_nothing_if_the_commitment_is_already_set() {
-        use miden_protocol::Felt;
-
         let endpoint = &Endpoint::devnet();
         let client = GrpcClient::new(endpoint, 10000);
 
         let initial_commitment = Word::default();
         client.set_genesis_commitment(initial_commitment).await.unwrap();
 
-        let new_commitment = Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+        let new_commitment = Word::from([1u32, 2, 3, 4]);
         client.set_genesis_commitment(new_commitment).await.unwrap();
 
         assert_eq!(client.genesis_commitment.read().unwrap(), initial_commitment);

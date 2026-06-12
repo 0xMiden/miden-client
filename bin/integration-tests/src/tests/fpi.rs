@@ -5,7 +5,7 @@ use miden_client::account::component::{AccountComponent, AccountComponentMetadat
 use miden_client::account::{
     Account,
     AccountBuilder,
-    AccountStorageMode,
+    AccountBuilderSchemaCommitmentExt,
     AccountType,
     PartialAccount,
     PartialStorage,
@@ -28,17 +28,26 @@ use crate::tests::config::ClientConfig;
 // FPI TESTS
 // ================================================================================================
 
-pub(crate) const MAP_KEY: [Felt; 4] = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)];
+pub(crate) const MAP_KEY: [Felt; 4] = [
+    Felt::new_unchecked(15),
+    Felt::new_unchecked(15),
+    Felt::new_unchecked(15),
+    Felt::new_unchecked(15),
+];
 pub(crate) const MAP_SLOT_NAME: &str = "miden::testing::fpi::map";
-pub(crate) const FPI_STORAGE_VALUE: [Felt; 4] =
-    [Felt::new(9u64), Felt::new(12u64), Felt::new(18u64), Felt::new(30u64)];
+pub(crate) const FPI_STORAGE_VALUE: [Felt; 4] = [
+    Felt::new_unchecked(9u64),
+    Felt::new_unchecked(12u64),
+    Felt::new_unchecked(18u64),
+    Felt::new_unchecked(30u64),
+];
 
 pub async fn test_standard_fpi_public(client_config: ClientConfig) -> Result<()> {
-    standard_fpi(AccountStorageMode::Public, client_config, RPO_FALCON_SCHEME_ID).await
+    standard_fpi(AccountType::Public, client_config, RPO_FALCON_SCHEME_ID).await
 }
 
 pub async fn test_standard_fpi_private(client_config: ClientConfig) -> Result<()> {
-    standard_fpi(AccountStorageMode::Private, client_config, RPO_FALCON_SCHEME_ID).await
+    standard_fpi(AccountType::Private, client_config, RPO_FALCON_SCHEME_ID).await
 }
 
 pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()> {
@@ -49,7 +58,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     let (foreign_account, proc_root) = deploy_foreign_account(
         &mut client,
         &keystore,
-        AccountStorageMode::Public,
+        AccountType::Public,
         "
             use miden::protocol::active_account
             pub proc get_fpi_map_item
@@ -111,13 +120,9 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
     // creation block
     client2.sync_state().await?;
 
-    let (wallet, ..) = insert_new_wallet(
-        &mut client2,
-        AccountStorageMode::Private,
-        &keystore2,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (wallet, ..) =
+        insert_new_wallet(&mut client2, AccountType::Private, &keystore2, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     let output_stack = client2
         .execute_program(
@@ -131,7 +136,7 @@ pub async fn test_fpi_execute_program(client_config: ClientConfig) -> Result<()>
         )
         .await?;
 
-    let mut expected_stack = [Felt::new(0); 16];
+    let mut expected_stack = [Felt::ZERO; 16];
     expected_stack[..4].copy_from_slice(&FPI_STORAGE_VALUE);
 
     assert_eq!(output_stack, expected_stack);
@@ -145,7 +150,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     let (inner_foreign_account, inner_proc_root) = deploy_foreign_account(
         &mut client,
         &keystore,
-        AccountStorageMode::Public,
+        AccountType::Public,
         "
             use miden::protocol::active_account
             pub proc get_fpi_map_item
@@ -162,7 +167,7 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     let (outer_foreign_account, outer_proc_root) = deploy_foreign_account(
         &mut client,
         &keystore,
-        AccountStorageMode::Public,
+        AccountType::Public,
         format!(
             "
             use miden::protocol::tx
@@ -262,13 +267,9 @@ pub async fn test_nested_fpi_calls(client_config: ClientConfig) -> Result<()> {
     // MAST forest data.
     let (mut client2, keystore2) = client_config.clone().into_client().await?;
 
-    let (native_account, ..) = insert_new_wallet(
-        &mut client2,
-        AccountStorageMode::Public,
-        &keystore2,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (native_account, ..) =
+        insert_new_wallet(&mut client2, AccountType::Public, &keystore2, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
 
@@ -282,12 +283,13 @@ pub async fn test_lazy_fpi_loading(client_config: ClientConfig) -> Result<()> {
     wait_for_node(&mut client).await;
 
     // Create a simple foreign account with a constant-returning procedure.
-    let constant_value: Word = [Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)].into();
+    let constant_value: Word =
+        [Felt::from(9u32), Felt::from(12u32), Felt::from(18u32), Felt::from(30u32)].into();
 
     let (foreign_account, proc_root) = deploy_foreign_account(
         &mut client,
         &keystore,
-        AccountStorageMode::Public,
+        AccountType::Public,
         format!(
             r#"
             pub proc get_constant
@@ -325,13 +327,9 @@ pub async fn test_lazy_fpi_loading(client_config: ClientConfig) -> Result<()> {
 
     client2.sync_state().await?;
 
-    let (native_account, ..) = insert_new_wallet(
-        &mut client2,
-        AccountStorageMode::Public,
-        &keystore2,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (native_account, ..) =
+        insert_new_wallet(&mut client2, AccountType::Public, &keystore2, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     wait_for_blocks_no_sync(&mut client2, 2).await;
 
@@ -365,7 +363,7 @@ pub async fn test_lazy_fpi_loading_with_storage_map(client_config: ClientConfig)
     let (foreign_account, proc_root) = deploy_foreign_account(
         &mut client,
         &keystore,
-        AccountStorageMode::Public,
+        AccountType::Public,
         format!(
             r#"
             const STORAGE_MAP_SLOT = word("{MAP_SLOT_NAME}")
@@ -407,13 +405,9 @@ pub async fn test_lazy_fpi_loading_with_storage_map(client_config: ClientConfig)
     let (mut client2, keystore2) = client_config.clone().into_client().await?;
     client2.sync_state().await?;
 
-    let (native_account, ..) = insert_new_wallet(
-        &mut client2,
-        AccountStorageMode::Public,
-        &keystore2,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (native_account, ..) =
+        insert_new_wallet(&mut client2, AccountType::Public, &keystore2, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     wait_for_blocks_no_sync(&mut client2, 2).await;
 
@@ -436,7 +430,7 @@ pub async fn test_lazy_fpi_loading_with_storage_map(client_config: ClientConfig)
 /// transaction that calls the foreign account's procedure via FPI. The test also verifies that the
 /// foreign account's code is correctly cached after the transaction.
 async fn standard_fpi(
-    storage_mode: AccountStorageMode,
+    account_type: AccountType,
     client_config: ClientConfig,
     auth_scheme: AuthSchemeId,
 ) -> Result<()> {
@@ -446,7 +440,7 @@ async fn standard_fpi(
     let (foreign_account, proc_root) = deploy_foreign_account(
         &mut client,
         &keystore,
-        storage_mode,
+        account_type,
         "
             use miden::protocol::active_account
             pub proc get_fpi_map_item
@@ -517,7 +511,7 @@ async fn standard_fpi(
     let storage_requirements =
         AccountStorageRequirements::new([(map_slot_name, &[StorageMapKey::new(MAP_KEY.into())])]);
 
-    let foreign_account = if storage_mode == AccountStorageMode::Public {
+    let foreign_account = if account_type == AccountType::Public {
         ForeignAccount::public(foreign_account_id, storage_requirements)
     } else {
         // Get current foreign account current state from the store (after 1st deployment tx)
@@ -549,13 +543,9 @@ async fn standard_fpi(
     // creation block
     client2.sync_state().await?;
 
-    let (native_account, ..) = insert_new_wallet(
-        &mut client2,
-        AccountStorageMode::Public,
-        &keystore2,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (native_account, ..) =
+        insert_new_wallet(&mut client2, AccountType::Public, &keystore2, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     let block_before_wait = client2.get_sync_height().await.unwrap();
     wait_for_blocks_no_sync(&mut client2, 2).await;
@@ -565,7 +555,7 @@ async fn standard_fpi(
     let _ = client2.submit_new_transaction(native_account.id(), tx_request).await?;
 
     // After the transaction the foreign account should be cached (for public accounts only)
-    if storage_mode == AccountStorageMode::Public {
+    if account_type == AccountType::Public {
         let foreign_accounts =
             client2.test_store().get_foreign_account_code(vec![foreign_account_id]).await?;
         assert_eq!(foreign_accounts.len(), 1);
@@ -595,7 +585,7 @@ async fn standard_fpi(
 /// - `Word` - The procedure root of the custom component's procedure.
 /// - `AuthSecretKey` - The secret key used for authentication.
 fn foreign_account_with_code(
-    storage_mode: AccountStorageMode,
+    account_type: AccountType,
     code: String,
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, Word, AuthSecretKey)> {
@@ -611,7 +601,7 @@ fn foreign_account_with_code(
     let get_item_component = AccountComponent::new(
         component_code,
         vec![map_slot],
-        AccountComponentMetadata::new("miden::testing::fpi_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::fpi_component"),
     )
     .map_err(|err| anyhow::anyhow!(err))
     .context("failed to create foreign account component")?;
@@ -643,8 +633,8 @@ fn foreign_account_with_code(
     let account = AccountBuilder::new(Default::default())
         .with_component(get_item_component.clone())
         .with_auth_component(auth_component)
-        .storage_mode(storage_mode)
-        .build()
+        .account_type(account_type)
+        .build_with_schema_commitment()
         .context("failed to build foreign account")?;
 
     let proc_root = get_item_component
@@ -666,12 +656,12 @@ fn foreign_account_with_code(
 pub(crate) async fn deploy_foreign_account(
     client: &mut TestClient,
     keystore: &FilesystemKeyStore,
-    storage_mode: AccountStorageMode,
+    account_type: AccountType,
     code: String,
     auth_scheme: AuthSchemeId,
 ) -> Result<(Account, Word)> {
     let (foreign_account, proc_root, secret_key) =
-        foreign_account_with_code(storage_mode, code, auth_scheme)?;
+        foreign_account_with_code(account_type, code, auth_scheme)?;
     let foreign_account_id = foreign_account.id();
 
     keystore
@@ -680,7 +670,7 @@ pub(crate) async fn deploy_foreign_account(
         .with_context(|| "failed to add key to keystore")?;
     client.add_account(&foreign_account, false).await?;
 
-    info!(account_id = %foreign_account_id, ?storage_mode, "Deploying foreign account");
+    info!(account_id = %foreign_account_id, ?account_type, "Deploying foreign account");
 
     let tx_id = client
         .submit_new_transaction(

@@ -101,8 +101,7 @@ A basic wallet is comprised of a basic authentication component (for RPO Falcon 
 
 This command has three optional flags:
 
-- `--storage-mode <TYPE>`: Used to select the storage mode of the account (private if not specified). It may receive "private" or "public".
-- `--mutable`: Makes the account code mutable (it's immutable by default).
+- `-t, --account-type <ACCOUNT_TYPE>`: Used to select the account visibility (private if not specified). It may receive "private" or "public". This is the only thing the protocol's `AccountType` encodes.
 - `--extra-packages <PACKAGES>`: Specifies a list of file paths for packages holding account components to include in the account. If the packages contain placeholders, the CLI will prompt the user to enter the required data for instantiating storage appropriately.
 - `--init-storage-data-path <INIT_STORAGE_DATA_PATH>`: Specifies an optional file path to a TOML file containing key/value pairs used for initializing storage. Each key should map to a placeholder within the packages' component metadata. The CLI will prompt for any keys that are not present in the file.
 
@@ -116,12 +115,9 @@ An account may be composed of one or more components, each with its own storage 
 
 This command has four flags:
 
-- `--storage-mode <STORAGE_MODE>`: Specifies the storage mode of the account. It accepts either "private" or "public", with "private" as the default.
-- `--account-type <ACCOUNT_TYPE>`: Specifies the type of account to create. Accepted values are:
-  - `fungible-faucet`
-  - `non-fungible-faucet`
-  - `regular-account-immutable-code`
-  - `regular-account-updatable-code`
+- `-t, --account-type <ACCOUNT_TYPE>`: Specifies the account visibility. It accepts either "private" or "public", with "private" as the default. This is the only thing the protocol's `AccountType` encodes.
+
+There is no `--faucet` flag: faucet-vs-regular is derived from the packages. If any package contributes the `FungibleFaucet` component, the resulting account is treated as a fungible faucet and an implicit `TokenPolicyManager` is installed when one is not already provided. `--account-type` only selects visibility.
 - `--packages <PACKAGES>`: Specifies a list of file paths for packages holding account components to include in the account. If the packages contain placeholders, the CLI will prompt the user to enter the required data for instantiating storage appropriately.
 - `--init-storage-data-path <INIT_STORAGE_DATA_PATH>`: Specifies an optional file path to a TOML file containing key/value pairs used for initializing storage. Each key should map to a placeholder within the packages' component metadata. The CLI will prompt for any keys that are not present in the file.
 
@@ -130,20 +126,22 @@ After creating an account with the `new-account` command, the account is stored 
 #### Examples
 
 ```bash
-# Create a new wallet with default settings (private storage, immutable, no extra components)
+# Create a new wallet with default settings (private visibility, no extra components)
 miden-client new-wallet
 
-# Create a new wallet with public storage and a mutable code
-miden-client new-wallet --storage-mode public --mutable
+# Create a new wallet with public visibility
+miden-client new-wallet -t public
 
 # Create a new wallet that includes custom packages
 miden-client new-wallet --extra-packages packages/custom-package.masp
 
 # Create a fungible faucet with interactive input
-miden-client new-account --account-type fungible-faucet --packages packages/basic-fungible-faucet.masp
+# (the resulting account is a faucet because basic-fungible-faucet.masp contributes the
+# `FungibleFaucet` component — no extra flag is needed)
+miden-client new-account --packages packages/basic-fungible-faucet.masp
 
 # Create a fungible faucet with preset fields
-miden-client new-account --account-type fungible-faucet --packages packages/basic-fungible-faucet.masp --init-storage-data-path init_data.toml
+miden-client new-account --packages packages/basic-fungible-faucet.masp --init-storage-data-path init_data.toml
 ```
 
 where `init_data.toml` is a TOML file with the following example content:
@@ -215,6 +213,31 @@ The downloaded notes will be added to the store.
 ```sh
 miden-client notes --fetch
 ```
+
+### `network-note-status`
+
+Query the network for the processing status of a note. This is useful for diagnosing issues with network transactions (NTX), such as notes that are stuck or have been discarded.
+
+```sh
+miden-client network-note-status <NOTE_ID>
+```
+
+The command displays a table with the following information:
+
+- **Status**: The current processing state of the note (`Pending`, `Processed`, `Discarded`, or `Committed`).
+- **Attempt Count**: The number of times the node has attempted to process the note.
+- **Last Error**: The last error encountered during processing, if any.
+- **Last Attempt Block**: The block number of the most recent processing attempt.
+
+The note ID must be provided as a full hex string:
+
+```sh
+miden-client network-note-status 0x70b7ecba1db44c3aa75e87a3394de95463cc094d7794b706e02a9228342faeb0
+```
+
+:::note
+This command queries the Miden node directly and does not require the note to be tracked locally.
+:::
 
 ### `sync`
 
@@ -295,11 +318,12 @@ View and manage addresses.
 
 #### Action Subcommands
 
-| Subcommand                       | Description                                                                            |
-| -------------------------------- | ---------------------------------------------------------------------------------------|
-| `list <ID>`                      | List all addresses or only for the specified account ID (default command)              |
-| `add <ID> <INTERFACE> <TAG_LEN>` | Bind an address for an interface for the specified account ID with optional tag length |
-| `remove <ID> <ADDRESS>`          | Remove an address for the specified account ID                                         |
+| Subcommand                          | Description                                                                                      |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------|
+| `list <ID>`                         | List all addresses or only for the specified account ID (default command)                        |
+| `add <ID> <ADDRESS>`                | Track a bech32-encoded address on the specified account ID                                       |
+| `remove <ID> <ADDRESS>`             | Remove a bech32-encoded address from the specified account ID                                    |
+| `encode <ID> <INTERFACE> <TAG_LEN>` | Produce a bech32 address from the account ID, interface, and optional tag length                 |
 
 The `list` subcommand optionally takes an account ID to only show the addresses of that account, if it is not provided, it will show all addresses of all accounts.
 
@@ -307,13 +331,19 @@ The `list` subcommand optionally takes an account ID to only show the addresses 
 miden-client address list 0x17f13f4f83a8e8100c19d2961dfda2
 ```
 
-`add` and `remove` take the account ID as a mandatory argument, and also the interface of the address, this values can be:
-- `BasicWallet`: The basic wallet interface.
+`add` and `remove` take the account ID and a bech32-encoded address as arguments. `add` validates that the bech32 address encodes the same account ID and that its network matches the CLI's configured network.
 
-Note: the `Unspecified` denotes an address not bound to any interface, it's the default address for every account created.
+Use `encode` to produce a bech32 address from its fields — this output is what `add` expects. The interface can be:
+- `basic-wallet`: The basic wallet interface.
+
+Note: `Unspecified` (shown by `address list`) denotes an address not bound to any interface, it's the default address for every account created.
 
 ```sh
-miden-client address add 0x17f13f4f83a8e8100c19d2961dfda2 BasicWallet 10
+# Produce a bech32 address for the given account, interface, and tag length
+miden-client address encode 0x17f13f4f83a8e8100c19d2961dfda2 basic-wallet 10
+
+# Track that address on the account
+miden-client address add 0x17f13f4f83a8e8100c19d2961dfda2 mlcl1qple0ejnutx8zyp0cm0pme9wjfgqz0u9djq_qruqqypuyph
 ```
 
 ```sh

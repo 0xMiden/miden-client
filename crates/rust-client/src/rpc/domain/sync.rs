@@ -4,6 +4,27 @@ use miden_protocol::crypto::merkle::mmr::MmrDelta;
 use crate::rpc::domain::MissingFieldHelper;
 use crate::rpc::{RpcError, generated as proto};
 
+// SYNC TARGET
+// ================================================================================================
+
+/// Finality level to sync the chain MMR to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncTarget {
+    /// Sync up to the latest committed block (the chain tip).
+    CommittedChainTip,
+    /// Sync up to the latest proven block, which may be behind the committed tip.
+    ProvenChainTip,
+}
+
+impl From<SyncTarget> for proto::rpc::FinalityLevel {
+    fn from(target: SyncTarget) -> Self {
+        match target {
+            SyncTarget::CommittedChainTip => Self::Committed,
+            SyncTarget::ProvenChainTip => Self::Proven,
+        }
+    }
+}
+
 // CHAIN MMR INFO
 // ================================================================================================
 
@@ -39,12 +60,7 @@ impl TryFrom<proto::rpc::SyncChainMmrResponse> for ChainMmrInfo {
 
         Ok(Self {
             block_from: block_range.block_from.into(),
-            block_to: block_range
-                .block_to
-                .ok_or(proto::rpc::SyncChainMmrResponse::missing_field(stringify!(
-                    block_range.block_to
-                )))?
-                .into(),
+            block_to: block_range.block_to.into(),
             mmr_delta,
             block_header,
         })

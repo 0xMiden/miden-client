@@ -36,6 +36,7 @@ CREATE TABLE latest_account_headers (
     nonce BIGINT NOT NULL,                   -- account nonce
     account_seed BLOB NULL,                  -- seed used to generate the ID; NULL for non-new accounts
     locked BOOLEAN NOT NULL,                 -- whether the account is locked
+    watched BOOLEAN NOT NULL DEFAULT FALSE, -- Whether the account is tracked in watch mode
     PRIMARY KEY (id),
     FOREIGN KEY (code_commitment) REFERENCES account_code(commitment)
 );
@@ -154,12 +155,14 @@ CREATE TABLE transaction_scripts (
 -- ── Notes ────────────────────────────────────────────────────────────────
 
 CREATE TABLE input_notes (
-    note_id TEXT NOT NULL,                                  -- the note id
+    details_commitment TEXT NOT NULL,                       -- commitment to the note details (recipient + assets); stable across the note's lifecycle and independent of metadata
+    note_id TEXT NULL,                                      -- the full note id (hash(details_commitment, metadata_commitment)); NULL until metadata is known
     assets BLOB NOT NULL,                                   -- the serialized list of assets
+    attachments BLOB NOT NULL,                              -- the serialized NoteAttachments
     serial_number BLOB NOT NULL,                            -- the serial number of the note
     inputs BLOB NOT NULL,                                   -- the serialized list of note inputs
     script_root TEXT NOT NULL,                              -- the script root of the note, used to join with the notes_scripts table
-    nullifier TEXT NOT NULL,                                -- the nullifier of the note, used to query by nullifier
+    nullifier TEXT NULL,                                    -- the nullifier of the note, used to query by nullifier; NULL until metadata is known
     state_discriminant UNSIGNED INT NOT NULL,               -- state discriminant of the note, used to query by state
     state BLOB NOT NULL,                                    -- serialized note state
     created_at UNSIGNED BIG INT NOT NULL,                   -- timestamp of the note creation/import
@@ -167,15 +170,17 @@ CREATE TABLE input_notes (
     consumed_tx_order INTEGER NULL,                         -- per-account position of the consuming tx in the account's execution chain within the block; NULL for external consumption or non-consumed notes
     consumer_account_id TEXT NULL,                          -- account ID that consumed this note; NULL for non-consumed or externally consumed notes
 
-    PRIMARY KEY (note_id),
+    PRIMARY KEY (details_commitment),
     FOREIGN KEY (script_root) REFERENCES notes_scripts(script_root)
 ) WITHOUT ROWID;
 CREATE INDEX idx_input_notes_state ON input_notes(state_discriminant);
 CREATE INDEX idx_input_notes_nullifier ON input_notes(nullifier);
+CREATE INDEX idx_input_notes_note_id ON input_notes(note_id);
 CREATE INDEX idx_input_notes_consumption ON input_notes(consumed_block_height, consumed_tx_order);
 
 CREATE TABLE output_notes (
-    note_id TEXT NOT NULL,                                  -- the note id
+    details_commitment TEXT NOT NULL,                       -- commitment to the note details (recipient + assets); primary key
+    note_id TEXT NOT NULL,                                  -- the full note id (hash(details_commitment, metadata_commitment))
     recipient_digest TEXT NOT NULL,                                -- the note recipient
     assets BLOB NOT NULL,                                   -- the serialized NoteAssets, including vault commitment and list of assets
     metadata BLOB NOT NULL,                                 -- serialized metadata
@@ -185,11 +190,13 @@ CREATE TABLE output_notes (
 --     script_commitment TEXT NULL,
     state_discriminant UNSIGNED INT NOT NULL,               -- state discriminant of the note, used to query by state
     state BLOB NOT NULL,                                    -- serialized note state
+    attachments BLOB NOT NULL,
 
-    PRIMARY KEY (note_id)
+    PRIMARY KEY (details_commitment)
 ) WITHOUT ROWID;
 CREATE INDEX idx_output_notes_state ON output_notes(state_discriminant);
 CREATE INDEX idx_output_notes_nullifier ON output_notes(nullifier);
+CREATE INDEX idx_output_notes_note_id ON output_notes(note_id);
 
 CREATE TABLE notes_scripts (
     script_root TEXT NOT NULL,                       -- Note script root
@@ -198,10 +205,11 @@ CREATE TABLE notes_scripts (
     PRIMARY KEY (script_root)
 );
 
--- ── State sync & tags ────────────────────────────────────────────────────
+-- ── Blockchain checkpoint & tags ─────────────────────────────────────────
 
-CREATE TABLE state_sync (
+CREATE TABLE blockchain_checkpoint (
     block_num UNSIGNED BIG INT NOT NULL,    -- the block number of the most recent state sync
+    partial_blockchain_peaks BLOB NOT NULL, -- serialized MMR peaks at the current sync height
     PRIMARY KEY (block_num)
 );
 
@@ -210,11 +218,11 @@ CREATE TABLE tags (
     source BLOB NOT NULL   -- the serialized tag source
 );
 
--- insert initial row into state_sync table
-INSERT OR IGNORE INTO state_sync (block_num)
-SELECT 0
+-- insert initial row into blockchain_checkpoint table
+INSERT OR IGNORE INTO blockchain_checkpoint (block_num, partial_blockchain_peaks)
+SELECT 0, X''
 WHERE (
-    SELECT COUNT(*) FROM state_sync
+    SELECT COUNT(*) FROM blockchain_checkpoint
 ) = 0;
 
 -- ── Block headers & partial blockchain ───────────────────────────────────
@@ -222,7 +230,6 @@ WHERE (
 CREATE TABLE block_headers (
     block_num UNSIGNED BIG INT NOT NULL,  -- block number
     header BLOB NOT NULL,                 -- serialized block header
-    partial_blockchain_peaks BLOB NOT NULL,        -- serialized peaks of the partial blockchain MMR at this block
     has_client_notes BOOL NOT NULL,       -- whether the block has notes relevant to the client
     PRIMARY KEY (block_num)
 );

@@ -69,31 +69,3 @@ impl GetNoteScriptByRootError {
         }
     }
 }
-
-// CHECK NULLIFIERS ERROR
-// ================================================================================================
-
-// Error codes match `miden-node/crates/store/src/errors.rs::CheckNullifiersError`.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum CheckNullifiersError {
-    /// Internal server error (code 0)
-    #[error("internal server error")]
-    Internal,
-    /// Failed to deserialize data
-    #[error("deserialization failed")]
-    DeserializationFailed,
-    /// Error code not recognized by this client version. This can happen if the node
-    /// is newer than the client and has added new error variants.
-    #[error("unknown error code {code}: {message}")]
-    Unknown { code: u8, message: String },
-}
-
-impl CheckNullifiersError {
-    pub fn from_code(code: u8, message: &str) -> Self {
-        match code {
-            0 => Self::Internal,
-            1 => Self::DeserializationFailed,
-            _ => Self::Unknown { code, message: String::from(message) },
-        }
-    }
-}

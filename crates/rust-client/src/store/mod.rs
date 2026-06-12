@@ -43,7 +43,7 @@ use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
 use miden_protocol::errors::AccountError;
-use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::note::{NoteDetailsCommitment, NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::TransactionId;
 use miden_protocol::{Felt, Word};
 use miden_tx::utils::serde::{Deserializable, Serializable};
@@ -68,7 +68,13 @@ mod smt_forest;
 pub use smt_forest::AccountSmtForest;
 
 mod account;
-pub use account::{AccountRecord, AccountRecordData, AccountStatus, AccountUpdates};
+pub use account::{
+    AccountRecord,
+    AccountRecordData,
+    AccountStatus,
+    AccountUpdates,
+    ClientAccountType,
+};
 
 pub use crate::sync::PublicAccountUpdate;
 mod note_record;
@@ -81,6 +87,19 @@ pub use note_record::{
     OutputNoteState,
     input_note_states,
 };
+
+// SETTING MUTATION
+// ================================================================================================
+
+/// A single mutation against the `settings` KV store, applied as part of an atomic batch via
+/// [`Store::apply_settings_mutations`].
+#[derive(Debug, Clone)]
+pub enum SettingMutation {
+    /// Insert or overwrite `key` with `value`.
+    Set { key: String, value: Vec<u8> },
+    /// Delete `key`.
+    Remove { key: String },
+}
 
 // STORE TRAIT
 // ================================================================================================
@@ -135,6 +154,18 @@ pub trait Store: Send + Sync {
     /// - Inserting the transaction into the store to track.
     async fn apply_transaction(&self, tx_update: TransactionStoreUpdate) -> Result<(), StoreError>;
 
+    /// Applies a batch of [`TransactionStoreUpdate`]s atomically. Semantically equivalent to
+    /// calling [`Store::apply_transaction`] for each update in order, but with an all-or-nothing
+    /// guarantee — on any error no update is visible.
+    ///
+    /// Used by `BatchBuilder::submit` to persist a batch's results. Backends that cannot provide
+    /// true atomicity must document that limitation explicitly in their impl — there is no blanket
+    /// default.
+    async fn apply_transaction_batch(
+        &self,
+        tx_updates: Vec<TransactionStoreUpdate>,
+    ) -> Result<(), StoreError>;
+
     // NOTES
     // --------------------------------------------------------------------------------------------
 
@@ -171,11 +202,12 @@ pub trait Store: Send + Sync {
     ///
     /// The default implementation of this method uses [`Store::get_input_notes`].
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {
-        self.get_input_notes(NoteFilter::Unspent)
+        Ok(self
+            .get_input_notes(NoteFilter::Unspent)
             .await?
             .iter()
-            .map(|input_note| Ok(input_note.nullifier()))
-            .collect::<Result<Vec<_>, _>>()
+            .filter_map(InputNoteRecord::nullifier)
+            .collect())
     }
 
     /// Inserts the provided input notes into the database. If a note with the same ID already
@@ -242,33 +274,42 @@ pub trait Store: Send + Sync {
         nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError>;
 
-    /// Returns peaks information from the blockchain by a specific block number.
+    /// Returns the chain MMR peaks at the current sync height (peaks at `forest = block_num`,
+    /// i.e. excluding `block_num` itself as a leaf).
     ///
-    /// If there is no partial blockchain info stored for the provided block returns an empty
-    /// [`MmrPeaks`].
-    async fn get_partial_blockchain_peaks_by_block_num(
-        &self,
-        block_num: BlockNumber,
-    ) -> Result<MmrPeaks, StoreError>;
+    /// The peaks' `forest().num_leaves()` equals the current sync height by construction,
+    /// so callers can derive the synced block number from the returned peaks without a
+    /// second query.
+    ///
+    /// Before the first sync, returns an empty [`MmrPeaks`].
+    async fn get_current_blockchain_peaks(&self) -> Result<MmrPeaks, StoreError>;
 
-    /// Inserts a block header into the store, alongside peaks information at the block's height.
+    /// Inserts a block header into the store.
     ///
     /// Insert-if-not-exists with a one-way flag upgrade: on conflict with an existing row,
-    /// `header` and `partial_blockchain_peaks` are preserved (peaks are per-block and must
-    /// stay consistent with that block's forest), and `has_client_notes` is only upgraded
-    /// from `false` to `true`; never downgraded.
+    /// `header` is preserved and `has_client_notes` is only upgraded from `false` to `true`;
+    /// never downgraded.
     // TODO: this method's name only tells half the story. The insert is conditional and
     // the flag has its own upgrade rule. Revisit the name in a follow-up.
     async fn insert_block_header(
         &self,
         block_header: &BlockHeader,
-        partial_blockchain_peaks: MmrPeaks,
         has_client_notes: bool,
     ) -> Result<(), StoreError>;
 
-    /// Removes block headers that do not contain any client notes and aren't the genesis or last
-    /// block.
-    async fn prune_irrelevant_blocks(&self) -> Result<(), StoreError>;
+    /// Prunes irrelevant block data from the store.
+    ///
+    /// This performs three operations atomically:
+    /// 1. Deletes MMR authentication nodes at the given `node_indices`.
+    /// 2. Sets `has_client_notes = false` for `blocks_to_untrack` (blocks whose notes have all been
+    ///    consumed).
+    /// 3. Deletes block headers with `has_client_notes = false` that are not the genesis or
+    ///    sync-height block.
+    async fn untrack_and_prune_irrelevant_blocks(
+        &self,
+        blocks_to_untrack: &[BlockNumber],
+        node_indices_to_remove: &[InOrderIndex],
+    ) -> Result<(), StoreError>;
 
     /// Prunes historical account states for the specified account up to the given nonce.
     ///
@@ -326,9 +367,9 @@ pub trait Store: Send + Sync {
         account_id: AccountId,
     ) -> Result<Option<AccountCode>, StoreError>;
 
-    /// Inserts an [`Account`] to the store.
-    /// Receives an [`Address`] as the initial address to associate with the account. This address
-    /// will be tracked for incoming notes and its derived note tag will be monitored.
+    /// Inserts an [`Account`] to the store, alongside its initial [`Address`].
+    ///
+    /// Tag registration is the caller's responsibility — see [`Self::add_note_tag`].
     ///
     /// # Errors
     ///
@@ -337,6 +378,7 @@ pub trait Store: Send + Sync {
         &self,
         account: &Account,
         initial_address: Address,
+        client_account_type: ClientAccountType,
     ) -> Result<(), StoreError>;
 
     /// Upserts the account code for a foreign account. This value will be used as a cache of known
@@ -366,19 +408,19 @@ pub trait Store: Send + Sync {
     /// Returns a `StoreError::AccountDataNotFound` if there is no account for the provided ID.
     async fn update_account(&self, new_account_state: &Account) -> Result<(), StoreError>;
 
-    /// Adds an [`Address`] to an [`Account`], alongside its derived note tag.
+    /// Adds an [`Address`] to an [`Account`].
+    ///
+    /// Tag registration is the caller's responsibility — see [`Self::add_note_tag`].
     async fn insert_address(
         &self,
         address: Address,
         account_id: AccountId,
     ) -> Result<(), StoreError>;
 
-    /// Removes an [`Address`] from an [`Account`], alongside its derived note tag.
-    async fn remove_address(
-        &self,
-        address: Address,
-        account_id: AccountId,
-    ) -> Result<(), StoreError>;
+    /// Removes an [`Address`].
+    ///
+    /// Tag removal is the caller's responsibility — see [`Self::remove_note_tag`].
+    async fn remove_address(&self, address: Address) -> Result<(), StoreError>;
 
     // SETTINGS
     // --------------------------------------------------------------------------------------------
@@ -394,6 +436,13 @@ pub trait Store: Send + Sync {
 
     /// Returns all the keys from the `settings` table.
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError>;
+
+    /// Applies a batch of [`SettingMutation`]s. Use this when several `settings` entries must stay
+    /// mutually consistent (e.g. a record and its secondary index).
+    async fn apply_settings_mutations(
+        &self,
+        mutations: Vec<SettingMutation>,
+    ) -> Result<(), StoreError>;
 
     // SYNC
     // --------------------------------------------------------------------------------------------
@@ -503,12 +552,12 @@ pub trait Store: Send + Sync {
     /// known leaves thus far.
     ///
     /// The default implementation is based on [`Store::get_partial_blockchain_nodes`],
-    /// [`Store::get_partial_blockchain_peaks_by_block_num`] and [`Store::get_block_header_by_num`]
+    /// [`Store::get_current_blockchain_peaks`] and [`Store::get_block_header_by_num`]
     async fn get_current_partial_mmr(&self) -> Result<PartialMmr, StoreError> {
-        let current_block_num = self.get_sync_height().await?;
-
-        let current_peaks =
-            self.get_partial_blockchain_peaks_by_block_num(current_block_num).await?;
+        let current_peaks = self.get_current_blockchain_peaks().await?;
+        let current_block_num = u32::try_from(current_peaks.num_leaves())
+            .map_err(|err| StoreError::ParsingError(err.to_string()))?
+            .into();
 
         let (current_block, has_client_notes) = self
             .get_block_header_by_num(current_block_num)
@@ -517,7 +566,9 @@ pub trait Store: Send + Sync {
 
         let mut current_partial_mmr = PartialMmr::from_peaks(current_peaks);
         let has_client_notes = has_client_notes.into();
-        current_partial_mmr.add(current_block.commitment(), has_client_notes);
+        current_partial_mmr
+            .add(current_block.commitment(), has_client_notes)
+            .map_err(StoreError::MmrError)?;
 
         // Build tracked_leaves from blocks that have client notes.
         let mut tracked_leaves = self.get_tracked_block_header_numbers().await?;
@@ -719,6 +770,11 @@ pub enum NoteFilter {
     Expected,
     /// Return a list containing any notes that match with the provided [`NoteId`] vector.
     List(Vec<NoteId>),
+    /// Return a list containing any notes whose details commitment matches one of the provided
+    /// [`NoteDetailsCommitment`] vector. Unlike [`NoteFilter::List`], this matches the
+    /// metadata-independent details commitment, so it also resolves metadata-less notes (which
+    /// have a NULL `note_id`).
+    DetailsCommitments(Vec<NoteDetailsCommitment>),
     /// Return a list containing any notes that match the provided [`Nullifier`] vector.
     Nullifiers(Vec<Nullifier>),
     /// Return a list of notes that are currently being processed. This filter doesn't apply to
@@ -778,4 +834,8 @@ pub enum AccountStorageFilter {
     Root(Word),
     /// Return an [`AccountStorage`] with a single slot that matches the provided slot name.
     SlotName(StorageSlotName),
+    /// Return an [`AccountStorage`] containing only the slots whose names are in the provided
+    /// list. Useful to avoid loading the full storage when only a known subset of slots is needed
+    /// (e.g. when applying a delta to a large account).
+    SlotNames(Vec<StorageSlotName>),
 }

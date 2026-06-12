@@ -20,12 +20,12 @@ pub struct SlotDescriptor {
 }
 
 #[cfg(test)]
-use miden_client::account::component::{AccountComponent, basic_wallet_library};
+use miden_client::account::component::AccountComponent;
 #[cfg(test)]
 use miden_client::account::{
     Account,
     AccountBuilder,
-    AccountStorageMode,
+    AccountBuilderSchemaCommitmentExt,
     AccountType,
     StorageMap,
     StorageMapKey,
@@ -140,25 +140,27 @@ fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account,
     let reader_component = AccountComponent::new(
         reader_component_code,
         storage_slots,
-        AccountComponentMetadata::new("miden::testing::storage_reader", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::storage_reader"),
     )
     .map_err(|e| anyhow::anyhow!("Failed to create reader component: {e}"))?;
 
     // Wallet component: provides standard wallet operations (no storage slots)
-    let wallet_component =
-        AccountComponent::new(basic_wallet_library(), vec![], BasicWallet::component_metadata())
-            .expect("basic wallet component should satisfy account component requirements");
+    let wallet_component = AccountComponent::new(
+        BasicWallet::code().as_library().clone(),
+        vec![],
+        BasicWallet::component_metadata(),
+    )
+    .expect("basic wallet component should satisfy account component requirements");
 
     let account = AccountBuilder::new(config.seed)
         .with_auth_component(AuthSingleSig::new(
             sk.public_key().to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
         ))
-        .account_type(AccountType::RegularAccountUpdatableCode)
+        .account_type(AccountType::Public)
         .with_component(wallet_component)
         .with_component(reader_component)
-        .storage_mode(AccountStorageMode::Public)
-        .build()?;
+        .build_with_schema_commitment()?;
 
     Ok((account, sk))
 }
@@ -170,7 +172,8 @@ fn create_large_account(config: &LargeAccountConfig) -> anyhow::Result<(Account,
 /// but we guard against it for correctness.
 pub fn random_word(rng: &mut impl Rng) -> [Felt; 4] {
     loop {
-        let word: [Felt; 4] = std::array::from_fn(|_| Felt::new(rng.random::<u64>() >> 1));
+        let word: [Felt; 4] =
+            std::array::from_fn(|_| Felt::new_unchecked(rng.random::<u64>() >> 1));
         if word.iter().any(|f| f.as_canonical_u64() != 0) {
             return word;
         }
@@ -192,7 +195,7 @@ fn create_large_storage_slot(name: &str, num_entries: usize, seed: u32) -> Stora
     let map_entries: Vec<_> = (0..num_entries as u32)
         .map(|i| {
             let key_val = seed.wrapping_mul(1000).wrapping_add(i);
-            let key = [Felt::new(key_val as u64); 4];
+            let key = [Felt::new_unchecked(key_val as u64); 4];
             let value = random_word(&mut rng);
             (StorageMapKey::new(key.into()), value.into())
         })

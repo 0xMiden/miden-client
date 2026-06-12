@@ -15,8 +15,8 @@ begin
     dropw
     dropw
 
-    # Pushes 2 words from the advice stack to the operand stack (1 and 2)
-    adv_push.2
+    # Pushes 2 elements from the advice stack to the operand stack (1 and 2)
+    adv_push adv_push
 
     # Add the top 2 numbers of the stack and push the result to the stack.
     add

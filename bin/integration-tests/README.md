@@ -181,7 +181,7 @@ AGGLAYER_ACCOUNTS_DIR=./data/ miden-client-integration-tests --contains "agglaye
 
 ### Environment variables
 
-- `AGGLAYER_ACCOUNTS_DIR` - Path to directory containing agglayer `.mac` account files. Required for `*_with_genesis` tests. The node writes these files to `./data/` when started with `AGGLAYER_GENESIS=1`. On devnet, this would point to wherever the devnet account files are stored.
+- `AGGLAYER_ACCOUNTS_DIR` - Path to directory containing agglayer `.mac` account files. Setting it switches the agglayer tests to complete-genesis mode (otherwise they default to runtime setup). The node writes these files to `./data/` when started with `AGGLAYER_GENESIS=1`. On devnet, this would point to wherever the devnet account files are stored.
 
 ### Genesis account files
 
@@ -200,7 +200,7 @@ The same tests work against devnet by setting `AGGLAYER_ACCOUNTS_DIR` to the dir
 
 ```bash
 AGGLAYER_ACCOUNTS_DIR=/path/to/devnet/accounts \
-  miden-client-integration-tests --network devnet --contains "with_genesis"
+  miden-client-integration-tests --network devnet --contains "agglayer"
 ```
 
 ## Test Case Generation

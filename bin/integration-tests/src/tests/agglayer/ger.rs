@@ -50,11 +50,9 @@ pub async fn test_agglayer_update_ger(client_config: ClientConfig) -> Result<()>
         .test_rpc_api()
         .get_account_details(bridge_id)
         .await?
-        .account()
-        .cloned()
         .with_context(|| "bridge account details not available")?;
 
-    let is_registered = AggLayerBridge::is_ger_registered(ger, updated_bridge_account)?;
+    let is_registered = AggLayerBridge::is_ger_registered(ger, &updated_bridge_account)?;
     println!("GER registered: {is_registered}");
 
     assert!(is_registered, "GER was not registered in the bridge account");

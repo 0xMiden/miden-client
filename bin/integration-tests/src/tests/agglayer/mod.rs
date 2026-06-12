@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use miden_agglayer::{AggLayerFaucet, EthAddress, create_bridge_account};
+use miden_agglayer::create_bridge_account;
 use miden_client::Deserializable;
-use miden_client::account::{AccountFile, AccountId, AccountStorageMode};
+use miden_client::account::{AccountFile, AccountId, AccountType};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::crypto::FeltRng;
 use miden_client::keystore::Keystore;
@@ -22,6 +22,12 @@ pub mod agglayer_bridge_in_out;
 mod agglayer_test_utils;
 pub mod ger;
 
+/// `AggLayer` network ID assigned to the Miden chain (the protocol's `MIDEN_NETWORK_ID` MASM
+/// constant). Claim validation compares the leaf's `destination_network` to this value, so it
+/// must match the `MIDEN_NETWORK_ID` constant in the foundry vectors
+/// (`foundry-vectors/test/ClaimAssetTestVectorsLocalTx.t.sol`).
+pub const MIDEN_AGGLAYER_NETWORK_ID: u32 = 77;
+
 // AGGLAYER CONFIG
 // ================================================================================================
 
@@ -39,7 +45,7 @@ pub struct AgglayerConfig {
 }
 
 impl AgglayerConfig {
-    /// File names matching the node-builder output.
+    /// File names matching the gen-genesis output (see the test-node-genesis crate).
     const BRIDGE_ADMIN_FILE: &str = "bridge_admin.mac";
     const GER_MANAGER_FILE: &str = "ger_manager.mac";
     const BRIDGE_FILE: &str = "bridge.mac";
@@ -80,24 +86,6 @@ impl AgglayerConfig {
 
     pub fn faucet_id(&self) -> AccountId {
         self.faucet.account.id()
-    }
-
-    /// Returns the faucet's origin token address from its storage.
-    pub fn faucet_origin_token_address(&self) -> EthAddress {
-        AggLayerFaucet::origin_token_address(&self.faucet.account)
-            .expect("faucet should have origin token address")
-    }
-
-    /// Returns the faucet's origin network from its storage.
-    #[allow(dead_code)]
-    pub fn faucet_origin_network(&self) -> u32 {
-        AggLayerFaucet::origin_network(&self.faucet.account)
-            .expect("faucet should have origin network")
-    }
-
-    /// Returns the faucet's scale from its storage.
-    pub fn faucet_scale(&self) -> u8 {
-        AggLayerFaucet::scale(&self.faucet.account).expect("faucet should have scale")
     }
 
     /// Imports a single account (by ID) into the given client and keystore.
@@ -176,85 +164,87 @@ pub async fn create_agglayer_clients(
 
 /// Sets up the core agglayer accounts (bridge admin, GER manager, bridge) across 3 clients.
 ///
-/// In genesis mode, imports accounts from the network into the appropriate clients.
-/// In runtime mode, creates, deploys, and distributes accounts.
+/// Two modes:
+/// - **Genesis** (`config` is `Some`, i.e. `AGGLAYER_ACCOUNTS_DIR` is set): the bridge admin, GER
+///   manager and bridge are pre-deployed at genesis and imported from `.mac` files.
+/// - **Runtime** (`config` is `None`): the bridge admin and GER manager wallets are created on
+///   their clients, and the bridge (`AuthNetworkAccount`) is created and deployed within the test;
+///   the faucet is registered against it later via the `CONFIG_AGG_BRIDGE` note.
 pub async fn setup_core_accounts(
     config: Option<&AgglayerConfig>,
     bridge_admin: &mut ClientPair,
     ger_manager: &mut ClientPair,
     user: &mut ClientPair,
 ) -> Result<CoreAccountIds> {
-    match config {
-        Some(config) => {
-            println!("[setup] Loading core accounts from genesis");
-            println!("[setup]   bridge admin:  {}", config.bridge_admin_id());
-            println!("[setup]   GER manager:   {}", config.ger_manager_id());
-            println!("[setup]   bridge:        {}", config.bridge_id());
+    if let Some(config) = config {
+        println!("[setup] Loading core accounts from genesis");
+        println!("[setup]   bridge admin:  {}", config.bridge_admin_id());
+        println!("[setup]   GER manager:   {}", config.ger_manager_id());
+        println!("[setup]   bridge:        {}", config.bridge_id());
 
-            config
-                .import_account(
-                    config.bridge_admin_id(),
-                    &mut bridge_admin.client,
-                    &bridge_admin.keystore,
-                )
-                .await?;
-            config
-                .import_account(
-                    config.ger_manager_id(),
-                    &mut ger_manager.client,
-                    &ger_manager.keystore,
-                )
-                .await?;
-
-            for pair in [&mut *bridge_admin, &mut *ger_manager, &mut *user] {
-                config
-                    .import_account(config.bridge_id(), &mut pair.client, &pair.keystore)
-                    .await?;
-            }
-
-            Ok((config.bridge_admin_id(), config.ger_manager_id(), config.bridge_id()))
-        },
-        None => {
-            println!("[setup] Creating core accounts at runtime");
-
-            let (bridge_admin_account, ..) = insert_new_wallet(
+        config
+            .import_account(
+                config.bridge_admin_id(),
                 &mut bridge_admin.client,
-                AccountStorageMode::Private,
                 &bridge_admin.keystore,
-                RPO_FALCON_SCHEME_ID,
             )
             .await?;
-
-            let (ger_manager_account, ..) = insert_new_wallet(
-                &mut ger_manager.client,
-                AccountStorageMode::Private,
-                &ger_manager.keystore,
-                RPO_FALCON_SCHEME_ID,
-            )
+        config
+            .import_account(config.ger_manager_id(), &mut ger_manager.client, &ger_manager.keystore)
             .await?;
 
-            let bridge_account = create_bridge_account(
-                bridge_admin.client.rng().draw_word(),
-                bridge_admin_account.id(),
-                ger_manager_account.id(),
-            );
-            println!("[setup]   bridge admin:  {}", bridge_admin_account.id());
-            println!("[setup]   GER manager:   {}", ger_manager_account.id());
-            println!("[setup]   bridge:        {}", bridge_account.id());
-
-            bridge_admin.client.add_account(&bridge_account, false).await?;
-            ger_manager.client.add_account(&bridge_account, false).await?;
-            user.client.add_account(&bridge_account, false).await?;
-
-            let deploy_tx = TransactionRequestBuilder::new().build()?;
-            let tx_id = bridge_admin
-                .client
-                .submit_new_transaction(bridge_account.id(), deploy_tx)
+        for pair in [&mut *bridge_admin, &mut *ger_manager, &mut *user] {
+            config
+                .import_account(config.bridge_id(), &mut pair.client, &pair.keystore)
                 .await?;
-            wait_for_tx(&mut bridge_admin.client, tx_id).await?;
-            println!("[setup] Bridge account deployed on-chain");
+        }
 
-            Ok((bridge_admin_account.id(), ger_manager_account.id(), bridge_account.id()))
-        },
+        return Ok((config.bridge_admin_id(), config.ger_manager_id(), config.bridge_id()));
     }
+
+    println!("[setup] Creating core accounts at runtime");
+
+    // Bridge admin and GER manager are ordinary wallets, created on their own clients.
+    let (bridge_admin_account, ..) = insert_new_wallet(
+        &mut bridge_admin.client,
+        AccountType::Public,
+        &bridge_admin.keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+    let (ger_manager_account, ..) = insert_new_wallet(
+        &mut ger_manager.client,
+        AccountType::Public,
+        &ger_manager.keystore,
+        RPO_FALCON_SCHEME_ID,
+    )
+    .await?;
+
+    // The bridge is an `AuthNetworkAccount`. Create it (unconfigured) and distribute it to all
+    // three clients so each can build transactions that reference it.
+    let bridge_seed = bridge_admin.client.rng().draw_word();
+    let bridge_account = create_bridge_account(
+        bridge_seed,
+        bridge_admin_account.id(),
+        ger_manager_account.id(),
+        MIDEN_AGGLAYER_NETWORK_ID,
+    );
+    println!("[setup]   bridge admin:  {}", bridge_admin_account.id());
+    println!("[setup]   GER manager:   {}", ger_manager_account.id());
+    println!("[setup]   bridge:        {}", bridge_account.id());
+
+    for pair in [&mut *bridge_admin, &mut *ger_manager, &mut *user] {
+        pair.client.add_account(&bridge_account, false).await?;
+    }
+
+    // Deploy the bridge account.
+    let deploy_tx = TransactionRequestBuilder::new().build()?;
+    let tx_id = bridge_admin
+        .client
+        .submit_new_transaction(bridge_account.id(), deploy_tx)
+        .await?;
+    wait_for_tx(&mut bridge_admin.client, tx_id).await?;
+    println!("[setup] Bridge account deployed on-chain");
+
+    Ok((bridge_admin_account.id(), ger_manager_account.id(), bridge_account.id()))
 }

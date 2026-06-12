@@ -12,6 +12,7 @@ miden-protocol            = { default-features = false, features = ["testing"], 
 miden-standards           = { features = ["testing"], workspace = true }
 miden-testing             = { default-features = false, workspace = true }
 rand                      = { workspace = true }
+rstest                    = { workspace = true }
 tokio                     = { workspace = true }
 
 [lints]

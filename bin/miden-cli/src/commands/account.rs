@@ -1,21 +1,23 @@
 use clap::Parser;
 use comfy_table::{Cell, ContentArrangement, presets};
+use miden_client::account::component::FungibleFaucet;
 use miden_client::account::{
     Account,
+    AccountCode,
     AccountId,
     AccountInterfaceExt,
-    AccountType,
     StorageSlotContent,
 };
-use miden_client::address::{Address, AddressInterface, RoutingParameters};
+use miden_client::address::{Address, AddressInterface, NetworkId, RoutingParameters};
 use miden_client::asset::Asset;
 use miden_client::rpc::{GrpcClient, NodeRpcClient};
 use miden_client::transaction::{AccountComponentInterface, AccountInterface};
+use miden_client::utils::base_units_to_tokens;
 use miden_client::{Client, PrettyPrint, ZERO};
 
-use crate::config::CliConfig;
+use crate::config::{CliConfig, RpcConfig};
 use crate::errors::CliError;
-use crate::utils::{load_faucet_details_map, parse_account_id};
+use crate::utils::parse_account_id;
 use crate::{client_binary_name, create_dynamic_table};
 
 pub const DEFAULT_ACCOUNT_ID_KEY: &str = "default_account_id";
@@ -56,7 +58,7 @@ impl AccountCmd {
                 ..
             } => {
                 let account_id = parse_account_id(&client, id).await?;
-                show_account(client, account_id, &cli_config, self.with_code).await?;
+                show_account(&client, account_id, &cli_config.rpc, self.with_code).await?;
             },
             AccountCmd {
                 list: false,
@@ -106,15 +108,19 @@ impl AccountCmd {
 async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
     let accounts = client.get_account_headers().await?;
 
-    let mut table =
-        create_dynamic_table(&["Account ID", "Type", "Storage Mode", "Nonce", "Status"]);
+    let mut table = create_dynamic_table(&["Account ID", "Kind", "Type", "Nonce", "Status"]);
     for (acc, _acc_seed) in &accounts {
-        let status = client.account_reader(acc.id()).status().await?.to_string();
+        let reader = client.account_reader(acc.id());
+        let status = reader.status().await?.to_string();
+        let token_symbol = get_faucet_component(&client, acc.id())
+            .await
+            .ok()
+            .map(|faucet| faucet.symbol().to_string());
 
         table.add_row(vec![
             acc.id().to_hex(),
-            account_type_display_name(&acc.id())?,
-            acc.id().storage_mode().to_string(),
+            account_kind_display_name(token_symbol.as_deref()),
+            acc.id().account_type().to_string(),
             acc.nonce().as_canonical_u64().to_string(),
             status,
         ]);
@@ -127,10 +133,10 @@ async fn list_accounts<AUTH>(client: Client<AUTH>) -> Result<(), CliError> {
 // SHOW ACCOUNT
 // ================================================================================================
 
-pub async fn show_account<AUTH>(
-    client: Client<AUTH>,
+async fn show_account<AUTH>(
+    client: &Client<AUTH>,
     account_id: AccountId,
-    cli_config: &CliConfig,
+    rpc_config: &RpcConfig,
     with_code: bool,
 ) -> Result<(), CliError> {
     let account = if let Some(account) = client.get_account(account_id).await? {
@@ -139,35 +145,41 @@ pub async fn show_account<AUTH>(
         println!("Account {account_id} is not tracked by the client. Fetching from the network...");
 
         let rpc_client =
-            GrpcClient::new(&cli_config.rpc.endpoint.clone().into(), cli_config.rpc.timeout_ms);
+            GrpcClient::new(&rpc_config.endpoint.clone().into(), rpc_config.timeout_ms);
 
-        let fetched_account = rpc_client.get_account_details(account_id).await.map_err(|_| {
-            CliError::Input(format!(
-                "Unable to fetch account {account_id} from the network. It may not exist.",
-            ))
+        let fetched_account = rpc_client.get_account_details(account_id).await.map_err(|err| {
+            CliError::Input(format!("Unable to fetch account {account_id} from the network: {err}"))
         })?;
 
-        let account: Option<Account> = fetched_account.into();
-
-        account.ok_or(CliError::Input(format!(
+        fetched_account.ok_or(CliError::Input(format!(
             "Account {account_id} is private and not tracked by the client",
         )))?
     };
 
-    print_summary_table(&account, &client, cli_config).await?;
+    let network_id = rpc_config.endpoint.0.to_network_id();
+    let token_symbol = faucet_component_from_account(&account)
+        .ok()
+        .map(|faucet| faucet.symbol().to_string());
+    print_summary_table(&account, network_id, token_symbol.as_deref());
 
     // Vault Table
     {
         let assets = account.vault().assets();
-        let faucet_details_map = load_faucet_details_map()?;
         println!("Assets: ");
 
         let mut table = create_dynamic_table(&["Asset Type", "Faucet", "Amount"]);
         for asset in assets {
             let (asset_type, faucet, amount) = match asset {
                 Asset::Fungible(fungible_asset) => {
-                    let (faucet, amount) =
-                        faucet_details_map.format_fungible_asset(&fungible_asset)?;
+                    let faucet_id = fungible_asset.faucet_id();
+                    let amount_u64 = fungible_asset.amount().as_u64();
+                    let (faucet, amount) = match get_faucet_component(client, faucet_id).await {
+                        Ok(faucet_component) => (
+                            faucet_component.symbol().to_string(),
+                            base_units_to_tokens(amount_u64, faucet_component.decimals()),
+                        ),
+                        Err(_) => (faucet_id.prefix().to_hex(), amount_u64.to_string()),
+                    };
                     ("Fungible Asset", faucet, amount)
                 },
                 Asset::NonFungible(non_fungible_asset) => {
@@ -230,30 +242,20 @@ pub async fn show_account<AUTH>(
 // ================================================================================================
 
 /// Prints a summary table with account information.
-async fn print_summary_table<AUTH>(
-    account: &Account,
-    client: &Client<AUTH>,
-    cli_config: &CliConfig,
-) -> Result<(), CliError> {
+fn print_summary_table(account: &Account, network_id: NetworkId, token_symbol: Option<&str>) {
     let mut table = create_dynamic_table(&["Account Information"]);
     table
         .load_preset(presets::UTF8_HORIZONTAL_ONLY)
         .set_content_arrangement(ContentArrangement::DynamicFullWidth);
 
-    table.add_row(vec![
-        Cell::new("Address"),
-        Cell::new(account_bech_32(account.id(), client, cli_config).await?),
-    ]);
+    table.add_row(vec![Cell::new("Address"), Cell::new(account_bech_32(account, network_id))]);
     table.add_row(vec![Cell::new("Account ID (hex)"), Cell::new(account.id().to_string())]);
     table.add_row(vec![
         Cell::new("Account Commitment"),
         Cell::new(account.to_commitment().to_string()),
     ]);
-    table.add_row(vec![Cell::new("Type"), Cell::new(account_type_display_name(&account.id())?)]);
-    table.add_row(vec![
-        Cell::new("Storage mode"),
-        Cell::new(account.id().storage_mode().to_string()),
-    ]);
+    table.add_row(vec![Cell::new("Kind"), Cell::new(account_kind_display_name(token_symbol))]);
+    table.add_row(vec![Cell::new("Type"), Cell::new(account.id().account_type().to_string())]);
     table.add_row(vec![
         Cell::new("Code Commitment"),
         Cell::new(account.code().commitment().to_string()),
@@ -269,22 +271,57 @@ async fn print_summary_table<AUTH>(
     ]);
 
     println!("{table}\n");
-    Ok(())
 }
 
-/// Returns a display name for the account type.
-fn account_type_display_name(account_id: &AccountId) -> Result<String, CliError> {
-    Ok(match account_id.account_type() {
-        AccountType::FungibleFaucet => {
-            let faucet_details_map = load_faucet_details_map()?;
-            let token_symbol = faucet_details_map.get_token_symbol_or_default(account_id);
+/// Loads the tracked account for `account_id` and reconstructs its [`FungibleFaucet`] component.
+///
+/// # Errors
+/// Returns an error if the account is not tracked by the client or its faucet metadata can't be
+/// read.
+async fn get_faucet_component<AUTH>(
+    client: &Client<AUTH>,
+    account_id: AccountId,
+) -> Result<FungibleFaucet, CliError> {
+    let account = client.get_account(account_id).await?.ok_or_else(|| {
+        CliError::Input(format!("account {account_id} not tracked by the client"))
+    })?;
 
-            format!("Fungible faucet (token symbol: {token_symbol})")
-        },
-        AccountType::NonFungibleFaucet => "Non-fungible faucet".to_string(),
-        AccountType::RegularAccountImmutableCode => "Regular".to_string(),
-        AccountType::RegularAccountUpdatableCode => "Regular (updatable)".to_string(),
+    faucet_component_from_account(&account)
+}
+
+/// Reconstructs the [`FungibleFaucet`] component from a materialized [`Account`].
+///
+/// # Errors
+/// Returns an error if the account's faucet metadata can't be read.
+fn faucet_component_from_account(account: &Account) -> Result<FungibleFaucet, CliError> {
+    let account_id = account.id();
+    FungibleFaucet::try_from(account).map_err(|err| {
+        CliError::Faucet(err.into(), format!("Failed to read faucet metadata for {account_id}"))
     })
+}
+
+/// Returns the account's kind for display. If `token_symbol` is provided the account is rendered as
+/// a fungible faucet (the symbol is appended); otherwise it's labelled "Regular".
+///
+/// The on-chain `AccountType` only encodes account visibility (`public` / `private`), so
+/// faucet-vs-wallet has to be inferred by the caller from the attached components.
+fn account_kind_display_name(token_symbol: Option<&str>) -> String {
+    if let Some(symbol) = token_symbol {
+        format!("Fungible faucet (token symbol: {symbol})")
+    } else {
+        "Regular".to_string()
+    }
+}
+
+/// Returns `true` if the account code exposes the [`BasicWallet`] component interface.
+///
+/// Takes the [`AccountCode`] rather than the full [`Account`] so callers can avoid loading the
+/// account's vault and storage just to inspect its interface.
+pub(crate) fn account_code_has_basic_wallet(account_id: AccountId, code: &AccountCode) -> bool {
+    AccountInterface::from_code(account_id, Vec::new(), code)
+        .components()
+        .iter()
+        .any(|c| matches!(c, AccountComponentInterface::BasicWallet))
 }
 
 /// Sets the provided account ID as the default account in the client's store, if not set already.
@@ -311,13 +348,9 @@ pub(crate) async fn set_default_account_if_unset<AUTH>(
     Ok(())
 }
 
-async fn account_bech_32<AUTH>(
-    account_id: AccountId,
-    client: &Client<AUTH>,
-    cli_config: &CliConfig,
-) -> Result<String, CliError> {
-    let account = client.try_get_account(account_id).await?;
-    let account_interface = AccountInterface::from_account(&account);
+fn account_bech_32(account: &Account, network_id: NetworkId) -> String {
+    let account_id = account.id();
+    let account_interface = AccountInterface::from_account(account);
 
     let mut address = Address::new(account_id);
     if account_interface
@@ -329,6 +362,5 @@ async fn account_bech_32<AUTH>(
             address.with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
     }
 
-    let encoded = address.encode(cli_config.rpc.endpoint.0.to_network_id());
-    Ok(encoded)
+    address.encode(network_id)
 }
