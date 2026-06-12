@@ -744,6 +744,24 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         let account_id = new_account_state.id();
         let account_id_hex = account_id.to_hex();
+
+        // Read old header before mutating the SMT snapshot or database rows. Sync filters stale
+        // full-account snapshots; if one still reaches storage, reject it before mutating.
+        let old_header = query_latest_account_headers(tx, "id = ?", params![&account_id_hex])?
+            .into_iter()
+            .next()
+            .map(|(header, ..)| header)
+            .ok_or(StoreError::AccountDataNotFound(account_id))?;
+
+        if new_account_state.nonce().as_canonical_u64() < old_header.nonce().as_canonical_u64() {
+            return Err(StoreError::DatabaseError(format!(
+                "update_account_state: new nonce {} is less than old nonce {} for account {}",
+                new_account_state.nonce().as_canonical_u64(),
+                old_header.nonce().as_canonical_u64(),
+                account_id,
+            )));
+        }
+
         let nonce_val = u64_to_value(new_account_state.nonce().as_canonical_u64());
 
         // Insert and register account state in the SMT forest (handles old root cleanup)
@@ -752,13 +770,6 @@ impl SqliteStore {
             new_account_state.vault(),
             new_account_state.storage(),
         )?;
-
-        // Read old header before overwriting.
-        let old_header = query_latest_account_headers(tx, "id = ?", params![account_id.to_hex()])?
-            .into_iter()
-            .next()
-            .map(|(header, ..)| header)
-            .ok_or(StoreError::AccountDataNotFound(account_id))?;
 
         // Archive all old entries from latest → historical
         tx.execute(
