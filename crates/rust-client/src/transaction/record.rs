@@ -147,6 +147,8 @@ pub enum DiscardCause {
     InputConsumed,
     DiscardedInitialState,
     Stale,
+    /// Another transaction reached the same account nonce first, so this one can never commit.
+    Superseded,
 }
 
 impl DiscardCause {
@@ -156,6 +158,7 @@ impl DiscardCause {
             "InputConsumed" => Ok(DiscardCause::InputConsumed),
             "DiscardedInitialState" => Ok(DiscardCause::DiscardedInitialState),
             "Stale" => Ok(DiscardCause::Stale),
+            "Superseded" => Ok(DiscardCause::Superseded),
             _ => Err(DeserializationError::InvalidValue(format!("Invalid discard cause: {cause}"))),
         }
     }
@@ -168,6 +171,7 @@ impl fmt::Display for DiscardCause {
             DiscardCause::InputConsumed => write!(f, "InputConsumed"),
             DiscardCause::DiscardedInitialState => write!(f, "DiscardedInitialState"),
             DiscardCause::Stale => write!(f, "Stale"),
+            DiscardCause::Superseded => write!(f, "Superseded"),
         }
     }
 }
@@ -179,6 +183,7 @@ impl Serializable for DiscardCause {
             DiscardCause::InputConsumed => target.write_u8(1),
             DiscardCause::DiscardedInitialState => target.write_u8(2),
             DiscardCause::Stale => target.write_u8(3),
+            DiscardCause::Superseded => target.write_u8(4),
         }
     }
 }
@@ -190,6 +195,7 @@ impl Deserializable for DiscardCause {
             1 => Ok(DiscardCause::InputConsumed),
             2 => Ok(DiscardCause::DiscardedInitialState),
             3 => Ok(DiscardCause::Stale),
+            4 => Ok(DiscardCause::Superseded),
             _ => Err(DeserializationError::InvalidValue("Invalid discard cause".to_string())),
         }
     }
