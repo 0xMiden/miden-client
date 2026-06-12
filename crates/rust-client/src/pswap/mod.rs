@@ -27,12 +27,13 @@ use alloc::vec::Vec;
 use async_trait::async_trait;
 pub use errors::PswapLineageError;
 pub use lineage::{PswapLineageFilter, PswapLineageRecord, PswapLineageState};
-use miden_protocol::Felt;
 use miden_protocol::account::AccountId;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::Note;
+use miden_protocol::{Felt, Word};
 use miden_standards::note::PswapNote;
 use miden_tx::auth::TransactionAuthenticator;
+use miden_tx::utils::serde::{Deserializable, Serializable};
 pub use observer::PswapChainObserver;
 
 use crate::store::{NoteFilter, Store};
@@ -95,7 +96,10 @@ impl TransactionObserver for PswapTransactionObserver {
                     // `note_type` is read straight off the note we just parsed — no
                     // need to mirror it on the record.
                     tag: record.asset_pair_tag(pswap.note_type()),
-                    source: NoteTagSource::Subscription(record.original_note_id),
+                    source: NoteTagSource::Subscription(
+                        Word::read_from_bytes(&record.original_note_id.to_bytes())
+                            .expect("NoteId and Word share identical serialization"),
+                    ),
                 })
                 .await?;
         }

@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 
 use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountId};
-use miden_protocol::note::{NoteDetailsCommitment, NoteId, NoteTag};
+use miden_protocol::note::{NoteDetailsCommitment, NoteTag};
 use miden_tx::utils::serde::{
     ByteReader,
     ByteWriter,
@@ -179,17 +179,16 @@ impl TryInto<NoteTagRecord> for &InputNoteRecord {
 
 #[cfg(test)]
 mod tag_source_tests {
-    use miden_protocol::Word;
     use miden_protocol::account::AccountId;
-    use miden_protocol::note::{NoteDetailsCommitment, NoteId};
+    use miden_protocol::note::NoteDetailsCommitment;
     use miden_protocol::testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET;
+    use miden_protocol::{Felt, Word};
 
     use super::{Deserializable, NoteTagSource, Serializable};
 
-    /// Helper: builds a deterministic `NoteId` from a single u64.
-    fn note_id_from_u64(value: u64) -> NoteId {
-        let f = miden_protocol::Felt::new(value).unwrap();
-        NoteId::from_raw(Word::from([f, f, f, f]))
+    fn word_from_u64(value: u64) -> Word {
+        let f = Felt::new(value).unwrap();
+        Word::from([f, f, f, f])
     }
 
     /// `NoteTagSource` is serialised into the on-disk `tags.source` BLOB
@@ -202,7 +201,7 @@ mod tag_source_tests {
     fn note_tag_source_discriminants_are_stable() {
         let cases = [
             (NoteTagSource::User, 2u8),
-            (NoteTagSource::Subscription(*note_id_from_u64(42)), 3u8),
+            (NoteTagSource::Subscription(word_from_u64(42)), 3u8),
         ];
         for (variant, expected_disc) in cases {
             let bytes = variant.to_bytes();
@@ -222,7 +221,7 @@ mod tag_source_tests {
         let account_id = AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET).unwrap();
         let details_commitment =
             NoteDetailsCommitment::from_raw_commitments(Word::empty(), Word::empty());
-        let subscription_key = *note_id_from_u64(0xdead_beef_dead_beef);
+        let subscription_key = word_from_u64(0xdead_beef_dead_beef);
 
         let variants = [
             NoteTagSource::Account(account_id),
