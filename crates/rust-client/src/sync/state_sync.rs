@@ -643,17 +643,22 @@ impl StateSync {
         current_public_accounts: &[&AccountHeader],
         block_from: BlockNumber,
     ) -> Result<(), ClientError> {
-        let local_commitments: BTreeMap<AccountId, Word> = current_public_accounts
-            .iter()
-            .map(|header| (header.id(), header.to_commitment()))
-            .collect();
+        let local_headers: BTreeMap<AccountId, &AccountHeader> =
+            current_public_accounts.iter().map(|header| (header.id(), *header)).collect();
         for (id, commitment) in commitment_updates {
-            if local_commitments.get(id).is_none_or(|local| local == commitment) {
+            let Some(local_header) = local_headers.get(id).copied() else {
+                continue;
+            };
+
+            if local_header.to_commitment() == *commitment {
                 continue;
             }
 
-            let public_update = self.sync_public_account(*id, block_from).await?;
-            account_updates.extend(AccountUpdates::new(vec![public_update], Vec::new()));
+            if let Some(public_update) =
+                self.sync_public_account(*id, local_header, block_from).await?
+            {
+                account_updates.extend(AccountUpdates::new(vec![public_update], Vec::new()));
+            }
         }
 
         Ok(())
@@ -662,7 +667,8 @@ impl StateSync {
     /// Fetches an updated snapshot for a single public account.
     ///
     /// Must only be called when the local commitment for the account is known to differ from the
-    /// network's, which guarantees the node returns updated details with a newer nonce.
+    /// network's. If the account snapshot returned by the node is not newer than the local header,
+    /// the update is ignored as stale.
     ///
     /// # Panics
     ///
@@ -671,8 +677,9 @@ impl StateSync {
     async fn sync_public_account(
         &self,
         account_id: AccountId,
+        local_header: &AccountHeader,
         block_from: BlockNumber,
-    ) -> Result<PublicAccountUpdate, ClientError> {
+    ) -> Result<Option<PublicAccountUpdate>, ClientError> {
         // A single request fetches the full snapshot: every storage map's entries plus the vault,
         // with the storage layout discovered server-side.
         let (proof_block_num, proof) = self
@@ -687,6 +694,9 @@ impl StateSync {
             .map_err(ClientError::RpcError)?;
 
         let details = proof.into_details().expect("node returned no details for a public account");
+        if details.header.nonce().as_canonical_u64() <= local_header.nonce().as_canonical_u64() {
+            return Ok(None);
+        }
 
         let vault_oversized = details.vault_details.too_many_assets;
         let any_map_oversized =
@@ -705,7 +715,7 @@ impl StateSync {
             PublicAccountUpdate::Full(account)
         };
 
-        Ok(public_update)
+        Ok(Some(public_update))
     }
 
     /// Builds a [`PublicAccountUpdate::Delta`] by fetching incremental storage map and vault
@@ -1086,6 +1096,35 @@ mod tests {
             ZERO,
         ]
         .into()
+    }
+
+    #[tokio::test]
+    async fn sync_public_accounts_ignores_non_newer_node_snapshot() {
+        let mut builder = MockChainBuilder::new();
+        let account = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
+        let rpc_api = MockRpcApi::new(builder.build().unwrap());
+        let state_sync = StateSync::new(Arc::new(rpc_api), Arc::new(MockScreener), None);
+
+        let local_header =
+            AccountHeader::new(account.id(), Felt::from(1u32), EMPTY_WORD, EMPTY_WORD, EMPTY_WORD);
+        let current_public_accounts = vec![&local_header];
+        let commitment_updates = vec![(account.id(), account.to_commitment())];
+        let mut account_updates = AccountUpdates::default();
+
+        state_sync
+            .sync_public_accounts(
+                &mut account_updates,
+                &commitment_updates,
+                &current_public_accounts,
+                BlockNumber::GENESIS,
+            )
+            .await
+            .unwrap();
+
+        assert!(
+            account_updates.updated_public_accounts().is_empty(),
+            "public account sync should ignore node snapshots that are not newer than local"
+        );
     }
 
     // COMPUTE NULLIFIER TX ORDER TESTS
