@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.15.0 (TBD)
+## 0.15.0 (2026-06-12)
 
 ### Fixes
 
@@ -11,6 +11,8 @@
 * [FIX] Preserve a fungible asset's callback flag when the store replays a vault delta, fixing a `ConflictingRoots` error when consuming callback-bearing (e.g. agglayer-minted) assets ([#2225](https://github.com/0xMiden/miden-client/pull/2225)).
 * [FIX] Fixed the `sync_notes_with_details` to fetch the attachments for private notes ([#2214](https://github.com/0xMiden/miden-client/pull/2214)).
 * [rust] Expanded validation for output notes before executing a `TransactionRequest`. ([#89](https://github.com/0xMiden/wallet-adapter/issues/89))
+* [FIX][rust] `Client::fetch_all_private_notes` now drains the full backlog across multiple server-paginated responses instead of returning after a single batch. Needed once the note-transport server (`0xMiden/note-transport-service#77`) caps each `fetch_notes` response at `FETCH_NOTES_BATCH_SIZE` rows — previously the function silently returned only the first batch, contradicting its documented "fetches all notes" semantics. Companion deterministic regression test (`fetch_all_private_notes_drains_across_batches`) uses a new `MockNoteTransportNode::with_max_batch(n)` constructor to exercise multi-batch drain. ([#2095](https://github.com/0xMiden/miden-client/pull/2095))
+* [FIX][rust] Fixed the `dap` feature build by bumping `miden-debug`/`miden-debug-engine` to 0.8.1 and `miden-core` to 0.23.2, aligning the debugger crates with the `miden-core` APIs they call. ([#2189](https://github.com/0xMiden/miden-client/pull/2189))
 
 ### Changes
 
@@ -70,11 +72,6 @@
 * [FEATURE][web] Added `wordToBigInt()` utility export for losslessly converting a `Word`'s first felt to a `BigInt`. `StorageResult.toString()` is BigInt-backed, and `valueOf()` returns a JS number for values fitting in `Number.MAX_SAFE_INTEGER` and throws `RangeError` for larger u64 values — use `.toBigInt()` for exact access ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][rust,cli] Added partial swap (PSWAP) support: `TransactionRequestBuilder::build_pswap_create` / `build_pswap_consume` / `build_pswap_cancel` and a `miden-client pswap` CLI command (`create`, `consume`, `cancel`) for partially-fillable fungible swaps ([#2162](https://github.com/0xMiden/miden-client/pull/2162)).
 * Added verification of MMR responses during state sync: validated the returned block range matches the requested range and checked that post-delta MMR peaks match the block header's chain commitment ([#1887](https://github.com/0xMiden/miden-client/pull/1887)).
-
-### Fixes
-
-* [FIX][rust] `Client::fetch_all_private_notes` now drains the full backlog across multiple server-paginated responses instead of returning after a single batch. Needed once the note-transport server (`0xMiden/note-transport-service#77`) caps each `fetch_notes` response at `FETCH_NOTES_BATCH_SIZE` rows — previously the function silently returned only the first batch, contradicting its documented "fetches all notes" semantics. Companion deterministic regression test (`fetch_all_private_notes_drains_across_batches`) uses a new `MockNoteTransportNode::with_max_batch(n)` constructor to exercise multi-batch drain. ([#2095](https://github.com/0xMiden/miden-client/pull/2095))
-* [FIX][rust] Fixed the `dap` feature build by bumping `miden-debug`/`miden-debug-engine` to 0.8.1 and `miden-core` to 0.23.2, aligning the debugger crates with the `miden-core` APIs they call. ([#2189](https://github.com/0xMiden/miden-client/pull/2189))
 
 ## 0.14.9 (2026-05-19)
 
