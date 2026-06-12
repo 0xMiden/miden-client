@@ -34,6 +34,7 @@ miden-client              = { default-features = false, path = "crates/rust-clie
 miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-store", version = "0.15.0" }
 
 # Miden protocol dependencies
+miden-agglayer        = { default-features = false, version = "0.15.3" }
 miden-protocol        = { default-features = false, version = "0.15.3" }
 miden-standards       = { default-features = false, version = "0.15.3" }
 miden-testing         = { default-features = false, version = "0.15.3" }

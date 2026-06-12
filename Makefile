@@ -90,6 +90,10 @@ test-docs: ## Run documentation tests
 start-node: ## Start the testing node in the foreground, streaming logs (Ctrl+C stops it)
 	./scripts/start-test-node.sh
 
+.PHONY: start-node-agglayer
+start-node-agglayer: ## Start the testing node with agglayer genesis accounts
+	AGGLAYER_GENESIS=1 ./scripts/start-test-node.sh
+
 .PHONY: start-node-background
 start-node-background: ## Start the testing node in the background
 	./scripts/start-test-node.sh --background

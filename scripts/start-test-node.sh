@@ -122,6 +122,13 @@ mkdir -p "$LOG_DIR" "$DATA/validator" "$DATA/node" "$DATA/ntx-builder"
 "$GEN_GENESIS" "$DATA/genesis-config"
 mkdir -p "$ROOT/data"
 cp "$DATA/genesis-config/tst_faucet.mac" "$ROOT/data/account.mac"
+# With AGGLAYER_GENESIS set, gen-genesis also emits the agglayer account files; expose them under
+# ./data so tests can load them via AGGLAYER_ACCOUNTS_DIR=./data.
+for mac in bridge_admin.mac ger_manager.mac bridge.mac agglayer_faucet.mac; do
+    if [ -f "$DATA/genesis-config/$mac" ]; then
+        cp "$DATA/genesis-config/$mac" "$ROOT/data/$mac"
+    fi
+done
 
 {
     "$BIN/miden-validator" bootstrap --data-directory "$DATA/validator" \

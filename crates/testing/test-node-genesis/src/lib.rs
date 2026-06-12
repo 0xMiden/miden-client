@@ -2,6 +2,8 @@
 //! executables. The accounts only depend on `miden-protocol`/`miden-standards`, so the generated
 //! configuration is independent of the node's own crates.
 
+pub mod agglayer;
+
 use std::fmt::Write as _;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -51,7 +53,11 @@ pub const GENESIS_FAUCET_FILE: &str = "tst_faucet.mac";
 /// The native faucet is left unset, so the node mints the default `MIDEN` faucet for fees. With
 /// `verification_base_fee = 0` fees are never charged, so the native faucet's identity does not
 /// affect tests.
-pub fn write_genesis_config(output_dir: &Path) -> Result<()> {
+///
+/// When `include_agglayer` is set, the agglayer genesis accounts (bridge admin, GER manager,
+/// bridge, and faucet) are also emitted and included in genesis; integration tests load their
+/// `.mac` files via the `AGGLAYER_ACCOUNTS_DIR` env var.
+pub fn write_genesis_config(output_dir: &Path, include_agglayer: bool) -> Result<()> {
     std::fs::create_dir_all(output_dir).with_context(|| {
         format!("failed to create genesis output directory {}", output_dir.display())
     })?;
@@ -76,6 +82,19 @@ pub fn write_genesis_config(output_dir: &Path) -> Result<()> {
             .write(output_dir.join(&file_name))
             .with_context(|| format!("failed to write {file_name}"))?;
         account_files.push(file_name);
+    }
+
+    // Agglayer accounts are written with their secret keys (where applicable) so tests can sign
+    // transactions on behalf of the bridge admin and GER manager.
+    if include_agglayer {
+        let agglayer_accounts = agglayer::create_agglayer_genesis_accounts()
+            .context("failed to create agglayer genesis accounts")?;
+        for (file_name, account_file) in agglayer_accounts {
+            account_file
+                .write(output_dir.join(file_name))
+                .with_context(|| format!("failed to write {file_name}"))?;
+            account_files.push(file_name.to_string());
+        }
     }
 
     let timestamp: u32 = SystemTime::now()

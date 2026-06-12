@@ -256,6 +256,8 @@ jobs:
           path: target/release
       - name: Restore note-transport permissions
         run: chmod +x target/release/miden-note-transport-node-bin
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@c7450ba673e133f5ee30098b3b54f444d3a2ca2d # v1.8
       # The test node now runs its own transaction prover (miden-remote-prover) for the ntx-builder;
       # see scripts/start-test-node.sh.
       - name: Start test node

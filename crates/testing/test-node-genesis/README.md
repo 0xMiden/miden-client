@@ -27,6 +27,19 @@ The node is then bootstrapped with:
 miden-validator bootstrap --genesis-config-file OUTPUT_DIR/genesis.toml ...
 ```
 
+## AggLayer genesis
+
+Setting the `AGGLAYER_GENESIS` env var additionally emits the pre-deployed AggLayer accounts:
+
+- `bridge_admin.mac` — bridge admin wallet (with secret key)
+- `ger_manager.mac` — GER manager wallet (with secret key)
+- `bridge.mac` — AggLayer bridge account (unconfigured; configured at test time)
+- `agglayer_faucet.mac` — AggLayer faucet (token symbol "AGG")
+
+The `start-node-agglayer` Make target starts the node this way, and
+`scripts/start-test-node.sh` copies the files into `./data/` so the integration tests can load
+them via `AGGLAYER_ACCOUNTS_DIR=./data`.
+
 ## Why a TOML manifest
 
 The accounts are built in Rust (depending only on `miden-protocol` / `miden-standards`) and emitted
