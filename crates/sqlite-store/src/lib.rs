@@ -45,6 +45,7 @@ use miden_client::store::{
     NoteFilter,
     OutputNoteRecord,
     PartialBlockchainFilter,
+    SettingMutation,
     Store,
     StoreError,
     TransactionFilter,
@@ -469,6 +470,26 @@ impl Store for SqliteStore {
 
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError> {
         self.interact_with_connection(move |conn| list_setting_keys(conn)).await
+    }
+
+    async fn apply_settings_mutations(
+        &self,
+        mutations: Vec<SettingMutation>,
+    ) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            for mutation in &mutations {
+                match mutation {
+                    SettingMutation::Set { key, value } => {
+                        set_setting(&tx, key, value).into_store_error()?;
+                    },
+                    SettingMutation::Remove { key } => remove_setting(&tx, key)?,
+                }
+            }
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await
     }
 
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {

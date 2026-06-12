@@ -1,6 +1,7 @@
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
+use miden_protocol::Word;
 use miden_protocol::account::{Account, AccountId};
 use miden_protocol::note::{NoteDetailsCommitment, NoteTag};
 use miden_tx::utils::serde::{
@@ -70,7 +71,11 @@ pub struct NoteTagRecord {
 
 /// Represents the source of the tag. This is used to differentiate between tags that are added by
 /// the user and tags that are added automatically by the client to track notes .
+///
+/// Marked `#[non_exhaustive]`: downstream code matching on this enum must include a wildcard arm,
+/// so future variants can be added without breaking it.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[non_exhaustive]
 pub enum NoteTagSource {
     /// Tag for notes directed to a tracked account.
     Account(AccountId),
@@ -78,6 +83,11 @@ pub enum NoteTagSource {
     Note(NoteDetailsCommitment),
     /// Tag manually added by the user.
     User,
+    /// Tag for a long-lived subscription, anchored to an opaque 4-felt key that identifies its
+    /// origin (e.g. the id of the note that registered it). Distinct subscriptions may share the
+    /// same [`NoteTag`]; the key keeps them as separate rows so each is tracked and removed
+    /// independently.
+    Subscription(Word),
 }
 
 impl NoteTagRecord {
@@ -123,6 +133,11 @@ impl Serializable for NoteTagSource {
                 details_commitment.write_into(target);
             },
             NoteTagSource::User => target.write_u8(2),
+            NoteTagSource::Subscription(key) => {
+                // Discriminant 3 must stay stable so rows survive deserialization.
+                target.write_u8(3);
+                key.write_into(target);
+            },
         }
     }
 }
@@ -133,6 +148,7 @@ impl Deserializable for NoteTagSource {
             0 => Ok(NoteTagSource::Account(AccountId::read_from(source)?)),
             1 => Ok(NoteTagSource::Note(NoteDetailsCommitment::read_from(source)?)),
             2 => Ok(NoteTagSource::User),
+            3 => Ok(NoteTagSource::Subscription(Word::read_from(source)?)),
             val => Err(DeserializationError::InvalidValue(format!("Invalid tag source: {val}"))),
         }
     }
@@ -162,5 +178,25 @@ impl TryInto<NoteTagRecord> for &InputNoteRecord {
                 "Input Note Record does not contain tag".to_string(),
             )),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use miden_protocol::{Felt, Word};
+    use miden_tx::utils::serde::{Deserializable, Serializable};
+
+    use super::NoteTagSource;
+
+    #[test]
+    fn subscription_note_tag_source_round_trips_with_stable_discriminant() {
+        let key: Word =
+            [Felt::from(1u32), Felt::from(2u32), Felt::from(3u32), Felt::from(4u32)].into();
+        let source = NoteTagSource::Subscription(key);
+
+        let bytes = source.to_bytes();
+        // Discriminant byte must stay 3 so persisted rows keep deserializing across releases.
+        assert_eq!(bytes[0], 3, "Subscription discriminant must remain 3");
+        assert_eq!(NoteTagSource::read_from_bytes(&bytes).unwrap(), source);
     }
 }
