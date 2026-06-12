@@ -439,22 +439,10 @@ pub trait Store: Send + Sync {
 
     /// Applies a batch of [`SettingMutation`]s. Use this when several `settings` entries must stay
     /// mutually consistent (e.g. a record and its secondary index).
-    ///
-    /// The default implementation applies the mutations sequentially and is **not** atomic — a
-    /// failure partway through leaves earlier mutations committed. Backends that can apply the
-    /// batch atomically (all-or-nothing) should override this; `SqliteStore` does.
     async fn apply_settings_mutations(
         &self,
         mutations: Vec<SettingMutation>,
-    ) -> Result<(), StoreError> {
-        for mutation in mutations {
-            match mutation {
-                SettingMutation::Set { key, value } => self.set_setting(key, value).await?,
-                SettingMutation::Remove { key } => self.remove_setting(key).await?,
-            }
-        }
-        Ok(())
-    }
+    ) -> Result<(), StoreError>;
 
     // SYNC
     // --------------------------------------------------------------------------------------------
