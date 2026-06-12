@@ -33,7 +33,7 @@ impl From<&BlockHeader> for proto::blockchain::BlockHeader {
 impl From<&FeeParameters> for proto::blockchain::FeeParameters {
     fn from(fee_params: &FeeParameters) -> Self {
         Self {
-            native_asset_id: Some(fee_params.native_asset_id().into()),
+            native_asset_id: Some(fee_params.fee_faucet_id().into()),
             verification_base_fee: fee_params.verification_base_fee(),
         }
     }
@@ -116,8 +116,7 @@ impl TryFrom<&proto::blockchain::FeeParameters> for FeeParameters {
             .ok_or(proto::blockchain::FeeParameters::missing_field("account_id"))?
             .try_into()?;
 
-        FeeParameters::new(account_id, value.verification_base_fee)
-            .map_err(|_err| RpcConversionError::InvalidField(stringify!(FeeParameter).into()))
+        Ok(FeeParameters::new(account_id, value.verification_base_fee))
     }
 }
 

@@ -43,7 +43,7 @@ The available gRPC methods are documented in the [Node gRPC Reference](https://d
 
 ## Transaction executor
 
-The transaction executor uses the [Miden VM](https://0xmiden.github.io/miden-docs/imported/miden-vm/src/intro/main.html) to execute transactions. All transactions run within the [transaction kernel](https://0xmiden.github.io/miden-docs/imported/miden-base/src/transaction.html).
+The transaction executor uses the [Miden VM](https://docs.miden.xyz/core-concepts/miden-vm/) to execute transactions. All transactions run within the [transaction kernel](https://docs.miden.xyz/builder/smart-contracts/transactions/introduction).
 
 When executing, the executor needs access to relevant blockchain history. The executor uses a `DataStore` interface for accessing this data. This means that there may be some coupling between the executor and the store.
 
@@ -58,6 +58,8 @@ These private keys are used by the executor to sign and authenticate transaction
 The note screener is used to check the consumability of notes by tracked accounts. It performs fast static checks (e.g. checking the inputs for well known notes) and also dry runs of consumption transactions.
 
 It can find the tracked accounts that can consume a note, and whether the note can be consumed at the moment or in the future.
+
+Usage examples for note screening can be found in the [Note screening section](./library.md#note-screening).
 
 ## State Sync component
 

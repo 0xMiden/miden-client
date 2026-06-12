@@ -10,7 +10,7 @@ In this section, we show you how to create a new local Miden account and how to 
 The Miden client facilitates interaction with the Miden rollup and provides a way to execute and prove transactions.
 
 :::tip
-Check the [Miden client documentation](https://0xMiden.github.io/miden-docs/miden-client/cli-reference.html) for more information.
+Check the [Miden client documentation](https://docs.miden.xyz/builder/tools/clients/rust-client/cli/) for more information.
 :::
 
 1. If you haven't already done so as part of another tutorial, open your terminal and create a new directory to store the Miden client.
@@ -30,10 +30,10 @@ Check the [Miden client documentation](https://0xMiden.github.io/miden-docs/mide
 
 ## Create a new Miden account
 
-1. Create a new account of type `mutable` using the following command:
+1. Create a new wallet account using the following command:
 
    ```sh
-   miden-client new-wallet --mutable
+   miden-client new-wallet
    ```
 
 2. List all created accounts by running the following command:
@@ -193,7 +193,7 @@ You have successfully configured and used the Miden client to interact with a Mi
 
 You have performed basic Miden rollup operations like submitting proofs of transactions, generating and consuming notes.
 
-For more information on the Miden client, refer to the [Miden client documentation](https://0xMiden.github.io/miden-docs/miden-client/index.html).
+For more information on the Miden client, refer to the [Miden client documentation](https://docs.miden.xyz/builder/tools/clients/).
 
 ## Debugging tips (clear state and folder)
 

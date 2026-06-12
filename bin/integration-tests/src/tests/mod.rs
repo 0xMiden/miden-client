@@ -1,4 +1,5 @@
 pub mod agglayer;
+pub mod batch;
 pub mod client;
 pub mod config;
 pub mod custom_transaction;
@@ -7,5 +8,6 @@ pub mod network_fpi;
 pub mod network_transaction;
 pub mod onchain;
 pub mod pass_through;
+pub mod pswap_transaction;
 pub mod swap_transaction;
 pub mod transport;

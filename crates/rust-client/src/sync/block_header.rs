@@ -1,17 +1,18 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use miden_protocol::Word;
 use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::crypto::hash::rpo::Rpo256;
 use miden_protocol::crypto::merkle::MerklePath;
-use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
-#[cfg(feature = "testing")]
-use miden_protocol::transaction::TransactionKernel;
+use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, PartialMmr};
+use miden_protocol::{Felt, Word};
 use tracing::warn;
 
 use crate::rpc::NodeRpcClient;
 use crate::store::{BlockRelevance, StoreError};
-use crate::{Client, ClientError};
+#[cfg(feature = "testing")]
+use crate::test_utils::mock::MockRpcApi;
+use crate::{CachedPartialMmr, Client, ClientError};
 
 /// Network information management methods.
 impl<AUTH> Client<AUTH> {
@@ -38,18 +39,16 @@ impl<AUTH> Client<AUTH> {
             .get_block_header_by_number(Some(BlockNumber::GENESIS), false)
             .await?;
 
-        let blank_mmr_peaks = MmrPeaks::new(Forest::empty(), vec![])
-            .expect("Blank MmrPeaks should not fail to instantiate");
-        self.store.insert_block_header(&genesis, blank_mmr_peaks, false).await?;
+        self.store.insert_block_header(&genesis, false).await?;
         self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         Ok(())
     }
 
-    /// Seeds the local client state needed to create accounts and execute programs without a node.
+    /// Seeds local state for offline account creation and debugging without a real node.
     ///
-    /// This stores default RPC limits and inserts a synthetic genesis header if one is not
-    /// already present in the store. The synthetic header is only intended for local-only
-    /// execution and debugging.
+    /// Applies default RPC limits, then either aligns the RPC genesis with an existing stored
+    /// genesis, or replaces the RPC client with [`MockRpcApi`] and runs
+    /// [`Self::ensure_genesis_in_place`] so genesis comes from the mock chain.
     #[cfg(feature = "testing")]
     pub async fn prepare_offline_bootstrap(&mut self) -> Result<(), ClientError> {
         let limits = self.store.get_rpc_limits().await?.unwrap_or_default();
@@ -62,17 +61,58 @@ impl<AUTH> Client<AUTH> {
             return Ok(());
         }
 
-        let genesis = synthetic_offline_genesis_header();
-        let blank_mmr_peaks = MmrPeaks::new(Forest::empty(), vec![])
-            .expect("Blank MmrPeaks should not fail to instantiate");
-        self.store.insert_block_header(&genesis, blank_mmr_peaks, false).await?;
-        self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
+        *self.test_rpc_api() = Arc::new(MockRpcApi::default());
+        self.ensure_genesis_in_place().await?;
         Ok(())
     }
 
-    /// Fetches from the store the current view of the chain's [`PartialMmr`].
+    /// Returns the cached [`PartialMmr`] if in-memory caching is enabled and its fingerprint
+    /// matches the current store state, otherwise rebuilds from the store.
     pub async fn get_current_partial_mmr(&self) -> Result<PartialMmr, ClientError> {
+        if self.cache_partial_mmr_in_memory
+            && let Some(ref cached) = self.partial_mmr
+            && cached.store_peaks_hash == self.current_store_peaks_hash().await?
+            && cached.tracked_blocks_hash == self.current_tracked_blocks_hash().await?
+        {
+            return Ok(cached.mmr.clone());
+        }
         self.store.get_current_partial_mmr().await.map_err(Into::into)
+    }
+
+    /// Stores the MMR in the cache if in-memory caching is enabled, capturing the current store
+    /// fingerprint. Must run after any store mutation that may have changed the sync-height peaks
+    /// or the tracked block set.
+    pub(crate) async fn cache_partial_mmr(&mut self, mmr: PartialMmr) -> Result<(), ClientError> {
+        if !self.cache_partial_mmr_in_memory {
+            return Ok(());
+        }
+
+        let store_peaks_hash = self.current_store_peaks_hash().await?;
+        let tracked_blocks_hash = self.current_tracked_blocks_hash().await?;
+        self.partial_mmr = Some(CachedPartialMmr {
+            store_peaks_hash,
+            tracked_blocks_hash,
+            mmr,
+        });
+        Ok(())
+    }
+
+    /// Hashes the store's peaks at the current sync height. Used as the cache freshness
+    /// fingerprint.
+    async fn current_store_peaks_hash(&self) -> Result<Word, ClientError> {
+        Ok(self.store.get_current_blockchain_peaks().await?.hash_peaks())
+    }
+
+    /// Hashes the store's tracked block numbers (sorted). Used as the cache freshness
+    /// fingerprint to detect tracked-set drift without rebuilding the MMR.
+    async fn current_tracked_blocks_hash(&self) -> Result<Word, ClientError> {
+        // BTreeSet iterates in sorted order, so the hash is deterministic.
+        let tracked = self.store.get_tracked_block_header_numbers().await?;
+        let elements: Vec<Felt> = tracked
+            .iter()
+            .map(|&n| Felt::from(u32::try_from(n).expect("block number fits in u32")))
+            .collect();
+        Ok(Rpo256::hash_elements(&elements))
     }
 
     // HELPERS
@@ -104,18 +144,11 @@ impl<AUTH> Client<AUTH> {
         let tracked_nodes = authenticated_block_nodes(&block_header, path_nodes);
 
         // Insert header and MMR nodes
-        self.store
-            .insert_block_header(&block_header, current_partial_mmr.peaks(), true)
-            .await?;
+        self.store.insert_block_header(&block_header, true).await?;
         self.store.insert_partial_blockchain_nodes(&tracked_nodes).await?;
 
         Ok(block_header)
     }
-}
-
-#[cfg(feature = "testing")]
-fn synthetic_offline_genesis_header() -> BlockHeader {
-    BlockHeader::mock(BlockNumber::GENESIS, None, None, &[], TransactionKernel.to_commitment())
 }
 
 // UTILS
@@ -149,6 +182,25 @@ pub(crate) fn adjust_merkle_path_for_forest(
     path_nodes
 }
 
+/// Adjusts a Merkle path for the given forest, then calls [`PartialMmr::track`] to verify
+/// and register the block. Returns the forest-adjusted authentication path nodes for the
+/// tracked block.
+pub(crate) fn track_block_in_mmr(
+    partial_mmr: &mut PartialMmr,
+    block_num: BlockNumber,
+    block_commitment: Word,
+    mmr_path: &MerklePath,
+) -> Result<Vec<(InOrderIndex, Word)>, ClientError> {
+    let path_nodes = adjust_merkle_path_for_forest(mmr_path, block_num, partial_mmr.forest());
+    let adjusted_path = MerklePath::new(path_nodes.iter().map(|(_, n)| *n).collect());
+
+    partial_mmr
+        .track(block_num.as_usize(), block_commitment, &adjusted_path)
+        .map_err(StoreError::MmrError)?;
+
+    Ok(path_nodes)
+}
+
 fn authenticated_block_nodes(
     block_header: &BlockHeader,
     mut path_nodes: Vec<(InOrderIndex, Word)>,
@@ -169,44 +221,38 @@ pub(crate) async fn fetch_block_header(
 ) -> Result<(BlockHeader, Vec<(InOrderIndex, Word)>), ClientError> {
     let (block_header, mmr_proof) = rpc_api.get_block_header_with_proof(block_num).await?;
 
-    // Trim merkle path to keep nodes relevant to our current PartialMmr since the node's MMR
-    // might be of a forest arbitrarily higher
-    let path_nodes = adjust_merkle_path_for_forest(
-        mmr_proof.merkle_path(),
+    let path_nodes = track_block_in_mmr(
+        current_partial_mmr,
         block_num,
-        current_partial_mmr.forest(),
-    );
-
-    let merkle_path = MerklePath::new(path_nodes.iter().map(|(_, n)| *n).collect());
-
-    current_partial_mmr
-        .track(block_num.as_usize(), block_header.commitment(), &merkle_path)
-        .map_err(StoreError::MmrError)?;
+        block_header.commitment(),
+        mmr_proof.merkle_path(),
+    )?;
 
     Ok((block_header, path_nodes))
 }
 
 #[cfg(test)]
 mod tests {
-    use miden_protocol::block::account_tree::AccountTree;
     use miden_protocol::block::{BlockHeader, BlockNumber};
     use miden_protocol::crypto::merkle::MerklePath;
     use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, Mmr, PartialMmr};
-    use miden_protocol::crypto::merkle::smt::Smt;
     use miden_protocol::transaction::TransactionKernel;
     use miden_protocol::{Felt, Word};
 
-    #[cfg(feature = "testing")]
-    use super::synthetic_offline_genesis_header;
     use super::{adjust_merkle_path_for_forest, authenticated_block_nodes};
 
     fn word(n: u64) -> Word {
-        Word::new([Felt::new(n), Felt::new(0), Felt::new(0), Felt::new(0)])
+        Word::new([
+            Felt::new(n).expect("test value should fit into the base field"),
+            Felt::new(0).expect("zero is a valid field element"),
+            Felt::new(0).expect("zero is a valid field element"),
+            Felt::new(0).expect("zero is a valid field element"),
+        ])
     }
 
     #[test]
     fn adjust_merkle_path_truncates_to_forest_bounds() {
-        let forest = Forest::new(5);
+        let forest = Forest::new(5).expect("valid forest");
         // Forest 5 <=> block 4 is rightmost leaf
         let block_num = BlockNumber::from(4u32);
         let path = MerklePath::new(vec![word(1), word(2), word(3)]);
@@ -222,11 +268,11 @@ mod tests {
         // different tree in the smaller forest, which would invalidate the proof.
         let mut mmr = Mmr::new();
         for value in 0u64..8 {
-            mmr.add(word(value));
+            mmr.add(word(value)).expect("test MMR append should succeed");
         }
 
-        let large_forest = Forest::new(8);
-        let small_forest = Forest::new(5);
+        let large_forest = Forest::new(8).expect("valid forest");
+        let small_forest = Forest::new(5).expect("valid forest");
         let leaf_pos = 4usize;
         let block_num = BlockNumber::from(u32::try_from(leaf_pos).unwrap());
 
@@ -247,7 +293,7 @@ mod tests {
     #[test]
     fn adjust_merkle_path_correct_indices() {
         // Forest 6 has trees of size 2 and 4
-        let forest = Forest::new(6);
+        let forest = Forest::new(6).expect("valid forest");
         // Block 1 is on tree with size 4 (merkle path should have 2 nodes)
         let block_num = BlockNumber::from(1u32);
         let nodes = vec![word(10), word(11), word(12), word(13)];
@@ -277,11 +323,13 @@ mod tests {
         let leaf_pos = 2usize;
         let mut mmr = Mmr::new();
         for value in 0u64..large_leaves as u64 {
-            mmr.add(word(value));
+            mmr.add(word(value)).expect("test MMR append should succeed");
         }
 
-        let small_forest = Forest::new(small_leaves);
-        let proof = mmr.open_at(leaf_pos, Forest::new(large_leaves)).expect("valid proof");
+        let small_forest = Forest::new(small_leaves).expect("valid forest");
+        let proof = mmr
+            .open_at(leaf_pos, Forest::new(large_leaves).expect("valid forest"))
+            .expect("valid proof");
         let expected_depth =
             small_forest.leaf_to_corresponding_tree(leaf_pos).expect("leaf is in forest") as usize;
 
@@ -316,15 +364,5 @@ mod tests {
 
         assert_eq!(nodes[0], (InOrderIndex::from_leaf_pos(4), block_header.commitment()));
         assert_eq!(&nodes[1..], path_nodes.as_slice());
-    }
-
-    #[test]
-    #[cfg(feature = "testing")]
-    fn synthetic_offline_genesis_header_uses_mock_genesis() {
-        let genesis = synthetic_offline_genesis_header();
-
-        assert_eq!(genesis.block_num(), BlockNumber::GENESIS);
-        assert_eq!(genesis.account_root(), AccountTree::<Smt>::default().root());
-        assert_eq!(genesis.tx_kernel_commitment(), TransactionKernel.to_commitment());
     }
 }

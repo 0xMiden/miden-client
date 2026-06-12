@@ -4,6 +4,8 @@ use alloc::sync::Arc;
 use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::keystore::Keystore;
+use miden_client::note::{NoteAttachments, P2idNote};
+use miden_client::store::NoteFilter;
 use miden_client::transaction::{
     ProvenTransaction,
     TransactionExecutorError,
@@ -17,7 +19,6 @@ use miden_protocol::account::{
     AccountBuilder,
     AccountComponent,
     AccountComponentMetadata,
-    AccountStorageMode,
     AccountType,
     StorageMap,
     StorageMapKey,
@@ -26,13 +27,15 @@ use miden_protocol::account::{
 };
 use miden_protocol::assembly::diagnostics::miette::GraphicalReportHandler;
 use miden_protocol::asset::{Asset, FungibleAsset};
-use miden_protocol::note::NoteType;
+use miden_protocol::crypto::rand::FeltRng;
+use miden_protocol::note::{NoteRecipient, NoteStorage, NoteType};
 use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
 };
 use miden_protocol::{Felt, Word};
+use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::wallets::BasicWallet;
 
 use super::PaymentNoteDescription;
@@ -96,14 +99,10 @@ async fn transaction_creates_two_notes() {
 #[tokio::test]
 async fn transaction_error_reports_source_line() {
     let (mut client, _, keystore) = Box::pin(create_test_client()).await;
-    let (wallet, _) = setup_wallet_and_faucet(
-        &mut client,
-        AccountStorageMode::Private,
-        &keystore,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await
-    .unwrap();
+    let (wallet, _) =
+        setup_wallet_and_faucet(&mut client, AccountType::Private, &keystore, RPO_FALCON_SCHEME_ID)
+            .await
+            .unwrap();
 
     let failing_script = client
         .code_builder()
@@ -136,6 +135,93 @@ async fn transaction_error_reports_source_line() {
     }
 }
 
+/// Regression test for #2221: a transaction request whose execution fails must leave the store
+/// unchanged — no orphaned input notes and no orphaned output note scripts.
+#[tokio::test]
+async fn execute_transaction_failure_leaves_store_unchanged() {
+    let (mut client, _, keystore) = Box::pin(create_test_client()).await;
+    let (wallet, faucet) =
+        setup_wallet_and_faucet(&mut client, AccountType::Private, &keystore, RPO_FALCON_SCHEME_ID)
+            .await
+            .unwrap();
+
+    // A note targeting the wallet that is not tracked by the store. Passing it as a request
+    // input note is what would trigger an input-note write during preparation.
+    let asset = FungibleAsset::new(faucet.id(), 100).unwrap();
+    let unauthenticated_note = P2idNote::create(
+        faucet.id(),
+        wallet.id(),
+        vec![asset.into()],
+        NoteType::Private,
+        NoteAttachments::empty(),
+        client.rng(),
+    )
+    .unwrap();
+    let note_id = unauthenticated_note.id();
+
+    // An expected output recipient with a non-standard script. Declaring it in the request is
+    // what would trigger a note-script write during preparation.
+    let output_note_script = client
+        .code_builder()
+        .compile_note_script(
+            "@note_script
+            pub proc main
+                nop
+            end",
+        )
+        .unwrap();
+    let script_root = output_note_script.root();
+    let serial_num = client.rng().draw_word();
+    let output_recipient =
+        NoteRecipient::new(serial_num, output_note_script, NoteStorage::new(vec![]).unwrap());
+
+    // A transaction script that always fails, forcing execution to error after preparation has
+    // succeeded.
+    let failing_script = client
+        .code_builder()
+        .compile_tx_script("begin push.0 push.2 assert_eq end")
+        .unwrap();
+
+    let tx_request = TransactionRequestBuilder::new()
+        .input_notes([(unauthenticated_note, None)])
+        .expected_output_recipients(vec![output_recipient])
+        .custom_script(failing_script)
+        .build()
+        .unwrap();
+
+    // Neither the note nor the script is tracked before execution.
+    assert!(
+        client
+            .get_input_notes(NoteFilter::List(vec![note_id]))
+            .await
+            .unwrap()
+            .is_empty(),
+        "note should not be tracked before execution"
+    );
+    assert!(
+        client.test_store().get_note_script(script_root.into()).await.is_err(),
+        "output note script should not be stored before execution"
+    );
+
+    Box::pin(client.execute_transaction(wallet.id(), tx_request))
+        .await
+        .expect_err("transaction execution should fail");
+
+    // The failed execution must leave the store unchanged.
+    assert!(
+        client
+            .get_input_notes(NoteFilter::List(vec![note_id]))
+            .await
+            .unwrap()
+            .is_empty(),
+        "execution failure must not persist the request's input notes"
+    );
+    assert!(
+        client.test_store().get_note_script(script_root.into()).await.is_err(),
+        "execution failure must not persist the request's output note scripts"
+    );
+}
+
 // MOCK PROVERS
 // ================================================================================================
 
@@ -161,14 +247,10 @@ impl TransactionProver for AlwaysFailingProver {
 #[tokio::test]
 async fn prover_fallback_pattern_allows_retry_with_different_prover() {
     let (mut client, _, keystore) = Box::pin(create_test_client()).await;
-    let (wallet, faucet) = setup_wallet_and_faucet(
-        &mut client,
-        AccountStorageMode::Private,
-        &keystore,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await
-    .unwrap();
+    let (wallet, faucet) =
+        setup_wallet_and_faucet(&mut client, AccountType::Private, &keystore, RPO_FALCON_SCHEME_ID)
+            .await
+            .unwrap();
 
     let fungible_asset = FungibleAsset::new(faucet.id(), 100).unwrap();
 
@@ -207,8 +289,10 @@ async fn lazy_foreign_account_loading() {
     let (mut client, rpc_api, keystore) = Box::pin(create_test_client()).await;
 
     // Setup: Create and deploy a public foreign account with a storage map.
-    let map_key: Word = [Felt::new(15), Felt::new(15), Felt::new(15), Felt::new(15)].into();
-    let map_value: Word = [Felt::new(9), Felt::new(12), Felt::new(18), Felt::new(30)].into();
+    let map_key: Word =
+        [Felt::from(15u32), Felt::from(15u32), Felt::from(15u32), Felt::from(15u32)].into();
+    let map_value: Word =
+        [Felt::from(9u32), Felt::from(12u32), Felt::from(18u32), Felt::from(30u32)].into();
     let map_slot_name = StorageSlotName::new("miden::testing::fpi::map").unwrap();
 
     let mut storage_map = StorageMap::new();
@@ -233,20 +317,20 @@ async fn lazy_foreign_account_loading() {
     let fpi_component = AccountComponent::new(
         component_code,
         vec![map_slot],
-        AccountComponentMetadata::new("miden::testing::fpi_lazy_component", AccountType::all()),
+        AccountComponentMetadata::new("miden::testing::fpi_lazy_component"),
     )
     .unwrap();
     let proc_root = fpi_component.mast_forest().procedure_digests().next().unwrap();
 
     let secret_key = AuthSecretKey::new_falcon512_poseidon2();
     let foreign_account = AccountBuilder::new(Default::default())
+        .account_type(AccountType::Public)
         .with_component(fpi_component)
         .with_auth_component(AuthSingleSig::new(
             secret_key.public_key().to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
         ))
-        .storage_mode(AccountStorageMode::Public)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
     let foreign_account_id = foreign_account.id();
 
@@ -264,7 +348,7 @@ async fn lazy_foreign_account_loading() {
     client.sync_state().await.unwrap();
 
     // Setup: Create a local wallet to execute the FPI transaction.
-    let local_wallet = super::insert_new_wallet(&mut client, AccountStorageMode::Public, &keystore)
+    let local_wallet = super::insert_new_wallet(&mut client, AccountType::Public, &keystore)
         .await
         .unwrap();
 

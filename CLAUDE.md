@@ -53,7 +53,7 @@ make install-tools
 ## Code Style
 
 ### Rust
-- Edition 2024, MSRV 1.90
+- Edition 2024, MSRV 1.93
 - Use section headers for major code sections:
   ```rust
   // SECTION NAME
@@ -146,5 +146,5 @@ Key external dependencies:
 
 ## Versioning
 
-- All workspace crates share version (currently 0.14.x)
+- All workspace crates share version set in the Cargo.toml
 - Protocol version must match node version

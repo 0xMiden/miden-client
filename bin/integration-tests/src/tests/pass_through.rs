@@ -1,6 +1,12 @@
 use anyhow::Result;
 use miden_client::account::component::BasicWallet;
-use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType};
+use miden_client::account::{
+    Account,
+    AccountBuilder,
+    AccountBuilderSchemaCommitmentExt,
+    AccountId,
+    AccountType,
+};
 use miden_client::assembly::CodeBuilder;
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::{
@@ -16,13 +22,13 @@ use miden_client::note::{
     NoteAssets,
     NoteDetails,
     NoteFile,
-    NoteMetadata,
     NoteRecipient,
     NoteScript,
     NoteStorage,
     NoteTag,
     NoteType,
     P2idNoteStorage,
+    PartialNoteMetadata,
 };
 use miden_client::store::{InputNoteState, TransactionFilter};
 use miden_client::testing::common::*;
@@ -60,14 +66,14 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
     // Create Client basic wallet (We'll call it accountA)
     let (sender, ..) = insert_new_wallet(
         &mut client,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_1,
         AuthSchemeId::Falcon512Poseidon2,
     )
     .await?;
     let (target, ..) = insert_new_wallet(
         &mut client_2,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_2,
         AuthSchemeId::Falcon512Poseidon2,
     )
@@ -78,7 +84,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
     // Create client with faucets BTC faucet
     let (btc_faucet_account, ..) = insert_new_fungible_faucet(
         &mut client,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_1,
         AuthSchemeId::Falcon512Poseidon2,
     )
@@ -208,11 +214,10 @@ async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
             .unwrap();
 
     let account = AccountBuilder::new(init_seed)
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(AccountStorageMode::Private)
+        .account_type(AccountType::Private)
         .with_auth_component(auth_component)
         .with_component(BasicWallet)
-        .build()
+        .build_with_schema_commitment()
         .unwrap();
 
     client.add_account(&account, false).await?;
@@ -261,8 +266,8 @@ fn create_pass_through_note(
     let serial_num = rng.draw_word();
     let pass_through_recipient = NoteRecipient::new(serial_num, note_script, inputs);
 
-    let metadata =
-        NoteMetadata::new(sender, NoteType::Public).with_tag(NoteTag::with_account_target(target));
+    let metadata = PartialNoteMetadata::new(sender, NoteType::Public)
+        .with_tag(NoteTag::with_account_target(target));
     let note = Note::new(NoteAssets::new(vec![asset])?, metadata, pass_through_recipient);
 
     let pass_through_note_details =

@@ -35,7 +35,7 @@ fn generate_entries(map_idx: usize, offset: usize, count: usize) -> Vec<([Felt; 
     (0..count)
         .map(|i| {
             let key_val = seed.wrapping_mul(1000).wrapping_add((offset + i) as u32);
-            let key = [Felt::new(key_val as u64); 4];
+            let key = [Felt::new_unchecked(key_val as u64); 4];
             let value = random_word(&mut rng);
             (key, value)
         })
@@ -133,7 +133,7 @@ pub async fn expand_storage(
     let total_t = Instant::now();
 
     // Import account if not already present in store
-    let has_account = client.get_account_storage(account_id).await.is_ok();
+    let has_account = client.account_reader(account_id).header().await.is_ok();
     if has_account {
         println!("Using account {account_id} from persistent store");
     } else {

@@ -6,7 +6,7 @@
 //! accounts and their state, and facilitates executing, proving, and submitting transactions.
 //!
 //! For a protocol-level overview and guides for getting started, please visit the official
-//! [Miden docs](https://0xMiden.github.io/miden-docs/).
+//! [Miden docs](https://docs.miden.xyz/).
 //!
 //! ## Overview
 //!
@@ -148,6 +148,8 @@ pub mod notes {
 pub mod assembly {
     pub use miden_protocol::MastForest;
     pub use miden_protocol::assembly::debuginfo::SourceManagerSync;
+    #[cfg(feature = "std")]
+    pub use miden_protocol::assembly::debuginfo::{SourceManagerExt, Uri};
     pub use miden_protocol::assembly::diagnostics::Report;
     pub use miden_protocol::assembly::diagnostics::reporting::PrintDiagnostic;
     pub use miden_protocol::assembly::mast::MastNodeExt;
@@ -170,6 +172,8 @@ pub mod asset {
         FungibleAssetDelta,
         NonFungibleAssetDelta,
         NonFungibleDeltaAction,
+        StorageMapDelta,
+        StorageSlotDelta,
     };
     pub use miden_protocol::account::{
         AccountStorageHeader,
@@ -179,6 +183,11 @@ pub mod asset {
     };
     pub use miden_protocol::asset::{
         Asset,
+        AssetAmount,
+        AssetCallbackFlag,
+        AssetCallbacks,
+        AssetComposition,
+        AssetId,
         AssetVault,
         AssetVaultKey,
         AssetWitness,
@@ -200,6 +209,7 @@ pub mod auth {
         PublicKeyCommitment,
         Signature,
     };
+    pub use miden_standards::AuthMethod;
     pub use miden_standards::account::auth::{
         AuthMultisig,
         AuthMultisigConfig,
@@ -281,6 +291,7 @@ pub mod vm {
         AdviceInputs,
         AdviceMap,
         AttributeSet,
+        MIN_STACK_DEPTH,
         Package,
         PackageExport,
         PackageManifest,
@@ -303,6 +314,7 @@ pub use miden_protocol::{
     MIN_TX_EXECUTION_CYCLES,
     ONE,
     PrettyPrint,
+    WORD_SIZE,
     Word,
     ZERO,
 };
@@ -315,8 +327,10 @@ pub use miden_tx::ExecutionOptions;
 #[cfg(feature = "testing")]
 pub mod testing {
     pub use miden_protocol::testing::account_id;
+    /// Raw access to `miden-standards` testing modules for items not curated by
+    /// `miden-client`.
+    pub use miden_standards::testing as standards;
     pub use miden_standards::testing::note::NoteBuilder;
-    pub use miden_standards::testing::*;
     pub use miden_testing::*;
 
     pub use crate::test_utils::*;
@@ -324,6 +338,8 @@ pub mod testing {
 
 use alloc::sync::Arc;
 
+use miden_protocol::block::BlockNumber;
+use miden_protocol::crypto::merkle::mmr::PartialMmr;
 use miden_protocol::crypto::rand::FeltRng;
 use miden_tx::auth::TransactionAuthenticator;
 use rand::RngCore;
@@ -364,12 +380,38 @@ pub struct Client<AUTH> {
     exec_options: ExecutionOptions,
     /// Number of blocks after which pending transactions are considered stale and discarded.
     tx_discard_delta: Option<u32>,
+    /// Number of synced blocks between automatic irrelevant-block pruning runs.
+    irrelevant_block_prune_interval: Option<u32>,
+    /// Sync height at which the last automatic irrelevant-block prune completed.
+    last_irrelevant_block_prune_sync_height: Option<BlockNumber>,
     /// Maximum number of blocks the client can be behind the network for transactions and account
     /// proofs to be considered valid.
     max_block_number_delta: Option<u32>,
     /// An instance of [`NoteTransportClient`] which provides a way for the client to connect to
     /// the Miden Note Transport network.
     note_transport_api: Option<Arc<dyn NoteTransportClient>>,
+    /// Whether the client should cache the current Partial MMR in memory.
+    cache_partial_mmr_in_memory: bool,
+    /// Cached [`PartialMmr`] for the chain's MMR. Lazily built from the store and kept in sync
+    /// across sync/prune operations. `None` forces a rebuild on next access.
+    partial_mmr: Option<CachedPartialMmr>,
+}
+
+/// Cached [`PartialMmr`] with a two-part freshness fingerprint:
+///
+/// - `store_peaks_hash`: peaks at the current sync height - guards against chain/height drift.
+/// - `tracked_blocks_hash`: hash of the store's tracked block numbers - guards against drift
+///   between store-tracked and cache-tracked blocks. Required because a same-height update can mark
+///   an existing block relevant without changing peaks; pruning the cached MMR while it's missing
+///   such a block would over-delete auth nodes that the store still needs.
+///
+/// The cached MMR includes the sync-height block as a tracked leaf; the store persists the
+/// peaks committed by that block's header, i.e. the peaks over the chain *before* that block
+/// was added, so the two states are offset by one leaf.
+pub(crate) struct CachedPartialMmr {
+    pub(crate) store_peaks_hash: Word,
+    pub(crate) tracked_blocks_hash: Word,
+    pub(crate) mmr: PartialMmr,
 }
 
 /// Constructors.
@@ -444,25 +486,9 @@ impl<AUTH> Client<AUTH> {
         self.store.identifier()
     }
 
-    // LIMITS
-    // --------------------------------------------------------------------------------------------
-
-    /// Checks if the note tag limit has been exceeded.
-    pub async fn check_note_tag_limit(&self) -> Result<(), ClientError> {
-        let limits = self.rpc_api.get_rpc_limits().await?;
-        if self.store.get_unique_note_tags().await?.len() >= limits.note_tags_limit as usize {
-            return Err(ClientError::NoteTagsLimitExceeded(limits.note_tags_limit));
-        }
-        Ok(())
-    }
-
-    /// Checks if the account limit has been exceeded.
-    pub async fn check_account_limit(&self) -> Result<(), ClientError> {
-        let limits = self.rpc_api.get_rpc_limits().await?;
-        if self.store.get_account_ids().await?.len() >= limits.account_ids_limit as usize {
-            return Err(ClientError::AccountsLimitExceeded(limits.account_ids_limit));
-        }
-        Ok(())
+    /// Returns the network ID of the node the client is connected to.
+    pub async fn network_id(&self) -> Result<address::NetworkId, ClientError> {
+        Ok(self.rpc_api.get_network_id().await?)
     }
 
     // TEST HELPERS
@@ -476,6 +502,11 @@ impl<AUTH> Client<AUTH> {
     #[cfg(any(test, feature = "testing"))]
     pub fn test_store(&mut self) -> &mut Arc<dyn Store> {
         &mut self.store
+    }
+
+    #[cfg(any(test, feature = "testing"))]
+    pub fn test_has_cached_partial_mmr(&self) -> bool {
+        self.partial_mmr.is_some()
     }
 }
 

@@ -21,13 +21,11 @@ use crate::{insert_sql, subst};
 struct SerializedBlockHeaderData {
     block_num: u32,
     header: Vec<u8>,
-    partial_blockchain_peaks: Vec<u8>,
     has_client_notes: bool,
 }
 struct SerializedBlockHeaderParts {
     _block_num: u64,
     header: Vec<u8>,
-    _partial_blockchain_peaks: Vec<u8>,
     has_client_notes: bool,
 }
 
@@ -44,17 +42,11 @@ impl SqliteStore {
     pub(crate) fn insert_block_header(
         conn: &mut Connection,
         block_header: &BlockHeader,
-        partial_blockchain_peaks: &MmrPeaks,
         has_client_notes: bool,
     ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
 
-        Self::insert_block_header_tx(
-            &tx,
-            block_header,
-            partial_blockchain_peaks,
-            has_client_notes,
-        )?;
+        Self::insert_block_header_tx(&tx, block_header, has_client_notes)?;
 
         tx.commit().into_store_error()?;
         Ok(())
@@ -69,7 +61,7 @@ impl SqliteStore {
             .map(|block_number| Value::Integer(i64::from(block_number.as_u32())))
             .collect::<Vec<Value>>();
 
-        const QUERY: &str = "SELECT block_num, header, partial_blockchain_peaks, has_client_notes FROM block_headers WHERE block_num IN rarray(?)";
+        const QUERY: &str = "SELECT block_num, header, has_client_notes FROM block_headers WHERE block_num IN rarray(?)";
 
         conn.prepare(QUERY)
             .into_store_error()?
@@ -86,7 +78,7 @@ impl SqliteStore {
     pub(crate) fn get_tracked_block_headers(
         conn: &mut Connection,
     ) -> Result<Vec<BlockHeader>, StoreError> {
-        const QUERY: &str = "SELECT block_num, header, partial_blockchain_peaks, has_client_notes FROM block_headers WHERE has_client_notes=true";
+        const QUERY: &str = "SELECT block_num, header, has_client_notes FROM block_headers WHERE has_client_notes=true";
         conn.prepare(QUERY)
             .into_store_error()?
             .query_map(params![], parse_block_headers_columns)
@@ -153,25 +145,25 @@ impl SqliteStore {
         }
     }
 
-    pub(crate) fn get_partial_blockchain_peaks_by_block_num(
+    pub(crate) fn get_current_blockchain_peaks(
         conn: &mut Connection,
-        block_num: BlockNumber,
     ) -> Result<MmrPeaks, StoreError> {
         const QUERY: &str =
-            "SELECT partial_blockchain_peaks FROM block_headers WHERE block_num = ?";
+            "SELECT block_num, partial_blockchain_peaks FROM blockchain_checkpoint LIMIT 1";
 
-        let partial_blockchain_peaks: Option<Vec<u8>> = conn
+        let row: Option<(u32, Vec<u8>)> = conn
             .prepare(QUERY)
             .into_store_error()?
-            .query_row(params![block_num.as_u32()], |row| row.get::<_, Vec<u8>>(0))
+            .query_row(params![], |row| Ok((row.get(0)?, row.get(1)?)))
             .optional()
             .into_store_error()?;
 
-        if let Some(partial_blockchain_peaks) = partial_blockchain_peaks {
-            return parse_partial_blockchain_peaks(block_num.as_u32(), &partial_blockchain_peaks);
+        match row {
+            Some((block_num, peaks_bytes)) if !peaks_bytes.is_empty() => {
+                parse_partial_blockchain_peaks(block_num, &peaks_bytes)
+            },
+            _ => Ok(MmrPeaks::new(Forest::empty(), vec![])?),
         }
-
-        Ok(MmrPeaks::new(Forest::empty(), vec![])?)
     }
 
     pub fn insert_partial_blockchain_nodes(
@@ -203,50 +195,75 @@ impl SqliteStore {
     pub(crate) fn insert_block_header_tx(
         tx: &Transaction<'_>,
         block_header: &BlockHeader,
-        partial_blockchain_peaks: &MmrPeaks,
         has_client_notes: bool,
     ) -> Result<(), StoreError> {
-        let partial_blockchain_peaks = partial_blockchain_peaks.peaks().to_vec();
-        let SerializedBlockHeaderData {
-            block_num,
-            header,
-            partial_blockchain_peaks,
-            has_client_notes,
-        } = serialize_block_header(block_header, &partial_blockchain_peaks, has_client_notes);
-        const QUERY: &str = insert_sql!(
-            block_headers {
-                block_num,
-                header,
-                partial_blockchain_peaks,
-                has_client_notes,
-            } | IGNORE
-        );
-        tx.execute(QUERY, params![block_num, header, partial_blockchain_peaks, has_client_notes])
+        let SerializedBlockHeaderData { block_num, header, has_client_notes } =
+            serialize_block_header(block_header, has_client_notes);
+        const QUERY: &str =
+            insert_sql!(block_headers { block_num, header, has_client_notes } | IGNORE);
+        tx.execute(QUERY, params![block_num, header, has_client_notes])
             .into_store_error()?;
 
         set_block_header_has_client_notes(tx, u64::from(block_num), has_client_notes)?;
         Ok(())
     }
 
-    /// Removes block headers that do not contain any client notes and aren't the genesis or last
-    /// block.
-    pub fn prune_irrelevant_blocks(conn: &mut Connection) -> Result<(), StoreError> {
+    /// Prunes irrelevant block data from the store.
+    ///
+    /// This performs three operations in a single transaction:
+    /// 1. Deletes MMR authentication nodes at the given `node_indices`.
+    /// 2. Sets `has_client_notes = false` for `blocks_to_untrack`.
+    /// 3. Deletes block headers with `has_client_notes = false` that are not the genesis or
+    ///    sync-height block.
+    pub fn prune_irrelevant_blocks(
+        conn: &mut Connection,
+        blocks_to_untrack: &[BlockNumber],
+        node_indices_to_remove: &[InOrderIndex],
+    ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
+
+        // 1. Delete stale MMR authentication nodes.
+        if !node_indices_to_remove.is_empty() {
+            let id_values = node_indices_to_remove
+                .iter()
+                .map(|id| Value::Integer(i64::try_from(id.inner()).expect("id is a valid i64")))
+                .collect::<Vec<_>>();
+
+            tx.execute(
+                "DELETE FROM partial_blockchain_nodes WHERE id IN rarray(?)",
+                params![Rc::new(id_values)],
+            )
+            .into_store_error()?;
+        }
+
+        // 2. Mark untracked blocks as irrelevant.
+        if !blocks_to_untrack.is_empty() {
+            let block_values = blocks_to_untrack
+                .iter()
+                .map(|b| Value::Integer(i64::from(b.as_u32())))
+                .collect::<Vec<_>>();
+
+            tx.execute(
+                "UPDATE block_headers SET has_client_notes = 0 WHERE block_num IN rarray(?)",
+                params![Rc::new(block_values)],
+            )
+            .into_store_error()?;
+        }
+
+        // 3. Delete irrelevant block headers.
         let genesis: u32 = BlockNumber::GENESIS.as_u32();
 
         let sync_block: Option<u32> = tx
-            .query_row("SELECT block_num FROM state_sync LIMIT 1", [], |r| r.get(0))
+            .query_row("SELECT block_num FROM blockchain_checkpoint LIMIT 1", [], |r| r.get(0))
             .optional()
             .into_store_error()?;
 
         if let Some(sync_height) = sync_block {
             tx.execute(
-                r"
-            DELETE FROM block_headers
-            WHERE has_client_notes = 0
-              AND block_num > ?1
-              AND block_num < ?2
-            ",
+                "DELETE FROM block_headers \
+                 WHERE has_client_notes = 0 \
+                 AND block_num > ?1 \
+                 AND block_num < ?2",
                 rusqlite::params![genesis, sync_height],
             )
             .into_store_error()?;
@@ -291,26 +308,27 @@ fn query_partial_blockchain_nodes<P: rusqlite::Params>(
 fn parse_partial_blockchain_peaks(forest: u32, peaks_nodes: &[u8]) -> Result<MmrPeaks, StoreError> {
     let mmr_peaks_nodes = Vec::<Word>::read_from_bytes(peaks_nodes)?;
 
-    MmrPeaks::new(
-        Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
-        mmr_peaks_nodes,
-    )
-    .map_err(StoreError::MmrError)
+    let forest_size = usize::try_from(forest).expect("u64 should fit in usize");
+    let forest = Forest::new(forest_size).map_err(|err| {
+        StoreError::DataDeserializationError(
+            miden_protocol::utils::serde::DeserializationError::InvalidValue(format!(
+                "invalid forest size {forest_size}: {err}"
+            )),
+        )
+    })?;
+    MmrPeaks::new(forest, mmr_peaks_nodes).map_err(StoreError::MmrError)
 }
 
 fn serialize_block_header(
     block_header: &BlockHeader,
-    partial_blockchain_peaks: &[Word],
     has_client_notes: bool,
 ) -> SerializedBlockHeaderData {
     let block_num = block_header.block_num();
     let header = block_header.to_bytes();
-    let partial_blockchain_peaks = partial_blockchain_peaks.to_bytes();
 
     SerializedBlockHeaderData {
         block_num: block_num.as_u32(),
         header,
-        partial_blockchain_peaks,
         has_client_notes,
     }
 }
@@ -320,13 +338,11 @@ fn parse_block_headers_columns(
 ) -> Result<SerializedBlockHeaderParts, rusqlite::Error> {
     let block_num: u32 = row.get(0)?;
     let header: Vec<u8> = row.get(1)?;
-    let partial_blockchain_peaks: Vec<u8> = row.get(2)?;
-    let has_client_notes: bool = row.get(3)?;
+    let has_client_notes: bool = row.get(2)?;
 
     Ok(SerializedBlockHeaderParts {
         _block_num: u64::from(block_num),
         header,
-        _partial_blockchain_peaks: partial_blockchain_peaks,
         has_client_notes,
     })
 }
@@ -393,7 +409,9 @@ mod test {
     use miden_client::Word;
     use miden_client::block::BlockHeader;
     use miden_client::crypto::{Forest, InOrderIndex, MmrPeaks};
+    use miden_client::note::BlockNumber;
     use miden_client::store::Store;
+    use miden_client::utils::Serializable;
     use miden_protocol::crypto::merkle::mmr::Mmr;
     use miden_protocol::transaction::TransactionKernel;
     use rusqlite::params;
@@ -412,12 +430,10 @@ mod test {
         store
             .interact_with_connection(move |conn| {
                 let tx = conn.transaction().unwrap();
-                let dummy_peaks = MmrPeaks::new(Forest::empty(), Vec::new()).unwrap();
                 (0..5).for_each(|block_num| {
                     SqliteStore::insert_block_header_tx(
                         &tx,
                         &block_headers_clone[block_num],
-                        &dummy_peaks,
                         false,
                     )
                     .unwrap();
@@ -482,7 +498,7 @@ mod test {
 
         let mut mmr = Mmr::default();
         for header in &block_headers {
-            mmr.add(header.commitment());
+            mmr.add(header.commitment()).expect("valid MMR append");
         }
 
         let mut tracked_set: BTreeSet<usize> = (0..(TOTAL_BLOCKS - 1)).step_by(97).collect();
@@ -504,22 +520,19 @@ mod test {
         let tracked_nodes: Vec<(InOrderIndex, Word)> = tracked_nodes.into_iter().collect();
 
         let peaks_by_block: Vec<MmrPeaks> = (0..TOTAL_BLOCKS)
-            .map(|block_num| mmr.peaks_at(Forest::new(block_num)).expect("valid peaks"))
+            .map(|block_num| {
+                mmr.peaks_at(Forest::new(block_num).expect("valid forest"))
+                    .expect("valid peaks")
+            })
             .collect();
 
         // Save blocks and nodes
         store
             .interact_with_connection(move |conn| {
                 let tx = conn.transaction().unwrap();
-                for block_num in 0..TOTAL_BLOCKS {
+                for (block_num, block_header) in block_headers.iter().enumerate() {
                     let has_notes = tracked_set.contains(&block_num);
-                    SqliteStore::insert_block_header_tx(
-                        &tx,
-                        &block_headers[block_num],
-                        &peaks_by_block[block_num],
-                        has_notes,
-                    )
-                    .unwrap();
+                    SqliteStore::insert_block_header_tx(&tx, block_header, has_notes).unwrap();
                 }
 
                 SqliteStore::insert_partial_blockchain_nodes_tx(&tx, &tracked_nodes).unwrap();
@@ -542,19 +555,23 @@ mod test {
         let mut previous_remaining: Option<i64> = None;
         for height in prune_heights {
             let height_i64 = i64::try_from(height).expect("fits in i64");
+            let peaks_bytes = peaks_by_block[height].peaks().to_vec().to_bytes();
 
-            // Update sync height to simulate having synced further
+            // Update sync height (and the matching MMR peaks) to simulate having synced further
             store
                 .interact_with_connection(move |conn| {
-                    conn.execute("UPDATE state_sync SET block_num = ?", params![height_i64])
-                        .unwrap();
+                    conn.execute(
+                        "UPDATE blockchain_checkpoint SET block_num = ?, partial_blockchain_peaks = ?",
+                        params![height_i64, peaks_bytes],
+                    )
+                    .unwrap();
                     Ok(())
                 })
                 .await
                 .unwrap();
 
             // Prune
-            store.prune_irrelevant_blocks().await.unwrap();
+            store.untrack_and_prune_irrelevant_blocks(&[], &[]).await.unwrap();
 
             // Assert blocks
             let remaining_headers: i64 = store
@@ -586,5 +603,95 @@ mod test {
                 mmr.open(block_num).unwrap().merkle_path()
             );
         }
+    }
+
+    /// Collects authentication nodes for a set of tracked leaves in an MMR.
+    fn collect_auth_nodes(
+        mmr: &Mmr,
+        block_headers: &[BlockHeader],
+        tracked: &BTreeSet<usize>,
+    ) -> Vec<(InOrderIndex, Word)> {
+        let mut nodes: BTreeMap<InOrderIndex, Word> = BTreeMap::new();
+        for &block_num in tracked {
+            nodes.insert(
+                InOrderIndex::from_leaf_pos(block_num),
+                block_headers[block_num].commitment(),
+            );
+            let proof = mmr.open(block_num).expect("valid proof");
+            let mut idx = InOrderIndex::from_leaf_pos(block_num);
+            for node in proof.merkle_path().nodes() {
+                nodes.insert(idx.sibling(), *node);
+                idx = idx.parent();
+            }
+        }
+        nodes.into_iter().collect()
+    }
+
+    /// Tests that `untrack_and_prune_irrelevant_blocks` removes redundant authentication nodes
+    /// for untracked blocks while preserving nodes needed by blocks that remain tracked.
+    #[tokio::test]
+    async fn prune_irrelevant_blocks_removes_redundant_auth_nodes() {
+        let store = create_test_store().await;
+        const TOTAL_BLOCKS: usize = 16;
+        let tx_kernel = TransactionKernel.to_commitment();
+
+        let headers: Vec<BlockHeader> = (0..TOTAL_BLOCKS)
+            .map(|n| BlockHeader::mock(u32::try_from(n).unwrap(), None, None, &[], tx_kernel))
+            .collect();
+        let mut mmr = Mmr::default();
+        for h in &headers {
+            mmr.add(h.commitment()).expect("valid MMR append");
+        }
+
+        // Track blocks 3 and 10; we will untrack 3 later.
+        let tracked: BTreeSet<usize> = [3, 10].into();
+        let auth_nodes = collect_auth_nodes(&mmr, &headers, &tracked);
+        let tip_peaks_bytes = mmr
+            .peaks_at(Forest::new(TOTAL_BLOCKS - 1).expect("valid forest"))
+            .unwrap()
+            .peaks()
+            .to_vec()
+            .to_bytes();
+
+        // Persist everything.
+        let headers_clone = headers.clone();
+        store
+            .interact_with_connection(move |conn| {
+                let tx = conn.transaction().unwrap();
+                for (i, header) in headers_clone.iter().enumerate().take(TOTAL_BLOCKS) {
+                    SqliteStore::insert_block_header_tx(&tx, header, tracked.contains(&i)).unwrap();
+                }
+                SqliteStore::insert_partial_blockchain_nodes_tx(&tx, &auth_nodes).unwrap();
+                tx.execute(
+                    "UPDATE blockchain_checkpoint SET block_num = ?, partial_blockchain_peaks = ?",
+                    params![i64::try_from(TOTAL_BLOCKS - 1).unwrap(), tip_peaks_bytes],
+                )
+                .unwrap();
+                tx.commit().unwrap();
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        // Untrack block 3 via the PartialMmr, then prune.
+        let mut partial_mmr = Store::get_current_partial_mmr(&store).await.unwrap();
+        let removed: Vec<InOrderIndex> =
+            partial_mmr.untrack(3).into_iter().map(|(idx, _)| idx).collect();
+        assert!(!removed.is_empty(), "untracking should remove at least one node");
+
+        store
+            .untrack_and_prune_irrelevant_blocks(&[BlockNumber::from(3u32)], &removed)
+            .await
+            .unwrap();
+
+        // Block 3 header should be deleted, block 10 should still be provable.
+        let rebuilt = Store::get_current_partial_mmr(&store).await.unwrap();
+        assert_eq!(rebuilt.peaks().hash_peaks(), mmr.peaks().hash_peaks());
+
+        let proof_10 = rebuilt.open(10).expect("open succeeds");
+        assert!(proof_10.is_some(), "block 10 should still be provable");
+
+        let proof_3 = rebuilt.open(3).expect("open succeeds");
+        assert!(proof_3.is_none(), "block 3 should no longer be provable");
     }
 }

@@ -3,7 +3,6 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
-use miden_protocol::account::AccountId;
 use miden_protocol::asset::Asset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{NoteHeader, NoteId, NoteInclusionProof, Nullifier};
@@ -14,12 +13,12 @@ use miden_protocol::transaction::{
     TransactionId,
 };
 
-use super::note::{CommittedNote, CommittedNoteMetadata};
+use super::note::CommittedNote;
 use crate::rpc::{RpcConversionError, RpcError, generated as proto};
 
 /// A native asset faucet ID for use in testing scenarios.
 #[cfg(test)]
-pub const ACCOUNT_ID_NATIVE_ASSET_FAUCET: u128 = 0xab00_0000_0000_cd20_0000_ac00_0000_de00_u128;
+pub const ACCOUNT_ID_NATIVE_ASSET_FAUCET: u128 = 0xab00_0000_0000_cd21_0000_ac00_0000_de00_u128;
 
 // INTO TRANSACTION ID
 // ================================================================================================
@@ -50,72 +49,6 @@ impl TryFrom<proto::transaction::TransactionId> for TransactionId {
 impl From<TransactionId> for proto::transaction::TransactionId {
     fn from(value: TransactionId) -> Self {
         Self { id: Some(value.as_word().into()) }
-    }
-}
-
-// TRANSACTION INCLUSION
-// ================================================================================================
-
-/// Represents a transaction that was included in the node at a certain block.
-#[derive(Debug, Clone)]
-pub struct TransactionInclusion {
-    /// The transaction identifier.
-    pub transaction_id: TransactionId,
-    /// The number of the block in which the transaction was included.
-    pub block_num: BlockNumber,
-    /// The account that the transaction was executed against.
-    pub account_id: AccountId,
-    /// The initial account state commitment before the transaction was executed.
-    pub initial_state_commitment: Word,
-    /// The nullifiers of the input notes consumed by this transaction.
-    pub nullifiers: Vec<Nullifier>,
-    /// Output notes committed by this transaction, with inclusion proofs.
-    /// Does not include erased notes.
-    pub output_notes: Vec<CommittedNote>,
-    /// Output notes that were erased by same-batch note erasure.
-    /// Contains the full note header (ID + metadata) from the transaction header.
-    pub erased_output_notes: Vec<NoteHeader>,
-}
-
-// TRANSACTIONS INFO
-// ================================================================================================
-
-/// Represent a list of transaction records that were included in a range of blocks.
-#[derive(Debug, Clone)]
-pub struct TransactionsInfo {
-    /// Current chain tip
-    pub chain_tip: BlockNumber,
-    /// The block number of the last check included in this response.
-    pub block_num: BlockNumber,
-    /// List of transaction records.
-    pub transaction_records: Vec<TransactionRecord>,
-}
-
-impl TryFrom<proto::rpc::SyncTransactionsResponse> for TransactionsInfo {
-    type Error = RpcError;
-
-    fn try_from(value: proto::rpc::SyncTransactionsResponse) -> Result<Self, Self::Error> {
-        let pagination_info = value.pagination_info.ok_or(
-            RpcConversionError::MissingFieldInProtobufRepresentation {
-                entity: "SyncTransactionsResponse",
-                field_name: "pagination_info",
-            },
-        )?;
-
-        let chain_tip = pagination_info.chain_tip.into();
-        let block_num = pagination_info.block_num.into();
-
-        let transaction_records = value
-            .transactions
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<TransactionRecord>, RpcError>>()?;
-
-        Ok(Self {
-            chain_tip,
-            block_num,
-            transaction_records,
-        })
     }
 }
 
@@ -241,10 +174,9 @@ fn convert_transaction_header(
     for header in &output_note_headers {
         let note_id = header.id();
         if let Some(proof) = proof_map.remove(&note_id) {
-            let metadata = CommittedNoteMetadata::Full(header.metadata().clone());
-            committed_output_notes.push(CommittedNote::new(note_id, metadata, proof));
+            committed_output_notes.push(CommittedNote::new(note_id, *header.metadata(), proof));
         } else {
-            erased_output_notes.push(header.clone());
+            erased_output_notes.push(*header);
         }
     }
 

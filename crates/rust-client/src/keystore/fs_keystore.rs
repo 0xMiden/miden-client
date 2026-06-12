@@ -1,12 +1,9 @@
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
-use core::future::Future;
 use std::fs;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::string::ToString;
 use std::sync::Arc;
 
 use miden_protocol::Word;
@@ -230,23 +227,23 @@ impl TransactionAuthenticator for FilesystemKeyStore {
     /// # Errors
     /// If the public key isn't found in the store, [`AuthenticationError::UnknownPublicKey`] is
     /// returned.
-    fn get_signature(
+    async fn get_signature(
         &self,
         pub_key: PublicKeyCommitment,
         signing_info: &SigningInputs,
-    ) -> impl Future<Output = Result<Signature, AuthenticationError>> {
+    ) -> Result<Signature, AuthenticationError> {
         let message = signing_info.to_commitment();
-        let secret_key = self.get_key_sync(pub_key);
 
-        async move {
-            let secret_key = secret_key
-                .map_err(|err| {
-                    AuthenticationError::other_with_source("failed to load secret key", err)
-                })?
-                .ok_or(AuthenticationError::UnknownPublicKey(pub_key))?;
+        let secret_key = self
+            .get_key_sync(pub_key)
+            .map_err(|err| {
+                AuthenticationError::other_with_source("failed to load secret key", err)
+            })?
+            .ok_or(AuthenticationError::UnknownPublicKey(pub_key))?;
 
-            Ok(secret_key.sign(message))
-        }
+        let signature = secret_key.sign(message);
+
+        Ok(signature)
     }
 
     /// Retrieves a public key for a specific public key commitment.
@@ -335,8 +332,8 @@ impl Keystore for FilesystemKeyStore {
 // ================================================================================================
 
 /// Returns the file path that belongs to the public key commitment
-fn key_file_path(keys_directory: &Path, pub_key: PublicKeyCommitment) -> PathBuf {
-    let filename = hash_pub_key(pub_key.into());
+fn key_file_path(keys_directory: &Path, pub_key_commitment: PublicKeyCommitment) -> PathBuf {
+    let filename = Word::from(pub_key_commitment).to_hex();
     keys_directory.join(filename)
 }
 
@@ -365,12 +362,4 @@ fn write_secret_key_file(file_path: &Path, key: &AuthSecretKey) -> Result<(), Ke
 
 fn keystore_error(context: &str) -> impl FnOnce(std::io::Error) -> KeyStoreError {
     move |err| KeyStoreError::StorageError(format!("{context}: {err:?}"))
-}
-
-/// Hashes a public key to a string representation.
-fn hash_pub_key(pub_key: Word) -> String {
-    let pub_key = pub_key.to_hex();
-    let mut hasher = DefaultHasher::new();
-    pub_key.hash(&mut hasher);
-    hasher.finish().to_string()
 }
