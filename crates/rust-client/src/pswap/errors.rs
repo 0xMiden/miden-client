@@ -1,5 +1,7 @@
 //! Errors specific to PSWAP chain tracking.
 
+use alloc::boxed::Box;
+
 use miden_protocol::Felt;
 use miden_protocol::account::AccountId;
 use miden_protocol::errors::{AssetError, NoteError};
@@ -65,4 +67,10 @@ pub enum PswapLineageError {
     /// A store call from the PSWAP layer failed.
     #[error("PSWAP store call failed: {0}")]
     Store(#[from] StoreError),
+}
+
+impl From<PswapLineageError> for crate::ClientError {
+    fn from(err: PswapLineageError) -> Self {
+        crate::ClientError::Observer(Box::new(err))
+    }
 }

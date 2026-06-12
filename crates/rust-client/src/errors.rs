@@ -223,12 +223,6 @@ pub(crate) fn log_observer_failure(
 // CONVERSIONS
 // ================================================================================================
 
-impl From<crate::pswap::PswapLineageError> for ClientError {
-    fn from(err: crate::pswap::PswapLineageError) -> Self {
-        ClientError::Observer(Box::new(err))
-    }
-}
-
 impl From<ClientError> for String {
     fn from(err: ClientError) -> String {
         err.to_string()
