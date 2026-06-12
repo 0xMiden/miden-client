@@ -71,11 +71,7 @@ pub struct NoteTagRecord {
 
 /// Represents the source of the tag. This is used to differentiate between tags that are added by
 /// the user and tags that are added automatically by the client to track notes .
-///
-/// Marked `#[non_exhaustive]`: downstream code matching on this enum must include a wildcard arm,
-/// so future variants can be added without breaking it.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[non_exhaustive]
 pub enum NoteTagSource {
     /// Tag for notes directed to a tracked account.
     Account(AccountId),
