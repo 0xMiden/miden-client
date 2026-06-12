@@ -516,14 +516,10 @@ impl TransactionRequestBuilder {
         let note_args = PswapNote::create_args(account_fill_amount, note_fill_amount)
             .map_err(TransactionRequestError::NoteArgError)?;
 
-        // Neither output note belongs to the consumer. The payback settles to the order's creator,
-        // and the remainder is the order's next tip (consumed by a future filler, or by the creator
-        // on reclaim). Both are declared as expected output recipients so the executed transaction
-        // is validated against them, but neither is registered as an expected future note: tracking
-        // notes one will receive is the creator's concern, not the consumer's. Registering either
-        // here would leave a stale, un-consumable expected note in the consumer's store. The
-        // creator picks up the payback through its own note screening (public) or PSWAP
-        // lineage discovery (private), and follows the remainder the same way.
+        // Payback and remainder both settle to the creator, not the consumer. Declare them as
+        // expected recipients so the transaction is validated against them, but don't register
+        // them as expected future notes — that's the creator's concern, and doing so here would
+        // leave stale, un-consumable notes in the consumer's store.
         let mut expected_recipients = vec![payback_note.recipient().clone()];
 
         if let Some(remainder) = remainder_pswap {
