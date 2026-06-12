@@ -13,7 +13,7 @@ ifneq ($(BUILD_TARGET),)
 TARGET_FLAG = --target $(BUILD_TARGET)
 endif
 
-FEATURES_CLIENT=--features "std"
+FEATURES_CLIENT=--features "std dap"
 WARNINGS=RUSTDOCFLAGS="-D warnings"
 
 TEST_MIDEN_NOTE_TRANSPORT_URL?=http://127.0.0.1:57292
@@ -150,6 +150,10 @@ install-tests: ## Install the tests binary
 
 build: ## Build the CLI binary, client library and tests binary in release mode
 	cargo build --workspace $(TARGET_FLAG) --release --locked
+
+.PHONY: build-wasm
+build-wasm: ## Build the client library for wasm32 with no_std (no default features)
+	cargo build --package miden-client --target wasm32-unknown-unknown --no-default-features --locked
 
 # --- Check ---------------------------------------------------------------------------------------
 

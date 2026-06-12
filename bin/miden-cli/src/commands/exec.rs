@@ -135,12 +135,7 @@ impl ExecCmd {
             loop {
                 // DAP restart can happen after the user edits the script. Refresh the cached
                 // source before compiling again so execution uses the current file contents.
-                client.reload_source_file(script_path.as_path()).map_err(|err| {
-                    CliError::Exec(
-                        err.into(),
-                        "error reloading the program source file".to_string(),
-                    )
-                })?;
+                reload_source_file(&client.source_manager(), script_path.as_path())?;
 
                 let tx_script = client.code_builder().compile_tx_script(script_path.as_path())?;
 
@@ -169,6 +164,56 @@ impl ExecCmd {
             .execute_program(account_id, tx_script, advice_inputs, foreign_accounts)
             .await
             .map_err(|err| CliError::Exec(err.into(), "error executing the program".to_string()))
+    }
+}
+
+// SOURCE FILE RELOADING
+// ================================================================================================
+
+#[cfg(feature = "dap")]
+use source_reload::reload_source_file;
+
+#[cfg(feature = "dap")]
+mod source_reload {
+    use std::path::Path;
+    use std::sync::Arc;
+
+    use miden_client::assembly::{SourceManagerExt, SourceManagerSync, Uri};
+
+    use crate::errors::CliError;
+
+    /// Reloads a source file from disk into the given source manager.
+    ///
+    /// Source managers cache files by URI, so compiling a path that has already been loaded may
+    /// reuse the cached `SourceFile`. This updates an existing entry for `path` in-place, or loads
+    /// it if the source manager has not seen it yet.
+    pub(super) fn reload_source_file(
+        source_manager: &Arc<dyn SourceManagerSync>,
+        path: &Path,
+    ) -> Result<(), CliError> {
+        let reload_err = |source: Box<dyn std::error::Error + Send + Sync>| {
+            CliError::Exec(source, "error reloading the program source file".to_string())
+        };
+
+        let uri = Uri::from(path);
+
+        let Some(source_id) = source_manager.find(&uri) else {
+            source_manager.load_file(path).map_err(|source| reload_err(Box::new(source)))?;
+            return Ok(());
+        };
+
+        let source =
+            std::fs::read_to_string(path).map_err(|source| reload_err(Box::new(source)))?;
+        let version = source_manager
+            .get(source_id)
+            .map_err(|source| reload_err(Box::new(source)))?
+            .content()
+            .version()
+            .saturating_add(1);
+
+        source_manager
+            .update(source_id, source, None, version)
+            .map_err(|source| reload_err(Box::new(source)))
     }
 }
 
