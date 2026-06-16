@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.1 (2026-06-16)
+
+### Enhancements
+
+* [FEATURE][rust] Re-exported `miden-agglayer` as `miden_client::agglayer`.
+
 ## 0.15.0 (2026-06-12)
 
 ### Fixes

@@ -36,6 +36,8 @@
 //! - **Blocks:** Types for handling block headers.
 //! - **Crypto:** Cryptographic types and utilities, including random number generators.
 //! - **Utils:** Miscellaneous utilities for serialization and common operations.
+//! - **`AggLayer`:** Bridge account components, note constructors, and Ethereum-compatible helper
+//!   types from the Miden `AggLayer` protocol crate.
 //!
 //! The library is designed to work in both `no_std` and `std` environments and is
 //! configurable via Cargo features.
@@ -142,6 +144,11 @@ pub use miden_protocol::utils::serde::{Deserializable, Serializable, SliceReader
 
 pub mod notes {
     pub use miden_protocol::note::NoteFile;
+}
+
+/// Provides `AggLayer` bridge components, note constructors, and helper types.
+pub mod agglayer {
+    pub use miden_agglayer::*;
 }
 
 /// Provides types and utilities for working with Miden Assembly.
