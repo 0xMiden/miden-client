@@ -505,7 +505,7 @@ impl NodeRpcClient for MockRpcApi {
 
         // A malicious node can answer a request for one account with a self-consistent response
         // for another; the substitution replaces the requested id wholesale to model that.
-        let account_id = self.substitute_account.read().clone().unwrap_or(account_id);
+        let account_id = (*self.substitute_account.read()).unwrap_or(account_id);
 
         let block_number = match request.at {
             AccountStateAt::Block(number) => number,
