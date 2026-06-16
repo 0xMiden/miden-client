@@ -4,7 +4,7 @@
 
 ### Enhancements
 
-* [FEATURE][rust] Re-exported `miden-agglayer` as `miden_client::agglayer` and added `TransactionRequestBuilder::build_b2agg(...)` to create and send a B2AGG (bridge-to-AggLayer) note.
+* [FEATURE][rust] Re-exported `miden-agglayer` as `miden_client::agglayer`.
 
 ## 0.15.0 (2026-06-12)
 

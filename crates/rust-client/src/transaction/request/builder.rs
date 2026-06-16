@@ -46,7 +46,6 @@ use super::{
     TransactionScriptTemplate,
 };
 use crate::ClientRng;
-use crate::agglayer::{B2AggNote, EthAddress};
 
 // TRANSACTION REQUEST BUILDER
 // ================================================================================================
@@ -406,43 +405,6 @@ impl TransactionRequestBuilder {
         self.expected_future_notes(vec![(payback_note_details, payback_tag)])
             .own_output_notes(vec![created_note])
             .build()
-    }
-
-    /// Consumes the builder and returns a [`TransactionRequest`] for a transaction that sends a
-    /// B2AGG (Bridge to `AggLayer`) note, bridging fungible assets out of Miden to a destination
-    /// network via the `AggLayer`. This request must be executed against the `sender_id` wallet.
-    ///
-    /// When the `AggLayer` bridge account consumes the note, the assets are burned on Miden and a
-    /// corresponding claim can be made on the destination network. B2AGG notes are always public.
-    ///
-    /// - `assets` are the fungible assets to bridge (must originate from a network faucet).
-    /// - `destination_network` is the `AggLayer`-assigned network ID of the destination chain.
-    /// - `destination_address` is the recipient address on the destination network.
-    /// - `bridge_id` is the `AggLayer` bridge account that will consume the note; it is encoded as
-    ///   a `NetworkAccountTarget` attachment so the node routes the note to the bridge.
-    /// - `sender_id` is the account creating and submitting the note.
-    /// - `rng` is the random number generator used to generate the note's serial number.
-    ///
-    /// This function cannot be used with a previously set custom script.
-    pub fn build_b2agg(
-        self,
-        assets: NoteAssets,
-        destination_network: u32,
-        destination_address: EthAddress,
-        bridge_id: AccountId,
-        sender_id: AccountId,
-        rng: &mut ClientRng,
-    ) -> Result<TransactionRequest, TransactionRequestError> {
-        let created_note = B2AggNote::create(
-            destination_network,
-            destination_address,
-            assets,
-            bridge_id,
-            sender_id,
-            rng,
-        )?;
-
-        self.own_output_notes(vec![created_note]).build()
     }
 
     /// Consumes the builder and returns a [`TransactionRequest`] for a transaction that registers
