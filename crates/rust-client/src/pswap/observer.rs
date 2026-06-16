@@ -6,36 +6,18 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use async_trait::async_trait;
-use miden_protocol::account::AccountId;
 use miden_protocol::asset::AssetAmount;
-use miden_protocol::block::BlockNumber;
-use miden_protocol::note::{NoteAttachments, NoteId, NoteInclusionProof, NoteTag};
+use miden_protocol::note::NoteAttachments;
 use miden_standards::note::{PswapNote, PswapNoteAttachment};
 use tracing::warn;
 
 use crate::ClientError;
 use crate::pswap::discovery::discover_pswap_rounds;
+use crate::pswap::lineage::PswapChainNoteUpdate;
 use crate::rpc::domain::note::CommittedNote;
 use crate::store::Store;
 use crate::sync::NoteObserver;
 use crate::utils::RwLock;
-
-// PSWAP CHAIN NOTE UPDATE
-// ================================================================================================
-
-/// Observed PSWAP-attachment note. The typed attachment carries
-/// `order_id`, `depth`, and amount (fill on payback, payout on remainder)
-/// — role distinguished by [`Self::tag`].
-#[derive(Debug, Clone)]
-pub(crate) struct PswapChainNoteUpdate {
-    pub note_id: NoteId,
-    pub attachment: PswapNoteAttachment,
-    pub sender: AccountId,
-    /// Payback uses the P2ID-style tag; remainder uses the asset-pair tag.
-    pub tag: NoteTag,
-    pub block_num: BlockNumber,
-    pub inclusion_proof: NoteInclusionProof,
-}
 
 // PSWAP CHAIN OBSERVER
 // ================================================================================================

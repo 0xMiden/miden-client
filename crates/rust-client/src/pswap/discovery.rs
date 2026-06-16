@@ -10,15 +10,18 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::Felt;
-use miden_protocol::asset::FungibleAsset;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::NoteId;
 use miden_standards::note::PswapNote;
 use tracing::error;
 
 use super::errors::PswapLineageError;
-use super::lineage::{PswapLineageRecord, PswapLineageRoundUpdate, PswapLineageState};
-use super::observer::PswapChainNoteUpdate;
+use super::lineage::{
+    PswapChainNoteUpdate,
+    PswapLineageRecord,
+    PswapLineageRoundUpdate,
+    PswapLineageState,
+};
 use super::store;
 use crate::store::Store;
 use crate::sync::StateSyncUpdate;
@@ -215,197 +218,3 @@ async fn advance_lineage(
     }
     lineage_rounds
 }
-
-// Per-round classification and in-memory advance. These hang off `PswapLineageRecord` because each
-// transition is a function of the lineage's current state plus the round's observed chain notes.
-impl PswapLineageRecord {
-    /// Builds one round's [`PswapLineageRoundUpdate`] from the chain notes observed at this depth.
-    fn build_round_update(
-        &self,
-        round_depth: u32,
-        block_number: BlockNumber,
-        notes: &[&PswapChainNoteUpdate],
-        block_headers: &BTreeMap<BlockNumber, BlockHeader>,
-        original_pswap: Option<&PswapNote>,
-    ) -> Result<PswapLineageRoundUpdate, PswapLineageError> {
-        match notes.len() {
-            0 => Ok(self.build_reclaim_round(round_depth, block_number)),
-            1 => {
-                let pswap = self.require_original(original_pswap)?;
-                self.build_full_fill_round(
-                    round_depth,
-                    block_number,
-                    notes[0],
-                    block_headers,
-                    pswap,
-                )
-            },
-            2 => {
-                let pswap = self.require_original(original_pswap)?;
-                self.build_partial_fill_round(
-                    round_depth,
-                    block_number,
-                    notes,
-                    block_headers,
-                    pswap,
-                )
-            },
-            count => Err(PswapLineageError::AmbiguousRound { depth: round_depth, count }),
-        }
-    }
-
-    /// The caller fetches the original note before any fill round, so a missing
-    /// note here is a broken invariant rather than an expected branch.
-    fn require_original<'a>(
-        &self,
-        original_pswap: Option<&'a PswapNote>,
-    ) -> Result<&'a PswapNote, PswapLineageError> {
-        original_pswap.ok_or(PswapLineageError::OriginalNoteUnavailable(self.original_note_id))
-    }
-
-    /// Zero-amount asset for the order's offered faucet (taken from the
-    /// chain-invariant faucet on `remaining_offered`).
-    fn zero_offered(&self) -> FungibleAsset {
-        FungibleAsset::new(self.remaining_offered.faucet_id(), 0).expect("FA(_, 0) is always valid")
-    }
-
-    /// Zero-amount asset for the order's requested faucet (taken from the
-    /// chain-invariant faucet on `remaining_requested`).
-    fn zero_requested(&self) -> FungibleAsset {
-        FungibleAsset::new(self.remaining_requested.faucet_id(), 0)
-            .expect("FA(_, 0) is always valid")
-    }
-
-    /// Reclaim — cancel branch emits no outputs; only the creator can hit it.
-    fn build_reclaim_round(
-        &self,
-        round_depth: u32,
-        block_number: BlockNumber,
-    ) -> PswapLineageRoundUpdate {
-        PswapLineageRoundUpdate {
-            order_id: self.order_id(),
-            round_depth,
-            remaining_offered: self.zero_offered(),
-            remaining_requested: self.zero_requested(),
-            state: PswapLineageState::Reclaimed,
-            tip_note_id: None,
-            at_block: block_number,
-            at_block_note_root: None,
-            payback: None,
-            remainder: None,
-        }
-    }
-
-    /// Full fill — only payback emitted; `remaining_requested` → 0.
-    fn build_full_fill_round(
-        &self,
-        round_depth: u32,
-        block_number: BlockNumber,
-        payback_note_update: &PswapChainNoteUpdate,
-        block_headers: &BTreeMap<BlockNumber, BlockHeader>,
-        pswap: &PswapNote,
-    ) -> Result<PswapLineageRoundUpdate, PswapLineageError> {
-        let payback = pswap
-            .payback_note(payback_note_update.sender, &payback_note_update.attachment)
-            .map_err(PswapLineageError::Reconstruction)?;
-
-        Ok(PswapLineageRoundUpdate {
-            order_id: self.order_id(),
-            round_depth,
-            remaining_offered: self.zero_offered(),
-            remaining_requested: self.zero_requested(),
-            state: PswapLineageState::FullyFilled,
-            tip_note_id: None,
-            at_block: block_number,
-            at_block_note_root: block_headers
-                .get(&payback_note_update.block_num)
-                .map(BlockHeader::note_root),
-            payback: Some((payback, payback_note_update.inclusion_proof.clone())),
-            remainder: None,
-        })
-    }
-
-    /// Partial fill — payback + remainder. Distinguishes the two by tag.
-    fn build_partial_fill_round(
-        &self,
-        round_depth: u32,
-        block_number: BlockNumber,
-        notes: &[&PswapChainNoteUpdate],
-        block_headers: &BTreeMap<BlockNumber, BlockHeader>,
-        pswap: &PswapNote,
-    ) -> Result<PswapLineageRoundUpdate, PswapLineageError> {
-        let offered_faucet = pswap.offered_asset().faucet_id();
-        let requested_faucet = pswap.storage().requested_asset().faucet_id();
-
-        let payback_tag = pswap.storage().payback_note_tag();
-        let (payback_note_update, remainder_note_update) = if notes[0].tag == payback_tag {
-            (notes[0], notes[1])
-        } else {
-            (notes[1], notes[0])
-        };
-
-        let payback_note = pswap
-            .payback_note(payback_note_update.sender, &payback_note_update.attachment)
-            .map_err(PswapLineageError::Reconstruction)?;
-
-        let fill_amount = FungibleAsset::new(
-            requested_faucet,
-            u64::from(payback_note_update.attachment.amount()),
-        )
-        .map_err(PswapLineageError::AssetError)?;
-        let payout_amount = FungibleAsset::new(
-            offered_faucet,
-            u64::from(remainder_note_update.attachment.amount()),
-        )
-        .map_err(PswapLineageError::AssetError)?;
-
-        // Saturating sub — clamp to zero on over-fill.
-        let remaining_requested = self
-            .remaining_requested
-            .sub(fill_amount)
-            .unwrap_or_else(|_| self.zero_requested());
-        let remaining_offered = self
-            .remaining_offered
-            .sub(payout_amount)
-            .unwrap_or_else(|_| self.zero_offered());
-
-        let remainder_note = pswap
-            .remainder_note(
-                remainder_note_update.sender,
-                &remainder_note_update.attachment,
-                remaining_offered.amount(),
-                remaining_requested.amount(),
-            )
-            .map_err(PswapLineageError::Reconstruction)?;
-        Ok(PswapLineageRoundUpdate {
-            order_id: self.order_id(),
-            round_depth,
-            remaining_offered,
-            remaining_requested,
-            state: PswapLineageState::Active,
-            tip_note_id: Some(remainder_note_update.note_id),
-            at_block: block_number,
-            at_block_note_root: block_headers
-                .get(&payback_note_update.block_num)
-                .map(BlockHeader::note_root),
-            payback: Some((payback_note, payback_note_update.inclusion_proof.clone())),
-            remainder: Some((remainder_note, remainder_note_update.inclusion_proof.clone())),
-        })
-    }
-
-    /// Returns the post-round version. Drives the same-block multi-fill loop.
-    fn apply_round_in_memory(mut self, update: &PswapLineageRoundUpdate) -> PswapLineageRecord {
-        self.current_depth = update.round_depth;
-        self.remaining_offered = update.remaining_offered;
-        self.remaining_requested = update.remaining_requested;
-        self.state = update.state;
-        self.updated_at_block = update.at_block;
-        if let Some(note_id) = update.tip_note_id {
-            self.current_tip_note_id = note_id;
-        }
-        self
-    }
-}
-
-#[cfg(test)]
-mod tests;
