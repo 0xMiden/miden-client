@@ -3381,7 +3381,7 @@ async fn consume_note_with_custom_script_default_policy_rejects_local_hit() {
 
     let (sender_account, receiver_account, faucet_account) = setup_two_wallets_and_faucet(
         &mut client,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &keystore,
         RPO_FALCON_SCHEME_ID,
     )
@@ -3449,7 +3449,7 @@ async fn consume_notes_with_custom_scripts_reports_all_rejected_roots() {
 
     let (sender_account, receiver_account, faucet_account) = setup_two_wallets_and_faucet(
         &mut client,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &keystore,
         RPO_FALCON_SCHEME_ID,
     )

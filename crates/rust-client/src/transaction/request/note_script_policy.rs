@@ -118,8 +118,6 @@ impl Deserializable for NoteScriptTrustPolicy {
 
 #[cfg(test)]
 mod tests {
-    use miden_protocol::Felt;
-
     use super::*;
 
     fn standard_root() -> Word {
@@ -130,7 +128,7 @@ mod tests {
 
     fn unknown_root() -> Word {
         // A deterministic non-standard root.
-        Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)])
+        Word::from([1u32, 2, 3, 4])
     }
 
     #[test]
@@ -152,7 +150,7 @@ mod tests {
         assert!(policy.allows(listed));
         assert!(policy.allows(standard_root()));
 
-        let other_unknown = Word::from([Felt::new(9), Felt::new(9), Felt::new(9), Felt::new(9)]);
+        let other_unknown = Word::from([9u32, 9, 9, 9]);
         assert!(!policy.allows(other_unknown));
     }
 
@@ -179,7 +177,7 @@ mod tests {
     fn serialization_roundtrip_trusted_script_roots() {
         let mut roots = BTreeSet::new();
         roots.insert(unknown_root());
-        roots.insert(Word::from([Felt::new(7), Felt::new(7), Felt::new(7), Felt::new(7)]));
+        roots.insert(Word::from([7u32, 7, 7, 7]));
         roundtrip(&NoteScriptTrustPolicy::TrustedScriptRoots(roots));
     }
 
