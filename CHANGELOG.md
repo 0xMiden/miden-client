@@ -1,10 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.15.1 (TBD)
 
 ### Fixes
 
 * [FIX][rust] State sync now range-checks `sync_transactions` records to `(current, chain_tip]`, rejecting out-of-range records that could forge transaction commit heights ([#2252](https://github.com/0xMiden/miden-client/pull/2252)).
+* [FIX][rust] Public account sync now binds `get_account` responses to the SyncMMR target block, rejecting snapshots from a different block, account, or account root ([#2255](https://github.com/0xMiden/miden-client/pull/2255)).
 
 ## 0.15.0 (2026-06-12)
 
