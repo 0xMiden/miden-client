@@ -59,6 +59,10 @@ pub struct MockRpcApi {
     /// notes without their attachment content (only metadata), so tests that need
     /// `get_notes_by_id` to return private-note attachments register them here.
     private_note_attachments: Arc<RwLock<BTreeMap<NoteId, NoteAttachments>>>,
+    /// When set, `get_account` ignores the requested account ID and builds a self-consistent
+    /// proof/details for this account instead. Models a malicious node that answers a request
+    /// for account A with a valid-looking response for a different account B.
+    substitute_account: Arc<RwLock<Option<AccountId>>>,
 }
 
 impl Default for MockRpcApi {
@@ -79,7 +83,15 @@ impl MockRpcApi {
             oversize_threshold: 1000,
             erased_notes: Arc::new(RwLock::new(Vec::new())),
             private_note_attachments: Arc::new(RwLock::new(BTreeMap::new())),
+            substitute_account: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Forces `get_account` to answer every request with a self-consistent proof for `real`,
+    /// ignoring the requested account ID. Models a malicious node returning a valid-looking
+    /// response for a different account than the one requested.
+    pub fn substitute_get_account_response(&self, real: AccountId) {
+        *self.substitute_account.write() = Some(real);
     }
 
     /// Registers the attachment content for a private note so that subsequent `get_notes_by_id`
@@ -490,6 +502,10 @@ impl NodeRpcClient for MockRpcApi {
         request: GetAccountRequest,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
         let mock_chain = self.mock_chain.read();
+
+        // A malicious node can answer a request for one account with a self-consistent response
+        // for another; the substitution replaces the requested id wholesale to model that.
+        let account_id = self.substitute_account.read().clone().unwrap_or(account_id);
 
         let block_number = match request.at {
             AccountStateAt::Block(number) => number,
