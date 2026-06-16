@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.3 (TBD)
+
+### Enhancements
+
+* [FEATURE][cli] `miden-cli call` now accepts advice map entries supplied via `--inputs-path/-i <FILE.toml>` in the same TOML format as `exec` ([#2244](https://github.com/0xMiden/miden-client/pull/2244)).
+
 ## 0.15.2 (2026-06-18)
 
 ### Features
@@ -77,7 +83,7 @@
 * Fixed the faucet token symbol display when showing account details ([#1985](https://github.com/0xMiden/miden-client/pull/1985) ([#2158](https://github.com/0xMiden/miden-client/pull/2158))).
 * [FEATURE][rust,cli,web] Added `get_network_note_status` to `NodeRpcClient` trait for querying the processing status of notes submitted to the network (pending, nullifier-inflight, discarded, nullifier-committed), along with attempt count and error details. Exposed as `miden-client network-note-status <note_id>` CLI command and `RpcClient.getNetworkNoteStatus()` in the web client. ([#1981](https://github.com/0xMiden/miden-client/pull/1981))
 * Remove MMR peaks from the blocks table and store them alongside the sync height in a new `blockchain_checkpoint` table ([#2100](https://github.com/0xMiden/miden-client/pull/2100)).
-* Added `miden-cli call` command for invoking account procedures directly from the CLI, including advice map entries supplied via `--inputs-path/-i <FILE.toml>` in the same TOML format as `exec` ([#1943](https://github.com/0xMiden/miden-client/pull/1943), [#2094](https://github.com/0xMiden/miden-client/issues/2094)).
+* Added `miden-cli call` command for invoking account procedures directly from the CLI ([#1943](https://github.com/0xMiden/miden-client/pull/1943)).
 * [FEATURE][rust,store] Added `BatchBuilder` for stacking multiple transactions against multiple local accounts and submitting them as one proven batch via `SubmitProvenBatch`. Also adds `Store::apply_transaction_batch` (atomic multi-tx apply) with a `SqliteStore` implementation. ([#2109](https://github.com/0xMiden/miden-client/pull/2109), [#2160](https://github.com/0xMiden/miden-client/issues/2160))
 * Made `TransactionStoreUpdate` serialization lossless ([#2112](https://github.com/0xMiden/miden-client/pull/2112)).
 * [FEATURE][cli] Added `address encode <ACCOUNT_ID> <INTERFACE> [TAG_LEN]` subcommand that prints the bech32 encoding of an address built from the given fields (useful for producing the input to `address add`). ([#2115](https://github.com/0xMiden/miden-client/pull/2115))

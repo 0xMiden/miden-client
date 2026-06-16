@@ -36,7 +36,7 @@ where
         .collect::<Result<Vec<u64>, _>>()
         .map_err(|_| {
             de::Error::custom(
-                "invalid type: expected u64 in between parentheses. For example: values = [\"13\", \"9\"]",
+                "invalid type: expected u64 in between double quotes. For example: values = [\"13\", \"9\"]",
             )
         })
 }
