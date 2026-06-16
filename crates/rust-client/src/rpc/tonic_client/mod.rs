@@ -26,7 +26,12 @@ use miden_tx::utils::sync::RwLock;
 use tonic::Status;
 use tracing::info;
 
-use super::domain::account::{AccountProof, GetAccountRequest, VaultFetch};
+use super::domain::account::{
+    AccountProof,
+    AccountStorageRequirements,
+    GetAccountRequest,
+    StorageMapFetch,
+};
 use super::domain::note::{FetchedNote, NoteSyncBlock};
 use super::domain::nullifier::NullifierUpdate;
 use super::generated::rpc::AccountRequest;
@@ -41,7 +46,6 @@ use crate::rpc::domain::transaction::TransactionRecord;
 use crate::rpc::errors::node::parse_node_error;
 use crate::rpc::errors::{AcceptHeaderContext, AcceptHeaderError, GrpcError, RpcConversionError};
 use crate::rpc::generated::rpc::BlockRange;
-use crate::rpc::generated::rpc::account_request::account_detail_request::StorageMapDetailRequest;
 use crate::rpc::{AccountStateAt, generated as proto};
 
 mod api_client;
@@ -52,7 +56,7 @@ use api_client::api_client_wrapper::ApiClient;
 /// Tracks the pagination state for block-driven endpoints.
 struct BlockPagination {
     current_block_from: BlockNumber,
-    block_to: Option<BlockNumber>,
+    block_to: BlockNumber,
     iterations: u32,
 }
 
@@ -71,7 +75,7 @@ impl BlockPagination {
     /// trigger an infinite loop.
     const MAX_ITERATIONS: u32 = 1000;
 
-    fn new(block_from: BlockNumber, block_to: Option<BlockNumber>) -> Self {
+    fn new(block_from: BlockNumber, block_to: BlockNumber) -> Self {
         Self {
             current_block_from: block_from,
             block_to,
@@ -83,7 +87,7 @@ impl BlockPagination {
         self.current_block_from
     }
 
-    fn block_to(&self) -> Option<BlockNumber> {
+    fn block_to(&self) -> BlockNumber {
         self.block_to
     }
 
@@ -105,7 +109,7 @@ impl BlockPagination {
             ));
         }
 
-        let target_block = self.block_to.map_or(chain_tip, |to| to.min(chain_tip));
+        let target_block = self.block_to.min(chain_tip);
 
         if block_num >= target_block {
             return Ok(PaginationResult::Done { chain_tip, block_num });
@@ -347,7 +351,7 @@ impl NodeRpcClient for GrpcClient {
         let api_response = self
             .call_with_retry(RpcEndpoint::SubmitProvenTx, |mut rpc_api| {
                 let request = request.clone();
-                Box::pin(async move { rpc_api.submit_proven_transaction(request).await })
+                Box::pin(async move { rpc_api.submit_proven_tx(request).await })
             })
             .await?;
 
@@ -369,7 +373,7 @@ impl NodeRpcClient for GrpcClient {
         let api_response = self
             .call_with_retry(RpcEndpoint::SubmitProvenBatch, |mut rpc_api| {
                 let request = request.clone();
-                Box::pin(async move { rpc_api.submit_proven_batch(request).await })
+                Box::pin(async move { rpc_api.submit_proven_tx_batch(request).await })
             })
             .await?;
 
@@ -410,12 +414,12 @@ impl NodeRpcClient for GrpcClient {
                 .ok_or(RpcError::ExpectedDataMissing("MmrPath".into()))?
                 .try_into()?;
 
+            let forest_size = usize::try_from(forest).expect("u64 should fit in usize");
+            let forest = Forest::new(forest_size).map_err(|_| {
+                RpcError::InvalidResponse(format!("invalid forest size: {forest_size}"))
+            })?;
             Some(MmrProof::new(
-                MmrPath::new(
-                    Forest::new(usize::try_from(forest).expect("u64 should fit in usize")),
-                    block_header.block_num().as_usize(),
-                    merkle_path,
-                ),
+                MmrPath::new(forest, block_header.block_num().as_usize(), merkle_path),
                 block_header.commitment(),
             ))
         } else {
@@ -457,11 +461,12 @@ impl NodeRpcClient for GrpcClient {
         current_block_height: BlockNumber,
         upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError> {
-        let block_from = current_block_height.as_u32();
+        let finality_level: proto::rpc::FinalityLevel = upper_bound.into();
 
-        let upper_bound = Some(upper_bound.into());
-
-        let request = proto::rpc::SyncChainMmrRequest { block_from, upper_bound };
+        let request = proto::rpc::SyncChainMmrRequest {
+            current_client_block_height: current_block_height.as_u32(),
+            finality_level: finality_level.into(),
+        };
 
         let response = self
             .call_with_retry(RpcEndpoint::SyncChainMmr, |mut rpc_api| {
@@ -496,21 +501,19 @@ impl NodeRpcClient for GrpcClient {
             known_codes_by_commitment.insert(account_code.commitment(), account_code);
         }
 
-        let storage_maps: Vec<StorageMapDetailRequest> = storage.clone().into();
-
-        let asset_vault_commitment = match vault {
-            VaultFetch::Skip => None,
-            VaultFetch::Always => Some(EMPTY_WORD.into()),
-            VaultFetch::IfChangedFrom(commitment) => Some(commitment.into()),
+        // We need the requested slots to interpret the node response.
+        let requirements = match storage.clone() {
+            StorageMapFetch::Slots(reqs) => reqs,
+            StorageMapFetch::Skip | StorageMapFetch::All => AccountStorageRequirements::default(),
         };
 
         // Only request details for accounts with public state (Public or Network), passing the
         // known code commitment so the node can skip re-sending code we already hold.
-        let account_details = if account_id.has_public_state() {
+        let account_details = if account_id.is_public() {
             Some(AccountDetailRequest {
                 code_commitment: Some(known_code_commitment.into()),
-                asset_vault_commitment,
-                storage_maps,
+                asset_vault_commitment: vault.into(),
+                storage_request: storage.into(),
             })
         } else {
             None
@@ -547,11 +550,11 @@ impl NodeRpcClient for GrpcClient {
             .into();
 
         // For accounts with public state, details should be present when requested
-        let headers = if account_witness.id().has_public_state() {
+        let headers = if account_witness.id().is_public() {
             let details = response
                 .details
                 .ok_or(RpcError::ExpectedDataMissing("Account.Details".to_string()))?
-                .into_domain(&known_codes_by_commitment, &storage)?;
+                .into_domain(&known_codes_by_commitment, &requirements)?;
 
             Some(details)
         } else {
@@ -588,7 +591,7 @@ impl NodeRpcClient for GrpcClient {
 
         for chunk in tags.chunks(limits.note_tags_limit as usize) {
             let proto_tags: Vec<u32> = chunk.iter().map(|&t| t.into()).collect();
-            let mut pagination = BlockPagination::new(block_from, Some(block_to));
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
                 let request = proto::rpc::SyncNotesRequest {
@@ -639,7 +642,7 @@ impl NodeRpcClient for GrpcClient {
         &self,
         prefixes: &[u16],
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         let limits = self.get_rpc_limits().await?;
         let mut all_nullifiers = BTreeSet::new();
@@ -656,7 +659,7 @@ impl NodeRpcClient for GrpcClient {
                     prefix_len: 16,
                     block_range: Some(BlockRange {
                         block_from: pagination.current_block_from().as_u32(),
-                        block_to: pagination.block_to().map_or(u32::MAX, |b| b.as_u32()),
+                        block_to: pagination.block_to().as_u32(),
                     }),
                 };
 
@@ -743,7 +746,7 @@ impl NodeRpcClient for GrpcClient {
     async fn sync_storage_maps(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError> {
         let mut pagination = BlockPagination::new(block_from, block_to);
@@ -753,7 +756,7 @@ impl NodeRpcClient for GrpcClient {
             let request = proto::rpc::SyncAccountStorageMapsRequest {
                 block_range: Some(BlockRange {
                     block_from: pagination.current_block_from().as_u32(),
-                    block_to: pagination.block_to().map_or(u32::MAX, |block| block.as_u32()),
+                    block_to: block_to.as_u32(),
                 }),
                 account_id: Some(account_id.into()),
             };
@@ -791,7 +794,7 @@ impl NodeRpcClient for GrpcClient {
     async fn sync_account_vault(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError> {
         let mut pagination = BlockPagination::new(block_from, block_to);
@@ -801,7 +804,7 @@ impl NodeRpcClient for GrpcClient {
             let request = proto::rpc::SyncAccountVaultRequest {
                 block_range: Some(BlockRange {
                     block_from: pagination.current_block_from().as_u32(),
-                    block_to: pagination.block_to().map_or(u32::MAX, |block| block.as_u32()),
+                    block_to: block_to.as_u32(),
                 }),
                 account_id: Some(account_id.into()),
             };
@@ -856,7 +859,7 @@ impl NodeRpcClient for GrpcClient {
 
         for chunk in account_ids.chunks(limits.account_ids_limit as usize) {
             let proto_account_ids: Vec<_> = chunk.iter().map(|acc_id| (*acc_id).into()).collect();
-            let mut pagination = BlockPagination::new(block_from, Some(block_to));
+            let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
                 let request = proto::rpc::SyncTransactionsRequest {
@@ -1005,7 +1008,7 @@ mod tests {
 
     #[test]
     fn block_pagination_errors_when_block_num_goes_backwards() {
-        let mut pagination = BlockPagination::new(10_u32.into(), None);
+        let mut pagination = BlockPagination::new(10_u32.into(), 20_u32.into());
 
         let res = pagination.advance(9_u32.into(), 20_u32.into());
         assert!(matches!(res, Err(RpcError::PaginationError(_))));
@@ -1013,7 +1016,7 @@ mod tests {
 
     #[test]
     fn block_pagination_errors_after_max_iterations() {
-        let mut pagination = BlockPagination::new(0_u32.into(), None);
+        let mut pagination = BlockPagination::new(0_u32.into(), 10_000_u32.into());
         let chain_tip: BlockNumber = 10_000_u32.into();
 
         for _ in 0..BlockPagination::MAX_ITERATIONS {
@@ -1031,7 +1034,7 @@ mod tests {
     #[test]
     fn block_pagination_stops_at_min_of_block_to_and_chain_tip() {
         // block_to is beyond chain tip, so target should be chain_tip.
-        let mut pagination = BlockPagination::new(0_u32.into(), Some(50_u32.into()));
+        let mut pagination = BlockPagination::new(0_u32.into(), 50_u32.into());
 
         let res = pagination
             .advance(30_u32.into(), 30_u32.into())
@@ -1048,7 +1051,7 @@ mod tests {
 
     #[test]
     fn block_pagination_advances_cursor_by_one() {
-        let mut pagination = BlockPagination::new(5_u32.into(), None);
+        let mut pagination = BlockPagination::new(5_u32.into(), 100_u32.into());
 
         let res = pagination
             .advance(5_u32.into(), 100_u32.into())
@@ -1087,15 +1090,13 @@ mod tests {
 
     #[tokio::test]
     async fn set_genesis_commitment_does_nothing_if_the_commitment_is_already_set() {
-        use miden_protocol::Felt;
-
         let endpoint = &Endpoint::devnet();
         let client = GrpcClient::new(endpoint, 10000);
 
         let initial_commitment = Word::default();
         client.set_genesis_commitment(initial_commitment).await.unwrap();
 
-        let new_commitment = Word::from([Felt::new(1), Felt::new(2), Felt::new(3), Felt::new(4)]);
+        let new_commitment = Word::from([1u32, 2, 3, 4]);
         client.set_genesis_commitment(new_commitment).await.unwrap();
 
         assert_eq!(client.genesis_commitment.read().unwrap(), initial_commitment);

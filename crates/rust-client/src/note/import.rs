@@ -17,6 +17,7 @@ use miden_protocol::note::{
     Note,
     NoteAttachments,
     NoteDetails,
+    NoteDetailsCommitment,
     NoteFile,
     NoteId,
     NoteInclusionProof,
@@ -43,7 +44,10 @@ where
     /// Imports a batch of new input notes into the client's store. The information stored depends
     /// on the type of note files provided. If the notes existed previously, it will be updated
     /// with the new information. The tags specified by the `NoteFile`s will start being
-    /// tracked. Returns the IDs of notes that were successfully imported or updated.
+    /// tracked. Returns the details commitments of notes that were successfully imported or
+    /// updated. The details commitment is used (rather than the note ID) because notes imported
+    /// without metadata — e.g. from [`NoteFile::NoteDetails`] in an `Expected` state — have no
+    /// note ID yet, whereas the details commitment is always available.
     ///
     /// - If the note files are [`NoteFile::NoteId`], the notes are fetched from the node and stored
     ///   in the client's store. If the note is private or doesn't exist, an error is returned.
@@ -62,47 +66,68 @@ where
     pub async fn import_notes(
         &mut self,
         note_files: &[NoteFile],
-    ) -> Result<Vec<NoteId>, ClientError> {
-        let mut note_ids_map = BTreeMap::new();
+    ) -> Result<Vec<NoteDetailsCommitment>, ClientError> {
+        // Deduplicate the incoming files, keeping note IDs and details commitments in separate
+        // collections. `NoteFile::NoteId` entries are keyed by their note ID; detail-carrying
+        // entries (`NoteDetails`/`NoteWithProof`) are keyed by their details commitment, since
+        // they may have no note ID of their own.
+        let mut ids = BTreeSet::new();
+        let mut files_by_commitment = BTreeMap::new();
         for note_file in note_files {
-            let id = match &note_file {
-                NoteFile::NoteId(id) => *id,
-                NoteFile::NoteDetails { details, .. } => details.id(),
-                NoteFile::NoteWithProof(note, _) => note.id(),
-            };
-            note_ids_map.insert(id, note_file);
+            match note_file {
+                NoteFile::NoteId(id) => {
+                    ids.insert(*id);
+                },
+                NoteFile::NoteDetails { details, .. } => {
+                    files_by_commitment.insert(details.commitment(), note_file.clone());
+                },
+                NoteFile::NoteWithProof(note, _) => {
+                    files_by_commitment.insert(note.details_commitment(), note_file.clone());
+                },
+            }
         }
 
-        let note_ids: Vec<NoteId> = note_ids_map.keys().copied().collect();
-        let previous_notes: Vec<InputNoteRecord> =
-            self.get_input_notes(NoteFilter::List(note_ids)).await?;
-        let previous_notes_map: BTreeMap<NoteId, InputNoteRecord> =
-            previous_notes.into_iter().map(|note| (note.id(), note)).collect();
+        // Resolve previously stored versions: by id for `NoteFile::NoteId`, by details commitment
+        // otherwise (which also matches metadata-less records, whose `note_id` is NULL).
+        let previous_by_id: BTreeMap<NoteId, InputNoteRecord> = self
+            .get_input_notes(NoteFilter::List(ids.iter().copied().collect()))
+            .await?
+            .into_iter()
+            .filter_map(|note| note.id().map(|id| (id, note)))
+            .collect();
+        let previous_by_commitment: BTreeMap<NoteDetailsCommitment, InputNoteRecord> = self
+            .get_input_notes(NoteFilter::DetailsCommitments(
+                files_by_commitment.keys().copied().collect(),
+            ))
+            .await?
+            .into_iter()
+            .map(|note| (note.details_commitment(), note))
+            .collect();
 
+        // Pair each deduplicated file with its previously stored version (if any), bucketed by
+        // variant. A note that is currently being processed can't be overwritten.
         let mut requests_by_id = BTreeMap::new();
         let mut requests_by_details = vec![];
         let mut requests_by_proof = vec![];
 
-        for (note_id, note_file) in note_ids_map {
-            let previous_note = previous_notes_map.get(&note_id).cloned();
+        for id in ids {
+            let previous_note = previous_by_id.get(&id).cloned();
+            ensure_not_processing(previous_note.as_ref())?;
+            requests_by_id.insert(id, previous_note);
+        }
 
-            // If the note is already in the store and is in the state processing we return an
-            // error.
-            if let Some(true) = previous_note.as_ref().map(InputNoteRecord::is_processing) {
-                return Err(ClientError::NoteImportError(format!(
-                    "Can't overwrite note with id {note_id} as it's currently being processed",
-                )));
-            }
-
-            match note_file.clone() {
-                NoteFile::NoteId(id) => {
-                    requests_by_id.insert(id, previous_note);
-                },
+        for (commitment, note_file) in files_by_commitment {
+            let previous_note = previous_by_commitment.get(&commitment).cloned();
+            ensure_not_processing(previous_note.as_ref())?;
+            match note_file {
                 NoteFile::NoteDetails { details, after_block_num, tag } => {
                     requests_by_details.push((previous_note, details, after_block_num, tag));
                 },
                 NoteFile::NoteWithProof(note, inclusion_proof) => {
                     requests_by_proof.push((previous_note, note, inclusion_proof));
+                },
+                NoteFile::NoteId(_) => {
+                    unreachable!("files_by_commitment only holds detail-carrying note files")
                 },
             }
         }
@@ -110,7 +135,7 @@ where
         let mut imported_notes = vec![];
         if !requests_by_id.is_empty() {
             let notes_by_id = self.import_note_records_by_id(requests_by_id).await?;
-            imported_notes.extend(notes_by_id.values().cloned());
+            imported_notes.extend(notes_by_id);
         }
 
         if !requests_by_details.is_empty() {
@@ -123,27 +148,31 @@ where
             imported_notes.extend(notes_by_proof);
         }
 
-        let mut imported_note_ids = Vec::with_capacity(imported_notes.len());
+        let mut imported_commitments = Vec::with_capacity(imported_notes.len());
         for note in imported_notes.into_iter().flatten() {
-            imported_note_ids.push(note.id());
+            let details_commitment = note.details_commitment();
             if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) = note.state()
             {
                 self.store
-                    .add_note_tag(NoteTagRecord::with_note_source(*tag, note.id()))
+                    .add_note_tag(NoteTagRecord::with_note_source(*tag, details_commitment))
                     .await?;
             }
             self.store.upsert_input_notes(&[note]).await?;
+            imported_commitments.push(details_commitment);
         }
 
-        Ok(imported_note_ids)
+        Ok(imported_commitments)
     }
 
     // HELPERS
     // ================================================================================================
 
-    /// Builds a note record map from the note IDs. If a note with the same ID was already stored it
+    /// Builds note records from the note IDs. If a note with the same ID was already stored it
     /// is passed via `previous_note` so it can be updated. The note information is fetched from
     /// the node and stored in the client's store.
+    ///
+    /// The returned records are not keyed by [`NoteId`] because a note that the node reports as
+    /// already consumed becomes a metadata-less `ConsumedExternal` record with no `NoteId`.
     ///
     /// # Errors:
     /// - If a note doesn't exist on the node.
@@ -151,7 +180,7 @@ where
     async fn import_note_records_by_id(
         &mut self,
         notes: BTreeMap<NoteId, Option<InputNoteRecord>>,
-    ) -> Result<BTreeMap<NoteId, Option<InputNoteRecord>>, ClientError> {
+    ) -> Result<Vec<Option<InputNoteRecord>>, ClientError> {
         let note_ids = notes.keys().copied().collect::<Vec<_>>();
 
         let fetched_notes =
@@ -164,7 +193,7 @@ where
             return Err(ClientError::NoteImportError("No notes fetched from node".to_string()));
         }
 
-        let mut note_records = BTreeMap::new();
+        let mut note_records = Vec::new();
         let mut notes_to_request = vec![];
         for fetched_note in fetched_notes {
             let note_id = fetched_note.id();
@@ -180,9 +209,9 @@ where
                 {
                     self.store.remove_note_tag((&previous_note).try_into()?).await?;
 
-                    note_records.insert(note_id, Some(previous_note));
+                    note_records.push(Some(previous_note));
                 } else {
-                    note_records.insert(note_id, None);
+                    note_records.push(None);
                 }
             } else {
                 let fetched_note = match fetched_note {
@@ -201,9 +230,7 @@ where
 
         if !notes_to_request.is_empty() {
             let note_records_by_proof = self.import_note_records_by_proof(notes_to_request).await?;
-            for note_record in note_records_by_proof.iter().flatten().cloned() {
-                note_records.insert(note_record.id(), Some(note_record));
-            }
+            note_records.extend(note_records_by_proof);
         }
         Ok(note_records)
     }
@@ -225,16 +252,15 @@ where
         let mut nullifier_requests = BTreeSet::new();
         let mut lowest_block_height: BlockNumber = u32::MAX.into();
         for (previous_note, note, inclusion_proof) in &requested_notes {
-            if let Some(previous_note) = previous_note {
-                nullifier_requests.insert(previous_note.nullifier());
-                if inclusion_proof.location().block_num() < lowest_block_height {
-                    lowest_block_height = inclusion_proof.location().block_num();
-                }
-            } else {
-                nullifier_requests.insert(note.nullifier());
-                if inclusion_proof.location().block_num() < lowest_block_height {
-                    lowest_block_height = inclusion_proof.location().block_num();
-                }
+            let nullifier = match previous_note {
+                Some(previous_note) => previous_note.nullifier(),
+                None => Some(note.nullifier()),
+            };
+            if let Some(nullifier) = nullifier {
+                nullifier_requests.insert(nullifier);
+            }
+            if inclusion_proof.location().block_num() < lowest_block_height {
+                lowest_block_height = inclusion_proof.location().block_num();
             }
         }
 
@@ -258,9 +284,10 @@ where
                 .into(),
             ));
 
-            if let Some(Some(block_height)) = nullifier_commit_heights.get(&note_record.nullifier())
+            if let Some(nullifier) = note_record.nullifier()
+                && let Some(Some(block_height)) = nullifier_commit_heights.get(&nullifier)
             {
-                if note_record.consumed_externally(note_record.nullifier(), *block_height, None)? {
+                if note_record.consumed_externally(nullifier, *block_height, None)? {
                     note_records.push(Some(note_record));
                 }
 
@@ -290,7 +317,10 @@ where
                     // If the note is in the future we import it as unverified. We add the note tag
                     // so that the note is verified naturally in the next sync.
                     self.store
-                        .add_note_tag(NoteTagRecord::with_note_source(tag, note_record.id()))
+                        .add_note_tag(NoteTagRecord::with_note_source(
+                            tag,
+                            note_record.details_commitment(),
+                        ))
                         .await?;
                 }
 
@@ -315,7 +345,7 @@ where
         let mut note_requests = vec![];
         for (_, details, after_block_num, tag) in &requested_notes {
             if let Some(tag) = tag {
-                note_requests.push((details.id(), tag));
+                note_requests.push((details.commitment(), tag));
                 if after_block_num < &lowest_request_block {
                     lowest_request_block = *after_block_num;
                 }
@@ -326,7 +356,7 @@ where
 
         let mut note_records = vec![];
         for (previous_note, details, after_block_num, tag) in requested_notes {
-            let mut note_record = previous_note.unwrap_or({
+            let note_record = previous_note.unwrap_or({
                 InputNoteRecord::new(
                     details,
                     NoteAttachments::empty(),
@@ -335,8 +365,8 @@ where
                 )
             });
 
-            match committed_notes_data.remove(&note_record.id()) {
-                Some(Some((metadata, inclusion_proof))) => {
+            match committed_notes_data.remove(&note_record.details_commitment()) {
+                Some((metadata, inclusion_proof)) => {
                     // Building the MMR outside the loop would fail with BlockHeaderNotFound(0)
                     // because store will be fresh, which can't happen here.
                     let mut partial_mmr = self.get_current_partial_mmr().await?;
@@ -350,12 +380,16 @@ where
                     self.cache_partial_mmr(partial_mmr).await?;
 
                     let tag = metadata.tag();
+                    let mut note_record = note_record;
                     let note_changed =
                         note_record.inclusion_proof_received(inclusion_proof, metadata)?;
 
                     if note_record.block_header_received(&block_header)? | note_changed {
                         self.store
-                            .remove_note_tag(NoteTagRecord::with_note_source(tag, note_record.id()))
+                            .remove_note_tag(NoteTagRecord::with_note_source(
+                                tag,
+                                note_record.details_commitment(),
+                            ))
                             .await?;
 
                         note_records.push(Some(note_record));
@@ -363,7 +397,7 @@ where
                         note_records.push(None);
                     }
                 },
-                _ => {
+                None => {
                     note_records.push(Some(note_record));
                 },
             }
@@ -372,15 +406,20 @@ where
         Ok(note_records)
     }
 
-    /// Checks if notes with their given `note_tag` and ID are present in the chain between the
-    /// `request_block_num` and the current block. If found it returns their metadata and inclusion
-    /// proof.
+    /// Checks if notes with the given details commitments and tags are present in the chain between
+    /// `request_block_num` and the current block, returning their metadata and inclusion proof
+    /// keyed by details commitment.
+    ///
+    /// Expected notes have no metadata and thus no `NoteId`, so each committed note is matched by
+    /// reconstructing the id from the committed metadata: `NoteId::new(details_commitment,
+    /// metadata)`.
     async fn check_expected_notes(
         &mut self,
         request_block_num: BlockNumber,
-        // Expected notes with their tags
-        expected_notes: Vec<(NoteId, &NoteTag)>,
-    ) -> Result<BTreeMap<NoteId, Option<(NoteMetadata, NoteInclusionProof)>>, ClientError> {
+        // Expected notes' details commitments with their tags
+        expected_notes: Vec<(NoteDetailsCommitment, &NoteTag)>,
+    ) -> Result<BTreeMap<NoteDetailsCommitment, (NoteMetadata, NoteInclusionProof)>, ClientError>
+    {
         let tracked_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
         let mut retrieved_proofs = BTreeMap::new();
         let current_block_num = self.get_sync_height().await?;
@@ -389,9 +428,9 @@ where
             return Ok(retrieved_proofs);
         }
 
-        let (blocks, _) = self
+        let blocks = self
             .rpc_api
-            .sync_notes_with_details(request_block_num, current_block_num, &tracked_tags)
+            .sync_notes(request_block_num, current_block_num, &tracked_tags)
             .await
             .map_err(ClientError::RpcError)?;
 
@@ -401,20 +440,36 @@ where
             }
 
             for sync_note in block.notes.values() {
-                if !expected_notes.iter().any(|(id, _)| id == sync_note.note_id()) {
+                let Some((commitment, _)) = expected_notes.iter().find(|(commitment, _)| {
+                    NoteId::new(*commitment, sync_note.metadata()) == *sync_note.note_id()
+                }) else {
                     continue;
-                }
+                };
 
                 retrieved_proofs.insert(
-                    *sync_note.note_id(),
-                    Some((*sync_note.metadata(), sync_note.inclusion_proof().clone())),
+                    *commitment,
+                    (*sync_note.metadata(), sync_note.inclusion_proof().clone()),
                 );
             }
         }
 
-        retrieved_proofs
-            .into_iter()
-            .map(|(note_id, data)| Ok((note_id, data)))
-            .collect()
+        Ok(retrieved_proofs)
     }
+}
+
+// HELPERS
+// ================================================================================================
+
+/// Returns an error if the already-stored note is currently being processed by a local
+/// transaction, since an in-flight note can't be overwritten by an import.
+fn ensure_not_processing(previous_note: Option<&InputNoteRecord>) -> Result<(), ClientError> {
+    if let Some(note) = previous_note
+        && note.is_processing()
+    {
+        return Err(ClientError::NoteImportError(format!(
+            "Can't overwrite note with details commitment {} as it's currently being processed",
+            note.details_commitment().to_hex(),
+        )));
+    }
+    Ok(())
 }

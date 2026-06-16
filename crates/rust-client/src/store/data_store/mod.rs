@@ -1,4 +1,4 @@
-use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::collections::BTreeSet;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -28,11 +28,14 @@ use crate::rpc::domain::account::{
     AccountStorageRequirements,
     GetAccountRequest,
     StorageMapEntries,
+    StorageMapFetch,
 };
 use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::StoreError;
 use crate::transaction::fetch_public_account_inputs;
-use crate::utils::RwLock;
+
+mod cache;
+use cache::DataStoreCache;
 
 // DATA STORE
 // ================================================================================================
@@ -41,15 +44,8 @@ use crate::utils::RwLock;
 pub struct ClientDataStore {
     /// Local database containing information about the accounts managed by this client.
     store: alloc::sync::Arc<dyn Store>,
-    /// Store used to provide MAST nodes to the transaction executor.
-    transaction_mast_store: Arc<TransactionMastStore>,
-    /// Cache of foreign account inputs that should be returned to the executor on demand.
-    foreign_account_inputs: RwLock<BTreeMap<AccountId, AccountInputs>>,
-    /// Cache of storage map witnesses, keyed by (`map_root`, `map_key`). Avoids redundant RPC
-    /// calls when the same map entry is accessed multiple times within a transaction.
-    storage_map_cache: RwLock<BTreeMap<(Word, StorageMapKey), StorageMapWitness>>,
-    /// The transaction reference block number.
-    ref_block: RwLock<Option<BlockNumber>>,
+    /// In-memory state served to the executor for the duration of the execution session.
+    cache: DataStoreCache,
     /// RPC client used to lazy-load foreign account data on cache miss.
     rpc_api: Arc<dyn NodeRpcClient>,
 }
@@ -58,16 +54,13 @@ impl ClientDataStore {
     pub fn new(store: alloc::sync::Arc<dyn Store>, rpc_api: Arc<dyn NodeRpcClient>) -> Self {
         Self {
             store,
-            transaction_mast_store: Arc::new(TransactionMastStore::new()),
-            foreign_account_inputs: RwLock::new(BTreeMap::new()),
-            storage_map_cache: RwLock::new(BTreeMap::new()),
-            ref_block: RwLock::new(None),
+            cache: DataStoreCache::new(),
             rpc_api,
         }
     }
 
     pub fn mast_store(&self) -> Arc<TransactionMastStore> {
-        self.transaction_mast_store.clone()
+        self.cache.mast_store.clone()
     }
 
     /// Stores the provided foreign account inputs so they can be served to the executor upon
@@ -76,12 +69,16 @@ impl ClientDataStore {
         &self,
         foreign_accounts: impl IntoIterator<Item = AccountInputs>,
     ) {
-        let mut cache = self.foreign_account_inputs.write();
-        cache.clear();
+        self.cache.replace_foreign_account_inputs(foreign_accounts);
+    }
 
-        for account_inputs in foreign_accounts {
-            cache.insert(account_inputs.id(), account_inputs);
-        }
+    /// Registers note scripts so they can be served to the executor upon request.
+    ///
+    /// Scripts accumulate across calls (they are not cleared) so that a data store reused for
+    /// several executions — e.g. by [`crate::transaction::BatchBuilder`] — keeps serving the
+    /// scripts registered for earlier transactions.
+    pub fn register_note_scripts(&self, note_scripts: impl IntoIterator<Item = NoteScript>) {
+        self.cache.insert_note_scripts(note_scripts);
     }
 
     /// Attempts to resolve a storage map witness from the local store.
@@ -140,8 +137,8 @@ impl ClientDataStore {
             DataStoreError::other_with_source("failed to fetch foreign account inputs", err)
         })?;
 
-        self.transaction_mast_store.load_account_code(account_inputs.code());
-        self.foreign_account_inputs.write().insert(account_id, account_inputs.clone());
+        self.cache.mast_store.load_account_code(account_inputs.code());
+        self.cache.insert_foreign_account_inputs(account_inputs.clone());
 
         Ok(account_inputs)
     }
@@ -161,7 +158,7 @@ impl ClientDataStore {
             .get_account(
                 account_id,
                 GetAccountRequest::new()
-                    .with_storage(storage_requirements)
+                    .with_storage(StorageMapFetch::Slots(storage_requirements))
                     .with_known_code(Some(known_code)),
             )
             .await
@@ -200,35 +197,8 @@ impl ClientDataStore {
         let witness = StorageMapWitness::new(proof, [map_key]).map_err(|err| {
             DataStoreError::other_with_source("failed to create storage map witness", err)
         })?;
-        self.storage_map_cache.write().insert((map_root, map_key), witness.clone());
+        self.cache.insert_storage_map_witness(map_root, map_key, witness.clone());
         Ok(witness)
-    }
-
-    /// Resolves the slot name and account code for a map root from the cached foreign account
-    /// inputs.
-    fn resolve_slot_name_and_code(
-        &self,
-        account_id: AccountId,
-        map_root: Word,
-    ) -> Result<(StorageSlotName, AccountCode), DataStoreError> {
-        let cache = self.foreign_account_inputs.read();
-        let inputs = cache
-            .get(&account_id)
-            .ok_or_else(|| DataStoreError::AccountNotFound(account_id))?;
-
-        let slot_name = inputs
-            .storage()
-            .header()
-            .slots()
-            .find(|slot| slot.slot_type().is_map() && slot.value() == map_root)
-            .map(|slot| slot.name().clone())
-            .ok_or_else(|| {
-                DataStoreError::other(format!(
-                    "did not find map slot with root {map_root} for foreign account {account_id}"
-                ))
-            })?;
-
-        Ok((slot_name, inputs.code().clone()))
     }
 }
 
@@ -244,7 +214,7 @@ impl DataStore for ClientDataStore {
         let ref_block = block_refs.pop_last().ok_or(DataStoreError::other("block set is empty"))?;
 
         // Cache the reference block so lazy-loading methods can use it
-        *self.ref_block.write() = Some(ref_block);
+        self.cache.set_ref_block(ref_block);
 
         let partial_account_record = self
             .store
@@ -350,10 +320,8 @@ impl DataStore for ClientDataStore {
         map_root: Word,
         map_key: StorageMapKey,
     ) -> Result<StorageMapWitness, DataStoreError> {
-        let cache_key = (map_root, map_key);
-
         // Check the in-memory witness cache first.
-        if let Some(witness) = self.storage_map_cache.read().get(&cache_key).cloned() {
+        if let Some(witness) = self.cache.get_storage_map_witness(map_root, map_key) {
             return Ok(witness);
         }
 
@@ -364,31 +332,32 @@ impl DataStore for ClientDataStore {
             return Ok(witness);
         }
 
-        // Ensure the account inputs are cached before resolving the slot name.
-        if !self.foreign_account_inputs.read().contains_key(&account_id) {
+        // Resolve against the cached account inputs (without cloning them), fetching and caching
+        // the account first if it isn't cached yet.
+        let resolution = if let Some(resolution) =
+            self.cache.with_foreign_account_inputs(account_id, |inputs| {
+                resolve_witness_from_inputs(inputs, map_root, map_key)
+            }) {
+            resolution?
+        } else {
             let account_state_at = self
-                .ref_block
-                .read()
+                .cache
+                .ref_block()
                 .map(AccountStateAt::Block)
                 .expect("reference block should be set");
-            self.fetch_and_cache_foreign_account(account_id, account_state_at).await?;
+            let inputs = self.fetch_and_cache_foreign_account(account_id, account_state_at).await?;
+            resolve_witness_from_inputs(&inputs, map_root, map_key)?
+        };
+
+        match resolution {
+            WitnessResolution::Witness(witness) => Ok(witness),
+            WitnessResolution::FetchParams(slot_name, known_code) => {
+                self.fetch_and_cache_storage_map_witness(
+                    account_id, map_root, slot_name, map_key, known_code,
+                )
+                .await
+            },
         }
-
-        // Try to get the witness from the cached account inputs. It will miss if the account's
-        // storage is too big.
-        if let Some(inputs) = self.foreign_account_inputs.read().get(&account_id)
-            && let Some(partial_map) = inputs.storage().maps().find(|m| m.root() == map_root)
-            && let Ok(witness) = partial_map.open(&map_key)
-        {
-            return Ok(witness);
-        }
-
-        let (slot_name, known_code) = self.resolve_slot_name_and_code(account_id, map_root)?;
-
-        self.fetch_and_cache_storage_map_witness(
-            account_id, map_root, slot_name, map_key, known_code,
-        )
-        .await
     }
 
     /// Returns the [`AccountInputs`] for the given foreign account from the cache or alternatively
@@ -398,28 +367,31 @@ impl DataStore for ClientDataStore {
         foreign_account_id: AccountId,
         ref_block: BlockNumber,
     ) -> Result<AccountInputs, DataStoreError> {
-        // Fast path: check the cache first (drop the read guard before any async work).
-        {
-            let cache = self.foreign_account_inputs.read();
-            if let Some(inputs) = cache.get(&foreign_account_id).cloned() {
-                return Ok(inputs);
-            }
+        // Fast path: check the cache first.
+        if let Some(inputs) = self.cache.get_foreign_account_inputs(foreign_account_id) {
+            return Ok(inputs);
         }
 
         self.fetch_and_cache_foreign_account(foreign_account_id, AccountStateAt::Block(ref_block))
             .await
     }
 
-    /// Returns the [`NoteScript`] for the given script root from the store or alternatively
-    /// fetching it from the RPC if not available locally.
+    /// Returns the [`NoteScript`] for the given script root from the registered session scripts,
+    /// the store, or alternatively fetching it from the RPC if not available locally.
     fn get_note_script(
         &self,
         script_root: NoteScriptRoot,
     ) -> impl FutureMaybeSend<Result<Option<NoteScript>, DataStoreError>> {
+        let registered_script = self.cache.get_note_script(script_root.into());
         let store = self.store.clone();
         let rpc_api = self.rpc_api.clone();
 
         async move {
+            // Fastest path: scripts registered for the in-flight transaction request.
+            if let Some(note_script) = registered_script {
+                return Ok(Some(note_script));
+            }
+
             // Fast path: check the local store first.
             match store.get_note_script(script_root.into()).await {
                 Ok(note_script) => return Ok(Some(note_script)),
@@ -459,12 +431,51 @@ impl DataStore for ClientDataStore {
 
 impl MastForestStore for ClientDataStore {
     fn get(&self, procedure_hash: &Word) -> Option<Arc<MastForest>> {
-        self.transaction_mast_store.get(procedure_hash)
+        self.cache.mast_store.get(procedure_hash)
     }
 }
 
 // HELPER FUNCTIONS
 // ================================================================================================
+
+/// Outcome of resolving a storage map witness against an account's inputs: either the witness
+/// itself, or the parameters needed to fetch it via RPC.
+enum WitnessResolution {
+    Witness(StorageMapWitness),
+    /// The [`AccountCode`] is not needed to build the witness: it is only sent along with the
+    /// RPC request so the node can omit the account code from its response.
+    FetchParams(StorageSlotName, AccountCode),
+}
+
+/// Tries to open the witness from the inputs' partial storage maps (this can miss if the
+/// account's storage is too big); on a miss, resolves the slot name and account code needed to
+/// fetch the witness via RPC.
+fn resolve_witness_from_inputs(
+    inputs: &AccountInputs,
+    map_root: Word,
+    map_key: StorageMapKey,
+) -> Result<WitnessResolution, DataStoreError> {
+    if let Some(partial_map) = inputs.storage().maps().find(|m| m.root() == map_root)
+        && let Ok(witness) = partial_map.open(&map_key)
+    {
+        return Ok(WitnessResolution::Witness(witness));
+    }
+
+    let account_id = inputs.id();
+    let slot_name = inputs
+        .storage()
+        .header()
+        .slots()
+        .find(|slot| slot.slot_type().is_map() && slot.value() == map_root)
+        .map(|slot| slot.name().clone())
+        .ok_or_else(|| {
+            DataStoreError::other(format!(
+                "did not find map slot with root {map_root} for foreign account {account_id}"
+            ))
+        })?;
+
+    Ok(WitnessResolution::FetchParams(slot_name, inputs.code().clone()))
+}
 
 /// Builds a [`PartialMmr`] from the given peaks and a list of blocks that should be
 /// authenticated against them.

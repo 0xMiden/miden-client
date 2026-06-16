@@ -30,7 +30,7 @@ use miden_client::account::{
     StorageMapKey,
     StorageSlotName,
 };
-use miden_client::asset::{AccountStorageHeader, Asset, AssetVault, AssetWitness};
+use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::block::BlockHeader;
 use miden_client::crypto::{InOrderIndex, MmrPeaks};
 use miden_client::note::{BlockNumber, NoteScript, NoteTag, Nullifier};
@@ -45,6 +45,7 @@ use miden_client::store::{
     NoteFilter,
     OutputNoteRecord,
     PartialBlockchainFilter,
+    SettingMutation,
     Store,
     StoreError,
     TransactionFilter,
@@ -471,6 +472,26 @@ impl Store for SqliteStore {
         self.interact_with_connection(move |conn| list_setting_keys(conn)).await
     }
 
+    async fn apply_settings_mutations(
+        &self,
+        mutations: Vec<SettingMutation>,
+    ) -> Result<(), StoreError> {
+        self.interact_with_connection(move |conn| {
+            let tx = conn.transaction().into_store_error()?;
+            for mutation in &mutations {
+                match mutation {
+                    SettingMutation::Set { key, value } => {
+                        set_setting(&tx, key, value).into_store_error()?;
+                    },
+                    SettingMutation::Remove { key } => remove_setting(&tx, key)?,
+                }
+            }
+            tx.commit().into_store_error()?;
+            Ok(())
+        })
+        .await
+    }
+
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {
         self.interact_with_connection(SqliteStore::get_unspent_input_note_nullifiers)
             .await
@@ -500,16 +521,6 @@ impl Store for SqliteStore {
     ) -> Result<AccountStorage, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_account_storage(conn, account_id, &filter)
-        })
-        .await
-    }
-
-    async fn get_account_storage_header(
-        &self,
-        account_id: AccountId,
-    ) -> Result<AccountStorageHeader, StoreError> {
-        self.interact_with_connection(move |conn| {
-            SqliteStore::get_account_storage_header(conn, account_id)
         })
         .await
     }

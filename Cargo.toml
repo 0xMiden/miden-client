@@ -8,8 +8,7 @@ members = [
   "crates/rust-client",
   "crates/sqlite-store",
   "crates/testing/miden-client-tests",
-  "crates/testing/node-builder",
-  "crates/testing/prover",
+  "crates/testing/test-node-genesis",
 ]
 
 default-members = ["bin/miden-cli", "crates/rust-client"]
@@ -35,29 +34,21 @@ miden-client              = { default-features = false, path = "crates/rust-clie
 miden-client-sqlite-store = { default-features = false, path = "crates/sqlite-store", version = "0.15.0" }
 
 # Miden protocol dependencies
-miden-protocol        = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
-miden-standards       = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
-miden-testing         = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
-miden-tx              = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
-miden-tx-batch-prover = { branch = "next", default-features = false, git = "https://github.com/0xMiden/protocol.git" }
+miden-agglayer        = { default-features = false, version = "0.15.3" }
+miden-protocol        = { default-features = false, version = "0.15.3" }
+miden-standards       = { default-features = false, version = "0.15.3" }
+miden-testing         = { default-features = false, version = "0.15.3" }
+miden-tx              = { default-features = false, version = "0.15.3" }
+miden-tx-batch-prover = { default-features = false, version = "0.15.3" }
 
 # Miden node dependencies
-miden-node-block-producer = { branch = "jmunoz-update-miden-deps", git = "https://github.com/0xMiden/node.git" }
-miden-node-proto = { branch = "jmunoz-update-miden-deps", git = "https://github.com/0xMiden/node.git" }
-miden-node-proto-build = { branch = "jmunoz-update-miden-deps", default-features = false, git = "https://github.com/0xMiden/node.git" }
-miden-node-rpc = { branch = "jmunoz-update-miden-deps", git = "https://github.com/0xMiden/node.git" }
-miden-node-store = { branch = "jmunoz-update-miden-deps", git = "https://github.com/0xMiden/node.git" }
-miden-node-utils = { branch = "jmunoz-update-miden-deps", git = "https://github.com/0xMiden/node.git" }
-miden-note-transport-proto-build = { default-features = false, version = "0.2" }
-miden-ntx-builder = { branch = "jmunoz-update-miden-deps", git = "https://github.com/0xMiden/node.git" }
-miden-remote-prover-client = { branch = "jmunoz-update-miden-deps", default-features = false, features = [
-  "tx-prover",
-], git = "https://github.com/0xMiden/node.git" }
-miden-validator = { branch = "jmunoz-update-miden-deps", git = "https://github.com/0xMiden/node.git" }
+miden-node-proto-build           = { default-features = false, version = "0.15.0" }
+miden-note-transport-proto-build = { default-features = false, version = "0.4" }
+miden-remote-prover-client       = { default-features = false, features = ["tx-prover"], version = "0.15.0" }
 
 # Miden debug dependency
-miden-debug     = { default-features = false, features = ["dap", "std"], version = "0.7" }
-miden-processor = { default-features = false, version = "0.22" }
+miden-debug     = { default-features = false, features = ["dap", "std"], version = "0.8" }
+miden-processor = { default-features = false, version = "0.23" }
 
 # External dependencies
 anyhow             = { default-features = false, version = "1.0" }

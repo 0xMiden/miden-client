@@ -77,13 +77,7 @@ mod tag;
 pub use tag::{NoteTagRecord, NoteTagSource};
 
 mod state_sync;
-pub use state_sync::{
-    AccountSyncHint,
-    NoteUpdateAction,
-    OnNoteReceived,
-    StateSync,
-    StateSyncInput,
-};
+pub use state_sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
 
 mod state_sync_update;
 pub use state_sync_update::{
@@ -160,9 +154,18 @@ where
             return Ok(Vec::new());
         }
 
+        // Drain any private notes whose previous relay attempt failed. A flush
+        // error is logged, not propagated: a failing relay must not block the
+        // sync, and the entries stay durable for the next attempt.
+        if let Err(err) = self.flush_relay_outbox().await {
+            tracing::warn!(?err, "relay outbox flush failed during sync; entries retained");
+        }
+
         let cursor = self.store.get_note_transport_cursor().await?;
-        let note_tags = self.store.get_unique_note_tags().await?;
-        self.fetch_transport_notes(cursor, note_tags).await
+        let note_tags: Vec<_> = self.store.get_unique_note_tags().await?.into_iter().collect();
+        let (ids, new_cursor) = self.fetch_transport_notes(cursor, &note_tags).await?;
+        self.store.update_note_transport_cursor(new_cursor).await?;
+        Ok(ids)
     }
 
     /// Runs the full client sync.
@@ -186,13 +189,13 @@ where
     /// This includes all tracked account headers, all unique note tags, all unspent input and
     /// output notes, and all uncommitted transactions.
     pub async fn build_sync_input(&self) -> Result<StateSyncInput, ClientError> {
-        let mut accounts = Vec::new();
-        // TODO 2178:
-        // Reduce amount of queries done to the database
-        for (header, _status) in self.store.get_account_headers().await? {
-            let storage_header = self.store.get_account_storage_header(header.id()).await?;
-            accounts.push(AccountSyncHint { header, storage_header });
-        }
+        let accounts = self
+            .store
+            .get_account_headers()
+            .await?
+            .into_iter()
+            .map(|(header, _status)| header)
+            .collect();
 
         let note_tags = self.store.get_unique_note_tags().await?;
 
@@ -324,7 +327,8 @@ pub struct SyncSummary {
     pub block_num: BlockNumber,
     /// IDs of new public notes that the client has received.
     pub new_public_notes: Vec<NoteId>,
-    /// IDs of private notes imported from the Note Transport Layer in this sync.
+    /// IDs of private notes imported from the Note Transport Layer in this sync. They are still
+    /// `Expected` until observed on-chain.
     ///
     /// Only populated by [`Client::sync_state`]; [`Client::sync_chain`] always leaves this empty
     /// because it does not touch the Note Transport Layer.

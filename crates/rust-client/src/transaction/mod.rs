@@ -68,7 +68,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::account::{Account, AccountCode, AccountId};
-use miden_protocol::asset::NonFungibleAsset;
+use miden_protocol::asset::{Asset, NonFungibleAsset};
 use miden_protocol::block::BlockNumber;
 use miden_protocol::errors::AssetError;
 use miden_protocol::note::{
@@ -90,7 +90,12 @@ use tracing::info;
 use super::Client;
 use crate::ClientError;
 use crate::note::{NoteScreenerError, NoteUpdateTracker, StandardNote};
-use crate::rpc::domain::account::{AccountStorageRequirements, GetAccountRequest, VaultFetch};
+use crate::rpc::domain::account::{
+    AccountStorageRequirements,
+    GetAccountRequest,
+    StorageMapFetch,
+    VaultFetch,
+};
 use crate::rpc::{AccountStateAt, NodeRpcClient};
 use crate::store::data_store::ClientDataStore;
 use crate::store::input_note_states::ExpectedNoteState;
@@ -111,6 +116,8 @@ use crate::transaction::batch::InMemoryBatchDataStore;
 pub mod batch;
 pub use batch::{BatchBuilder, BatchBuilderError};
 
+#[cfg(feature = "dap")]
+mod dap_executor;
 mod prover;
 pub use prover::TransactionProver;
 
@@ -158,6 +165,7 @@ pub use miden_protocol::transaction::{
     TransactionInputs,
     TransactionKernel,
     TransactionScript,
+    TransactionScriptRoot,
     TransactionSummary,
 };
 pub use miden_protocol::vm::{AdviceInputs, AdviceMap};
@@ -300,16 +308,24 @@ where
         let prep = self.prepare_transaction(&account, transaction_request).await?;
 
         let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
-        data_store.register_foreign_account_inputs(prep.foreign_account_inputs.iter().cloned());
+        data_store.register_note_scripts(prep.output_note_scripts());
         for fpi_account in &prep.foreign_account_inputs {
             data_store.mast_store().load_account_code(fpi_account.code());
         }
+        data_store.register_foreign_account_inputs(prep.foreign_account_inputs);
 
         data_store.mast_store().load_account_code(account.code());
 
         let mut notes = prep.notes;
         if prep.ignore_invalid_notes {
-            notes = self.get_valid_input_notes(&account, notes, prep.tx_args.clone()).await?;
+            notes = self
+                .get_valid_input_notes(
+                    &account,
+                    notes,
+                    prep.tx_args.clone(),
+                    &prep.output_recipients,
+                )
+                .await?;
         }
 
         let executed_transaction = self
@@ -324,8 +340,10 @@ where
     /// Performs the data-store-independent setup shared by `execute_transaction` and
     /// `execute_transaction_for_batch`: validates the request against the supplied
     /// `account`, loads/filters input notes, builds the transaction script and args,
-    /// retrieves foreign-account inputs, upserts output note scripts, and computes the
-    /// reference block number.
+    /// retrieves foreign-account inputs, and computes the reference block number.
+    ///
+    /// This method does not write to the store: any state produced by the transaction is
+    /// persisted only after the transaction executes successfully.
     ///
     /// `account` is the state validation runs against — for a single transaction this is
     /// the persisted account; inside [`crate::transaction::BatchBuilder::push`] it is the
@@ -351,31 +369,17 @@ where
         // Verify that none of the authenticated input notes are already consumed.
         for note in &stored_note_records {
             if note.is_consumed() {
+                let id = note.id().expect(
+                    "stored note records reaching this check carry metadata so id() is Some",
+                );
                 return Err(ClientError::TransactionRequestError(
-                    TransactionRequestError::InputNoteAlreadyConsumed(note.id()),
+                    TransactionRequestError::InputNoteAlreadyConsumed(id),
                 ));
             }
         }
 
         // Only keep authenticated input notes from the store.
         stored_note_records.retain(InputNoteRecord::is_authenticated);
-
-        let authenticated_note_ids =
-            stored_note_records.iter().map(InputNoteRecord::id).collect::<Vec<_>>();
-
-        // Upsert request notes missing from the store so they can be tracked and updated.
-        // NOTE: Unauthenticated notes may be stored locally in an unverified/invalid state at
-        // this point. The upsert will replace the state to an InputNoteState::Expected (with
-        // metadata included).
-        let unauthenticated_input_notes = transaction_request
-            .input_notes()
-            .iter()
-            .filter(|n| !authenticated_note_ids.contains(&n.id()))
-            .cloned()
-            .map(Into::into)
-            .collect::<Vec<_>>();
-
-        self.store.upsert_input_notes(&unauthenticated_input_notes).await?;
 
         let notes = transaction_request.build_input_notes(stored_note_records)?;
 
@@ -385,10 +389,8 @@ where
         let future_notes: Vec<(NoteDetails, NoteTag)> =
             transaction_request.expected_future_notes().cloned().collect();
 
-        let tx_script = transaction_request.build_transaction_script(
-            &self.get_account_interface(account_id).await?,
-            self.source_manager.clone(),
-        )?;
+        let tx_script = transaction_request
+            .build_transaction_script(&self.get_account_interface(account_id).await?)?;
 
         let foreign_accounts = transaction_request.foreign_accounts().clone();
 
@@ -396,10 +398,6 @@ where
             self.retrieve_foreign_account_inputs(foreign_accounts).await?;
 
         let ignore_invalid_notes = transaction_request.ignore_invalid_input_notes();
-
-        let output_note_scripts: Vec<NoteScript> =
-            output_recipients.iter().map(|r| r.script().clone()).collect();
-        self.store.upsert_note_scripts(&output_note_scripts).await?;
 
         let block_num = if let Some(block_num) = fpi_block_num {
             block_num
@@ -478,7 +476,7 @@ where
                 if let InputNoteState::Expected(ExpectedNoteState { tag: Some(tag), .. }) =
                     note.state()
                 {
-                    Some(NoteTagRecord::with_note_source(*tag, note.id()))
+                    Some(NoteTagRecord::with_note_source(*tag, note.details_commitment()))
                 } else {
                     None
                 }
@@ -487,7 +485,7 @@ where
 
         new_tags.extend(note_updates.updated_output_notes().map(|note| {
             let note = note.inner();
-            NoteTagRecord::with_note_source(note.metadata().tag(), note.id())
+            NoteTagRecord::with_note_source(note.metadata().tag(), note.details_commitment())
         }));
 
         Ok(TransactionStoreUpdate::new(
@@ -585,6 +583,7 @@ where
         transaction_request: &TransactionRequest,
     ) -> Result<(), ClientError> {
         self.validate_recency().await?;
+        validate_output_note_senders(transaction_request, account_id)?;
         let account = self.try_get_account(account_id).await?;
         validate_account_request(transaction_request, &account)
     }
@@ -662,14 +661,21 @@ where
         Ok(())
     }
 
+    /// Filters the provided input notes down to the subset that can be consumed by the account.
+    ///
+    /// `output_recipients` are the request's expected output recipients; their scripts are
+    /// registered on the consumption-check data store so output note creation can resolve them
+    /// without them being present in the store.
     pub(crate) async fn get_valid_input_notes(
         &self,
         account: &Account,
         mut input_notes: InputNotes<InputNote>,
         tx_args: TransactionArgs,
+        output_recipients: &[NoteRecipient],
     ) -> Result<InputNotes<InputNote>, ClientError> {
         loop {
             let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
+            data_store.register_note_scripts(output_recipients.iter().map(|r| r.script().clone()));
 
             data_store.mast_store().load_account_code(account.code());
             let execution = NoteConsumptionChecker::new(&self.build_executor(&data_store)?)
@@ -777,14 +783,14 @@ where
 
         let data_store = ClientDataStore::new(self.store.clone(), self.rpc_api.clone());
 
-        data_store.register_foreign_account_inputs(foreign_account_inputs.iter().cloned());
-
         // Ensure code is loaded on MAST store
         data_store.mast_store().load_account_code(account.code());
 
         for fpi_account in &foreign_account_inputs {
             data_store.mast_store().load_account_code(fpi_account.code());
         }
+
+        data_store.register_foreign_account_inputs(foreign_account_inputs);
 
         Ok((data_store, block_ref))
     }
@@ -827,10 +833,12 @@ where
         &'auth self,
         data_store: &'store STORE,
     ) -> Result<
-        TransactionExecutor<'store, 'auth, STORE, AUTH, DapProgramExecutor>,
+        TransactionExecutor<'store, 'auth, STORE, AUTH, dap_executor::DapProgramExecutor>,
         TransactionExecutorError,
     > {
-        Ok(self.build_executor(data_store)?.with_program_executor::<DapProgramExecutor>())
+        Ok(self
+            .build_executor(data_store)?
+            .with_program_executor::<dap_executor::DapProgramExecutor>())
     }
 
     /// Loads the account and constructs an [`AccountInterface`] from it.
@@ -905,12 +913,30 @@ where
             )
         }));
 
-        // Locally consumed notes
+        // Locally consumed notes. Notes already tracked by the store only need their state
+        // advanced; the rest (the request's unauthenticated notes, which are not persisted
+        // before the transaction succeeds) are tracked from this point on, so records for them
+        // are built from the executed transaction's inputs.
         let consumed_note_ids =
             executed_tx.tx_inputs().input_notes().iter().map(InputNote::id).collect();
 
         let consumed_notes =
             self.store.get_input_notes(NoteFilter::List(consumed_note_ids)).await?;
+
+        let tracked_note_ids =
+            consumed_notes.iter().filter_map(InputNoteRecord::id).collect::<BTreeSet<_>>();
+
+        for input_note in executed_tx.tx_inputs().input_notes() {
+            if !tracked_note_ids.contains(&input_note.id()) {
+                let mut input_note_record = InputNoteRecord::from(input_note.clone());
+                input_note_record.consumed_locally(
+                    executed_tx.account_id(),
+                    executed_tx.id(),
+                    current_timestamp,
+                )?;
+                new_input_notes.push(input_note_record);
+            }
+        }
 
         let mut updated_input_notes = vec![];
 
@@ -918,7 +944,7 @@ where
             if input_note_record.consumed_locally(
                 executed_tx.account_id(),
                 executed_tx.id(),
-                self.store.get_current_timestamp(),
+                current_timestamp,
             )? {
                 updated_input_notes.push(input_note_record);
             }
@@ -929,33 +955,6 @@ where
             updated_input_notes,
             new_output_notes,
         ))
-    }
-}
-
-/// Adapts [`miden_debug::DapExecutor`] (which exposes `new` + `execute_async`) to
-/// [`miden_tx::ProgramExecutor`]. `miden-debug` does not depend on `miden-tx`, so the impl
-/// must live here.
-#[cfg(feature = "dap")]
-pub(crate) struct DapProgramExecutor(miden_debug::DapExecutor);
-
-#[cfg(feature = "dap")]
-impl miden_tx::ProgramExecutor for DapProgramExecutor {
-    fn new(
-        stack_inputs: miden_processor::StackInputs,
-        advice_inputs: miden_processor::advice::AdviceInputs,
-        options: miden_processor::ExecutionOptions,
-    ) -> Self {
-        Self(miden_debug::DapExecutor::new(stack_inputs, advice_inputs, options))
-    }
-
-    fn execute<H: miden_processor::Host + Send>(
-        self,
-        program: &miden_processor::Program,
-        host: &mut H,
-    ) -> impl miden_processor::FutureMaybeSend<
-        Result<miden_processor::ExecutionOutput, miden_processor::ExecutionError>,
-    > {
-        self.0.execute_async(program, host)
     }
 }
 
@@ -1006,6 +1005,14 @@ pub(crate) struct PreparedTransaction {
     pub(crate) ignore_invalid_notes: bool,
 }
 
+impl PreparedTransaction {
+    /// Returns the scripts of the request's expected output notes. These must be registered on
+    /// the executor's data store so output note creation can resolve them during execution.
+    pub(crate) fn output_note_scripts(&self) -> impl Iterator<Item = NoteScript> + '_ {
+        self.output_recipients.iter().map(|recipient| recipient.script().clone())
+    }
+}
+
 /// Helper to get the account outgoing assets.
 ///
 /// Any outgoing assets resulting from executing note scripts but not present in expected output
@@ -1044,14 +1051,11 @@ pub(super) fn validate_account_request(
     transaction_request: &TransactionRequest,
     account: &Account,
 ) -> Result<(), ClientError> {
-    // Output notes emitted by this transaction must declare the executing account as their
-    // sender. The kernel binds an emitted note's sender to the account that produces it, and
-    // note scripts (e.g. P2IDE reclaim) authorize on that field, so a foreign sender is
-    // unsatisfiable. Reject it here — read-only, before any execution or store writes —
-    // instead of failing deep in transaction script building.
-    validate_output_note_senders(transaction_request, account.id())?;
-
-    if account.is_faucet() {
+    let account_interface = AccountInterface::from_account(account);
+    if account_interface
+        .components()
+        .contains(&AccountComponentInterface::FungibleFaucet)
+    {
         // TODO(SantiagoPittella): Add faucet validations.
         Ok(())
     } else {
@@ -1098,10 +1102,20 @@ fn validate_basic_account_request(
     let (incoming_fungible_balance_map, incoming_non_fungible_balance_set) =
         transaction_request.incoming_assets();
 
+    // Aggregate the account's fungible balance per faucet in one pass. A faucet's fungible asset
+    // may occupy more than one callback-flag vault key, so all matching entries are summed.
+    let mut available_fungible: BTreeMap<AccountId, u64> = BTreeMap::new();
+    for asset in account.vault().assets() {
+        if let Asset::Fungible(fungible) = asset {
+            let balance = available_fungible.entry(fungible.faucet_id()).or_default();
+            *balance = balance.saturating_add(fungible.amount().as_u64());
+        }
+    }
+
     // Check if the account balance plus incoming assets is greater than or equal to the
     // outgoing fungible assets
     for (faucet_id, amount) in fungible_balance_map {
-        let account_asset_amount = account.vault().get_balance(faucet_id).unwrap_or(0);
+        let account_asset_amount = available_fungible.get(&faucet_id).copied().unwrap_or(0);
         let incoming_balance = incoming_fungible_balance_map.get(&faucet_id).unwrap_or(&0);
         if account_asset_amount + incoming_balance < amount {
             return Err(ClientError::AssetError(AssetError::FungibleAssetAmountNotSufficient {
@@ -1119,15 +1133,15 @@ fn validate_basic_account_request(
             Ok(false) => {
                 // Check if the non fungible asset is in the incoming assets
                 if !incoming_non_fungible_balance_set.contains(non_fungible) {
-                    return Err(ClientError::AssetError(
-                        AssetError::NonFungibleFaucetIdTypeMismatch(non_fungible.faucet_id()),
+                    return Err(ClientError::TransactionRequestError(
+                        TransactionRequestError::MissingNonFungibleAsset(non_fungible.faucet_id()),
                     ));
                 }
             },
             _ => {
-                return Err(ClientError::AssetError(AssetError::NonFungibleFaucetIdTypeMismatch(
-                    non_fungible.faucet_id(),
-                )));
+                return Err(ClientError::TransactionRequestError(
+                    TransactionRequestError::MissingNonFungibleAsset(non_fungible.faucet_id()),
+                ));
             },
         }
     }
@@ -1162,7 +1176,7 @@ pub(crate) async fn fetch_public_account_inputs(
         .get_account(
             account_id,
             GetAccountRequest::new()
-                .with_storage(storage_requirements.clone())
+                .with_storage(StorageMapFetch::Slots(storage_requirements.clone()))
                 .at(account_state_at)
                 .with_known_code(known_code)
                 .with_vault(vault),

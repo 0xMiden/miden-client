@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use miden_client::account::{AccountId, AccountStorageMode};
+use miden_client::account::{AccountId, AccountType};
 use miden_client::asset::FungibleAsset;
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::crypto::{FeltRng, MerkleStore, MerkleTree, NodeIndex, Poseidon2, RandomCoin};
@@ -42,14 +42,14 @@ use crate::tests::config::ClientConfig;
 // is used as the base for the note code.
 
 const NOTE_ARGS: [Felt; 8] = [
-    Felt::new(9),
-    Felt::new(12),
-    Felt::new(18),
-    Felt::new(3),
-    Felt::new(3),
-    Felt::new(18),
-    Felt::new(12),
-    Felt::new(9),
+    Felt::new_unchecked(9),
+    Felt::new_unchecked(12),
+    Felt::new_unchecked(18),
+    Felt::new_unchecked(3),
+    Felt::new_unchecked(3),
+    Felt::new_unchecked(18),
+    Felt::new_unchecked(12),
+    Felt::new_unchecked(9),
 ];
 
 pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()> {
@@ -58,17 +58,13 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
 
     client.sync_state().await?;
     // Insert Account
-    let (regular_account, _) = insert_new_wallet(
-        &mut client,
-        AccountStorageMode::Private,
-        &authenticator,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (regular_account, _) =
+        insert_new_wallet(&mut client, AccountType::Private, &authenticator, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     let (fungible_faucet, _) = insert_new_fungible_faucet(
         &mut client,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator,
         RPO_FALCON_SCHEME_ID,
     )
@@ -120,7 +116,7 @@ pub async fn test_transaction_request(client_config: ClientConfig) -> Result<()>
         .input_notes(note_args_map)
         .trusted_input_note_script_roots([Word::from(note.script().root())])
         .custom_script(tx_script)
-        .script_arg([Felt::new(4), Felt::new(3), Felt::new(2), Felt::new(1)].into())
+        .script_arg([Felt::from(4u32), Felt::from(3u32), Felt::from(2u32), Felt::from(1u32)].into())
         .extend_advice_map(advice_map)
         .build()?;
 
@@ -164,17 +160,13 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
 
     client.sync_state().await?;
     // Insert Account
-    let (regular_account, _) = insert_new_wallet(
-        &mut client,
-        AccountStorageMode::Private,
-        &authenticator,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (regular_account, _) =
+        insert_new_wallet(&mut client, AccountType::Private, &authenticator, RPO_FALCON_SCHEME_ID)
+            .await?;
 
     let (fungible_faucet, _) = insert_new_fungible_faucet(
         &mut client,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator,
         RPO_FALCON_SCHEME_ID,
     )
@@ -195,8 +187,10 @@ pub async fn test_merkle_store(client_config: ClientConfig) -> Result<()> {
     advice_map.insert(note_args_commitment, NOTE_ARGS.to_vec());
 
     // Build merkle store and advice stack with merkle root
-    let leaves: Vec<Word> =
-        [1, 2, 3, 4].iter().map(|&v| [Felt::new(v), ZERO, ZERO, ZERO].into()).collect();
+    let leaves: Vec<Word> = [1, 2, 3, 4]
+        .iter()
+        .map(|&v| [Felt::new_unchecked(v), ZERO, ZERO, ZERO].into())
+        .collect();
     let num_leaves = leaves.len();
     let merkle_tree = MerkleTree::new(leaves)?;
     let merkle_root = merkle_tree.root();
@@ -264,20 +258,11 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
     wait_for_node(&mut client_3).await;
 
     // Create accounts
-    let (basic_account_1, ..) = insert_new_wallet(
-        &mut client_1,
-        AccountStorageMode::Private,
-        &keystore_1,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
-    insert_new_wallet(
-        &mut client_2,
-        AccountStorageMode::Private,
-        &keystore_2,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await?;
+    let (basic_account_1, ..) =
+        insert_new_wallet(&mut client_1, AccountType::Private, &keystore_1, RPO_FALCON_SCHEME_ID)
+            .await?;
+    insert_new_wallet(&mut client_2, AccountType::Private, &keystore_2, RPO_FALCON_SCHEME_ID)
+        .await?;
 
     client_1.sync_state().await?;
     client_2.sync_state().await?;
@@ -326,7 +311,7 @@ pub async fn test_onchain_notes_sync_with_tag(client_config: ClientConfig) -> Re
         .await?
         .context("failed to find input note in client 2 after sync")?
         .try_into()?;
-    assert_eq!(received_note.note().commitment(), note.commitment());
+    assert_eq!(received_note.note().id(), note.id());
     assert!(client_3.get_input_notes(NoteFilter::All).await?.is_empty());
     Ok(())
 }

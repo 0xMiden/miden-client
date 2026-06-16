@@ -100,8 +100,10 @@ fn main() {
 struct TestCaseInfo {
     /// Display name for the test case (typically same as function_name)
     name: String,
-    /// Test category derived from the file name (e.g., "client", "swap_transaction")
+    /// Test category derived from the file path (e.g., "client", "agglayer")
     category: String,
+    /// Module path relative to `tests` (e.g., "agglayer::ger")
+    module_path: String,
     /// The actual function name that implements the test
     function_name: String,
 }
@@ -171,6 +173,10 @@ fn collect_test_cases_from_file(file_path: &Path) -> Vec<TestCaseInfo> {
         Some(cat) => cat,
         None => return test_cases, // Skip files that don't match the expected pattern
     };
+    let module_path = match extract_module_path_from_path(file_path) {
+        Some(path) => path,
+        None => return test_cases,
+    };
 
     let content = match fs::read_to_string(file_path) {
         Ok(content) => content,
@@ -185,6 +191,7 @@ fn collect_test_cases_from_file(file_path: &Path) -> Vec<TestCaseInfo> {
             test_cases.push(TestCaseInfo {
                 name: function_name.clone(),
                 category: category.clone(),
+                module_path: module_path.clone(),
                 function_name,
             });
         }
@@ -195,9 +202,8 @@ fn collect_test_cases_from_file(file_path: &Path) -> Vec<TestCaseInfo> {
 
 /// Extracts the test category name from a file path.
 ///
-/// The category is derived from the filename (without extension) and is used to
-/// organize tests logically. For example, `src/tests/client.rs` produces the
-/// category `"client"`.
+/// The category is derived from the top-level directory when a test is nested,
+/// or the filename (without extension) for tests in `src/tests/`.
 ///
 /// # Arguments
 ///
@@ -227,11 +233,40 @@ fn extract_category_from_path(file_path: &Path) -> Option<String> {
     }
 
     // Verify this is in the tests directory
-    if !file_path.to_str()?.contains("src/tests/") {
-        return None;
+    let relative_path = file_path.strip_prefix("src/tests").ok()?;
+    let mut components = relative_path.components();
+    let first_component = components.next()?;
+
+    // If this file is nested, use the top-level directory as the category
+    if components.next().is_some() {
+        return Some(first_component.as_os_str().to_str()?.to_string());
     }
 
     Some(file_stem.to_string())
+}
+
+/// Extracts the module path from a file path.
+///
+/// For example, `src/tests/agglayer/ger.rs` becomes `agglayer::ger`.
+fn extract_module_path_from_path(file_path: &Path) -> Option<String> {
+    let relative_path = file_path.strip_prefix("src/tests").ok()?;
+    let mut components = relative_path.components().peekable();
+    let mut module_parts = Vec::new();
+
+    while let Some(component) = components.next() {
+        let part = component.as_os_str().to_str()?;
+        if components.peek().is_none() {
+            let file_stem = Path::new(part).file_stem()?.to_str()?;
+            if file_stem == "mod" {
+                return None;
+            }
+            module_parts.push(file_stem.to_string());
+        } else {
+            module_parts.push(part.to_string());
+        }
+    }
+
+    Some(module_parts.join("::"))
 }
 
 /// Determines if a function should be treated as an integration test.
@@ -343,8 +378,8 @@ fn generate_integration_tests(test_cases: &[TestCaseInfo]) -> String {
     // Collect unique imports for test modules
     let mut modules = HashSet::new();
     for test_case in test_cases {
-        let module_name = &test_case.category;
-        modules.insert(module_name);
+        let module_path = &test_case.module_path;
+        modules.insert(module_path);
     }
 
     for module in modules {
@@ -404,10 +439,12 @@ fn generate_integration_tests(test_cases: &[TestCaseInfo]) -> String {
 ///
 /// # Test Categories
 ///
-/// Categories are automatically derived from file names and converted to PascalCase:
+/// Categories are automatically derived from file names (or the top-level directory
+/// for nested tests) and converted to PascalCase:
 /// - `client.rs` → `TestCategory::Client`
 /// - `swap_transaction.rs` → `TestCategory::SwapTransaction`
 /// - `custom_transaction.rs` → `TestCategory::CustomTransaction`
+/// - `agglayer/e2e.rs` → `TestCategory::Agglayer`
 fn generate_test_case_vector(test_cases: &[TestCaseInfo]) -> String {
     let mut result = String::new();
 
@@ -422,8 +459,8 @@ fn generate_test_case_vector(test_cases: &[TestCaseInfo]) -> String {
     // Collect unique imports
     let mut modules = HashSet::new();
     for test_case in test_cases {
-        let module_name = &test_case.category;
-        modules.insert(module_name);
+        let module_path = &test_case.module_path;
+        modules.insert(module_path);
     }
 
     for module in modules {

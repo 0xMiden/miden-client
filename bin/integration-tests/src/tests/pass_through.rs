@@ -5,7 +5,6 @@ use miden_client::account::{
     AccountBuilder,
     AccountBuilderSchemaCommitmentExt,
     AccountId,
-    AccountStorageMode,
     AccountType,
 };
 use miden_client::assembly::CodeBuilder;
@@ -67,14 +66,14 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
     // Create Client basic wallet (We'll call it accountA)
     let (sender, ..) = insert_new_wallet(
         &mut client,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_1,
         AuthSchemeId::Falcon512Poseidon2,
     )
     .await?;
     let (target, ..) = insert_new_wallet(
         &mut client_2,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_2,
         AuthSchemeId::Falcon512Poseidon2,
     )
@@ -85,7 +84,7 @@ pub async fn test_pass_through(client_config: ClientConfig) -> Result<()> {
     // Create client with faucets BTC faucet
     let (btc_faucet_account, ..) = insert_new_fungible_faucet(
         &mut client,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_1,
         AuthSchemeId::Falcon512Poseidon2,
     )
@@ -217,8 +216,7 @@ async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
             .unwrap();
 
     let account = AccountBuilder::new(init_seed)
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(AccountStorageMode::Private)
+        .account_type(AccountType::Private)
         .with_auth_component(auth_component)
         .with_component(BasicWallet)
         .build_with_schema_commitment()

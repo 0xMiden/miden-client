@@ -66,6 +66,12 @@ impl InMemoryBatchDataStore {
     ) {
         self.inner.register_foreign_account_inputs(foreign_accounts);
     }
+
+    /// Registers note scripts on the inner [`ClientDataStore`] so the executor can resolve
+    /// the request's output note scripts during transaction execution.
+    pub(crate) fn register_note_scripts(&self, note_scripts: impl IntoIterator<Item = NoteScript>) {
+        self.inner.register_note_scripts(note_scripts);
+    }
 }
 
 // DATA STORE IMPL

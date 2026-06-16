@@ -1,3 +1,4 @@
+pub mod agglayer;
 pub mod batch;
 pub mod client;
 pub mod config;

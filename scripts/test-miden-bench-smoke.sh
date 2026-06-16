@@ -5,10 +5,10 @@ set -euo pipefail
 # Smoke-tests the installed `miden-bench` binary against a running local Miden node.
 #
 # Coverage:
-# - download the large account seeded by node-builder via `import --account-id`;
+# - download the large account seeded in the testing node's genesis via `import --account-id`;
 # - deploy a bench account, then export/import it through a `.mac` file;
 # - expand one storage-map entry and run one transaction benchmark iteration.
-# The script expects node-builder to already be running on localhost:57291.
+# The script expects the testing node to already be running on localhost:57291.
 
 if [[ -n "${MIDEN_BENCH_BIN:-}" ]]; then
   bench_bin="$MIDEN_BENCH_BIN"

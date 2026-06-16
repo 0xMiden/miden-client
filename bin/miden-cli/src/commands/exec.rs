@@ -77,8 +77,6 @@ impl ExecCmd {
             ));
         }
 
-        let program = fs::read_to_string(script_path)?;
-
         let account_id =
             get_input_acc_id_by_prefix_or_default(&client, self.account_id.clone()).await?;
 
@@ -100,7 +98,11 @@ impl ExecCmd {
 
         let advice_inputs = AdviceInputs::default().with_map(inputs);
 
-        let tx_script = client.code_builder().compile_tx_script(&program)?;
+        // Pass the path rather than the source string so the assembler's source manager
+        // records the real filesystem URI in every `AssemblyOp`'s location. Without this,
+        // DAP clients (VS Code, Zed) get `Source { path: None }` in stack traces and can't
+        // highlight the current line or open the file.
+        let tx_script = client.code_builder().compile_tx_script(script_path.as_path())?;
 
         let output_stack =
             self.execute_program(&mut client, account_id, tx_script, advice_inputs).await?;
@@ -131,8 +133,11 @@ impl ExecCmd {
 
             let script_path = PathBuf::from(&self.script_path);
             loop {
-                let program = fs::read_to_string(&script_path)?;
-                let tx_script = client.code_builder().compile_tx_script(&program)?;
+                // DAP restart can happen after the user edits the script. Refresh the cached
+                // source before compiling again so execution uses the current file contents.
+                reload_source_file(&client.source_manager(), script_path.as_path())?;
+
+                let tx_script = client.code_builder().compile_tx_script(script_path.as_path())?;
 
                 let result = client
                     .execute_program_with_dap(
@@ -159,6 +164,56 @@ impl ExecCmd {
             .execute_program(account_id, tx_script, advice_inputs, foreign_accounts)
             .await
             .map_err(|err| CliError::Exec(err.into(), "error executing the program".to_string()))
+    }
+}
+
+// SOURCE FILE RELOADING
+// ================================================================================================
+
+#[cfg(feature = "dap")]
+use source_reload::reload_source_file;
+
+#[cfg(feature = "dap")]
+mod source_reload {
+    use std::path::Path;
+    use std::sync::Arc;
+
+    use miden_client::assembly::{SourceManagerExt, SourceManagerSync, Uri};
+
+    use crate::errors::CliError;
+
+    /// Reloads a source file from disk into the given source manager.
+    ///
+    /// Source managers cache files by URI, so compiling a path that has already been loaded may
+    /// reuse the cached `SourceFile`. This updates an existing entry for `path` in-place, or loads
+    /// it if the source manager has not seen it yet.
+    pub(super) fn reload_source_file(
+        source_manager: &Arc<dyn SourceManagerSync>,
+        path: &Path,
+    ) -> Result<(), CliError> {
+        let reload_err = |source: Box<dyn std::error::Error + Send + Sync>| {
+            CliError::Exec(source, "error reloading the program source file".to_string())
+        };
+
+        let uri = Uri::from(path);
+
+        let Some(source_id) = source_manager.find(&uri) else {
+            source_manager.load_file(path).map_err(|source| reload_err(Box::new(source)))?;
+            return Ok(());
+        };
+
+        let source =
+            std::fs::read_to_string(path).map_err(|source| reload_err(Box::new(source)))?;
+        let version = source_manager
+            .get(source_id)
+            .map_err(|source| reload_err(Box::new(source)))?
+            .content()
+            .version()
+            .saturating_add(1);
+
+        source_manager
+            .update(source_id, source, None, version)
+            .map_err(|source| reload_err(Box::new(source)))
     }
 }
 
@@ -219,7 +274,11 @@ fn deserialize_tx_inputs(serialized: &str) -> Result<Vec<(Word, Vec<Felt>)>, Cli
         .into_iter()
         .map(|input| {
             let word = Word::try_from(input.key).map_err(|err| err.to_string())?;
-            let felts = input.values.into_iter().map(Felt::new).collect();
+            let felts: Vec<Felt> = input
+                .values
+                .into_iter()
+                .map(|v| Felt::new(v).map_err(|err| err.to_string()))
+                .collect::<Result<_, _>>()?;
             Ok((word, felts))
         })
         .collect::<Result<Vec<_>, _>>()

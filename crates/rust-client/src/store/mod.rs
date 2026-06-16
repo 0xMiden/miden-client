@@ -32,7 +32,6 @@ use miden_protocol::account::{
     AccountHeader,
     AccountId,
     AccountStorage,
-    AccountStorageHeader,
     StorageMapKey,
     StorageMapWitness,
     StorageSlot,
@@ -44,7 +43,7 @@ use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{Forest, InOrderIndex, MmrPeaks, PartialMmr};
 use miden_protocol::errors::AccountError;
-use miden_protocol::note::{NoteId, NoteScript, NoteTag, Nullifier};
+use miden_protocol::note::{NoteDetailsCommitment, NoteId, NoteScript, NoteTag, Nullifier};
 use miden_protocol::transaction::TransactionId;
 use miden_protocol::{Felt, Word};
 use miden_tx::utils::serde::{Deserializable, Serializable};
@@ -88,6 +87,19 @@ pub use note_record::{
     OutputNoteState,
     input_note_states,
 };
+
+// SETTING MUTATION
+// ================================================================================================
+
+/// A single mutation against the `settings` KV store, applied as part of an atomic batch via
+/// [`Store::apply_settings_mutations`].
+#[derive(Debug, Clone)]
+pub enum SettingMutation {
+    /// Insert or overwrite `key` with `value`.
+    Set { key: String, value: Vec<u8> },
+    /// Delete `key`.
+    Remove { key: String },
+}
 
 // STORE TRAIT
 // ================================================================================================
@@ -190,11 +202,12 @@ pub trait Store: Send + Sync {
     ///
     /// The default implementation of this method uses [`Store::get_input_notes`].
     async fn get_unspent_input_note_nullifiers(&self) -> Result<Vec<Nullifier>, StoreError> {
-        self.get_input_notes(NoteFilter::Unspent)
+        Ok(self
+            .get_input_notes(NoteFilter::Unspent)
             .await?
             .iter()
-            .map(|input_note| Ok(input_note.nullifier()))
-            .collect::<Result<Vec<_>, _>>()
+            .filter_map(InputNoteRecord::nullifier)
+            .collect())
     }
 
     /// Inserts the provided input notes into the database. If a note with the same ID already
@@ -424,6 +437,13 @@ pub trait Store: Send + Sync {
     /// Returns all the keys from the `settings` table.
     async fn list_setting_keys(&self) -> Result<Vec<String>, StoreError>;
 
+    /// Applies a batch of [`SettingMutation`]s. Use this when several `settings` entries must stay
+    /// mutually consistent (e.g. a record and its secondary index).
+    async fn apply_settings_mutations(
+        &self,
+        mutations: Vec<SettingMutation>,
+    ) -> Result<(), StoreError>;
+
     // SYNC
     // --------------------------------------------------------------------------------------------
 
@@ -546,7 +566,9 @@ pub trait Store: Send + Sync {
 
         let mut current_partial_mmr = PartialMmr::from_peaks(current_peaks);
         let has_client_notes = has_client_notes.into();
-        current_partial_mmr.add(current_block.commitment(), has_client_notes);
+        current_partial_mmr
+            .add(current_block.commitment(), has_client_notes)
+            .map_err(StoreError::MmrError)?;
 
         // Build tracked_leaves from blocks that have client notes.
         let mut tracked_leaves = self.get_tracked_block_header_numbers().await?;
@@ -605,21 +627,6 @@ pub trait Store: Send + Sync {
         account_id: AccountId,
         filter: AccountStorageFilter,
     ) -> Result<AccountStorage, StoreError>;
-
-    /// Returns the storage header (slot names, types, and current values/roots) for the given
-    /// account.
-    ///
-    /// This is a lightweight read used by `Client::build_sync_input` to populate
-    /// `AccountSyncHint`s without paying the cost of reading every map entry. The default
-    /// implementation falls back to `get_account_storage`; backends are encouraged to override
-    /// it with a focused query.
-    async fn get_account_storage_header(
-        &self,
-        account_id: AccountId,
-    ) -> Result<AccountStorageHeader, StoreError> {
-        let storage = self.get_account_storage(account_id, AccountStorageFilter::All).await?;
-        Ok(AccountStorageHeader::from(&storage))
-    }
 
     /// Retrieves a storage slot value by name.
     ///
@@ -763,6 +770,11 @@ pub enum NoteFilter {
     Expected,
     /// Return a list containing any notes that match with the provided [`NoteId`] vector.
     List(Vec<NoteId>),
+    /// Return a list containing any notes whose details commitment matches one of the provided
+    /// [`NoteDetailsCommitment`] vector. Unlike [`NoteFilter::List`], this matches the
+    /// metadata-independent details commitment, so it also resolves metadata-less notes (which
+    /// have a NULL `note_id`).
+    DetailsCommitments(Vec<NoteDetailsCommitment>),
     /// Return a list containing any notes that match the provided [`Nullifier`] vector.
     Nullifiers(Vec<Nullifier>),
     /// Return a list of notes that are currently being processed. This filter doesn't apply to

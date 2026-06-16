@@ -50,6 +50,7 @@ use crate::account::helpers::{
     query_vault_assets,
 };
 use crate::sql_error::SqlResultExt;
+use crate::transaction::with_forest_snapshot;
 use crate::{SqliteStore, column_value_as_u64, insert_sql, subst, u64_to_value};
 
 impl SqliteStore {
@@ -242,20 +243,6 @@ impl SqliteStore {
         Ok(AccountStorage::new(slots)?)
     }
 
-    /// Retrieves the storage header (slot names, types, and current values/roots) for the given
-    /// account, without loading any storage map entries.
-    pub fn get_account_storage_header(
-        conn: &Connection,
-        account_id: AccountId,
-    ) -> Result<AccountStorageHeader, StoreError> {
-        let mut slots: Vec<StorageSlotHeader> = query_storage_values(conn, account_id)?
-            .into_iter()
-            .map(|(name, (slot_type, value))| StorageSlotHeader::new(name, slot_type, value))
-            .collect();
-        slots.sort_by_key(StorageSlotHeader::id);
-        AccountStorageHeader::new(slots).map_err(StoreError::AccountError)
-    }
-
     /// Fetches a specific asset from the account's vault without the need of loading the entire
     /// vault. The witness is retrieved from the [`AccountSmtForest`].
     pub(crate) fn get_account_asset(
@@ -264,11 +251,14 @@ impl SqliteStore {
         account_id: AccountId,
         vault_key: AssetVaultKey,
     ) -> Result<Option<(Asset, AssetWitness)>, StoreError> {
+        // Acquire forest lock before getting header in order to avoid concurrent writes to it.
+        let smt_forest = smt_forest
+            .read()
+            .map_err(|_| StoreError::DatabaseError("smt_forest read lock poisoned".to_string()))?;
         let header = Self::get_account_header(conn, account_id)?
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
 
-        let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
         match smt_forest.get_asset_and_witness(header.vault_root(), vault_key) {
             Ok((asset, witness)) => Ok(Some((asset, witness))),
             Err(StoreError::MerkleStoreError(MerkleError::UntrackedKey(_))) => Ok(None),
@@ -285,6 +275,10 @@ impl SqliteStore {
         slot_name: StorageSlotName,
         key: StorageMapKey,
     ) -> Result<(Word, StorageMapWitness), StoreError> {
+        // Acquire forest lock before getting header in order to avoid concurrent writes to it.
+        let smt_forest = smt_forest
+            .read()
+            .map_err(|_| StoreError::DatabaseError("smt_forest read lock poisoned".to_string()))?;
         let header = Self::get_account_header(conn, account_id)?
             .ok_or(StoreError::AccountDataNotFound(account_id))?
             .0;
@@ -297,7 +291,6 @@ impl SqliteStore {
             return Err(StoreError::AccountError(AccountError::StorageSlotNotMap(slot_name)));
         }
 
-        let smt_forest = smt_forest.read().expect("smt_forest read lock not poisoned");
         let witness = smt_forest.get_storage_map_item_witness(map_root, key)?;
         let item = witness.get(key).unwrap_or(miden_client::EMPTY_WORD);
 
@@ -337,30 +330,23 @@ impl SqliteStore {
         initial_address: &Address,
         client_account_type: ClientAccountType,
     ) -> Result<(), StoreError> {
-        let tx = conn.transaction().into_store_error()?;
+        with_forest_snapshot(conn, smt_forest, |tx, smt_forest| {
+            Self::insert_account_code(tx, account.code())?;
 
-        Self::insert_account_code(&tx, account.code())?;
+            let account_id = account.id();
+            Self::insert_storage_slots(tx, account_id, account.storage().slots().iter())?;
+            Self::insert_assets(tx, account_id, account.vault().assets())?;
+            let watched = matches!(client_account_type, ClientAccountType::Watched);
+            Self::insert_new_account_header(tx, &account.into(), account.seed(), watched)?;
+            Self::insert_address(tx, initial_address, account.id())?;
 
-        let account_id = account.id();
-
-        Self::insert_storage_slots(&tx, account_id, account.storage().slots().iter())?;
-
-        Self::insert_assets(&tx, account_id, account.vault().assets())?;
-        let watched = matches!(client_account_type, ClientAccountType::Watched);
-        Self::insert_new_account_header(&tx, &account.into(), account.seed(), watched)?;
-
-        Self::insert_address(&tx, initial_address, account.id())?;
-
-        tx.commit().into_store_error()?;
-
-        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-        smt_forest.insert_and_register_account_state(
-            account.id(),
-            account.vault(),
-            account.storage(),
-        )?;
-
-        Ok(())
+            smt_forest.insert_and_register_account_state(
+                account.id(),
+                account.vault(),
+                account.storage(),
+            )?;
+            Ok(())
+        })
     }
 
     pub(crate) fn update_account(
@@ -391,10 +377,9 @@ impl SqliteStore {
             return Err(StoreError::AccountDataNotFound(new_account_state.id()));
         }
 
-        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-        let tx = conn.transaction().into_store_error()?;
-        Self::update_account_state(&tx, &mut smt_forest, new_account_state)?;
-        tx.commit().into_store_error()
+        with_forest_snapshot(conn, smt_forest, |tx, smt_forest| {
+            Self::update_account_state(tx, smt_forest, new_account_state)
+        })
     }
 
     pub fn upsert_foreign_account_code(
@@ -759,6 +744,24 @@ impl SqliteStore {
     ) -> Result<(), StoreError> {
         let account_id = new_account_state.id();
         let account_id_hex = account_id.to_hex();
+
+        // Read old header before mutating the SMT snapshot or database rows. Sync filters stale
+        // full-account snapshots; if one still reaches storage, reject it before mutating.
+        let old_header = query_latest_account_headers(tx, "id = ?", params![&account_id_hex])?
+            .into_iter()
+            .next()
+            .map(|(header, ..)| header)
+            .ok_or(StoreError::AccountDataNotFound(account_id))?;
+
+        if new_account_state.nonce().as_canonical_u64() < old_header.nonce().as_canonical_u64() {
+            return Err(StoreError::DatabaseError(format!(
+                "update_account_state: new nonce {} is less than old nonce {} for account {}",
+                new_account_state.nonce().as_canonical_u64(),
+                old_header.nonce().as_canonical_u64(),
+                account_id,
+            )));
+        }
+
         let nonce_val = u64_to_value(new_account_state.nonce().as_canonical_u64());
 
         // Insert and register account state in the SMT forest (handles old root cleanup)
@@ -767,13 +770,6 @@ impl SqliteStore {
             new_account_state.vault(),
             new_account_state.storage(),
         )?;
-
-        // Read old header before overwriting.
-        let old_header = query_latest_account_headers(tx, "id = ?", params![account_id.to_hex()])?
-            .into_iter()
-            .next()
-            .map(|(header, ..)| header)
-            .ok_or(StoreError::AccountDataNotFound(account_id))?;
 
         // Archive all old entries from latest → historical
         tx.execute(

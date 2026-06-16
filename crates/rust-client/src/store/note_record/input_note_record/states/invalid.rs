@@ -3,7 +3,7 @@ use alloc::string::ToString;
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
 use miden_protocol::block::{BlockHeader, BlockNumber};
-use miden_protocol::note::{NoteId, NoteInclusionProof, NoteMetadata, compute_note_commitment};
+use miden_protocol::note::{NoteId, NoteInclusionProof, NoteMetadata};
 use miden_protocol::transaction::TransactionId;
 
 use super::{
@@ -61,7 +61,7 @@ impl NoteStateHandler for InvalidNoteState {
             .note_path()
             .verify(
                 self.invalid_inclusion_proof.location().block_note_tree_index().into(),
-                compute_note_commitment(note_id, &self.metadata),
+                note_id.as_word(),
                 &block_header.note_root(),
             )
             .is_ok()
