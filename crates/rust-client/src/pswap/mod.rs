@@ -12,10 +12,10 @@
 //! word layout, deterministic reconstruction) live on
 //! `miden_standards::note::PswapNote`.
 
-pub mod discovery;
-pub mod errors;
-pub mod lineage;
-pub mod observer;
+pub(crate) mod discovery;
+pub(crate) mod errors;
+pub(crate) mod lineage;
+pub(crate) mod observer;
 pub(crate) mod store;
 
 // `PswapTransactionObserver` is defined inline below in this file.
