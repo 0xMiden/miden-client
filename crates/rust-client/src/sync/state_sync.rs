@@ -202,7 +202,7 @@ impl StateSync {
     /// logged (tagged with the observer's [`NoteObserver::name`]) and never
     /// abort the rest of the pass — symmetric with the per-note `observe()`
     /// dispatcher.
-    pub async fn run_apply_hooks(
+    pub(crate) async fn run_apply_hooks(
         &self,
         state_sync_update: &StateSyncUpdate,
     ) -> Result<(), ClientError> {
