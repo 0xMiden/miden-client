@@ -15,15 +15,15 @@
 //! # Trust model
 //!
 //! Observed notes are matched to an order by the `order_id` on their attachment, which the sender
-//! controls — so the `(order_id, depth)` bucket is untrusted. Anyone who knows one of our live order
-//! ids (public orders expose it on-chain) can publish a note carrying that id and our tag. We never
-//! trust such a note on its face: for each candidate we reconstruct the note it *should* be from our
-//! stored depth-0 note (`payback_note` / `remainder_note`) and accept it only if the reconstructed
-//! id matches the observed id. A forger can't produce a matching id without actually emitting a
-//! genuine payback/remainder of our order (which pays our creator), so this is an authenticity
-//! check, not a checksum. Candidates that fail are skipped — they can't advance the tip, change a
-//! round's classification, or be inserted as consumable notes. Classification runs only on the
-//! surviving genuine notes, never on the raw observed count.
+//! controls — so the `(order_id, depth)` bucket is untrusted. Anyone who knows one of our live
+//! order ids (public orders expose it on-chain) can publish a note carrying that id and our tag. We
+//! never trust such a note on its face: for each candidate we reconstruct the note it *should* be
+//! from our stored depth-0 note (`payback_note` / `remainder_note`) and accept it only if the
+//! reconstructed id matches the observed id. A forger can't produce a matching id without actually
+//! emitting a genuine payback/remainder of our order (which pays our creator), so this is an
+//! authenticity check, not a checksum. Candidates that fail are skipped — they can't advance the
+//! tip, change a round's classification, or be inserted as consumable notes. Classification runs
+//! only on the surviving genuine notes, never on the raw observed count.
 
 pub(crate) mod discovery;
 pub(crate) mod errors;
