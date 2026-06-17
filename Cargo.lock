@@ -2077,6 +2077,7 @@ dependencies = [
  "prost",
  "prost-types",
  "rand 0.9.4",
+ "rand_chacha",
  "serde",
  "serde_json",
  "tempfile",

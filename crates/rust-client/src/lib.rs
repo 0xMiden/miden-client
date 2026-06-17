@@ -130,6 +130,8 @@ pub mod utils;
 
 pub mod builder;
 
+mod rng;
+
 #[cfg(feature = "testing")]
 mod test_utils;
 
@@ -270,7 +272,9 @@ pub mod crypto {
         NodeIndex,
         SparseMerklePath,
     };
-    pub use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
+    pub use miden_protocol::crypto::rand::FeltRng;
+
+    pub use crate::rng::{DefaultFeltRng, FeltRngAdapter};
 }
 
 /// Provides types for working with addresses within the Miden network.

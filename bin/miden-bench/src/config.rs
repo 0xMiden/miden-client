@@ -2,10 +2,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use miden_client::builder::ClientBuilder;
-use miden_client::crypto::RandomCoin;
+use miden_client::crypto::DefaultFeltRng;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::rpc::{Endpoint, GrpcClient};
-use miden_client::{Client, DebugMode, Felt};
+use miden_client::{Client, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::Rng;
 
@@ -44,8 +44,8 @@ pub async fn create_client(
     std::fs::create_dir_all(&keystore_path)?;
 
     let mut rng = rand::rng();
-    let coin_seed: [u64; 4] = rng.random();
-    let rng_coin = RandomCoin::new(coin_seed.map(Felt::new_unchecked).into());
+    let seed: [u8; 32] = rng.random();
+    let rng_coin = DefaultFeltRng::from_seed(seed);
 
     let client = ClientBuilder::new()
         .rpc(Arc::new(GrpcClient::new(endpoint, 30_000)))

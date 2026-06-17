@@ -3,8 +3,7 @@ use alloc::sync::Arc;
 
 use miden_protocol::assembly::{DefaultSourceManager, SourceManagerSync};
 use miden_protocol::block::BlockNumber;
-use miden_protocol::crypto::rand::RandomCoin;
-use miden_protocol::{Felt, MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
+use miden_protocol::{MAX_TX_EXECUTION_CYCLES, MIN_TX_EXECUTION_CYCLES};
 use miden_tx::{ExecutionOptions, LocalTransactionProver};
 use rand::Rng;
 
@@ -14,6 +13,7 @@ use crate::alloc::string::ToString;
 use crate::keystore::FilesystemKeyStore;
 use crate::keystore::Keystore;
 use crate::note_transport::NoteTransportClient;
+use crate::rng::DefaultFeltRng;
 use crate::rpc::{Endpoint, NodeRpcClient};
 use crate::store::{Store, StoreError};
 use crate::transaction::TransactionProver;
@@ -482,8 +482,8 @@ where
             user_rng
         } else {
             let mut seed_rng = rand::rng();
-            let coin_seed: [u64; 4] = seed_rng.random();
-            Box::new(RandomCoin::new(coin_seed.map(Felt::new_unchecked).into()))
+            let seed: [u8; 32] = seed_rng.random();
+            Box::new(DefaultFeltRng::from_seed(seed))
         };
 
         // Set default prover if not provided

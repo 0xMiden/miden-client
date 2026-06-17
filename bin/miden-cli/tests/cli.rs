@@ -12,7 +12,7 @@ use miden_client::account::{AccountId, AccountType, FaucetMetadata};
 use miden_client::address::{Address, NetworkId};
 use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
 use miden_client::builder::ClientBuilder;
-use miden_client::crypto::{FeltRng, RandomCoin};
+use miden_client::crypto::{DefaultFeltRng, FeltRng};
 use miden_client::keystore::Keystore;
 use miden_client::note::{
     Note,
@@ -37,7 +37,7 @@ use miden_client::testing::common::{
 };
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Serializable;
-use miden_client::{self, Client, DebugMode, Felt};
+use miden_client::{self, Client, DebugMode};
 use miden_client_cli::MIDEN_DIR;
 use miden_client_cli::config::Network;
 use miden_client_sqlite_store::SqliteStore;
@@ -1515,9 +1515,9 @@ async fn create_rust_client_with_store_path(
     };
 
     let mut rng = rand::rng();
-    let coin_seed: [u64; 4] = rng.random();
+    let seed: [u8; 32] = rng.random();
 
-    let rng = Box::new(RandomCoin::new(coin_seed.map(Felt::new_unchecked).into()));
+    let rng = Box::new(DefaultFeltRng::from_seed(seed));
 
     let keystore = FilesystemKeyStore::new(temp_dir())?;
 

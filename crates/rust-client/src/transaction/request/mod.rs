@@ -566,7 +566,7 @@ mod tests {
         StorageSlotName,
     };
     use miden_protocol::asset::FungibleAsset;
-    use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
+    use miden_protocol::crypto::rand::FeltRng;
     use miden_protocol::note::{NoteAttachments, NoteTag, NoteType};
     use miden_protocol::testing::account_id::{
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
@@ -580,6 +580,7 @@ mod tests {
     use miden_tx::utils::serde::{Deserializable, Serializable};
 
     use super::{TransactionRequest, TransactionRequestBuilder};
+    use crate::rng::DefaultFeltRng;
     use crate::rpc::domain::account::AccountStorageRequirements;
     use crate::transaction::ForeignAccount;
 
@@ -610,7 +611,7 @@ mod tests {
         let target_id =
             AccountId::try_from(ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE).unwrap();
         let faucet_id = AccountId::try_from(ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET).unwrap();
-        let mut rng = RandomCoin::new(Word::default());
+        let mut rng = DefaultFeltRng::from_seed([0u8; 32]);
 
         let mut notes = vec![];
         for i in 0..6 {

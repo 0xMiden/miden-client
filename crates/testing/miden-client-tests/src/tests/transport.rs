@@ -5,6 +5,7 @@ use miden_client::DebugMode;
 use miden_client::account::{Account, AccountType};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::builder::ClientBuilder;
+use miden_client::crypto::DefaultFeltRng;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{NoteAttachments, NoteDetails, NoteTag, NoteType};
 use miden_client::note_transport::NoteTransportClient;
@@ -18,8 +19,6 @@ use miden_client::testing::note_transport::{
 };
 use miden_client::utils::RwLock;
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
-use miden_protocol::Felt;
-use miden_protocol::crypto::rand::RandomCoin;
 use miden_protocol::note::NoteType as ProtocolNoteType;
 use miden_protocol::transaction::RawOutputNote;
 use miden_protocol::utils::serde::Serializable;
@@ -248,14 +247,11 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
         .add_existing_mock_account(miden_testing::Auth::IncrNonce)
         .unwrap();
 
-    let private_note = NoteBuilder::new(
-        mock_account.id(),
-        RandomCoin::new([1, 2, 3, 4].map(Felt::new_unchecked).into()),
-    )
-    .note_type(ProtocolNoteType::Private)
-    .tag(NoteTag::new(0).into())
-    .build()
-    .unwrap();
+    let private_note = NoteBuilder::new(mock_account.id(), DefaultFeltRng::from_seed([1u8; 32]))
+        .note_type(ProtocolNoteType::Private)
+        .tag(NoteTag::new(0).into())
+        .build()
+        .unwrap();
 
     let spawn_note =
         mock_chain_builder.add_spawn_note(std::slice::from_ref(&private_note)).unwrap();
@@ -289,8 +285,8 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     let transport_client = MockNoteTransportApi::new(mock_transport_node.clone());
 
     let mut rng = rand::rng();
-    let coin_seed: [u64; 4] = rng.random();
-    let rng = RandomCoin::new(coin_seed.map(|v| Felt::new_unchecked(v >> 1)).into());
+    let seed: [u8; 32] = rng.random();
+    let rng = DefaultFeltRng::from_seed(seed);
 
     let keystore_path = temp_dir();
     let keystore = FilesystemKeyStore::new(keystore_path.clone()).unwrap();
