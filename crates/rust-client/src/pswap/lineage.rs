@@ -169,7 +169,7 @@ pub(crate) struct PswapLineageRoundUpdate {
 /// `order_id`, `depth`, and amount (fill on payback, payout on remainder)
 /// — role distinguished by [`Self::tag`].
 #[derive(Debug, Clone)]
-pub(crate) struct PswapChainNoteUpdate {
+pub(crate) struct ObservedPswapNote {
     pub note_id: NoteId,
     pub attachment: PswapNoteAttachment,
     pub sender: AccountId,
@@ -183,43 +183,127 @@ pub(crate) struct PswapChainNoteUpdate {
 // ================================================================================================
 
 impl PswapLineageRecord {
-    /// Builds one round's [`PswapLineageRoundUpdate`] from the chain notes observed at this depth.
+    /// Builds this round's [`PswapLineageRoundUpdate`] from the chain notes observed at
+    /// `round_depth`.
+    ///
+    /// The `(order_id, depth)` bucket is keyed off attachment fields the sender controls, so the
+    /// raw note set is untrusted. We **validate then classify**: each candidate is
+    /// reconstructed from our stored depth-0 note and kept only if its id matches the observed
+    /// note (a forger can't match without actually emitting a genuine payback/remainder of our
+    /// order). Classification runs on the surviving genuine notes, never on the raw count.
+    ///
+    /// Returns `Ok(None)` when the bucket holds no genuine note and the tip wasn't consumed — the
+    /// notes are forged/unrelated and this isn't our round, so the caller stops advancing.
     pub(crate) fn build_round_update(
         &self,
         round_depth: u32,
         block_number: BlockNumber,
-        notes: &[&PswapChainNoteUpdate],
+        notes: &[&ObservedPswapNote],
         block_headers: &BTreeMap<BlockNumber, BlockHeader>,
         original_pswap: Option<&PswapNote>,
-    ) -> Result<PswapLineageRoundUpdate, PswapLineageError> {
-        match notes.len() {
-            0 => Ok(self.build_reclaim_round(round_depth, block_number)),
-            1 => {
-                // Fetched by the caller before any fill round; absence is a broken invariant.
-                let pswap = original_pswap
-                    .ok_or(PswapLineageError::OriginalNoteUnavailable(self.original_note_id))?;
-                self.build_full_fill_round(
-                    round_depth,
-                    block_number,
-                    notes[0],
-                    block_headers,
-                    pswap,
-                )
-            },
-            2 => {
-                // Fetched by the caller before any fill round; absence is a broken invariant.
-                let pswap = original_pswap
-                    .ok_or(PswapLineageError::OriginalNoteUnavailable(self.original_note_id))?;
-                self.build_partial_fill_round(
-                    round_depth,
-                    block_number,
-                    notes,
-                    block_headers,
-                    pswap,
-                )
-            },
-            count => Err(PswapLineageError::AmbiguousRound { depth: round_depth, count }),
+        tip_consumed: bool,
+    ) -> Result<Option<PswapLineageRoundUpdate>, PswapLineageError> {
+        // No outputs at all: the only way the round fired is a consumed tip → reclaim.
+        if notes.is_empty() {
+            return Ok(Some(self.build_reclaim_round(round_depth, block_number)));
         }
+
+        // Fetched by the caller before any fill round; absence is a broken invariant.
+        let pswap = original_pswap
+            .ok_or(PswapLineageError::OriginalNoteUnavailable(self.original_note_id))?;
+        let payback_tag = pswap.storage().payback_note_tag();
+
+        // The genuine payback anchors the round; forged candidates reconstruct to a different id
+        // and fall away. More than one genuine payback at a depth is impossible (one tip →
+        // one fill), so the first match is the one.
+        let Some((observed_payback, payback_note)) = notes
+            .iter()
+            .copied()
+            .filter(|note| note.tag == payback_tag)
+            .find_map(|note| validate_payback(pswap, note).map(|recon| (note, recon)))
+        else {
+            // No valid fill: a consumed tip with no genuine payback is a reclaim; otherwise the
+            // notes are forged against a still-live tip and this isn't our round.
+            return Ok(tip_consumed.then(|| self.build_reclaim_round(round_depth, block_number)));
+        };
+
+        let fill_amount = FungibleAsset::new(
+            pswap.storage().requested_asset().faucet_id(),
+            u64::from(observed_payback.attachment.amount()),
+        )
+        .map_err(PswapLineageError::AssetError)?;
+
+        // A genuine remainder (if any) is validated against the post-round balances derived from
+        // the payback's fill. Present → partial fill; absent → full fill.
+        let remainder =
+            notes.iter().copied().filter(|note| note.tag != payback_tag).find_map(|note| {
+                self.validate_remainder(pswap, note, fill_amount).map(|recon| (note, recon))
+            });
+
+        Ok(Some(match remainder {
+            Some((observed_remainder, remainder_note)) => self.build_partial_fill_round(
+                round_depth,
+                block_number,
+                observed_payback,
+                payback_note,
+                observed_remainder,
+                remainder_note,
+                fill_amount,
+                block_headers,
+            ),
+            None => self.build_full_fill_round(
+                round_depth,
+                block_number,
+                observed_payback,
+                payback_note,
+                block_headers,
+            ),
+        }))
+    }
+
+    /// The genuine remainder for `observed`, if it reconstructs (against the post-round balances
+    /// derived from `fill_amount` and the candidate's own payout) to a matching id; `None`
+    /// otherwise.
+    fn validate_remainder(
+        &self,
+        pswap: &PswapNote,
+        observed: &ObservedPswapNote,
+        fill_amount: FungibleAsset,
+    ) -> Option<Note> {
+        let payout_amount = FungibleAsset::new(
+            pswap.offered_asset().faucet_id(),
+            u64::from(observed.attachment.amount()),
+        )
+        .ok()?;
+        let (remaining_offered, remaining_requested) =
+            self.remaining_after_fill(fill_amount, payout_amount);
+        let remainder_note = pswap
+            .remainder_note(
+                observed.sender,
+                &observed.attachment,
+                remaining_offered.amount(),
+                remaining_requested.amount(),
+            )
+            .ok()?;
+        (remainder_note.id() == observed.note_id).then_some(remainder_note)
+    }
+
+    /// Saturating post-round balances after filling `fill_amount` (requested) for `payout_amount`
+    /// (offered). Clamps to zero on over-fill.
+    fn remaining_after_fill(
+        &self,
+        fill_amount: FungibleAsset,
+        payout_amount: FungibleAsset,
+    ) -> (FungibleAsset, FungibleAsset) {
+        let remaining_requested = self
+            .remaining_requested
+            .sub(fill_amount)
+            .unwrap_or_else(|_| self.zero_requested());
+        let remaining_offered = self
+            .remaining_offered
+            .sub(payout_amount)
+            .unwrap_or_else(|_| self.zero_offered());
+        (remaining_offered, remaining_requested)
     }
 
     /// Zero-amount asset for the order's offered faucet (taken from the
@@ -255,20 +339,17 @@ impl PswapLineageRecord {
         }
     }
 
-    /// Full fill — only payback emitted; `remaining_requested` → 0.
+    /// Full fill — only payback emitted; both `remaining_*` → 0. Takes the already-validated
+    /// `payback_note` and its observed note (for the inclusion proof and commit block).
     fn build_full_fill_round(
         &self,
         round_depth: u32,
         block_number: BlockNumber,
-        payback_note_update: &PswapChainNoteUpdate,
+        observed_payback: &ObservedPswapNote,
+        payback_note: Note,
         block_headers: &BTreeMap<BlockNumber, BlockHeader>,
-        pswap: &PswapNote,
-    ) -> Result<PswapLineageRoundUpdate, PswapLineageError> {
-        let payback = pswap
-            .payback_note(payback_note_update.sender, &payback_note_update.attachment)
-            .map_err(PswapLineageError::Reconstruction)?;
-
-        Ok(PswapLineageRoundUpdate {
+    ) -> PswapLineageRoundUpdate {
+        PswapLineageRoundUpdate {
             order_id: self.order_id(),
             round_depth,
             remaining_offered: self.zero_offered(),
@@ -277,79 +358,50 @@ impl PswapLineageRecord {
             tip_note_id: None,
             at_block: block_number,
             at_block_note_root: block_headers
-                .get(&payback_note_update.block_num)
+                .get(&observed_payback.block_num)
                 .map(BlockHeader::note_root),
-            payback: Some((payback, payback_note_update.inclusion_proof.clone())),
+            payback: Some((payback_note, observed_payback.inclusion_proof.clone())),
             remainder: None,
-        })
+        }
     }
 
-    /// Partial fill — payback + remainder. Distinguishes the two by tag.
+    /// Partial fill — payback + remainder. Takes the already-validated notes; balances come from
+    /// the payback's `fill_amount` and the remainder's payout.
+    #[allow(clippy::too_many_arguments)]
     fn build_partial_fill_round(
         &self,
         round_depth: u32,
         block_number: BlockNumber,
-        notes: &[&PswapChainNoteUpdate],
+        observed_payback: &ObservedPswapNote,
+        payback_note: Note,
+        observed_remainder: &ObservedPswapNote,
+        remainder_note: Note,
+        fill_amount: FungibleAsset,
         block_headers: &BTreeMap<BlockNumber, BlockHeader>,
-        pswap: &PswapNote,
-    ) -> Result<PswapLineageRoundUpdate, PswapLineageError> {
-        let offered_faucet = pswap.offered_asset().faucet_id();
-        let requested_faucet = pswap.storage().requested_asset().faucet_id();
-
-        let payback_tag = pswap.storage().payback_note_tag();
-        let (payback_note_update, remainder_note_update) = if notes[0].tag == payback_tag {
-            (notes[0], notes[1])
-        } else {
-            (notes[1], notes[0])
-        };
-
-        let payback_note = pswap
-            .payback_note(payback_note_update.sender, &payback_note_update.attachment)
-            .map_err(PswapLineageError::Reconstruction)?;
-
-        let fill_amount = FungibleAsset::new(
-            requested_faucet,
-            u64::from(payback_note_update.attachment.amount()),
-        )
-        .map_err(PswapLineageError::AssetError)?;
+    ) -> PswapLineageRoundUpdate {
+        // The remainder was already validated, so its payout amount is well-formed.
         let payout_amount = FungibleAsset::new(
-            offered_faucet,
-            u64::from(remainder_note_update.attachment.amount()),
+            self.remaining_offered.faucet_id(),
+            u64::from(observed_remainder.attachment.amount()),
         )
-        .map_err(PswapLineageError::AssetError)?;
+        .unwrap_or_else(|_| self.zero_offered());
+        let (remaining_offered, remaining_requested) =
+            self.remaining_after_fill(fill_amount, payout_amount);
 
-        // Saturating sub — clamp to zero on over-fill.
-        let remaining_requested = self
-            .remaining_requested
-            .sub(fill_amount)
-            .unwrap_or_else(|_| self.zero_requested());
-        let remaining_offered = self
-            .remaining_offered
-            .sub(payout_amount)
-            .unwrap_or_else(|_| self.zero_offered());
-
-        let remainder_note = pswap
-            .remainder_note(
-                remainder_note_update.sender,
-                &remainder_note_update.attachment,
-                remaining_offered.amount(),
-                remaining_requested.amount(),
-            )
-            .map_err(PswapLineageError::Reconstruction)?;
-        Ok(PswapLineageRoundUpdate {
+        PswapLineageRoundUpdate {
             order_id: self.order_id(),
             round_depth,
             remaining_offered,
             remaining_requested,
             state: PswapLineageState::Active,
-            tip_note_id: Some(remainder_note_update.note_id),
+            tip_note_id: Some(observed_remainder.note_id),
             at_block: block_number,
             at_block_note_root: block_headers
-                .get(&payback_note_update.block_num)
+                .get(&observed_payback.block_num)
                 .map(BlockHeader::note_root),
-            payback: Some((payback_note, payback_note_update.inclusion_proof.clone())),
-            remainder: Some((remainder_note, remainder_note_update.inclusion_proof.clone())),
-        })
+            payback: Some((payback_note, observed_payback.inclusion_proof.clone())),
+            remainder: Some((remainder_note, observed_remainder.inclusion_proof.clone())),
+        }
     }
 
     /// Returns the post-round version. Drives the same-block multi-fill loop.
@@ -367,6 +419,13 @@ impl PswapLineageRecord {
         }
         self
     }
+}
+
+/// The genuine payback for `observed`, if it reconstructs to a matching id; `None` otherwise
+/// (forged, unrelated, or unreconstructable — all skipped, never trusted).
+fn validate_payback(pswap: &PswapNote, observed: &ObservedPswapNote) -> Option<Note> {
+    let payback_note = pswap.payback_note(observed.sender, &observed.attachment).ok()?;
+    (payback_note.id() == observed.note_id).then_some(payback_note)
 }
 
 // PSWAP LINEAGE FILTER
@@ -781,15 +840,15 @@ mod tests {
         record
     }
 
-    /// `PswapChainNoteUpdate` mirroring `note` (id + tag) so the
+    /// `ObservedPswapNote` mirroring `note` (id + tag) so the
     /// correlator's tag-based payback/remainder split works.
     fn chain_update_from(
         note: &Note,
         attachment: PswapNoteAttachment,
         sender: AccountId,
         block: u32,
-    ) -> PswapChainNoteUpdate {
-        PswapChainNoteUpdate {
+    ) -> ObservedPswapNote {
+        ObservedPswapNote {
             note_id: note.id(),
             attachment,
             sender,
@@ -797,6 +856,34 @@ mod tests {
             block_num: BlockNumber::from(block),
             inclusion_proof: dummy_inclusion_proof(block),
         }
+    }
+
+    /// A forged candidate: claims `tag` + `attachment` for our order but carries a `note_id` that
+    /// won't match any reconstruction (here, the depth-0 note's id).
+    fn forged_note(
+        forged_id: NoteId,
+        attachment: PswapNoteAttachment,
+        tag: NoteTag,
+        sender: AccountId,
+        block: u32,
+    ) -> ObservedPswapNote {
+        ObservedPswapNote {
+            note_id: forged_id,
+            attachment,
+            sender,
+            tag,
+            block_num: BlockNumber::from(block),
+            inclusion_proof: dummy_inclusion_proof(block),
+        }
+    }
+
+    /// Unwraps a successful, present round update.
+    fn expect_round(
+        result: Result<Option<PswapLineageRoundUpdate>, PswapLineageError>,
+    ) -> PswapLineageRoundUpdate {
+        result
+            .expect("build_round_update should not error")
+            .expect("expected a round update")
     }
 
     /// 2-candidate partial fill → `Active`, both `remaining_*` reduced.
@@ -837,15 +924,14 @@ mod tests {
         let cand_payback = chain_update_from(&payback, payback_att, consumer, 7);
         let cand_remainder = chain_update_from(&remainder, remainder_att, consumer, 7);
 
-        let update = record
-            .build_round_update(
-                1,
-                BlockNumber::from(7),
-                &[&cand_payback, &cand_remainder],
-                &no_block_headers(),
-                Some(&pswap),
-            )
-            .expect("partial fill must produce a round update");
+        let update = expect_round(record.build_round_update(
+            1,
+            BlockNumber::from(7),
+            &[&cand_payback, &cand_remainder],
+            &no_block_headers(),
+            Some(&pswap),
+            true,
+        ));
 
         assert_eq!(update.round_depth, 1);
         assert_eq!(update.remaining_offered.amount(), AssetAmount::new(new_off).unwrap());
@@ -898,26 +984,25 @@ mod tests {
         let cand_remainder = chain_update_from(&remainder, remainder_att, consumer, 7);
 
         // Reverse the input order — remainder first.
-        let update = record
-            .build_round_update(
-                1,
-                BlockNumber::from(7),
-                &[&cand_remainder, &cand_payback],
-                &no_block_headers(),
-                Some(&pswap),
-            )
-            .expect("partial fill must classify regardless of input order");
+        let update = expect_round(record.build_round_update(
+            1,
+            BlockNumber::from(7),
+            &[&cand_remainder, &cand_payback],
+            &no_block_headers(),
+            Some(&pswap),
+            true,
+        ));
 
         assert_eq!(update.tip_note_id, Some(remainder.id()));
         assert_eq!(update.state, PswapLineageState::Active);
     }
 
-    /// A malformed attachment (`depth == 0`) makes `PswapNote::payback_note`
-    /// reject reconstruction; `build_round_update` surfaces the error rather
-    /// than panicking. In `discover_pswap_rounds` this is caught, logged via
-    /// `error!`, and the lineage is left at its previous tip.
+    /// A candidate that can't be reconstructed (here, a `depth == 0` attachment that trips
+    /// `payback_note`'s "depth must be >= 1" guard) is *filtered*, not fatal: with the tip still
+    /// live and no genuine note, the round yields `Ok(None)` and the lineage stays at its tip. This
+    /// non-fatal skip is what stops a single malformed forged note from stalling the chain.
     #[test]
-    fn build_round_update_propagates_reconstruction_error() {
+    fn build_round_update_filters_unreconstructable_candidate() {
         let (_sender, _creator, offered_faucet, requested_faucet) = fixed_account_ids();
         let consumer = AccountId::try_from(
             miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
@@ -931,20 +1016,27 @@ mod tests {
         let pswap = build_test_pswap(consumer, creator, offered_faucet, 100, requested_faucet, 50);
         let record = initial_record(&pswap, 100, 50);
 
-        // `depth == 0` trips `payback_note`'s "depth must be >= 1" guard.
-        let bad_attachment =
-            PswapNoteAttachment::new(AssetAmount::new(20).unwrap(), pswap.order_id(), 0);
-        let dummy_note = Note::from(pswap.clone());
-        let cand = chain_update_from(&dummy_note, bad_attachment, consumer, 5);
+        // Carries the payback tag (so it reaches reconstruction) but a depth-0 attachment that
+        // makes `payback_note` fail — `validate_payback` returns `None` and the candidate
+        // is skipped.
+        let good_att = PswapNoteAttachment::new(AssetAmount::new(20).unwrap(), pswap.order_id(), 1);
+        let payback = pswap.payback_note(consumer, &good_att).unwrap();
+        let bad_att = PswapNoteAttachment::new(AssetAmount::new(20).unwrap(), pswap.order_id(), 0);
+        let cand = forged_note(payback.id(), bad_att, payback.metadata().tag(), consumer, 5);
 
+        // Tip still live → no genuine note → no round.
         let result = record.build_round_update(
             1,
             BlockNumber::from(5),
             &[&cand],
             &no_block_headers(),
             Some(&pswap),
+            false,
         );
-        assert!(result.is_err(), "depth-0 attachment must fail reconstruction");
+        assert!(
+            matches!(result, Ok(None)),
+            "unreconstructable candidate must be filtered, not fatal"
+        );
     }
 
     /// 1-candidate full fill → `FullyFilled`, no remainder, both zeros.
@@ -970,15 +1062,14 @@ mod tests {
         let payback = pswap.payback_note(consumer, &payback_att).unwrap();
         let cand = chain_update_from(&payback, payback_att, consumer, 9);
 
-        let update = record
-            .build_round_update(
-                1,
-                BlockNumber::from(9),
-                &[&cand],
-                &no_block_headers(),
-                Some(&pswap),
-            )
-            .expect("full fill must produce a round update");
+        let update = expect_round(record.build_round_update(
+            1,
+            BlockNumber::from(9),
+            &[&cand],
+            &no_block_headers(),
+            Some(&pswap),
+            true,
+        ));
 
         assert_eq!(update.state, PswapLineageState::FullyFilled);
         assert_eq!(update.remaining_offered.amount(), AssetAmount::ZERO);
@@ -1004,9 +1095,14 @@ mod tests {
         let pswap = build_test_pswap(consumer, creator, offered_faucet, 80, requested_faucet, 40);
         let record = initial_record(&pswap, 80, 40);
 
-        let update = record
-            .build_round_update(1, BlockNumber::from(5), &[], &no_block_headers(), None)
-            .expect("zero-output consumption must produce a round update");
+        let update = expect_round(record.build_round_update(
+            1,
+            BlockNumber::from(5),
+            &[],
+            &no_block_headers(),
+            None,
+            true,
+        ));
 
         assert_eq!(update.state, PswapLineageState::Reclaimed);
         assert_eq!(update.remaining_offered.amount(), AssetAmount::ZERO);
@@ -1054,15 +1150,14 @@ mod tests {
         let payback_cand = chain_update_from(&payback1, payback_att1, consumer, 11);
         let remainder_cand = chain_update_from(&remainder1, remainder_att1, consumer, 11);
 
-        let update1 = record0
-            .build_round_update(
-                1,
-                BlockNumber::from(11),
-                &[&payback_cand, &remainder_cand],
-                &no_block_headers(),
-                Some(&pswap),
-            )
-            .unwrap();
+        let update1 = expect_round(record0.build_round_update(
+            1,
+            BlockNumber::from(11),
+            &[&payback_cand, &remainder_cand],
+            &no_block_headers(),
+            Some(&pswap),
+            true,
+        ));
 
         // Mirrors `discover_pswap_rounds`'s inner loop.
         let record1 = record0.apply_round_in_memory(&update1);
@@ -1079,15 +1174,14 @@ mod tests {
         let payback2 = pswap.payback_note(consumer, &payback_att2).unwrap();
         let cand_p2 = chain_update_from(&payback2, payback_att2, consumer, 11);
 
-        let update2 = record1
-            .build_round_update(
-                2,
-                BlockNumber::from(11),
-                &[&cand_p2],
-                &no_block_headers(),
-                Some(&pswap),
-            )
-            .unwrap();
+        let update2 = expect_round(record1.build_round_update(
+            2,
+            BlockNumber::from(11),
+            &[&cand_p2],
+            &no_block_headers(),
+            Some(&pswap),
+            true,
+        ));
 
         assert_eq!(update2.round_depth, 2);
         assert_eq!(update2.state, PswapLineageState::FullyFilled);
@@ -1098,5 +1192,174 @@ mod tests {
         assert_eq!(record2.state, PswapLineageState::FullyFilled);
         let emitted = [update1, update2];
         assert_eq!(emitted.len(), 2);
+    }
+
+    /// A payback-tagged note whose id doesn't match the reconstruction is a forgery and is
+    /// filtered. With the tip still live there's no genuine payback → no round; with the tip
+    /// consumed the forged-only bucket reads as a reclaim.
+    #[test]
+    fn build_round_update_filters_forged_payback() {
+        let (_sender, _creator, offered_faucet, requested_faucet) = fixed_account_ids();
+        let consumer = AccountId::try_from(
+            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+        )
+        .unwrap();
+        let creator = AccountId::try_from(
+            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE_2,
+        )
+        .unwrap();
+
+        let pswap = build_test_pswap(consumer, creator, offered_faucet, 100, requested_faucet, 50);
+        let record = initial_record(&pswap, 100, 50);
+
+        let att = PswapNoteAttachment::new(AssetAmount::new(20).unwrap(), pswap.order_id(), 1);
+        let genuine_payback = pswap.payback_note(consumer, &att).unwrap();
+        // Same payback tag + attachment, but the depth-0 note's id — won't match the
+        // reconstruction.
+        let forged = forged_note(
+            Note::from(pswap.clone()).id(),
+            att,
+            genuine_payback.metadata().tag(),
+            consumer,
+            7,
+        );
+
+        // Tip still live → forged-only bucket → not our round.
+        assert!(matches!(
+            record.build_round_update(
+                1,
+                BlockNumber::from(7),
+                &[&forged],
+                &no_block_headers(),
+                Some(&pswap),
+                false,
+            ),
+            Ok(None)
+        ));
+
+        // Tip consumed → forged-only bucket → it was a reclaim.
+        let reclaim = expect_round(record.build_round_update(
+            1,
+            BlockNumber::from(7),
+            &[&forged],
+            &no_block_headers(),
+            Some(&pswap),
+            true,
+        ));
+        assert_eq!(reclaim.state, PswapLineageState::Reclaimed);
+    }
+
+    /// A genuine payback plus a forged remainder-tagged note: the forgery is filtered, so the round
+    /// is classified as a full fill (no remainder), never used as the tip.
+    #[test]
+    fn build_round_update_forged_remainder_yields_full_fill() {
+        let (_sender, _creator, offered_faucet, requested_faucet) = fixed_account_ids();
+        let consumer = AccountId::try_from(
+            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+        )
+        .unwrap();
+        let creator = AccountId::try_from(
+            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE_2,
+        )
+        .unwrap();
+
+        let pswap = build_test_pswap(consumer, creator, offered_faucet, 100, requested_faucet, 50);
+        let record = initial_record(&pswap, 100, 50);
+
+        let payback_att =
+            PswapNoteAttachment::new(AssetAmount::new(20).unwrap(), pswap.order_id(), 1);
+        let payback = pswap.payback_note(consumer, &payback_att).unwrap();
+        let cand_payback = chain_update_from(&payback, payback_att, consumer, 7);
+
+        // Remainder tag + plausible attachment, but a non-matching id → forged.
+        let remainder_att =
+            PswapNoteAttachment::new(AssetAmount::new(40).unwrap(), pswap.order_id(), 1);
+        let genuine_remainder = pswap
+            .remainder_note(
+                consumer,
+                &remainder_att,
+                AssetAmount::new(60).unwrap(),
+                AssetAmount::new(30).unwrap(),
+            )
+            .unwrap();
+        let forged_remainder = forged_note(
+            Note::from(pswap.clone()).id(),
+            remainder_att,
+            genuine_remainder.metadata().tag(),
+            consumer,
+            7,
+        );
+
+        let update = expect_round(record.build_round_update(
+            1,
+            BlockNumber::from(7),
+            &[&cand_payback, &forged_remainder],
+            &no_block_headers(),
+            Some(&pswap),
+            true,
+        ));
+        assert_eq!(
+            update.state,
+            PswapLineageState::FullyFilled,
+            "forged remainder filtered → full fill"
+        );
+        assert!(update.remainder.is_none());
+    }
+
+    /// A padded bucket — genuine payback + genuine remainder + an extra forged note — still
+    /// classifies as a partial fill; the forgery is dropped, never tripping an ambiguity error.
+    #[test]
+    fn build_round_update_bucket_padding_stays_partial() {
+        let (_sender, _creator, offered_faucet, requested_faucet) = fixed_account_ids();
+        let consumer = AccountId::try_from(
+            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
+        )
+        .unwrap();
+        let creator = AccountId::try_from(
+            miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE_2,
+        )
+        .unwrap();
+
+        let pswap = build_test_pswap(consumer, creator, offered_faucet, 100, requested_faucet, 50);
+        let record = initial_record(&pswap, 100, 50);
+
+        let payback_att =
+            PswapNoteAttachment::new(AssetAmount::new(20).unwrap(), pswap.order_id(), 1);
+        let remainder_att =
+            PswapNoteAttachment::new(AssetAmount::new(40).unwrap(), pswap.order_id(), 1);
+        let payback = pswap.payback_note(consumer, &payback_att).unwrap();
+        let remainder = pswap
+            .remainder_note(
+                consumer,
+                &remainder_att,
+                AssetAmount::new(60).unwrap(),
+                AssetAmount::new(30).unwrap(),
+            )
+            .unwrap();
+        let cand_payback = chain_update_from(&payback, payback_att, consumer, 7);
+        let cand_remainder = chain_update_from(&remainder, remainder_att, consumer, 7);
+        // Forged extra, payback-tagged, placed first to prove it's skipped before the genuine one.
+        let forged = forged_note(
+            Note::from(pswap.clone()).id(),
+            payback_att,
+            payback.metadata().tag(),
+            consumer,
+            7,
+        );
+
+        let update = expect_round(record.build_round_update(
+            1,
+            BlockNumber::from(7),
+            &[&forged, &cand_payback, &cand_remainder],
+            &no_block_headers(),
+            Some(&pswap),
+            true,
+        ));
+        assert_eq!(
+            update.state,
+            PswapLineageState::Active,
+            "forgery dropped → still a partial fill"
+        );
+        assert_eq!(update.tip_note_id, Some(remainder.id()));
     }
 }

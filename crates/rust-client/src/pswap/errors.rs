@@ -57,13 +57,6 @@ pub enum PswapLineageError {
     #[error("unknown PSWAP lineage state byte: {0}")]
     UnknownState(u8),
 
-    /// More chain notes share an `(order_id, depth)` than the protocol's
-    /// payback + remainder maximum of two. Reachable when an unrelated note
-    /// carries a colliding attachment, so it is handled (the round is skipped)
-    /// rather than asserted.
-    #[error("PSWAP round at depth {depth} has {count} candidate notes (expected at most 2)")]
-    AmbiguousRound { depth: u32, count: usize },
-
     /// A store call from the PSWAP layer failed.
     #[error("PSWAP store call failed: {0}")]
     Store(#[from] StoreError),

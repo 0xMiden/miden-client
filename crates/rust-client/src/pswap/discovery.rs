@@ -17,7 +17,7 @@ use tracing::error;
 
 use super::errors::PswapLineageError;
 use super::lineage::{
-    PswapChainNoteUpdate,
+    ObservedPswapNote,
     PswapLineageRecord,
     PswapLineageRoundUpdate,
     PswapLineageState,
@@ -34,7 +34,7 @@ use crate::sync::StateSyncUpdate;
 pub(crate) async fn discover_pswap_rounds(
     store: Arc<dyn Store>,
     state_sync_update: &StateSyncUpdate,
-    chain_note_updates: &[PswapChainNoteUpdate],
+    chain_note_updates: &[ObservedPswapNote],
 ) -> Result<Vec<PswapLineageRoundUpdate>, PswapLineageError> {
     let consumed_note_ids: BTreeSet<NoteId> =
         state_sync_update.note_updates.consumed_note_ids().collect();
@@ -87,7 +87,7 @@ pub(crate) async fn discover_pswap_rounds(
 async fn collect_candidate_orders(
     store: &Arc<dyn Store>,
     consumed_note_ids: &BTreeSet<NoteId>,
-    chain_note_updates: &[PswapChainNoteUpdate],
+    chain_note_updates: &[ObservedPswapNote],
 ) -> Result<BTreeSet<Felt>, PswapLineageError> {
     let mut candidate_orders: BTreeSet<Felt> = BTreeSet::new();
     for note_id in consumed_note_ids {
@@ -120,10 +120,9 @@ async fn load_active_lineages(
 
 /// Groups observed chain notes by `(order_id, depth)` for O(1) per-round lookup.
 fn group_notes_by_order_depth(
-    chain_note_updates: &[PswapChainNoteUpdate],
-) -> BTreeMap<(Felt, u32), Vec<&PswapChainNoteUpdate>> {
-    let mut notes_by_order_depth: BTreeMap<(Felt, u32), Vec<&PswapChainNoteUpdate>> =
-        BTreeMap::new();
+    chain_note_updates: &[ObservedPswapNote],
+) -> BTreeMap<(Felt, u32), Vec<&ObservedPswapNote>> {
+    let mut notes_by_order_depth: BTreeMap<(Felt, u32), Vec<&ObservedPswapNote>> = BTreeMap::new();
     for note in chain_note_updates {
         notes_by_order_depth
             .entry((note.attachment.order_id(), note.attachment.depth()))
@@ -146,7 +145,7 @@ async fn advance_lineage(
     store: &Arc<dyn Store>,
     mut lineage: PswapLineageRecord,
     consumed_note_ids: &BTreeSet<NoteId>,
-    notes_by_order_depth: &BTreeMap<(Felt, u32), Vec<&PswapChainNoteUpdate>>,
+    notes_by_order_depth: &BTreeMap<(Felt, u32), Vec<&ObservedPswapNote>>,
     sync_block: BlockNumber,
     block_headers: &BTreeMap<BlockNumber, BlockHeader>,
 ) -> Vec<PswapLineageRoundUpdate> {
@@ -190,8 +189,12 @@ async fn advance_lineage(
             notes,
             block_headers,
             original_pswap.as_ref(),
+            tip_consumed,
         ) {
-            Ok(u) => u,
+            Ok(Some(u)) => u,
+            // Notes present but none reconstruct to a genuine payback/remainder for our live tip
+            // (forged or unrelated) — not our round; stop advancing this lineage.
+            Ok(None) => break,
             Err(err) => {
                 error!(
                     order_id = ?lineage.order_id(),

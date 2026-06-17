@@ -13,7 +13,7 @@ use tracing::warn;
 
 use crate::ClientError;
 use crate::pswap::discovery::discover_pswap_rounds;
-use crate::pswap::lineage::PswapChainNoteUpdate;
+use crate::pswap::lineage::ObservedPswapNote;
 use crate::rpc::domain::note::CommittedNote;
 use crate::store::Store;
 use crate::sync::NoteObserver;
@@ -25,8 +25,8 @@ use crate::utils::RwLock;
 /// Per-sync collector of PSWAP-attachment notes seen this sync.
 ///
 /// - `observe()` runs per-note during sync: reads the PSWAP attachment word straight off the note's
-///   resolved attachments (carried inline on the sync window) and records a `PswapChainNoteUpdate`.
-///   No RPC round trip, no DB write.
+///   resolved attachments (carried inline on the sync window) and records a `ObservedPswapNote`. No
+///   RPC round trip, no DB write.
 /// - `apply()` runs once post-sync: drains the collector, runs the correlator, applies round
 ///   updates.
 pub struct PswapChainObserver {
@@ -35,7 +35,7 @@ pub struct PswapChainObserver {
     /// shared via the outer `Arc<dyn NoteObserver>` and only ever touched
     /// through `&self`, so the `RwLock` alone provides the needed interior
     /// mutability — no inner `Arc`.
-    chain_note_updates: RwLock<Vec<PswapChainNoteUpdate>>,
+    chain_note_updates: RwLock<Vec<ObservedPswapNote>>,
 }
 
 impl PswapChainObserver {
@@ -68,7 +68,7 @@ impl NoteObserver for PswapChainObserver {
         };
 
         let inclusion_proof = committed_note.inclusion_proof().clone();
-        self.chain_note_updates.write().push(PswapChainNoteUpdate {
+        self.chain_note_updates.write().push(ObservedPswapNote {
             note_id: *committed_note.note_id(),
             attachment,
             sender: committed_note.sender(),
