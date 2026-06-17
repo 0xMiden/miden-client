@@ -4,7 +4,7 @@ use alloc::boxed::Box;
 
 use miden_protocol::Felt;
 use miden_protocol::account::AccountId;
-use miden_protocol::errors::{AssetError, NoteError};
+use miden_protocol::errors::AssetError;
 use miden_protocol::note::NoteId;
 
 use super::lineage::PswapLineageState;
@@ -42,10 +42,6 @@ pub enum PswapLineageError {
         "PSWAP original note {0} is unavailable in the output-note store or lacks recipient details"
     )]
     OriginalNoteUnavailable(NoteId),
-
-    /// `PswapNote::payback_note` / `remainder_note` reconstruction failed.
-    #[error("PSWAP note reconstruction failed: {0}")]
-    Reconstruction(#[source] NoteError),
 
     /// `FungibleAsset::new` rejected an attachment-derived amount (the stored
     /// value exceeds the protocol's max). Indicates either a malformed
