@@ -4,6 +4,7 @@
 
 ### Fixes
 
+* [FIX][rust] State sync now re-verifies a tracked private account's commitment mismatch against the witness `get_account` returns. The witness is checked against the synced block's account root before locking the account, so a node can no longer durably lock it with a forged `sync_transactions` commitment ([#2239](https://github.com/0xMiden/miden-client/issues/2239)).
 * [FIX][rust] State sync now range-checks `sync_transactions` records to `(current, chain_tip]`, rejecting out-of-range records that could forge transaction commit heights ([#2252](https://github.com/0xMiden/miden-client/pull/2252)).
 
 ## 0.15.0 (2026-06-12)
