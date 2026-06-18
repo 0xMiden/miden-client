@@ -1,10 +1,20 @@
 # Changelog
 
+## 0.15.2 (2026-06-18)
+
+### Features
+
+* [FEATURE][rust] Added `Client::send_private_note_with_block_hint`, which relays a sender-provided `after_block_num` so recipients get deterministic delivery instead of relying on receiving side lookback. ([#2262](https://github.com/0xMiden/miden-client/issues/2262))
+
+### Changes
+
+* [rust] Bumped `miden-note-transport-proto-build` to `0.4.1`. Notes imported from the note transport layer now use the provided `after_block_num` when present, falling back to the 20-block lookback window otherwise. `NoteInfo` gained a `block_hint: Option<BlockNumber>` field (plus a `NoteInfo::new` constructor) and `NoteTransportClient` gained a `send_note_with_block_hint` method (defaulting to `send_note`, so existing implementors keep compiling).  ([#2262](https://github.com/0xMiden/miden-client/issues/2262))
+
 ## 0.15.1 (2026-06-16)
 
 ### Enhancements
 
-* [FEATURE][rust] Re-exported `miden-agglayer` as `miden_client::agglayer`.
+* [FEATURE][rust] Re-exported `miden-agglayer` as `miden_client::agglayer`. ([#2253](https://github.com/0xMiden/miden-client/issues/2253))
 
 ## 0.15.0 (2026-06-12)
 
