@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+* [FIX][rust] Private notes delivered via the Note Transport Layer are no longer silently lost when their on-chain commitment lands more than the 20-block lookback window before the NTL delivers the note. `Client::send_private_note` now relays the note's submission height as the NTL `after_block_num` hint (a lower bound on the commitment block that the creating transaction cannot precede), and the receiver scans from `min(after_block_num, sync_height - lookback)` rather than a fixed lookback window — so the scanned range is always a superset of the lookback and a precise hint covers the exact commitment block. Each sync also re-scans still-`Expected` notes from their stored floor, recovering a note whose commitment a one-shot import scan missed (e.g. an incomplete `sync_notes` response). Consumes the `after_block_num` field added in `0xMiden/note-transport-service#81` and bumps `miden-note-transport-proto-build` to `0.4.1` ([#2108](https://github.com/0xMiden/miden-client/issues/2108)).
+
+### Changes
+
+* [BREAKING][param][rust] `NoteTransportClient::send_note` takes an additional `after_block_num: Option<BlockNumber>` argument — the sender-provided lower bound on the note's commitment block, relayed as the NTL `after_block_num` wire field — and the `NoteInfo` struct carries a matching `after_block_num` field ([#2108](https://github.com/0xMiden/miden-client/issues/2108)).
+
 ## 0.15.1 (2026-06-16)
 
 ### Enhancements

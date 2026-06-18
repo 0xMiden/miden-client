@@ -4,10 +4,11 @@ use std::sync::Arc;
 use miden_client::DebugMode;
 use miden_client::account::{Account, AccountType};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
+use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{Note, NoteAttachments, NoteDetails, NoteTag, NoteType};
-use miden_client::note_transport::NoteTransportClient;
+use miden_client::note_transport::{NoteTransportClient, NoteTransportCursor};
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::create_test_store_path;
 use miden_client::testing::mock::{MockClient, MockRpcApi};
@@ -16,9 +17,11 @@ use miden_client::testing::note_transport::{
     MockNoteTransportApi,
     MockNoteTransportNode,
 };
+use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::RwLock;
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_protocol::Felt;
+use miden_protocol::asset::FungibleAsset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::rand::RandomCoin;
 use miden_protocol::note::NoteType as ProtocolNoteType;
@@ -29,7 +32,7 @@ use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
 use rand::Rng;
 
-use crate::tests::{create_test_client_builder, insert_new_wallet};
+use crate::tests::{create_test_client_builder, insert_new_wallet, setup_wallet_and_faucet};
 
 #[tokio::test]
 async fn transport_basic() {
@@ -320,7 +323,9 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     let details = NoteDetails::from(private_note.clone());
     let details_bytes = details.to_bytes();
     // No after_block_num hint, so the receiver must fall back to its lookback window.
-    mock_transport_node.write().add_note(*private_note.header(), details_bytes, None);
+    mock_transport_node
+        .write()
+        .add_note(*private_note.header(), details_bytes, None);
 
     // 6. Second sync_state: fetch_transport_notes imports the note, then chain sync runs.
     // Without the fix, after_block_num = sync_height, scan misses the note at block 1.
@@ -461,7 +466,9 @@ async fn without_hint_note_beyond_lookback_stays_expected() {
             .await;
 
     let details_bytes = NoteDetails::from(private_note.clone()).to_bytes();
-    mock_transport_node.write().add_note(*private_note.header(), details_bytes, None);
+    mock_transport_node
+        .write()
+        .add_note(*private_note.header(), details_bytes, None);
 
     client.sync_state().await.unwrap();
 
@@ -496,7 +503,9 @@ async fn expected_note_rescan_recovers_from_incomplete_import_scan() {
     rpc_api.drop_next_sync_notes(1);
 
     let details_bytes = NoteDetails::from(private_note.clone()).to_bytes();
-    mock_transport_node.write().add_note(*private_note.header(), details_bytes, None);
+    mock_transport_node
+        .write()
+        .add_note(*private_note.header(), details_bytes, None);
 
     let note_details_commitment = NoteDetails::from(private_note.clone()).commitment();
 
@@ -515,6 +524,57 @@ async fn expected_note_rescan_recovers_from_incomplete_import_scan() {
     assert!(
         committed.iter().any(|n| n.details_commitment() == note_details_commitment),
         "a subsequent sync should rescan the Expected note and commit it"
+    );
+}
+
+/// Exercises the real sender path: a note created by the client's own transaction is relayed via
+/// `send_private_note`, and the relayed `after_block_num` equals the note's stored
+/// `expected_height` (a safe lower bound on its commitment block). Guards against the sender
+/// silently relaying no hint, which would reintroduce the lost-note bug for notes committed more
+/// than the lookback window before delivery.
+#[tokio::test]
+async fn send_private_note_relays_output_note_expected_height() {
+    let mock_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
+    let (mut client, keystore) = create_test_client_transport(mock_node.clone()).await;
+    let (wallet, faucet) =
+        setup_wallet_and_faucet(&mut client, AccountType::Private, &keystore, RPO_FALCON_SCHEME_ID)
+            .await
+            .unwrap();
+
+    // Mint a private note from the faucet to the wallet. This records an output note with
+    // expected_height = the transaction's submission height.
+    let asset = FungibleAsset::new(faucet.id(), 100).unwrap();
+    let tx_request = TransactionRequestBuilder::new()
+        .build_mint_fungible_asset(asset, wallet.id(), NoteType::Private, client.rng())
+        .unwrap();
+    let note = tx_request.expected_output_own_notes().first().unwrap().clone();
+    Box::pin(client.submit_new_transaction(faucet.id(), tx_request)).await.unwrap();
+
+    let expected_height = client
+        .get_output_notes(NoteFilter::List(vec![note.id()]))
+        .await
+        .unwrap()
+        .first()
+        .unwrap()
+        .expected_height();
+
+    // Relay the note. The recipient address is irrelevant to the hint.
+    let address = Address::new(wallet.id())
+        .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
+    client.send_private_note(note.clone(), &address).await.unwrap();
+
+    // The NTL should have stored the note with after_block_num = the note's expected_height.
+    let (relayed, _) = mock_node
+        .read()
+        .get_notes(&[note.metadata().tag()], NoteTransportCursor::init());
+    let entry = relayed
+        .iter()
+        .find(|info| info.header.id() == note.id())
+        .expect("relayed note should be present in the NTL");
+    assert_eq!(
+        entry.after_block_num,
+        Some(expected_height),
+        "sender should relay the output note's expected_height as the after_block_num hint"
     );
 }
 

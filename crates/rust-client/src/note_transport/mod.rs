@@ -32,7 +32,7 @@ use miden_tx::utils::serde::{
 };
 
 pub use self::errors::NoteTransportError;
-use crate::store::NoteFilter;
+use crate::store::{NoteFilter, OutputNoteRecord};
 use crate::{Client, ClientError};
 
 pub const NOTE_TRANSPORT_TESTNET_ENDPOINT: &str = "https://transport.miden.io";
@@ -100,7 +100,7 @@ impl<AUTH> Client<AUTH> {
             .get_output_notes(NoteFilter::List(Vec::from([note_id])))
             .await?
             .first()
-            .map(|record| record.expected_height());
+            .map(OutputNoteRecord::expected_height);
 
         // Persist the payload before the network call so a failed or
         // interrupted `send_note` leaves a recoverable record rather than
@@ -153,7 +153,9 @@ impl<AUTH> Client<AUTH> {
         let mut last_err: Option<NoteTransportError> = None;
 
         for entry in entries {
-            match api.send_note(entry.header, entry.details_bytes.clone(), entry.after_block_num).await
+            match api
+                .send_note(entry.header, entry.details_bytes.clone(), entry.after_block_num)
+                .await
             {
                 Ok(()) => {},
                 Err(err) => {
@@ -190,6 +192,13 @@ impl<AUTH> Client<AUTH> {
         match Vec::<NoteInfo>::read_from_bytes(&bytes) {
             Ok(entries) => Ok(entries),
             Err(err) => {
+                // A relay-outbox blob written before `after_block_num` was added to `NoteInfo`
+                // lacks the trailing field, so the current decoder rejects it. Read it with the
+                // legacy layout (defaulting the hint to `None`) so a still-pending relay survives
+                // a client upgrade instead of being dropped as unreadable.
+                if let Ok(legacy) = Vec::<LegacyNoteInfo>::read_from_bytes(&bytes) {
+                    return Ok(legacy.into_iter().map(NoteInfo::from).collect());
+                }
                 tracing::warn!(?err, "dropping unreadable relay outbox; resetting to empty");
                 self.store
                     .remove_setting(String::from(NOTE_TRANSPORT_OUTBOX_KEY))
@@ -308,6 +317,12 @@ where
 
         let (note_infos, rcursor) =
             self.get_note_transport_api()?.fetch_notes(tags, cursor).await?;
+
+        // Steady-state polling fetches empty batches; skip the rest (including the sync-height
+        // read) so an empty tick does no extra store work.
+        if note_infos.is_empty() {
+            return Ok((Vec::new(), rcursor));
+        }
 
         let sync_height = self.get_sync_height().await?;
         // Always scan back at least NOTE_LOOKBACK_BLOCKS from the sync height. This handles the
@@ -463,6 +478,32 @@ impl Deserializable for NoteInfo {
     }
 }
 
+/// The pre-`after_block_num` on-disk layout of [`NoteInfo`] (header + details only). Used only to
+/// read relay-outbox blobs written by an earlier client version so a pending relay survives an
+/// upgrade; see [`Client::load_relay_outbox`].
+struct LegacyNoteInfo {
+    header: NoteHeader,
+    details_bytes: Vec<u8>,
+}
+
+impl Deserializable for LegacyNoteInfo {
+    fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
+        let header = NoteHeader::read_from(source)?;
+        let details_bytes = Vec::<u8>::read_from(source)?;
+        Ok(LegacyNoteInfo { header, details_bytes })
+    }
+}
+
+impl From<LegacyNoteInfo> for NoteInfo {
+    fn from(legacy: LegacyNoteInfo) -> Self {
+        NoteInfo {
+            header: legacy.header,
+            details_bytes: legacy.details_bytes,
+            after_block_num: None,
+        }
+    }
+}
+
 impl Serializable for NoteTransportCursor {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         self.0.write_into(target);
@@ -488,4 +529,50 @@ fn rejoin_note(header: &NoteHeader, details_bytes: &[u8]) -> Result<Note, Deseri
         partial_metadata,
         details.recipient().clone(),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use miden_protocol::Felt;
+    use miden_protocol::crypto::rand::RandomCoin;
+    use miden_protocol::note::NoteType;
+    use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE;
+    use miden_protocol::utils::serde::Deserializable;
+    use miden_standards::testing::note::NoteBuilder;
+
+    use super::*;
+
+    /// A relay-outbox blob written before `after_block_num` was added (header + details only) must
+    /// still be readable so a pending relay survives a client upgrade instead of being dropped.
+    #[test]
+    fn legacy_outbox_blob_is_recovered_with_no_hint() {
+        let account_id = ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap();
+        let note = NoteBuilder::new(
+            account_id,
+            RandomCoin::new([1, 2, 3, 4].map(Felt::new_unchecked).into()),
+        )
+        .note_type(NoteType::Private)
+        .build()
+        .unwrap();
+        let header = *note.header();
+        let details_bytes = NoteDetails::from(note).to_bytes();
+
+        // The pre-`after_block_num` layout is header + details with the same `Vec` framing, which a
+        // `(NoteHeader, Vec<u8>)` tuple reproduces byte for byte.
+        let old_bytes = vec![(header, details_bytes.clone())].to_bytes();
+
+        // The current decoder rejects the missing trailing field...
+        assert!(Vec::<NoteInfo>::read_from_bytes(&old_bytes).is_err());
+
+        // ...but the legacy fallback reads it, defaulting the hint to `None`.
+        let recovered: Vec<NoteInfo> = Vec::<LegacyNoteInfo>::read_from_bytes(&old_bytes)
+            .unwrap()
+            .into_iter()
+            .map(NoteInfo::from)
+            .collect();
+        assert_eq!(recovered.len(), 1);
+        assert_eq!(recovered[0].header.id(), header.id());
+        assert_eq!(recovered[0].details_bytes, details_bytes);
+        assert_eq!(recovered[0].after_block_num, None);
+    }
 }

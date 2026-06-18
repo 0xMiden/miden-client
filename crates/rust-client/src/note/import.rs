@@ -51,26 +51,40 @@ where
     /// indefinitely. Re-importing reuses [`Client::import_notes`], so a note that is found
     /// transitions to `Committed` and one that is not is left untouched.
     ///
-    /// Cheap in the steady state: `Expected` notes are transient (they commit within a few
-    /// blocks) and the rescan issues no RPC when there are none.
+    /// The rescan floor is bounded to [`RESCAN_LOOKBACK_BLOCKS`] behind the sync height: a note
+    /// that never commits (e.g. its creating transaction was dropped) would otherwise keep its
+    /// original floor forever and grow the scanned range without limit as the chain advances. The
+    /// import scan already covered each note's full floor→import-height window once; a transient
+    /// incomplete-response miss commits near the import height, so a bounded recent window
+    /// recovers it. Issues no RPC when there are no `Expected` notes, the steady-state case.
     pub(crate) async fn rescan_expected_notes(&mut self) -> Result<(), ClientError> {
+        /// Cap on how far behind the sync height the rescan scans, bounding the per-sync cost.
+        const RESCAN_LOOKBACK_BLOCKS: u32 = 256;
+
         let expected_notes = self.store.get_input_notes(NoteFilter::Expected).await?;
+        if expected_notes.is_empty() {
+            return Ok(());
+        }
+
+        let floor_bound =
+            self.get_sync_height().await?.as_u32().saturating_sub(RESCAN_LOOKBACK_BLOCKS);
 
         let mut note_files = Vec::new();
         for record in expected_notes {
             // Only notes that still carry a tag can be matched on-chain, by reconstructing their
             // id from the committed metadata (see `check_expected_notes`).
             let InputNoteState::Expected(ExpectedNoteState {
-                after_block_num,
-                tag: Some(tag),
-                ..
+                after_block_num, tag: Some(tag), ..
             }) = record.state()
             else {
                 continue;
             };
             note_files.push(NoteFile::NoteDetails {
                 details: record.details().clone(),
-                after_block_num: *after_block_num,
+                // Never scan further back than the bounded window, even when the note's stored
+                // floor is older. This only sets the scan floor; the stored record keeps its
+                // original `after_block_num` (the re-import reuses it via `previous_note`).
+                after_block_num: BlockNumber::from(after_block_num.as_u32().max(floor_bound)),
                 tag: Some(*tag),
             });
         }
