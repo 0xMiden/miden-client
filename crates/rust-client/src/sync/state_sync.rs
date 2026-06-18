@@ -1304,9 +1304,7 @@ mod tests {
     // --------------------------------------------------------------------------------------------
 
     /// A forged `sync_transactions` commitment must not lock the account when the witness proves
-    /// the on-chain commitment still matches the local one. The helper is
-    /// type-agnostic: it ignores account details and only verifies the witness, so a committed
-    /// mock account exercises the same path used for private accounts.
+    /// the on-chain commitment still matches the local one.
     #[tokio::test]
     async fn verify_private_account_mismatch_ignores_forged_commitment() {
         let mut builder = MockChainBuilder::new();
@@ -1327,8 +1325,8 @@ mod tests {
         );
     }
 
-    /// When the witness proves a commitment that genuinely differs from the local one, the account
-    /// is reported as mismatched with the proven (not the record's) commitment.
+    /// When the witness proves a commitment that differs from the local one, the account is
+    /// reported as mismatched with the proven commitment.
     #[tokio::test]
     async fn verify_private_account_mismatch_reports_proven_divergence() {
         let mut builder = MockChainBuilder::new();
@@ -1337,8 +1335,6 @@ mod tests {
         let chain_tip_header = rpc_api.mock_chain.read().latest_block_header();
         let on_chain_commitment = account.to_commitment();
         let state_sync = StateSync::new(Arc::new(rpc_api), Arc::new(MockScreener), None);
-
-        // Local state lags behind the proven on-chain commitment.
         let stale_local_commitment = word(0xdead_beef);
 
         let result = state_sync
