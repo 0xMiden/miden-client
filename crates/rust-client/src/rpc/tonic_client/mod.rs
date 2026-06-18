@@ -405,6 +405,15 @@ impl NodeRpcClient for GrpcClient {
             .ok_or(RpcError::ExpectedDataMissing("BlockHeader".into()))?
             .try_into()?;
 
+        if let Some(requested) = block_num
+            && block_header.block_num() != requested
+        {
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned header for block {} for requested block {requested}",
+                block_header.block_num(),
+            )));
+        }
+
         let mmr_proof = if include_mmr_proof {
             let forest = response
                 .chain_length
@@ -714,6 +723,13 @@ impl NodeRpcClient for GrpcClient {
             ProvenBlock::read_from_bytes(&response.block.ok_or(RpcError::ExpectedDataMissing(
                 "GetBlockByNumberResponse.block".to_string(),
             ))?)?;
+
+        if block.header().block_num() != block_num {
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned block {} for requested block {block_num}",
+                block.header().block_num(),
+            )));
+        }
 
         Ok(block)
     }

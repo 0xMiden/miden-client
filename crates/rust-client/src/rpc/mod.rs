@@ -165,6 +165,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// of the return tuple should always be Some(MmrProof).
     ///
     /// When `None` is provided, returns info regarding the latest block.
+    ///
+    /// When `block_num` is `Some`, implementations must verify that the returned header's block
+    /// number matches the requested one and return [`RpcError::InvalidResponse`] otherwise.
+    ///
+    /// Errors:
+    /// - [`RpcError::InvalidResponse`] if the node returns a header whose block number does not
+    ///   match the requested `block_num`.
     async fn get_block_header_by_number(
         &self,
         block_num: Option<BlockNumber>,
@@ -175,6 +182,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// the `/GetBlockByNumber` RPC endpoint.
     ///
     /// If `include_proof` is set to true, the block proof will be included in the response.
+    ///
+    /// Implementations must verify that the returned block's number matches the requested
+    /// `block_num` and return [`RpcError::InvalidResponse`] otherwise.
+    ///
+    /// Errors:
+    /// - [`RpcError::InvalidResponse`] if the node returns a block whose number does not match the
+    ///   requested `block_num`.
     async fn get_block_by_number(
         &self,
         block_num: BlockNumber,
