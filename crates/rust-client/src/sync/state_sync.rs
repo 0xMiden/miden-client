@@ -332,6 +332,12 @@ impl StateSync {
                 .await?
         };
 
+        Self::validate_transaction_records_range(
+            &transaction_records,
+            current_block_num,
+            chain_tip,
+        )?;
+
         Ok(Some(FetchedSyncData {
             mmr_delta: chain_mmr_info.mmr_delta,
             chain_tip_header: chain_mmr_info.block_header,
@@ -429,6 +435,24 @@ impl StateSync {
             if block_num <= current_block_num || block_num > chain_tip {
                 return Err(ClientError::ChainValidationError(format!(
                     "sync_notes returned block {block_num} outside requested range ({current_block_num}, {chain_tip}]"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Validates that every record returned by `sync_transactions` falls in the requested range
+    /// `(current_block_num, chain_tip]`.
+    fn validate_transaction_records_range(
+        records: &[RpcTransactionRecord],
+        current_block_num: BlockNumber,
+        chain_tip: BlockNumber,
+    ) -> Result<(), ClientError> {
+        for record in records {
+            let block_num = record.block_num;
+            if block_num <= current_block_num || block_num > chain_tip {
+                return Err(ClientError::ChainValidationError(format!(
+                    "sync_transactions returned block {block_num} outside requested range ({current_block_num}, {chain_tip}]"
                 )));
             }
         }
@@ -2077,6 +2101,56 @@ mod tests {
             &chain_tip_header,
             &mut genesis_partial_mmr(),
             &mut PartialBlockchainUpdates::default(),
+        );
+        assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
+    }
+
+    /// Builds a minimal RPC transaction record at `block_num`, for range-validation tests.
+    fn make_tx_record(account_id: AccountId, block_num: u32) -> RpcTransactionRecord {
+        let fee =
+            FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("valid"), 0u64)
+                .unwrap();
+        RpcTransactionRecord {
+            block_num: BlockNumber::from(block_num),
+            transaction_header: TransactionHeader::new(
+                account_id,
+                word(1),
+                word(2),
+                InputNotes::new_unchecked(vec![]),
+                vec![],
+                fee,
+            ),
+            output_notes: vec![],
+            erased_output_notes: vec![],
+        }
+    }
+
+    /// Verifies that `sync_transactions` records outside the requested range `(current, chain_tip]`
+    /// are rejected with a `ChainValidationError`.
+    #[test]
+    fn validate_transaction_records_range_rejects_out_of_range_blocks() {
+        let account_id: AccountId = ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap();
+        let current = BlockNumber::from(5u32);
+        let chain_tip = BlockNumber::from(10u32);
+
+        StateSync::validate_transaction_records_range(
+            &[make_tx_record(account_id, 7)],
+            current,
+            chain_tip,
+        )
+        .unwrap();
+
+        let result = StateSync::validate_transaction_records_range(
+            &[make_tx_record(account_id, 11)],
+            current,
+            chain_tip,
+        );
+        assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
+
+        let result = StateSync::validate_transaction_records_range(
+            &[make_tx_record(account_id, 5)],
+            current,
+            chain_tip,
         );
         assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
     }
