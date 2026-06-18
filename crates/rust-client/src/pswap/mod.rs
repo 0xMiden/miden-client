@@ -39,10 +39,10 @@ use alloc::vec::Vec;
 
 use async_trait::async_trait;
 pub use errors::PswapLineageError;
-pub use lineage::{PswapLineageFilter, PswapLineageRecord, PswapLineageState};
+use lineage::PswapLineageFilter;
+pub use lineage::{PswapLineageRecord, PswapLineageState};
 use miden_protocol::Felt;
 use miden_protocol::account::AccountId;
-use miden_protocol::block::BlockNumber;
 use miden_protocol::note::Note;
 use miden_standards::note::PswapNote;
 use miden_tx::auth::TransactionAuthenticator;
@@ -81,11 +81,7 @@ impl TransactionObserver for PswapTransactionObserver {
         "PswapTransactionObserver"
     }
 
-    async fn apply(
-        &self,
-        tx_result: &TransactionResult,
-        _submission_height: BlockNumber,
-    ) -> Result<(), ClientError> {
+    async fn apply(&self, tx_result: &TransactionResult) -> Result<(), ClientError> {
         let output_notes = tx_result.executed_transaction().output_notes();
 
         for note in notes_from_output(output_notes) {
@@ -139,6 +135,14 @@ impl<AUTH: TransactionAuthenticator + Sync + 'static> Client<AUTH> {
         creator: AccountId,
     ) -> Result<Vec<PswapLineageRecord>, ClientError> {
         store::list_lineages(&self.store, PswapLineageFilter::ByCreator(creator))
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Returns the still-open PSWAP lineages — orders that are neither fully
+    /// filled nor reclaimed (i.e. the creator's live, reclaimable orders).
+    pub async fn pswap_active_lineages(&self) -> Result<Vec<PswapLineageRecord>, ClientError> {
+        store::list_lineages(&self.store, PswapLineageFilter::Active)
             .await
             .map_err(Into::into)
     }

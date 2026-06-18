@@ -292,7 +292,7 @@ where
             crate::errors::log_observer_failure(
                 observer.name(),
                 "TransactionObserver::apply",
-                observer.apply(&tx_result, submission_height).await,
+                observer.apply(&tx_result).await,
             );
         }
 
@@ -517,7 +517,7 @@ where
 
         // Fire transaction observers. Per-observer failures are logged.
         for observer in &self.transaction_observers {
-            if let Err(err) = observer.apply(tx_result, submission_height).await {
+            if let Err(err) = observer.apply(tx_result).await {
                 tracing::warn!(
                     observer = observer.name(),
                     error = ?err,

@@ -8,7 +8,6 @@
 use alloc::boxed::Box;
 
 use async_trait::async_trait;
-use miden_protocol::block::BlockNumber;
 
 use crate::ClientError;
 use crate::transaction::TransactionResult;
@@ -23,9 +22,5 @@ pub trait TransactionObserver: Send + Sync {
 
     /// Return `Ok(())` for "not interested"; reserve `Err(_)` for genuine
     /// internal failures.
-    async fn apply(
-        &self,
-        tx_result: &TransactionResult,
-        submission_height: BlockNumber,
-    ) -> Result<(), ClientError>;
+    async fn apply(&self, tx_result: &TransactionResult) -> Result<(), ClientError>;
 }

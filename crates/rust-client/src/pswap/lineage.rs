@@ -373,7 +373,7 @@ fn saturating_sub(total: AssetAmount, used: AssetAmount) -> AssetAmount {
 /// Client-side filter for `crate::pswap::store::list_lineages`. Applied in
 /// Rust after a prefix-scan of the `settings` KV — not a store-trait concept.
 #[derive(Debug, Clone)]
-pub enum PswapLineageFilter {
+pub(crate) enum PswapLineageFilter {
     All,
     Active,
     ByCreator(AccountId),
@@ -386,7 +386,7 @@ pub enum PswapLineageFilter {
 /// in a store backend) so alternative backends can reuse it. The only validation
 /// is decoding the `state_byte` into a known [`PswapLineageState`].
 #[allow(clippy::too_many_arguments)]
-pub fn build_record_from_fields(
+pub(crate) fn build_record_from_fields(
     original_note_id: NoteId,
     order_id: Felt,
     creator_account_id: AccountId,
