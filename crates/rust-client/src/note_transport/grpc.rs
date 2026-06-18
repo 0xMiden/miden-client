@@ -132,25 +132,34 @@ impl GrpcNoteTransportClient {
         header: NoteHeader,
         details: Vec<u8>,
     ) -> Result<(), NoteTransportError> {
-        self.send_note_after(header, details, None).await
+        self.send_note_inner(header, details, None).await
     }
 
-    /// Pushes a note to the note transport network, relaying an optional commitment block floor.
+    /// Pushes a note to the note transport network, relaying a block hint for the recipient.
     ///
-    /// `after_block_num` is forwarded verbatim to the server (as the `TransportNote`'s optional
-    /// `after_block_num`) for the recipient's commitment scan. `None` leaves it unset, in which
-    /// case the recipient falls back to its own lookback heuristic.
-    pub async fn send_note_after(
+    /// `block_hint` is forwarded to the server (as the `TransportNote`'s `after_block_num`) as the
+    /// block from which the recipient should start scanning for the note's commitment.
+    pub async fn send_note_with_block_hint(
         &self,
         header: NoteHeader,
         details: Vec<u8>,
-        after_block_num: Option<BlockNumber>,
+        block_hint: BlockNumber,
+    ) -> Result<(), NoteTransportError> {
+        self.send_note_inner(header, details, Some(block_hint.as_u32())).await
+    }
+
+    /// Sends a note, passing the optional block hint straight through to the wire `TransportNote`.
+    async fn send_note_inner(
+        &self,
+        header: NoteHeader,
+        details: Vec<u8>,
+        after_block_num: Option<u32>,
     ) -> Result<(), NoteTransportError> {
         let request = SendNoteRequest {
             note: Some(TransportNote {
                 header: header.to_bytes(),
                 details,
-                after_block_num: after_block_num.map(|block_num| block_num.as_u32()),
+                after_block_num,
             }),
         };
 
@@ -192,7 +201,7 @@ impl GrpcNoteTransportClient {
             notes.push(NoteInfo {
                 header,
                 details_bytes: pnote.details,
-                after_block_num: pnote.after_block_num.map(BlockNumber::from),
+                block_hint: pnote.after_block_num.map(BlockNumber::from),
             });
         }
 
@@ -261,13 +270,13 @@ impl super::NoteTransportClient for GrpcNoteTransportClient {
         self.send_note(header, details).await
     }
 
-    async fn send_note_after(
+    async fn send_note_with_block_hint(
         &self,
         header: NoteHeader,
         details: Vec<u8>,
-        after_block_num: Option<BlockNumber>,
+        block_hint: BlockNumber,
     ) -> Result<(), NoteTransportError> {
-        self.send_note_after(header, details, after_block_num).await
+        self.send_note_with_block_hint(header, details, block_hint).await
     }
 
     async fn fetch_notes(
@@ -314,7 +323,7 @@ impl Stream for NoteStreamAdapter {
                     notes.push(NoteInfo {
                         header,
                         details_bytes: pnote.details,
-                        after_block_num: pnote.after_block_num.map(BlockNumber::from),
+                        block_hint: pnote.after_block_num.map(BlockNumber::from),
                     });
                 }
                 Poll::Ready(Some(Ok(notes)))
