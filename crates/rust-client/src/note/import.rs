@@ -51,7 +51,7 @@ where
     /// indefinitely. Re-importing reuses [`Client::import_notes`], so a note that is found
     /// transitions to `Committed` and one that is not is left untouched.
     ///
-    /// The rescan floor is bounded to [`RESCAN_LOOKBACK_BLOCKS`] behind the sync height: a note
+    /// The rescan floor is bounded to `RESCAN_LOOKBACK_BLOCKS` behind the sync height: a note
     /// that never commits (e.g. its creating transaction was dropped) would otherwise keep its
     /// original floor forever and grow the scanned range without limit as the chain advances. The
     /// import scan already covered each note's full floor→import-height window once; a transient
