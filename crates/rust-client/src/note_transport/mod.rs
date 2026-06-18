@@ -303,32 +303,40 @@ where
         cursor: NoteTransportCursor,
         tags: &[NoteTag],
     ) -> Result<(Vec<NoteId>, NoteTransportCursor), ClientError> {
-        // Number of blocks to look back from sync height when scanning for committed notes.
-        // Handles the race where a note is committed on-chain just before the NTL delivers
-        // its data — without this, check_expected_notes would scan from sync_height forward
-        // and miss the already-committed note.
+        // Number of blocks to look back from the sync height when scanning for committed notes.
         const NOTE_LOOKBACK_BLOCKS: u32 = 20;
 
-        let mut notes = Vec::new();
         let (note_infos, rcursor) =
             self.get_note_transport_api()?.fetch_notes(tags, cursor).await?;
+
+        let sync_height = self.get_sync_height().await?;
+        // Always scan back at least NOTE_LOOKBACK_BLOCKS from the sync height. This handles the
+        // race where a note is committed on-chain just before the NTL delivers its data —
+        // without it, the import scan would start at the sync height and miss the already-
+        // committed note. A sender-provided `after_block_num` can only lower this floor further
+        // (a note committed longer ago than the window), so the scanned range is always a
+        // superset of the lookback window: the hint extends coverage but never shrinks it.
+        let lookback_floor = sync_height.as_u32().saturating_sub(NOTE_LOOKBACK_BLOCKS);
+
+        let mut notes_with_floor = Vec::with_capacity(note_infos.len());
         for note_info in &note_infos {
             // e2ee impl hint:
             // for key in self.store.decryption_keys() try
             // key.decrypt(details_bytes_encrypted)
             let note = rejoin_note(&note_info.header, &note_info.details_bytes)?;
-            notes.push(note);
+            let after_block_num = note_info
+                .after_block_num
+                .map_or(lookback_floor, |hint| hint.as_u32().min(lookback_floor));
+            notes_with_floor.push((note, BlockNumber::from(after_block_num)));
         }
 
-        let sync_height = self.get_sync_height().await?;
-        let after_block_num =
-            BlockNumber::from(sync_height.as_u32().saturating_sub(NOTE_LOOKBACK_BLOCKS));
+        let id_by_commitment: BTreeMap<NoteDetailsCommitment, NoteId> = notes_with_floor
+            .iter()
+            .map(|(note, _)| (note.details_commitment(), note.id()))
+            .collect();
 
-        let id_by_commitment: BTreeMap<NoteDetailsCommitment, NoteId> =
-            notes.iter().map(|note| (note.details_commitment(), note.id())).collect();
-
-        let mut note_requests = Vec::with_capacity(notes.len());
-        for note in notes {
+        let mut note_requests = Vec::with_capacity(notes_with_floor.len());
+        for (note, after_block_num) in notes_with_floor {
             let tag = note.metadata().tag();
             let note_file = NoteFile::NoteDetails {
                 details: note.into(),

@@ -6,7 +6,7 @@ use miden_client::account::{Account, AccountType};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteAttachments, NoteDetails, NoteTag, NoteType};
+use miden_client::note::{Note, NoteAttachments, NoteDetails, NoteTag, NoteType};
 use miden_client::note_transport::NoteTransportClient;
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::create_test_store_path;
@@ -19,13 +19,14 @@ use miden_client::testing::note_transport::{
 use miden_client::utils::RwLock;
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_protocol::Felt;
+use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::rand::RandomCoin;
 use miden_protocol::note::NoteType as ProtocolNoteType;
 use miden_protocol::transaction::RawOutputNote;
 use miden_protocol::utils::serde::Serializable;
 use miden_standards::note::P2idNote;
 use miden_standards::testing::note::NoteBuilder;
-use miden_testing::{MockChainBuilder, TxContextInput};
+use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
 use rand::Rng;
 
 use crate::tests::{create_test_client_builder, insert_new_wallet};
@@ -335,6 +336,142 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     assert!(
         committed_notes.iter().any(|n| n.id() == Some(private_note.id())),
         "note committed before sync_height should be found via lookback during NTL import"
+    );
+}
+
+/// Builds a mock chain that commits a private note (tag 0) near genesis, then proves
+/// `extra_blocks` further blocks so the note's commitment sits that far behind the chain tip.
+/// Returns the built chain and the committed note.
+async fn commit_private_note_then_advance(extra_blocks: usize) -> (MockChain, Note) {
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let mock_account = mock_chain_builder
+        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .unwrap();
+
+    let private_note = NoteBuilder::new(
+        mock_account.id(),
+        RandomCoin::new([1, 2, 3, 4].map(Felt::new_unchecked).into()),
+    )
+    .note_type(ProtocolNoteType::Private)
+    .tag(NoteTag::new(0).into())
+    .build()
+    .unwrap();
+
+    let spawn_note =
+        mock_chain_builder.add_spawn_note(std::slice::from_ref(&private_note)).unwrap();
+    let mut mock_chain = mock_chain_builder.build().unwrap();
+
+    // Commit the private note.
+    let tx = Box::pin(
+        mock_chain
+            .build_tx_context(TxContextInput::AccountId(mock_account.id()), &[], &[spawn_note])
+            .unwrap()
+            .extend_expected_output_notes(vec![RawOutputNote::Full(private_note.clone())])
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    mock_chain.add_pending_executed_transaction(&tx).unwrap();
+    mock_chain.prove_next_block().unwrap();
+
+    for _ in 0..extra_blocks {
+        mock_chain.prove_next_block().unwrap();
+    }
+
+    (mock_chain, private_note)
+}
+
+/// Builds a client over `mock_chain` + `mock_transport_node`, syncs it to the chain tip, and
+/// registers tag 0 so chain sync sees the note's block. The NTL is not drained here.
+async fn build_synced_ntl_client(
+    mock_chain: MockChain,
+    mock_transport_node: Arc<RwLock<MockNoteTransportNode>>,
+) -> MockClient<FilesystemKeyStore> {
+    let transport_client = MockNoteTransportApi::new(mock_transport_node);
+
+    let mut rng = rand::rng();
+    let coin_seed: [u64; 4] = rng.random();
+    let rng = RandomCoin::new(coin_seed.map(|v| Felt::new_unchecked(v >> 1)).into());
+
+    let keystore = FilesystemKeyStore::new(temp_dir()).unwrap();
+
+    let builder: ClientBuilder<FilesystemKeyStore> = ClientBuilder::new()
+        .rpc(Arc::new(MockRpcApi::new(mock_chain)))
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_discard_delta(None)
+        .note_transport(Arc::new(transport_client));
+
+    let mut client = builder.build().await.unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+    client.add_note_tag(NoteTag::new(0)).await.unwrap();
+    client.sync_state().await.unwrap();
+    client
+}
+
+/// A note whose commitment sits more than the lookback window (20 blocks) behind the
+/// recipient's sync height is missed by the lookback alone. The sender-provided
+/// `after_block_num` hint lowers the scan floor to (at or below) the commitment block so the
+/// note still commits on import.
+#[tokio::test]
+async fn after_block_num_hint_commits_note_beyond_lookback() {
+    let (mock_chain, private_note) = commit_private_note_then_advance(30).await;
+    let mock_transport_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
+    let mut client = build_synced_ntl_client(mock_chain, mock_transport_node.clone()).await;
+
+    let sync_height = client.get_sync_height().await.unwrap();
+    assert!(
+        sync_height.as_u32() > 21,
+        "note must sit more than the lookback window behind the tip"
+    );
+
+    // Deliver the note with a hint at genesis — a valid lower bound on its commitment block.
+    let details_bytes = NoteDetails::from(private_note.clone()).to_bytes();
+    mock_transport_node.write().add_note(
+        *private_note.header(),
+        details_bytes,
+        Some(BlockNumber::from(0)),
+    );
+
+    client.sync_state().await.unwrap();
+
+    let note_details_commitment = NoteDetails::from(private_note.clone()).commitment();
+    let committed = client.get_input_notes(NoteFilter::Committed).await.unwrap();
+    assert!(
+        committed.iter().any(|n| n.details_commitment() == note_details_commitment),
+        "the after_block_num hint should lower the scan floor so a note beyond the lookback \
+         window still commits on import"
+    );
+}
+
+/// Control for [`after_block_num_hint_commits_note_beyond_lookback`]: without the hint the same
+/// note stays `Expected`, proving the hint — not the lookback — is what commits it.
+#[tokio::test]
+async fn without_hint_note_beyond_lookback_stays_expected() {
+    let (mock_chain, private_note) = commit_private_note_then_advance(30).await;
+    let mock_transport_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
+    let mut client = build_synced_ntl_client(mock_chain, mock_transport_node.clone()).await;
+
+    let details_bytes = NoteDetails::from(private_note.clone()).to_bytes();
+    mock_transport_node.write().add_note(*private_note.header(), details_bytes, None);
+
+    client.sync_state().await.unwrap();
+
+    // Expected notes carry no metadata and thus no NoteId, so match by details commitment.
+    let note_details_commitment = NoteDetails::from(private_note.clone()).commitment();
+    let committed = client.get_input_notes(NoteFilter::Committed).await.unwrap();
+    assert!(
+        !committed.iter().any(|n| n.details_commitment() == note_details_commitment),
+        "without a hint, a note beyond the lookback window must not commit on import"
+    );
+    let expected = client.get_input_notes(NoteFilter::Expected).await.unwrap();
+    assert!(
+        expected.iter().any(|n| n.details_commitment() == note_details_commitment),
+        "the note should remain Expected (imported but not yet observed on-chain)"
     );
 }
 
