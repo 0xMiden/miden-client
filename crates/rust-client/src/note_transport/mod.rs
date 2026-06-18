@@ -77,7 +77,33 @@ impl<AUTH> Client<AUTH> {
     pub async fn send_private_note(
         &mut self,
         note: Note,
+        address: &Address,
+    ) -> Result<(), ClientError> {
+        self.relay_private_note(note, address, None).await
+    }
+
+    /// Send a note through the note transport network, telling the recipient a block floor for
+    /// its on-chain commitment scan.
+    ///
+    /// The same durability guarantees as [`Client::send_private_note`] apply: the floor is
+    /// persisted with the relay payload, so a retried send preserves it.
+    pub async fn send_private_note_after(
+        &mut self,
+        note: Note,
+        address: &Address,
+        after_block_num: BlockNumber,
+    ) -> Result<(), ClientError> {
+        self.relay_private_note(note, address, Some(after_block_num)).await
+    }
+
+    /// Shared relay path for [`Client::send_private_note`] and
+    /// [`Client::send_private_note_after`]. `after_block_num` is the optional commitment block
+    /// floor relayed to the recipient.
+    async fn relay_private_note(
+        &self,
+        note: Note,
         _address: &Address,
+        after_block_num: Option<BlockNumber>,
     ) -> Result<(), ClientError> {
         let api = self.get_note_transport_api()?;
 
@@ -90,10 +116,12 @@ impl<AUTH> Client<AUTH> {
 
         // Persist the payload before the network call so a failed or
         // interrupted `send_note` leaves a recoverable record rather than
-        // losing the only copy with the call frame.
+        // losing the only copy with the call frame. The floor travels with the
+        // entry so a retried send relays the same value.
         let entry = NoteInfo {
             header,
             details_bytes: details_bytes.clone(),
+            after_block_num,
         };
         let mut outbox = self.load_relay_outbox().await?;
         // Replace any existing entry for this note id so the latest payload
@@ -102,7 +130,7 @@ impl<AUTH> Client<AUTH> {
         outbox.push(entry);
         self.save_relay_outbox(outbox).await?;
 
-        api.send_note(header, details_bytes).await?;
+        api.send_note_after(header, details_bytes, after_block_num).await?;
 
         // Relay succeeded — drop the entry. A failed store write here is
         // tolerable: the next flush re-sends and the receiver dedupes by note
@@ -138,7 +166,10 @@ impl<AUTH> Client<AUTH> {
         let mut last_err: Option<NoteTransportError> = None;
 
         for entry in entries {
-            match api.send_note(entry.header, entry.details_bytes.clone()).await {
+            match api
+                .send_note_after(entry.header, entry.details_bytes.clone(), entry.after_block_num)
+                .await
+            {
                 Ok(()) => {},
                 Err(err) => {
                     tracing::warn!(?err, "relay-outbox entry retry failed; will retry next sync");
@@ -287,10 +318,11 @@ where
         cursor: NoteTransportCursor,
         tags: &[NoteTag],
     ) -> Result<(Vec<NoteId>, NoteTransportCursor), ClientError> {
-        // Number of blocks to look back from sync height when scanning for committed notes.
-        // Handles the race where a note is committed on-chain just before the NTL delivers
-        // its data — without this, check_expected_notes would scan from sync_height forward
-        // and miss the already-committed note.
+        // Fallback lookback window, in blocks, used only for notes the transport delivered
+        // without a sender-provided `after_block_num`. Scanning back from sync height handles
+        // the race where a note is committed on-chain just before the NTL delivers its data —
+        // without it, check_expected_notes would scan from sync_height forward and miss the
+        // already-committed note. A sender-provided floor is deterministic and always preferred.
         const NOTE_LOOKBACK_BLOCKS: u32 = 20;
 
         let mut notes = Vec::new();
@@ -301,19 +333,21 @@ where
             // for key in self.store.decryption_keys() try
             // key.decrypt(details_bytes_encrypted)
             let note = rejoin_note(&note_info.header, &note_info.details_bytes)?;
-            notes.push(note);
+            notes.push((note, note_info.after_block_num));
         }
 
         let sync_height = self.get_sync_height().await?;
-        let after_block_num =
+        let fallback_after_block_num =
             BlockNumber::from(sync_height.as_u32().saturating_sub(NOTE_LOOKBACK_BLOCKS));
 
         let id_by_commitment: BTreeMap<NoteDetailsCommitment, NoteId> =
-            notes.iter().map(|note| (note.details_commitment(), note.id())).collect();
+            notes.iter().map(|(note, _)| (note.details_commitment(), note.id())).collect();
 
         let mut note_requests = Vec::with_capacity(notes.len());
-        for note in notes {
+        for (note, after_block_num) in notes {
             let tag = note.metadata().tag();
+            // Prefer the sender-provided floor; fall back to the lookback window when absent.
+            let after_block_num = after_block_num.unwrap_or(fallback_after_block_num);
             let note_file = NoteFile::NoteDetails {
                 details: note.into(),
                 after_block_num,
@@ -377,6 +411,22 @@ pub trait NoteTransportClient: Send + Sync {
         details: Vec<u8>,
     ) -> Result<(), NoteTransportError>;
 
+    /// Send a note, relaying an optional commitment block floor to the recipient.
+    ///
+    /// `after_block_num` is a lower bound on the block at which the note's on-chain commitment
+    /// lands. The default implementation ignores it and delegates to
+    /// [`NoteTransportClient::send_note`], so existing implementors keep compiling. Transports
+    /// that can carry the floor (e.g. the gRPC client) override this.
+    async fn send_note_after(
+        &self,
+        header: NoteHeader,
+        details: Vec<u8>,
+        after_block_num: Option<BlockNumber>,
+    ) -> Result<(), NoteTransportError> {
+        let _ = after_block_num;
+        self.send_note(header, details).await
+    }
+
     /// Fetch notes for given tags
     ///
     /// Downloads notes for given tags.
@@ -408,6 +458,23 @@ pub struct NoteInfo {
     pub header: NoteHeader,
     /// Note details, can be encrypted
     pub details_bytes: Vec<u8>,
+    /// Sender-provided lower bound on the block at which the note's on-chain commitment lands.
+    /// When present, the recipient scans for the commitment from this block instead of applying
+    /// its default lookback window. `None` when the sender did not provide a floor.
+    pub after_block_num: Option<BlockNumber>,
+}
+
+impl NoteInfo {
+    /// Build a [`NoteInfo`] without a commitment block floor (`after_block_num` is `None`).
+    ///
+    /// Use the [`NoteInfo::after_block_num`] field directly to attach a floor.
+    pub fn new(header: NoteHeader, details_bytes: Vec<u8>) -> Self {
+        Self {
+            header,
+            details_bytes,
+            after_block_num: None,
+        }
+    }
 }
 
 // SERIALIZATION
@@ -417,6 +484,7 @@ impl Serializable for NoteInfo {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         self.header.write_into(target);
         self.details_bytes.write_into(target);
+        self.after_block_num.write_into(target);
     }
 }
 
@@ -424,7 +492,8 @@ impl Deserializable for NoteInfo {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let header = NoteHeader::read_from(source)?;
         let details_bytes = Vec::<u8>::read_from(source)?;
-        Ok(NoteInfo { header, details_bytes })
+        let after_block_num = Option::<BlockNumber>::read_from(source)?;
+        Ok(NoteInfo { header, details_bytes, after_block_num })
     }
 }
 
