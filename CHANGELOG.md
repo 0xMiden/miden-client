@@ -4,6 +4,7 @@
 
 ### Features
 
+* [FEATURE][rust] Added PSWAP chain tracking: the client now follows a local creator's partial-swap order across foreign partial fills during sync, surfacing each reconstructed payback as a consumable input note and letting the creator reclaim the current tip. New `Client` API: `pswap_lineages`, `pswap_lineages_for`, `pswap_active_lineages`, `pswap_lineage`, and `build_pswap_cancel_by_order` ([#2231](https://github.com/0xMiden/miden-client/pull/2231)).
 * [FEATURE][rust] Added `Client::send_private_note_with_block_hint`, which relays a sender-provided `after_block_num` so recipients get deterministic delivery instead of relying on receiving side lookback. ([#2262](https://github.com/0xMiden/miden-client/issues/2262))
 
 ### Changes
@@ -88,7 +89,6 @@
 * [FEATURE][web] Added `wordToBigInt()` utility export for losslessly converting a `Word`'s first felt to a `BigInt`. `StorageResult.toString()` is BigInt-backed, and `valueOf()` returns a JS number for values fitting in `Number.MAX_SAFE_INTEGER` and throws `RangeError` for larger u64 values — use `.toBigInt()` for exact access ([#1955](https://github.com/0xMiden/miden-client/pull/1955)).
 * [FEATURE][rust,cli] Added partial swap (PSWAP) support: `TransactionRequestBuilder::build_pswap_create` / `build_pswap_consume` / `build_pswap_cancel` and a `miden-client pswap` CLI command (`create`, `consume`, `cancel`) for partially-fillable fungible swaps ([#2162](https://github.com/0xMiden/miden-client/pull/2162)).
 * Added verification of MMR responses during state sync: validated the returned block range matches the requested range and checked that post-delta MMR peaks match the block header's chain commitment ([#1887](https://github.com/0xMiden/miden-client/pull/1887)).
-* [FEATURE][rust] Added PSWAP chain tracking: the client now follows a local creator's partial-swap order across foreign partial fills during sync, surfacing each reconstructed payback as a consumable input note and letting the creator reclaim the current tip. New `Client` API: `pswap_lineages`, `pswap_lineages_for`, `pswap_active_lineages`, `pswap_lineage`, and `build_pswap_cancel_by_order` ([#2231](https://github.com/0xMiden/miden-client/pull/2231)).
 
 ## 0.14.9 (2026-05-19)
 
