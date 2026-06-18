@@ -57,6 +57,12 @@ where
     /// import scan already covered each note's full floor→import-height window once; a transient
     /// incomplete-response miss commits near the import height, so a bounded recent window
     /// recovers it. Issues no RPC when there are no `Expected` notes, the steady-state case.
+    ///
+    /// This recovers only near-import-height misses; it is not a general safety net. A note
+    /// committed below its stored floor — e.g. delivered with no `after_block_num` hint and
+    /// committed more than the lookback window before import — is unreachable from that floor and
+    /// is not recovered here. The sender-provided hint, applied at import, is the fix for that
+    /// case.
     pub(crate) async fn rescan_expected_notes(&mut self) -> Result<(), ClientError> {
         /// Cap on how far behind the sync height the rescan scans, bounding the per-sync cost.
         const RESCAN_LOOKBACK_BLOCKS: u32 = 256;

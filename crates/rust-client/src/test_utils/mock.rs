@@ -60,9 +60,10 @@ pub struct MockRpcApi {
     /// `get_notes_by_id` to return private-note attachments register them here.
     private_note_attachments: Arc<RwLock<BTreeMap<NoteId, NoteAttachments>>>,
     /// Number of upcoming `sync_notes` calls to answer with an empty (but successful) response,
-    /// simulating a node that returns an incomplete scan result. Only `sync_notes` is affected
-    /// (used by `check_expected_notes`); `sync_notes_with_details` used by forward chain sync is
-    /// left intact.
+    /// simulating a node that returns an incomplete scan result. The drop applies to the next `n`
+    /// `sync_notes` calls in execution order, regardless of caller — forward chain sync's
+    /// `sync_notes_with_details` also routes through `sync_notes`. A test must order its scenario
+    /// so the intended call (e.g. the import scan in `check_expected_notes`) is the first to run.
     sync_notes_drops: Arc<RwLock<usize>>,
 }
 
@@ -90,6 +91,8 @@ impl MockRpcApi {
 
     /// Makes the next `n` `sync_notes` calls return an empty (successful) response, simulating a
     /// node that returns an incomplete scan result. Used to exercise the expected-note rescan.
+    /// The count applies to `sync_notes` calls in execution order from any caller (including
+    /// forward chain sync via `sync_notes_with_details`); see the field docs.
     pub fn drop_next_sync_notes(&self, n: usize) {
         *self.sync_notes_drops.write() = n;
     }

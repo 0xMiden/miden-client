@@ -8,7 +8,11 @@ use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{Note, NoteAttachments, NoteDetails, NoteTag, NoteType};
-use miden_client::note_transport::{NoteTransportClient, NoteTransportCursor};
+use miden_client::note_transport::{
+    NOTE_TRANSPORT_OUTBOX_KEY,
+    NoteTransportClient,
+    NoteTransportCursor,
+};
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::create_test_store_path;
 use miden_client::testing::mock::{MockClient, MockRpcApi};
@@ -25,6 +29,7 @@ use miden_protocol::asset::FungibleAsset;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::rand::RandomCoin;
 use miden_protocol::note::NoteType as ProtocolNoteType;
+use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE;
 use miden_protocol::transaction::RawOutputNote;
 use miden_protocol::utils::serde::Serializable;
 use miden_standards::note::P2idNote;
@@ -499,7 +504,9 @@ async fn expected_note_rescan_recovers_from_incomplete_import_scan() {
     let rpc_api = Arc::new(MockRpcApi::new(mock_chain));
     let mut client = build_synced_ntl_client(rpc_api.clone(), mock_transport_node.clone()).await;
 
-    // The import-time scan (check_expected_notes -> sync_notes) returns an incomplete response.
+    // Drop the next sync_notes call. On the first sync, rescan_expected_notes finds no Expected
+    // notes yet and early-returns without scanning, so the import scan (check_expected_notes ->
+    // sync_notes) is the first sync_notes call and gets the incomplete (empty) response.
     rpc_api.drop_next_sync_notes(1);
 
     let details_bytes = NoteDetails::from(private_note.clone()).to_bytes();
@@ -575,6 +582,44 @@ async fn send_private_note_relays_output_note_expected_height() {
         entry.after_block_num,
         Some(expected_height),
         "sender should relay the output note's expected_height as the after_block_num hint"
+    );
+}
+
+/// A relay-outbox blob written by a pre-`after_block_num` client (header + details only) is read
+/// via the legacy decoder and re-sent on the next flush, rather than dropped as unreadable — so a
+/// pending relay survives a client upgrade. Drives the `load_relay_outbox` migration path end to
+/// end (the unit test only covers the decoders in isolation).
+#[tokio::test]
+async fn legacy_relay_outbox_blob_survives_upgrade() {
+    let mock_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
+    let (mut client, _keystore) = create_test_client_transport(mock_node.clone()).await;
+
+    // Persist an outbox entry in the pre-`after_block_num` layout: header + details with the same
+    // Vec framing, which a (NoteHeader, Vec<u8>) tuple reproduces byte for byte.
+    let account_id = ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE.try_into().unwrap();
+    let note =
+        NoteBuilder::new(account_id, RandomCoin::new([9, 9, 9, 9].map(Felt::new_unchecked).into()))
+            .note_type(ProtocolNoteType::Private)
+            .build()
+            .unwrap();
+    let header = *note.header();
+    let details_bytes = NoteDetails::from(note).to_bytes();
+    let legacy_bytes = vec![(header, details_bytes)].to_bytes();
+    client
+        .test_store()
+        .set_setting(NOTE_TRANSPORT_OUTBOX_KEY.to_string(), legacy_bytes)
+        .await
+        .unwrap();
+
+    // Flushing must read the legacy entry and re-send it to the NTL, not drop it.
+    client.flush_relay_outbox().await.unwrap();
+
+    let (relayed, _) = mock_node
+        .read()
+        .get_notes(&[header.metadata().tag()], NoteTransportCursor::init());
+    assert!(
+        relayed.iter().any(|info| info.header.id() == header.id()),
+        "a legacy outbox entry must be loaded and re-sent, not dropped as unreadable"
     );
 }
 
