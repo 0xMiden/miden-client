@@ -32,6 +32,7 @@ use miden_tx::utils::serde::{
 };
 
 pub use self::errors::NoteTransportError;
+use crate::store::NoteFilter;
 use crate::{Client, ClientError};
 
 pub const NOTE_TRANSPORT_TESTNET_ENDPOINT: &str = "https://transport.miden.io";
@@ -88,12 +89,26 @@ impl<AUTH> Client<AUTH> {
         // e2ee impl hint:
         // address.key().encrypt(details_bytes)
 
+        // The note's creating transaction cannot commit before the block at which it was
+        // submitted, so the output note's `expected_height` (the submission height) is a safe
+        // lower bound on the note's on-chain commitment block: relaying it lets the recipient
+        // scan from exactly there rather than guess with a lookback window. `None` when the note
+        // isn't tracked as an output note here, in which case the recipient falls back to its own
+        // lookback heuristic.
+        let after_block_num = self
+            .store
+            .get_output_notes(NoteFilter::List(Vec::from([note_id])))
+            .await?
+            .first()
+            .map(|record| record.expected_height());
+
         // Persist the payload before the network call so a failed or
         // interrupted `send_note` leaves a recoverable record rather than
         // losing the only copy with the call frame.
         let entry = NoteInfo {
             header,
             details_bytes: details_bytes.clone(),
+            after_block_num,
         };
         let mut outbox = self.load_relay_outbox().await?;
         // Replace any existing entry for this note id so the latest payload
@@ -102,7 +117,7 @@ impl<AUTH> Client<AUTH> {
         outbox.push(entry);
         self.save_relay_outbox(outbox).await?;
 
-        api.send_note(header, details_bytes).await?;
+        api.send_note(header, details_bytes, after_block_num).await?;
 
         // Relay succeeded — drop the entry. A failed store write here is
         // tolerable: the next flush re-sends and the receiver dedupes by note
@@ -138,7 +153,8 @@ impl<AUTH> Client<AUTH> {
         let mut last_err: Option<NoteTransportError> = None;
 
         for entry in entries {
-            match api.send_note(entry.header, entry.details_bytes.clone()).await {
+            match api.send_note(entry.header, entry.details_bytes.clone(), entry.after_block_num).await
+            {
                 Ok(()) => {},
                 Err(err) => {
                     tracing::warn!(?err, "relay-outbox entry retry failed; will retry next sync");
@@ -371,10 +387,14 @@ impl From<u64> for NoteTransportCursor {
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 pub trait NoteTransportClient: Send + Sync {
     /// Send a note with optionally encrypted details
+    ///
+    /// `after_block_num` is a sender-provided lower bound on the block at which the note's
+    /// on-chain commitment landed; it is relayed verbatim so the recipient can scan from it.
     async fn send_note(
         &self,
         header: NoteHeader,
         details: Vec<u8>,
+        after_block_num: Option<BlockNumber>,
     ) -> Result<(), NoteTransportError>;
 
     /// Fetch notes for given tags
@@ -408,6 +428,11 @@ pub struct NoteInfo {
     pub header: NoteHeader,
     /// Note details, can be encrypted
     pub details_bytes: Vec<u8>,
+    /// Sender-provided lower bound on the block at which the note's on-chain commitment landed
+    /// (the NTL `after_block_num` wire field). The receiver scans from this block forward when
+    /// committing the note. `None` when the sender did not set it, in which case the receiver
+    /// falls back to its own lookback heuristic.
+    pub after_block_num: Option<BlockNumber>,
 }
 
 // SERIALIZATION
@@ -417,6 +442,7 @@ impl Serializable for NoteInfo {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
         self.header.write_into(target);
         self.details_bytes.write_into(target);
+        self.after_block_num.write_into(target);
     }
 }
 
@@ -424,7 +450,8 @@ impl Deserializable for NoteInfo {
     fn read_from<R: ByteReader>(source: &mut R) -> Result<Self, DeserializationError> {
         let header = NoteHeader::read_from(source)?;
         let details_bytes = Vec::<u8>::read_from(source)?;
-        Ok(NoteInfo { header, details_bytes })
+        let after_block_num = Option::<BlockNumber>::read_from(source)?;
+        Ok(NoteInfo { header, details_bytes, after_block_num })
     }
 }
 

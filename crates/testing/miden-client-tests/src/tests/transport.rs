@@ -318,7 +318,8 @@ async fn fetch_private_notes_finds_note_committed_at_sync_height() {
     // 5. Now the NTL delivers the note (simulates late delivery after the first sync).
     let details = NoteDetails::from(private_note.clone());
     let details_bytes = details.to_bytes();
-    mock_transport_node.write().add_note(*private_note.header(), details_bytes);
+    // No after_block_num hint, so the receiver must fall back to its lookback window.
+    mock_transport_node.write().add_note(*private_note.header(), details_bytes, None);
 
     // 6. Second sync_state: fetch_transport_notes imports the note, then chain sync runs.
     // Without the fix, after_block_num = sync_height, scan misses the note at block 1.

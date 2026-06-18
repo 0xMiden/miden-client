@@ -10,6 +10,7 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 
 use futures::Stream;
+use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{NoteHeader, NoteTag};
 use miden_protocol::utils::serde::{Deserializable, Serializable};
 use miden_tx::utils::sync::RwLock;
@@ -130,9 +131,14 @@ impl GrpcNoteTransportClient {
         &self,
         header: NoteHeader,
         details: Vec<u8>,
+        after_block_num: Option<BlockNumber>,
     ) -> Result<(), NoteTransportError> {
         let request = SendNoteRequest {
-            note: Some(TransportNote { header: header.to_bytes(), details }),
+            note: Some(TransportNote {
+                header: header.to_bytes(),
+                details,
+                after_block_num: after_block_num.map(|block| block.as_u32()),
+            }),
         };
 
         self.api()
@@ -170,7 +176,11 @@ impl GrpcNoteTransportClient {
         for pnote in response.notes {
             let header = NoteHeader::read_from_bytes(&pnote.header)?;
 
-            notes.push(NoteInfo { header, details_bytes: pnote.details });
+            notes.push(NoteInfo {
+                header,
+                details_bytes: pnote.details,
+                after_block_num: pnote.after_block_num.map(BlockNumber::from),
+            });
         }
 
         Ok((notes, response.cursor.into()))
@@ -234,8 +244,9 @@ impl super::NoteTransportClient for GrpcNoteTransportClient {
         &self,
         header: NoteHeader,
         details: Vec<u8>,
+        after_block_num: Option<BlockNumber>,
     ) -> Result<(), NoteTransportError> {
-        self.send_note(header, details).await
+        self.send_note(header, details, after_block_num).await
     }
 
     async fn fetch_notes(
@@ -279,7 +290,11 @@ impl Stream for NoteStreamAdapter {
                 for pnote in update.notes {
                     let header = NoteHeader::read_from_bytes(&pnote.header)?;
 
-                    notes.push(NoteInfo { header, details_bytes: pnote.details });
+                    notes.push(NoteInfo {
+                        header,
+                        details_bytes: pnote.details,
+                        after_block_num: pnote.after_block_num.map(BlockNumber::from),
+                    });
                 }
                 Poll::Ready(Some(Ok(notes)))
             },

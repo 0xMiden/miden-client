@@ -9,6 +9,7 @@ use core::task::{Context, Poll};
 
 use chrono::Utc;
 use futures::Stream;
+use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{NoteHeader, NoteTag};
 use miden_tx::utils::serde::{
     ByteReader,
@@ -55,9 +56,14 @@ impl MockNoteTransportNode {
         }
     }
 
-    pub fn add_note(&mut self, header: NoteHeader, details_bytes: Vec<u8>) {
+    pub fn add_note(
+        &mut self,
+        header: NoteHeader,
+        details_bytes: Vec<u8>,
+        after_block_num: Option<BlockNumber>,
+    ) {
         let tag = header.metadata().tag();
-        let info = NoteInfo { header, details_bytes };
+        let info = NoteInfo { header, details_bytes, after_block_num };
         let cursor = u64::try_from(Utc::now().timestamp_micros()).unwrap();
         self.notes.entry(tag).or_default().push((info, cursor.into()));
     }
@@ -126,8 +132,13 @@ impl MockNoteTransportApi {
 }
 
 impl MockNoteTransportApi {
-    pub fn send_note(&self, header: NoteHeader, details_bytes: Vec<u8>) {
-        self.mock_node.write().add_note(header, details_bytes);
+    pub fn send_note(
+        &self,
+        header: NoteHeader,
+        details_bytes: Vec<u8>,
+        after_block_num: Option<BlockNumber>,
+    ) {
+        self.mock_node.write().add_note(header, details_bytes, after_block_num);
     }
 
     pub fn fetch_notes(
@@ -156,8 +167,9 @@ impl NoteTransportClient for MockNoteTransportApi {
         &self,
         header: NoteHeader,
         details: Vec<u8>,
+        after_block_num: Option<BlockNumber>,
     ) -> Result<(), NoteTransportError> {
-        self.send_note(header, details);
+        self.send_note(header, details, after_block_num);
         Ok(())
     }
 
@@ -230,6 +242,7 @@ impl NoteTransportClient for FaultyNoteTransportApi {
         &self,
         header: NoteHeader,
         details: Vec<u8>,
+        after_block_num: Option<BlockNumber>,
     ) -> Result<(), NoteTransportError> {
         self.send_attempts.fetch_add(1, Ordering::SeqCst);
         let should_fail = self
@@ -241,7 +254,7 @@ impl NoteTransportClient for FaultyNoteTransportApi {
                 "FaultyNoteTransportApi: simulated send_note failure".to_string(),
             ));
         }
-        self.inner.send_note(header, details);
+        self.inner.send_note(header, details, after_block_num);
         Ok(())
     }
 
