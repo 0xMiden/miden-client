@@ -171,6 +171,14 @@ where
             tracing::warn!(?err, "relay outbox flush failed during sync; entries retained");
         }
 
+        // Re-scan still-`Expected` notes from a prior import in case the one-shot import scan
+        // missed their on-chain commitment (e.g. an incomplete `sync_notes` response). Like the
+        // relay flush, a failure here is logged rather than propagated: the recovery is
+        // best-effort and the next sync retries it, so it must not block the sync.
+        if let Err(err) = self.rescan_expected_notes().await {
+            tracing::warn!(?err, "expected-note rescan failed during sync; will retry next sync");
+        }
+
         let cursor = self.store.get_note_transport_cursor().await?;
         let note_tags: Vec<_> = self.store.get_unique_note_tags().await?.into_iter().collect();
         let (ids, new_cursor) = self.fetch_transport_notes(cursor, &note_tags).await?;

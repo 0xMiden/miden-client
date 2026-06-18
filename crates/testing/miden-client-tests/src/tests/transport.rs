@@ -383,10 +383,10 @@ async fn commit_private_note_then_advance(extra_blocks: usize) -> (MockChain, No
     (mock_chain, private_note)
 }
 
-/// Builds a client over `mock_chain` + `mock_transport_node`, syncs it to the chain tip, and
+/// Builds a client over `rpc_api` + `mock_transport_node`, syncs it to the chain tip, and
 /// registers tag 0 so chain sync sees the note's block. The NTL is not drained here.
 async fn build_synced_ntl_client(
-    mock_chain: MockChain,
+    rpc_api: Arc<MockRpcApi>,
     mock_transport_node: Arc<RwLock<MockNoteTransportNode>>,
 ) -> MockClient<FilesystemKeyStore> {
     let transport_client = MockNoteTransportApi::new(mock_transport_node);
@@ -398,7 +398,7 @@ async fn build_synced_ntl_client(
     let keystore = FilesystemKeyStore::new(temp_dir()).unwrap();
 
     let builder: ClientBuilder<FilesystemKeyStore> = ClientBuilder::new()
-        .rpc(Arc::new(MockRpcApi::new(mock_chain)))
+        .rpc(rpc_api)
         .rng(Box::new(rng))
         .sqlite_store(create_test_store_path())
         .authenticator(Arc::new(keystore))
@@ -421,7 +421,9 @@ async fn build_synced_ntl_client(
 async fn after_block_num_hint_commits_note_beyond_lookback() {
     let (mock_chain, private_note) = commit_private_note_then_advance(30).await;
     let mock_transport_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
-    let mut client = build_synced_ntl_client(mock_chain, mock_transport_node.clone()).await;
+    let mut client =
+        build_synced_ntl_client(Arc::new(MockRpcApi::new(mock_chain)), mock_transport_node.clone())
+            .await;
 
     let sync_height = client.get_sync_height().await.unwrap();
     assert!(
@@ -454,7 +456,9 @@ async fn after_block_num_hint_commits_note_beyond_lookback() {
 async fn without_hint_note_beyond_lookback_stays_expected() {
     let (mock_chain, private_note) = commit_private_note_then_advance(30).await;
     let mock_transport_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
-    let mut client = build_synced_ntl_client(mock_chain, mock_transport_node.clone()).await;
+    let mut client =
+        build_synced_ntl_client(Arc::new(MockRpcApi::new(mock_chain)), mock_transport_node.clone())
+            .await;
 
     let details_bytes = NoteDetails::from(private_note.clone()).to_bytes();
     mock_transport_node.write().add_note(*private_note.header(), details_bytes, None);
@@ -472,6 +476,45 @@ async fn without_hint_note_beyond_lookback_stays_expected() {
     assert!(
         expected.iter().any(|n| n.details_commitment() == note_details_commitment),
         "the note should remain Expected (imported but not yet observed on-chain)"
+    );
+}
+
+/// The one-shot import scan can miss a note's on-chain commitment when the node returns an
+/// incomplete (but successful) `sync_notes` response. Forward chain sync only revisits blocks
+/// ahead of the last sync height, so without a retry the note would stay `Expected` forever. A
+/// subsequent sync re-scans still-`Expected` notes from their stored floor and recovers it.
+#[tokio::test]
+async fn expected_note_rescan_recovers_from_incomplete_import_scan() {
+    // The note is committed within the lookback window, so the only thing keeping it from
+    // committing on import is the dropped scan — not the scan floor.
+    let (mock_chain, private_note) = commit_private_note_then_advance(3).await;
+    let mock_transport_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
+    let rpc_api = Arc::new(MockRpcApi::new(mock_chain));
+    let mut client = build_synced_ntl_client(rpc_api.clone(), mock_transport_node.clone()).await;
+
+    // The import-time scan (check_expected_notes -> sync_notes) returns an incomplete response.
+    rpc_api.drop_next_sync_notes(1);
+
+    let details_bytes = NoteDetails::from(private_note.clone()).to_bytes();
+    mock_transport_node.write().add_note(*private_note.header(), details_bytes, None);
+
+    let note_details_commitment = NoteDetails::from(private_note.clone()).commitment();
+
+    // First sync imports the note, but the dropped scan leaves it Expected.
+    client.sync_state().await.unwrap();
+    let committed = client.get_input_notes(NoteFilter::Committed).await.unwrap();
+    assert!(
+        !committed.iter().any(|n| n.details_commitment() == note_details_commitment),
+        "an incomplete import scan should leave the note Expected"
+    );
+
+    // Second sync: the rescan re-checks the still-Expected note, and the now-complete scan
+    // commits it.
+    client.sync_state().await.unwrap();
+    let committed = client.get_input_notes(NoteFilter::Committed).await.unwrap();
+    assert!(
+        committed.iter().any(|n| n.details_commitment() == note_details_commitment),
+        "a subsequent sync should rescan the Expected note and commit it"
     );
 }
 

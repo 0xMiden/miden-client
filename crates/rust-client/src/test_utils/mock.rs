@@ -59,6 +59,11 @@ pub struct MockRpcApi {
     /// notes without their attachment content (only metadata), so tests that need
     /// `get_notes_by_id` to return private-note attachments register them here.
     private_note_attachments: Arc<RwLock<BTreeMap<NoteId, NoteAttachments>>>,
+    /// Number of upcoming `sync_notes` calls to answer with an empty (but successful) response,
+    /// simulating a node that returns an incomplete scan result. Only `sync_notes` is affected
+    /// (used by `check_expected_notes`); `sync_notes_with_details` used by forward chain sync is
+    /// left intact.
+    sync_notes_drops: Arc<RwLock<usize>>,
 }
 
 impl Default for MockRpcApi {
@@ -79,7 +84,14 @@ impl MockRpcApi {
             oversize_threshold: 1000,
             erased_notes: Arc::new(RwLock::new(Vec::new())),
             private_note_attachments: Arc::new(RwLock::new(BTreeMap::new())),
+            sync_notes_drops: Arc::new(RwLock::new(0)),
         }
+    }
+
+    /// Makes the next `n` `sync_notes` calls return an empty (successful) response, simulating a
+    /// node that returns an incomplete scan result. Used to exercise the expected-note rescan.
+    pub fn drop_next_sync_notes(&self, n: usize) {
+        *self.sync_notes_drops.write() = n;
     }
 
     /// Registers the attachment content for a private note so that subsequent `get_notes_by_id`
@@ -329,6 +341,15 @@ impl NodeRpcClient for MockRpcApi {
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<Vec<NoteSyncBlock>, RpcError> {
+        // Simulate an incomplete (but successful) scan response when configured to.
+        {
+            let mut drops = self.sync_notes_drops.write();
+            if *drops > 0 {
+                *drops -= 1;
+                return Ok(Vec::new());
+            }
+        }
+
         let mut blocks_with_notes: BTreeMap<BlockNumber, BTreeMap<NoteId, CommittedNote>> =
             BTreeMap::new();
         for note in self.mock_chain.read().committed_notes().values() {

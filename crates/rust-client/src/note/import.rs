@@ -41,6 +41,47 @@ where
     // INPUT NOTE CREATION
     // --------------------------------------------------------------------------------------------
 
+    /// Re-scans still-`Expected` notes against the chain, committing any whose on-chain
+    /// commitment the one-shot import scan missed — for example because the node returned an
+    /// incomplete (but successful) `sync_notes` response when the note was imported.
+    ///
+    /// This is the only path that recovers such a note: the import scan runs once, and forward
+    /// chain sync only revisits blocks ahead of the last sync height, so a note committed at or
+    /// below the import height that the import scan didn't return would otherwise stay `Expected`
+    /// indefinitely. Re-importing reuses [`Client::import_notes`], so a note that is found
+    /// transitions to `Committed` and one that is not is left untouched.
+    ///
+    /// Cheap in the steady state: `Expected` notes are transient (they commit within a few
+    /// blocks) and the rescan issues no RPC when there are none.
+    pub(crate) async fn rescan_expected_notes(&mut self) -> Result<(), ClientError> {
+        let expected_notes = self.store.get_input_notes(NoteFilter::Expected).await?;
+
+        let mut note_files = Vec::new();
+        for record in expected_notes {
+            // Only notes that still carry a tag can be matched on-chain, by reconstructing their
+            // id from the committed metadata (see `check_expected_notes`).
+            let InputNoteState::Expected(ExpectedNoteState {
+                after_block_num,
+                tag: Some(tag),
+                ..
+            }) = record.state()
+            else {
+                continue;
+            };
+            note_files.push(NoteFile::NoteDetails {
+                details: record.details().clone(),
+                after_block_num: *after_block_num,
+                tag: Some(*tag),
+            });
+        }
+
+        if !note_files.is_empty() {
+            self.import_notes(&note_files).await?;
+        }
+
+        Ok(())
+    }
+
     /// Imports a batch of new input notes into the client's store. The information stored depends
     /// on the type of note files provided. If the notes existed previously, it will be updated
     /// with the new information. The tags specified by the `NoteFile`s will start being
