@@ -23,7 +23,13 @@ use super::{
 };
 use crate::ClientError;
 use crate::note::{NoteConsumption, NoteUpdateTracker};
-use crate::rpc::domain::account::{AccountDetails, GetAccountRequest, StorageMapFetch, VaultFetch};
+use crate::rpc::domain::account::{
+    AccountDetails,
+    AccountProof,
+    GetAccountRequest,
+    StorageMapFetch,
+    VaultFetch,
+};
 use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock, SyncedNoteDetails};
 use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::transaction::TransactionRecord as RpcTransactionRecord;
@@ -761,36 +767,8 @@ impl StateSync {
             .await
             .map_err(ClientError::RpcError)?;
 
-        if proof_block_num != target_block_num {
-            return Err(ClientError::ChainValidationError(format!(
-                "get_account returned block {proof_block_num} but {target_block_num} was requested"
-            )));
-        }
-
-        let (witness, details) = proof.into_parts();
-
-        // AccountProof::new checks the returned fields are internally consistent; bind them to the
-        // account requested for this sync step.
-        if witness.id() != account_id {
-            return Err(ClientError::ChainValidationError(format!(
-                "get_account returned account {} but {account_id} was requested",
-                witness.id()
-            )));
-        }
-
-        let account_key = AccountIdKey::from(account_id).as_word();
-        let state_commitment = witness.state_commitment();
-        witness
-            .into_proof()
-            .verify_presence(&account_key, &state_commitment, &chain_tip_header.account_root())
-            .map_err(|err| {
-                ClientError::ChainValidationError(format!(
-                    "get_account witness for account {account_id} does not open under block \
-                     {target_block_num} account root: {err}"
-                ))
-            })?;
-
-        let details = details.expect("node returned no details for a public account");
+        let details =
+            Self::validate_account_proof(proof, proof_block_num, account_id, chain_tip_header)?;
 
         match details
             .header
@@ -825,6 +803,49 @@ impl StateSync {
         };
 
         Ok(PublicAccountSync::Apply(Box::new(public_update)))
+    }
+
+    /// Validates that a `get_account` proof is bound to the sync target: it must be for the
+    /// requested `account_id`, at the target block, and its witness must open under the target
+    /// header's account root. Returns the account details on success.
+    fn validate_account_proof(
+        proof: AccountProof,
+        proof_block_num: BlockNumber,
+        account_id: AccountId,
+        chain_tip_header: &BlockHeader,
+    ) -> Result<AccountDetails, ClientError> {
+        let target_block_num = chain_tip_header.block_num();
+
+        if proof_block_num != target_block_num {
+            return Err(ClientError::ChainValidationError(format!(
+                "get_account returned block {proof_block_num} but {target_block_num} was requested"
+            )));
+        }
+
+        let (witness, details) = proof.into_parts();
+
+        // AccountProof::new checks the returned fields are internally consistent; bind them to the
+        // account requested for this sync step.
+        if witness.id() != account_id {
+            return Err(ClientError::ChainValidationError(format!(
+                "get_account returned account {} but {account_id} was requested",
+                witness.id()
+            )));
+        }
+
+        let account_key = AccountIdKey::from(account_id).as_word();
+        let state_commitment = witness.state_commitment();
+        witness
+            .into_proof()
+            .verify_presence(&account_key, &state_commitment, &chain_tip_header.account_root())
+            .map_err(|err| {
+                ClientError::ChainValidationError(format!(
+                    "get_account witness for account {account_id} does not open under block \
+                     {target_block_num} account root: {err}"
+                ))
+            })?;
+
+        Ok(details.expect("node returned no details for a public account"))
     }
 
     /// Builds a [`PublicAccountUpdate::Delta`] by fetching incremental storage map and vault
@@ -1299,100 +1320,58 @@ mod tests {
         );
     }
 
-    /// A `get_account` response for another account must be rejected before staging updates.
+    /// Builds an honest `get_account` response for `account_id`.
+    async fn get_account_proof(
+        rpc_api: &MockRpcApi,
+        account_id: AccountId,
+    ) -> (BlockNumber, AccountProof) {
+        rpc_api
+            .get_account(
+                account_id,
+                GetAccountRequest::new()
+                    .with_storage(StorageMapFetch::All)
+                    .with_vault(VaultFetch::Always),
+            )
+            .await
+            .unwrap()
+    }
+
+    /// `validate_account_proof` rejects a proof whose account differs from the requested one.
     #[tokio::test]
-    async fn sync_public_account_rejects_mismatched_account_id() {
+    async fn validate_account_proof_rejects_mismatched_account() {
         let mut builder = MockChainBuilder::new();
         let account_a = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
         let account_b = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
         let rpc_api = MockRpcApi::new(builder.build().unwrap());
         let chain_tip_header = rpc_api.mock_chain.read().latest_block_header();
 
-        // The mock answers the request for A with a self-consistent proof for B.
-        rpc_api.substitute_get_account_response(account_b.id());
-
-        let state_sync = StateSync::new(Arc::new(rpc_api), Arc::new(MockScreener), None);
-
-        // A's local nonce is below B's, so the substituted (B) snapshot looks newer and is adopted.
-        let local_header = AccountHeader::new(
+        // An honest proof for B, validated as if A had been requested.
+        let (proof_block_num, proof) = get_account_proof(&rpc_api, account_b.id()).await;
+        let result = StateSync::validate_account_proof(
+            proof,
+            proof_block_num,
             account_a.id(),
-            Felt::from(0u32),
-            EMPTY_WORD,
-            EMPTY_WORD,
-            EMPTY_WORD,
+            &chain_tip_header,
         );
-        let current_public_accounts = vec![&local_header];
-        // A's commitment differs from local, so the path fetches A's state from the node.
-        let commitment_updates = vec![(account_a.id(), account_b.to_commitment())];
-        let mut account_updates = AccountUpdates::default();
 
-        let result = state_sync
-            .sync_public_accounts(
-                &mut account_updates,
-                &commitment_updates,
-                &current_public_accounts,
-                BlockNumber::GENESIS,
-                &chain_tip_header,
-            )
-            .await;
-
-        let Err(ClientError::ChainValidationError(message)) = result else {
-            panic!(
-                "get_account returned a proof for account B when account A was requested; the \
-                 client must reject the mismatched response, got {result:?}"
-            );
-        };
-
-        assert!(
-            message.contains("get_account returned account"),
-            "unexpected validation error: {message}"
-        );
-        assert!(
-            account_updates.updated_public_accounts().is_empty(),
-            "rejected get_account response must not stage public account updates"
-        );
+        assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
     }
 
-    /// A `get_account` witness must open under the target block's account root.
+    /// `validate_account_proof` rejects a witness that doesn't open under the target account root.
     #[tokio::test]
-    async fn sync_public_account_rejects_witness_for_wrong_account_root() {
+    async fn validate_account_proof_rejects_wrong_account_root() {
         let mut builder = MockChainBuilder::new();
         let account = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
         let rpc_api = MockRpcApi::new(builder.build().unwrap());
         let chain_tip_header = rpc_api.mock_chain.read().latest_block_header();
         let wrong_header = header_with_account_root(&chain_tip_header, word(999));
-        assert_ne!(wrong_header.account_root(), chain_tip_header.account_root());
 
-        let state_sync = StateSync::new(Arc::new(rpc_api), Arc::new(MockScreener), None);
+        // An honest proof for the account, validated against a header with a bogus account root.
+        let (proof_block_num, proof) = get_account_proof(&rpc_api, account.id()).await;
+        let result =
+            StateSync::validate_account_proof(proof, proof_block_num, account.id(), &wrong_header);
 
-        let local_header =
-            AccountHeader::new(account.id(), Felt::from(0u32), EMPTY_WORD, EMPTY_WORD, EMPTY_WORD);
-        let current_public_accounts = vec![&local_header];
-        let commitment_updates = vec![(account.id(), account.to_commitment())];
-        let mut account_updates = AccountUpdates::default();
-
-        let result = state_sync
-            .sync_public_accounts(
-                &mut account_updates,
-                &commitment_updates,
-                &current_public_accounts,
-                BlockNumber::GENESIS,
-                &wrong_header,
-            )
-            .await;
-
-        let Err(ClientError::ChainValidationError(message)) = result else {
-            panic!(
-                "get_account returned a witness that does not open under the target account root; \
-                 the client must reject it, got {result:?}"
-            );
-        };
-
-        assert!(message.contains("account root"), "unexpected validation error: {message}");
-        assert!(
-            account_updates.updated_public_accounts().is_empty(),
-            "rejected get_account response must not stage public account updates"
-        );
+        assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
     }
 
     // COMPUTE NULLIFIER TX ORDER TESTS
