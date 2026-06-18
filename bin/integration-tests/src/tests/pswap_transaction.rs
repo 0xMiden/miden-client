@@ -284,8 +284,8 @@ pub async fn test_pswap_partial_fill_onchain(client_config: ClientConfig) -> Res
         .await?
         .context("Alice should track a lineage for her PSWAP order")?;
     assert_eq!(lineage.current_depth, 1, "a single partial fill advances the tip to depth 1");
-    assert_eq!(lineage.remaining_offered.amount().as_u64(), REMAINING_OFFERED);
-    assert_eq!(lineage.remaining_requested.amount().as_u64(), REMAINING_REQUESTED);
+    assert_eq!(lineage.remaining_offered.as_u64(), REMAINING_OFFERED);
+    assert_eq!(lineage.remaining_requested.as_u64(), REMAINING_REQUESTED);
 
     Ok(())
 }

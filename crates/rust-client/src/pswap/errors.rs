@@ -4,7 +4,6 @@ use alloc::boxed::Box;
 
 use miden_protocol::Felt;
 use miden_protocol::account::AccountId;
-use miden_protocol::errors::AssetError;
 use miden_protocol::note::NoteId;
 
 use super::lineage::PswapLineageState;
@@ -42,12 +41,6 @@ pub enum PswapLineageError {
         "PSWAP original note {0} is unavailable in the output-note store or lacks recipient details"
     )]
     OriginalNoteUnavailable(NoteId),
-
-    /// `FungibleAsset::new` rejected an attachment-derived amount (the stored
-    /// value exceeds the protocol's max). Indicates either a malformed
-    /// attachment from the network or a corrupted stored lineage record.
-    #[error("PSWAP attachment amount is out of range for FungibleAsset: {0}")]
-    AssetError(#[from] AssetError),
 
     /// A stored lineage's `state` byte has no matching [`PswapLineageState`] variant.
     #[error("unknown PSWAP lineage state byte: {0}")]

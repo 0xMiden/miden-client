@@ -52,8 +52,7 @@ pub(crate) async fn discover_pswap_rounds(
 
     let notes_by_order_depth = group_notes_by_order_depth(chain_note_updates);
 
-    // All rounds discovered this sync share the sync's terminal block.
-    let sync_block = state_sync_update.block_num;
+    // Commit-block note roots for inserting reconstructed notes as `Committed`.
     let block_headers: BTreeMap<BlockNumber, BlockHeader> = state_sync_update
         .partial_blockchain_updates
         .block_headers()
@@ -67,7 +66,6 @@ pub(crate) async fn discover_pswap_rounds(
             lineage,
             &consumed_note_ids,
             &notes_by_order_depth,
-            sync_block,
             &block_headers,
         )
         .await;
@@ -146,7 +144,6 @@ async fn advance_lineage(
     mut lineage: PswapLineageRecord,
     consumed_note_ids: &BTreeSet<NoteId>,
     notes_by_order_depth: &BTreeMap<(Felt, u32), Vec<&ObservedPswapNote>>,
-    sync_block: BlockNumber,
     block_headers: &BTreeMap<BlockNumber, BlockHeader>,
 ) -> Vec<PswapLineageRoundUpdate> {
     let mut lineage_rounds: Vec<PswapLineageRoundUpdate> = Vec::new();
@@ -185,7 +182,6 @@ async fn advance_lineage(
 
         let update = match lineage.build_round_update(
             round_depth,
-            sync_block,
             notes,
             block_headers,
             original_pswap.as_ref(),
@@ -206,7 +202,7 @@ async fn advance_lineage(
             },
         };
 
-        lineage = lineage.apply_round_in_memory(&update);
+        lineage = lineage.advance(&update);
         lineage_rounds.push(update);
     }
 

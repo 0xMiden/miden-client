@@ -3043,8 +3043,8 @@ async fn pswap_chain_tracking_test(#[case] note_type: NoteType) {
         .expect("creating a PSWAP should install a lineage row");
     assert_eq!(lineage.current_depth, 0);
     assert_eq!(lineage.state, PswapLineageState::Active);
-    assert_eq!(lineage.remaining_offered.amount().as_u64(), offered_amount);
-    assert_eq!(lineage.remaining_requested.amount().as_u64(), requested_amount);
+    assert_eq!(lineage.remaining_offered.as_u64(), offered_amount);
+    assert_eq!(lineage.remaining_requested.as_u64(), requested_amount);
 
     // Private-only: pre-register payback + remainder attachments on the mock (a real node
     // returns them via RPC).
@@ -3084,8 +3084,8 @@ async fn pswap_chain_tracking_test(#[case] note_type: NoteType) {
     let lineage = alice_client.pswap_lineage(order_id).await.unwrap().unwrap();
     assert_eq!(lineage.current_depth, 1, "fill should advance the tip to depth 1");
     assert_eq!(lineage.state, PswapLineageState::Active);
-    assert_eq!(lineage.remaining_offered.amount().as_u64(), 50);
-    assert_eq!(lineage.remaining_requested.amount().as_u64(), 25);
+    assert_eq!(lineage.remaining_offered.as_u64(), 50);
+    assert_eq!(lineage.remaining_requested.as_u64(), 25);
 
     // Payback must land `Committed` (not `Unverified`) on Alice's side. For the public case
     // the standard screener path inserts it; for the private case the at_block_header path in
@@ -3251,8 +3251,8 @@ async fn pswap_full_fill_chain_tracking_test(#[case] note_type: NoteType) {
     let lineage = alice_client.pswap_lineage(order_id).await.unwrap().unwrap();
     assert_eq!(lineage.current_depth, 1, "full fill is a single round");
     assert_eq!(lineage.state, PswapLineageState::FullyFilled);
-    assert_eq!(lineage.remaining_offered.amount().as_u64(), 0);
-    assert_eq!(lineage.remaining_requested.amount().as_u64(), 0);
+    assert_eq!(lineage.remaining_offered.as_u64(), 0);
+    assert_eq!(lineage.remaining_requested.as_u64(), 0);
 
     // FullyFilled must drop the asset-pair subscription (same code path as Reclaimed).
     let asset_pair_tag = PswapNote::create_tag(note_type, &offered_asset, &requested_asset);
@@ -3375,8 +3375,8 @@ async fn pswap_multi_round_chain_tracking_test() {
     let lineage = alice_client.pswap_lineage(order_id).await.unwrap().unwrap();
     assert_eq!(lineage.current_depth, 1, "round 1 advances the tip to depth 1");
     assert_eq!(lineage.state, PswapLineageState::Active);
-    assert_eq!(lineage.remaining_offered.amount().as_u64(), 50);
-    assert_eq!(lineage.remaining_requested.amount().as_u64(), 25);
+    assert_eq!(lineage.remaining_offered.as_u64(), 50);
+    assert_eq!(lineage.remaining_requested.as_u64(), 25);
 
     // Bob's round-1 remainder must be tracked as a consumable note in his own store — this is
     // exactly what the fix enables. Previously it was a proofless `expected_future_notes`
@@ -3406,8 +3406,8 @@ async fn pswap_multi_round_chain_tracking_test() {
     let lineage = alice_client.pswap_lineage(order_id).await.unwrap().unwrap();
     assert_eq!(lineage.current_depth, 2, "round 2 advances the tip to depth 2");
     assert_eq!(lineage.state, PswapLineageState::Active);
-    assert_eq!(lineage.remaining_offered.amount().as_u64(), 30);
-    assert_eq!(lineage.remaining_requested.amount().as_u64(), 15);
+    assert_eq!(lineage.remaining_offered.as_u64(), 30);
+    assert_eq!(lineage.remaining_requested.as_u64(), 15);
 
     // ── Reclaim: Alice cancels the depth-2 tip via the order id. ──
     let cancel_request = alice_client.build_pswap_cancel_by_order(order_id).await.unwrap();

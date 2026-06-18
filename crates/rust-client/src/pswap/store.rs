@@ -209,15 +209,9 @@ pub(crate) async fn apply_round(
     //    terminating round, and the live tip index is dropped (a terminal lineage has no tip to
     //    resolve).
     let old_tip = record.current_tip_note_id;
-    // Carry over the immutable order facts (and `original_note_id`) by cloning,
-    // then advance only the mutable tip state.
-    let mut new_record = record.clone();
-    new_record.current_tip_note_id = update.tip_note_id.unwrap_or(old_tip);
-    new_record.current_depth = update.round_depth;
-    new_record.remaining_offered = update.remaining_offered;
-    new_record.remaining_requested = update.remaining_requested;
-    new_record.state = update.state;
-    new_record.updated_at_block = update.at_block;
+    // Reuse the record's own advance logic (the same `advance` the in-memory walk in `discovery`
+    // uses) so the persisted transition can never drift from it.
+    let new_record = record.advance(update);
     let mut mutations = vec![
         SettingMutation::Set {
             key: order_key(update.order_id),
@@ -235,25 +229,27 @@ pub(crate) async fn apply_round(
     }
     store.apply_settings_mutations(mutations).await?;
 
-    // 4. Terminal states no longer need the asset-pair subscription. The tag's faucets ride on the
-    //    record's `remaining_*` fields; its `note_type` is recovered from the depth-0 note (one
-    //    fetch, fired once per lineage lifetime). The subscription is keyed by the stable
+    // 4. Terminal states no longer need the asset-pair subscription. The tag is re-derived from the
+    //    depth-0 note (the record stores only amounts, not the faucets the tag needs) — one fetch,
+    //    fired once per lineage lifetime. The subscription is keyed by the stable
     //    `original_note_id` (the same key used at creation).
     if matches!(update.state, PswapLineageState::FullyFilled | PswapLineageState::Reclaimed) {
-        let note_type = get_original_pswap(store, record.original_note_id)
-            .await
-            .map_err(|err| {
+        let pswap =
+            get_original_pswap(store, new_record.original_note_id).await.map_err(|err| {
                 StoreError::DatabaseError(format!(
-                    "apply_round: cannot recover note_type to remove the asset-pair tag for \
-                     order_id {}: {err}",
+                    "apply_round: cannot recover the depth-0 note to remove the asset-pair tag for \
+                 order_id {}: {err}",
                     update.order_id
                 ))
-            })?
-            .note_type();
+            })?;
         store
             .remove_note_tag(NoteTagRecord {
-                tag: record.asset_pair_tag(note_type),
-                source: NoteTagSource::Subscription(record.original_note_id.as_word()),
+                tag: PswapNote::create_tag(
+                    pswap.note_type(),
+                    pswap.offered_asset(),
+                    pswap.storage().requested_asset(),
+                ),
+                source: NoteTagSource::Subscription(new_record.original_note_id.as_word()),
             })
             .await?;
     }

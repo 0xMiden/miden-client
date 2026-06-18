@@ -84,7 +84,7 @@ impl TransactionObserver for PswapTransactionObserver {
     async fn apply(
         &self,
         tx_result: &TransactionResult,
-        submission_height: BlockNumber,
+        _submission_height: BlockNumber,
     ) -> Result<(), ClientError> {
         let output_notes = tx_result.executed_transaction().output_notes();
 
@@ -100,14 +100,18 @@ impl TransactionObserver for PswapTransactionObserver {
 
             // The full note lives in `output_notes`; the record keeps only its id
             // plus the immutable order facts (see `PswapLineageRecord`).
-            let record = PswapLineageRecord::new_depth_zero(note.id(), &pswap, submission_height);
+            let record = PswapLineageRecord::new_depth_zero(note.id(), &pswap);
 
             store::put_lineage(&self.store, &record).await?;
             self.store
                 .add_note_tag(NoteTagRecord {
-                    // `note_type` is read straight off the note we just parsed — no
-                    // need to mirror it on the record.
-                    tag: record.asset_pair_tag(pswap.note_type()),
+                    // The asset-pair tag is derived straight from the note we just parsed; the
+                    // record stores only amounts, not the faucets the tag needs.
+                    tag: PswapNote::create_tag(
+                        pswap.note_type(),
+                        pswap.offered_asset(),
+                        pswap.storage().requested_asset(),
+                    ),
                     source: NoteTagSource::Subscription(record.original_note_id.as_word()),
                 })
                 .await?;
