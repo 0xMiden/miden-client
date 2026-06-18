@@ -139,6 +139,8 @@ impl TryFrom<&str> for Endpoint {
             (None, None) => ("https", endpoint, None),
         };
 
+        let hostname = hostname.trim_end_matches('/');
+
         Ok(Endpoint::new(protocol.to_string(), hostname.to_string(), port))
     }
 }
@@ -258,6 +260,18 @@ mod test {
             protocol: "https".to_string(),
             host: "some.test.domain".to_string(),
             port: Some(8000),
+        };
+
+        assert_eq!(endpoint, expected_endpoint);
+    }
+
+    #[test]
+    fn endpoint_parsing_with_protocol_and_final_forward_slash_no_port() {
+        let endpoint = Endpoint::try_from("http://some.test.domain/").unwrap();
+        let expected_endpoint = Endpoint {
+            protocol: "http".to_string(),
+            host: "some.test.domain".to_string(),
+            port: None,
         };
 
         assert_eq!(endpoint, expected_endpoint);
