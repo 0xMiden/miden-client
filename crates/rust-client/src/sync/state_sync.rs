@@ -1303,6 +1303,36 @@ mod tests {
     // PRIVATE ACCOUNT LOCK VERIFICATION TESTS
     // --------------------------------------------------------------------------------------------
 
+    /// Verifies that `sync_transactions` records outside the requested range `(current, chain_tip]`
+    /// are rejected with a `ChainValidationError`.
+    #[test]
+    fn validate_transaction_records_range_rejects_out_of_range_blocks() {
+        let account_id: AccountId = ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap();
+        let current = BlockNumber::from(5u32);
+        let chain_tip = BlockNumber::from(10u32);
+
+        StateSync::validate_transaction_records_range(
+            &[make_tx_record(account_id, 7)],
+            current,
+            chain_tip,
+        )
+        .unwrap();
+
+        let result = StateSync::validate_transaction_records_range(
+            &[make_tx_record(account_id, 11)],
+            current,
+            chain_tip,
+        );
+        assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
+
+        let result = StateSync::validate_transaction_records_range(
+            &[make_tx_record(account_id, 5)],
+            current,
+            chain_tip,
+        );
+        assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
+    }
+
     /// A forged `sync_transactions` commitment must not lock the account when the witness proves
     /// the on-chain commitment still matches the local one.
     #[tokio::test]
@@ -2278,35 +2308,5 @@ mod tests {
             output_notes: vec![],
             erased_output_notes: vec![],
         }
-    }
-
-    /// Verifies that `sync_transactions` records outside the requested range `(current, chain_tip]`
-    /// are rejected with a `ChainValidationError`.
-    #[test]
-    fn validate_transaction_records_range_rejects_out_of_range_blocks() {
-        let account_id: AccountId = ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET.try_into().unwrap();
-        let current = BlockNumber::from(5u32);
-        let chain_tip = BlockNumber::from(10u32);
-
-        StateSync::validate_transaction_records_range(
-            &[make_tx_record(account_id, 7)],
-            current,
-            chain_tip,
-        )
-        .unwrap();
-
-        let result = StateSync::validate_transaction_records_range(
-            &[make_tx_record(account_id, 11)],
-            current,
-            chain_tip,
-        );
-        assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
-
-        let result = StateSync::validate_transaction_records_range(
-            &[make_tx_record(account_id, 5)],
-            current,
-            chain_tip,
-        );
-        assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
     }
 }
