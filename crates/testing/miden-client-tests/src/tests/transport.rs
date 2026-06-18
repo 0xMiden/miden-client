@@ -59,7 +59,10 @@ async fn transport_basic() {
     assert_eq!(notes.len(), 0);
 
     // Send note
-    sender.send_private_note(note, &recipient_address).await.unwrap();
+    sender
+        .send_private_note_with_block_hint(note, &recipient_address, BlockNumber::from(0))
+        .await
+        .unwrap();
 
     // Sync-state / fetch notes
     // 1 note stored
@@ -108,7 +111,10 @@ async fn transport_cursor_pagination() {
     .unwrap();
 
     // Send note A, sync → recipient receives 1 note
-    sender.send_private_note(note_a.clone(), &recipient_address).await.unwrap();
+    sender
+        .send_private_note_with_block_hint(note_a.clone(), &recipient_address, BlockNumber::from(0))
+        .await
+        .unwrap();
     recipient.sync_state().await.unwrap();
     let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 1, "should have 1 note after first sync");
@@ -117,7 +123,10 @@ async fn transport_cursor_pagination() {
     assert_eq!(notes[0].details_commitment(), note_a.details_commitment());
 
     // Send note B, sync → recipient receives note B (cursor advanced past A)
-    sender.send_private_note(note_b.clone(), &recipient_address).await.unwrap();
+    sender
+        .send_private_note_with_block_hint(note_b.clone(), &recipient_address, BlockNumber::from(0))
+        .await
+        .unwrap();
     recipient.sync_state().await.unwrap();
     let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 2, "should have 2 notes total after second sync");
@@ -142,7 +151,10 @@ async fn transport_duplicate_note_handling() {
     )
     .unwrap();
 
-    sender.send_private_note(note, &recipient_address).await.unwrap();
+    sender
+        .send_private_note_with_block_hint(note, &recipient_address, BlockNumber::from(0))
+        .await
+        .unwrap();
 
     // First fetch
     recipient.sync_state().await.unwrap();
@@ -186,7 +198,10 @@ async fn fetch_all_private_notes_drains_across_batches() {
             sender.rng(),
         )
         .unwrap();
-        sender.send_private_note(note, &recipient_address).await.unwrap();
+        sender
+            .send_private_note_with_block_hint(note, &recipient_address, BlockNumber::from(0))
+            .await
+            .unwrap();
     }
 
     // With BATCH_CAP=3 and TOTAL_NOTES=10, a single-shot fetch would return
@@ -224,7 +239,10 @@ async fn transport_fetch_no_matching_tags() {
     )
     .unwrap();
 
-    sender.send_private_note(note, &recipient_address).await.unwrap();
+    sender
+        .send_private_note_with_block_hint(note, &recipient_address, BlockNumber::from(0))
+        .await
+        .unwrap();
 
     // Observer syncs — tags don't match, should get nothing
     observer.sync_state().await.unwrap();
@@ -378,7 +396,9 @@ async fn private_note_relay_recovers_after_transient_ntl_failure() {
 
     // First relay attempt — the faulty NTL rejects it. We don't assert on the
     // return value: the relay may fail here and be retried later.
-    let _ = sender.send_private_note(note, &recipient_address).await;
+    let _ = sender
+        .send_private_note_with_block_hint(note, &recipient_address, BlockNumber::from(0))
+        .await;
 
     // Drive both clients forward; the retry must deliver the note within a few
     // rounds.
@@ -437,7 +457,9 @@ async fn flush_relay_outbox_retries_failed_relay_without_full_sync() {
     let note_commitment = note.details_commitment();
 
     // First relay fails; the payload must survive in the outbox.
-    let first_attempt = sender.send_private_note(note, &recipient_address).await;
+    let first_attempt = sender
+        .send_private_note_with_block_hint(note, &recipient_address, BlockNumber::from(0))
+        .await;
     assert!(
         first_attempt.is_err(),
         "expected NTL failure on first attempt, got {first_attempt:?}"
@@ -502,7 +524,9 @@ async fn persistent_relay_failure_does_not_block_sync_state() {
     .unwrap();
 
     // The relay fails and the payload is persisted to the outbox.
-    let _ = sender.send_private_note(note, &recipient_address).await;
+    let _ = sender
+        .send_private_note_with_block_hint(note, &recipient_address, BlockNumber::from(0))
+        .await;
 
     // sync_state flushes the outbox (which fails) but must still complete: the
     // relay failure is logged, not propagated.
@@ -519,10 +543,10 @@ async fn persistent_relay_failure_does_not_block_sync_state() {
     );
 }
 
-/// `send_private_note_after` delivers a note end-to-end like `send_private_note`, exercising the
-/// floor-carrying relay path.
+/// `send_private_note_with_block_hint` delivers a note end-to-end like `send_private_note`,
+/// exercising the floor-carrying relay path.
 #[tokio::test]
-async fn send_private_note_after_delivers_note() {
+async fn send_private_note_with_block_hint_delivers_note() {
     let mock_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
     let (mut sender, sender_account) = create_test_user_transport(mock_node.clone()).await;
     let (mut recipient, recipient_account) = create_test_user_transport(mock_node.clone()).await;
@@ -540,7 +564,7 @@ async fn send_private_note_after_delivers_note() {
     .unwrap();
 
     sender
-        .send_private_note_after(note, &recipient_address, BlockNumber::from(0))
+        .send_private_note_with_block_hint(note, &recipient_address, BlockNumber::from(0))
         .await
         .unwrap();
 
@@ -565,7 +589,8 @@ async fn fetch_private_notes_uses_sender_provided_after_block_num() {
         "sync height must be beyond the fallback lookback window for this test to be meaningful"
     );
 
-    // Deliver the note WITH a floor pointing at genesis, mirroring `send_private_note_after`.
+    // Deliver the note WITH a floor pointing at genesis, mirroring
+    // `send_private_note_with_block_hint`.
     let details_bytes = NoteDetails::from(private_note.clone()).to_bytes();
     mock_transport_node.write().add_note_after(
         *private_note.header(),
