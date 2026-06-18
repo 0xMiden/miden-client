@@ -2,11 +2,19 @@
 
 ## Unreleased
 
+### Features
+
+* [FEATURE][rust] Added `Client::send_private_note_after`, which relays a sender-provided `after_block_num` so recipients get deterministic delivery instead of relying on receiving side lookback. ([#2262](https://github.com/0xMiden/rust-sdk/issues/2262))
+
 ### Fixes
 
 * [FIX][rust] State sync now range-checks `sync_transactions` records to `(current, chain_tip]`, rejecting out-of-range records that could forge transaction commit heights ([#2252](https://github.com/0xMiden/rust-sdk/pull/2252)).
 * [FIX][rust] `Endpoint` parsing now strips a trailing slash from the host of no-port endpoints such as `http://host/`, matching the cleanup already applied when a port is present ([#2268](https://github.com/0xMiden/rust-sdk/pull/2268)).
 * [FIX][rust] `NodeRpcClient::get_block_header_by_number` and `get_block_by_number` now reject responses whose block number does not match the requested one with `RpcError::InvalidResponse` ([#2270](https://github.com/0xMiden/rust-sdk/pull/2270)).
+
+### Changes
+
+* [rust] Bumped `miden-note-transport-proto-build` to `0.4.1`. Notes imported from the note transport layer now use the provided `after_block_num` when present, falling back to the 20-block lookback window otherwise. `NoteInfo` gained an `after_block_num: Option<BlockNumber>` field (plus a `NoteInfo::new` constructor) and `NoteTransportClient` gained a `send_note_after` method (defaulting to `send_note`, so existing implementors keep compiling).  ([#2262](https://github.com/0xMiden/rust-sdk/issues/2262))
 
 ## 0.15.0 (2026-06-12)
 
