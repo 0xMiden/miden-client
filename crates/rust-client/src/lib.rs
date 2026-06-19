@@ -148,6 +148,8 @@ pub mod notes {
 pub mod assembly {
     pub use miden_protocol::MastForest;
     pub use miden_protocol::assembly::debuginfo::SourceManagerSync;
+    #[cfg(feature = "std")]
+    pub use miden_protocol::assembly::debuginfo::{SourceManagerExt, Uri};
     pub use miden_protocol::assembly::diagnostics::Report;
     pub use miden_protocol::assembly::diagnostics::reporting::PrintDiagnostic;
     pub use miden_protocol::assembly::mast::MastNodeExt;
@@ -170,6 +172,8 @@ pub mod asset {
         FungibleAssetDelta,
         NonFungibleAssetDelta,
         NonFungibleDeltaAction,
+        StorageMapDelta,
+        StorageSlotDelta,
     };
     pub use miden_protocol::account::{
         AccountStorageHeader,
@@ -179,6 +183,11 @@ pub mod asset {
     };
     pub use miden_protocol::asset::{
         Asset,
+        AssetAmount,
+        AssetCallbackFlag,
+        AssetCallbacks,
+        AssetComposition,
+        AssetId,
         AssetVault,
         AssetVaultKey,
         AssetWitness,
@@ -200,6 +209,7 @@ pub mod auth {
         PublicKeyCommitment,
         Signature,
     };
+    pub use miden_standards::AuthMethod;
     pub use miden_standards::account::auth::{
         AuthMultisig,
         AuthMultisigConfig,
@@ -317,8 +327,10 @@ pub use miden_tx::ExecutionOptions;
 #[cfg(feature = "testing")]
 pub mod testing {
     pub use miden_protocol::testing::account_id;
+    /// Raw access to `miden-standards` testing modules for items not curated by
+    /// `miden-client`.
+    pub use miden_standards::testing as standards;
     pub use miden_standards::testing::note::NoteBuilder;
-    pub use miden_standards::testing::*;
     pub use miden_testing::*;
 
     pub use crate::test_utils::*;
@@ -472,6 +484,11 @@ impl<AUTH> Client<AUTH> {
     /// file path).
     pub fn store_identifier(&self) -> &str {
         self.store.identifier()
+    }
+
+    /// Returns the network ID of the node the client is connected to.
+    pub async fn network_id(&self) -> Result<address::NetworkId, ClientError> {
+        Ok(self.rpc_api.get_network_id().await?)
     }
 
     // TEST HELPERS

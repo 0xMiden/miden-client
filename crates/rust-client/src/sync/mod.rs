@@ -83,6 +83,7 @@ mod state_sync_update;
 pub use state_sync_update::{
     AccountUpdates,
     PartialBlockchainUpdates,
+    PublicAccountDelta,
     PublicAccountUpdate,
     StateSyncUpdate,
     TransactionUpdateTracker,
@@ -117,12 +118,8 @@ where
 
         // Build sync state components
         let note_screener = self.note_screener();
-        let state_sync = StateSync::new(
-            self.rpc_api.clone(),
-            Some(self.store.clone()),
-            Arc::new(note_screener),
-            self.tx_discard_delta,
-        );
+        let state_sync =
+            StateSync::new(self.rpc_api.clone(), Arc::new(note_screener), self.tx_discard_delta);
         let input = self.build_sync_input().await?;
 
         let mut partial_mmr = self.get_current_partial_mmr().await?;
@@ -157,9 +154,18 @@ where
             return Ok(Vec::new());
         }
 
+        // Drain any private notes whose previous relay attempt failed. A flush
+        // error is logged, not propagated: a failing relay must not block the
+        // sync, and the entries stay durable for the next attempt.
+        if let Err(err) = self.flush_relay_outbox().await {
+            tracing::warn!(?err, "relay outbox flush failed during sync; entries retained");
+        }
+
         let cursor = self.store.get_note_transport_cursor().await?;
-        let note_tags = self.store.get_unique_note_tags().await?;
-        self.fetch_transport_notes(cursor, note_tags).await
+        let note_tags: Vec<_> = self.store.get_unique_note_tags().await?.into_iter().collect();
+        let (ids, new_cursor) = self.fetch_transport_notes(cursor, &note_tags).await?;
+        self.store.update_note_transport_cursor(new_cursor).await?;
+        Ok(ids)
     }
 
     /// Runs the full client sync.
@@ -321,7 +327,8 @@ pub struct SyncSummary {
     pub block_num: BlockNumber,
     /// IDs of new public notes that the client has received.
     pub new_public_notes: Vec<NoteId>,
-    /// IDs of private notes imported from the Note Transport Layer in this sync.
+    /// IDs of private notes imported from the Note Transport Layer in this sync. They are still
+    /// `Expected` until observed on-chain.
     ///
     /// Only populated by [`Client::sync_state`]; [`Client::sync_chain`] always leaves this empty
     /// because it does not touch the Note Transport Layer.

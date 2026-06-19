@@ -5,12 +5,12 @@ use alloc::vec::Vec;
 
 use miden_protocol::Word;
 use miden_protocol::account::delta::AccountUpdateDetails;
-use miden_protocol::account::{AccountCode, AccountId, StorageSlot, StorageSlotContent};
+use miden_protocol::account::{AccountId, StorageSlot, StorageSlotContent, StorageSlotType};
 use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::{Forest, Mmr, MmrProof};
-use miden_protocol::note::{NoteHeader, NoteId, NoteScript, NoteTag};
+use miden_protocol::note::{NoteAttachments, NoteHeader, NoteId, NoteScript, NoteTag};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 use miden_testing::{MockChain, MockChainNote};
 use miden_tx::utils::sync::RwLock;
@@ -21,15 +21,14 @@ use crate::rpc::domain::account::{
     AccountProof,
     AccountStorageDetails,
     AccountStorageMapDetails,
-    AccountStorageRequirements,
-    AccountUpdateSummary,
     AccountVaultDetails,
-    FetchedAccount,
+    GetAccountRequest,
     StorageMapEntries,
     StorageMapEntry,
+    StorageMapFetch,
 };
 use crate::rpc::domain::account_vault::{AccountVaultInfo, AccountVaultUpdate};
-use crate::rpc::domain::note::{CommittedNote, CommittedNoteMetadata, FetchedNote, NoteSyncBlock};
+use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncBlock};
 use crate::rpc::domain::nullifier::NullifierUpdate;
 use crate::rpc::domain::status::NetworkNoteStatusInfo;
 use crate::rpc::domain::storage_map::{StorageMapInfo, StorageMapUpdate};
@@ -56,6 +55,10 @@ pub struct MockRpcApi {
     oversize_threshold: usize,
     /// Note headers to report as erased in sync transaction responses.
     erased_notes: Arc<RwLock<Vec<NoteHeader>>>,
+    /// Attachment content for private notes, keyed by note ID. The [`MockChain`] stores private
+    /// notes without their attachment content (only metadata), so tests that need
+    /// `get_notes_by_id` to return private-note attachments register them here.
+    private_note_attachments: Arc<RwLock<BTreeMap<NoteId, NoteAttachments>>>,
 }
 
 impl Default for MockRpcApi {
@@ -75,12 +78,19 @@ impl MockRpcApi {
             mock_chain: Arc::new(RwLock::new(mock_chain)),
             oversize_threshold: 1000,
             erased_notes: Arc::new(RwLock::new(Vec::new())),
+            private_note_attachments: Arc::new(RwLock::new(BTreeMap::new())),
         }
     }
 
-    /// Sets the oversize threshold for `get_account_proof`. Any storage map with more
-    /// entries than this threshold, or a vault with more assets, will have the
-    /// `too_many_entries` / `too_many_assets` flags set in the response.
+    /// Registers the attachment content for a private note so that subsequent `get_notes_by_id`
+    /// responses include it, mirroring a node that stores private-note attachments on-chain.
+    pub fn register_private_note_attachments(&self, note_id: NoteId, attachments: NoteAttachments) {
+        self.private_note_attachments.write().insert(note_id, attachments);
+    }
+
+    /// Sets the oversize threshold for `get_account`. Any storage map with more entries than
+    /// this threshold, or a vault with more assets, will have the `too_many_entries` /
+    /// `too_many_assets` flags set in the response.
     #[must_use]
     pub fn with_oversize_threshold(mut self, threshold: usize) -> Self {
         self.oversize_threshold = threshold;
@@ -131,11 +141,11 @@ impl MockRpcApi {
     fn get_sync_account_vault_request(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> AccountVaultInfo {
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+        let target_block = block_to.min(chain_tip);
 
         let page_end_block: BlockNumber = (block_from.as_u32() + Self::PAGINATION_BLOCK_LIMIT)
             .min(target_block.as_u32())
@@ -144,8 +154,8 @@ impl MockRpcApi {
         let mut updates = vec![];
         for block in self.mock_chain.read().proven_blocks() {
             let block_number = block.header().block_num();
-            // Only include blocks in range (block_from, page_end_block]
-            if block_number <= block_from || block_number > page_end_block {
+            // Only include blocks in range [block_from, page_end_block]
+            if block_number < block_from || block_number > page_end_block {
                 continue;
             }
 
@@ -218,11 +228,11 @@ impl MockRpcApi {
     fn get_sync_storage_maps_request(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> StorageMapInfo {
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+        let target_block = block_to.min(chain_tip);
 
         let page_end_block: BlockNumber = (block_from.as_u32() + Self::PAGINATION_BLOCK_LIMIT)
             .min(target_block.as_u32())
@@ -231,7 +241,8 @@ impl MockRpcApi {
         let mut updates = vec![];
         for block in self.mock_chain.read().proven_blocks() {
             let block_number = block.header().block_num();
-            if block_number <= block_from || block_number > page_end_block {
+            // Only include blocks in range [block_from, page_end_block]
+            if block_number < block_from || block_number > page_end_block {
                 continue;
             }
 
@@ -326,11 +337,8 @@ impl NodeRpcClient for MockRpcApi {
                 && note_block >= block_from
                 && note_block <= block_to
             {
-                let committed = CommittedNote::new(
-                    note.id(),
-                    CommittedNoteMetadata::Full(note.metadata().clone()),
-                    note.inclusion_proof().clone(),
-                );
+                let committed =
+                    CommittedNote::new(note.id(), *note.metadata(), note.inclusion_proof().clone());
                 blocks_with_notes.entry(note_block).or_default().insert(note.id(), committed);
             }
         }
@@ -351,10 +359,8 @@ impl NodeRpcClient for MockRpcApi {
         upper_bound: SyncTarget,
     ) -> Result<ChainMmrInfo, RpcError> {
         let chain_tip = self.get_chain_tip_block_num();
-        // The mock chain doesn't distinguish committed vs proven tips, but respects
-        // explicit block numbers.
+        // The mock chain doesn't distinguish committed vs proven tips.
         let target_block = match upper_bound {
-            SyncTarget::BlockNumber(block_num) => block_num.min(chain_tip),
             SyncTarget::CommittedChainTip | SyncTarget::ProvenChainTip => chain_tip,
         };
 
@@ -366,7 +372,10 @@ impl NodeRpcClient for MockRpcApi {
 
         let mmr_delta = self
             .get_mmr()
-            .get_delta(Forest::new(from_forest), Forest::new(target_block.as_usize()))
+            .get_delta(
+                Forest::new(from_forest).unwrap(),
+                Forest::new(target_block.as_usize()).unwrap(),
+            )
             .unwrap();
 
         let block_header = self.get_block_by_num(target_block);
@@ -411,8 +420,18 @@ impl NodeRpcClient for MockRpcApi {
         for note in hit_notes {
             let fetched_note = match note {
                 MockChainNote::Private(note_id, note_metadata, note_inclusion_proof) => {
-                    let note_header = NoteHeader::new(*note_id, note_metadata.clone());
-                    FetchedNote::Private(note_header, note_inclusion_proof.clone())
+                    let attachments = self
+                        .private_note_attachments
+                        .read()
+                        .get(note_id)
+                        .cloned()
+                        .unwrap_or_else(NoteAttachments::empty);
+                    FetchedNote::Private(
+                        *note_id,
+                        *note_metadata,
+                        attachments,
+                        note_inclusion_proof.clone(),
+                    )
                 },
                 MockChainNote::Public(note, note_inclusion_proof) => {
                     FetchedNote::Public(note.clone(), note_inclusion_proof.clone())
@@ -461,58 +480,41 @@ impl NodeRpcClient for MockRpcApi {
         Ok(block_num)
     }
 
-    /// Returns the node's tracked account details for the specified account ID.
-    /// Always returns the full account for public accounts.
-    async fn get_account_details(&self, account_id: AccountId) -> Result<FetchedAccount, RpcError> {
-        let summary =
-            self.account_commitment_updates
-                .read()
-                .iter()
-                .rev()
-                .find_map(|(block_num, updates)| {
-                    updates.get(&account_id).map(|commitment| AccountUpdateSummary {
-                        commitment: *commitment,
-                        last_block_num: *block_num,
-                    })
-                });
-
-        if let Ok(account) = self.mock_chain.read().committed_account(account_id) {
-            let summary = summary.unwrap_or_else(|| AccountUpdateSummary {
-                commitment: account.to_commitment(),
-                last_block_num: BlockNumber::GENESIS,
-            });
-            Ok(FetchedAccount::new_public(account.clone(), summary))
-        } else if let Some(summary) = summary {
-            Ok(FetchedAccount::new_private(account_id, summary))
-        } else {
-            Err(RpcError::ExpectedDataMissing(format!(
-                "account {account_id} not found in mock commitment updates or mock chain"
-            )))
-        }
-    }
-
-    /// Returns the account proof for the specified account. The `known_account_code` parameter
-    /// is ignored in the mock implementation and the latest account code is always returned.
-    async fn get_account_proof(
+    /// Returns the account proof for the specified account. The `known_code` and `vault` fields
+    /// of the request are ignored in the mock implementation: the latest account code and full
+    /// asset list are always returned, and the truncation flags are set when the data exceeds
+    /// `oversize_threshold`.
+    async fn get_account(
         &self,
         account_id: AccountId,
-        account_storage_requirements: AccountStorageRequirements,
-        account_state: AccountStateAt,
-        _known_account_code: Option<AccountCode>,
-        _known_vault_commitment: Option<Word>,
+        request: GetAccountRequest,
     ) -> Result<(BlockNumber, AccountProof), RpcError> {
         let mock_chain = self.mock_chain.read();
 
-        let block_number = match account_state {
+        let block_number = match request.at {
             AccountStateAt::Block(number) => number,
             AccountStateAt::ChainTip => mock_chain.latest_block_header().block_num(),
         };
 
-        let headers = if account_id.has_public_state() {
+        let headers = if account_id.is_public() {
             let account = mock_chain.committed_account(account_id).unwrap();
 
+            // `All` enumerates the account's map slots directly — the mock can introspect the
+            // account, so it simulates the (not-yet-on-the-wire) "all storage maps" request.
+            let requested_slots: Vec<_> = match &request.storage {
+                StorageMapFetch::Skip => Vec::new(),
+                StorageMapFetch::Slots(reqs) => reqs.inner().keys().cloned().collect(),
+                StorageMapFetch::All => account
+                    .storage()
+                    .to_header()
+                    .slots()
+                    .filter(|slot| slot.slot_type() == StorageSlotType::Map)
+                    .map(|slot| slot.name().clone())
+                    .collect(),
+            };
+
             let mut map_details = vec![];
-            for slot_name in account_storage_requirements.inner().keys() {
+            for slot_name in &requested_slots {
                 if let Some(StorageSlotContent::Map(storage_map)) =
                     account.storage().get(slot_name).map(StorageSlot::content)
                 {
@@ -573,7 +575,7 @@ impl NodeRpcClient for MockRpcApi {
         &self,
         prefixes: &[u16],
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError> {
         let nullifiers = self
             .mock_chain
@@ -581,11 +583,7 @@ impl NodeRpcClient for MockRpcApi {
             .nullifier_tree()
             .entries()
             .filter_map(|(nullifier, block_num)| {
-                let within_range = if let Some(to_block) = block_to {
-                    block_num >= block_from && block_num <= to_block
-                } else {
-                    block_num >= block_from
-                };
+                let within_range = block_num >= block_from && block_num <= block_to;
 
                 if prefixes.contains(&nullifier.prefix()) && within_range {
                     Some(NullifierUpdate { nullifier, block_num })
@@ -615,27 +613,27 @@ impl NodeRpcClient for MockRpcApi {
         Ok(block)
     }
 
-    async fn get_note_script_by_root(&self, root: Word) -> Result<NoteScript, RpcError> {
-        let note = self
+    async fn get_note_script_by_root(&self, root: Word) -> Result<Option<NoteScript>, RpcError> {
+        let script = self
             .get_available_notes()
             .iter()
-            .find(|note| note.note().is_some_and(|n| Word::from(n.script().root()) == root))
-            .unwrap()
-            .clone();
+            .filter_map(|note| note.note())
+            .find(|n| Word::from(n.script().root()) == root)
+            .map(|n| n.script().clone());
 
-        Ok(note.note().unwrap().script().clone())
+        Ok(script)
     }
 
     async fn sync_storage_maps(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<StorageMapInfo, RpcError> {
         let mut all_updates = Vec::new();
         let mut current_block_from = block_from;
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+        let target_block = block_to.min(chain_tip);
 
         loop {
             let response =
@@ -657,13 +655,13 @@ impl NodeRpcClient for MockRpcApi {
     async fn sync_account_vault(
         &self,
         block_from: BlockNumber,
-        block_to: Option<BlockNumber>,
+        block_to: BlockNumber,
         account_id: AccountId,
     ) -> Result<AccountVaultInfo, RpcError> {
         let mut all_updates = Vec::new();
         let mut current_block_from = block_from;
         let chain_tip = self.get_chain_tip_block_num();
-        let target_block = block_to.unwrap_or(chain_tip).min(chain_tip);
+        let target_block = block_to.min(chain_tip);
 
         loop {
             let response =
@@ -711,7 +709,7 @@ impl NodeRpcClient for MockRpcApi {
         Ok(RpcStatusInfo {
             version: env!("CARGO_PKG_VERSION").into(),
             genesis_commitment: None,
-            store: None,
+            chain_tip: 0,
             block_producer: None,
         })
     }

@@ -7,15 +7,21 @@ use std::vec::Vec;
 use miden_client::Word;
 use miden_client::account::AccountId;
 use miden_client::note::{BlockNumber, NoteTag};
-use miden_client::store::{AccountSmtForest, StoreError};
-use miden_client::sync::{NoteTagRecord, NoteTagSource, PublicAccountUpdate, StateSyncUpdate};
+use miden_client::store::{AccountSmtForest, AccountStorageFilter, StoreError};
+use miden_client::sync::{
+    NoteTagRecord,
+    NoteTagSource,
+    PublicAccountDelta,
+    PublicAccountUpdate,
+    StateSyncUpdate,
+};
 use miden_client::utils::{Deserializable, Serializable};
 use rusqlite::{Connection, Transaction, params};
 
 use super::SqliteStore;
 use crate::note::apply_note_updates_tx;
 use crate::sql_error::SqlResultExt;
-use crate::transaction::upsert_transaction_record;
+use crate::transaction::{upsert_transaction_record, with_forest_snapshot};
 use crate::{insert_sql, subst};
 
 impl SqliteStore {
@@ -110,92 +116,119 @@ impl SqliteStore {
             account_updates,
         } = state_sync_update;
 
-        let tx = conn.transaction().into_store_error()?;
+        with_forest_snapshot(conn, smt_forest, |tx, smt_forest| {
+            // Update blockchain checkpoint (block number and peaks) only if moving forward.
+            let new_peaks_bytes = partial_blockchain_updates.new_peaks.peaks().to_vec().to_bytes();
+            const BLOCKCHAIN_CHECKPOINT_QUERY: &str = "UPDATE blockchain_checkpoint SET block_num = ?, partial_blockchain_peaks = ? WHERE block_num < ?";
+            tx.execute(
+                BLOCKCHAIN_CHECKPOINT_QUERY,
+                params![
+                    i64::from(block_num.as_u32()),
+                    new_peaks_bytes,
+                    i64::from(block_num.as_u32())
+                ],
+            )
+            .into_store_error()?;
 
-        // Update blockchain checkpoint (block number and peaks) only if moving forward.
-        let new_peaks_bytes = partial_blockchain_updates.new_peaks.peaks().to_vec().to_bytes();
-        const BLOCKCHAIN_CHECKPOINT_QUERY: &str = "UPDATE blockchain_checkpoint SET block_num = ?, partial_blockchain_peaks = ? WHERE block_num < ?";
-        tx.execute(
-            BLOCKCHAIN_CHECKPOINT_QUERY,
-            params![i64::from(block_num.as_u32()), new_peaks_bytes, i64::from(block_num.as_u32())],
-        )
-        .into_store_error()?;
-
-        for (block_header, block_has_relevant_notes) in partial_blockchain_updates.block_headers() {
-            Self::insert_block_header_tx(&tx, block_header, *block_has_relevant_notes)?;
-        }
-
-        // Insert new authentication nodes (inner nodes of the PartialBlockchain)
-        Self::insert_partial_blockchain_nodes_tx(
-            &tx,
-            partial_blockchain_updates.new_authentication_nodes(),
-        )?;
-
-        // Update notes
-        apply_note_updates_tx(&tx, &note_updates)?;
-
-        // Remove tags
-        let tags_to_remove = note_updates
-            .updated_input_notes()
-            .filter_map(|note_update| {
-                let note = note_update.inner();
-                if note.is_committed() {
-                    Some(NoteTagRecord {
-                        tag: note.metadata().expect("Committed notes should have metadata").tag(),
-                        source: NoteTagSource::Note(note.id()),
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-
-        for tag in tags_to_remove {
-            remove_note_tag_tx(&tx, tag)?;
-        }
-
-        for transaction_record in transaction_updates
-            .committed_transactions()
-            .chain(transaction_updates.discarded_transactions())
-        {
-            upsert_transaction_record(&tx, transaction_record)?;
-        }
-
-        // Remove the accounts that are originated from the discarded transactions
-        let discarded_states: Vec<(AccountId, Word)> = transaction_updates
-            .discarded_transactions()
-            .map(|tx| (tx.details.account_id, tx.details.final_account_state))
-            .collect();
-
-        let mut smt_forest = smt_forest.write().expect("smt_forest write lock not poisoned");
-        Self::undo_account_state(&tx, &mut smt_forest, &discarded_states)?;
-
-        // For committed transactions, release the old staged roots.
-        for committed_tx in transaction_updates.committed_transactions() {
-            smt_forest.commit_roots(committed_tx.details.account_id);
-        }
-
-        // Update public accounts on the db that have been updated onchain
-        for update in account_updates.updated_public_accounts() {
-            match update {
-                PublicAccountUpdate::Full(account) => {
-                    Self::update_account_state(&tx, &mut smt_forest, account)?;
-                },
-                PublicAccountUpdate::Delta { new_header, delta } => {
-                    Self::apply_sync_account_delta(&tx, &mut smt_forest, new_header, delta)?;
-                },
+            for (block_header, block_has_relevant_notes) in
+                partial_blockchain_updates.block_headers()
+            {
+                Self::insert_block_header_tx(tx, block_header, *block_has_relevant_notes)?;
             }
-        }
-        drop(smt_forest);
 
-        for (account_id, digest) in account_updates.mismatched_private_accounts() {
-            Self::lock_account_on_unexpected_commitment(&tx, account_id, digest)?;
-        }
+            // Insert new authentication nodes (inner nodes of the PartialBlockchain)
+            Self::insert_partial_blockchain_nodes_tx(
+                tx,
+                partial_blockchain_updates.new_authentication_nodes(),
+            )?;
 
-        // Commit the updates
-        tx.commit().into_store_error()?;
+            // Update notes
+            apply_note_updates_tx(tx, &note_updates)?;
 
-        Ok(())
+            // Remove tags
+            let tags_to_remove = note_updates
+                .updated_input_notes()
+                .filter_map(|note_update| {
+                    let note = note_update.inner();
+                    if note.is_committed() {
+                        Some(NoteTagRecord {
+                            tag: note
+                                .metadata()
+                                .expect("Committed notes should have metadata")
+                                .tag(),
+                            source: NoteTagSource::Note(note.details_commitment()),
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            for tag in tags_to_remove {
+                remove_note_tag_tx(tx, tag)?;
+            }
+
+            for transaction_record in transaction_updates
+                .committed_transactions()
+                .chain(transaction_updates.discarded_transactions())
+            {
+                upsert_transaction_record(tx, transaction_record)?;
+            }
+
+            // Remove the accounts that are originated from the discarded transactions
+            let discarded_states: Vec<(AccountId, Word)> = transaction_updates
+                .discarded_transactions()
+                .map(|tx| (tx.details.account_id, tx.details.final_account_state))
+                .collect();
+
+            Self::undo_account_state(tx, smt_forest, &discarded_states)?;
+
+            // For committed transactions, release the old staged roots.
+            for committed_tx in transaction_updates.committed_transactions() {
+                smt_forest.commit_roots(committed_tx.details.account_id);
+            }
+
+            // Update public accounts on the db that have been updated onchain
+            for update in account_updates.updated_public_accounts() {
+                match update {
+                    PublicAccountUpdate::Full(account) => {
+                        Self::update_account_state(tx, smt_forest, account)?;
+                    },
+                    PublicAccountUpdate::Delta(delta) => {
+                        Self::apply_public_account_delta(tx, smt_forest, delta)?;
+                    },
+                }
+            }
+
+            for (account_id, digest) in account_updates.mismatched_private_accounts() {
+                Self::lock_account_on_unexpected_commitment(tx, account_id, digest)?;
+            }
+
+            Ok(())
+        })
+    }
+
+    /// Reads the local account state, derives the [`AccountDelta`] from `delta`'s incremental
+    /// payload, and applies it.
+    fn apply_public_account_delta(
+        tx: &Transaction<'_>,
+        smt_forest: &mut AccountSmtForest,
+        delta: &PublicAccountDelta,
+    ) -> Result<(), StoreError> {
+        let account_id = delta.id();
+        let local_header = Self::get_account_header(tx, account_id)?
+            .map(|(header, _)| header)
+            .ok_or(StoreError::AccountDataNotFound(account_id))?;
+        let local_storage = Self::get_account_storage(
+            tx,
+            account_id,
+            &AccountStorageFilter::SlotNames(delta.value_slot_names()),
+        )?;
+        let local_vault = Self::get_account_vault(tx, account_id)?;
+
+        let account_delta =
+            delta.compute_account_delta(&local_header, &local_storage, &local_vault)?;
+        Self::apply_sync_account_delta(tx, smt_forest, delta.new_header(), &account_delta)
     }
 }
 

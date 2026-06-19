@@ -1,0 +1,9 @@
+# Compiler output
+/out/
+/cache/
+
+# Test vector output (generated at runtime)
+/test-vectors/
+
+# Dependencies (installed via forge install)
+/lib/
