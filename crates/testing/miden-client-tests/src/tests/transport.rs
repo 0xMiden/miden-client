@@ -51,8 +51,9 @@ async fn transport_basic() {
     // public wallet purely to source a valid public account id for the attachment.
     let (mut target_client, target_keystore) =
         create_test_client_transport(mock_node.clone()).await;
-    let target =
-        insert_new_wallet(&mut target_client, AccountType::Public, &target_keystore).await.unwrap();
+    let target = insert_new_wallet(&mut target_client, AccountType::Public, &target_keystore)
+        .await
+        .unwrap();
 
     // Create a note carrying a NetworkAccountTarget attachment.
     let ntx_target = NetworkAccountTarget::new(target.id(), NoteExecutionHint::Always).unwrap();
