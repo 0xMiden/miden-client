@@ -14,6 +14,9 @@ on:
 permissions:
   contents: read
 
+env:
+  RELEASE_TAG: ${{ inputs.version || github.event.release.tag_name }}
+
 jobs:
   publish:
     runs-on: ubuntu-24.04
@@ -60,7 +63,6 @@ jobs:
       - name: Publish unpublished crates
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
 
