@@ -6,7 +6,14 @@ use miden_client::account::{Account, AccountType};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{NoteAttachments, NoteDetails, NoteTag, NoteType};
+use miden_client::note::{
+    NetworkAccountTarget,
+    NoteAttachments,
+    NoteDetails,
+    NoteExecutionHint,
+    NoteTag,
+    NoteType,
+};
 use miden_client::note_transport::NoteTransportClient;
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::create_test_store_path;
@@ -40,13 +47,22 @@ async fn transport_basic() {
         .with_routing_parameters(RoutingParameters::new(AddressInterface::BasicWallet));
     let (mut observer, _observer_account) = create_test_user_transport(mock_node.clone()).await;
 
-    // Create note
+    // A `NetworkAccountTarget` attachment requires a public target account, so mint a throwaway
+    // public wallet purely to source a valid public account id for the attachment.
+    let (mut target_client, target_keystore) =
+        create_test_client_transport(mock_node.clone()).await;
+    let target =
+        insert_new_wallet(&mut target_client, AccountType::Public, &target_keystore).await.unwrap();
+
+    // Create a note carrying a NetworkAccountTarget attachment.
+    let ntx_target = NetworkAccountTarget::new(target.id(), NoteExecutionHint::Always).unwrap();
+    let attachments = NoteAttachments::new(vec![ntx_target.into()]).unwrap();
     let note = P2idNote::create(
         sender_account.id(),
         recipient_account.id(),
         vec![],
         NoteType::Private,
-        NoteAttachments::empty(),
+        attachments.clone(),
         sender.rng(),
     )
     .unwrap();
@@ -65,6 +81,13 @@ async fn transport_basic() {
     recipient.sync_state().await.unwrap();
     let notes = recipient.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 1);
+
+    // The received note must retain the attachments it was sent with.
+    assert_eq!(
+        notes[0].attachments(),
+        &attachments,
+        "recipient should receive the note with its original attachments",
+    );
 
     // Sync again, should be only 1 note stored
     recipient.sync_state().await.unwrap();
