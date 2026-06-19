@@ -805,9 +805,9 @@ impl StateSync {
         Ok(PublicAccountSync::Apply(Box::new(public_update)))
     }
 
-    /// Validates that a `get_account` proof is bound to the sync target: it must be for the
-    /// requested `account_id`, at the target block, and its witness must open under the target
-    /// header's account root. Returns the account details on success.
+    /// Validates that a `get_account` proof is bound to the sync target `chain_tip_header`: it must
+    /// be for the requested `account_id`, at the target block, and its witness must open under the
+    /// target header's account root. Returns the account details on success.
     fn validate_account_proof(
         proof: AccountProof,
         proof_block_num: BlockNumber,
@@ -824,8 +824,7 @@ impl StateSync {
 
         let (witness, details) = proof.into_parts();
 
-        // AccountProof::new checks the returned fields are internally consistent; bind them to the
-        // account requested for this sync step.
+        // The witness is internally consistent but not yet tied to the account we requested.
         if witness.id() != account_id {
             return Err(ClientError::ChainValidationError(format!(
                 "get_account returned account {} but {account_id} was requested",
@@ -1370,6 +1369,26 @@ mod tests {
         let (proof_block_num, proof) = get_account_proof(&rpc_api, account.id()).await;
         let result =
             StateSync::validate_account_proof(proof, proof_block_num, account.id(), &wrong_header);
+
+        assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
+    }
+
+    /// `validate_account_proof` rejects a proof reported for a block other than the sync target.
+    #[tokio::test]
+    async fn validate_account_proof_rejects_wrong_block() {
+        let mut builder = MockChainBuilder::new();
+        let account = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
+        let rpc_api = MockRpcApi::new(builder.build().unwrap());
+        let chain_tip_header = rpc_api.mock_chain.read().latest_block_header();
+
+        // An honest proof, but reported at a block other than the target.
+        let (proof_block_num, proof) = get_account_proof(&rpc_api, account.id()).await;
+        let result = StateSync::validate_account_proof(
+            proof,
+            proof_block_num + 1,
+            account.id(),
+            &chain_tip_header,
+        );
 
         assert!(matches!(result, Err(ClientError::ChainValidationError(_))));
     }
