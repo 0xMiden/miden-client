@@ -349,7 +349,8 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// For a fully oversize-resolved account, use [`NodeRpcClient::get_account_details`].
     ///
-    /// Errors if the account isn't found.
+    /// Errors if the account isn't found or the block number of the requested account doesn't match
+    /// the response block number.
     async fn get_account(
         &self,
         account_id: AccountId,
