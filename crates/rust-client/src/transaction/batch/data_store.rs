@@ -4,14 +4,16 @@ use alloc::vec::Vec;
 
 use miden_protocol::account::{
     Account,
+    AccountDelta,
     AccountId,
     PartialAccount,
-    PartialStorage,
     StorageMapKey,
     StorageMapWitness,
+    StorageSlotContent,
 };
-use miden_protocol::asset::{AssetVaultKey, AssetWitness, PartialVault};
+use miden_protocol::asset::{AssetVaultKey, AssetWitness};
 use miden_protocol::block::{BlockHeader, BlockNumber};
+use miden_protocol::errors::AccountDeltaError;
 use miden_protocol::note::{NoteScript, NoteScriptRoot};
 use miden_protocol::transaction::{AccountInputs, PartialBlockchain};
 use miden_protocol::vm::FutureMaybeSend;
@@ -24,38 +26,34 @@ use crate::store::data_store::ClientDataStore;
 // ================================================================================================
 
 /// A [`DataStore`] that lets a [`crate::transaction::BatchBuilder`] stack in-memory account
-/// inputs for any number of local accounts. For each account registered in `current_accounts`,
-/// the executor sees the in-batch partial account state instead of the stale store state. All
-/// other reads pass through to the inner [`ClientDataStore`].
+/// inputs for any number of local accounts. For each account pushed into the batch, an
+/// accumulated [`AccountDelta`] is kept; the executor sees the in-batch account state (the
+/// persisted account with that delta applied) instead of the stale store state. All other
+/// reads pass through to the inner [`ClientDataStore`].
 pub(crate) struct InMemoryBatchDataStore {
     inner: ClientDataStore,
-    current_accounts: BTreeMap<AccountId, PartialAccount>,
-    execution_accounts: BTreeMap<AccountId, Account>,
+    account_deltas: BTreeMap<AccountId, AccountDelta>,
 }
 
 impl InMemoryBatchDataStore {
     /// Wraps the provided [`ClientDataStore`] with an empty in-batch account cache.
     pub(crate) fn new(inner: ClientDataStore) -> Self {
-        Self {
-            inner,
-            current_accounts: BTreeMap::new(),
-            execution_accounts: BTreeMap::new(),
+        Self { inner, account_deltas: BTreeMap::new() }
+    }
+
+    /// Merges `delta` into the accumulated in-batch delta for `account_id`, so later
+    /// transactions in the same batch targeting `account_id` observe its post-state.
+    pub(crate) fn cache_account(
+        &mut self,
+        account_id: AccountId,
+        delta: AccountDelta,
+    ) -> Result<(), AccountDeltaError> {
+        if let Some(existing) = self.account_deltas.get_mut(&account_id) {
+            existing.merge(delta)?;
+        } else {
+            self.account_deltas.insert(account_id, delta);
         }
-    }
-
-    /// Returns the full in-batch account state for `id`, if a transaction earlier in the
-    /// batch has cached one. A return of `None` means subsequent transactions targeting
-    /// this account will load the store's state first.
-    pub(crate) fn get_account(&self, id: AccountId) -> Option<&Account> {
-        self.execution_accounts.get(&id)
-    }
-
-    /// Records the post-execution state of an account so that later transactions in the
-    /// same batch targeting `id` observe the in-batch state. Overwrites any previously
-    /// cached entry for `id`.
-    pub(crate) fn cache_account(&mut self, id: AccountId, new_state: Account) {
-        self.current_accounts.insert(id, full_partial_account(&new_state));
-        self.execution_accounts.insert(id, new_state);
+        Ok(())
     }
 
     /// Returns the inner [`ClientDataStore`]'s MAST store so callers can load account
@@ -78,18 +76,20 @@ impl InMemoryBatchDataStore {
     pub(crate) fn register_note_scripts(&self, note_scripts: impl IntoIterator<Item = NoteScript>) {
         self.inner.register_note_scripts(note_scripts);
     }
-}
 
-fn full_partial_account(account: &Account) -> PartialAccount {
-    PartialAccount::new(
-        account.id(),
-        account.nonce(),
-        account.code().clone(),
-        PartialStorage::new_full(account.storage().clone()),
-        PartialVault::new_full(account.vault().clone()),
-        account.seed(),
-    )
-    .expect("account should ensure that seed is valid for account")
+    pub(crate) async fn current_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Account, DataStoreError> {
+        let mut account = self.inner.load_account(account_id).await?;
+        if let Some(delta) = self.account_deltas.get(&account_id) {
+            account.apply_delta(delta).map_err(|err| {
+                DataStoreError::other_with_source("failed to apply in-batch account delta", err)
+            })?;
+        }
+
+        Ok(account)
+    }
 }
 
 // DATA STORE IMPL
@@ -104,8 +104,8 @@ impl DataStore for InMemoryBatchDataStore {
         let (mut partial_account, block_header, partial_blockchain) =
             self.inner.get_transaction_inputs(account_id, ref_blocks).await?;
 
-        if let Some(account) = self.current_accounts.get(&account_id) {
-            partial_account = account.clone();
+        if self.account_deltas.contains_key(&account_id) {
+            partial_account = PartialAccount::from(&self.current_account(account_id).await?);
         }
 
         Ok((partial_account, block_header, partial_blockchain))
@@ -117,7 +117,8 @@ impl DataStore for InMemoryBatchDataStore {
         vault_root: Word,
         vault_keys: BTreeSet<AssetVaultKey>,
     ) -> Result<Vec<AssetWitness>, DataStoreError> {
-        if let Some(account) = self.current_accounts.get(&account_id) {
+        if self.account_deltas.contains_key(&account_id) {
+            let account = self.current_account(account_id).await?;
             let vault = account.vault();
             let in_batch_root = vault.root();
             if in_batch_root != vault_root {
@@ -125,16 +126,8 @@ impl DataStore for InMemoryBatchDataStore {
                     "vault root mismatch for account {account_id}: in-batch root = {in_batch_root:?}, requested root = {vault_root:?}",
                 )));
             }
-            vault_keys
-                .into_iter()
-                .map(|key| {
-                    vault.open(key).map_err(|err| {
-                        DataStoreError::other(format!(
-                            "vault asset witness not found in in-batch account state for account {account_id}: {err}",
-                        ))
-                    })
-                })
-                .collect()
+            let witnesses = vault_keys.into_iter().map(|key| vault.open(key)).collect();
+            Ok(witnesses)
         } else {
             self.inner.get_vault_asset_witnesses(account_id, vault_root, vault_keys).await
         }
@@ -146,21 +139,21 @@ impl DataStore for InMemoryBatchDataStore {
         map_root: Word,
         map_key: StorageMapKey,
     ) -> Result<StorageMapWitness, DataStoreError> {
-        if let Some(account) = self.current_accounts.get(&account_id) {
-            for map in account.storage().maps() {
-                if map.root() == map_root {
-                    return map.open(&map_key).map_err(|err| {
-                        DataStoreError::other(format!(
-                            "storage map witness not found in in-batch account state for account {account_id}: {err}",
-                        ))
-                    });
+        if self.account_deltas.contains_key(&account_id) {
+            let account = self.current_account(account_id).await?;
+            for slot in account.storage().slots() {
+                if let StorageSlotContent::Map(map) = slot.content()
+                    && map.root() == map_root
+                {
+                    return Ok(map.open(&map_key));
                 }
             }
-            return Err(DataStoreError::other(format!(
+            Err(DataStoreError::other(format!(
                 "storage map root not found in in-batch account state for account {account_id}: requested root = {map_root:?}",
-            )));
+            )))
+        } else {
+            self.inner.get_storage_map_witness(account_id, map_root, map_key).await
         }
-        self.inner.get_storage_map_witness(account_id, map_root, map_key).await
     }
 
     async fn get_foreign_account_inputs(

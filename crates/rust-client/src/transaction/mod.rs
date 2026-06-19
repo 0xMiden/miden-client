@@ -349,9 +349,28 @@ where
         account: &Account,
         transaction_request: TransactionRequest,
     ) -> Result<PreparedTransaction, ClientError> {
+        self.prepare_transaction_inner(account, transaction_request, true).await
+    }
+
+    pub(crate) async fn prepare_transaction_for_batch(
+        &self,
+        account: &Account,
+        transaction_request: TransactionRequest,
+    ) -> Result<PreparedTransaction, ClientError> {
+        self.prepare_transaction_inner(account, transaction_request, false).await
+    }
+
+    async fn prepare_transaction_inner(
+        &self,
+        account: &Account,
+        transaction_request: TransactionRequest,
+        validate_account: bool,
+    ) -> Result<PreparedTransaction, ClientError> {
         let account_id = account.id();
         self.validate_recency().await?;
-        validate_account_request(&transaction_request, account)?;
+        if validate_account {
+            validate_account_request(&transaction_request, account)?;
+        }
 
         // Retrieve all input notes from the store.
         let mut stored_note_records = self

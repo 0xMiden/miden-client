@@ -56,7 +56,7 @@ use alloc::vec::Vec;
 pub(crate) use data_store::InMemoryBatchDataStore;
 pub use error::BatchBuilderError;
 use miden_protocol::MIN_PROOF_SECURITY_LEVEL;
-use miden_protocol::account::{Account, AccountId};
+use miden_protocol::account::AccountId;
 use miden_protocol::batch::ProposedBatch;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::NoteId;
@@ -272,23 +272,14 @@ async fn execute_transaction_for_batch<AUTH>(
 where
     AUTH: TransactionAuthenticator + Sync + 'static,
 {
-    let mut account = if let Some(account) = data_store.get_account(account_id) {
-        account.clone()
-    } else {
-        let record = client
-            .store
-            .get_account(account_id)
-            .await?
-            .ok_or(ClientError::AccountDataNotFound(account_id))?;
-        if record.is_locked() {
-            return Err(ClientError::AccountLocked(account_id));
-        }
-        let account: Account = record.try_into()?;
-        account
-    };
+    if client.account_reader(account_id).status().await?.is_locked() {
+        return Err(ClientError::AccountLocked(account_id));
+    }
+
+    let account = data_store.current_account(account_id).await?;
 
     let account_id = account.id();
-    let prep = client.prepare_transaction(&account, transaction_request).await?;
+    let prep = client.prepare_transaction_for_batch(&account, transaction_request).await?;
 
     data_store.register_note_scripts(prep.output_note_scripts());
     for fpi_account in &prep.foreign_account_inputs {
@@ -309,12 +300,13 @@ where
         .build_executor(data_store)?
         .execute_transaction(account_id, prep.block_num, notes, prep.tx_args)
         .await?;
+    let account_delta = executed_transaction.account_delta().clone();
 
-    // Cache new account state in memory data store
-    account
-        .apply_delta(executed_transaction.account_delta())
-        .map_err(ClientError::AccountError)?;
-    data_store.cache_account(account_id, account);
+    // Merge this transaction's delta into the batch's in-memory state so later pushes for this
+    // account observe its post-state.
+    data_store
+        .cache_account(account_id, account_delta)
+        .map_err(|err| ClientError::StoreError(crate::store::StoreError::AccountDeltaError(err)))?;
 
     validate_executed_transaction(&executed_transaction, &prep.output_recipients)?;
     TransactionResult::new(executed_transaction, prep.future_notes)

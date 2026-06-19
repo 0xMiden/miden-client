@@ -63,6 +63,21 @@ impl ClientDataStore {
         self.cache.mast_store.clone()
     }
 
+    pub(crate) async fn load_account(
+        &self,
+        account_id: AccountId,
+    ) -> Result<Account, DataStoreError> {
+        let account_record = self
+            .store
+            .get_account(account_id)
+            .await?
+            .ok_or(DataStoreError::AccountNotFound(account_id))?;
+
+        account_record
+            .try_into()
+            .map_err(|_| DataStoreError::AccountNotFound(account_id))
+    }
+
     /// Stores the provided foreign account inputs so they can be served to the executor upon
     /// request.
     pub fn register_foreign_account_inputs(
