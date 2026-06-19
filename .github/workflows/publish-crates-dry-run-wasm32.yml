@@ -35,4 +35,5 @@ jobs:
         run: |
           cargo publish --workspace --dry-run \
             --target wasm32-unknown-unknown \
-            --package miden-client
+            --package miden-client \
+            --no-default-features
