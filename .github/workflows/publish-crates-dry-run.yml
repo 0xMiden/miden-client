@@ -28,8 +28,30 @@ jobs:
         run: |
           rustup update --no-self-update
 
+      - name: Extract crate version from Cargo.toml
+        id: extract_version
+        run: |
+          VERSION=$(yq eval '.workspace.package.version // .package.version' Cargo.toml)
+          echo "RELEASE_TAG=$VERSION" >> $GITHUB_ENV
+
       - name: Dry run - publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
+          set -euo pipefail
+
+          version="${RELEASE_TAG#v}"
+          metadata="$(cargo metadata --no-deps --format-version 1)"
+
+          mapfile -t publishable_crates < <(
+            jq -r '[.packages[] | select(.publish != []) | .name] | sort | .[]' <<< "${metadata}"
+          )
+
+          for crate in "${publishable_crates[@]}"; do
+            if cargo info --quiet --registry crates-io "${crate}@${version}" >/dev/null 2>&1; then
+              echo "${crate} ${version} already exists on crates.io; excluding it."
+              exit 1
+            fi
+          done
+
           cargo publish --workspace --dry-run
