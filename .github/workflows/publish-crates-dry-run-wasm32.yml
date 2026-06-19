@@ -33,7 +33,7 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
-          cargo publish --workspace --dry-run \
+          cargo publish --dry-run \
             --target wasm32-unknown-unknown \
             --package miden-client \
             --no-default-features
