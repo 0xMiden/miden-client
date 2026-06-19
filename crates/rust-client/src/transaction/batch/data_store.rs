@@ -6,11 +6,11 @@ use miden_protocol::account::{
     Account,
     AccountId,
     PartialAccount,
+    PartialStorage,
     StorageMapKey,
     StorageMapWitness,
-    StorageSlotContent,
 };
-use miden_protocol::asset::{AssetVaultKey, AssetWitness};
+use miden_protocol::asset::{AssetVaultKey, AssetWitness, PartialVault};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::note::{NoteScript, NoteScriptRoot};
 use miden_protocol::transaction::{AccountInputs, PartialBlockchain};
@@ -24,32 +24,38 @@ use crate::store::data_store::ClientDataStore;
 // ================================================================================================
 
 /// A [`DataStore`] that lets a [`crate::transaction::BatchBuilder`] stack in-memory account
-/// states for any number of local accounts. For each account registered in
-/// `current_accounts`, the executor sees the in-batch state instead of the stale store state.
-/// All other reads pass through to the inner [`ClientDataStore`].
+/// inputs for any number of local accounts. For each account registered in `current_accounts`,
+/// the executor sees the in-batch partial account state instead of the stale store state. All
+/// other reads pass through to the inner [`ClientDataStore`].
 pub(crate) struct InMemoryBatchDataStore {
     inner: ClientDataStore,
-    current_accounts: BTreeMap<AccountId, Account>,
+    current_accounts: BTreeMap<AccountId, PartialAccount>,
+    execution_accounts: BTreeMap<AccountId, Account>,
 }
 
 impl InMemoryBatchDataStore {
     /// Wraps the provided [`ClientDataStore`] with an empty in-batch account cache.
     pub(crate) fn new(inner: ClientDataStore) -> Self {
-        Self { inner, current_accounts: BTreeMap::new() }
+        Self {
+            inner,
+            current_accounts: BTreeMap::new(),
+            execution_accounts: BTreeMap::new(),
+        }
     }
 
-    /// Returns the in-batch account state for `id`, if a transaction earlier in the batch
-    /// has cached one. A return of `None` means subsequent transactions targeting this
-    /// account will see the store's state instead.
+    /// Returns the full in-batch account state for `id`, if a transaction earlier in the
+    /// batch has cached one. A return of `None` means subsequent transactions targeting
+    /// this account will load the store's state first.
     pub(crate) fn get_account(&self, id: AccountId) -> Option<&Account> {
-        self.current_accounts.get(&id)
+        self.execution_accounts.get(&id)
     }
 
     /// Records the post-execution state of an account so that later transactions in the
     /// same batch targeting `id` observe the in-batch state. Overwrites any previously
     /// cached entry for `id`.
     pub(crate) fn cache_account(&mut self, id: AccountId, new_state: Account) {
-        self.current_accounts.insert(id, new_state);
+        self.current_accounts.insert(id, full_partial_account(&new_state));
+        self.execution_accounts.insert(id, new_state);
     }
 
     /// Returns the inner [`ClientDataStore`]'s MAST store so callers can load account
@@ -74,6 +80,18 @@ impl InMemoryBatchDataStore {
     }
 }
 
+fn full_partial_account(account: &Account) -> PartialAccount {
+    PartialAccount::new(
+        account.id(),
+        account.nonce(),
+        account.code().clone(),
+        PartialStorage::new_full(account.storage().clone()),
+        PartialVault::new_full(account.vault().clone()),
+        account.seed(),
+    )
+    .expect("account should ensure that seed is valid for account")
+}
+
 // DATA STORE IMPL
 // ================================================================================================
 
@@ -87,7 +105,7 @@ impl DataStore for InMemoryBatchDataStore {
             self.inner.get_transaction_inputs(account_id, ref_blocks).await?;
 
         if let Some(account) = self.current_accounts.get(&account_id) {
-            partial_account = PartialAccount::from(account);
+            partial_account = account.clone();
         }
 
         Ok((partial_account, block_header, partial_blockchain))
@@ -107,8 +125,16 @@ impl DataStore for InMemoryBatchDataStore {
                     "vault root mismatch for account {account_id}: in-batch root = {in_batch_root:?}, requested root = {vault_root:?}",
                 )));
             }
-            let witnesses = vault_keys.into_iter().map(|key| vault.open(key)).collect();
-            Ok(witnesses)
+            vault_keys
+                .into_iter()
+                .map(|key| {
+                    vault.open(key).map_err(|err| {
+                        DataStoreError::other(format!(
+                            "vault asset witness not found in in-batch account state for account {account_id}: {err}",
+                        ))
+                    })
+                })
+                .collect()
         } else {
             self.inner.get_vault_asset_witnesses(account_id, vault_root, vault_keys).await
         }
@@ -121,11 +147,13 @@ impl DataStore for InMemoryBatchDataStore {
         map_key: StorageMapKey,
     ) -> Result<StorageMapWitness, DataStoreError> {
         if let Some(account) = self.current_accounts.get(&account_id) {
-            for slot in account.storage().slots() {
-                if let StorageSlotContent::Map(map) = slot.content()
-                    && map.root() == map_root
-                {
-                    return Ok(map.open(&map_key));
+            for map in account.storage().maps() {
+                if map.root() == map_root {
+                    return map.open(&map_key).map_err(|err| {
+                        DataStoreError::other(format!(
+                            "storage map witness not found in in-batch account state for account {account_id}: {err}",
+                        ))
+                    });
                 }
             }
             return Err(DataStoreError::other(format!(
