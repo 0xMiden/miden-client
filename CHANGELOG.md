@@ -5,6 +5,7 @@
 ### Fixes
 
 * [FIX][rust] State sync now range-checks `sync_transactions` records to `(current, chain_tip]`, rejecting out-of-range records that could forge transaction commit heights ([#2252](https://github.com/0xMiden/miden-client/pull/2252)).
+* [FIX][rust] `Endpoint` parsing now strips a trailing slash from the host of no-port endpoints such as `http://host/`, matching the cleanup already applied when a port is present ([#2268](https://github.com/0xMiden/miden-client/pull/2268)).
 
 ## 0.15.0 (2026-06-12)
 
