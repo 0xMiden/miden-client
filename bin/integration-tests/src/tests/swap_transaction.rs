@@ -184,14 +184,14 @@ pub async fn test_swap_public_payback(client_config: ClientConfig) -> Result<()>
 
     let (account_a, ..) = insert_new_wallet(
         &mut client1,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_1,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
     let (account_b, ..) = insert_new_wallet(
         &mut client2,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_2,
         RPO_FALCON_SCHEME_ID,
     )
@@ -199,14 +199,14 @@ pub async fn test_swap_public_payback(client_config: ClientConfig) -> Result<()>
 
     let (btc_faucet_account, _) = insert_new_fungible_faucet(
         &mut client1,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_1,
         RPO_FALCON_SCHEME_ID,
     )
     .await?;
     let (eth_faucet_account, _) = insert_new_fungible_faucet(
         &mut client2,
-        AccountStorageMode::Private,
+        AccountType::Private,
         &authenticator_2,
         RPO_FALCON_SCHEME_ID,
     )
@@ -267,12 +267,14 @@ pub async fn test_swap_public_payback(client_config: ClientConfig) -> Result<()>
     execute_tx_and_sync(&mut client2, account_b.id(), tx_request).await?;
 
     client1.sync_state().await?;
-    info!(note_id = %expected_payback_note_details[0].id(), account_id = %account_a.id(), "Consuming public payback note on client 1");
+    let payback_commitment = expected_payback_note_details[0].commitment();
+    info!(note = %payback_commitment.to_hex(), account_id = %account_a.id(), "Consuming public payback note on client 1");
 
-    let note = client1
-        .get_input_note(expected_payback_note_details[0].id())
+    let note: Note = client1
+        .get_input_notes(NoteFilter::DetailsCommitments(vec![payback_commitment]))
         .await?
-        .unwrap()
+        .pop()
+        .with_context(|| format!("Payback note {} not found", payback_commitment.to_hex()))?
         .try_into()?;
     let tx_request = TransactionRequestBuilder::new().build_consume_notes(vec![note])?;
     execute_tx_and_sync(&mut client1, account_a.id(), tx_request).await?;

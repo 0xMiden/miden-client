@@ -2617,26 +2617,18 @@ async fn swap_chain_test() {
 async fn swap_public_payback_test() {
     let (mut client, mock_rpc_api, keystore) = create_test_client().await;
 
-    let (wallet_a, faucet_a) = setup_wallet_and_faucet(
-        &mut client,
-        AccountStorageMode::Private,
-        &keystore,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await
-    .unwrap();
+    let (wallet_a, faucet_a) =
+        setup_wallet_and_faucet(&mut client, AccountType::Private, &keystore, RPO_FALCON_SCHEME_ID)
+            .await
+            .unwrap();
     mint_and_consume(&mut client, wallet_a.id(), faucet_a.id(), NoteType::Private).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
 
-    let (wallet_b, faucet_b) = setup_wallet_and_faucet(
-        &mut client,
-        AccountStorageMode::Private,
-        &keystore,
-        RPO_FALCON_SCHEME_ID,
-    )
-    .await
-    .unwrap();
+    let (wallet_b, faucet_b) =
+        setup_wallet_and_faucet(&mut client, AccountType::Private, &keystore, RPO_FALCON_SCHEME_ID)
+            .await
+            .unwrap();
     mint_and_consume(&mut client, wallet_b.id(), faucet_b.id(), NoteType::Private).await;
     mock_rpc_api.prove_block();
     client.sync_state().await.unwrap();
