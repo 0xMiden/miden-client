@@ -27,6 +27,7 @@ jobs:
       - name: Update Rust toolchain
         run: |
           rustup update --no-self-update
+          rustup target add wasm32-unknown-unknown
 
       - name: Dry run - publish
         env:
