@@ -49,7 +49,7 @@ jobs:
 
           for crate in "${publishable_crates[@]}"; do
             if cargo info --quiet --registry crates-io "${crate}@${version}" >/dev/null 2>&1; then
-              echo "${crate} ${version} already exists on crates.io; excluding it."
+              echo "${crate} ${version} already exists on crates.io."
               exit 1
             fi
           done
