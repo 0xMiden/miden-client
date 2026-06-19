@@ -186,7 +186,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// Implementations must verify that the returned block's number matches the requested
     /// `block_num` and return [`RpcError::InvalidResponse`] otherwise.
     ///
-    /// Errors:
+    /// # Errors:
     /// - [`RpcError::InvalidResponse`] if the node returns a block whose number does not match the
     ///   requested `block_num`.
     async fn get_block_by_number(
