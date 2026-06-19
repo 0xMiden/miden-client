@@ -409,7 +409,7 @@ impl NodeRpcClient for GrpcClient {
             && block_header.block_num() != requested
         {
             return Err(RpcError::InvalidResponse(format!(
-                "node returned header for block {} for requested block {requested}",
+                "node returned header for block {} but block {requested} was requested",
                 block_header.block_num(),
             )));
         }
@@ -726,7 +726,7 @@ impl NodeRpcClient for GrpcClient {
 
         if block.header().block_num() != block_num {
             return Err(RpcError::InvalidResponse(format!(
-                "node returned block {} for requested block {block_num}",
+                "node returned header for block {} but block {block_num} was requested",
                 block.header().block_num(),
             )));
         }
