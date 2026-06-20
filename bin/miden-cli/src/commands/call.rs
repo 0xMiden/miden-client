@@ -5,11 +5,12 @@ use std::path::{Path, PathBuf};
 use clap::Parser;
 use miden_client::assembly::CodeBuilder;
 use miden_client::keystore::Keystore;
-use miden_client::package_debug_info::{TypedProcInfo, parse_felt_token};
 use miden_client::transaction::{AdviceInputs, TransactionRequestBuilder, TransactionScript};
 use miden_client::vm::{Package, PackageExport};
 use miden_client::{Client, Deserializable, Felt, Word};
+use miden_mast_package::debug_info::typed::TypedProcInfo;
 
+use crate::codecs::with_cli_codecs;
 use crate::errors::CliError;
 use crate::utils::{parse_account_id, print_executed_program_stack, print_executed_transaction};
 
@@ -54,14 +55,14 @@ impl CallCmd {
         let package = load_package(&self.package)?;
         let digest = resolve_procedure_digest(&package, procedure)?;
 
-        let typed = TypedProcInfo::resolve(&package, procedure);
+        let typed = TypedProcInfo::from_package(&package, procedure).map(with_cli_codecs);
 
         // Print the signature and get the expected arg count and result size. `None` means
         // it's unknown: on the raw path the manifest carries no param count; on the typed path a
         // parameter has no fixed token size (e.g. a dynamic array).
         let (expected_args, result_count) = if let Some(t) = &typed {
-            println!("Signature: {}\n", t.format_signature());
-            (t.expected_arg_count(), t.return_value_felt_count())
+            println!("Signature: {t}\n");
+            (t.expected_arg_count(), t.output_felt_count())
         } else {
             let sig = print_manifest_signature(&package, procedure);
             (sig.param_count, sig.result_count)
@@ -85,8 +86,8 @@ impl CallCmd {
         }
 
         let args = match &typed {
-            Some(t) => t.encode_args(&self.args)?,
-            None => parse_args_raw(&self.args)?,
+            Some(t) => encode_typed_args(t, &self.args)?,
+            None => encode_raw_args(&self.args)?,
         };
 
         // The account's code is loaded from the client's store at VM runtime, so we don't need
@@ -162,10 +163,16 @@ fn resolve_procedure_digest(package: &Package, procedure_name: &str) -> Result<W
         let PackageExport::Procedure(proc) = export else {
             continue;
         };
-        if export.name().replace('_', "-") == target {
+        if export.name().replace('_', "-") != target {
+            // Not the requested procedure; keep it for the "not found" error list.
+            available.push(format!("  {}", proc.path));
+            continue;
+        }
+        // The same leaf name is exported both as a `C`-ABI lowering (for `exec`) and as the
+        // `ComponentModel` export (the cross-context `call` target); pick the latter.
+        if proc.signature.as_ref().is_some_and(|sig| sig.abi.is_wasm_canonical_abi()) {
             return Ok(proc.digest);
         }
-        available.push(format!("  {}", proc.path));
     }
 
     Err(CliError::InvalidArgument(format!(
@@ -174,8 +181,42 @@ fn resolve_procedure_digest(package: &Package, procedure_name: &str) -> Result<W
     )))
 }
 
-fn parse_args_raw(args: &[String]) -> Result<Vec<Felt>, CliError> {
-    args.iter().map(|arg| Ok(parse_felt_token(arg)?)).collect()
+/// Parses each CLI token into one felt, with no type information. Used when the package has no
+/// debug info for the procedure. Accepts a decimal or `0x` hex `u64`.
+fn encode_raw_args(args: &[String]) -> Result<Vec<Felt>, CliError> {
+    args.iter()
+        .map(|arg| {
+            let n: u64 = match arg.strip_prefix("0x").or_else(|| arg.strip_prefix("0X")) {
+                Some(hex) => u64::from_str_radix(hex, 16).map_err(|_| {
+                    CliError::InvalidArgument(format!("Invalid hex argument '{arg}'."))
+                })?,
+                None => arg.parse::<u64>().map_err(|_| {
+                    CliError::InvalidArgument(format!(
+                        "Invalid argument '{arg}'. Expected a u64 or 0x hex."
+                    ))
+                })?,
+            };
+            Felt::try_from(n).map_err(|_| {
+                CliError::InvalidArgument(format!("Argument '{arg}' is too large for a felt."))
+            })
+        })
+        .collect()
+}
+
+/// Encodes the CLI `tokens` into a flat felt vector, one parameter at a time via `encode_arg`.
+///
+/// The caller validates the argument count first, so the leftover-token check only fires when the
+/// count isn't statically known.
+fn encode_typed_args(typed: &TypedProcInfo, tokens: &[String]) -> Result<Vec<Felt>, CliError> {
+    let mut iter = tokens.iter().cloned();
+    let mut felts = Vec::new();
+    for idx in typed.param_type_indices() {
+        felts.extend(typed.encode_arg(&mut iter, idx)?);
+    }
+    if iter.next().is_some() {
+        return Err(CliError::InvalidArgument("too many arguments for procedure".into()));
+    }
+    Ok(felts)
 }
 
 /// Parameter and result counts from a procedure's manifest signature. `None` means the

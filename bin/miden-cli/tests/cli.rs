@@ -1728,15 +1728,29 @@ fn build_call_test_exports(
     use miden_client::vm::{PackageExport, ProcedureExport, QualifiedProcedureName};
     use midenc_hir_type::{CallConv, FunctionType, Type};
 
+    // The `call` command targets the `ComponentModel` (Canonical ABI) export, the only convention
+    // that `call`/`dyncall` may invoke across Miden contexts. Real compiler-produced components
+    // export their procedures with this convention, so the test packages must do the same.
     let signature_overrides: [(&str, FunctionType); 3] = [
-        ("add", FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt], [Type::Felt])),
+        (
+            "add",
+            FunctionType::new(CallConv::ComponentModel, [Type::Felt, Type::Felt], [Type::Felt]),
+        ),
         (
             "set_value",
-            FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt, Type::Felt, Type::Felt], []),
+            FunctionType::new(
+                CallConv::ComponentModel,
+                [Type::Felt, Type::Felt, Type::Felt, Type::Felt],
+                [],
+            ),
         ),
         (
             "take_account_id",
-            FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt], [Type::Felt, Type::Felt]),
+            FunctionType::new(
+                CallConv::ComponentModel,
+                [Type::Felt, Type::Felt],
+                [Type::Felt, Type::Felt],
+            ),
         ),
     ];
 
@@ -1959,7 +1973,7 @@ fn call_set_value_shows_storage_delta() {
 fn call_typed_account_id_roundtrip() {
     let (temp_dir, account_id, masp_path) = setup_call_test_account();
 
-    let acct_hex = "0xa591009a3022e800788f9ed177dcdb";
+    let acct_hex = "0xaa0000000000bb110000cc000000dd";
     let mut cmd = cargo_bin_cmd!("miden-client");
     cmd.args([
         "call",

@@ -1,3 +1,5 @@
+extern crate alloc;
+
 use std::env;
 use std::ffi::OsString;
 use std::ops::{Deref, DerefMut};
@@ -13,6 +15,7 @@ use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::store::{NoteFilter as ClientNoteFilter, OutputNoteRecord};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 
+mod codecs;
 mod commands;
 use commands::account::AccountCmd;
 use commands::call::CallCmd;

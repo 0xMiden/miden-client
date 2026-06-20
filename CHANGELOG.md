@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.2
+
+### Enhancements
+
+* [FEATURE][cli] `call` renders the typed signature and decodes the result from the package's debug info (e.g. `account-id` args/results), falling back to raw felts when absent.
+
 ## 0.15.1 (2026-06-16)
 
 ### Enhancements
