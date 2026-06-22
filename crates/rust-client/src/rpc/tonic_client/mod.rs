@@ -698,6 +698,15 @@ impl NodeRpcClient for GrpcClient {
                     .collect::<Result<Vec<NullifierUpdate>, _>>()
                     .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
 
+                for update in &batch_nullifiers {
+                    let prefix = update.nullifier.prefix();
+                    if !chunk.contains(&prefix) {
+                        return Err(RpcError::InvalidResponse(format!(
+                            "node returned nullifier with prefix {prefix} that was not requested"
+                        )));
+                    }
+                }
+
                 all_nullifiers.extend(batch_nullifiers);
 
                 let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
