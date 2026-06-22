@@ -273,7 +273,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// fetch public note bodies in a single follow-up call.
     ///
     /// Implementations must drop any returned note whose tag was not present in `note_tags`,
-    /// logging the discard, instead of failing the whole sync.
+    /// logging the discard.
     async fn sync_notes(
         &self,
         block_from: BlockNumber,
