@@ -466,7 +466,7 @@ impl NodeRpcClient for GrpcClient {
                     let requested =
                         chunk.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
                     return Err(RpcError::InvalidResponse(format!(
-                        "node returned note {note_id} but {requested} were requested"
+                        "node returned note {note_id} but [{requested}] were requested"
                     )));
                 }
             }
