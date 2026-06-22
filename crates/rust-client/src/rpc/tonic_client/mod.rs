@@ -405,6 +405,15 @@ impl NodeRpcClient for GrpcClient {
             .ok_or(RpcError::ExpectedDataMissing("BlockHeader".into()))?
             .try_into()?;
 
+        if let Some(requested) = block_num
+            && block_header.block_num() != requested
+        {
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned header for block {} but block {requested} was requested",
+                block_header.block_num(),
+            )));
+        }
+
         let mmr_proof = if include_mmr_proof {
             let forest = response
                 .chain_length
@@ -485,6 +494,7 @@ impl NodeRpcClient for GrpcClient {
     /// This function will return an error if:
     ///
     /// - The requested Account isn't returned by the node.
+    /// - The block number of the requested Account doesn't match the response block number.
     /// - There was an error sending the request to the node.
     /// - The answer had a `None` for one of the expected fields.
     /// - There is an error during storage deserialization.
@@ -543,11 +553,21 @@ impl NodeRpcClient for GrpcClient {
             .ok_or(RpcError::ExpectedDataMissing("AccountWitness".to_string()))?
             .try_into()?;
 
-        let block_num: BlockNumber = response
+        let response_block_num: BlockNumber = response
             .block_num
             .ok_or(RpcError::ExpectedDataMissing("response block num".to_string()))?
             .block_num
             .into();
+
+        if let Some(requested) = block_num
+            && requested.block_num != response_block_num.as_u32()
+        {
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned header for block {} but block {} was requested",
+                response_block_num.as_u32(),
+                requested.block_num
+            )));
+        }
 
         // For accounts with public state, details should be present when requested
         let headers = if account_witness.id().is_public() {
@@ -564,7 +584,7 @@ impl NodeRpcClient for GrpcClient {
         let proof = AccountProof::new(account_witness, headers)
             .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
 
-        Ok((block_num, proof))
+        Ok((response_block_num, proof))
     }
 
     /// Sends one or more `SyncNoteRequest`s to the node and merges the responses into a list of
@@ -714,6 +734,13 @@ impl NodeRpcClient for GrpcClient {
             ProvenBlock::read_from_bytes(&response.block.ok_or(RpcError::ExpectedDataMissing(
                 "GetBlockByNumberResponse.block".to_string(),
             ))?)?;
+
+        if block.header().block_num() != block_num {
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned header for block {} but block {block_num} was requested",
+                block.header().block_num(),
+            )));
+        }
 
         Ok(block)
     }
