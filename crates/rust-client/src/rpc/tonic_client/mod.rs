@@ -121,6 +121,25 @@ impl BlockPagination {
     }
 }
 
+/// Splits a `sync_nullifiers` batch into the updates whose prefix was requested and a count of
+/// those that weren't. An entry whose prefix was not requested can never match a requested
+/// nullifier, so it is dropped instead of failing the whole sync.
+fn split_requested_nullifiers(
+    requested_prefixes: &[u16],
+    batch: Vec<NullifierUpdate>,
+) -> (Vec<NullifierUpdate>, usize) {
+    let mut kept = Vec::with_capacity(batch.len());
+    let mut discarded = 0;
+    for update in batch {
+        if requested_prefixes.contains(&update.nullifier.prefix()) {
+            kept.push(update);
+        } else {
+            discarded += 1;
+        }
+    }
+    (kept, discarded)
+}
+
 // GRPC CLIENT
 // ================================================================================================
 
@@ -698,14 +717,11 @@ impl NodeRpcClient for GrpcClient {
                     .collect::<Result<Vec<NullifierUpdate>, _>>()
                     .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
 
-                for update in batch_nullifiers {
-                    let prefix = update.nullifier.prefix();
-                    if chunk.contains(&prefix) {
-                        all_nullifiers.insert(update);
-                    } else {
-                        warn!(%prefix, "discarding nullifier with prefix that was not requested");
-                    }
+                let (kept, discarded) = split_requested_nullifiers(chunk, batch_nullifiers);
+                if discarded > 0 {
+                    warn!(discarded, "discarded nullifiers with prefixes that were not requested");
                 }
+                all_nullifiers.extend(kept);
 
                 let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
                     "SyncNullifiersResponse.pagination_info".to_owned(),
@@ -1025,10 +1041,17 @@ impl From<&Status> for GrpcError {
 mod tests {
     use std::boxed::Box;
 
-    use miden_protocol::Word;
     use miden_protocol::block::BlockNumber;
+    use miden_protocol::note::Nullifier;
+    use miden_protocol::{Felt, Word};
 
-    use super::{BlockPagination, GrpcClient, PaginationResult};
+    use super::{
+        BlockPagination,
+        GrpcClient,
+        NullifierUpdate,
+        PaginationResult,
+        split_requested_nullifiers,
+    };
     use crate::alloc::string::ToString;
     use crate::rpc::{Endpoint, NodeRpcClient, RpcError};
 
@@ -1220,5 +1243,32 @@ mod tests {
             .await
             .expect("testnet status with caller auth header must succeed");
         assert!(!status.version.is_empty(), "status must include a server version");
+    }
+
+    fn nullifier_with_prefix(prefix: u16) -> Nullifier {
+        Nullifier::from_raw(Word::new([
+            Felt::ZERO,
+            Felt::ZERO,
+            Felt::ZERO,
+            Felt::new_unchecked(u64::from(prefix) << 48),
+        ]))
+    }
+
+    #[test]
+    fn split_requested_nullifiers_keeps_requested_and_counts_discards() {
+        let kept = NullifierUpdate {
+            nullifier: nullifier_with_prefix(0x1234),
+            block_num: 1u32.into(),
+        };
+        let dropped = NullifierUpdate {
+            nullifier: nullifier_with_prefix(0xabcd),
+            block_num: 2u32.into(),
+        };
+
+        let (result, discarded) =
+            split_requested_nullifiers(&[0x1234], vec![kept.clone(), dropped]);
+
+        assert_eq!(discarded, 1);
+        assert_eq!(result, vec![kept]);
     }
 }
