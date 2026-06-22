@@ -460,6 +460,15 @@ impl NodeRpcClient for GrpcClient {
                 .map(FetchedNote::try_from)
                 .collect::<Result<Vec<FetchedNote>, RpcConversionError>>()?;
 
+            for note in &response_notes {
+                let note_id = note.id();
+                if !chunk.contains(&note_id) {
+                    return Err(RpcError::InvalidResponse(format!(
+                        "node returned note {note_id} that was not requested"
+                    )));
+                }
+            }
+
             notes.extend(response_notes);
         }
         Ok(notes)
