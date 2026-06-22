@@ -17,7 +17,7 @@ default-members = ["bin/miden-cli", "crates/rust-client"]
 authors      = ["miden contributors"]
 edition      = "2024"
 license      = "MIT"
-repository   = "https://github.com/0xMiden/miden-client"
+repository   = "https://github.com/0xMiden/rust-sdk"
 rust-version = "1.93"
 version      = "0.15.0"
 
