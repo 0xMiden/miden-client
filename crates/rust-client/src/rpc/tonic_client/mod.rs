@@ -638,6 +638,14 @@ impl NodeRpcClient for GrpcClient {
 
                 for proto_block in response.blocks {
                     let block: NoteSyncBlock = proto_block.try_into()?;
+                    for note in block.notes.values() {
+                        let tag = note.tag();
+                        if !chunk.contains(&tag) {
+                            return Err(RpcError::InvalidResponse(format!(
+                                "node returned note with tag {tag} that was not requested"
+                            )));
+                        }
+                    }
                     let bn = block.block_header.block_num();
                     if let Some(existing) = merged_blocks.get_mut(&bn) {
                         for (id, note) in block.notes {

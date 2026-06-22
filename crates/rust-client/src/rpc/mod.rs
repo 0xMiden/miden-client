@@ -271,6 +271,12 @@ pub trait NodeRpcClient: Send + Sync {
     /// Notes with attachments will have header-only metadata after this call; use
     /// [`NodeRpcClient::sync_notes_with_details`] to also resolve their full metadata and
     /// fetch public note bodies in a single follow-up call.
+    ///
+    /// Implementations must verify that every returned note's tag was present in `note_tags` and
+    /// return [`RpcError::InvalidResponse`] otherwise.
+    ///
+    /// Errors:
+    /// - [`RpcError::InvalidResponse`] if the node returns a note whose tag was not requested.
     async fn sync_notes(
         &self,
         block_from: BlockNumber,
