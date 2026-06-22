@@ -641,8 +641,13 @@ impl NodeRpcClient for GrpcClient {
                     for note in block.notes.values() {
                         let tag = note.tag();
                         if !chunk.contains(&tag) {
+                            let requested = chunk
+                                .iter()
+                                .map(ToString::to_string)
+                                .collect::<Vec<_>>()
+                                .join(", ");
                             return Err(RpcError::InvalidResponse(format!(
-                                "node returned note with tag {tag} that was not requested"
+                                "node returned note with tag {tag} but [{requested}] were requested"
                             )));
                         }
                     }
