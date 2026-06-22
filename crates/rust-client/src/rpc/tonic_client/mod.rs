@@ -121,6 +121,22 @@ impl BlockPagination {
     }
 }
 
+/// Returns an error if any note in a `GetNotesById` response has an ID that was not requested.
+fn ensure_requested_note_ids(
+    requested: &[NoteId],
+    returned: impl IntoIterator<Item = NoteId>,
+) -> Result<(), RpcError> {
+    for id in returned {
+        if !requested.contains(&id) {
+            let list = requested.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned note {id} but [{list}] were requested"
+            )));
+        }
+    }
+    Ok(())
+}
+
 // GRPC CLIENT
 // ================================================================================================
 
@@ -460,16 +476,7 @@ impl NodeRpcClient for GrpcClient {
                 .map(FetchedNote::try_from)
                 .collect::<Result<Vec<FetchedNote>, RpcConversionError>>()?;
 
-            for note in &response_notes {
-                let note_id = note.id();
-                if !chunk.contains(&note_id) {
-                    let requested =
-                        chunk.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
-                    return Err(RpcError::InvalidResponse(format!(
-                        "node returned note {note_id} but [{requested}] were requested"
-                    )));
-                }
-            }
+            ensure_requested_note_ids(chunk, response_notes.iter().map(FetchedNote::id))?;
 
             notes.extend(response_notes);
         }
@@ -1031,8 +1038,9 @@ mod tests {
 
     use miden_protocol::Word;
     use miden_protocol::block::BlockNumber;
+    use miden_protocol::note::NoteId;
 
-    use super::{BlockPagination, GrpcClient, PaginationResult};
+    use super::{BlockPagination, GrpcClient, PaginationResult, ensure_requested_note_ids};
     use crate::alloc::string::ToString;
     use crate::rpc::{Endpoint, NodeRpcClient, RpcError};
 
@@ -1224,5 +1232,20 @@ mod tests {
             .await
             .expect("testnet status with caller auth header must succeed");
         assert!(!status.version.is_empty(), "status must include a server version");
+    }
+
+    fn note_id(n: u32) -> NoteId {
+        NoteId::from_raw(Word::from([n, 0, 0, 0]))
+    }
+
+    #[test]
+    fn ensure_requested_note_ids_rejects_unrequested() {
+        let requested = note_id(1);
+        let other = note_id(2);
+
+        ensure_requested_note_ids(&[requested], [requested]).unwrap();
+
+        let err = ensure_requested_note_ids(&[requested], [other]).unwrap_err();
+        assert!(matches!(err, RpcError::InvalidResponse(_)));
     }
 }
