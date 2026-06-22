@@ -14,6 +14,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: "${{ github.workflow }} @ ${{ inputs.version || github.event.release.tag_name }}"
+  cancel-in-progress: false
+
 env:
   RELEASE_TAG: ${{ inputs.version || github.event.release.tag_name }}
 
@@ -27,19 +31,37 @@ jobs:
       # (which happen from `target/package/...`) don't create nested `target/` dirs.
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
     steps:
+      - name: Validate release tag
+        run: |
+          set -euo pipefail
+
+          if [[ ! "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "::error::Release tags must look like v1.2.3 or v1.2.3-rc.1"
+            exit 1
+          fi
+
       - name: Check out code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ env.RELEASE_TAG }}
           persist-credentials: false
 
       - name: Cleanup large tools for build space
         uses: ./.github/actions/cleanup-runner
 
-      - name: Log release info
+      - name: Verify GitHub release exists
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if ! gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null; then
+            echo "::error::GitHub release ${RELEASE_TAG} does not exist. Refusing to publish crates."
+            exit 1
+          fi
+
+      - name: Log release info
         run: |
           echo "Publishing release $RELEASE_TAG"
           echo "Commit: $(git rev-parse HEAD)"
@@ -100,6 +122,7 @@ jobs:
   # This is used by midenup to speed installs up.
   upload-artifacts:
     name: upload pre-built miden-client executable artifacts
+    if: ${{ github.event_name == 'release' }}
     permissions:
       contents: write
       id-token: write
