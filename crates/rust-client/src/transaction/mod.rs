@@ -137,6 +137,7 @@ mod request;
 pub use request::{
     ForeignAccount,
     NoteArgs,
+    NoteScriptTrustPolicy,
     PaymentNoteDescription,
     PswapTransactionData,
     SwapTransactionData,
@@ -242,6 +243,9 @@ where
         transaction_request: TransactionRequest,
         tx_prover: Arc<dyn TransactionProver>,
     ) -> Result<TransactionId, ClientError> {
+        // Check before NTX registration, which can submit a separate transaction.
+        check_input_note_script_trust(&transaction_request)?;
+
         // Register any missing NTX scripts before the main transaction.
         // The registration path contains its own full execute -> prove -> submit pipeline.
         if !transaction_request.expected_ntx_scripts().is_empty() {
@@ -352,6 +356,9 @@ where
         let account_id = account.id();
         self.validate_recency().await?;
         validate_account_request(&transaction_request, account)?;
+
+        // Also check direct execution callers.
+        check_input_note_script_trust(&transaction_request)?;
 
         // Retrieve all input notes from the store.
         let mut stored_note_records = self
@@ -968,6 +975,24 @@ pub enum TransactionStoreUpdateError {
 
 // HELPERS
 // ================================================================================================
+
+/// Rejects input notes whose script roots are not allowed by the request policy.
+fn check_input_note_script_trust(
+    transaction_request: &TransactionRequest,
+) -> Result<(), ClientError> {
+    let policy = transaction_request.note_script_trust_policy();
+    let script_roots: BTreeSet<Word> = transaction_request
+        .input_notes()
+        .iter()
+        .map(|note| Word::from(note.script().root()))
+        .filter(|script_root| !policy.allows(*script_root))
+        .collect();
+    if script_roots.is_empty() {
+        Ok(())
+    } else {
+        Err(ClientError::UntrustedNoteScript { script_roots, policy: policy.clone() })
+    }
+}
 
 /// Data-store-independent state produced during transaction preparation.
 pub(crate) struct PreparedTransaction {
