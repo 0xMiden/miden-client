@@ -1,6 +1,6 @@
 # Miden client
 
-[![LICENSE](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/0xMiden/rust-sdk/blob/main/LICENSE)
+[![LICENSE](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/0xMiden/rust-sdk/blob/HEAD/LICENSE)
 [![test](https://github.com/0xMiden/rust-sdk/actions/workflows/test.yml/badge.svg)](https://github.com/0xMiden/rust-sdk/actions/workflows/test.yml)
 [![build](https://github.com/0xMiden/rust-sdk/actions/workflows/build.yml/badge.svg)](https://github.com/0xMiden/rust-sdk/actions/workflows/build.yml)
 [![RUST_VERSION](https://img.shields.io/badge/rustc-1.88+-lightgray.svg)](https://www.rust-lang.org/tools/install)
