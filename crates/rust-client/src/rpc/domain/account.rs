@@ -357,7 +357,7 @@ impl TryFrom<&AccountDetails> for Account {
 /// Account storage details for `AccountResponse`
 #[derive(Clone, Debug)]
 pub struct AccountStorageDetails {
-    /// Account storage header (storage slot info for up to 256 slots)
+    /// Account storage header
     pub header: AccountStorageHeader,
     /// Additional data for the requested storage maps
     pub map_details: Vec<AccountStorageMapDetails>,

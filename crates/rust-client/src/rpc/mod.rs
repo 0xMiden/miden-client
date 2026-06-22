@@ -348,6 +348,7 @@ pub trait NodeRpcClient: Send + Sync {
     async fn resolve_oversize_vault(
         &self,
         account_id: AccountId,
+        block_from: BlockNumber,
         block_to: BlockNumber,
         details: &mut AccountDetails,
     ) -> Result<(), RpcError> {
@@ -355,7 +356,7 @@ pub trait NodeRpcClient: Send + Sync {
             return Ok(());
         }
         let vault_info =
-            self.sync_account_vault(BlockNumber::GENESIS, block_to, account_id).await?;
+            self.sync_account_vault(block_from, block_to, account_id).await?;
         let mut updates = vault_info.updates;
         // The node returns the full history of vault entries, so a given key may appear in more
         // than one block. Sort by block so the BTreeMap keeps the latest value per key.

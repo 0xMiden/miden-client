@@ -130,6 +130,12 @@ pub struct PartialBlockchainUpdates {
 }
 
 impl PartialBlockchainUpdates {
+    /// Creates a new [`PartialBlockchainUpdates`] with the given peaks and no block headers or
+    /// authentication nodes.
+    pub fn new(new_peaks: MmrPeaks) -> Self {
+        Self { new_peaks, ..Default::default() }
+    }
+
     /// Adds or updates a block header in this [`PartialBlockchainUpdates`].
     ///
     /// If the block header already exists (same block number), the `has_client_notes` flag is
@@ -361,6 +367,14 @@ impl PublicAccountUpdate {
         match self {
             Self::Full(account) => account.nonce(),
             Self::Delta(delta) => delta.new_header().nonce(),
+        }
+    }
+
+    /// Returns the commitment of the account state that this update advances the local state to.
+    pub fn commitment(&self) -> Word {
+        match self {
+            Self::Full(account) => account.to_commitment(),
+            Self::Delta(delta) => delta.new_header().to_commitment(),
         }
     }
 }

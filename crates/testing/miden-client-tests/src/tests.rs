@@ -749,6 +749,162 @@ async fn sync_state_no_redundant_get_account_calls() {
 }
 
 #[tokio::test]
+async fn sync_state_skips_stale_public_account_state() {
+    use miden_client::async_trait;
+    use miden_client::rpc::domain::note::CommittedNote;
+    use miden_client::store::InputNoteRecord;
+    use miden_client::sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
+    use miden_protocol::crypto::merkle::mmr::{Forest, MmrPeaks, PartialMmr};
+
+    struct DiscardAllNotes;
+
+    #[async_trait(?Send)]
+    impl OnNoteReceived for DiscardAllNotes {
+        async fn on_note_received(
+            &self,
+            _committed_note: CommittedNote,
+            _public_note: Option<InputNoteRecord>,
+        ) -> Result<NoteUpdateAction, ClientError> {
+            Ok(NoteUpdateAction::Discard)
+        }
+    }
+
+    let (_client, rpc_api, _) = Box::pin(create_test_client()).await;
+
+    let account_id = {
+        let mock_chain = rpc_api.mock_chain.read();
+        mock_chain
+            .proven_blocks()
+            .iter()
+            .flat_map(|b| b.body().updated_accounts().iter())
+            .map(miden_protocol::block::BlockAccountUpdate::account_id)
+            .find(|id| !id.is_private())
+            .expect("prebuilt mock chain should have a public account")
+    };
+
+    // Local header with a nonce higher than anything on the mock chain and a commitment that
+    // differs from the on-chain one, mimicking an applied-but-uncommitted local transaction.
+    let account_header =
+        AccountHeader::new(account_id, Felt::from(u32::MAX), EMPTY_WORD, EMPTY_WORD, EMPTY_WORD);
+
+    let genesis = rpc_api.get_block_header_by_number(Some(0.into()), false).await.unwrap().0;
+    let mut partial_mmr = PartialMmr::from_peaks(MmrPeaks::new(Forest::empty(), vec![]).unwrap());
+    partial_mmr.add(genesis.commitment(), true).unwrap();
+
+    let state_sync = StateSync::new(Arc::new(rpc_api.clone()), Arc::new(DiscardAllNotes), None);
+
+    let input = StateSyncInput {
+        accounts: vec![account_header],
+        note_tags: BTreeSet::from([NoteTag::new(0)]),
+        input_notes: vec![],
+        output_notes: vec![],
+        uncommitted_transactions: vec![],
+    };
+    let state_sync_update = state_sync.sync_state(&mut partial_mmr, input).await.unwrap();
+
+    assert!(
+        state_sync_update.account_updates.updated_public_accounts().is_empty(),
+        "stale on-chain account state should be skipped, not applied"
+    );
+}
+
+#[tokio::test]
+async fn sync_state_skips_chain_state_behind_in_flight_transaction() {
+    use miden_client::async_trait;
+    use miden_client::rpc::domain::note::CommittedNote;
+    use miden_client::store::InputNoteRecord;
+    use miden_client::sync::{NoteUpdateAction, OnNoteReceived, StateSync, StateSyncInput};
+    use miden_client::transaction::{
+        RawOutputNotes,
+        TransactionDetails,
+        TransactionId,
+        TransactionRecord,
+        TransactionStatus,
+    };
+    use miden_protocol::crypto::merkle::mmr::{Forest, MmrPeaks, PartialMmr};
+
+    struct DiscardAllNotes;
+
+    #[async_trait(?Send)]
+    impl OnNoteReceived for DiscardAllNotes {
+        async fn on_note_received(
+            &self,
+            _committed_note: CommittedNote,
+            _public_note: Option<InputNoteRecord>,
+        ) -> Result<NoteUpdateAction, ClientError> {
+            Ok(NoteUpdateAction::Discard)
+        }
+    }
+
+    let (_client, rpc_api, _) = Box::pin(create_test_client()).await;
+
+    // Pick a public account from the prebuilt mock chain along with its current on-chain
+    // commitment (the final state of its last update across the proven blocks).
+    let (account_id, onchain_commitment) = {
+        let mock_chain = rpc_api.mock_chain.read();
+        let updates: Vec<_> = mock_chain
+            .proven_blocks()
+            .iter()
+            .flat_map(|b| b.body().updated_accounts().iter())
+            .filter(|update| !update.account_id().is_private())
+            .map(|update| (update.account_id(), update.final_state_commitment()))
+            .collect();
+        let account_id =
+            updates.first().expect("prebuilt mock chain should have a public account").0;
+        let commitment = updates
+            .iter()
+            .rev()
+            .find(|(id, _)| *id == account_id)
+            .expect("account has at least one update")
+            .1;
+        (account_id, commitment)
+    };
+
+    // Local header mimicking an applied-but-uncommitted local transaction: its commitment
+    // differs from the on-chain one, and the in-flight transaction below records the on-chain
+    // state as the state it was executed against.
+    let account_header =
+        AccountHeader::new(account_id, Felt::from(u32::MAX), EMPTY_WORD, EMPTY_WORD, EMPTY_WORD);
+
+    let in_flight_tx = TransactionRecord::new(
+        TransactionId::read_from_bytes(&EMPTY_WORD.to_bytes()).unwrap(),
+        TransactionDetails {
+            account_id,
+            init_account_state: onchain_commitment,
+            final_account_state: account_header.to_commitment(),
+            input_note_nullifiers: vec![],
+            output_notes: RawOutputNotes::new(vec![]).unwrap(),
+            block_num: 0.into(),
+            submission_height: 0.into(),
+            expiration_block_num: u32::MAX.into(),
+            creation_timestamp: 0,
+        },
+        None,
+        TransactionStatus::Pending,
+    );
+
+    let genesis = rpc_api.get_block_header_by_number(Some(0.into()), false).await.unwrap().0;
+    let mut partial_mmr = PartialMmr::from_peaks(MmrPeaks::new(Forest::empty(), vec![]).unwrap());
+    partial_mmr.add(genesis.commitment(), true).unwrap();
+
+    let state_sync = StateSync::new(Arc::new(rpc_api.clone()), Arc::new(DiscardAllNotes), None);
+
+    let input = StateSyncInput {
+        accounts: vec![account_header],
+        note_tags: BTreeSet::from([NoteTag::new(0)]),
+        input_notes: vec![],
+        output_notes: vec![],
+        uncommitted_transactions: vec![in_flight_tx],
+    };
+    let state_sync_update = state_sync.sync_state(&mut partial_mmr, input).await.unwrap();
+
+    assert!(
+        state_sync_update.account_updates.updated_public_accounts().is_empty(),
+        "on-chain state in the in-flight transaction lineage should be skipped, not applied"
+    );
+}
+
+#[tokio::test]
 async fn sync_state_tags() {
     // generate test client with a random store name
     let (mut client, rpc_api, _) = Box::pin(create_test_client()).await;
