@@ -208,7 +208,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// verify that each note is part of the block's note tree.
     ///
     /// Implementations must drop any returned note whose ID was not present in `note_ids`, logging
-    /// the discard, instead of failing the call.
+    /// the discard.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
     /// Fetches the MMR delta for a given block range using the `/SyncChainMmr` RPC endpoint.
