@@ -24,7 +24,7 @@ use miden_protocol::{EMPTY_WORD, Word};
 use miden_tx::utils::serde::Serializable;
 use miden_tx::utils::sync::RwLock;
 use tonic::Status;
-use tracing::info;
+use tracing::{info, warn};
 
 use super::domain::account::{
     AccountProof,
@@ -698,18 +698,14 @@ impl NodeRpcClient for GrpcClient {
                     .collect::<Result<Vec<NullifierUpdate>, _>>()
                     .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
 
-                for update in &batch_nullifiers {
+                for update in batch_nullifiers {
                     let prefix = update.nullifier.prefix();
-                    if !chunk.contains(&prefix) {
-                        let requested =
-                            chunk.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
-                        return Err(RpcError::InvalidResponse(format!(
-                            "node returned nullifier with prefix {prefix} but [{requested}] were requested"
-                        )));
+                    if chunk.contains(&prefix) {
+                        all_nullifiers.insert(update);
+                    } else {
+                        warn!(%prefix, "discarding nullifier with prefix that was not requested");
                     }
                 }
-
-                all_nullifiers.extend(batch_nullifiers);
 
                 let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
                     "SyncNullifiersResponse.pagination_info".to_owned(),
