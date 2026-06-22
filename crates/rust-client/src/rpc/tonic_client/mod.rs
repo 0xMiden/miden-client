@@ -701,8 +701,10 @@ impl NodeRpcClient for GrpcClient {
                 for update in &batch_nullifiers {
                     let prefix = update.nullifier.prefix();
                     if !chunk.contains(&prefix) {
+                        let requested =
+                            chunk.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
                         return Err(RpcError::InvalidResponse(format!(
-                            "node returned nullifier with prefix {prefix} that was not requested"
+                            "node returned nullifier with prefix {prefix} but [{requested}] were requested"
                         )));
                     }
                 }
