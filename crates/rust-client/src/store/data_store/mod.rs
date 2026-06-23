@@ -63,13 +63,13 @@ impl ClientDataStore {
         self.cache.mast_store.clone()
     }
 
-    pub(crate) async fn load_account(
+    pub(crate) async fn load_partial_account(
         &self,
         account_id: AccountId,
-    ) -> Result<Account, DataStoreError> {
+    ) -> Result<PartialAccount, DataStoreError> {
         let account_record = self
             .store
-            .get_account(account_id)
+            .get_minimal_partial_account(account_id)
             .await?
             .ok_or(DataStoreError::AccountNotFound(account_id))?;
 
