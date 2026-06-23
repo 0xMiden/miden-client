@@ -318,11 +318,8 @@ impl NoteUpdateTracker {
     pub fn consumed_input_note_ids(&self) -> impl Iterator<Item = NoteId> + '_ {
         self.input_notes_by_id.iter().filter_map(|(note_id, commitment)| {
             let update = self.input_notes.get(commitment)?;
-            (matches!(
-                update.update_type,
-                NoteUpdateType::Insert | NoteUpdateType::Update | NoteUpdateType::InsertCommitted
-            ) && update.inner().is_consumed())
-            .then_some(*note_id)
+            (update.update_type != NoteUpdateType::None && update.inner().is_consumed())
+                .then_some(*note_id)
         })
     }
 
@@ -760,11 +757,14 @@ impl Deserializable for OutputNoteUpdate {
 
 impl Serializable for NoteUpdateTracker {
     fn write_into<W: ByteWriter>(&self, target: &mut W) {
-        // The nullifier and id lookup indices are reconstructed from the records on deserialize,
-        // so they are not serialized.
+        // These indices retain entries for metadata-less notes (e.g. externally-consumed ones)
+        // whose id and nullifier can no longer be recovered from the records, so they are
+        // serialized to preserve them across a round trip.
         self.input_notes.write_into(target);
         self.output_notes.write_into(target);
         self.nullifier_order.write_into(target);
+        self.input_notes_by_id.write_into(target);
+        self.input_notes_by_nullifier.write_into(target);
     }
 }
 
@@ -773,21 +773,11 @@ impl Deserializable for NoteUpdateTracker {
         let input_notes = BTreeMap::<NoteDetailsCommitment, InputNoteUpdate>::read_from(source)?;
         let output_notes = BTreeMap::<NoteId, OutputNoteUpdate>::read_from(source)?;
         let nullifier_order = BTreeMap::<Nullifier, u32>::read_from(source)?;
+        let input_notes_by_id = BTreeMap::<NoteId, NoteDetailsCommitment>::read_from(source)?;
+        let input_notes_by_nullifier =
+            BTreeMap::<Nullifier, NoteDetailsCommitment>::read_from(source)?;
 
-        // Rebuild the lookup indices from the records. Only metadata-bearing notes have an id and
-        // a nullifier, so a metadata-less note contributes no index entry and is reachable only by
-        // its details commitment.
-        let mut input_notes_by_nullifier = BTreeMap::new();
-        let mut input_notes_by_id = BTreeMap::new();
-        for (commitment, update) in &input_notes {
-            let record = update.inner();
-            if let Some(note_id) = record.id() {
-                input_notes_by_id.insert(note_id, *commitment);
-            }
-            if let Some(nullifier) = record.nullifier() {
-                input_notes_by_nullifier.insert(nullifier, *commitment);
-            }
-        }
+        // Output notes always carry metadata, so this index can be safely derived from the records.
         let output_notes_by_nullifier = output_notes
             .iter()
             .filter_map(|(note_id, update)| {
@@ -972,7 +962,44 @@ mod tests {
     }
 
     #[test]
-    fn serialize_round_trip_rebuilds_lookup_indices() {
+    fn externally_consumed_note_id_survives_round_trip() {
+        let sender: AccountId = ACCOUNT_ID_SENDER.try_into().unwrap();
+        let note = processing_note(12, sender);
+        let id = note.id().expect("processing note has metadata");
+        let nullifier = note.nullifier().expect("processing note has metadata");
+
+        let mut tracker = NoteUpdateTracker::for_transaction_updates(vec![], vec![note], vec![]);
+
+        // External consumption drops the record's id; the tracker retains it in
+        // `input_notes_by_id` so the note can still be reported as consumed by its id.
+        tracker
+            .apply_note_consumption(
+                &NoteConsumption {
+                    nullifier,
+                    block_num: BlockNumber::from(5u32),
+                    external_consumer: None,
+                },
+                core::iter::empty::<&TransactionRecord>(),
+            )
+            .expect("external consumption should apply");
+
+        // In memory the id is reported correctly.
+        let before: alloc::vec::Vec<NoteId> = tracker.consumed_input_note_ids().collect();
+        assert_eq!(before, vec![id]);
+
+        // The retained id must survive a serialize/deserialize round trip.
+        let bytes = tracker.to_bytes();
+        let restored = NoteUpdateTracker::read_from_bytes(&bytes).expect("round-trip should work");
+        let after: alloc::vec::Vec<NoteId> = restored.consumed_input_note_ids().collect();
+        assert_eq!(
+            after,
+            vec![id],
+            "the retained id of an externally consumed note must survive serialization"
+        );
+    }
+
+    #[test]
+    fn serialize_round_trip_preserves_lookup_indices() {
         let sender: AccountId = ACCOUNT_ID_SENDER.try_into().unwrap();
         let expected = expected_note(10);
         let processing = processing_note(11, sender);
@@ -986,8 +1013,8 @@ mod tests {
         let bytes = tracker.to_bytes();
         let restored = NoteUpdateTracker::read_from_bytes(&bytes).expect("round-trip should work");
 
-        // The records survive and the lookup indices (which are not serialized) are rebuilt to
-        // exactly match the original, including for the metadata-less note keyed by commitment.
+        // The records and lookup indices round-trip unchanged, including the metadata-less note
+        // that is keyed only by its details commitment.
         assert_eq!(tracker, restored);
         assert_eq!(restored.updated_input_notes().count(), 2);
         assert_eq!(
