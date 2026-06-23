@@ -11,6 +11,8 @@ use miden_protocol::vm::FutureMaybeSend;
 use miden_protocol::{MastForest, Word};
 use miden_tx::{DataStore, DataStoreError, MastForestStore, TransactionMastStore};
 
+use crate::ClientError;
+use crate::account::AccountReader;
 use crate::store::data_store::ClientDataStore;
 
 // IN-MEMORY BATCH DATA STORE
@@ -67,13 +69,14 @@ impl InMemoryBatchDataStore {
 
     pub(crate) async fn current_account(
         &self,
-        account_id: AccountId,
-    ) -> Result<PartialAccount, DataStoreError> {
+        account_reader: &AccountReader,
+    ) -> Result<PartialAccount, ClientError> {
+        let account_id = account_reader.account_id();
         if let Some(state) = self.current_accounts.get(&account_id) {
             return Ok(state.account.clone());
         }
 
-        self.inner.load_partial_account(account_id).await
+        account_reader.partial_account().await
     }
 }
 

@@ -56,8 +56,15 @@ use alloc::vec::Vec;
 pub(crate) use data_store::InMemoryBatchDataStore;
 pub use error::BatchBuilderError;
 use miden_protocol::account::{
-    AccountId, AccountStorageHeader, PartialAccount, PartialStorage, PartialStorageMap,
-    StorageMapDelta, StorageSlotDelta, StorageSlotHeader, StorageSlotType,
+    AccountId,
+    AccountStorageHeader,
+    PartialAccount,
+    PartialStorage,
+    PartialStorageMap,
+    StorageMapDelta,
+    StorageSlotDelta,
+    StorageSlotHeader,
+    StorageSlotType,
 };
 use miden_protocol::asset::PartialVault;
 use miden_protocol::batch::ProposedBatch;
@@ -65,15 +72,22 @@ use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::smt::PartialSmt;
 use miden_protocol::note::NoteId;
 use miden_protocol::transaction::{
-    ExecutedTransaction, PartialBlockchain, ProvenTransaction, TransactionInputs,
+    ExecutedTransaction,
+    PartialBlockchain,
+    ProvenTransaction,
+    TransactionInputs,
 };
 use miden_protocol::{MIN_PROOF_SECURITY_LEVEL, ZERO};
-use miden_tx::{DataStoreError, auth::TransactionAuthenticator};
+use miden_tx::DataStoreError;
+use miden_tx::auth::TransactionAuthenticator;
 use miden_tx_batch_prover::LocalBatchProver;
 
 use crate::store::data_store::build_partial_mmr_with_paths;
 use crate::transaction::{
-    TransactionRequest, TransactionResult, TransactionStoreUpdate, validate_executed_transaction,
+    TransactionRequest,
+    TransactionResult,
+    TransactionStoreUpdate,
+    validate_executed_transaction,
 };
 use crate::{Client, ClientError};
 
@@ -276,11 +290,12 @@ async fn execute_transaction_for_batch<AUTH>(
 where
     AUTH: TransactionAuthenticator + Sync + 'static,
 {
-    if client.account_reader(account_id).status().await?.is_locked() {
+    let account_reader = client.account_reader(account_id);
+    if account_reader.status().await?.is_locked() {
         return Err(ClientError::AccountLocked(account_id));
     }
 
-    let account = data_store.current_account(account_id).await?;
+    let account = data_store.current_account(&account_reader).await?;
 
     let account_id = account.id();
     let prep = client.prepare_transaction_for_batch(&account, transaction_request).await?;
@@ -394,11 +409,7 @@ fn final_storage_header_from_delta(
             },
         };
 
-        slots.push(StorageSlotHeader::new(
-            slot.name().clone(),
-            slot.slot_type(),
-            new_slot_value,
-        ));
+        slots.push(StorageSlotHeader::new(slot.name().clone(), slot.slot_type(), new_slot_value));
     }
 
     let storage_header = AccountStorageHeader::new(slots).map_err(|err| {
@@ -428,9 +439,8 @@ fn updated_storage_map_root(
     let mut partial_smt = PartialSmt::new(initial_root);
 
     for map_key in map_delta.entries().keys() {
-        let witness = tx_inputs
-            .read_storage_map_witness(initial_root, *map_key)
-            .map_err(|err| {
+        let witness =
+            tx_inputs.read_storage_map_witness(initial_root, *map_key).map_err(|err| {
                 DataStoreError::other_with_source(
                     "failed to read initial storage map witness while rebuilding in-batch state",
                     err,
@@ -445,14 +455,12 @@ fn updated_storage_map_root(
     }
 
     for (map_key, value) in map_delta.entries() {
-        partial_smt
-            .insert(map_key.hash().as_word(), *value)
-            .map_err(|err| {
-                DataStoreError::other_with_source(
-                    "failed to apply storage map delta while rebuilding in-batch state",
-                    err,
-                )
-            })?;
+        partial_smt.insert(map_key.hash().as_word(), *value).map_err(|err| {
+            DataStoreError::other_with_source(
+                "failed to apply storage map delta while rebuilding in-batch state",
+                err,
+            )
+        })?;
     }
 
     Ok(partial_smt.root())
