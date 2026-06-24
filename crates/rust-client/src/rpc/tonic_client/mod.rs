@@ -24,7 +24,7 @@ use miden_protocol::{EMPTY_WORD, Word};
 use miden_tx::utils::serde::Serializable;
 use miden_tx::utils::sync::RwLock;
 use tonic::Status;
-use tracing::{info, warn};
+use tracing::info;
 
 use super::domain::account::{
     AccountProof,
@@ -121,23 +121,26 @@ impl BlockPagination {
     }
 }
 
-/// Splits a `sync_nullifiers` batch into the updates whose prefix was requested and a count of
-/// those that weren't. An entry whose prefix was not requested can never match a requested
-/// nullifier, so it is dropped instead of failing the whole sync.
-fn split_requested_nullifiers(
+/// Returns [`RpcError::InvalidResponse`] if any update in the `sync_nullifiers` batch carries a
+/// nullifier whose prefix was not requested.
+fn verify_requested_nullifiers(
     requested_prefixes: &[u16],
-    batch: Vec<NullifierUpdate>,
-) -> (Vec<NullifierUpdate>, usize) {
-    let mut kept = Vec::with_capacity(batch.len());
-    let mut discarded = 0;
+    batch: &[NullifierUpdate],
+) -> Result<(), RpcError> {
     for update in batch {
-        if requested_prefixes.contains(&update.nullifier.prefix()) {
-            kept.push(update);
-        } else {
-            discarded += 1;
+        let prefix = update.nullifier.prefix();
+        if !requested_prefixes.contains(&prefix) {
+            let requested = requested_prefixes
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned nullifier with prefix {prefix} but [{requested}] were requested"
+            )));
         }
     }
-    (kept, discarded)
+    Ok(())
 }
 
 // GRPC CLIENT
@@ -717,11 +720,8 @@ impl NodeRpcClient for GrpcClient {
                     .collect::<Result<Vec<NullifierUpdate>, _>>()
                     .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
 
-                let (kept, discarded) = split_requested_nullifiers(chunk, batch_nullifiers);
-                if discarded > 0 {
-                    warn!(discarded, "discarded nullifiers with prefixes that were not requested");
-                }
-                all_nullifiers.extend(kept);
+                verify_requested_nullifiers(chunk, &batch_nullifiers)?;
+                all_nullifiers.extend(batch_nullifiers);
 
                 let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
                     "SyncNullifiersResponse.pagination_info".to_owned(),
@@ -1039,6 +1039,7 @@ impl From<&Status> for GrpcError {
 
 #[cfg(test)]
 mod tests {
+    use core::slice;
     use std::boxed::Box;
 
     use miden_protocol::block::BlockNumber;
@@ -1050,7 +1051,7 @@ mod tests {
         GrpcClient,
         NullifierUpdate,
         PaginationResult,
-        split_requested_nullifiers,
+        verify_requested_nullifiers,
     };
     use crate::alloc::string::ToString;
     use crate::rpc::{Endpoint, NodeRpcClient, RpcError};
@@ -1255,20 +1256,21 @@ mod tests {
     }
 
     #[test]
-    fn split_requested_nullifiers_keeps_requested_and_counts_discards() {
-        let kept = NullifierUpdate {
+    fn verify_requested_nullifiers_rejects_unrequested_prefix() {
+        let requested = NullifierUpdate {
             nullifier: nullifier_with_prefix(0x1234),
             block_num: 1u32.into(),
         };
-        let dropped = NullifierUpdate {
+        let unrequested = NullifierUpdate {
             nullifier: nullifier_with_prefix(0xabcd),
             block_num: 2u32.into(),
         };
 
-        let (result, discarded) =
-            split_requested_nullifiers(&[0x1234], vec![kept.clone(), dropped]);
+        verify_requested_nullifiers(&[0x1234], slice::from_ref(&requested))
+            .expect("requested prefix must be accepted");
 
-        assert_eq!(discarded, 1);
-        assert_eq!(result, vec![kept]);
+        let err = verify_requested_nullifiers(&[0x1234], &[requested, unrequested])
+            .expect_err("unrequested prefix must be rejected");
+        assert!(matches!(err, RpcError::InvalidResponse(_)));
     }
 }
