@@ -24,7 +24,7 @@ use miden_protocol::{EMPTY_WORD, Word};
 use miden_tx::utils::serde::Serializable;
 use miden_tx::utils::sync::RwLock;
 use tonic::Status;
-use tracing::{info, warn};
+use tracing::info;
 
 use super::domain::account::{
     AccountProof,
@@ -121,16 +121,20 @@ impl BlockPagination {
     }
 }
 
-/// Removes from a `sync_notes` block any note whose tag was not requested, returning how many were
-/// dropped. A note with an unrequested tag is one the client never asked for, so it is dropped
-/// instead of failing the whole sync.
-fn retain_requested_tags(
+/// Returns an error if any note in a `sync_notes` response carries a tag that was not requested.
+fn ensure_requested_tags(
     requested: &[NoteTag],
-    notes: &mut BTreeMap<NoteId, CommittedNote>,
-) -> usize {
-    let before = notes.len();
-    notes.retain(|_, note| requested.contains(&note.tag()));
-    before - notes.len()
+    returned: impl IntoIterator<Item = NoteTag>,
+) -> Result<(), RpcError> {
+    for tag in returned {
+        if !requested.contains(&tag) {
+            let list = requested.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned note with tag {tag} but [{list}] were requested"
+            )));
+        }
+    }
+    Ok(())
 }
 
 // GRPC CLIENT
@@ -649,14 +653,8 @@ impl NodeRpcClient for GrpcClient {
                 let page_block_to = BlockNumber::from(page.block_num);
 
                 for proto_block in response.blocks {
-                    let mut block: NoteSyncBlock = proto_block.try_into()?;
-                    let discarded = retain_requested_tags(chunk, &mut block.notes);
-                    if discarded > 0 {
-                        warn!(discarded, "discarded notes with tags that were not requested");
-                    }
-                    if block.notes.is_empty() {
-                        continue;
-                    }
+                    let block: NoteSyncBlock = proto_block.try_into()?;
+                    ensure_requested_tags(chunk, block.notes.values().map(CommittedNote::tag))?;
                     let bn = block.block_header.block_num();
                     if let Some(existing) = merged_blocks.get_mut(&bn) {
                         for (id, note) in block.notes {
@@ -1036,30 +1034,12 @@ impl From<&Status> for GrpcError {
 #[cfg(test)]
 mod tests {
     use std::boxed::Box;
-    use std::collections::BTreeMap;
 
     use miden_protocol::Word;
-    use miden_protocol::account::AccountId;
     use miden_protocol::block::BlockNumber;
-    use miden_protocol::crypto::merkle::SparseMerklePath;
-    use miden_protocol::note::{
-        NoteAttachments,
-        NoteId,
-        NoteInclusionProof,
-        NoteMetadata,
-        NoteTag,
-        NoteType,
-        PartialNoteMetadata,
-    };
-    use miden_protocol::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
+    use miden_protocol::note::NoteTag;
 
-    use super::{
-        BlockPagination,
-        CommittedNote,
-        GrpcClient,
-        PaginationResult,
-        retain_requested_tags,
-    };
+    use super::{BlockPagination, GrpcClient, PaginationResult, ensure_requested_tags};
     use crate::alloc::string::ToString;
     use crate::rpc::{Endpoint, NodeRpcClient, RpcError};
 
@@ -1253,32 +1233,15 @@ mod tests {
         assert!(!status.version.is_empty(), "status must include a server version");
     }
 
-    fn note_id(n: u32) -> NoteId {
-        NoteId::from_raw(Word::from([n, 0, 0, 0]))
-    }
-
-    fn committed_note(id: u32, tag: u32) -> CommittedNote {
-        let sender = AccountId::try_from(ACCOUNT_ID_PRIVATE_SENDER).unwrap();
-        let metadata = NoteMetadata::new(
-            PartialNoteMetadata::new(sender, NoteType::Private).with_tag(NoteTag::new(tag)),
-            &NoteAttachments::empty(),
-        );
-        let proof = NoteInclusionProof::new(0u32.into(), 0, SparseMerklePath::default()).unwrap();
-        CommittedNote::new(note_id(id), metadata, proof)
-    }
-
     #[test]
-    fn retain_requested_tags_keeps_requested_and_counts_discards() {
-        let keep = committed_note(1, 100);
-        let dropped = committed_note(2, 200);
-        let mut notes = BTreeMap::new();
-        notes.insert(*keep.note_id(), keep);
-        notes.insert(*dropped.note_id(), dropped);
+    fn ensure_requested_tags_rejects_unrequested() {
+        let requested = NoteTag::new(1);
+        let other = NoteTag::new(2);
 
-        let discarded = retain_requested_tags(&[NoteTag::new(100)], &mut notes);
+        ensure_requested_tags(&[requested], [requested]).expect("requested tag must be accepted");
 
-        assert_eq!(discarded, 1);
-        assert_eq!(notes.len(), 1);
-        assert!(notes.values().all(|n| n.tag() == NoteTag::new(100)));
+        let err = ensure_requested_tags(&[requested], [other])
+            .expect_err("unrequested tag must be rejected");
+        assert!(matches!(err, RpcError::InvalidResponse(_)));
     }
 }
