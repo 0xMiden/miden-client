@@ -24,7 +24,7 @@ use miden_protocol::{EMPTY_WORD, Word};
 use miden_tx::utils::serde::Serializable;
 use miden_tx::utils::sync::RwLock;
 use tonic::Status;
-use tracing::{info, warn};
+use tracing::info;
 
 use super::domain::account::{
     AccountProof,
@@ -121,23 +121,20 @@ impl BlockPagination {
     }
 }
 
-/// Splits a `GetNotesById` response into the notes whose ID was requested and a count of those
-/// that weren't. A note whose ID was not requested was never asked for, so it is dropped instead
-/// of failing the whole call.
-fn split_requested_notes(
-    requested_ids: &[NoteId],
-    notes: Vec<FetchedNote>,
-) -> (Vec<FetchedNote>, usize) {
-    let mut kept = Vec::with_capacity(notes.len());
-    let mut discarded = 0;
-    for note in notes {
-        if requested_ids.contains(&note.id()) {
-            kept.push(note);
-        } else {
-            discarded += 1;
+/// Returns an error if any note in a `GetNotesById` response has an ID that was not requested.
+fn ensure_requested_note_ids(
+    requested: &[NoteId],
+    returned: impl IntoIterator<Item = NoteId>,
+) -> Result<(), RpcError> {
+    for id in returned {
+        if !requested.contains(&id) {
+            let list = requested.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned note {id} but [{list}] were requested"
+            )));
         }
     }
-    (kept, discarded)
+    Ok(())
 }
 
 // GRPC CLIENT
@@ -479,11 +476,9 @@ impl NodeRpcClient for GrpcClient {
                 .map(FetchedNote::try_from)
                 .collect::<Result<Vec<FetchedNote>, RpcConversionError>>()?;
 
-            let (kept, discarded) = split_requested_notes(chunk, response_notes);
-            if discarded > 0 {
-                warn!(discarded, "discarded notes that were not requested");
-            }
-            notes.extend(kept);
+            ensure_requested_note_ids(chunk, response_notes.iter().map(FetchedNote::id))?;
+
+            notes.extend(response_notes);
         }
         Ok(notes)
     }
@@ -1042,26 +1037,10 @@ mod tests {
     use std::boxed::Box;
 
     use miden_protocol::Word;
-    use miden_protocol::account::AccountId;
     use miden_protocol::block::BlockNumber;
-    use miden_protocol::crypto::merkle::SparseMerklePath;
-    use miden_protocol::note::{
-        NoteAttachments,
-        NoteId,
-        NoteInclusionProof,
-        NoteMetadata,
-        NoteType,
-        PartialNoteMetadata,
-    };
-    use miden_protocol::testing::account_id::ACCOUNT_ID_PRIVATE_SENDER;
+    use miden_protocol::note::NoteId;
 
-    use super::{
-        BlockPagination,
-        FetchedNote,
-        GrpcClient,
-        PaginationResult,
-        split_requested_notes,
-    };
+    use super::{BlockPagination, GrpcClient, PaginationResult, ensure_requested_note_ids};
     use crate::alloc::string::ToString;
     use crate::rpc::{Endpoint, NodeRpcClient, RpcError};
 
@@ -1259,23 +1238,16 @@ mod tests {
         NoteId::from_raw(Word::from([n, 0, 0, 0]))
     }
 
-    fn fetched_note(id: u32) -> FetchedNote {
-        let sender = AccountId::try_from(ACCOUNT_ID_PRIVATE_SENDER).unwrap();
-        let metadata = NoteMetadata::new(
-            PartialNoteMetadata::new(sender, NoteType::Private),
-            &NoteAttachments::empty(),
-        );
-        let proof = NoteInclusionProof::new(0u32.into(), 0, SparseMerklePath::default()).unwrap();
-        FetchedNote::Private(note_id(id), metadata, NoteAttachments::empty(), proof)
-    }
-
     #[test]
-    fn split_requested_notes_keeps_requested_and_counts_discards() {
-        let (kept, discarded) =
-            split_requested_notes(&[note_id(1)], vec![fetched_note(1), fetched_note(2)]);
+    fn ensure_requested_note_ids_rejects_unrequested() {
+        let requested = note_id(1);
+        let other = note_id(2);
 
-        assert_eq!(discarded, 1);
-        assert_eq!(kept.len(), 1);
-        assert_eq!(kept[0].id(), note_id(1));
+        ensure_requested_note_ids(&[requested], [requested])
+            .expect("requested note id must be accepted");
+
+        let err = ensure_requested_note_ids(&[requested], [other])
+            .expect_err("unrequested note id must be rejected");
+        assert!(matches!(err, RpcError::InvalidResponse(_)));
     }
 }
