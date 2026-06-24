@@ -172,8 +172,7 @@ where
         }
 
         // Recover historical private notes for any tag added after the global cursor advanced.
-        // This drains each newly
-        // tracked tag from the start, fetching only that tag's own history.
+        // This drains each newly tracked tag from the start, fetching only that tag's own history.
         let mut imported_ids = self.backfill_new_tags().await?;
 
         let cursor = self.store.get_note_transport_cursor().await?;
