@@ -123,7 +123,7 @@ impl BlockPagination {
 
 /// Returns an error if any note in a `GetNotesById` response has an ID that was not requested.
 fn ensure_requested_note_ids(
-    requested: &[NoteId],
+    requested: &BTreeSet<NoteId>,
     returned: impl IntoIterator<Item = NoteId>,
 ) -> Result<(), RpcError> {
     for id in returned {
@@ -456,6 +456,7 @@ impl NodeRpcClient for GrpcClient {
 
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
         let limits = self.get_rpc_limits().await?;
+        let requested_ids: BTreeSet<NoteId> = note_ids.iter().copied().collect();
         let mut notes = Vec::with_capacity(note_ids.len());
         for chunk in note_ids.chunks(limits.note_ids_limit as usize) {
             let request = proto::note::NoteIdList {
@@ -476,7 +477,7 @@ impl NodeRpcClient for GrpcClient {
                 .map(FetchedNote::try_from)
                 .collect::<Result<Vec<FetchedNote>, RpcConversionError>>()?;
 
-            ensure_requested_note_ids(chunk, response_notes.iter().map(FetchedNote::id))?;
+            ensure_requested_note_ids(&requested_ids, response_notes.iter().map(FetchedNote::id))?;
 
             notes.extend(response_notes);
         }
@@ -1035,6 +1036,7 @@ impl From<&Status> for GrpcError {
 #[cfg(test)]
 mod tests {
     use std::boxed::Box;
+    use std::collections::BTreeSet;
 
     use miden_protocol::Word;
     use miden_protocol::block::BlockNumber;
@@ -1242,11 +1244,12 @@ mod tests {
     fn ensure_requested_note_ids_rejects_unrequested() {
         let requested = note_id(1);
         let other = note_id(2);
+        let requested_set = BTreeSet::from([requested]);
 
-        ensure_requested_note_ids(&[requested], [requested])
+        ensure_requested_note_ids(&requested_set, [requested])
             .expect("requested note id must be accepted");
 
-        let err = ensure_requested_note_ids(&[requested], [other])
+        let err = ensure_requested_note_ids(&requested_set, [other])
             .expect_err("unrequested note id must be rejected");
         assert!(matches!(err, RpcError::InvalidResponse(_)));
     }
