@@ -143,6 +143,22 @@ fn verify_requested_nullifiers(
     Ok(())
 }
 
+/// Returns an error if any note in a `GetNotesById` response has an ID that was not requested.
+fn ensure_requested_note_ids(
+    requested: &BTreeSet<NoteId>,
+    returned: impl IntoIterator<Item = NoteId>,
+) -> Result<(), RpcError> {
+    for id in returned {
+        if !requested.contains(&id) {
+            let list = requested.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned note {id} but [{list}] were requested"
+            )));
+        }
+    }
+    Ok(())
+}
+
 // GRPC CLIENT
 // ================================================================================================
 
@@ -462,6 +478,7 @@ impl NodeRpcClient for GrpcClient {
 
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
         let limits = self.get_rpc_limits().await?;
+        let requested_ids: BTreeSet<NoteId> = note_ids.iter().copied().collect();
         let mut notes = Vec::with_capacity(note_ids.len());
         for chunk in note_ids.chunks(limits.note_ids_limit as usize) {
             let request = proto::note::NoteIdList {
@@ -481,6 +498,8 @@ impl NodeRpcClient for GrpcClient {
                 .into_iter()
                 .map(FetchedNote::try_from)
                 .collect::<Result<Vec<FetchedNote>, RpcConversionError>>()?;
+
+            ensure_requested_note_ids(&requested_ids, response_notes.iter().map(FetchedNote::id))?;
 
             notes.extend(response_notes);
         }
@@ -1045,7 +1064,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use miden_protocol::block::BlockNumber;
-    use miden_protocol::note::Nullifier;
+    use miden_protocol::note::{NoteId, Nullifier};
     use miden_protocol::{Felt, Word};
 
     use super::{
@@ -1053,6 +1072,7 @@ mod tests {
         GrpcClient,
         NullifierUpdate,
         PaginationResult,
+        ensure_requested_note_ids,
         verify_requested_nullifiers,
     };
     use crate::alloc::string::ToString;
@@ -1275,6 +1295,24 @@ mod tests {
 
         let err = verify_requested_nullifiers(&requested_prefixes, &[requested, unrequested])
             .expect_err("unrequested prefix must be rejected");
+        assert!(matches!(err, RpcError::InvalidResponse(_)));
+    }
+
+    fn note_id(n: u32) -> NoteId {
+        NoteId::from_raw(Word::from([n, 0, 0, 0]))
+    }
+
+    #[test]
+    fn ensure_requested_note_ids_rejects_unrequested() {
+        let requested = note_id(1);
+        let other = note_id(2);
+        let requested_set = BTreeSet::from([requested]);
+
+        ensure_requested_note_ids(&requested_set, [requested])
+            .expect("requested note id must be accepted");
+
+        let err = ensure_requested_note_ids(&requested_set, [other])
+            .expect_err("unrequested note id must be rejected");
         assert!(matches!(err, RpcError::InvalidResponse(_)));
     }
 }
