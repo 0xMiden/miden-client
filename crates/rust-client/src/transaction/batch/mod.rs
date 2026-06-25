@@ -327,7 +327,8 @@ where
 
     let current_account = partial_account_from_executed_transaction(&executed_transaction)?;
     let tx_inputs = executed_transaction.tx_inputs().clone();
-    data_store.cache_account(current_account, tx_inputs);
+    let account_delta = executed_transaction.account_delta().clone();
+    data_store.cache_account(current_account, tx_inputs, account_delta)?;
 
     validate_executed_transaction(&executed_transaction, &prep.output_recipients)?;
     TransactionResult::new(executed_transaction, prep.future_notes)
