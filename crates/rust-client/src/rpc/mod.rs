@@ -275,7 +275,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// Implementations must verify that every returned note's tag was present in `note_tags` and
     /// return [`RpcError::InvalidResponse`] otherwise.
     ///
-    /// Errors:
+    /// # Errors
     /// - [`RpcError::InvalidResponse`] if the node returns a note whose tag was not requested.
     async fn sync_notes(
         &self,
