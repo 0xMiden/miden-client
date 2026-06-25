@@ -123,7 +123,7 @@ impl BlockPagination {
 
 /// Returns an error if any note in a `sync_notes` response carries a tag that was not requested.
 fn ensure_requested_tags(
-    requested: &[NoteTag],
+    requested: &BTreeSet<NoteTag>,
     returned: impl IntoIterator<Item = NoteTag>,
 ) -> Result<(), RpcError> {
     for tag in returned {
@@ -627,6 +627,7 @@ impl NodeRpcClient for GrpcClient {
 
         for chunk in tags.chunks(limits.note_tags_limit as usize) {
             let proto_tags: Vec<u32> = chunk.iter().map(|&t| t.into()).collect();
+            let requested_tags: BTreeSet<NoteTag> = chunk.iter().copied().collect();
             let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
@@ -654,7 +655,10 @@ impl NodeRpcClient for GrpcClient {
 
                 for proto_block in response.blocks {
                     let block: NoteSyncBlock = proto_block.try_into()?;
-                    ensure_requested_tags(chunk, block.notes.values().map(CommittedNote::tag))?;
+                    ensure_requested_tags(
+                        &requested_tags,
+                        block.notes.values().map(CommittedNote::tag),
+                    )?;
                     let bn = block.block_header.block_num();
                     if let Some(existing) = merged_blocks.get_mut(&bn) {
                         for (id, note) in block.notes {
@@ -1034,6 +1038,7 @@ impl From<&Status> for GrpcError {
 #[cfg(test)]
 mod tests {
     use std::boxed::Box;
+    use std::collections::BTreeSet;
 
     use miden_protocol::Word;
     use miden_protocol::block::BlockNumber;
@@ -1237,10 +1242,11 @@ mod tests {
     fn ensure_requested_tags_rejects_unrequested() {
         let requested = NoteTag::new(1);
         let other = NoteTag::new(2);
+        let requested_set = BTreeSet::from([requested]);
 
-        ensure_requested_tags(&[requested], [requested]).expect("requested tag must be accepted");
+        ensure_requested_tags(&requested_set, [requested]).expect("requested tag must be accepted");
 
-        let err = ensure_requested_tags(&[requested], [other])
+        let err = ensure_requested_tags(&requested_set, [other])
             .expect_err("unrequested tag must be rejected");
         assert!(matches!(err, RpcError::InvalidResponse(_)));
     }
