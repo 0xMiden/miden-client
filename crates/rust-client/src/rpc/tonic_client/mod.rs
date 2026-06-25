@@ -124,7 +124,7 @@ impl BlockPagination {
 /// Returns [`RpcError::InvalidResponse`] if any update in the `sync_nullifiers` batch carries a
 /// nullifier whose prefix was not requested.
 fn verify_requested_nullifiers(
-    requested_prefixes: &[u16],
+    requested_prefixes: &BTreeSet<u16>,
     batch: &[NullifierUpdate],
 ) -> Result<(), RpcError> {
     for update in batch {
@@ -693,6 +693,7 @@ impl NodeRpcClient for GrpcClient {
         // violating the RPC limit.
         for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
             let proto_prefixes: Vec<u32> = chunk.iter().map(|&x| u32::from(x)).collect();
+            let requested_prefixes: BTreeSet<u16> = chunk.iter().copied().collect();
             let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
@@ -720,7 +721,7 @@ impl NodeRpcClient for GrpcClient {
                     .collect::<Result<Vec<NullifierUpdate>, _>>()
                     .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
 
-                verify_requested_nullifiers(chunk, &batch_nullifiers)?;
+                verify_requested_nullifiers(&requested_prefixes, &batch_nullifiers)?;
                 all_nullifiers.extend(batch_nullifiers);
 
                 let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
@@ -1041,6 +1042,7 @@ impl From<&Status> for GrpcError {
 mod tests {
     use core::slice;
     use std::boxed::Box;
+    use std::collections::BTreeSet;
 
     use miden_protocol::block::BlockNumber;
     use miden_protocol::note::Nullifier;
@@ -1266,10 +1268,12 @@ mod tests {
             block_num: 2u32.into(),
         };
 
-        verify_requested_nullifiers(&[0x1234], slice::from_ref(&requested))
+        let requested_prefixes: BTreeSet<u16> = BTreeSet::from([0x1234]);
+
+        verify_requested_nullifiers(&requested_prefixes, slice::from_ref(&requested))
             .expect("requested prefix must be accepted");
 
-        let err = verify_requested_nullifiers(&[0x1234], &[requested, unrequested])
+        let err = verify_requested_nullifiers(&requested_prefixes, &[requested, unrequested])
             .expect_err("unrequested prefix must be rejected");
         assert!(matches!(err, RpcError::InvalidResponse(_)));
     }
