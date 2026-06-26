@@ -123,7 +123,7 @@ impl BlockPagination {
 
 /// Returns [`RpcError::InvalidResponse`] if any update in the `sync_nullifiers` batch carries a
 /// nullifier whose prefix was not requested.
-fn verify_requested_nullifiers(
+fn ensure_requested_nullifiers(
     requested_prefixes: &BTreeSet<u16>,
     batch: &[NullifierUpdate],
 ) -> Result<(), RpcError> {
@@ -761,7 +761,7 @@ impl NodeRpcClient for GrpcClient {
                     .collect::<Result<Vec<NullifierUpdate>, _>>()
                     .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
 
-                verify_requested_nullifiers(&requested_prefixes, &batch_nullifiers)?;
+                ensure_requested_nullifiers(&requested_prefixes, &batch_nullifiers)?;
                 all_nullifiers.extend(batch_nullifiers);
 
                 let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
@@ -1094,8 +1094,8 @@ mod tests {
         NullifierUpdate,
         PaginationResult,
         ensure_requested_note_ids,
+        ensure_requested_nullifiers,
         ensure_requested_tags,
-        verify_requested_nullifiers,
     };
     use crate::alloc::string::ToString;
     use crate::rpc::{Endpoint, NodeRpcClient, RpcError};
@@ -1312,10 +1312,10 @@ mod tests {
 
         let requested_prefixes: BTreeSet<u16> = BTreeSet::from([0x1234]);
 
-        verify_requested_nullifiers(&requested_prefixes, slice::from_ref(&requested))
+        ensure_requested_nullifiers(&requested_prefixes, slice::from_ref(&requested))
             .expect("requested prefix must be accepted");
 
-        let err = verify_requested_nullifiers(&requested_prefixes, &[requested, unrequested])
+        let err = ensure_requested_nullifiers(&requested_prefixes, &[requested, unrequested])
             .expect_err("unrequested prefix must be rejected");
         assert!(matches!(err, RpcError::InvalidResponse(_)));
     }
