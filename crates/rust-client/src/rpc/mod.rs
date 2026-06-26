@@ -206,6 +206,12 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// In both cases, a [`miden_protocol::note::NoteInclusionProof`] is returned so the caller can
     /// verify that each note is part of the block's note tree.
+    ///
+    /// Implementations must verify that every returned note's ID was present in `note_ids` and
+    /// return [`RpcError::InvalidResponse`] otherwise.
+    ///
+    /// Errors:
+    /// - [`RpcError::InvalidResponse`] if the node returns a note whose ID was not requested.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
     /// Fetches the MMR delta for a given block range using the `/SyncChainMmr` RPC endpoint.
@@ -271,6 +277,12 @@ pub trait NodeRpcClient: Send + Sync {
     /// Notes with attachments will have header-only metadata after this call; use
     /// [`NodeRpcClient::sync_notes_with_details`] to also resolve their full metadata and
     /// fetch public note bodies in a single follow-up call.
+    ///
+    /// Implementations must verify that every returned note's tag was present in `note_tags` and
+    /// return [`RpcError::InvalidResponse`] otherwise.
+    ///
+    /// # Errors
+    /// - [`RpcError::InvalidResponse`] if the node returns a note whose tag was not requested.
     async fn sync_notes(
         &self,
         block_from: BlockNumber,
