@@ -121,6 +121,28 @@ impl BlockPagination {
     }
 }
 
+/// Returns [`RpcError::InvalidResponse`] if any update in the `sync_nullifiers` batch carries a
+/// nullifier whose prefix was not requested.
+fn ensure_requested_nullifiers(
+    requested_prefixes: &BTreeSet<u16>,
+    batch: &[NullifierUpdate],
+) -> Result<(), RpcError> {
+    for update in batch {
+        let prefix = update.nullifier.prefix();
+        if !requested_prefixes.contains(&prefix) {
+            let requested = requested_prefixes
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned nullifier with prefix {prefix} but [{requested}] were requested"
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Returns an error if any note in a `sync_notes` response carries a tag that was not requested.
 fn ensure_requested_tags(
     requested: &BTreeSet<NoteTag>,
@@ -711,6 +733,7 @@ impl NodeRpcClient for GrpcClient {
         // violating the RPC limit.
         for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
             let proto_prefixes: Vec<u32> = chunk.iter().map(|&x| u32::from(x)).collect();
+            let requested_prefixes: BTreeSet<u16> = chunk.iter().copied().collect();
             let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
@@ -738,6 +761,7 @@ impl NodeRpcClient for GrpcClient {
                     .collect::<Result<Vec<NullifierUpdate>, _>>()
                     .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
 
+                ensure_requested_nullifiers(&requested_prefixes, &batch_nullifiers)?;
                 all_nullifiers.extend(batch_nullifiers);
 
                 let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
@@ -1056,18 +1080,21 @@ impl From<&Status> for GrpcError {
 
 #[cfg(test)]
 mod tests {
+    use core::slice;
     use std::boxed::Box;
     use std::collections::BTreeSet;
 
-    use miden_protocol::Word;
     use miden_protocol::block::BlockNumber;
-    use miden_protocol::note::{NoteId, NoteTag};
+    use miden_protocol::note::{NoteId, NoteTag, Nullifier};
+    use miden_protocol::{Felt, Word};
 
     use super::{
         BlockPagination,
         GrpcClient,
+        NullifierUpdate,
         PaginationResult,
         ensure_requested_note_ids,
+        ensure_requested_nullifiers,
         ensure_requested_tags,
     };
     use crate::alloc::string::ToString;
@@ -1261,6 +1288,36 @@ mod tests {
             .await
             .expect("testnet status with caller auth header must succeed");
         assert!(!status.version.is_empty(), "status must include a server version");
+    }
+
+    fn nullifier_with_prefix(prefix: u16) -> Nullifier {
+        Nullifier::from_raw(Word::new([
+            Felt::ZERO,
+            Felt::ZERO,
+            Felt::ZERO,
+            Felt::new_unchecked(u64::from(prefix) << 48),
+        ]))
+    }
+
+    #[test]
+    fn verify_requested_nullifiers_rejects_unrequested_prefix() {
+        let requested = NullifierUpdate {
+            nullifier: nullifier_with_prefix(0x1234),
+            block_num: 1u32.into(),
+        };
+        let unrequested = NullifierUpdate {
+            nullifier: nullifier_with_prefix(0xabcd),
+            block_num: 2u32.into(),
+        };
+
+        let requested_prefixes: BTreeSet<u16> = BTreeSet::from([0x1234]);
+
+        ensure_requested_nullifiers(&requested_prefixes, slice::from_ref(&requested))
+            .expect("requested prefix must be accepted");
+
+        let err = ensure_requested_nullifiers(&requested_prefixes, &[requested, unrequested])
+            .expect_err("unrequested prefix must be rejected");
+        assert!(matches!(err, RpcError::InvalidResponse(_)));
     }
 
     #[test]

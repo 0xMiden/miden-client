@@ -345,6 +345,13 @@ pub trait NodeRpcClient: Send + Sync {
     /// - `prefix` is a list of nullifiers prefixes to search for.
     /// - `block_from`: The starting block number for the range (inclusive).
     /// - `block_to`: The ending block number for the range (inclusive).
+    ///
+    /// Implementations must verify that every returned nullifier's prefix was present in `prefix`
+    /// and return [`RpcError::InvalidResponse`] otherwise.
+    ///
+    /// # Errors
+    /// - [`RpcError::InvalidResponse`] if the node returns a nullifier whose prefix was not
+    ///   requested.
     async fn sync_nullifiers(
         &self,
         prefix: &[u16],
