@@ -4,6 +4,7 @@
 
 ### Fixes
 
+* [FIX][rust] RPC endpoint parsing now rejects endpoint strings that omit either the protocol or host. ([#2266](https://github.com/0xMiden/miden-client/pull/2266))
 * [FIX][rust] State sync now re-verifies a tracked private account's commitment mismatch against the witness `get_account` returns. The witness is checked against the synced block's account root before locking the account, so a node can no longer durably lock it with a forged `sync_transactions` commitment ([#2260](https://github.com/0xMiden/rust-sdk/pull/2260)).
 * [FIX][rust] State sync now range-checks `sync_transactions` records to `(current, chain_tip]`, rejecting out-of-range records that could forge transaction commit heights ([#2252](https://github.com/0xMiden/rust-sdk/pull/2252)).
 * [FIX][rust] `Endpoint` parsing now strips a trailing slash from the host of no-port endpoints such as `http://host/`, matching the cleanup already applied when a port is present ([#2268](https://github.com/0xMiden/rust-sdk/pull/2268)).
