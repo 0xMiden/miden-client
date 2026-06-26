@@ -32,7 +32,7 @@ use super::domain::account::{
     GetAccountRequest,
     StorageMapFetch,
 };
-use super::domain::note::{FetchedNote, NoteSyncBlock};
+use super::domain::note::{CommittedNote, FetchedNote, NoteSyncBlock};
 use super::domain::nullifier::NullifierUpdate;
 use super::generated::rpc::AccountRequest;
 use super::generated::rpc::account_request::AccountDetailRequest;
@@ -119,6 +119,22 @@ impl BlockPagination {
 
         Ok(PaginationResult::Continue)
     }
+}
+
+/// Returns an error if any note in a `sync_notes` response carries a tag that was not requested.
+fn ensure_requested_tags(
+    requested: &BTreeSet<NoteTag>,
+    returned: impl IntoIterator<Item = NoteTag>,
+) -> Result<(), RpcError> {
+    for tag in returned {
+        if !requested.contains(&tag) {
+            let list = requested.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
+            return Err(RpcError::InvalidResponse(format!(
+                "node returned note with tag {tag} but [{list}] were requested"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Returns an error if any note in a `GetNotesById` response has an ID that was not requested.
@@ -630,6 +646,7 @@ impl NodeRpcClient for GrpcClient {
 
         for chunk in tags.chunks(limits.note_tags_limit as usize) {
             let proto_tags: Vec<u32> = chunk.iter().map(|&t| t.into()).collect();
+            let requested_tags: BTreeSet<NoteTag> = chunk.iter().copied().collect();
             let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
@@ -657,6 +674,10 @@ impl NodeRpcClient for GrpcClient {
 
                 for proto_block in response.blocks {
                     let block: NoteSyncBlock = proto_block.try_into()?;
+                    ensure_requested_tags(
+                        &requested_tags,
+                        block.notes.values().map(CommittedNote::tag),
+                    )?;
                     let bn = block.block_header.block_num();
                     if let Some(existing) = merged_blocks.get_mut(&bn) {
                         for (id, note) in block.notes {
@@ -1040,9 +1061,15 @@ mod tests {
 
     use miden_protocol::Word;
     use miden_protocol::block::BlockNumber;
-    use miden_protocol::note::NoteId;
+    use miden_protocol::note::{NoteId, NoteTag};
 
-    use super::{BlockPagination, GrpcClient, PaginationResult, ensure_requested_note_ids};
+    use super::{
+        BlockPagination,
+        GrpcClient,
+        PaginationResult,
+        ensure_requested_note_ids,
+        ensure_requested_tags,
+    };
     use crate::alloc::string::ToString;
     use crate::rpc::{Endpoint, NodeRpcClient, RpcError};
 
@@ -1234,6 +1261,19 @@ mod tests {
             .await
             .expect("testnet status with caller auth header must succeed");
         assert!(!status.version.is_empty(), "status must include a server version");
+    }
+
+    #[test]
+    fn ensure_requested_tags_rejects_unrequested() {
+        let requested = NoteTag::new(1);
+        let other = NoteTag::new(2);
+        let requested_set = BTreeSet::from([requested]);
+
+        ensure_requested_tags(&requested_set, [requested]).expect("requested tag must be accepted");
+
+        let err = ensure_requested_tags(&requested_set, [other])
+            .expect_err("unrequested tag must be rejected");
+        assert!(matches!(err, RpcError::InvalidResponse(_)));
     }
 
     fn note_id(n: u32) -> NoteId {
