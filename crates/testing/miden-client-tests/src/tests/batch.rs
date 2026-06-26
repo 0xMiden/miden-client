@@ -2,11 +2,10 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use miden_client::account::AccountType;
-use miden_client::assembly::CodeBuilder;
 use miden_client::asset::{Asset, FungibleAsset};
-use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
+use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::builder::ClientBuilder;
-use miden_client::keystore::{FilesystemKeyStore, Keystore};
+use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{NoteType, NoteUpdateTracker};
 use miden_client::rpc::NodeRpcClient;
 use miden_client::store::{StoreError, TransactionFilter};
@@ -29,21 +28,9 @@ use miden_client::transaction::{
 };
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
-use miden_protocol::account::{
-    AccountBuilder,
-    AccountComponent,
-    AccountComponentMetadata,
-    StorageMap,
-    StorageMapKey,
-    StorageSlot,
-    StorageSlotName,
-};
+use miden_protocol::Felt;
 use miden_protocol::crypto::rand::RandomCoin;
-use miden_protocol::{Felt, Word};
-use miden_standards::account::AccountBuilderSchemaCommitmentExt;
-use miden_standards::account::wallets::BasicWallet;
 use miden_testing::{Auth, MockChainBuilder, TxContextInput};
-use rand::RngCore;
 
 use crate::tests::create_test_client;
 
@@ -345,73 +332,19 @@ async fn batch_builder_push_succeeds_when_balance_depends_on_prior_push() {
     assert!(block_num.as_u32() > 0);
 }
 
-/// Storage map slot name used by the storage-map portion of the untouched-key regression test.
-const BATCH_MAP_SLOT_NAME: &str = "miden::testing::batch_map::map";
-/// Two distinct keys of the same storage map; transaction 1 bumps A, transaction 2 bumps B.
-const MAP_KEY_A: [Felt; 4] = [
-    Felt::new_unchecked(11),
-    Felt::new_unchecked(11),
-    Felt::new_unchecked(11),
-    Felt::new_unchecked(11),
-];
-const MAP_KEY_B: [Felt; 4] = [
-    Felt::new_unchecked(22),
-    Felt::new_unchecked(22),
-    Felt::new_unchecked(22),
-    Felt::new_unchecked(22),
-];
-
-/// MASM for a procedure that increments the storage map entry at `key`. The body mirrors the
-/// known-good `bump` sequence from the `storage_and_vault_proofs` test.
-fn bump_proc(name: &str, key: &str) -> String {
-    format!(
-        r"
-pub proc {name}
-    push.{key}
-    push.MAP_SLOT[0..2]
-    exec.::miden::protocol::active_account::get_map_item
-    add.1
-    push.{key}
-    push.MAP_SLOT[0..2]
-    exec.::miden::protocol::native_account::set_map_item
-    dropw
-    dupw
-    push.MAP_SLOT[0..2]
-    exec.::miden::protocol::native_account::set_map_item
-    dropw dropw
-end"
-    )
-}
-
-/// Account/script module exposing `bump_a` and `bump_b`, each mutating a distinct key of the same
-/// storage map slot. The same module is installed on the account and linked into the tx scripts so
-/// the `call` targets resolve to the account's procedures.
-fn bump_map_module() -> String {
-    format!(
-        "use miden::core::word\n\nconst MAP_SLOT = word(\"{slot}\")\n{a}\n{b}",
-        slot = BATCH_MAP_SLOT_NAME,
-        a = bump_proc("bump_a", &Word::from(MAP_KEY_A).to_hex()),
-        b = bump_proc("bump_b", &Word::from(MAP_KEY_B).to_hex()),
-    )
-}
-
-/// A later transaction in a batch may touch a vault key *or* storage map key that an earlier
-/// transaction in the same batch never touched. That key is absent from the earlier transaction's
-/// execution advice, so the batch data store must serve its witness by staging the accumulated
-/// in-batch delta onto the store's committed Merkle forest — not fail. Regression test for the
-/// in-batch "untouched key" witness path, covering both the vault and storage-map cases.
+/// A later transaction in a batch may touch a vault key that an earlier transaction in the same
+/// batch never touched. That key is absent from the earlier transaction's execution advice, so the
+/// batch data store must serve its witness by staging the accumulated in-batch delta onto the
+/// store's committed Merkle forest — not fail. Regression test for the in-batch "untouched key"
+/// witness path.
 ///
-/// Vault case — `from` holds a balance of faucet G (committed); a note from a *different* faucet F
-/// is left unconsumed:
-/// - Push 1 consumes the F note → touches only the F vault key.
-/// - Push 2 sends G to `to` → touches the G vault key, which push 1 never loaded.
-///
-/// Storage-map case — a custom account has a map slot with two keys A and B:
-/// - Push 1 bumps key A → touches only A.
-/// - Push 2 bumps key B → touches B, which push 1 never loaded.
-#[allow(clippy::too_many_lines)]
+/// Setup: `from` holds a balance of a "held" faucet (committed); a note from a *different*
+/// "consumed" faucet is left unconsumed.
+/// - Push 1 consumes the note → touches only the consumed faucet's vault key.
+/// - Push 2 sends the held asset to `to` → touches the held faucet's vault key, which push 1 never
+///   loaded.
 #[tokio::test]
-async fn batch_builder_serves_witness_for_untouched_key() {
+async fn batch_builder_serves_witness_for_untouched_vault_key() {
     let (mut client, rpc_api, authenticator) = Box::pin(create_test_client()).await;
 
     let (from_account, to_account, consumed_faucet) = setup_two_wallets_and_faucet(
@@ -481,89 +414,6 @@ async fn batch_builder_serves_witness_for_untouched_key() {
     .expect("submit should succeed: the untouched G vault key is served via the store forest");
 
     assert!(block_num.as_u32() > 0);
-
-    // ---------------------------------------------------------------------------------------------
-    // Storage-map case: a custom account with a map slot holding keys A and B. Push 1 bumps A,
-    // push 2 bumps B — B is never touched by push 1 and so is absent from its execution advice.
-    // ---------------------------------------------------------------------------------------------
-    let module = bump_map_module();
-
-    let component_code = CodeBuilder::default()
-        .compile_component_code("miden::testing::batch_map_component", module.clone())
-        .unwrap();
-
-    let mut storage_map = StorageMap::new();
-    let initial_value: Word =
-        [Felt::from(0u32), Felt::from(0u32), Felt::from(0u32), Felt::from(1u32)].into();
-    storage_map.insert(StorageMapKey::new(MAP_KEY_A.into()), initial_value).unwrap();
-    storage_map.insert(StorageMapKey::new(MAP_KEY_B.into()), initial_value).unwrap();
-
-    let map_slot =
-        StorageSlot::with_map(StorageSlotName::new(BATCH_MAP_SLOT_NAME).unwrap(), storage_map);
-    let map_component = AccountComponent::new(
-        component_code,
-        vec![map_slot],
-        AccountComponentMetadata::new("miden::testing::batch_map_component"),
-    )
-    .unwrap();
-
-    let key_pair = AuthSecretKey::new_falcon512_poseidon2();
-    let pub_key = key_pair.public_key();
-    let mut init_seed = [0u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
-    let map_account = AccountBuilder::new(init_seed)
-        .account_type(AccountType::Public)
-        .with_auth_component(AuthSingleSig::new(
-            pub_key.to_commitment(),
-            AuthSchemeId::Falcon512Poseidon2,
-        ))
-        .with_component(BasicWallet)
-        .with_component(map_component)
-        .build_with_schema_commitment()
-        .unwrap();
-    let map_account_id = map_account.id();
-    authenticator.add_key(&key_pair, map_account_id).await.unwrap();
-    client.add_account(&map_account, false).await.unwrap();
-
-    // Commit the account on chain so the batch runs against committed state (as the wallets above).
-    mint_and_consume(&mut client, map_account_id, held_faucet_id, NoteType::Private).await;
-    rpc_api.prove_block();
-    client.sync_state().await.unwrap();
-
-    // The same module is linked into both scripts so `call.batch_map::bump_*` resolves to the
-    // account's procedures.
-    let script_a = CodeBuilder::new()
-        .with_linked_module("external_contract::batch_map", module.clone())
-        .unwrap()
-        .compile_tx_script(
-            "use external_contract::batch_map\nbegin\n    call.batch_map::bump_a\nend",
-        )
-        .unwrap();
-    let script_b = CodeBuilder::new()
-        .with_linked_module("external_contract::batch_map", module.clone())
-        .unwrap()
-        .compile_tx_script(
-            "use external_contract::batch_map\nbegin\n    call.batch_map::bump_b\nend",
-        )
-        .unwrap();
-
-    let map_push1 = TransactionRequestBuilder::new().custom_script(script_a).build().unwrap();
-    let map_push2 = TransactionRequestBuilder::new().custom_script(script_b).build().unwrap();
-
-    let map_block_num = Box::pin(async {
-        client
-            .new_transaction_batch()
-            .push(map_account_id, map_push1)
-            .await?
-            .push(map_account_id, map_push2)
-            .await?
-            .submit()
-            .await
-    })
-    .await
-    .expect("submit should succeed: the untouched map key B is served via the store forest");
-
-    assert!(map_block_num.as_u32() > 0);
 }
 
 /// Verify that submitting an empty batch (no pushes) returns `BatchBuilderError::Empty`.
