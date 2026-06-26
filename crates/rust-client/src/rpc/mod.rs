@@ -343,7 +343,7 @@ pub trait NodeRpcClient: Send + Sync {
     /// Implementations must verify that every returned nullifier's prefix was present in `prefix`
     /// and return [`RpcError::InvalidResponse`] otherwise.
     ///
-    /// Errors:
+    /// # Errors
     /// - [`RpcError::InvalidResponse`] if the node returns a nullifier whose prefix was not
     ///   requested.
     async fn sync_nullifiers(
