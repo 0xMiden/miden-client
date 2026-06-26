@@ -612,7 +612,7 @@ pub trait Store: Send + Sync {
             return Ok(None);
         };
 
-        let witness = AssetWitness::new(vault.open(vault_key).into())?;
+        let witness = AssetWitness::new(vault.open(vault_key).into(), [vault_key])?;
 
         Ok(Some((asset, witness)))
     }

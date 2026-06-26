@@ -24,17 +24,16 @@ use uuid::Uuid;
 use crate::account::component::{
     AccountComponent,
     BasicWallet,
-    BurnPolicyConfig,
+    BurnPolicy,
     FungibleFaucet,
-    MintPolicyConfig,
-    PolicyRegistration,
+    MintPolicy,
     TokenPolicyManager,
 };
 use crate::account::{AccountBuilder, AccountBuilderSchemaCommitmentExt, AccountType, StorageSlot};
 use crate::auth::AuthSchemeId;
 use crate::crypto::FeltRng;
 pub use crate::keystore::{FilesystemKeyStore, Keystore};
-use crate::note::{Note, NoteAttachments, NoteConsumability, P2idNote};
+use crate::note::{Note, NoteConsumability, P2idNote};
 use crate::rpc::RpcError;
 use crate::store::{InputNoteRecord, NoteFilter, TransactionFilter};
 use crate::sync::SyncSummary;
@@ -141,11 +140,10 @@ pub async fn insert_new_fungible_faucet(
     // `AssetCallbackFlag::Enabled`. Tests construct assets via `FungibleAsset::new`, which
     // defaults to `Disabled`, so adding transfer policies makes `mint_and_send` reject the
     // mint with `ERR_FUNGIBLE_MINT_NOTE_ASSET_NOT_FROM_THIS_FAUCET`.
-    let policy_manager = TokenPolicyManager::new()
-        .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap()
-        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap();
+    let policy_manager = TokenPolicyManager::builder()
+        .active_mint_policy(MintPolicy::allow_all())
+        .active_burn_policy(BurnPolicy::allow_all())
+        .build();
     let account = AccountBuilder::new(init_seed)
         .account_type(visibility)
         .with_auth_component(auth_component)
@@ -539,15 +537,15 @@ pub fn mint_multiple_fungible_asset(
     let notes = target_id
         .iter()
         .map(|account_id| {
-            P2idNote::create(
-                asset.faucet_id(),
-                *account_id,
-                vec![asset.into()],
-                note_type,
-                NoteAttachments::empty(),
-                rng,
-            )
-            .unwrap()
+            P2idNote::builder()
+                .sender(asset.faucet_id())
+                .target(*account_id)
+                .asset(asset)
+                .note_type(note_type)
+                .generate_serial_number(rng)
+                .build()
+                .expect("note creation failed")
+                .into()
         })
         .collect::<Vec<Note>>();
 

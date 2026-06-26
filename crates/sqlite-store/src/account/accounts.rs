@@ -9,9 +9,9 @@ use std::vec::Vec;
 use miden_client::account::{
     Account,
     AccountCode,
-    AccountDelta,
     AccountHeader,
     AccountId,
+    AccountPatch,
     AccountStorage,
     Address,
     PartialAccount,
@@ -22,7 +22,7 @@ use miden_client::account::{
     StorageSlotName,
     StorageSlotType,
 };
-use miden_client::asset::{Asset, AssetVault, AssetWitness, FungibleAsset};
+use miden_client::asset::{Asset, AssetVault, AssetWitness};
 use miden_client::store::{
     AccountRecord,
     AccountRecordData,
@@ -440,33 +440,31 @@ impl SqliteStore {
     /// Applies the account delta to the account state, updating the vault and storage maps.
     ///
     /// Archives old values from latest to historical and updates latest via INSERT OR REPLACE.
-    pub(crate) fn apply_account_delta(
+    pub(crate) fn apply_account_patch(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,
         init_account_state: &AccountHeader,
         final_account_state: &AccountHeader,
-        updated_fungible_assets: BTreeMap<AssetVaultKey, FungibleAsset>,
         old_map_roots: &BTreeMap<StorageSlotName, Word>,
-        delta: &AccountDelta,
+        patch: &AccountPatch,
     ) -> Result<(), StoreError> {
         let account_id = final_account_state.id();
 
         // Archive old header and insert the new one
         Self::replace_account_header(tx, final_account_state, init_account_state)?;
 
-        Self::apply_account_vault_delta(
+        Self::apply_account_vault_patch(
             tx,
             smt_forest,
             account_id,
             init_account_state,
             final_account_state,
-            updated_fungible_assets,
-            delta,
+            patch.vault(),
         )?;
 
         // Build the final roots from the init state's registered roots:
         // - Replace vault root with the final one
-        // - Replace changed map roots with their new values (done by apply_account_storage_delta)
+        // - Replace changed map roots with their new values (done by apply_account_storage_patch)
         // - Unchanged map roots continue as they were
         let mut final_roots = smt_forest
             .get_roots(&init_account_state.id())
@@ -480,9 +478,9 @@ impl SqliteStore {
 
         let default_map_root = StorageMap::default().root();
         let updated_storage_slots =
-            Self::apply_account_storage_delta(smt_forest, old_map_roots, delta)?;
+            Self::apply_account_storage_patch(smt_forest, old_map_roots, patch.storage())?;
 
-        // Update map roots in final_roots with new values from the delta
+        // Update map roots in final_roots with new values from the patch
         for (slot_name, (new_root, slot_type)) in &updated_storage_slots {
             if *slot_type == StorageSlotType::Map {
                 let old_root = old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
@@ -495,12 +493,12 @@ impl SqliteStore {
             }
         }
 
-        Self::write_storage_delta(
+        Self::write_storage_patch(
             tx,
             account_id,
             final_account_state.nonce().as_canonical_u64(),
             &updated_storage_slots,
-            delta,
+            patch.storage(),
         )?;
 
         smt_forest.stage_roots(final_account_state.id(), final_roots);
@@ -852,11 +850,11 @@ impl SqliteStore {
     }
 
     /// Applies an incremental delta to a public account's state during sync.
-    pub(crate) fn apply_sync_account_delta(
+    pub(crate) fn apply_sync_account_patch(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,
         new_header: &AccountHeader,
-        delta: &AccountDelta,
+        patch: &AccountPatch,
     ) -> Result<(), StoreError> {
         let account_id = new_header.id();
 
@@ -867,23 +865,19 @@ impl SqliteStore {
             .map(|(header, ..)| header)
             .ok_or(StoreError::AccountDataNotFound(account_id))?;
 
-        // Read the fungible assets that will be affected by the delta.
+        if new_header.nonce().as_canonical_u64() <= init_header.nonce().as_canonical_u64() {
+            return Err(StoreError::DatabaseError(format!(
+                "apply_sync_account_patch: new nonce {} is not greater than local nonce {} for account {}",
+                new_header.nonce().as_canonical_u64(),
+                init_header.nonce().as_canonical_u64(),
+                account_id,
+            )));
+        }
+
         // Transaction derefs to Connection, so we can pass it where Connection is expected.
-        let updated_fungible_assets =
-            Self::get_account_fungible_assets_for_delta(tx, account_id, delta)?;
+        let old_map_roots = Self::get_storage_map_roots_for_patch(tx, account_id, patch.storage())?;
 
-        // Read the old map roots for slots affected by the delta.
-        let old_map_roots = Self::get_storage_map_roots_for_delta(tx, account_id, delta)?;
-
-        Self::apply_account_delta(
-            tx,
-            smt_forest,
-            &init_header,
-            new_header,
-            updated_fungible_assets,
-            &old_map_roots,
-            delta,
-        )
+        Self::apply_account_patch(tx, smt_forest, &init_header, new_header, &old_map_roots, patch)
     }
 
     /// Locks the account if the mismatched digest doesn't belong to a previous account state (stale

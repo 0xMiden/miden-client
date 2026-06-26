@@ -113,13 +113,7 @@ use miden_protocol::vm::AdviceInputs;
 use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
 use miden_standards::account::AccountBuilderSchemaCommitmentExt;
 use miden_standards::account::faucets::{FungibleFaucet, TokenName};
-use miden_standards::account::interface::AccountInterfaceError;
-use miden_standards::account::policies::{
-    BurnPolicyConfig,
-    MintPolicyConfig,
-    PolicyRegistration,
-    TokenPolicyManager,
-};
+use miden_standards::account::policies::{BurnPolicy, MintPolicy, TokenPolicyManager};
 use miden_standards::account::wallets::BasicWallet;
 use miden_standards::note::{
     NoteConsumptionStatus,
@@ -131,6 +125,7 @@ use miden_standards::note::{
 };
 use miden_standards::testing::mock_account::MockAccountExt;
 use miden_standards::testing::note::NoteBuilder;
+use miden_standards::tx_script::SendNotesTransactionScriptError;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
@@ -847,7 +842,7 @@ async fn mint_transaction() {
             .unwrap();
     let executed_tx = transaction_result.executed_transaction().clone();
 
-    assert_eq!(executed_tx.account_delta().nonce_delta(), ONE);
+    assert_eq!(executed_tx.account_patch().final_nonce(), Some(ONE));
 }
 
 #[tokio::test]
@@ -1048,9 +1043,11 @@ async fn note_without_asset() {
 
     assert!(matches!(
         error,
-        ClientError::TransactionRequestError(TransactionRequestError::AccountInterfaceError(
-            AccountInterfaceError::FaucetNoteWithoutAsset
-        ))
+        ClientError::TransactionRequestError(
+            TransactionRequestError::SendNotesTransactionScriptError(
+                SendNotesTransactionScriptError::FaucetNoteWithoutAsset
+            )
+        )
     ));
 
     let error = TransactionRequestBuilder::new()
@@ -3781,7 +3778,8 @@ async fn storage_and_vault_proofs() {
             .unwrap()
             .unwrap();
 
-        let expected_witness = AssetWitness::new(vault.open(asset.vault_key()).into()).unwrap();
+        let expected_witness =
+            AssetWitness::new(vault.open(asset.vault_key()).into(), [asset.vault_key()]).unwrap();
         assert_eq!(witness, expected_witness);
 
         // Check that specific map item proof matches the one in the storage
@@ -4159,15 +4157,15 @@ async fn sync_stores_private_note_attachments() {
     let ntx_target = NetworkAccountTarget::new(target.id(), NoteExecutionHint::Always).unwrap();
     let attachments = NoteAttachments::new(vec![ntx_target.into()]).unwrap();
     let mut note_rng = RandomCoin::new([1, 2, 3, 4].map(Felt::new_unchecked).into());
-    let private_note = P2idNote::create(
-        sender.id(),
-        target.id(),
-        vec![],
-        NoteType::Private,
-        attachments.clone(),
-        &mut note_rng,
-    )
-    .unwrap();
+    let private_note = P2idNote::builder()
+        .sender(sender.id())
+        .target(target.id())
+        .note_type(NoteType::Private)
+        .attachments(attachments.clone().into_vec())
+        .generate_serial_number(&mut note_rng)
+        .build()
+        .unwrap()
+        .into();
 
     // Declare the note as a spawn note (not yet committed) and build the chain at genesis.
     let spawn_note =
@@ -4646,11 +4644,10 @@ async fn insert_new_fungible_faucet(
         .unwrap();
     // Only mint/burn policies — see test_utils/common.rs::insert_new_fungible_faucet for the
     // reason transfer policies are intentionally omitted.
-    let policy_manager = TokenPolicyManager::new()
-        .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap()
-        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap();
+    let policy_manager = TokenPolicyManager::builder()
+        .active_mint_policy(MintPolicy::allow_all())
+        .active_burn_policy(BurnPolicy::allow_all())
+        .build();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(visibility)
@@ -4696,11 +4693,10 @@ async fn insert_new_ecdsa_fungible_faucet(
         .unwrap();
     // Only mint/burn policies — see test_utils/common.rs::insert_new_fungible_faucet for the
     // reason transfer policies are intentionally omitted.
-    let policy_manager = TokenPolicyManager::new()
-        .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap()
-        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap();
+    let policy_manager = TokenPolicyManager::builder()
+        .active_mint_policy(MintPolicy::allow_all())
+        .active_burn_policy(BurnPolicy::allow_all())
+        .build();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(visibility)
@@ -4835,7 +4831,8 @@ async fn storage_and_vault_proofs_ecdsa() {
             .unwrap()
             .unwrap();
 
-        let expected_witness = AssetWitness::new(vault.open(asset.vault_key()).into()).unwrap();
+        let expected_witness =
+            AssetWitness::new(vault.open(asset.vault_key()).into(), [asset.vault_key()]).unwrap();
         assert_eq!(witness, expected_witness);
 
         // Check that specific map item proof matches the one in the storage
@@ -4887,11 +4884,10 @@ async fn execute_transaction_fails_for_watched_account() {
         .max_supply(AssetAmount::new(max_supply).unwrap())
         .build()
         .unwrap();
-    let policy_manager = TokenPolicyManager::new()
-        .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap()
-        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap();
+    let policy_manager = TokenPolicyManager::builder()
+        .active_mint_policy(MintPolicy::allow_all())
+        .active_burn_policy(BurnPolicy::allow_all())
+        .build();
     let faucet = AccountBuilder::new(init_seed)
         .account_type(AccountType::Public)
         .with_auth_component(auth_component)

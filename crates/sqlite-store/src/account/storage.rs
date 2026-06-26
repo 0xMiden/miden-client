@@ -6,8 +6,8 @@ use std::string::ToString;
 use std::vec::Vec;
 
 use miden_client::account::{
-    AccountDelta,
     AccountId,
+    AccountStoragePatch,
     StorageMap,
     StorageSlot,
     StorageSlotContent,
@@ -31,13 +31,12 @@ impl SqliteStore {
     /// Only queries the slot values (roots) from the latest storage table, avoiding the need to
     /// load full storage map entries into memory. The `AccountSmtForest` handles the actual
     /// Merkle tree operations.
-    pub(crate) fn get_storage_map_roots_for_delta(
+    pub(crate) fn get_storage_map_roots_for_patch(
         conn: &rusqlite::Connection,
         account_id: AccountId,
-        delta: &AccountDelta,
+        storage_patch: &AccountStoragePatch,
     ) -> Result<BTreeMap<StorageSlotName, Word>, StoreError> {
-        let map_slot_names: Vec<Value> = delta
-            .storage()
+        let map_slot_names: Vec<Value> = storage_patch
             .maps()
             .map(|(slot_name, _)| Value::Text(slot_name.to_string()))
             .collect();
@@ -124,12 +123,12 @@ impl SqliteStore {
     /// For each changed slot, the old value is read from latest and archived to historical.
     /// NULL `old_slot_value` means the slot was new. For map entries, the old entry value is
     /// similarly archived before updating latest.
-    pub(crate) fn write_storage_delta(
+    pub(crate) fn write_storage_patch(
         tx: &Transaction<'_>,
         account_id: AccountId,
         nonce: u64,
         updated_slots: &BTreeMap<StorageSlotName, (Word, StorageSlotType)>,
-        delta: &AccountDelta,
+        storage_patch: &AccountStoragePatch,
     ) -> Result<(), StoreError> {
         const LATEST_SLOT_QUERY: &str = insert_sql!(
             latest_account_storage {
@@ -169,12 +168,11 @@ impl SqliteStore {
         let account_id_hex = account_id.to_hex();
         let nonce_val = u64_to_value(nonce);
 
-        // Collect the delta's changed map entries for efficient lookup
-        let delta_map_entries: BTreeMap<&StorageSlotName, Vec<(Word, Word)>> = delta
-            .storage()
+        // Collect the patch's changed map entries for efficient lookup
+        let patch_map_entries: BTreeMap<&StorageSlotName, Vec<(Word, Word)>> = storage_patch
             .maps()
-            .map(|(slot_name, map_delta)| {
-                let entries: Vec<(Word, Word)> = map_delta
+            .map(|(slot_name, map_patch)| {
+                let entries: Vec<(Word, Word)> = map_patch
                     .entries()
                     .iter()
                     .map(|(key, value)| ((*key).into(), *value))
@@ -213,7 +211,7 @@ impl SqliteStore {
                 .execute(params![&account_id_hex, &slot_name_str, &slot_value_hex, slot_type_val])
                 .into_store_error()?;
 
-            if let Some(changed_entries) = delta_map_entries.get(slot_name) {
+            if let Some(changed_entries) = patch_map_entries.get(slot_name) {
                 Self::write_map_entry_delta(
                     tx,
                     &mut latest_map_stmt,
@@ -290,23 +288,22 @@ impl SqliteStore {
     /// root is used to update the SMT forest with the delta entries, producing the new root.
     /// Full storage maps are never loaded into memory — the `AccountSmtForest` handles all
     /// Merkle tree operations.
-    pub(crate) fn apply_account_storage_delta(
+    pub(crate) fn apply_account_storage_patch(
         smt_forest: &mut AccountSmtForest,
         old_map_roots: &BTreeMap<StorageSlotName, Word>,
-        delta: &AccountDelta,
+        storage_patch: &AccountStoragePatch,
     ) -> Result<BTreeMap<StorageSlotName, (Word, StorageSlotType)>, StoreError> {
-        let mut updated_slots: BTreeMap<StorageSlotName, (Word, StorageSlotType)> = delta
-            .storage()
+        let mut updated_slots: BTreeMap<StorageSlotName, (Word, StorageSlotType)> = storage_patch
             .values()
             .map(|(slot_name, value)| (slot_name.clone(), (*value, StorageSlotType::Value)))
             .collect();
 
         let default_map_root = StorageMap::default().root();
 
-        for (slot_name, map_delta) in delta.storage().maps() {
+        for (slot_name, map_patch) in storage_patch.maps() {
             let old_root = old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
             let entries: Vec<_> =
-                map_delta.entries().iter().map(|(key, value)| (*key, *value)).collect();
+                map_patch.entries().iter().map(|(key, value)| (*key, *value)).collect();
 
             let new_root = smt_forest.update_storage_map_nodes(old_root, entries.into_iter())?;
             updated_slots.insert(slot_name.clone(), (new_root, StorageSlotType::Map));

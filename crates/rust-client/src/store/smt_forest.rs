@@ -52,16 +52,16 @@ impl AccountSmtForest {
         vault_root: Word,
         vault_key: AssetVaultKey,
     ) -> Result<(Asset, AssetWitness), StoreError> {
-        let vault_key_word = vault_key.into();
-        let proof = self.forest.open(vault_root, vault_key_word)?;
-        let asset_word =
-            proof.get(&vault_key_word).ok_or(MerkleError::UntrackedKey(vault_key_word))?;
+        let vault_key_word: Word = vault_key.into();
+        let hashed_key: Word = vault_key.hash().into();
+        let proof = self.forest.open(vault_root, hashed_key)?;
+        let asset_word = proof.get(&hashed_key).ok_or(MerkleError::UntrackedKey(hashed_key))?;
         if asset_word == EMPTY_WORD {
-            return Err(MerkleError::UntrackedKey(vault_key_word).into());
+            return Err(MerkleError::UntrackedKey(hashed_key).into());
         }
 
         let asset = Asset::from_key_value_words(vault_key_word, asset_word)?;
-        let witness = AssetWitness::new(proof)?;
+        let witness = AssetWitness::new(proof, [vault_key])?;
         Ok((asset, witness))
     }
 
@@ -158,11 +158,11 @@ impl AccountSmtForest {
     ) -> Result<Word, StoreError> {
         let entries: Vec<(Word, Word)> = new_assets
             .map(|asset| {
-                let key: Word = asset.vault_key().into();
+                let key: Word = asset.vault_key().hash().into();
                 let value = asset.to_value_word();
                 (key, value)
             })
-            .chain(removed_vault_keys.map(|vault_key| (vault_key.into(), EMPTY_WORD)))
+            .chain(removed_vault_keys.map(|vault_key| (vault_key.hash().into(), EMPTY_WORD)))
             .collect();
 
         if entries.is_empty() {
@@ -196,7 +196,7 @@ impl AccountSmtForest {
     /// Inserts the asset vault SMT nodes to the SMT forest.
     pub fn insert_asset_nodes(&mut self, vault: &AssetVault) -> Result<(), StoreError> {
         let smt = Smt::with_entries(vault.assets().map(|asset| {
-            let key: Word = asset.vault_key().into();
+            let key: Word = asset.vault_key().hash().into();
             let value = asset.to_value_word();
             (key, value)
         }))

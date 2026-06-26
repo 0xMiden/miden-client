@@ -3,22 +3,20 @@ use alloc::vec::Vec;
 
 use miden_protocol::account::{
     Account,
-    AccountDelta,
+    AccountCode,
     AccountHeader,
     AccountId,
-    AccountStorage,
-    AccountStorageDelta,
-    AccountVaultDelta,
-    StorageMapKey,
+    AccountPatch,
+    AccountStoragePatch,
+    AccountVaultPatch,
     StorageSlotName,
 };
-use miden_protocol::asset::{Asset, AssetVault, AssetVaultKey};
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks};
-use miden_protocol::errors::{AccountDeltaError, AccountError};
+use miden_protocol::errors::AccountPatchError;
 use miden_protocol::note::{NoteId, Nullifier};
 use miden_protocol::transaction::TransactionId;
-use miden_protocol::{Felt, Word};
+use miden_protocol::{Felt, ONE, Word};
 
 use super::SyncSummary;
 use crate::note::{NoteUpdateTracker, NoteUpdateType};
@@ -341,18 +339,18 @@ impl TransactionUpdateTracker {
 ///
 /// - [`PublicAccountUpdate::Full`] carries the new [`Account`] state directly (used when no storage
 ///   map is oversized and the vault fits in the response). The store applies it by replacing the
-///   local state — no delta computation needed.
-/// - [`PublicAccountUpdate::Delta`] carries a [`PublicAccountDelta`] payload (new header plus
+///   local state.
+/// - [`PublicAccountUpdate::Patch`] carries a [`PublicAccountPatch`] payload (new header plus
 ///   incremental updates from `sync_storage_maps` and `sync_account_vault`, used when any part of
-///   the account is oversized). The store calls [`PublicAccountDelta::compute_account_delta`] to
-///   derive the [`AccountDelta`] to apply.
+///   the account is oversized). The store calls [`PublicAccountPatch::compute_account_patch`] to
+///   build the absolute [`AccountPatch`] to apply.
 #[derive(Debug, Clone)]
 pub enum PublicAccountUpdate {
     /// The account fits in a single proof response — the new full state is carried as-is.
     Full(Account),
-    /// The account is oversized in some dimension. The new state must be reconstructed by
-    /// replaying the carried incremental updates against the locally-stored state.
-    Delta(PublicAccountDelta),
+    /// The account is oversized in some dimension. The new state is described by the absolute
+    /// patch built from the carried incremental updates.
+    Patch(PublicAccountPatch),
 }
 
 impl PublicAccountUpdate {
@@ -360,7 +358,7 @@ impl PublicAccountUpdate {
     pub fn id(&self) -> AccountId {
         match self {
             Self::Full(account) => account.id(),
-            Self::Delta(delta) => delta.id(),
+            Self::Patch(patch) => patch.id(),
         }
     }
 
@@ -368,19 +366,18 @@ impl PublicAccountUpdate {
     pub fn nonce(&self) -> Felt {
         match self {
             Self::Full(account) => account.nonce(),
-            Self::Delta(delta) => delta.new_header().nonce(),
+            Self::Patch(patch) => patch.new_header().nonce(),
         }
     }
 }
 
-/// Incremental delta payload for a public account update.
+/// Patch payload for a public account update.
 ///
 /// Carries the new account header plus the per-block updates fetched from the node's incremental
-/// endpoints (`sync_storage_maps` and `sync_account_vault`). The store derives the
-/// [`AccountDelta`] to apply by replaying these updates against its locally-stored account state
-/// via [`Self::compute_account_delta`].
+/// endpoints (`sync_storage_maps` and `sync_account_vault`). The store turns these absolute
+/// updates into the [`AccountPatch`] to apply via [`Self::compute_account_patch`].
 #[derive(Debug, Clone)]
-pub struct PublicAccountDelta {
+pub struct PublicAccountPatch {
     /// The new account header after applying these updates.
     new_header: AccountHeader,
     /// First block of the synced range (the client's previous sync height).
@@ -396,8 +393,8 @@ pub struct PublicAccountDelta {
     vault_updates: Vec<AccountVaultUpdate>,
 }
 
-impl PublicAccountDelta {
-    /// Creates a new [`PublicAccountDelta`].
+impl PublicAccountPatch {
+    /// Creates a new [`PublicAccountPatch`].
     pub fn new(
         new_header: AccountHeader,
         block_from: BlockNumber,
@@ -431,8 +428,7 @@ impl PublicAccountDelta {
         self.block_from
     }
 
-    /// Returns the names of the value slots referenced by this delta. The store can use this to
-    /// load only the slots needed by [`Self::compute_account_delta`] instead of the full storage.
+    /// Returns the names of the value slots referenced by this delta.
     pub fn value_slot_names(&self) -> Vec<StorageSlotName> {
         self.value_slot_updates.iter().map(|(name, _)| name.clone()).collect()
     }
@@ -442,124 +438,53 @@ impl PublicAccountDelta {
         self.block_to
     }
 
-    /// Computes the [`AccountDelta`] implied by this payload by replaying the carried
-    /// incremental updates against the locally-stored account state.
-    // TODO #2171:
-    // skip building AccountDelta; have the store accept raw RPC updates directly.
-    pub fn compute_account_delta(
+    /// Builds the absolute [`AccountPatch`] implied by this payload.
+    ///
+    /// The node's incremental endpoints already report the new absolute value of each changed
+    /// storage slot, map entry, and vault asset, so the patch is assembled directly from them with
+    /// no need to load the prior account state: value slots and map entries become storage-patch
+    /// entries, present assets become vault-patch insertions, and absent assets (the node's removal
+    /// signal) become vault-patch removals.
+    ///
+    /// An update of an existing account (final nonce > 1) yields a partial-state patch with no
+    /// code. A newly created account (final nonce 1) cannot be represented as a partial-state
+    /// patch, so it must carry the account code: the caller supplies `code` (the account's code
+    /// is fixed at creation, so the locally-tracked code matches), and the patch becomes a
+    /// full-state patch.
+    pub fn compute_account_patch(
         &self,
-        local_header: &AccountHeader,
-        local_storage: &AccountStorage,
-        local_vault: &AssetVault,
-    ) -> Result<AccountDelta, AccountDeltaError> {
-        let old_nonce = local_header.nonce().as_canonical_u64();
-        let new_nonce = self.new_header.nonce().as_canonical_u64();
-        if new_nonce <= old_nonce {
-            return Err(AccountDeltaError::AccountDeltaApplicationFailed {
-                account_id: self.new_header.id(),
-                source: AccountError::other(format!(
-                    "node returned non-monotonic account nonce: local {old_nonce} >= new {new_nonce}"
-                )),
-            });
+        code: Option<AccountCode>,
+    ) -> Result<AccountPatch, AccountPatchError> {
+        let account_id = self.new_header.id();
+
+        let mut storage = AccountStoragePatch::new();
+        for (slot_name, new_value) in &self.value_slot_updates {
+            storage.set_item(slot_name.clone(), *new_value)?;
+        }
+        // Map entries are absolute per (slot, key), applying them in block order lets a later block
+        // overwrite an earlier one for the same key, yielding the final value.
+        let mut map_updates: Vec<&StorageMapUpdate> = self.storage_map_updates.iter().collect();
+        map_updates.sort_by_key(|u| u.block_num);
+        for update in map_updates {
+            storage.set_map_item(update.slot_name.clone(), update.key, update.value)?;
         }
 
-        let storage_delta = replay_storage_updates(
-            local_storage,
-            &self.value_slot_updates,
-            &self.storage_map_updates,
-        )?;
-        let vault_delta = replay_vault_updates(local_vault, &self.vault_updates)?;
-
-        let nonce_delta = Felt::new(new_nonce - old_nonce).expect(
-            "new_nonce was checked to be higher than old_nonce; should return a valid nonce",
-        );
-
-        AccountDelta::new(self.new_header.id(), storage_delta, vault_delta, nonce_delta)
-    }
-}
-
-// DELTA REPLAY HELPERS
-// ================================================================================================
-
-/// Computes a storage delta by replaying incremental updates onto the locally-stored state.
-fn replay_storage_updates(
-    local_storage: &AccountStorage,
-    value_slot_updates: &[(StorageSlotName, Word)],
-    storage_map_updates: &[StorageMapUpdate],
-) -> Result<AccountStorageDelta, AccountDeltaError> {
-    let mut storage_delta = AccountStorageDelta::new();
-
-    // Value slots: emit only the slots whose new value differs from local.
-    for (slot_name, new_value) in value_slot_updates {
-        let local_value = local_storage.get_item(slot_name).ok();
-        if local_value.as_ref() != Some(new_value) {
-            storage_delta.set_item(slot_name.clone(), *new_value)?;
+        // Vault entries are absolute per key, applying them in block order yields the final value,
+        // with a `None` asset encoding a removal.
+        let mut vault = AccountVaultPatch::default();
+        let mut vault_updates: Vec<&AccountVaultUpdate> = self.vault_updates.iter().collect();
+        vault_updates.sort_by_key(|u| u.block_num);
+        for update in vault_updates {
+            match update.asset {
+                Some(asset) => vault.insert_asset(asset),
+                None => vault.remove_asset(update.vault_key),
+            }
         }
+
+        let code = if self.new_header.nonce() == ONE { code } else { None };
+
+        AccountPatch::new(account_id, storage, vault, code, Some(self.new_header.nonce()))
     }
-
-    // Map slots: dedup updates per (slot, key) keeping the latest value by block number.
-    let mut by_slot: BTreeMap<StorageSlotName, BTreeMap<StorageMapKey, Word>> = BTreeMap::new();
-    let mut sorted: Vec<&StorageMapUpdate> = storage_map_updates.iter().collect();
-    sorted.sort_by_key(|u| u.block_num);
-    for update in sorted {
-        by_slot
-            .entry(update.slot_name.clone())
-            .or_default()
-            .insert(update.key, update.value);
-    }
-    for (slot_name, entries) in by_slot {
-        for (key, value) in entries {
-            storage_delta.set_map_item(slot_name.clone(), key, value)?;
-        }
-    }
-
-    Ok(storage_delta)
-}
-
-/// Computes a vault delta by replaying incremental updates onto the locally-stored vault.
-fn replay_vault_updates(
-    local_vault: &AssetVault,
-    vault_updates: &[AccountVaultUpdate],
-) -> Result<AccountVaultDelta, AccountDeltaError> {
-    let mut vault_delta = AccountVaultDelta::default();
-
-    let mut final_vault: BTreeMap<AssetVaultKey, Asset> =
-        local_vault.assets().map(|asset| (asset.vault_key(), asset)).collect();
-
-    let mut sorted: Vec<&AccountVaultUpdate> = vault_updates.iter().collect();
-    sorted.sort_by_key(|u| u.block_num);
-    for update in sorted {
-        match update.asset {
-            Some(asset) => {
-                final_vault.insert(update.vault_key, asset);
-            },
-            None => {
-                final_vault.remove(&update.vault_key);
-            },
-        }
-    }
-
-    let local_assets: BTreeMap<AssetVaultKey, Asset> =
-        local_vault.assets().map(|a| (a.vault_key(), a)).collect();
-    for (key, final_asset) in &final_vault {
-        match local_assets.get(key) {
-            None => {
-                vault_delta.add_asset(*final_asset)?;
-            },
-            Some(local_asset) if local_asset != final_asset => {
-                vault_delta.remove_asset(*local_asset)?;
-                vault_delta.add_asset(*final_asset)?;
-            },
-            _ => {},
-        }
-    }
-    for (key, local_asset) in &local_assets {
-        if !final_vault.contains_key(key) {
-            vault_delta.remove_asset(*local_asset)?;
-        }
-    }
-
-    Ok(vault_delta)
 }
 
 // ACCOUNT UPDATES
@@ -615,8 +540,8 @@ impl AccountUpdates {
 mod tests {
     use alloc::vec;
 
-    use miden_protocol::account::{StorageMapKey, StorageSlot};
-    use miden_protocol::asset::{Asset, AssetVault, FungibleAsset};
+    use miden_protocol::account::StorageMapKey;
+    use miden_protocol::asset::{Asset, AssetVaultKey, FungibleAsset};
     use miden_protocol::testing::account_id::{
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_IMMUTABLE_CODE,
@@ -663,8 +588,8 @@ mod tests {
         )
     }
 
-    fn empty_payload(new_header: AccountHeader) -> PublicAccountDelta {
-        PublicAccountDelta::new(
+    fn empty_payload(new_header: AccountHeader) -> PublicAccountPatch {
+        PublicAccountPatch::new(
             new_header,
             BlockNumber::from(0u32),
             BlockNumber::from(1u32),
@@ -674,274 +599,181 @@ mod tests {
         )
     }
 
-    // REPLAY STORAGE UPDATES
+    fn storage_map_update(
+        block: u32,
+        slot: &StorageSlotName,
+        key: StorageMapKey,
+        value: Word,
+    ) -> StorageMapUpdate {
+        StorageMapUpdate {
+            block_num: BlockNumber::from(block),
+            slot_name: slot.clone(),
+            key,
+            value,
+        }
+    }
+
+    fn vault_update(
+        block: u32,
+        asset: Option<Asset>,
+        vault_key: AssetVaultKey,
+    ) -> AccountVaultUpdate {
+        AccountVaultUpdate {
+            block_num: BlockNumber::from(block),
+            asset,
+            vault_key,
+        }
+    }
+
+    fn payload(
+        new_nonce: u64,
+        value_slot_updates: Vec<(StorageSlotName, Word)>,
+        storage_map_updates: Vec<StorageMapUpdate>,
+        vault_updates: Vec<AccountVaultUpdate>,
+    ) -> PublicAccountPatch {
+        PublicAccountPatch::new(
+            header_with_nonce(new_nonce),
+            BlockNumber::from(0u32),
+            BlockNumber::from(1u32),
+            value_slot_updates,
+            storage_map_updates,
+            vault_updates,
+        )
+    }
+
+    // COMPUTE ACCOUNT PATCH - STORAGE
     // --------------------------------------------------------------------------------------------
 
     #[test]
-    fn replay_storage_empty_inputs_returns_empty_delta() {
-        let storage = AccountStorage::new(vec![]).unwrap();
-        let delta = replay_storage_updates(&storage, &[], &[]).unwrap();
-        assert!(delta.is_empty());
+    fn compute_patch_empty_payload_carries_only_nonce() {
+        let patch = empty_payload(header_with_nonce(4)).compute_account_patch(None).unwrap();
+
+        assert_eq!(patch.final_nonce(), Some(Felt::new_unchecked(4)));
+        assert!(patch.storage().is_empty());
+        assert!(patch.vault().is_empty());
+        assert!(!patch.is_full_state());
     }
 
     #[test]
-    fn replay_storage_value_slot_changed_emits_delta() {
+    fn compute_patch_sets_value_slot_absolutely() {
         let value_slot = slot_name("miden::test::value");
-        let storage =
-            AccountStorage::new(vec![StorageSlot::with_value(value_slot.clone(), word(1))])
-                .unwrap();
+        let patch = payload(2, vec![(value_slot.clone(), word(2))], vec![], vec![])
+            .compute_account_patch(None)
+            .unwrap();
 
-        let delta =
-            replay_storage_updates(&storage, &[(value_slot.clone(), word(2))], &[]).unwrap();
-
-        let entry = delta.get(&value_slot).expect("delta should contain value slot");
-        assert_eq!(entry.clone().unwrap_value(), word(2));
+        assert_eq!(patch.storage().get_value(&value_slot), Some(word(2)));
     }
 
     #[test]
-    fn replay_storage_value_slot_unchanged_is_skipped() {
-        let value_slot = slot_name("miden::test::value");
-        let storage =
-            AccountStorage::new(vec![StorageSlot::with_value(value_slot.clone(), word(1))])
-                .unwrap();
-
-        let delta =
-            replay_storage_updates(&storage, &[(value_slot.clone(), word(1))], &[]).unwrap();
-
-        assert!(delta.is_empty());
-    }
-
-    #[test]
-    fn replay_storage_map_dedup_keeps_latest_block_per_key() {
+    fn compute_patch_map_dedup_keeps_latest_block_per_key() {
         let map_slot = slot_name("miden::test::map");
-        let storage =
-            AccountStorage::new(vec![StorageSlot::with_empty_map(map_slot.clone())]).unwrap();
-
         let key = map_key(42);
         let updates = vec![
-            StorageMapUpdate {
-                block_num: BlockNumber::from(1u32),
-                slot_name: map_slot.clone(),
-                key,
-                value: word(100),
-            },
-            StorageMapUpdate {
-                block_num: BlockNumber::from(3u32),
-                slot_name: map_slot.clone(),
-                key,
-                value: word(300),
-            },
-            StorageMapUpdate {
-                block_num: BlockNumber::from(2u32),
-                slot_name: map_slot.clone(),
-                key,
-                value: word(200),
-            },
+            storage_map_update(1, &map_slot, key, word(100)),
+            storage_map_update(3, &map_slot, key, word(300)),
+            storage_map_update(2, &map_slot, key, word(200)),
         ];
 
-        let delta = replay_storage_updates(&storage, &[], &updates).unwrap();
+        let patch = payload(2, vec![], updates, vec![]).compute_account_patch(None).unwrap();
 
-        let map_delta = delta.get(&map_slot).expect("delta should contain map slot").clone();
-        let map = map_delta.unwrap_map();
+        let map = patch.storage().get_map(&map_slot).expect("patch should contain map slot");
         assert_eq!(map.entries().len(), 1);
         assert_eq!(*map.entries().values().next().unwrap(), word(300));
     }
 
     #[test]
-    fn replay_storage_map_multiple_keys_in_same_slot_all_kept() {
+    fn compute_patch_map_multiple_keys_in_same_slot_all_kept() {
         let map_slot = slot_name("miden::test::map");
-        let storage =
-            AccountStorage::new(vec![StorageSlot::with_empty_map(map_slot.clone())]).unwrap();
-
         let updates = vec![
-            StorageMapUpdate {
-                block_num: BlockNumber::from(1u32),
-                slot_name: map_slot.clone(),
-                key: map_key(1),
-                value: word(100),
-            },
-            StorageMapUpdate {
-                block_num: BlockNumber::from(2u32),
-                slot_name: map_slot.clone(),
-                key: map_key(2),
-                value: word(200),
-            },
+            storage_map_update(1, &map_slot, map_key(1), word(100)),
+            storage_map_update(2, &map_slot, map_key(2), word(200)),
         ];
 
-        let delta = replay_storage_updates(&storage, &[], &updates).unwrap();
-        let map = delta.get(&map_slot).unwrap().clone().unwrap_map();
+        let patch = payload(2, vec![], updates, vec![]).compute_account_patch(None).unwrap();
+        let map = patch.storage().get_map(&map_slot).unwrap();
         assert_eq!(map.entries().len(), 2);
     }
 
-    // REPLAY VAULT UPDATES
+    // COMPUTE ACCOUNT PATCH - VAULT
     // --------------------------------------------------------------------------------------------
 
     #[test]
-    fn replay_vault_empty_inputs_returns_empty_delta() {
-        let vault = AssetVault::new(&[]).unwrap();
-        let delta = replay_vault_updates(&vault, &[]).unwrap();
-        assert!(delta.is_empty());
-    }
-
-    #[test]
-    fn replay_vault_added_asset_emits_add() {
-        let vault = AssetVault::new(&[]).unwrap();
+    fn compute_patch_inserts_asset_absolutely() {
         let asset = fungible(100);
-        let updates = vec![AccountVaultUpdate {
-            block_num: BlockNumber::from(1u32),
-            asset: Some(asset),
-            vault_key: asset.vault_key(),
-        }];
+        let updates = vec![vault_update(1, Some(asset), asset.vault_key())];
 
-        let delta = replay_vault_updates(&vault, &updates).unwrap();
-        let added: Vec<_> = delta.added_assets().collect();
-        assert_eq!(added, vec![asset]);
-        assert_eq!(delta.removed_assets().count(), 0);
+        let patch = payload(2, vec![], vec![], updates).compute_account_patch(None).unwrap();
+
+        let updated_assets: Vec<_> = patch.vault().updated_assets().collect();
+        assert_eq!(updated_assets, vec![asset]);
+        assert_eq!(patch.vault().removed_asset_keys().count(), 0);
     }
 
     #[test]
-    fn replay_vault_removed_asset_emits_remove() {
+    fn compute_patch_removed_asset_is_a_removal() {
         let asset = fungible(100);
-        let vault = AssetVault::new(&[asset]).unwrap();
-        let updates = vec![AccountVaultUpdate {
-            block_num: BlockNumber::from(1u32),
-            asset: None,
-            vault_key: asset.vault_key(),
-        }];
+        let updates = vec![vault_update(1, None, asset.vault_key())];
 
-        let delta = replay_vault_updates(&vault, &updates).unwrap();
-        let removed: Vec<_> = delta.removed_assets().collect();
-        assert_eq!(removed, vec![asset]);
-        assert_eq!(delta.added_assets().count(), 0);
+        let patch = payload(2, vec![], vec![], updates).compute_account_patch(None).unwrap();
+
+        let removed: Vec<_> = patch.vault().removed_asset_keys().copied().collect();
+        assert_eq!(removed, vec![asset.vault_key()]);
+        assert_eq!(patch.vault().updated_assets().count(), 0);
     }
 
     #[test]
-    fn replay_vault_replace_asset_emits_net_diff() {
-        let asset_a = fungible(100);
-        let asset_b = fungible(150);
-        let vault = AssetVault::new(&[asset_a]).unwrap();
-        let updates = vec![AccountVaultUpdate {
-            block_num: BlockNumber::from(1u32),
-            asset: Some(asset_b),
-            vault_key: asset_b.vault_key(),
-        }];
-
-        let delta = replay_vault_updates(&vault, &updates).unwrap();
-        let added: Vec<_> = delta.added_assets().collect();
-        assert_eq!(added, vec![fungible(50)]);
-        assert_eq!(delta.removed_assets().count(), 0);
-    }
-
-    #[test]
-    fn replay_vault_dedup_keeps_latest_block_per_key() {
-        let vault = AssetVault::new(&[]).unwrap();
+    fn compute_patch_vault_dedup_keeps_latest_block_per_key() {
         let asset_v1 = fungible(100);
-        let asset_v2 = fungible(200);
         let asset_v3 = fungible(300);
+        let asset_v2 = fungible(200);
         let key = asset_v1.vault_key();
-
         let updates = vec![
-            AccountVaultUpdate {
-                block_num: BlockNumber::from(1u32),
-                asset: Some(asset_v1),
-                vault_key: key,
-            },
-            AccountVaultUpdate {
-                block_num: BlockNumber::from(3u32),
-                asset: Some(asset_v3),
-                vault_key: key,
-            },
-            AccountVaultUpdate {
-                block_num: BlockNumber::from(2u32),
-                asset: Some(asset_v2),
-                vault_key: key,
-            },
+            vault_update(1, Some(asset_v1), key),
+            vault_update(3, Some(asset_v3), key),
+            vault_update(2, Some(asset_v2), key),
         ];
 
-        let delta = replay_vault_updates(&vault, &updates).unwrap();
-        let added: Vec<_> = delta.added_assets().collect();
-        assert_eq!(added, vec![asset_v3]);
+        let patch = payload(2, vec![], vec![], updates).compute_account_patch(None).unwrap();
+        let updated_assets: Vec<_> = patch.vault().updated_assets().collect();
+        assert_eq!(updated_assets, vec![asset_v3]);
     }
 
     #[test]
-    fn replay_vault_added_then_removed_is_noop() {
-        let vault = AssetVault::new(&[]).unwrap();
+    fn compute_patch_added_then_removed_is_a_removal() {
         let asset = fungible(100);
         let key = asset.vault_key();
+        let updates = vec![vault_update(1, Some(asset), key), vault_update(2, None, key)];
 
-        let updates = vec![
-            AccountVaultUpdate {
-                block_num: BlockNumber::from(1u32),
-                asset: Some(asset),
-                vault_key: key,
-            },
-            AccountVaultUpdate {
-                block_num: BlockNumber::from(2u32),
-                asset: None,
-                vault_key: key,
-            },
-        ];
-
-        let delta = replay_vault_updates(&vault, &updates).unwrap();
-        assert!(delta.is_empty());
+        let patch = payload(2, vec![], vec![], updates).compute_account_patch(None).unwrap();
+        assert_eq!(patch.vault().updated_assets().count(), 0);
+        let removed: Vec<_> = patch.vault().removed_asset_keys().copied().collect();
+        assert_eq!(removed, vec![key]);
     }
 
-    // COMPUTE ACCOUNT DELTA
-    // --------------------------------------------------------------------------------------------
-
     #[test]
-    fn compute_delta_happy_path_emits_nonce_delta() {
-        let local_header = header_with_nonce(1);
-        let local_storage = AccountStorage::new(vec![]).unwrap();
-        let local_vault = AssetVault::new(&[]).unwrap();
-        let payload = empty_payload(header_with_nonce(4));
+    fn compute_patch_rejects_zero_nonce() {
+        let result = empty_payload(header_with_nonce(0)).compute_account_patch(None);
+        assert!(result.is_err());
+    }
 
-        let delta = payload
-            .compute_account_delta(&local_header, &local_storage, &local_vault)
+    /// A newly created account (final nonce 1) observed via the oversized sync path yields a
+    /// full-state patch carrying the supplied code, rather than failing to build.
+    #[test]
+    fn compute_patch_for_new_account_is_full_state() {
+        let value_slot = slot_name("miden::test::value");
+        let patch = payload(1, vec![(value_slot, word(1))], vec![], vec![])
+            .compute_account_patch(Some(AccountCode::mock()))
             .unwrap();
 
-        assert_eq!(delta.nonce_delta(), Felt::new_unchecked(3));
-        assert!(delta.storage().is_empty());
-        assert!(delta.vault().is_empty());
+        assert!(patch.is_full_state());
+        assert_eq!(patch.final_nonce(), Some(ONE));
     }
 
+    /// A final-nonce-1 patch cannot be built without the account code (it must be a full-state
+    /// patch), so the missing-code case is reported rather than silently producing a wrong patch.
     #[test]
-    fn compute_delta_rejects_equal_nonce() {
-        let local_header = header_with_nonce(5);
-        let local_storage = AccountStorage::new(vec![]).unwrap();
-        let local_vault = AssetVault::new(&[]).unwrap();
-        let payload = empty_payload(header_with_nonce(5));
-
-        let err = payload
-            .compute_account_delta(&local_header, &local_storage, &local_vault)
-            .unwrap_err();
-
-        assert!(matches!(
-            err,
-            AccountDeltaError::AccountDeltaApplicationFailed {
-                source: AccountError::Other { .. },
-                ..
-            }
-        ));
-    }
-
-    #[test]
-    fn compute_delta_rejects_decreasing_nonce() {
-        let local_header = header_with_nonce(10);
-        let local_storage = AccountStorage::new(vec![]).unwrap();
-        let local_vault = AssetVault::new(&[]).unwrap();
-        let payload = empty_payload(header_with_nonce(9));
-
-        let err = payload
-            .compute_account_delta(&local_header, &local_storage, &local_vault)
-            .unwrap_err();
-
-        assert!(matches!(
-            err,
-            AccountDeltaError::AccountDeltaApplicationFailed {
-                source: AccountError::Other { .. },
-                ..
-            }
-        ));
+    fn compute_patch_for_new_account_without_code_errors() {
+        let result = payload(1, vec![], vec![], vec![]).compute_account_patch(None);
+        assert!(result.is_err());
     }
 }

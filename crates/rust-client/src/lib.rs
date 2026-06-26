@@ -175,13 +175,10 @@ pub mod assembly {
 /// Provides types and utilities for working with assets within the Miden network.
 pub mod asset {
     pub use miden_protocol::account::delta::{
-        AccountStorageDelta,
         AccountVaultDelta,
         FungibleAssetDelta,
         NonFungibleAssetDelta,
         NonFungibleDeltaAction,
-        StorageMapDelta,
-        StorageSlotDelta,
     };
     pub use miden_protocol::account::{
         AccountStorageHeader,
@@ -217,7 +214,6 @@ pub mod auth {
         PublicKeyCommitment,
         Signature,
     };
-    pub use miden_standards::AuthMethod;
     pub use miden_standards::account::auth::{
         AuthMultisig,
         AuthMultisigConfig,

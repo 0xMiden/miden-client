@@ -8,11 +8,10 @@ use miden_client::account::component::{
     AccountComponent,
     AccountComponentMetadata,
     AuthNetworkAccount,
-    BurnPolicyConfig,
+    BurnPolicy,
     FungibleFaucet,
-    MintPolicyConfig,
+    MintPolicy,
     PausableManager,
-    PolicyRegistration,
     TokenName,
     TokenPolicyManager,
 };
@@ -268,9 +267,10 @@ async fn deploy_network_fungible_faucet(
         .max_supply(AssetAmount::new(9_999_999)?)
         .build()
         .map_err(|e| anyhow!("failed to build fungible faucet component: {e}"))?;
-    let policy_manager = TokenPolicyManager::new()
-        .with_mint_policy(MintPolicyConfig::OwnerOnly, PolicyRegistration::Active)?
-        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)?;
+    let policy_manager = TokenPolicyManager::builder()
+        .active_mint_policy(MintPolicy::owner_only())
+        .active_burn_policy(BurnPolicy::allow_all())
+        .build();
     let faucet = AccountBuilder::new(init_seed)
         .account_type(AccountType::Public)
         .with_auth_component(network_auth)

@@ -7,6 +7,7 @@ use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::keystore::Keystore;
 use miden_client::note::{
     BlockNumber,
+    Note,
     NoteAttachment,
     NoteAttachmentScheme,
     NoteAttachments,
@@ -758,22 +759,24 @@ pub async fn test_sync_note_with_attachment(client_config: ClientConfig) -> Resu
     )])?;
     let asset = FungibleAsset::new(faucet_account.id(), MINT_AMOUNT)?;
 
-    let public_note = P2idNote::create(
-        faucet_account.id(),
-        wallet.id(),
-        vec![asset.into()],
-        NoteType::Public,
-        public_attachments,
-        client_1.rng(),
-    )?;
-    let private_note = P2idNote::create(
-        faucet_account.id(),
-        wallet.id(),
-        vec![asset.into()],
-        NoteType::Private,
-        private_attachments,
-        client_1.rng(),
-    )?;
+    let public_note: Note = P2idNote::builder()
+        .sender(faucet_account.id())
+        .target(wallet.id())
+        .asset(asset)
+        .note_type(NoteType::Public)
+        .attachments(public_attachments.into_vec())
+        .generate_serial_number(client_1.rng())
+        .build()?
+        .into();
+    let private_note: Note = P2idNote::builder()
+        .sender(faucet_account.id())
+        .target(wallet.id())
+        .asset(asset)
+        .note_type(NoteType::Private)
+        .attachments(private_attachments.into_vec())
+        .generate_serial_number(client_1.rng())
+        .build()?
+        .into();
 
     info!(public = %public_note.id(), private = %private_note.id(), "Minting P2ID notes with attachments");
     let tx_request = TransactionRequestBuilder::new()

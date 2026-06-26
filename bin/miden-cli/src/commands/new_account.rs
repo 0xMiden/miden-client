@@ -9,12 +9,11 @@ use miden_client::Client;
 use miden_client::account::component::{
     AccountComponent,
     AccountComponentMetadata,
-    BurnPolicyConfig,
+    BurnPolicy,
     FungibleFaucet,
     InitStorageData,
     MIDEN_PACKAGE_EXTENSION,
-    MintPolicyConfig,
-    PolicyRegistration,
+    MintPolicy,
     StorageSlotSchema,
     TokenName,
     TokenPolicyManager,
@@ -529,15 +528,10 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     // default `allow_all` policy manager implicitly.
     if should_add_implicit_token_policy_manager(&regular_components) {
         debug!("Adding implicit TokenPolicyManager component for fungible faucet");
-        let policy_manager = TokenPolicyManager::new()
-            .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
-            .map_err(|err| {
-                CliError::Faucet(err.into(), "Failed to register mint policy".to_string())
-            })?
-            .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
-            .map_err(|err| {
-                CliError::Faucet(err.into(), "Failed to register burn policy".to_string())
-            })?;
+        let policy_manager = TokenPolicyManager::builder()
+            .active_mint_policy(MintPolicy::allow_all())
+            .active_burn_policy(BurnPolicy::allow_all())
+            .build();
         regular_components.extend(policy_manager);
     }
     // Add the auth component (either from packages or default Falcon)
@@ -717,11 +711,10 @@ mod tests {
     #[test]
     fn implicit_token_policy_manager_is_skipped_when_component_already_present() {
         let mut regular_components: Vec<AccountComponent> = vec![test_fungible_faucet_component()];
-        let policy_manager = TokenPolicyManager::new()
-            .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
-            .unwrap()
-            .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
-            .unwrap();
+        let policy_manager = TokenPolicyManager::builder()
+            .active_mint_policy(MintPolicy::allow_all())
+            .active_burn_policy(BurnPolicy::allow_all())
+            .build();
         regular_components.extend(policy_manager);
 
         assert!(!should_add_implicit_token_policy_manager(&regular_components));

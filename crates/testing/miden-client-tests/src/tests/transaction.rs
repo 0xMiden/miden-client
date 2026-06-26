@@ -4,7 +4,7 @@ use alloc::sync::Arc;
 use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::keystore::Keystore;
-use miden_client::note::{NoteAttachments, P2idNote};
+use miden_client::note::{Note, P2idNote};
 use miden_client::store::NoteFilter;
 use miden_client::transaction::{
     ProvenTransaction,
@@ -148,15 +148,15 @@ async fn execute_transaction_failure_leaves_store_unchanged() {
     // A note targeting the wallet that is not tracked by the store. Passing it as a request
     // input note is what would trigger an input-note write during preparation.
     let asset = FungibleAsset::new(faucet.id(), 100).unwrap();
-    let unauthenticated_note = P2idNote::create(
-        faucet.id(),
-        wallet.id(),
-        vec![asset.into()],
-        NoteType::Private,
-        NoteAttachments::empty(),
-        client.rng(),
-    )
-    .unwrap();
+    let unauthenticated_note: Note = P2idNote::builder()
+        .sender(faucet.id())
+        .target(wallet.id())
+        .asset(asset)
+        .note_type(NoteType::Private)
+        .generate_serial_number(client.rng())
+        .build()
+        .unwrap()
+        .into();
     let note_id = unauthenticated_note.id();
 
     // An expected output recipient with a non-standard script. Declaring it in the request is

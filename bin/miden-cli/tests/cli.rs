@@ -1838,8 +1838,8 @@ fn call_shows_nonce_delta() {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("Nonce incremented by:"),
-        "Expected nonce delta in output:\n{stdout}"
+        stdout.contains("New account nonce:"),
+        "Expected the new account nonce in output:\n{stdout}"
     );
 }
 

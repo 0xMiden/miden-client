@@ -29,14 +29,7 @@ use miden_protocol::note::{
 use miden_protocol::transaction::TransactionScript;
 use miden_protocol::vm::AdviceMap;
 use miden_protocol::{Felt, Word};
-use miden_standards::note::{
-    P2idNote,
-    P2ideNote,
-    P2ideNoteStorage,
-    PswapNote,
-    PswapNoteStorage,
-    SwapNote,
-};
+use miden_standards::note::{P2idNote, P2ideNote, PswapNote, PswapNoteStorage, SwapNote};
 
 use super::{
     ForeignAccount,
@@ -328,14 +321,14 @@ impl TransactionRequestBuilder {
         note_type: NoteType,
         rng: &mut ClientRng,
     ) -> Result<TransactionRequest, TransactionRequestError> {
-        let created_note = P2idNote::create(
-            asset.faucet_id(),
-            target_id,
-            vec![asset.into()],
-            note_type,
-            NoteAttachments::empty(),
-            rng,
-        )?;
+        let created_note = P2idNote::builder()
+            .sender(asset.faucet_id())
+            .target(target_id)
+            .asset(asset)
+            .note_type(note_type)
+            .generate_serial_number(rng)
+            .build()?
+            .into();
 
         self.own_output_notes(vec![created_note]).build()
     }
@@ -576,6 +569,10 @@ impl TransactionRequestBuilder {
             }
         }
 
+        if self.expiration_delta == Some(0) {
+            return Err(TransactionRequestError::ZeroExpirationDelta);
+        }
+
         let script_template = match (self.custom_script, self.own_output_notes.is_empty()) {
             (Some(_), false) => {
                 return Err(TransactionRequestError::ScriptTemplateError(
@@ -709,28 +706,26 @@ impl PaymentNoteDescription {
     ) -> Result<Note, NoteError> {
         if self.reclaim_height.is_none() && self.timelock_height.is_none() {
             // Create a P2ID note
-            P2idNote::create(
-                self.sender_account_id,
-                self.target_account_id,
-                self.assets,
-                note_type,
-                NoteAttachments::empty(),
-                rng,
-            )
+            Ok(P2idNote::builder()
+                .sender(self.sender_account_id)
+                .target(self.target_account_id)
+                .assets(self.assets)
+                .note_type(note_type)
+                .generate_serial_number(rng)
+                .build()?
+                .into())
         } else {
             // Create a P2IDE note
-            P2ideNote::create(
-                self.sender_account_id,
-                P2ideNoteStorage::new(
-                    self.target_account_id,
-                    self.reclaim_height,
-                    self.timelock_height,
-                ),
-                self.assets,
-                note_type,
-                NoteAttachments::empty(),
-                rng,
-            )
+            Ok(P2ideNote::builder()
+                .sender(self.sender_account_id)
+                .target(self.target_account_id)
+                .assets(self.assets)
+                .note_type(note_type)
+                .maybe_reclaim_height(self.reclaim_height)
+                .maybe_timelock_height(self.timelock_height)
+                .generate_serial_number(rng)
+                .build()?
+                .into())
         }
     }
 }

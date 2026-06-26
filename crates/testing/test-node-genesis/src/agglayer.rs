@@ -19,11 +19,6 @@ use miden_standards::account::wallets::BasicWallet;
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
 
-/// `AggLayer` network ID assigned to the Miden chain (the protocol's `MIDEN_NETWORK_ID` MASM
-/// constant). Claim validation compares the leaf's `destination_network` to this value, so it
-/// must match the `MIDEN_NETWORK_ID` used by the foundry-generated test vectors.
-pub const MIDEN_AGGLAYER_NETWORK_ID: u32 = 77;
-
 /// File names for agglayer genesis account exports.
 pub const BRIDGE_ADMIN_ACCOUNT_FILE: &str = "bridge_admin.mac";
 pub const GER_MANAGER_ACCOUNT_FILE: &str = "ger_manager.mac";
@@ -66,12 +61,8 @@ pub fn create_agglayer_genesis_accounts() -> Result<AgglayerGenesisAccounts> {
 
     // 3. Create and deploy the Bridge account (unconfigured; configured at test time).
     let bridge_seed: Word = rng.random::<[u32; 4]>().map(Felt::from).into();
-    let bridge = create_bridge_account(
-        bridge_seed,
-        admin_account.id(),
-        ger_account.id(),
-        MIDEN_AGGLAYER_NETWORK_ID,
-    );
+    let bridge =
+        create_bridge_account(bridge_seed, admin_account.id(), ger_account.id(), ger_account.id());
     let bridge = set_nonce_to_one(bridge);
 
     // 4. Create and deploy the Faucet. In protocol 0.15 the faucet no longer stores conversion

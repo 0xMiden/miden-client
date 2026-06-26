@@ -10,6 +10,7 @@ use miden_protocol::errors::{
     AccountDeltaError,
     AccountError,
     AccountIdError,
+    AccountPatchError,
     AddressError,
     AssetError,
     AssetVaultError,
@@ -42,6 +43,8 @@ pub enum StoreError {
     AccountDataNotFound(AccountId),
     #[error("account delta error")]
     AccountDeltaError(#[from] AccountDeltaError),
+    #[error("account patch error")]
+    AccountPatchError(#[from] AccountPatchError),
     #[error("account error")]
     AccountError(#[from] AccountError),
     #[error("address error")]

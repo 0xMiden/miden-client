@@ -37,7 +37,6 @@ use alloc::vec::Vec;
 
 use miden_protocol::Felt;
 use miden_protocol::account::auth::PublicKey;
-pub use miden_protocol::account::delta::AccountUpdateDetails;
 pub use miden_protocol::account::{
     Account,
     AccountBuilder,
@@ -52,23 +51,27 @@ pub use miden_protocol::account::{
     AccountIdPrefixV1,
     AccountIdV1,
     AccountIdVersion,
+    AccountPatch,
     AccountProcedureRoot,
     AccountStorage,
+    AccountStoragePatch,
     AccountType,
+    AccountUpdateDetails,
+    AccountVaultPatch,
     PartialAccount,
     PartialStorage,
     PartialStorageMap,
     RoleSymbol,
     StorageMap,
-    StorageMapDelta,
     StorageMapKey,
     StorageMapKeyHash,
+    StorageMapPatch,
     StorageMapWitness,
     StorageSlot,
     StorageSlotContent,
-    StorageSlotDelta,
     StorageSlotId,
     StorageSlotName,
+    StorageSlotPatch,
     StorageSlotType,
 };
 pub use miden_protocol::address::{Address, AddressInterface, AddressType, NetworkId};
@@ -186,7 +189,8 @@ pub mod component {
         TokenMetadata,
         TokenMetadataError,
         TokenName,
-        create_fungible_faucet,
+        create_network_fungible_faucet,
+        create_user_fungible_faucet,
     };
     pub use miden_standards::account::policies::{
         AllowlistOwnerControlled,
@@ -197,15 +201,18 @@ pub mod component {
         BlocklistStorage,
         BurnAllowAll,
         BurnOwnerOnly,
-        BurnPolicyConfig,
+        BurnPolicy,
+        BurnPolicyError,
+        MinBurnAmount,
         MintAllowAll,
         MintOwnerOnly,
-        MintPolicyConfig,
-        PolicyRegistration,
+        MintPolicy,
+        MintPolicyError,
         TokenPolicyManager,
-        TokenPolicyManagerError,
+        TokenPolicyManagerBuilder,
         TransferAllowAll,
         TransferPolicy,
+        TransferPolicyError,
     };
     pub use miden_standards::account::wallets::BasicWallet;
 }
