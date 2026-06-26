@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Features
+
+* [FEATURE][rust] Added `Client::send_private_note_with_block_hint`, which relays a sender-provided `after_block_num` so recipients get deterministic delivery instead of relying on receiving side lookback. ([#2262](https://github.com/0xMiden/rust-sdk/issues/2262))
+* [FEATURE][rust] Historical private notes for a newly tracked tag are now backfilled automatically on sync. `Client::sync_note_transport` diffs the tracked note tags against a persisted covered set and drains each newly tracked tag from the start, fetching only that tag's own history rather than re-scanning every tag. ([#2258](https://github.com/0xMiden/rust-sdk/issues/2258))
+
 ### Fixes
 
 * [FIX][rust] State sync now range-checks `sync_transactions` records to `(current, chain_tip]`, rejecting out-of-range records that could forge transaction commit heights ([#2252](https://github.com/0xMiden/rust-sdk/pull/2252)).
@@ -27,6 +32,11 @@
 ### Enhancements
 
 * [FEATURE][rust] Re-exported `miden-agglayer` as `miden_client::agglayer`. ([#2253](https://github.com/0xMiden/miden-client/issues/2253))
+
+### Changes
+
+* [rust] Bumped `miden-note-transport-proto-build` to `0.4.1`. Notes imported from the note transport layer now use the provided `after_block_num` when present, falling back to the 20-block lookback window otherwise. `NoteInfo` gained a `block_hint: Option<BlockNumber>` field (plus a `NoteInfo::new` constructor) and `NoteTransportClient` gained a `send_note_with_block_hint` method (defaulting to `send_note`, so existing implementors keep compiling).  ([#2262](https://github.com/0xMiden/rust-sdk/issues/2262))
+* [BREAKING][rust] Removed `Client::fetch_all_private_notes`. The automatic per-tag backfill on sync replaces it, so callers no longer reset the cursor and re-fetch every tag after adding a tag or importing an account. ([#2258](https://github.com/0xMiden/rust-sdk/issues/2258))
 
 ## 0.15.0 (2026-06-12)
 
