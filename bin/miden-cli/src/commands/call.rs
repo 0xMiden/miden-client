@@ -149,22 +149,30 @@ fn load_package(path: &Path) -> Result<Package, CliError> {
 }
 
 fn resolve_procedure_digest(package: &Package, procedure_name: &str) -> Result<Word, CliError> {
-    let library = &*package.mast;
-    for module_info in library.module_infos() {
-        if let Some(digest) = module_info.get_procedure_digest_by_name(procedure_name) {
-            return Ok(digest);
+    // The user passes a bare name (e.g. `get_count`); match it
+    // against each export's name without the module path. Export names may be kebab (Rust/WIT) or
+    // snake (hand-written MASM bare identifiers), so compare with `_` and `-` treated as equal.
+    let target = procedure_name.replace('_', "-");
+
+    let mut available = Vec::new();
+    for export in package.manifest.exports() {
+        let PackageExport::Procedure(proc) = export else {
+            continue;
+        };
+        if export.name().replace('_', "-") != target {
+            // Not the requested procedure; keep it for the "not found" error list.
+            available.push(format!("  {}", proc.path));
+            continue;
+        }
+        // The same leaf name is exported both as a `C`-ABI lowering (for `exec`) and as the
+        // `ComponentModel` export (the cross-context `call` target); pick the latter.
+        if proc.signature.as_ref().is_some_and(|sig| sig.abi.is_wasm_canonical_abi()) {
+            return Ok(proc.digest);
         }
     }
 
-    let mut available = Vec::new();
-    for module_info in library.module_infos() {
-        for (_idx, proc_info) in module_info.procedures() {
-            available.push(format!("  {}::{}", module_info.path(), proc_info.name));
-        }
-    }
     Err(CliError::InvalidArgument(format!(
-        "Procedure '{}' not found. Available:\n{}",
-        procedure_name,
+        "Procedure '{procedure_name}' not found. Available:\n{}",
         available.join("\n")
     )))
 }
