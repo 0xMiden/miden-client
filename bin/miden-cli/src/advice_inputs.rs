@@ -8,6 +8,23 @@ use crate::errors::CliError;
 // ADVICE MAP INPUTS
 // ================================================================================================
 
+/// Long-form `--help` text shared by the `inputs_path` argument of the `exec` and `call` commands,
+/// describing the advice-inputs TOML file format.
+pub const INPUTS_PATH_LONG_HELP: &str = "\
+Path to a TOML file whose entries are loaded into the VM's advice map.
+
+The file must contain a TOML array named `inputs` of inline tables, where each table has two \
+fields:
+- `key`: a 256-bit hexadecimal string (prefixed with `0x`) used as the advice-map key.
+- `values`: an array of 64-bit unsigned integers, each written as a separate string within double \
+quotes.
+
+Example:
+    inputs = [
+        { key = \"0x0000000000000000000000000000000000000000000000000000001000000000\", values = [\"13\", \"9\"] },
+        { key = \"0x0000000000000000000000000000000000000000000000000000000000000000\", values = [\"1\", \"2\"] },
+    ]";
+
 /// Struct that holds a single key-values pair from the provided file inputs file. These will be
 /// aggregated in the [`CliAdviceInputs`] struct
 #[derive(Deserialize)]

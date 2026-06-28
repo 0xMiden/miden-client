@@ -32,25 +32,9 @@ pub struct ExecCmd {
     #[arg(long, short)]
     script_path: String,
 
-    #[rustfmt::skip]
-    #[allow(clippy::doc_link_with_quotes)]
-    /// Path to the inputs file. This file will be used as inputs to the VM's advice map.
-    ///
-    /// The file should contain a TOML array of inline tables, where each table has two fields:
-    /// - `key`: a 256-bit hexadecimal string representing a word to be used as a key for the input
-    ///   entry. The hexadecimal value must be prefixed with 0x.
-    /// - `values`: an array of 64-bit unsigned integers representing field elements to be used as
-    ///   values for the input entry. Each integer must be written as a separate string, within
-    ///   double quotes.
-    ///
-    /// The input file should contain a TOML table called `inputs`, as in the following example:
-    ///    inputs = [
-    ///        { key = "0x0000000000000000000000000000000000000000000000000000001000000000", values = ["13", "9"]},
-    ///        { key = "0x0000000000000000000000000000000000000000000000000000000000000000" , values = ["1", "2"]},
-    ///    ]
-    #[arg(long, short)]
-    #[clap(verbatim_doc_comment)]
-    inputs_path: Option<String>,
+    /// Path to a TOML file with advice map entries used as inputs to the VM's advice map.
+    #[arg(long, short, long_help = crate::advice_inputs::INPUTS_PATH_LONG_HELP)]
+    inputs_path: Option<PathBuf>,
 
     /// Print the output stack grouped into words
     #[arg(long, default_value_t = false)]
@@ -80,7 +64,7 @@ impl ExecCmd {
             get_input_acc_id_by_prefix_or_default(&client, self.account_id.clone()).await?;
 
         let inputs = match &self.inputs_path {
-            Some(input_file) => load_advice_map_from_file(&PathBuf::from(input_file))?,
+            Some(input_file) => load_advice_map_from_file(input_file)?,
             None => vec![],
         };
 

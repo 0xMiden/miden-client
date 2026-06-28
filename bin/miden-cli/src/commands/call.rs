@@ -32,7 +32,7 @@ pub struct CallCmd {
     package: PathBuf,
 
     /// Path to a TOML file with advice map entries, in the same format as the `exec` command.
-    #[arg(long, short)]
+    #[arg(long, short, long_help = crate::advice_inputs::INPUTS_PATH_LONG_HELP)]
     inputs_path: Option<PathBuf>,
 }
 
