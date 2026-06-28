@@ -1638,6 +1638,47 @@ fn call_nonexistent_procedure() {
 
 /// Helper: builds the `call-test` package (arithmetic + storage procedures) at runtime and
 /// writes the serialized `.masp` to `out_path`.
+fn call_test_exports(
+    library: &miden_client::assembly::Library,
+) -> Vec<miden_client::vm::PackageExport> {
+    use miden_client::vm::{PackageExport, ProcedureExport, QualifiedProcedureName};
+    use midenc_hir_type::{CallConv, FunctionType, Type};
+
+    let signature_overrides: [(&str, FunctionType); 3] = [
+        (
+            "add",
+            FunctionType::new(CallConv::ComponentModel, [Type::Felt, Type::Felt], [Type::Felt]),
+        ),
+        (
+            "set_value",
+            FunctionType::new(
+                CallConv::ComponentModel,
+                [Type::Felt, Type::Felt, Type::Felt, Type::Felt],
+                [],
+            ),
+        ),
+        ("read_advice", FunctionType::new(CallConv::ComponentModel, [], [Type::Felt])),
+    ];
+
+    let mut exports = Vec::new();
+    for module_info in library.module_infos() {
+        for (_, proc_info) in module_info.procedures() {
+            let name = QualifiedProcedureName::new(module_info.path(), proc_info.name.clone());
+            let override_sig = signature_overrides
+                .iter()
+                .find(|(n, _)| *n == proc_info.name.as_str())
+                .map(|(_, sig)| sig.clone());
+            exports.push(PackageExport::Procedure(ProcedureExport {
+                path: name.into_inner(),
+                digest: proc_info.digest,
+                signature: override_sig.or_else(|| proc_info.signature.as_deref().cloned()),
+                attributes: proc_info.attributes.clone(),
+            }));
+        }
+    }
+    exports
+}
+
 fn build_call_test_masp(out_path: &Path) {
     use miden_client::account::StorageSlotName;
     use miden_client::account::component::{
@@ -1649,17 +1690,7 @@ fn build_call_test_masp(out_path: &Path) {
         WordSchema,
     };
     use miden_client::assembly::{CodeBuilder, Library};
-    use miden_client::vm::{
-        Package,
-        PackageExport,
-        PackageManifest,
-        ProcedureExport,
-        QualifiedProcedureName,
-        Section,
-        SectionId,
-        TargetType,
-    };
-    use midenc_hir_type::{CallConv, FunctionType, Type};
+    use miden_client::vm::{Package, PackageManifest, Section, SectionId, TargetType};
 
     let call_test_code = r#"
         use miden::protocol::native_account
@@ -1713,33 +1744,7 @@ fn build_call_test_masp(out_path: &Path) {
 
     let metadata = AccountComponentMetadata::new("call-test").with_storage_schema(storage_schema);
 
-    let signature_overrides: [(&str, FunctionType); 3] = [
-        ("add", FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt], [Type::Felt])),
-        (
-            "set_value",
-            FunctionType::new(CallConv::Fast, [Type::Felt, Type::Felt, Type::Felt, Type::Felt], []),
-        ),
-        ("read_advice", FunctionType::new(CallConv::Fast, [], [Type::Felt])),
-    ];
-
-    let mut exports: Vec<PackageExport> = Vec::new();
-    for module_info in library.module_infos() {
-        for (_, proc_info) in module_info.procedures() {
-            let name = QualifiedProcedureName::new(module_info.path(), proc_info.name.clone());
-            let override_sig = signature_overrides
-                .iter()
-                .find(|(n, _)| *n == proc_info.name.as_str())
-                .map(|(_, sig)| sig.clone());
-            let export = ProcedureExport {
-                path: name.into_inner(),
-                digest: proc_info.digest,
-                signature: override_sig.or_else(|| proc_info.signature.as_deref().cloned()),
-                attributes: proc_info.attributes.clone(),
-            };
-            exports.push(PackageExport::Procedure(export));
-        }
-    }
-
+    let exports = call_test_exports(&library);
     let manifest = PackageManifest::new(exports).expect("manifest validation failed");
     let section = Section::new(SectionId::ACCOUNT_COMPONENT_METADATA, metadata.to_bytes());
 
