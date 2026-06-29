@@ -4,7 +4,7 @@
 
 ### Features
 
-* [FEATURE][rust] Added `NodeRpcClient::endpoint` and `Client::rpc_endpoint`, exposing the configured node endpoint URL without a network round-trip. ([#PR](https://github.com/0xMiden/miden-client/pull/PR))
+* [FEATURE][rust] Added `NodeRpcClient::endpoint` and `Client::rpc_endpoint`, exposing the configured node endpoint URL without a network round-trip. ([#2291](https://github.com/0xMiden/miden-client/pull/2291))
 
 ### Fixes
 
