@@ -101,7 +101,7 @@ impl InputNoteRecord {
     /// Creates a header-only record for an erased note (created and consumed in the same batch)
     /// that the client only knows via its [`NoteHeader`]. The record is placed in the
     /// [`InputNoteState::ConsumedExternalErased`] state, which carries the authoritative note id
-    /// and metadata; the `details` field is a placeholder (see [`placeholder_details`]) and
+    /// and metadata; the `details` field is a placeholder (see `placeholder_details`) and
     /// [`InputNoteRecord::has_details`] returns `false`.
     pub fn from_header(
         header: &NoteHeader,
