@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Features
+
+* [FEATURE][rust] Added `NodeRpcClient::endpoint` and `Client::rpc_endpoint`, exposing the configured node endpoint URL without a network round-trip. ([#PR](https://github.com/0xMiden/miden-client/pull/PR))
+
 ### Fixes
 
 * [FIX][rust] RPC endpoint parsing now rejects endpoint strings that omit either the protocol or host. ([#2266](https://github.com/0xMiden/miden-client/pull/2266))
