@@ -166,13 +166,17 @@ impl SqliteStore {
         }
     }
 
-    pub fn insert_partial_blockchain_nodes(
+    pub(crate) fn insert_authenticated_block_header(
         conn: &mut Connection,
+        block_header: &BlockHeader,
+        has_client_notes: bool,
         nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
 
+        Self::insert_block_header_tx(&tx, block_header, has_client_notes)?;
         Self::insert_partial_blockchain_nodes_tx(&tx, nodes)?;
+
         tx.commit().into_store_error()?;
         Ok(())
     }
@@ -472,6 +476,49 @@ mod test {
             &[mock_block_headers[1].clone(), mock_block_headers[3].clone()],
             &block_headers[..]
         );
+    }
+
+    /// Tests that `insert_authenticated_block_header` persists the tracked header and its MMR
+    /// authentication nodes in the same call, so both are retrievable afterwards.
+    #[tokio::test]
+    async fn insert_authenticated_block_header_stores_header_and_nodes() {
+        use miden_client::store::PartialBlockchainFilter;
+
+        let store = create_test_store().await;
+        const TOTAL_BLOCKS: usize = 8;
+        let tx_kernel = TransactionKernel.to_commitment();
+
+        let headers: Vec<BlockHeader> = (0..TOTAL_BLOCKS)
+            .map(|n| BlockHeader::mock(u32::try_from(n).unwrap(), None, None, &[], tx_kernel))
+            .collect();
+        let mut mmr = Mmr::default();
+        for header in &headers {
+            mmr.add(header.commitment()).expect("valid MMR append");
+        }
+
+        let tracked: BTreeSet<usize> = [5].into();
+        let auth_nodes = collect_auth_nodes(&mmr, &headers, &tracked);
+        let header = headers[5].clone();
+
+        Store::insert_authenticated_block_header(&store, &header, true, &auth_nodes)
+            .await
+            .unwrap();
+
+        // The header is stored and marked as tracked.
+        let stored = Store::get_block_headers(&store, &[5.into()].into_iter().collect())
+            .await
+            .unwrap();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].0, header);
+        assert_eq!(Store::get_tracked_block_header_numbers(&store).await.unwrap(), [5].into());
+
+        // Every authentication node was stored by the same call.
+        let stored_nodes =
+            Store::get_partial_blockchain_nodes(&store, PartialBlockchainFilter::All)
+                .await
+                .unwrap();
+        let expected: BTreeMap<InOrderIndex, Word> = auth_nodes.iter().copied().collect();
+        assert_eq!(stored_nodes, expected);
     }
 
     /// Tests that large stored MMRs are built consistently throughout multiple prunes

@@ -265,15 +265,6 @@ pub trait Store: Send + Sync {
         filter: PartialBlockchainFilter,
     ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError>;
 
-    /// Inserts blockchain MMR authentication nodes.
-    ///
-    /// In the case where the [`InOrderIndex`] already exists on the table, the insertion is
-    /// ignored.
-    async fn insert_partial_blockchain_nodes(
-        &self,
-        nodes: &[(InOrderIndex, Word)],
-    ) -> Result<(), StoreError>;
-
     /// Returns the chain MMR peaks at the current sync height (peaks at `forest = block_num`,
     /// i.e. excluding `block_num` itself as a leaf).
     ///
@@ -295,6 +286,19 @@ pub trait Store: Send + Sync {
         &self,
         block_header: &BlockHeader,
         has_client_notes: bool,
+    ) -> Result<(), StoreError>;
+
+    /// Inserts a block header together with its MMR authentication nodes in a single
+    /// transaction, so the header and the nodes that rebuild its `PartialMmr` are committed
+    /// together.
+    ///
+    /// The `has_client_notes` flag follows the same insert-if-not-exists upgrade rule as
+    /// [`Self::insert_block_header`].
+    async fn insert_authenticated_block_header(
+        &self,
+        block_header: &BlockHeader,
+        has_client_notes: bool,
+        nodes: &[(InOrderIndex, Word)],
     ) -> Result<(), StoreError>;
 
     /// Prunes irrelevant block data from the store.

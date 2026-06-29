@@ -287,6 +287,25 @@ impl Store for SqliteStore {
         .await
     }
 
+    async fn insert_authenticated_block_header(
+        &self,
+        block_header: &BlockHeader,
+        has_client_notes: bool,
+        nodes: &[(InOrderIndex, Word)],
+    ) -> Result<(), StoreError> {
+        let block_header = block_header.clone();
+        let nodes = nodes.to_vec();
+        self.interact_with_connection(move |conn| {
+            SqliteStore::insert_authenticated_block_header(
+                conn,
+                &block_header,
+                has_client_notes,
+                &nodes,
+            )
+        })
+        .await
+    }
+
     async fn untrack_and_prune_irrelevant_blocks(
         &self,
         blocks_to_untrack: &[BlockNumber],
@@ -338,17 +357,6 @@ impl Store for SqliteStore {
     ) -> Result<BTreeMap<InOrderIndex, Word>, StoreError> {
         self.interact_with_connection(move |conn| {
             SqliteStore::get_partial_blockchain_nodes(conn, &filter)
-        })
-        .await
-    }
-
-    async fn insert_partial_blockchain_nodes(
-        &self,
-        nodes: &[(InOrderIndex, Word)],
-    ) -> Result<(), StoreError> {
-        let nodes = nodes.to_vec();
-        self.interact_with_connection(move |conn| {
-            SqliteStore::insert_partial_blockchain_nodes(conn, &nodes)
         })
         .await
     }

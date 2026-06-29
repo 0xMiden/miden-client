@@ -143,9 +143,10 @@ impl<AUTH> Client<AUTH> {
             fetch_block_header(self.rpc_api.clone(), block_num, current_partial_mmr).await?;
         let tracked_nodes = authenticated_block_nodes(&block_header, path_nodes);
 
-        // Insert header and MMR nodes
-        self.store.insert_block_header(&block_header, true).await?;
-        self.store.insert_partial_blockchain_nodes(&tracked_nodes).await?;
+        // Insert header and MMR nodes atomically
+        self.store
+            .insert_authenticated_block_header(&block_header, true, &tracked_nodes)
+            .await?;
 
         Ok(block_header)
     }
