@@ -59,8 +59,6 @@ pub struct MockRpcApi {
     /// notes without their attachment content (only metadata), so tests that need
     /// `get_notes_by_id` to return private-note attachments register them here.
     private_note_attachments: Arc<RwLock<BTreeMap<NoteId, NoteAttachments>>>,
-    /// Recorded `get_notes_by_id` requests.
-    pub get_notes_by_id_requests: Arc<RwLock<Vec<Vec<NoteId>>>>,
     /// Makes the next `get_notes_by_id` request fail when set.
     pub fail_next_get_notes_by_id: Arc<RwLock<bool>>,
 }
@@ -83,7 +81,6 @@ impl MockRpcApi {
             oversize_threshold: 1000,
             erased_notes: Arc::new(RwLock::new(Vec::new())),
             private_note_attachments: Arc::new(RwLock::new(BTreeMap::new())),
-            get_notes_by_id_requests: Arc::new(RwLock::new(Vec::new())),
             fail_next_get_notes_by_id: Arc::new(RwLock::new(false)),
         }
     }
@@ -418,7 +415,6 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Returns the node's tracked notes that match the provided note IDs.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
-        self.get_notes_by_id_requests.write().push(note_ids.to_vec());
         let should_fail = core::mem::take(&mut *self.fail_next_get_notes_by_id.write());
         if should_fail {
             return Err(RpcError::InvalidResponse("injected get_notes_by_id failure".into()));

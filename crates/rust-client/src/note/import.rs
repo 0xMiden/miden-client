@@ -27,7 +27,7 @@ use miden_protocol::note::{
 use miden_tx::auth::TransactionAuthenticator;
 
 use crate::rpc::RpcError;
-use crate::rpc::domain::note::FetchedNote;
+use crate::rpc::domain::note::{FetchedNote, SyncedNoteDetails};
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{InputNoteRecord, InputNoteState, NoteFilter};
 use crate::sync::NoteTagRecord;
@@ -366,7 +366,7 @@ where
             });
 
             match committed_notes_data.remove(&note_record.details_commitment()) {
-                Some((metadata, inclusion_proof)) => {
+                Some((metadata, inclusion_proof, attachments)) => {
                     // Building the MMR outside the loop would fail with BlockHeaderNotFound(0)
                     // because store will be fresh, which can't happen here.
                     let mut partial_mmr = self.get_current_partial_mmr().await?;
@@ -381,8 +381,14 @@ where
 
                     let tag = metadata.tag();
                     let mut note_record = note_record;
-                    let note_changed =
+                    let mut note_changed =
                         note_record.inclusion_proof_received(inclusion_proof, metadata)?;
+                    if let Some(attachments) = attachments
+                        && note_record.attachments() != &attachments
+                    {
+                        note_record.set_attachments(attachments);
+                        note_changed = true;
+                    }
 
                     if note_record.block_header_received(&block_header)? | note_changed {
                         self.store
@@ -407,8 +413,8 @@ where
     }
 
     /// Checks if notes with the given details commitments and tags are present in the chain between
-    /// `request_block_num` and the current block, returning their metadata and inclusion proof
-    /// keyed by details commitment.
+    /// `request_block_num` and the current block, returning their metadata, inclusion proof and
+    /// attachments keyed by details commitment.
     ///
     /// Expected notes have no metadata and thus no `NoteId`, so each committed note is matched by
     /// reconstructing the id from the committed metadata: `NoteId::new(details_commitment,
@@ -418,8 +424,13 @@ where
         request_block_num: BlockNumber,
         // Expected notes' details commitments with their tags
         expected_notes: Vec<(NoteDetailsCommitment, &NoteTag)>,
-    ) -> Result<BTreeMap<NoteDetailsCommitment, (NoteMetadata, NoteInclusionProof)>, ClientError>
-    {
+    ) -> Result<
+        BTreeMap<
+            NoteDetailsCommitment,
+            (NoteMetadata, NoteInclusionProof, Option<NoteAttachments>),
+        >,
+        ClientError,
+    > {
         let tracked_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
         let mut retrieved_proofs = BTreeMap::new();
         let current_block_num = self.get_sync_height().await?;
@@ -428,9 +439,9 @@ where
             return Ok(retrieved_proofs);
         }
 
-        let blocks = self
+        let (blocks, synced_notes) = self
             .rpc_api
-            .sync_notes(request_block_num, current_block_num, &tracked_tags)
+            .sync_notes_with_details(request_block_num, current_block_num, &tracked_tags, false)
             .await
             .map_err(ClientError::RpcError)?;
 
@@ -446,9 +457,19 @@ where
                     continue;
                 };
 
+                let attachments = match synced_notes.get(sync_note.note_id()) {
+                    Some(SyncedNoteDetails::Public(note)) if !note.attachments().is_empty() => {
+                        Some(note.attachments().clone())
+                    },
+                    Some(SyncedNoteDetails::Private(Some(attachments))) => {
+                        Some(attachments.clone())
+                    },
+                    _ => None,
+                };
+
                 retrieved_proofs.insert(
                     *commitment,
-                    (*sync_note.metadata(), sync_note.inclusion_proof().clone()),
+                    (*sync_note.metadata(), sync_note.inclusion_proof().clone(), attachments),
                 );
             }
         }

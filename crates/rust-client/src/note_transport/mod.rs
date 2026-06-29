@@ -14,7 +14,6 @@ use miden_protocol::address::Address;
 use miden_protocol::block::BlockNumber;
 use miden_protocol::note::{
     Note,
-    NoteAttachments,
     NoteDetails,
     NoteDetailsCommitment,
     NoteFile,
@@ -33,8 +32,6 @@ use miden_tx::utils::serde::{
 };
 
 pub use self::errors::NoteTransportError;
-use crate::rpc::domain::note::FetchedNote;
-use crate::store::NoteFilter;
 use crate::{Client, ClientError};
 
 pub const NOTE_TRANSPORT_TESTNET_ENDPOINT: &str = "https://transport.miden.io";
@@ -357,26 +354,15 @@ where
         const NOTE_LOOKBACK_BLOCKS: u32 = 20;
 
         let mut notes = Vec::new();
-        let mut commitment_by_id = BTreeMap::new();
         let (note_infos, rcursor) =
             self.get_note_transport_api()?.fetch_notes(tags, cursor).await?;
-        let should_fetch_attachments = note_infos.iter().any(|note_info| {
-            note_info
-                .header
-                .metadata()
-                .attachment_headers()
-                .iter()
-                .any(|header| header.scheme().is_some())
-        });
         for note_info in &note_infos {
             // e2ee impl hint:
             // for key in self.store.decryption_keys() try
             // key.decrypt(details_bytes_encrypted)
             let note = rejoin_note(&note_info.header, &note_info.details_bytes)?;
             let note_id = note_info.header.id();
-            let details_commitment = note.details_commitment();
 
-            commitment_by_id.insert(note_id, details_commitment);
             // The header carries the attachment-aware (on-chain) note id; the rejoined note has
             // empty attachments and would hash to a different id, so key off the header.
             notes.push((note_id, note, note_info.block_hint));
@@ -402,42 +388,10 @@ where
             note_requests.push(note_file);
         }
         let imported_commitments = self.import_notes(&note_requests).await?;
-        let imported_ids: Vec<NoteId> = imported_commitments
-            .iter()
-            .filter_map(|commitment| id_by_commitment.get(commitment).copied())
+        let imported_ids = imported_commitments
+            .into_iter()
+            .filter_map(|commitment| id_by_commitment.get(&commitment).copied())
             .collect();
-
-        if should_fetch_attachments {
-            // Query the whole tag-scanned batch so the node cannot identify one candidate note.
-            let note_ids: Vec<NoteId> = commitment_by_id.keys().copied().collect();
-            let attachments_by_commitment: BTreeMap<NoteDetailsCommitment, NoteAttachments> = self
-                .rpc_api
-                .get_notes_by_id(&note_ids)
-                .await?
-                .into_iter()
-                .filter_map(|note| match note {
-                    FetchedNote::Private(note_id, _, attachments, _) if !attachments.is_empty() => {
-                        commitment_by_id.get(&note_id).map(|commitment| (*commitment, attachments))
-                    },
-                    _ => None,
-                })
-                .collect();
-            if !attachments_by_commitment.is_empty() {
-                let mut records = self
-                    .get_input_notes(NoteFilter::DetailsCommitments(
-                        attachments_by_commitment.keys().copied().collect(),
-                    ))
-                    .await?;
-                for record in &mut records {
-                    if let Some(attachments) =
-                        attachments_by_commitment.get(&record.details_commitment())
-                    {
-                        record.set_attachments(attachments.clone());
-                    }
-                }
-                self.store.upsert_input_notes(&records).await?;
-            }
-        }
 
         Ok((imported_ids, rcursor))
     }

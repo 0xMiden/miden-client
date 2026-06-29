@@ -348,7 +348,7 @@ impl StateSync {
             (Vec::new(), BTreeMap::new())
         } else {
             self.rpc_api
-                .sync_notes_with_details(current_block_num + 1, chain_tip, note_tags.as_ref())
+                .sync_notes_with_details(current_block_num + 1, chain_tip, note_tags.as_ref(), true)
                 .await?
         };
 
@@ -2194,7 +2194,7 @@ mod tests {
         let mock_rpc = MockRpcApi::new(chain);
 
         let (blocks, _synced_notes) = mock_rpc
-            .sync_notes_with_details(4_u32.into(), 10_u32.into(), &note_tags)
+            .sync_notes_with_details(4_u32.into(), 10_u32.into(), &note_tags, true)
             .await
             .expect("sync notes should succeed");
 

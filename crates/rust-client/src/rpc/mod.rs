@@ -291,15 +291,12 @@ pub trait NodeRpcClient: Send + Sync {
     ) -> Result<Vec<NoteSyncBlock>, RpcError>;
 
     /// Calls [`NodeRpcClient::sync_notes`] for the requested range, then makes a single
-    /// [`NodeRpcClient::get_notes_by_id`] call to fetch full note bodies (scripts, assets,
-    /// recipient) for public notes and attachment content for private notes that carry
-    /// attachments.
+    /// [`NodeRpcClient::get_notes_by_id`] call to fetch attachment content and, when
+    /// `include_public_notes` is set, full public note bodies.
     ///
-    /// All public notes in the range are fetched (not just the ones the client tracks) to
-    /// avoid revealing which specific notes the client is interested in. Private notes are only
-    /// fetched when their synced metadata indicates non-empty attachments, since the sync record
-    /// carries attachment scheme markers but not the attachment content, which is needed to
-    /// reconstruct the note's ID.
+    /// When public notes are included, all of them in the range are fetched to avoid revealing
+    /// which specific notes the client is interested in. Private notes are only fetched when their
+    /// synced metadata indicates non-empty attachments.
     ///
     /// Returns the resolved note blocks paired with a map of the fetched content (public note
     /// bodies and private-note attachments), keyed by note ID.
@@ -308,13 +305,17 @@ pub trait NodeRpcClient: Send + Sync {
         block_from: BlockNumber,
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
+        include_public_notes: bool,
     ) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, SyncedNoteDetails>), RpcError> {
         let blocks = self.sync_notes(block_from, block_to, note_tags).await?;
 
         let note_ids: Vec<NoteId> = blocks
             .iter()
             .flat_map(|b| b.notes.values())
-            .filter(|n| n.note_type() == NoteType::Public || metadata_has_attachments(n.metadata()))
+            .filter(|n| {
+                (include_public_notes && n.note_type() == NoteType::Public)
+                    || metadata_has_attachments(n.metadata())
+            })
             .map(|n| *n.note_id())
             .collect();
 

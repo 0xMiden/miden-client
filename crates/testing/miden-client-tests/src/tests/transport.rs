@@ -108,26 +108,15 @@ async fn transport_recovers_attachments() {
         &mut note_rng,
     )
     .unwrap();
-    let decoy_note = P2idNote::create(
-        sender.id(),
-        target.id(),
-        vec![],
-        NoteType::Private,
-        NoteAttachments::empty(),
-        &mut note_rng,
-    )
-    .unwrap();
 
-    let output_notes = [private_note.clone(), decoy_note.clone()];
-    let spawn_note = mock_chain_builder.add_spawn_note(&output_notes).unwrap();
+    let spawn_note =
+        mock_chain_builder.add_spawn_note(std::slice::from_ref(&private_note)).unwrap();
     let mut mock_chain = mock_chain_builder.build().unwrap();
     let tx = Box::pin(
         mock_chain
             .build_tx_context(TxContextInput::AccountId(sender.id()), &[], &[spawn_note])
             .unwrap()
-            .extend_expected_output_notes(
-                output_notes.into_iter().map(RawOutputNote::Full).collect(),
-            )
+            .extend_expected_output_notes(vec![RawOutputNote::Full(private_note.clone())])
             .build()
             .unwrap()
             .execute(),
@@ -159,36 +148,21 @@ async fn transport_recovers_attachments() {
     client.sync_state().await.unwrap();
 
     client.add_note_tag(private_note.metadata().tag()).await.unwrap();
-    {
-        let mut mock_node = mock_node.write();
-        mock_node
-            .add_note(*private_note.header(), NoteDetails::from(private_note.clone()).to_bytes());
-        mock_node.add_note(*decoy_note.header(), NoteDetails::from(decoy_note.clone()).to_bytes());
-    }
+    mock_node
+        .write()
+        .add_note(*private_note.header(), NoteDetails::from(private_note.clone()).to_bytes());
 
     *rpc_api.fail_next_get_notes_by_id.write() = true;
     assert!(client.fetch_private_notes().await.is_err());
     client.fetch_private_notes().await.unwrap();
 
     let notes = client.get_input_notes(NoteFilter::All).await.unwrap();
-    assert_eq!(notes.len(), 2);
-    let private_note_record = notes
-        .iter()
-        .find(|note| note.details_commitment() == private_note.details_commitment())
-        .unwrap();
+    assert_eq!(notes.len(), 1);
     assert_eq!(
-        private_note_record.attachments(),
+        notes[0].attachments(),
         &attachments,
         "note transport recipient should recover attachments via get_notes_by_id",
     );
-
-    let requests = rpc_api.get_notes_by_id_requests.read();
-    assert_eq!(requests.len(), 2);
-    for request in requests.iter() {
-        assert_eq!(request.len(), 2);
-        assert!(request.contains(&private_note.id()));
-        assert!(request.contains(&decoy_note.id()));
-    }
 }
 
 /// Verifies that cursor-based pagination works: a second sync only receives newly sent notes.
