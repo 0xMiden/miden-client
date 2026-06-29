@@ -56,7 +56,7 @@ use domain::account::{
     StorageMapFetch,
     VaultFetch,
 };
-use domain::note::{FetchedNote, NoteSyncBlock, SyncedNoteDetails};
+use domain::note::{CommittedNote, FetchedNote, NoteSyncBlock, SyncedNoteDetails};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
@@ -84,7 +84,6 @@ pub use domain::status::{NetworkNoteStatus, NetworkNoteStatusInfo, RpcStatusInfo
 pub use endpoint::Endpoint;
 
 mod verification;
-pub use verification::VerifyingRpcClient;
 
 #[cfg(not(feature = "testing"))]
 mod generated;
@@ -163,26 +162,66 @@ pub trait NodeRpcClient: Send + Sync {
     ) -> Result<BlockNumber, RpcError>;
 
     /// Given a block number, fetches the block header corresponding to that height from the node
-    /// using the `/GetBlockHeaderByNumber` endpoint.
+    /// using the `/GetBlockHeaderByNumber` endpoint, without verifying that the returned header
+    /// matches the requested block number.
+    ///
     /// If `include_mmr_proof` is set to true and the function returns an `Ok`, the second value
     /// of the return tuple should always be Some(MmrProof).
     ///
     /// When `None` is provided, returns info regarding the latest block.
-    async fn get_block_header_by_number(
+    async fn get_block_header_by_number_unchecked(
         &self,
         block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
     ) -> Result<(BlockHeader, Option<MmrProof>), RpcError>;
 
+    /// Fetches the block header for `block_num` and, when one is specified, verifies that the node
+    /// returned the requested block.
+    ///
+    /// See [`NodeRpcClient::get_block_header_by_number_unchecked`] for the parameters and the
+    /// latest-block behavior.
+    ///
+    /// # Errors
+    /// - [`RpcError::InvalidResponse`] if the node returns a header whose block number does not
+    ///   match the requested `block_num`.
+    async fn get_block_header_by_number(
+        &self,
+        block_num: Option<BlockNumber>,
+        include_mmr_proof: bool,
+    ) -> Result<(BlockHeader, Option<MmrProof>), RpcError> {
+        let (header, mmr_proof) =
+            self.get_block_header_by_number_unchecked(block_num, include_mmr_proof).await?;
+        verification::verify_block_num(block_num, header.block_num())?;
+        Ok((header, mmr_proof))
+    }
+
     /// Given a block number, fetches the block corresponding to that height from the node using
-    /// the `/GetBlockByNumber` RPC endpoint.
+    /// the `/GetBlockByNumber` RPC endpoint, without verifying that the returned block matches the
+    /// requested block number.
     ///
     /// If `include_proof` is set to true, the block proof will be included in the response.
-    async fn get_block_by_number(
+    async fn get_block_by_number_unchecked(
         &self,
         block_num: BlockNumber,
         include_proof: bool,
     ) -> Result<ProvenBlock, RpcError>;
+
+    /// Fetches the block for `block_num` and verifies that the node returned the requested block.
+    ///
+    /// See [`NodeRpcClient::get_block_by_number_unchecked`] for the parameters.
+    ///
+    /// # Errors
+    /// - [`RpcError::InvalidResponse`] if the node returns a block whose number does not match the
+    ///   requested `block_num`.
+    async fn get_block_by_number(
+        &self,
+        block_num: BlockNumber,
+        include_proof: bool,
+    ) -> Result<ProvenBlock, RpcError> {
+        let block = self.get_block_by_number_unchecked(block_num, include_proof).await?;
+        verification::verify_block_num(Some(block_num), block.header().block_num())?;
+        Ok(block)
+    }
 
     /// Fetches note-related data for a list of [`NoteId`] using the `/GetNotesById`
     /// RPC endpoint.
@@ -195,7 +234,26 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// In both cases, a [`miden_protocol::note::NoteInclusionProof`] is returned so the caller can
     /// verify that each note is part of the block's note tree.
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
+    ///
+    /// This does not verify that every returned note was among `note_ids`.
+    async fn get_notes_by_id_unchecked(
+        &self,
+        note_ids: &[NoteId],
+    ) -> Result<Vec<FetchedNote>, RpcError>;
+
+    /// Fetches note-related data for `note_ids` and verifies that every returned note was
+    /// requested.
+    ///
+    /// See [`NodeRpcClient::get_notes_by_id_unchecked`] for the response shape.
+    ///
+    /// # Errors
+    /// - [`RpcError::InvalidResponse`] if the node returns a note whose ID was not requested.
+    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
+        let notes = self.get_notes_by_id_unchecked(note_ids).await?;
+        let requested: BTreeSet<NoteId> = note_ids.iter().copied().collect();
+        verification::verify_note_ids(&requested, notes.iter().map(FetchedNote::id))?;
+        Ok(notes)
+    }
 
     /// Fetches the MMR delta for a given block range using the `/SyncChainMmr` RPC endpoint.
     ///
@@ -260,12 +318,35 @@ pub trait NodeRpcClient: Send + Sync {
     /// Notes with attachments will have header-only metadata after this call; use
     /// [`NodeRpcClient::sync_notes_with_details`] to also resolve their full metadata and
     /// fetch public note bodies in a single follow-up call.
-    async fn sync_notes(
+    ///
+    /// This does not verify that every returned note's tag was among `note_tags`.
+    async fn sync_notes_unchecked(
         &self,
         block_from: BlockNumber,
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
     ) -> Result<Vec<NoteSyncBlock>, RpcError>;
+
+    /// Fetches notes for `note_tags` over the range and verifies that every returned note's tag
+    /// was requested.
+    ///
+    /// See [`NodeRpcClient::sync_notes_unchecked`] for the parameters and pagination behavior.
+    ///
+    /// # Errors
+    /// - [`RpcError::InvalidResponse`] if the node returns a note whose tag was not requested.
+    async fn sync_notes(
+        &self,
+        block_from: BlockNumber,
+        block_to: BlockNumber,
+        note_tags: &BTreeSet<NoteTag>,
+    ) -> Result<Vec<NoteSyncBlock>, RpcError> {
+        let blocks = self.sync_notes_unchecked(block_from, block_to, note_tags).await?;
+        verification::verify_note_tags(
+            note_tags,
+            blocks.iter().flat_map(|b| b.notes.values().map(CommittedNote::tag)),
+        )?;
+        Ok(blocks)
+    }
 
     /// Calls [`NodeRpcClient::sync_notes`] for the requested range, then makes a single
     /// [`NodeRpcClient::get_notes_by_id`] call to fetch full note bodies (scripts, assets,
@@ -322,12 +403,34 @@ pub trait NodeRpcClient: Send + Sync {
     /// - `prefix` is a list of nullifiers prefixes to search for.
     /// - `block_from`: The starting block number for the range (inclusive).
     /// - `block_to`: The ending block number for the range (inclusive).
-    async fn sync_nullifiers(
+    ///
+    /// This does not verify that every returned nullifier's prefix was among `prefix`.
+    async fn sync_nullifiers_unchecked(
         &self,
         prefix: &[u16],
         block_from: BlockNumber,
         block_to: BlockNumber,
     ) -> Result<Vec<NullifierUpdate>, RpcError>;
+
+    /// Fetches nullifiers for `prefix` over the range and verifies that every returned nullifier's
+    /// prefix was requested.
+    ///
+    /// See [`NodeRpcClient::sync_nullifiers_unchecked`] for the parameters.
+    ///
+    /// # Errors
+    /// - [`RpcError::InvalidResponse`] if the node returns a nullifier whose prefix was not
+    ///   requested.
+    async fn sync_nullifiers(
+        &self,
+        prefix: &[u16],
+        block_from: BlockNumber,
+        block_to: BlockNumber,
+    ) -> Result<Vec<NullifierUpdate>, RpcError> {
+        let nullifiers = self.sync_nullifiers_unchecked(prefix, block_from, block_to).await?;
+        let requested: BTreeSet<u16> = prefix.iter().copied().collect();
+        verification::verify_nullifier_prefixes(&requested, &nullifiers)?;
+        Ok(nullifiers)
+    }
 
     /// Fetches the account from the node, using the `/GetAccount` endpoint.
     ///
@@ -338,14 +441,40 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// For a fully oversize-resolved account, use [`NodeRpcClient::get_account_details`].
     ///
+    /// This does not verify that the response block number matches the requested one.
+    ///
     /// # Errors
     ///
     /// - If the account isn't found in the network
-    async fn get_account(
+    async fn get_account_unchecked(
         &self,
         account_id: AccountId,
         request: GetAccountRequest,
     ) -> Result<(BlockNumber, AccountProof), RpcError>;
+
+    /// Fetches the account from the node and, when a specific block was requested, verifies that
+    /// the node returned the account at that block.
+    ///
+    /// See [`NodeRpcClient::get_account_unchecked`] for details on the response.
+    ///
+    /// # Errors
+    ///
+    /// - If the account isn't found in the network.
+    /// - [`RpcError::InvalidResponse`] if the response block number does not match the requested
+    ///   one.
+    async fn get_account(
+        &self,
+        account_id: AccountId,
+        request: GetAccountRequest,
+    ) -> Result<(BlockNumber, AccountProof), RpcError> {
+        let requested = match request.at {
+            AccountStateAt::Block(number) => Some(number),
+            AccountStateAt::ChainTip => None,
+        };
+        let (block_num, proof) = self.get_account_unchecked(account_id, request).await?;
+        verification::verify_block_num(requested, block_num)?;
+        Ok((block_num, proof))
+    }
 
     /// Fills in the asset list when the vault came back flagged `too_many_assets`, by
     /// querying [`NodeRpcClient::sync_account_vault`] over `[GENESIS, block_to]`. No-op when
@@ -502,8 +631,28 @@ pub trait NodeRpcClient: Send + Sync {
     }
 
     /// Fetches the note script with the specified root, returning `None` if the node has no script
-    /// registered for that root.
-    async fn get_note_script_by_root(&self, root: Word) -> Result<Option<NoteScript>, RpcError>;
+    /// registered for that root, without verifying that a returned script's root matches the
+    /// requested `root`.
+    async fn get_note_script_by_root_unchecked(
+        &self,
+        root: Word,
+    ) -> Result<Option<NoteScript>, RpcError>;
+
+    /// Fetches the note script with the specified root and verifies that a returned script's root
+    /// matches the requested `root`.
+    ///
+    /// Returns `None` if the node has no script registered for that root.
+    ///
+    /// # Errors
+    /// - [`RpcError::InvalidResponse`] if the node returns a script whose root does not match the
+    ///   requested `root`.
+    async fn get_note_script_by_root(&self, root: Word) -> Result<Option<NoteScript>, RpcError> {
+        let script = self.get_note_script_by_root_unchecked(root).await?;
+        if let Some(script) = &script {
+            verification::verify_note_script_root(root, script)?;
+        }
+        Ok(script)
+    }
 
     /// Fetches storage map updates for specified account and storage slots within a block range,
     /// using the `/SyncStorageMaps` RPC endpoint.

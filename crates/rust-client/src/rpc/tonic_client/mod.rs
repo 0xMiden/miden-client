@@ -380,7 +380,7 @@ impl NodeRpcClient for GrpcClient {
         Ok(BlockNumber::from(api_response.into_inner().block_num))
     }
 
-    async fn get_block_header_by_number(
+    async fn get_block_header_by_number_unchecked(
         &self,
         block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
@@ -429,7 +429,10 @@ impl NodeRpcClient for GrpcClient {
         Ok((block_header, mmr_proof))
     }
 
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
+    async fn get_notes_by_id_unchecked(
+        &self,
+        note_ids: &[NoteId],
+    ) -> Result<Vec<FetchedNote>, RpcError> {
         let limits = self.get_rpc_limits().await?;
         let mut notes = Vec::with_capacity(note_ids.len());
         for chunk in note_ids.chunks(limits.note_ids_limit as usize) {
@@ -485,11 +488,10 @@ impl NodeRpcClient for GrpcClient {
     /// This function will return an error if:
     ///
     /// - The requested Account isn't returned by the node.
-    /// - The block number of the requested Account doesn't match the response block number.
     /// - There was an error sending the request to the node.
     /// - The answer had a `None` for one of the expected fields.
     /// - There is an error during storage deserialization.
-    async fn get_account(
+    async fn get_account_unchecked(
         &self,
         account_id: AccountId,
         request: GetAccountRequest,
@@ -573,7 +575,7 @@ impl NodeRpcClient for GrpcClient {
     ///
     /// Chunks `note_tags` by [`RpcLimits::note_tags_limit`] and paginates each chunk across the
     /// requested block range.
-    async fn sync_notes(
+    async fn sync_notes_unchecked(
         &self,
         block_from: BlockNumber,
         block_to: BlockNumber,
@@ -639,7 +641,7 @@ impl NodeRpcClient for GrpcClient {
         Ok(merged_blocks.into_values().collect())
     }
 
-    async fn sync_nullifiers(
+    async fn sync_nullifiers_unchecked(
         &self,
         prefixes: &[u16],
         block_from: BlockNumber,
@@ -694,7 +696,7 @@ impl NodeRpcClient for GrpcClient {
         Ok(all_nullifiers.into_iter().collect::<Vec<_>>())
     }
 
-    async fn get_block_by_number(
+    async fn get_block_by_number_unchecked(
         &self,
         block_num: BlockNumber,
         include_proof: bool,
@@ -719,7 +721,10 @@ impl NodeRpcClient for GrpcClient {
         Ok(block)
     }
 
-    async fn get_note_script_by_root(&self, root: Word) -> Result<Option<NoteScript>, RpcError> {
+    async fn get_note_script_by_root_unchecked(
+        &self,
+        root: Word,
+    ) -> Result<Option<NoteScript>, RpcError> {
         let request = proto::note::NoteScriptRoot { root: Some(root.into()) };
 
         let response = self

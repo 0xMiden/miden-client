@@ -17,7 +17,7 @@ use crate::keystore::FilesystemKeyStore;
 use crate::keystore::Keystore;
 use crate::note_transport::NoteTransportClient;
 use crate::pswap::PswapTransactionObserver;
-use crate::rpc::{Endpoint, NodeRpcClient, VerifyingRpcClient};
+use crate::rpc::{Endpoint, NodeRpcClient};
 use crate::store::{Store, StoreError};
 use crate::transaction::{TransactionObserver, TransactionProver};
 use crate::{Client, ClientError, ClientRng, ClientRngBox, DebugMode, grpc_support};
@@ -459,10 +459,9 @@ where
     /// - Returns an error if the store cannot be instantiated.
     #[allow(clippy::unused_async, unused_mut)]
     pub async fn build(mut self) -> Result<Client<AUTH>, ClientError> {
-        // Determine the RPC client to use, wrapping it so every response is verified against its
-        // request regardless of the underlying implementation.
+        // Determine the RPC client to use.
         let rpc_api: Arc<dyn NodeRpcClient> = if let Some(client) = self.rpc_api {
-            Arc::new(VerifyingRpcClient::new(client))
+            client
         } else {
             return Err(ClientError::ClientInitializationError(
                 "RPC client is required. Call `.rpc(...)` or `.grpc_client(...)`.".into(),

@@ -323,7 +323,7 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Returns note updates in the inclusive block range `[block_from, block_to]`.
     /// Only notes that match the provided tags will be returned, grouped by block.
-    async fn sync_notes(
+    async fn sync_notes_unchecked(
         &self,
         block_from: BlockNumber,
         block_to: BlockNumber,
@@ -390,7 +390,7 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Retrieves the block header for the specified block number. If the block number is not
     /// provided, the chain tip block header will be returned.
-    async fn get_block_header_by_number(
+    async fn get_block_header_by_number_unchecked(
         &self,
         block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
@@ -411,7 +411,10 @@ impl NodeRpcClient for MockRpcApi {
     }
 
     /// Returns the node's tracked notes that match the provided note IDs.
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
+    async fn get_notes_by_id_unchecked(
+        &self,
+        note_ids: &[NoteId],
+    ) -> Result<Vec<FetchedNote>, RpcError> {
         // assume all public notes for now
         let notes = self.mock_chain.read().committed_notes().clone();
 
@@ -484,7 +487,7 @@ impl NodeRpcClient for MockRpcApi {
     /// of the request are ignored in the mock implementation: the latest account code and full
     /// asset list are always returned, and the truncation flags are set when the data exceeds
     /// `oversize_threshold`.
-    async fn get_account(
+    async fn get_account_unchecked(
         &self,
         account_id: AccountId,
         request: GetAccountRequest,
@@ -571,7 +574,7 @@ impl NodeRpcClient for MockRpcApi {
 
     /// Returns the nullifiers created after the specified block number that match the provided
     /// prefixes.
-    async fn sync_nullifiers(
+    async fn sync_nullifiers_unchecked(
         &self,
         prefixes: &[u16],
         block_from: BlockNumber,
@@ -596,7 +599,7 @@ impl NodeRpcClient for MockRpcApi {
         Ok(nullifiers)
     }
 
-    async fn get_block_by_number(
+    async fn get_block_by_number_unchecked(
         &self,
         block_num: BlockNumber,
         _include_proof: bool,
@@ -613,7 +616,10 @@ impl NodeRpcClient for MockRpcApi {
         Ok(block)
     }
 
-    async fn get_note_script_by_root(&self, root: Word) -> Result<Option<NoteScript>, RpcError> {
+    async fn get_note_script_by_root_unchecked(
+        &self,
+        root: Word,
+    ) -> Result<Option<NoteScript>, RpcError> {
         let script = self
             .get_available_notes()
             .iter()

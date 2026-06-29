@@ -2,9 +2,9 @@
 
 ## Unreleased
 
-### Changes
+### Breaking Changes
 
-* [rust] RPC response verification now lives in a single `VerifyingRpcClient` wrapper that the client builder places around every `NodeRpcClient`. Implementations only provide transport and no longer need to check that a node's response matches the request themselves ([#2278](https://github.com/0xMiden/rust-sdk/pull/2278)).
+* [BREAKING][rust] `NodeRpcClient` response verification moved into the trait's default methods; implementors now provide the raw transport via `get_block_header_by_number_unchecked`, `get_block_by_number_unchecked`, `get_notes_by_id_unchecked`, `sync_notes_unchecked`, `sync_nullifiers_unchecked`, `get_account_unchecked`, and `get_note_script_by_root_unchecked`, and the public methods verify the response ([#2278](https://github.com/0xMiden/rust-sdk/pull/2278)).
 
 ### Fixes
 
