@@ -12,6 +12,7 @@ use miden_protocol::note::{
     NoteMetadata,
     Nullifier,
 };
+use miden_protocol::transaction::InputNoteCommitment;
 use miden_standards::note::NetworkAccountTarget;
 use miden_tx::utils::serde::{
     ByteReader,
@@ -318,9 +319,10 @@ impl NoteUpdateTracker {
             .filter(|note| note.update_type.is_modified())
     }
 
-    /// Returns the ids of updated input notes that are now consumed, by tracking key. Consumed
-    /// states carry no metadata, so `InputNoteRecord::id` is `None`; the key (the id assigned at
-    /// commit) is used instead.
+    /// Returns the ids of updated input notes that are now consumed, by tracking key. The key (the
+    /// id assigned when the record was inserted) is used rather than `InputNoteRecord::id`, which
+    /// can be `None` for a consumed record whose state carries no metadata (e.g. an
+    /// externally-consumed note imported from bare `NoteFile::NoteDetails`).
     pub fn consumed_input_note_ids(&self) -> impl Iterator<Item = NoteId> + '_ {
         self.input_notes
             .iter()
@@ -510,6 +512,38 @@ impl NoteUpdateTracker {
         }
 
         Ok(())
+    }
+
+    /// Records a note consumed by a tracked account that the client only learns about from the
+    /// consuming transaction's input commitment.
+    ///
+    /// Unauthenticated input notes (which includes same-batch-erased notes) carry their full
+    /// [`NoteHeader`] in the transaction. When the client holds neither an input nor an output
+    /// record for such a note (i.e. it is following the consuming account rather than having
+    /// created the note), this builds a header-only record attributed to the `consumer` so the
+    /// consumption surfaces through [`crate::note::InputNoteReader`]. No-op when the commitment
+    /// carries no header (authenticated notes, discoverable via the note tag instead) or the note
+    /// is already tracked (the full-detail paths own that case).
+    pub(crate) fn insert_consumed_unauthenticated_note(
+        &mut self,
+        commitment: &InputNoteCommitment,
+        consumer: AccountId,
+        block_num: BlockNumber,
+    ) {
+        let Some(header) = commitment.header() else {
+            return;
+        };
+        let note_id = header.id();
+        if self.input_notes.contains_key(&note_id) || self.output_notes.contains_key(&note_id) {
+            return;
+        }
+
+        // Preserve the note's position within the block when known; fall back to 0 so the record
+        // still satisfies the reader's "has a consumption order" requirement.
+        let order = self.get_nullifier_order(commitment.nullifier()).or(Some(0));
+        let mut record = InputNoteRecord::from_header(header, block_num, Some(consumer));
+        record.set_consumed_tx_order(order);
+        self.insert_input_note(record, NoteUpdateType::Insert);
     }
 
     /// Builds a consumed input note record from a tracked output note and inserts it.

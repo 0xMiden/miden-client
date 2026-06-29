@@ -911,8 +911,8 @@ async fn import_note_validation() {
     .pop()
     .unwrap();
 
-    // The consumed note is in `ConsumedExternal` state (no metadata), so it's retrieved by its
-    // details commitment rather than by `NoteId`.
+    // The consumed note is in `ConsumedExternal` state; it's retrieved by its details commitment,
+    // a stable identifier that does not depend on the note's metadata.
     let consumed_note = client
         .get_input_notes(NoteFilter::DetailsCommitments(vec![
             consumed_note.note().unwrap().details_commitment(),
@@ -1391,8 +1391,8 @@ async fn input_note_reader_finds_externally_consumed_notes() {
     // Sync: the client should discover the note was consumed externally by the tracked account.
     client.sync_state().await.unwrap();
 
-    // The note is in ConsumedExternal state (no metadata), so it's retrieved by its details
-    // commitment rather than by `NoteId`.
+    // The note is in `ConsumedExternal` state; it's retrieved by its details commitment, a stable
+    // identifier that does not depend on the note's metadata.
     let input_note = client
         .get_input_notes(NoteFilter::DetailsCommitments(vec![p2id_details_commitment]))
         .await
