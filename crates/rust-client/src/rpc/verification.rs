@@ -40,16 +40,12 @@ use super::{
 // VERIFYING RPC CLIENT
 // ================================================================================================
 
-/// A [`NodeRpcClient`] decorator that verifies each response against its request.
+/// A [`NodeRpcClient`] decorator that verifies each response against its request, returning
+/// [`RpcError::InvalidResponse`] on a mismatch. Each overridden method documents the specific
+/// invariant it checks.
 ///
-/// It delegates every call to the wrapped client and then checks request-scoped invariants (for
-/// example, that a returned block matches the requested number, or that returned notes were among
-/// those requested). Checks that need cross-call or client-side state are not performed here; they
-/// live in the sync layer.
-///
-/// The trait's provided methods are intentionally left inherited: their default implementations
-/// call back through this type's verified methods, so the composite calls they make are checked
-/// too.
+/// Checks that need cross-call or client-side state are not performed here; they live in the sync
+/// layer.
 pub struct VerifyingRpcClient {
     inner: Arc<dyn NodeRpcClient>,
 }
@@ -93,6 +89,7 @@ impl NodeRpcClient for VerifyingRpcClient {
             .await
     }
 
+    /// Verifies the returned header is for the requested block, when a block number is given.
     async fn get_block_header_by_number(
         &self,
         block_num: Option<BlockNumber>,
@@ -104,6 +101,7 @@ impl NodeRpcClient for VerifyingRpcClient {
         Ok((header, mmr_proof))
     }
 
+    /// Verifies the returned block is for the requested number.
     async fn get_block_by_number(
         &self,
         block_num: BlockNumber,
@@ -114,6 +112,7 @@ impl NodeRpcClient for VerifyingRpcClient {
         Ok(block)
     }
 
+    /// Verifies every returned note's ID was requested.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
         let notes = self.inner.get_notes_by_id(note_ids).await?;
         let requested: BTreeSet<NoteId> = note_ids.iter().copied().collect();
@@ -129,6 +128,7 @@ impl NodeRpcClient for VerifyingRpcClient {
         self.inner.sync_chain_mmr(current_block_height, upper_bound).await
     }
 
+    /// Verifies every returned note's tag was requested.
     async fn sync_notes(
         &self,
         block_from: BlockNumber,
@@ -143,6 +143,7 @@ impl NodeRpcClient for VerifyingRpcClient {
         Ok(blocks)
     }
 
+    /// Verifies every returned nullifier's prefix was requested.
     async fn sync_nullifiers(
         &self,
         prefix: &[u16],
@@ -155,6 +156,7 @@ impl NodeRpcClient for VerifyingRpcClient {
         Ok(nullifiers)
     }
 
+    /// Verifies the response is for the requested block, when a specific block is requested.
     async fn get_account(
         &self,
         account_id: AccountId,
@@ -169,6 +171,7 @@ impl NodeRpcClient for VerifyingRpcClient {
         Ok((block_num, proof))
     }
 
+    /// Verifies the returned script's root matches the requested one.
     async fn get_note_script_by_root(&self, root: Word) -> Result<Option<NoteScript>, RpcError> {
         let script = self.inner.get_note_script_by_root(root).await?;
         if let Some(script) = &script {

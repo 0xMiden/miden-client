@@ -168,13 +168,6 @@ pub trait NodeRpcClient: Send + Sync {
     /// of the return tuple should always be Some(MmrProof).
     ///
     /// When `None` is provided, returns info regarding the latest block.
-    ///
-    /// When `block_num` is `Some`, a returned header whose block number does not match it is
-    /// rejected with [`RpcError::InvalidResponse`].
-    ///
-    /// Errors:
-    /// - [`RpcError::InvalidResponse`] if the node returns a header whose block number does not
-    ///   match the requested `block_num`.
     async fn get_block_header_by_number(
         &self,
         block_num: Option<BlockNumber>,
@@ -185,13 +178,6 @@ pub trait NodeRpcClient: Send + Sync {
     /// the `/GetBlockByNumber` RPC endpoint.
     ///
     /// If `include_proof` is set to true, the block proof will be included in the response.
-    ///
-    /// A returned block whose number does not match the requested `block_num` is rejected with
-    /// [`RpcError::InvalidResponse`].
-    ///
-    /// # Errors:
-    /// - [`RpcError::InvalidResponse`] if the node returns a block whose number does not match the
-    ///   requested `block_num`.
     async fn get_block_by_number(
         &self,
         block_num: BlockNumber,
@@ -209,12 +195,6 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// In both cases, a [`miden_protocol::note::NoteInclusionProof`] is returned so the caller can
     /// verify that each note is part of the block's note tree.
-    ///
-    /// A returned note whose ID was not present in `note_ids` is rejected with
-    /// [`RpcError::InvalidResponse`].
-    ///
-    /// Errors:
-    /// - [`RpcError::InvalidResponse`] if the node returns a note whose ID was not requested.
     async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError>;
 
     /// Fetches the MMR delta for a given block range using the `/SyncChainMmr` RPC endpoint.
@@ -280,12 +260,6 @@ pub trait NodeRpcClient: Send + Sync {
     /// Notes with attachments will have header-only metadata after this call; use
     /// [`NodeRpcClient::sync_notes_with_details`] to also resolve their full metadata and
     /// fetch public note bodies in a single follow-up call.
-    ///
-    /// A returned note whose tag was not present in `note_tags` is rejected with
-    /// [`RpcError::InvalidResponse`].
-    ///
-    /// # Errors
-    /// - [`RpcError::InvalidResponse`] if the node returns a note whose tag was not requested.
     async fn sync_notes(
         &self,
         block_from: BlockNumber,
@@ -348,13 +322,6 @@ pub trait NodeRpcClient: Send + Sync {
     /// - `prefix` is a list of nullifiers prefixes to search for.
     /// - `block_from`: The starting block number for the range (inclusive).
     /// - `block_to`: The ending block number for the range (inclusive).
-    ///
-    /// A returned nullifier whose prefix was not present in `prefix` is rejected with
-    /// [`RpcError::InvalidResponse`].
-    ///
-    /// # Errors
-    /// - [`RpcError::InvalidResponse`] if the node returns a nullifier whose prefix was not
-    ///   requested.
     async fn sync_nullifiers(
         &self,
         prefix: &[u16],
@@ -371,13 +338,9 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// For a fully oversize-resolved account, use [`NodeRpcClient::get_account_details`].
     ///
-    /// When the request targets a specific block, a response for a different block is rejected with
-    /// [`RpcError::InvalidResponse`].
-    ///
     /// # Errors
     ///
     /// - If the account isn't found in the network
-    /// - If the response block number does not match the requested one
     async fn get_account(
         &self,
         account_id: AccountId,
@@ -540,13 +503,6 @@ pub trait NodeRpcClient: Send + Sync {
 
     /// Fetches the note script with the specified root, returning `None` if the node has no script
     /// registered for that root.
-    ///
-    /// A returned script whose root does not match the requested `root` is rejected with
-    /// [`RpcError::InvalidResponse`]; callers may rely on this invariant.
-    ///
-    /// Errors:
-    /// - [`RpcError::InvalidResponse`] if the node returns a script whose root does not match the
-    ///   requested `root`.
     async fn get_note_script_by_root(&self, root: Word) -> Result<Option<NoteScript>, RpcError>;
 
     /// Fetches storage map updates for specified account and storage slots within a block range,
