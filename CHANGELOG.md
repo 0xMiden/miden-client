@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changes
+
+* [rust] RPC response verification now lives in a single `VerifyingRpcClient` wrapper that the client builder places around every `NodeRpcClient`. Implementations only provide transport and no longer need to check that a node's response matches the request themselves ([#2278](https://github.com/0xMiden/rust-sdk/pull/2278)).
+
 ### Fixes
 
 * [FIX][rust] RPC endpoint parsing now rejects endpoint strings that omit either the protocol or host. ([#2266](https://github.com/0xMiden/miden-client/pull/2266))

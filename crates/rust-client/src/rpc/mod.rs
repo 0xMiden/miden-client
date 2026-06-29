@@ -83,6 +83,9 @@ pub use domain::limits::RpcLimits;
 pub use domain::status::{NetworkNoteStatus, NetworkNoteStatusInfo, RpcStatusInfo};
 pub use endpoint::Endpoint;
 
+mod verification;
+pub use verification::VerifyingRpcClient;
+
 #[cfg(not(feature = "testing"))]
 mod generated;
 #[cfg(feature = "testing")]
@@ -166,8 +169,8 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// When `None` is provided, returns info regarding the latest block.
     ///
-    /// When `block_num` is `Some`, implementations must verify that the returned header's block
-    /// number matches the requested one and return [`RpcError::InvalidResponse`] otherwise.
+    /// When `block_num` is `Some`, a returned header whose block number does not match it is
+    /// rejected with [`RpcError::InvalidResponse`].
     ///
     /// Errors:
     /// - [`RpcError::InvalidResponse`] if the node returns a header whose block number does not
@@ -183,8 +186,8 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// If `include_proof` is set to true, the block proof will be included in the response.
     ///
-    /// Implementations must verify that the returned block's number matches the requested
-    /// `block_num` and return [`RpcError::InvalidResponse`] otherwise.
+    /// A returned block whose number does not match the requested `block_num` is rejected with
+    /// [`RpcError::InvalidResponse`].
     ///
     /// # Errors:
     /// - [`RpcError::InvalidResponse`] if the node returns a block whose number does not match the
@@ -207,8 +210,8 @@ pub trait NodeRpcClient: Send + Sync {
     /// In both cases, a [`miden_protocol::note::NoteInclusionProof`] is returned so the caller can
     /// verify that each note is part of the block's note tree.
     ///
-    /// Implementations must verify that every returned note's ID was present in `note_ids` and
-    /// return [`RpcError::InvalidResponse`] otherwise.
+    /// A returned note whose ID was not present in `note_ids` is rejected with
+    /// [`RpcError::InvalidResponse`].
     ///
     /// Errors:
     /// - [`RpcError::InvalidResponse`] if the node returns a note whose ID was not requested.
@@ -278,8 +281,8 @@ pub trait NodeRpcClient: Send + Sync {
     /// [`NodeRpcClient::sync_notes_with_details`] to also resolve their full metadata and
     /// fetch public note bodies in a single follow-up call.
     ///
-    /// Implementations must verify that every returned note's tag was present in `note_tags` and
-    /// return [`RpcError::InvalidResponse`] otherwise.
+    /// A returned note whose tag was not present in `note_tags` is rejected with
+    /// [`RpcError::InvalidResponse`].
     ///
     /// # Errors
     /// - [`RpcError::InvalidResponse`] if the node returns a note whose tag was not requested.
@@ -346,8 +349,8 @@ pub trait NodeRpcClient: Send + Sync {
     /// - `block_from`: The starting block number for the range (inclusive).
     /// - `block_to`: The ending block number for the range (inclusive).
     ///
-    /// Implementations must verify that every returned nullifier's prefix was present in `prefix`
-    /// and return [`RpcError::InvalidResponse`] otherwise.
+    /// A returned nullifier whose prefix was not present in `prefix` is rejected with
+    /// [`RpcError::InvalidResponse`].
     ///
     /// # Errors
     /// - [`RpcError::InvalidResponse`] if the node returns a nullifier whose prefix was not
@@ -368,7 +371,9 @@ pub trait NodeRpcClient: Send + Sync {
     ///
     /// For a fully oversize-resolved account, use [`NodeRpcClient::get_account_details`].
     ///
-    /// Errors if the account isn't found or the block number of the requested account doesn't match
+    /// When the request targets a specific block, a response for a different block is rejected with
+    /// [`RpcError::InvalidResponse`].
+    ///
     /// # Errors
     ///
     /// - If the account isn't found in the network
@@ -536,8 +541,8 @@ pub trait NodeRpcClient: Send + Sync {
     /// Fetches the note script with the specified root, returning `None` if the node has no script
     /// registered for that root.
     ///
-    /// Implementations must verify that a returned script's root matches the requested `root` and
-    /// return [`RpcError::InvalidResponse`] otherwise; callers may rely on this invariant.
+    /// A returned script whose root does not match the requested `root` is rejected with
+    /// [`RpcError::InvalidResponse`]; callers may rely on this invariant.
     ///
     /// Errors:
     /// - [`RpcError::InvalidResponse`] if the node returns a script whose root does not match the
