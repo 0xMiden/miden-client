@@ -20,7 +20,13 @@ use crate::utils::{parse_account_id, print_executed_program_stack, print_execute
 #[command(about = "Call a procedure on a local account and display the result and state delta")]
 pub struct CallCmd {
     /// Account and procedure in the form `<ACCOUNT_ID>:<PROCEDURE>`.
-    #[arg(value_name = "ACCOUNT_ID:PROCEDURE")]
+    #[arg(
+        value_name = "ACCOUNT_ID:PROCEDURE",
+        long_help = "Account and procedure in the form `<ACCOUNT_ID>:<PROCEDURE>`.\n\n\
+                     The procedure name is matched against the package's exports with `_` and `-` \
+                     treated as equivalent, so it can be written in either snake_case or \
+                     kebab-case (e.g. `get_count` matches the WIT export `get-count`)."
+    )]
     target: String,
 
     /// Positional arguments to push onto the stack before calling the procedure.
