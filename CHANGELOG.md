@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.15.3 (2026-06-29)
+
 ### Fixes
 
 * [FIX][rust] RPC endpoint parsing now rejects endpoint strings that omit either the protocol or host. ([#2266](https://github.com/0xMiden/miden-client/pull/2266))
