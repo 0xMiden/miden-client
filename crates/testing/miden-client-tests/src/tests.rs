@@ -70,6 +70,7 @@ use miden_protocol::account::{
     AccountComponentMetadata,
     AccountHeader,
     AccountId,
+    AccountIdVersion,
     AccountType,
     StorageMap,
     StorageMapKey,
@@ -4148,8 +4149,10 @@ async fn sync_stores_private_note_attachments() {
     // 1. Build a mock chain with a sender and a public target account (the attachment target must
     //    be public).
     let mut mock_chain_builder = MockChainBuilder::new();
+    let faucet_id = AccountId::dummy([7u8; 15], AccountIdVersion::Version1, AccountType::Public);
+    let note_asset = FungibleAsset::new(faucet_id, 100).unwrap();
     let sender = mock_chain_builder
-        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .add_existing_mock_account_with_assets(miden_testing::Auth::IncrNonce, [note_asset.into()])
         .unwrap();
     let target = mock_chain_builder.add_existing_wallet(miden_testing::Auth::IncrNonce).unwrap();
 
@@ -4160,6 +4163,7 @@ async fn sync_stores_private_note_attachments() {
     let private_note = P2idNote::builder()
         .sender(sender.id())
         .target(target.id())
+        .asset(note_asset)
         .note_type(NoteType::Private)
         .attachments(attachments.clone().into_vec())
         .generate_serial_number(&mut note_rng)

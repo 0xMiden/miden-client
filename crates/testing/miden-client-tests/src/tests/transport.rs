@@ -19,6 +19,8 @@ use miden_client::testing::note_transport::{
 use miden_client::utils::RwLock;
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_protocol::Felt;
+use miden_protocol::account::{AccountId, AccountIdVersion, AccountType as ProtocolAccountType};
+use miden_protocol::asset::{Asset, FungibleAsset};
 use miden_protocol::block::BlockNumber;
 use miden_protocol::crypto::rand::RandomCoin;
 use miden_protocol::note::NoteType as ProtocolNoteType;
@@ -45,6 +47,7 @@ async fn transport_basic() {
     let note: Note = P2idNote::builder()
         .sender(sender_account.id())
         .target(recipient_account.id())
+        .asset(dummy_asset())
         .note_type(NoteType::Private)
         .generate_serial_number(sender.rng())
         .build()
@@ -92,6 +95,7 @@ async fn transport_cursor_pagination() {
     let note_a: Note = P2idNote::builder()
         .sender(sender_account.id())
         .target(recipient_account.id())
+        .asset(dummy_asset())
         .note_type(NoteType::Private)
         .generate_serial_number(sender.rng())
         .build()
@@ -101,6 +105,7 @@ async fn transport_cursor_pagination() {
     let note_b: Note = P2idNote::builder()
         .sender(sender_account.id())
         .target(recipient_account.id())
+        .asset(dummy_asset())
         .note_type(NoteType::Private)
         .generate_serial_number(sender.rng())
         .build()
@@ -141,6 +146,7 @@ async fn transport_duplicate_note_handling() {
     let note: Note = P2idNote::builder()
         .sender(sender_account.id())
         .target(recipient_account.id())
+        .asset(dummy_asset())
         .note_type(NoteType::Private)
         .generate_serial_number(sender.rng())
         .build()
@@ -188,6 +194,7 @@ async fn fetch_all_private_notes_drains_across_batches() {
         let note: Note = P2idNote::builder()
             .sender(sender_account.id())
             .target(recipient_account.id())
+            .asset(dummy_asset())
             .note_type(NoteType::Private)
             .generate_serial_number(sender.rng())
             .build()
@@ -227,6 +234,7 @@ async fn transport_fetch_no_matching_tags() {
     let note: Note = P2idNote::builder()
         .sender(sender_account.id())
         .target(recipient_account.id())
+        .asset(dummy_asset())
         .note_type(NoteType::Private)
         .generate_serial_number(sender.rng())
         .build()
@@ -378,6 +386,7 @@ async fn private_note_relay_recovers_after_transient_ntl_failure() {
     let note: Note = P2idNote::builder()
         .sender(sender_account.id())
         .target(recipient_account.id())
+        .asset(dummy_asset())
         .note_type(NoteType::Private)
         .generate_serial_number(sender.rng())
         .build()
@@ -439,6 +448,7 @@ async fn flush_relay_outbox_retries_failed_relay_without_full_sync() {
     let note: Note = P2idNote::builder()
         .sender(sender_account.id())
         .target(recipient_account.id())
+        .asset(dummy_asset())
         .note_type(NoteType::Private)
         .generate_serial_number(sender.rng())
         .build()
@@ -508,6 +518,7 @@ async fn persistent_relay_failure_does_not_block_sync_state() {
     let note: Note = P2idNote::builder()
         .sender(sender_account.id())
         .target(recipient_account.id())
+        .asset(dummy_asset())
         .note_type(NoteType::Private)
         .generate_serial_number(sender.rng())
         .build()
@@ -547,6 +558,7 @@ async fn send_private_note_with_block_hint_delivers_note() {
     let note: Note = P2idNote::builder()
         .sender(sender_account.id())
         .target(recipient_account.id())
+        .asset(dummy_asset())
         .note_type(NoteType::Private)
         .generate_serial_number(sender.rng())
         .build()
@@ -629,6 +641,14 @@ async fn fetch_private_notes_without_floor_falls_back_to_lookback_window() {
 
 // HELPERS
 // ================================================================================================
+
+/// A dummy fungible asset for transport-layer notes. P2ID notes require at least one asset, and
+/// these notes are never consumed on-chain, so the issuing faucet only needs to be a valid ID.
+fn dummy_asset() -> Asset {
+    let faucet_id =
+        AccountId::dummy([7u8; 15], AccountIdVersion::Version1, ProtocolAccountType::Public);
+    FungibleAsset::new(faucet_id, 100).unwrap().into()
+}
 
 pub async fn create_test_client_transport(
     mock_node: Arc<RwLock<MockNoteTransportNode>>,
