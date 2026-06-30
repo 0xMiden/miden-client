@@ -301,6 +301,8 @@ impl StateSync {
             self.nullifiers_state_sync(&mut state_sync_update, block_num).await?;
         }
 
+        state_sync_update.minimize(current_partial_mmr);
+
         Ok(state_sync_update)
     }
 
