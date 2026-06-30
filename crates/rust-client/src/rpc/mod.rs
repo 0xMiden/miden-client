@@ -596,12 +596,16 @@ pub trait NodeRpcClient: Send + Sync {
     ) -> Result<NetworkNoteStatusInfo, RpcError>;
 }
 
+/// Sync notes by tags and fetches note details if either:
+/// 
+/// - The synced note has non-empty attachments
+/// - `get_public_note_deatils` is `false`
 async fn sync_notes_and_fetch_details<T: NodeRpcClient + ?Sized>(
     rpc: &T,
     block_from: BlockNumber,
     block_to: BlockNumber,
     note_tags: &BTreeSet<NoteTag>,
-    include_public_notes: bool,
+    get_public_note_details: bool,
 ) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, SyncedNoteDetails>), RpcError> {
     let blocks = rpc.sync_notes(block_from, block_to, note_tags).await?;
     let note_ids: Vec<NoteId> = blocks
