@@ -414,7 +414,7 @@ mod test {
     use miden_client::block::BlockHeader;
     use miden_client::crypto::{Forest, InOrderIndex, MmrPeaks};
     use miden_client::note::BlockNumber;
-    use miden_client::store::Store;
+    use miden_client::store::{PartialBlockchainFilter, Store};
     use miden_client::utils::Serializable;
     use miden_protocol::crypto::merkle::mmr::Mmr;
     use miden_protocol::transaction::TransactionKernel;
@@ -482,8 +482,6 @@ mod test {
     /// authentication nodes in the same call, so both are retrievable afterwards.
     #[tokio::test]
     async fn insert_authenticated_block_header_stores_header_and_nodes() {
-        use miden_client::store::PartialBlockchainFilter;
-
         let store = create_test_store().await;
         const TOTAL_BLOCKS: usize = 8;
         let tx_kernel = TransactionKernel.to_commitment();
