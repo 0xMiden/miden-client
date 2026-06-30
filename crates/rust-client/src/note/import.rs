@@ -21,13 +21,12 @@ use miden_protocol::note::{
     NoteFile,
     NoteId,
     NoteInclusionProof,
-    NoteMetadata,
     NoteTag,
 };
 use miden_tx::auth::TransactionAuthenticator;
 
 use crate::rpc::RpcError;
-use crate::rpc::domain::note::{FetchedNote, SyncedNoteDetails};
+use crate::rpc::domain::note::{CommittedNote, FetchedNote, SyncedNoteDetails};
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{InputNoteRecord, InputNoteState, NoteFilter};
 use crate::sync::NoteTagRecord;
@@ -366,23 +365,26 @@ where
             });
 
             match committed_notes_data.remove(&note_record.details_commitment()) {
-                Some((metadata, inclusion_proof, attachments)) => {
+                Some((committed_note, attachments)) => {
                     // Building the MMR outside the loop would fail with BlockHeaderNotFound(0)
                     // because store will be fresh, which can't happen here.
                     let mut partial_mmr = self.get_current_partial_mmr().await?;
                     let block_header = self
                         .get_and_store_authenticated_block(
-                            inclusion_proof.location().block_num(),
+                            committed_note.inclusion_proof().location().block_num(),
                             &mut partial_mmr,
                         )
                         .await?;
 
                     self.cache_partial_mmr(partial_mmr).await?;
 
+                    let metadata = *committed_note.metadata();
                     let tag = metadata.tag();
                     let mut note_record = note_record;
-                    let mut note_changed =
-                        note_record.inclusion_proof_received(inclusion_proof, metadata)?;
+                    let mut note_changed = note_record.inclusion_proof_received(
+                        committed_note.inclusion_proof().clone(),
+                        metadata,
+                    )?;
                     if let Some(attachments) = attachments
                         && note_record.attachments() != &attachments
                     {
@@ -413,8 +415,8 @@ where
     }
 
     /// Checks if notes with the given details commitments and tags are present in the chain between
-    /// `request_block_num` and the current block, returning their metadata, inclusion proof and
-    /// attachments keyed by details commitment.
+    /// `request_block_num` and the current block, returning the committed notes and attachments
+    /// keyed by details commitment.
     ///
     /// Expected notes have no metadata and thus no `NoteId`, so each committed note is matched by
     /// reconstructing the id from the committed metadata: `NoteId::new(details_commitment,
@@ -425,10 +427,7 @@ where
         // Expected notes' details commitments with their tags
         expected_notes: Vec<(NoteDetailsCommitment, &NoteTag)>,
     ) -> Result<
-        BTreeMap<
-            NoteDetailsCommitment,
-            (NoteMetadata, NoteInclusionProof, Option<NoteAttachments>),
-        >,
+        BTreeMap<NoteDetailsCommitment, (CommittedNote, Option<NoteAttachments>)>,
         ClientError,
     > {
         let tracked_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
@@ -467,10 +466,7 @@ where
                     _ => None,
                 };
 
-                retrieved_proofs.insert(
-                    *commitment,
-                    (*sync_note.metadata(), sync_note.inclusion_proof().clone(), attachments),
-                );
+                retrieved_proofs.insert(*commitment, (sync_note.clone(), attachments));
             }
         }
 
