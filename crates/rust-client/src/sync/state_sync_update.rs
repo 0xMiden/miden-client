@@ -21,7 +21,8 @@ use miden_protocol::transaction::TransactionId;
 use miden_protocol::{Felt, Word};
 
 use super::SyncSummary;
-use crate::note::{NoteUpdateTracker, NoteUpdateType};
+use crate::ClientError;
+use crate::note::{NoteConsumption, NoteUpdateTracker, NoteUpdateType};
 use crate::rpc::domain::account_vault::AccountVaultUpdate;
 use crate::rpc::domain::storage_map::StorageMapUpdate;
 use crate::rpc::domain::transaction::TransactionRecord as RpcTransactionRecord;
@@ -34,21 +35,76 @@ use crate::transaction::{DiscardCause, TransactionRecord, TransactionStatus};
 #[derive(Default)]
 pub struct StateSyncUpdate {
     /// The block number of the last block that was synced.
-    pub(crate) block_num: BlockNumber,
+    block_num: BlockNumber,
     /// New blocks, authentication nodes and MMR peaks.
-    pub(crate) partial_blockchain_updates: PartialBlockchainUpdates,
+    partial_blockchain_updates: PartialBlockchainUpdates,
     /// New and updated notes to be upserted in the store.
-    pub(crate) note_updates: NoteUpdateTracker,
+    note_updates: NoteUpdateTracker,
     /// Committed and discarded transactions after the sync.
-    pub(crate) transaction_updates: TransactionUpdateTracker,
+    transaction_updates: TransactionUpdateTracker,
     /// Public account updates and mismatched private accounts after the sync.
-    pub(crate) account_updates: AccountUpdates,
+    account_updates: AccountUpdates,
 }
 
 impl StateSyncUpdate {
+    /// Creates a new update for a sync starting at `block_num`, seeded with the notes and
+    /// transactions to reconcile.
+    ///
+    /// The blockchain and account updates start empty; the sync stages fill them in as they run.
+    pub(super) fn new(
+        block_num: BlockNumber,
+        note_updates: NoteUpdateTracker,
+        transaction_updates: TransactionUpdateTracker,
+    ) -> Self {
+        Self {
+            block_num,
+            note_updates,
+            transaction_updates,
+            ..Default::default()
+        }
+    }
+
     /// Returns the block number of the last synced block.
     pub fn block_num(&self) -> BlockNumber {
         self.block_num
+    }
+
+    /// Sets the block number of the last synced block.
+    pub(super) fn set_block_num(&mut self, block_num: BlockNumber) {
+        self.block_num = block_num;
+    }
+
+    /// Returns a mutable reference to the partial blockchain updates.
+    pub(super) fn partial_blockchain_updates_mut(&mut self) -> &mut PartialBlockchainUpdates {
+        &mut self.partial_blockchain_updates
+    }
+
+    /// Returns a mutable reference to the note updates.
+    pub(super) fn note_updates_mut(&mut self) -> &mut NoteUpdateTracker {
+        &mut self.note_updates
+    }
+
+    /// Returns a mutable reference to the transaction updates.
+    pub(super) fn transaction_updates_mut(&mut self) -> &mut TransactionUpdateTracker {
+        &mut self.transaction_updates
+    }
+
+    /// Returns a mutable reference to the account updates.
+    pub(super) fn account_updates_mut(&mut self) -> &mut AccountUpdates {
+        &mut self.account_updates
+    }
+
+    /// Applies a note consumption to the note updates, resolving the consumer against the
+    /// update's committed transactions.
+    ///
+    /// Performs the disjoint borrow of the note and transaction trackers that callers outside
+    /// this type cannot express through the accessors.
+    pub(super) fn apply_note_consumption(
+        &mut self,
+        consumption: &NoteConsumption,
+    ) -> Result<(), ClientError> {
+        self.note_updates
+            .apply_note_consumption(consumption, self.transaction_updates.committed_transactions())
     }
 
     /// Returns the partial blockchain updates.
