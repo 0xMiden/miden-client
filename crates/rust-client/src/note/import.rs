@@ -440,7 +440,7 @@ where
 
         let (blocks, synced_notes) = self
             .rpc_api
-            .sync_notes_with_details(request_block_num, current_block_num, &tracked_tags, false)
+            .sync_notes_with_attachments(request_block_num, current_block_num, &tracked_tags)
             .await
             .map_err(ClientError::RpcError)?;
 
