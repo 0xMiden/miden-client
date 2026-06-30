@@ -36,6 +36,7 @@ use miden_protocol::testing::account_id::{
 };
 use miden_protocol::{Felt, Word};
 use miden_standards::account::AccountBuilderSchemaCommitmentExt;
+use miden_standards::account::auth::Approver;
 use miden_standards::account::wallets::BasicWallet;
 
 use super::PaymentNoteDescription;
@@ -58,10 +59,10 @@ async fn transaction_creates_two_notes() {
 
     let account = AccountBuilder::new(Default::default())
         .with_component(BasicWallet)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             pub_key.to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_assets([asset_1, asset_2])
         .build_existing()
         .unwrap();
@@ -326,10 +327,10 @@ async fn lazy_foreign_account_loading() {
     let foreign_account = AccountBuilder::new(Default::default())
         .account_type(AccountType::Public)
         .with_component(fpi_component)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             secret_key.public_key().to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .build_with_schema_commitment()
         .unwrap();
     let foreign_account_id = foreign_account.id();

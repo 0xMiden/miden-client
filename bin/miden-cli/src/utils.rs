@@ -137,8 +137,10 @@ pub async fn print_executed_transaction<AUTH>(
     // STORAGE VALUES
     if patch.storage().values().next().is_some() {
         let mut table = create_dynamic_table(&["Storage Slot", "New Value"]);
-        for (slot, new_value) in patch.storage().values() {
-            table.add_row(vec![slot.to_string(), new_value.to_hex()]);
+        for (slot, value_patch) in patch.storage().values() {
+            let new_value =
+                value_patch.value().map_or_else(|| "removed".to_string(), |v| v.to_hex());
+            table.add_row(vec![slot.to_string(), new_value]);
         }
         println!("Storage changes:");
         println!("{table}");
@@ -150,7 +152,7 @@ pub async fn print_executed_transaction<AUTH>(
     if patch.storage().maps().next().is_some() {
         let mut table = create_dynamic_table(&["Storage Slot", "Map Key", "New Value"]);
         for (slot, map_patch) in patch.storage().maps() {
-            for (key, value) in map_patch.entries() {
+            for (key, value) in map_patch.entries().into_iter().flat_map(|e| e.as_map().iter()) {
                 table.add_row(vec![slot.to_string(), Word::from(*key).to_hex(), value.to_hex()]);
             }
         }

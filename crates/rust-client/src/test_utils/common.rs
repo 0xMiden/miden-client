@@ -14,7 +14,7 @@ use miden_protocol::asset::{AssetAmount, FungibleAsset, TokenSymbol};
 use miden_protocol::note::NoteType;
 use miden_protocol::testing::account_id::ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE;
 use miden_protocol::transaction::TransactionId;
-use miden_standards::account::auth::AuthSingleSig;
+use miden_standards::account::auth::{Approver, AuthSingleSig};
 use miden_standards::account::faucets::TokenName;
 use miden_standards::code_builder::CodeBuilder;
 use rand::RngCore;
@@ -88,7 +88,8 @@ pub async fn insert_new_wallet_with_seed(
         AuthSchemeId::EcdsaK256Keccak => AuthSecretKey::new_ecdsa_k256_keccak(),
         other => panic!("unsupported auth scheme: {}", other.as_u8()),
     };
-    let auth_component = AuthSingleSig::new(key_pair.public_key().to_commitment(), auth_scheme);
+    let auth_component =
+        AuthSingleSig::new(Approver::new(key_pair.public_key().to_commitment(), auth_scheme));
 
     let account = AccountBuilder::new(init_seed)
         .account_type(visibility)
@@ -118,7 +119,8 @@ pub async fn insert_new_fungible_faucet(
         AuthSchemeId::EcdsaK256Keccak => AuthSecretKey::new_ecdsa_k256_keccak(),
         other => panic!("unsupported auth scheme: {}", other.as_u8()),
     };
-    let auth_component = AuthSingleSig::new(key_pair.public_key().to_commitment(), auth_scheme);
+    let auth_component =
+        AuthSingleSig::new(Approver::new(key_pair.public_key().to_commitment(), auth_scheme));
 
     // we need to use an initial seed to create the faucet account
     let mut init_seed = [0u8; 32];
@@ -632,10 +634,10 @@ pub async fn insert_account_with_custom_component(
 
     let account = AccountBuilder::new(init_seed)
         .account_type(visibility)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             pub_key.to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(BasicWallet)
         .with_component(custom_component)
         .build_with_schema_commitment()

@@ -144,7 +144,7 @@ pub use miden_protocol::utils::serde::{Deserializable, Serializable, SliceReader
 // ================================================================================================
 
 pub mod notes {
-    pub use miden_protocol::note::NoteFile;
+    pub use miden_standards::note::NoteFile;
 }
 
 /// Provides `AggLayer` bridge components, note constructors, and helper types.
@@ -215,6 +215,7 @@ pub mod auth {
         Signature,
     };
     pub use miden_standards::account::auth::{
+        Approver,
         AuthMultisig,
         AuthMultisigConfig,
         AuthSingleSig,

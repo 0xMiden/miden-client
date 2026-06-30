@@ -23,8 +23,12 @@ use miden_protocol::account::{
 };
 use miden_protocol::asset::{Asset, AssetAmount, FungibleAsset, TokenSymbol};
 use miden_protocol::{ONE, Word};
-use miden_standards::account::auth::AuthSingleSig;
-use miden_standards::account::faucets::{FungibleFaucet, TokenName, create_user_fungible_faucet};
+use miden_standards::account::auth::{Approver, AuthSingleSig};
+use miden_standards::account::faucets::{
+    FungibleFaucet,
+    TokenName,
+    create_singlesig_user_fungible_faucet,
+};
 use miden_standards::account::policies::{BurnPolicy, MintPolicy, TokenPolicyManager};
 use miden_standards::account::wallets::BasicWallet;
 use miden_standards::testing::faucet::user_faucet_single_sig_acl;
@@ -132,7 +136,7 @@ fn generate_genesis_account() -> anyhow::Result<AccountFile> {
         .decimals(12)
         .max_supply(AssetAmount::new(1_000_000_000_000).unwrap())
         .build()?;
-    let account = create_user_fungible_faucet(
+    let account = create_singlesig_user_fungible_faucet(
         rng.random(),
         faucet,
         auth_component,
@@ -224,7 +228,7 @@ fn create_single_test_faucet(index: u128, secret: &AuthSecretKey) -> anyhow::Res
         .decimals(FAUCET_DECIMALS)
         .max_supply(AssetAmount::new(u64::from(FAUCET_MAX_SUPPLY)).unwrap())
         .build()?;
-    let faucet = create_user_fungible_faucet(
+    let faucet = create_singlesig_user_fungible_faucet(
         init_seed,
         faucet_component,
         auth_component,
@@ -260,10 +264,10 @@ fn create_test_account_with_many_assets(faucets: &[Account]) -> anyhow::Result<A
     });
 
     let account = AccountBuilder::new(TEST_ACCOUNT_SEED)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             sk.public_key().to_commitment(),
             AuthScheme::Falcon512Poseidon2,
-        ))
+        )))
         .account_type(AccountType::Public)
         .with_component(acc_component)
         .with_assets(assets)

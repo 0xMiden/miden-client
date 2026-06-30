@@ -271,14 +271,16 @@ impl MockRpcApi {
                 let storage_patch = patch.storage();
 
                 for (slot_name, map_patch) in storage_patch.maps() {
-                    for (key, value) in map_patch.entries() {
-                        let storage_map_info = StorageMapUpdate {
-                            block_num: block_number,
-                            slot_name: slot_name.clone(),
-                            key: *key,
-                            value: *value,
-                        };
-                        updates.push(storage_map_info);
+                    if let Some(entries) = map_patch.entries() {
+                        for (key, value) in entries.as_map() {
+                            let storage_map_info = StorageMapUpdate {
+                                block_num: block_number,
+                                slot_name: slot_name.clone(),
+                                key: *key,
+                                value: *value,
+                            };
+                            updates.push(storage_map_info);
+                        }
                     }
                 }
             }

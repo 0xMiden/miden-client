@@ -174,7 +174,8 @@ impl SqliteStore {
             .map(|(slot_name, map_patch)| {
                 let entries: Vec<(Word, Word)> = map_patch
                     .entries()
-                    .iter()
+                    .into_iter()
+                    .flat_map(|e| e.as_map().iter())
                     .map(|(key, value)| ((*key).into(), *value))
                     .collect();
                 (slot_name, entries)
@@ -295,15 +296,24 @@ impl SqliteStore {
     ) -> Result<BTreeMap<StorageSlotName, (Word, StorageSlotType)>, StoreError> {
         let mut updated_slots: BTreeMap<StorageSlotName, (Word, StorageSlotType)> = storage_patch
             .values()
-            .map(|(slot_name, value)| (slot_name.clone(), (*value, StorageSlotType::Value)))
+            .map(|(slot_name, value_patch)| {
+                (
+                    slot_name.clone(),
+                    (value_patch.value().unwrap_or_default(), StorageSlotType::Value),
+                )
+            })
             .collect();
 
         let default_map_root = StorageMap::default().root();
 
         for (slot_name, map_patch) in storage_patch.maps() {
             let old_root = old_map_roots.get(slot_name).copied().unwrap_or(default_map_root);
-            let entries: Vec<_> =
-                map_patch.entries().iter().map(|(key, value)| (*key, *value)).collect();
+            let entries: Vec<_> = map_patch
+                .entries()
+                .into_iter()
+                .flat_map(|e| e.as_map().iter())
+                .map(|(key, value)| (*key, *value))
+                .collect();
 
             let new_root = smt_forest.update_storage_map_nodes(old_root, entries.into_iter())?;
             updated_slots.insert(slot_name.clone(), (new_root, StorageSlotType::Map));

@@ -583,7 +583,7 @@ mod tests {
         ACCOUNT_ID_SENDER,
     };
     use miden_protocol::{EMPTY_WORD, Felt, Word};
-    use miden_standards::account::auth::AuthSingleSig;
+    use miden_standards::account::auth::{Approver, AuthSingleSig};
     use miden_standards::note::P2idNote;
     use miden_standards::testing::account_component::MockAccountComponent;
     use miden_tx::utils::serde::{Deserializable, Serializable};
@@ -595,10 +595,10 @@ mod tests {
     #[test]
     fn transaction_request_serialization() {
         assert_transaction_request_serialization_with(|| {
-            AuthSingleSig::new(
+            AuthSingleSig::new(Approver::new(
                 PublicKeyCommitment::from(EMPTY_WORD),
                 AuthScheme::Falcon512Poseidon2,
-            )
+            ))
             .into()
         });
     }
@@ -606,8 +606,11 @@ mod tests {
     #[test]
     fn transaction_request_serialization_ecdsa() {
         assert_transaction_request_serialization_with(|| {
-            AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthScheme::EcdsaK256Keccak)
-                .into()
+            AuthSingleSig::new(Approver::new(
+                PublicKeyCommitment::from(EMPTY_WORD),
+                AuthScheme::EcdsaK256Keccak,
+            ))
+            .into()
         });
     }
 

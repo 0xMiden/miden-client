@@ -14,7 +14,7 @@ use miden_protocol::account::{
     AccountType,
 };
 use miden_protocol::{Felt, ONE, Word};
-use miden_standards::account::auth::AuthSingleSig;
+use miden_standards::account::auth::{Approver, AuthSingleSig};
 use miden_standards::account::wallets::BasicWallet;
 use rand_chacha::ChaCha20Rng;
 use rand_chacha::rand_core::SeedableRng;
@@ -102,10 +102,10 @@ fn build_wallet_account(rng: &mut ChaCha20Rng, secret: &AuthSecretKey) -> Result
     .context("failed to create wallet component")?;
 
     let account = AccountBuilder::new(seed)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             secret.public_key().to_commitment(),
             AuthScheme::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(acc_component)
         .account_type(AccountType::Public)
         .build()

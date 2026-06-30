@@ -9,7 +9,11 @@ use miden_protocol::account::{
     AccountPatch,
     AccountStoragePatch,
     AccountVaultPatch,
+    StorageMapPatch,
+    StorageMapPatchEntries,
     StorageSlotName,
+    StorageSlotPatch,
+    StorageValuePatch,
 };
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{InOrderIndex, MmrPeaks};
@@ -457,17 +461,39 @@ impl PublicAccountPatch {
     ) -> Result<AccountPatch, AccountPatchError> {
         let account_id = self.new_header.id();
 
-        let mut storage = AccountStoragePatch::new();
-        for (slot_name, new_value) in &self.value_slot_updates {
-            storage.set_item(slot_name.clone(), *new_value)?;
-        }
+        let is_full_state = self.new_header.nonce() == ONE;
+
+        let value_entries = self.value_slot_updates.iter().map(|(slot_name, new_value)| {
+            let value_patch = if is_full_state {
+                StorageValuePatch::Create { value: *new_value }
+            } else {
+                StorageValuePatch::Update { value: *new_value }
+            };
+            (slot_name.clone(), StorageSlotPatch::Value(value_patch))
+        });
+
         // Map entries are absolute per (slot, key), applying them in block order lets a later block
         // overwrite an earlier one for the same key, yielding the final value.
         let mut map_updates: Vec<&StorageMapUpdate> = self.storage_map_updates.iter().collect();
         map_updates.sort_by_key(|u| u.block_num);
+        let mut map_entries_by_slot: BTreeMap<StorageSlotName, StorageMapPatchEntries> =
+            BTreeMap::new();
         for update in map_updates {
-            storage.set_map_item(update.slot_name.clone(), update.key, update.value)?;
+            map_entries_by_slot
+                .entry(update.slot_name.clone())
+                .or_default()
+                .insert(update.key, update.value);
         }
+        let map_entries = map_entries_by_slot.into_iter().map(|(slot_name, entries)| {
+            let map_patch = if is_full_state {
+                StorageMapPatch::Create { entries }
+            } else {
+                StorageMapPatch::Update { entries }
+            };
+            (slot_name, StorageSlotPatch::Map(map_patch))
+        });
+
+        let storage = AccountStoragePatch::from_entries(value_entries.chain(map_entries))?;
 
         // Vault entries are absolute per key, applying them in block order yields the final value,
         // with a `None` asset encoding a removal.
@@ -677,8 +703,8 @@ mod tests {
         let patch = payload(2, vec![], updates, vec![]).compute_account_patch(None).unwrap();
 
         let map = patch.storage().get_map(&map_slot).expect("patch should contain map slot");
-        assert_eq!(map.entries().len(), 1);
-        assert_eq!(*map.entries().values().next().unwrap(), word(300));
+        assert_eq!(map.entries().unwrap().as_map().len(), 1);
+        assert_eq!(*map.entries().unwrap().as_map().values().next().unwrap(), word(300));
     }
 
     #[test]
@@ -691,7 +717,7 @@ mod tests {
 
         let patch = payload(2, vec![], updates, vec![]).compute_account_patch(None).unwrap();
         let map = patch.storage().get_map(&map_slot).unwrap();
-        assert_eq!(map.entries().len(), 2);
+        assert_eq!(map.entries().unwrap().as_map().len(), 2);
     }
 
     // COMPUTE ACCOUNT PATCH - VAULT

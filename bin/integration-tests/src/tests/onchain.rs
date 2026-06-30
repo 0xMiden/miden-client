@@ -5,6 +5,7 @@ use miden_client::account::{AccountType, build_wallet_id};
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::keystore::Keystore;
+use miden_client::note::standards::NoteSyncHint;
 use miden_client::note::{
     BlockNumber,
     Note,
@@ -787,10 +788,9 @@ pub async fn test_sync_note_with_attachment(client_config: ClientConfig) -> Resu
     // A private note's details never appear on-chain, so client 2 must receive the details.
     client_2.add_note_tag(private_note.metadata().tag()).await?;
     client_2
-        .import_notes(&[NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::ExpectedNote {
             details: private_note.clone().into(),
-            after_block_num: 0u32.into(),
-            tag: Some(private_note.metadata().tag()),
+            sync_hint: NoteSyncHint::new(0u32.into(), private_note.metadata().tag()),
         }])
         .await?;
 

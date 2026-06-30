@@ -25,7 +25,7 @@ use miden_client::account::{
     AccountType,
 };
 use miden_client::asset::{AssetAmount, TokenSymbol};
-use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig};
+use miden_client::auth::{Approver, AuthSchemeId, AuthSecretKey, AuthSingleSig};
 use miden_client::keystore::Keystore;
 use miden_client::transaction::TransactionRequestBuilder;
 use miden_client::utils::Deserializable;
@@ -542,10 +542,10 @@ async fn create_client_account<AUTH: Keystore + Sync + 'static>(
     } else {
         debug!("Adding default Falcon auth component");
         let kp = AuthSecretKey::new_falcon512_poseidon2_with_rng(client.rng());
-        builder = builder.with_auth_component(AuthSingleSig::new(
+        builder = builder.with_auth_component(AuthSingleSig::new(Approver::new(
             kp.public_key().to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
-        ));
+        )));
         Some(kp)
     };
 

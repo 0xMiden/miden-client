@@ -372,14 +372,13 @@ fn build_non_standard_mint(
         NoteTag::with_account_target(target).into(),
     )?;
     let target_ntx = NetworkAccountTarget::new(faucet.id(), NoteExecutionHint::Always)?;
-    let attachments = NoteAttachments::new(vec![target_ntx.into()])?;
-    let mint_note = MintNote::create(
-        faucet.id(),
-        faucet_owner, // must equal the faucet owner, checked by mint_and_send
-        mint_storage,
-        attachments,
-        client.rng(),
-    )?;
+    let mint_note: Note = MintNote::builder()
+        .sender(faucet_owner) // must equal the faucet owner, checked by mint_and_send
+        .mint_storage(mint_storage)
+        .attachment(target_ntx)
+        .generate_serial_number(client.rng())
+        .build()?
+        .into();
 
     Ok((custom_script, mint_note, expected_output_commitment))
 }
@@ -702,9 +701,13 @@ pub async fn test_ntx_mint_produces_public_p2id(client_config: ClientConfig) -> 
     )?;
 
     let target_ntx = NetworkAccountTarget::new(faucet.id(), NoteExecutionHint::Always)?;
-    let attachments = NoteAttachments::new(vec![target_ntx.into()])?;
-    let mint_note =
-        MintNote::create(faucet.id(), alice.id(), mint_storage, attachments, client.rng())?;
+    let mint_note: Note = MintNote::builder()
+        .sender(alice.id())
+        .mint_storage(mint_storage)
+        .attachment(target_ntx)
+        .generate_serial_number(client.rng())
+        .build()?
+        .into();
 
     let mint_tx = TransactionRequestBuilder::new().own_output_notes(vec![mint_note]).build()?;
     execute_tx_and_sync(&mut client, alice.id(), mint_tx).await?;

@@ -27,13 +27,20 @@ use miden_client::auth::{AuthSchemeId, AuthSingleSig, PublicKeyCommitment};
 use miden_client::store::{ClientAccountType, Store, StoreError};
 use miden_client::testing::common::ACCOUNT_ID_REGULAR;
 use miden_client::{EMPTY_WORD, Felt, ONE, ZERO};
-use miden_protocol::account::AccountComponentMetadata;
+use miden_protocol::account::{
+    AccountComponentMetadata,
+    StorageMapPatch,
+    StorageMapPatchEntries,
+    StorageSlotPatch,
+    StorageValuePatch,
+};
 use miden_protocol::asset::AssetCallbackFlag;
 use miden_protocol::testing::account_id::{
     ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET,
     ACCOUNT_ID_PUBLIC_NON_FUNGIBLE_FAUCET,
 };
 use miden_protocol::testing::constants::NON_FUNGIBLE_ASSET_DATA;
+use miden_standards::account::auth::Approver;
 use rusqlite::params;
 
 use crate::SqliteStore;
@@ -52,8 +59,11 @@ async fn account_code_insertion_no_duplicates() -> anyhow::Result<()> {
         AccountComponentMetadata::new("miden::testing::dummy_component"),
     )?;
     let account_code = AccountCode::from_components(&[
-        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Poseidon2)
-            .into(),
+        AuthSingleSig::new(Approver::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Poseidon2,
+        ))
+        .into(),
         account_component,
     ])?;
 
@@ -114,10 +124,10 @@ async fn apply_account_patch_additions() -> anyhow::Result<()> {
     // Create and insert an account
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -126,13 +136,21 @@ async fn apply_account_patch_additions() -> anyhow::Result<()> {
         .insert_account(&account, default_address, ClientAccountType::Native)
         .await?;
 
-    let mut storage_patch = AccountStoragePatch::new();
-    storage_patch.set_item(value_slot_name.clone(), [ZERO, ZERO, ZERO, ONE].into())?;
-    storage_patch.set_map_item(
-        map_slot_name.clone(),
-        StorageMapKey::new([ONE, ZERO, ZERO, ZERO].into()),
-        [ONE, ONE, ONE, ONE].into(),
-    )?;
+    let mut map_entries = StorageMapPatchEntries::new();
+    map_entries
+        .insert(StorageMapKey::new([ONE, ZERO, ZERO, ZERO].into()), [ONE, ONE, ONE, ONE].into());
+    let storage_patch = AccountStoragePatch::from_entries([
+        (
+            value_slot_name.clone(),
+            StorageSlotPatch::Value(StorageValuePatch::Update {
+                value: [ZERO, ZERO, ZERO, ONE].into(),
+            }),
+        ),
+        (
+            map_slot_name.clone(),
+            StorageSlotPatch::Map(StorageMapPatch::Update { entries: map_entries }),
+        ),
+    ])?;
 
     // The account starts with an empty vault, so the absolute values of the added assets are the
     // assets themselves.
@@ -216,10 +234,10 @@ async fn apply_account_patch_preserves_fungible_callback_flag() -> anyhow::Resul
     // Create and insert an account with an empty vault.
     let account = AccountBuilder::new([7; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(BasicWallet)
         .build_existing()?;
     store
@@ -319,10 +337,10 @@ async fn apply_account_patch_removals() -> anyhow::Result<()> {
     ];
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(dummy_component)
         .with_assets(assets.clone())
         .build_existing()?;
@@ -331,15 +349,20 @@ async fn apply_account_patch_removals() -> anyhow::Result<()> {
         .insert_account(&account, default_address, ClientAccountType::Native)
         .await?;
 
-    let mut storage_patch = AccountStoragePatch::new();
-    // A cleared value slot is represented by an empty value.
-    storage_patch.set_item(value_slot_name.clone(), EMPTY_WORD)?;
     // A removed map entry is represented by an empty value for the key.
-    storage_patch.set_map_item(
-        map_slot_name.clone(),
-        StorageMapKey::new([ONE, ZERO, ZERO, ZERO].into()),
-        EMPTY_WORD,
-    )?;
+    let mut map_entries = StorageMapPatchEntries::new();
+    map_entries.insert(StorageMapKey::new([ONE, ZERO, ZERO, ZERO].into()), EMPTY_WORD);
+    let storage_patch = AccountStoragePatch::from_entries([
+        // A cleared value slot is represented by an empty value.
+        (
+            value_slot_name.clone(),
+            StorageSlotPatch::Value(StorageValuePatch::Update { value: EMPTY_WORD }),
+        ),
+        (
+            map_slot_name.clone(),
+            StorageSlotPatch::Map(StorageMapPatch::Update { entries: map_entries }),
+        ),
+    ])?;
 
     // Both assets are removed: the absolute final state is an empty vault, so each asset's vault
     // key is marked as removed.
@@ -418,10 +441,10 @@ async fn get_account_storage_item_success() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -453,10 +476,10 @@ async fn get_account_storage_item_not_found() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -496,10 +519,10 @@ async fn get_account_map_item_success() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -532,10 +555,10 @@ async fn get_account_map_item_value_slot_error() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -565,10 +588,10 @@ async fn get_account_code() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -620,10 +643,10 @@ async fn account_reader_nonce_and_status() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(dummy_component)
         .build_with_schema_commitment()?;
 
@@ -698,10 +721,10 @@ async fn account_reader_storage_access() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -737,10 +760,10 @@ async fn account_reader_addresses_access() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -868,10 +891,10 @@ async fn prune_account_history_multiple_accounts() -> anyhow::Result<()> {
     )?;
     let account_b = AccountBuilder::new([1; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(component_b)
         .build_existing()?;
     let b_id = account_b.id();
@@ -1075,10 +1098,10 @@ async fn setup_account_with_map(
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(component)
         .build_existing()?;
 
@@ -1096,12 +1119,15 @@ async fn apply_single_entry_update(
     map_slot_name: &StorageSlotName,
     target_nonce: u64,
 ) -> anyhow::Result<()> {
-    let mut storage_patch = AccountStoragePatch::new();
-    storage_patch.set_map_item(
-        map_slot_name.clone(),
+    let mut map_entries = StorageMapPatchEntries::new();
+    map_entries.insert(
         StorageMapKey::new([Felt::from(1u32), ZERO, ZERO, ZERO].into()),
         [Felt::new_unchecked(target_nonce * 1000), ZERO, ZERO, ZERO].into(),
-    )?;
+    );
+    let storage_patch = AccountStoragePatch::from_entries([(
+        map_slot_name.clone(),
+        StorageSlotPatch::Map(StorageMapPatch::Update { entries: map_entries }),
+    )])?;
 
     let patch = AccountPatch::new(
         account.id(),
@@ -1165,12 +1191,15 @@ async fn undo_account_state_restores_previous_latest() -> anyhow::Result<()> {
     // Apply a patch (nonce 2) that changes a map entry AND adds a fungible asset.
     // The vault change ensures the vault root differs between nonce 1 and 2,
     // which is needed for pop_roots to work correctly.
-    let mut storage_patch = AccountStoragePatch::new();
-    storage_patch.set_map_item(
-        map_slot_name.clone(),
+    let mut map_entries = StorageMapPatchEntries::new();
+    map_entries.insert(
         StorageMapKey::new([Felt::from(1u32), ZERO, ZERO, ZERO].into()),
         [Felt::from(1000u32), ZERO, ZERO, ZERO].into(),
-    )?;
+    );
+    let storage_patch = AccountStoragePatch::from_entries([(
+        map_slot_name.clone(),
+        StorageSlotPatch::Map(StorageMapPatch::Update { entries: map_entries }),
+    )])?;
     // The account starts with an empty vault, so the absolute value of the added asset is the
     // asset itself.
     let mut vault_patch = AccountVaultPatch::default();
@@ -1277,10 +1306,10 @@ async fn undo_account_state_deletes_account_entirely() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(component)
         .with_assets(vec![
             FungibleAsset::new(AccountId::try_from(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET)?, 100)?
@@ -1345,12 +1374,15 @@ async fn lock_account_affects_latest_and_historical() -> anyhow::Result<()> {
     let account_id = account.id();
 
     // Apply a patch (nonce 2) with vault change
-    let mut storage_patch = AccountStoragePatch::new();
-    storage_patch.set_map_item(
-        map_slot_name.clone(),
+    let mut map_entries = StorageMapPatchEntries::new();
+    map_entries.insert(
         StorageMapKey::new([Felt::from(1u32), ZERO, ZERO, ZERO].into()),
         [Felt::from(2000u32), ZERO, ZERO, ZERO].into(),
-    )?;
+    );
+    let storage_patch = AccountStoragePatch::from_entries([(
+        map_slot_name.clone(),
+        StorageSlotPatch::Map(StorageMapPatch::Update { entries: map_entries }),
+    )])?;
     // The account starts with an empty vault, so the absolute value of the added asset is the
     // asset itself.
     let mut vault_patch = AccountVaultPatch::default();
@@ -1474,10 +1506,10 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     // Build an existing account at nonce 1: no initial assets
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(component)
         .build_existing()?;
 
@@ -1534,8 +1566,12 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     assert_eq!(m.latest_account_assets, 2, "Should have 2 assets (X + Y)");
 
     // Step 3: Build in-memory state with only {A, B} and {X} (C and Y removed)
-    let mut storage_patch_remove = AccountStoragePatch::new();
-    storage_patch_remove.set_map_item(map_slot_name.clone(), key_c, EMPTY_WORD)?;
+    let mut map_entries_remove = StorageMapPatchEntries::new();
+    map_entries_remove.insert(key_c, EMPTY_WORD);
+    let storage_patch_remove = AccountStoragePatch::from_entries([(
+        map_slot_name.clone(),
+        StorageSlotPatch::Map(StorageMapPatch::Update { entries: map_entries_remove }),
+    )])?;
     // Y is removed, so its vault key is marked as removed (absolute final vault is {X}).
     let mut vault_patch_remove = AccountVaultPatch::default();
     vault_patch_remove.remove_asset(asset_y.vault_key());
@@ -1570,12 +1606,12 @@ async fn undo_after_update_account_state_does_not_resurrect_removed_entries() ->
     assert_eq!(m.latest_account_assets, 1, "Should have 1 asset after update");
 
     // Step 4: Apply a patch that changes entry A and adds asset Z
-    let mut storage_patch_next = AccountStoragePatch::new();
-    storage_patch_next.set_map_item(
+    let mut map_entries_next = StorageMapPatchEntries::new();
+    map_entries_next.insert(key_a, [Felt::from(999u32), ZERO, ZERO, ZERO].into());
+    let storage_patch_next = AccountStoragePatch::from_entries([(
         map_slot_name.clone(),
-        key_a,
-        [Felt::from(999u32), ZERO, ZERO, ZERO].into(),
-    )?;
+        StorageSlotPatch::Map(StorageMapPatch::Update { entries: map_entries_next }),
+    )])?;
 
     let asset_z =
         NonFungibleAsset::new(&NonFungibleAssetDetails::new(nf_faucet_id, vec![5, 6, 7, 8]));
@@ -1784,12 +1820,15 @@ async fn undo_multiple_nonces_at_once() -> anyhow::Result<()> {
     assert_eq!(m.latest_account_assets, 0, "Initial: no assets");
 
     // Apply patch at nonce 2: change map entry key=1, add fungible asset
-    let mut storage_patch_1 = AccountStoragePatch::new();
-    storage_patch_1.set_map_item(
-        map_slot_name.clone(),
+    let mut map_entries_1 = StorageMapPatchEntries::new();
+    map_entries_1.insert(
         StorageMapKey::new([Felt::from(1u32), ZERO, ZERO, ZERO].into()),
         [Felt::from(1000u32), ZERO, ZERO, ZERO].into(),
-    )?;
+    );
+    let storage_patch_1 = AccountStoragePatch::from_entries([(
+        map_slot_name.clone(),
+        StorageSlotPatch::Map(StorageMapPatch::Update { entries: map_entries_1 }),
+    )])?;
     let asset_1 = FungibleAsset::new(faucet_id, 100)?;
     // The account starts with an empty vault, so the absolute value of the added asset is the
     // asset itself.
@@ -1834,12 +1873,15 @@ async fn undo_multiple_nonces_at_once() -> anyhow::Result<()> {
         .await?;
 
     // Apply patch at nonce 3: change map entry key=2, add non-fungible asset
-    let mut storage_patch_2 = AccountStoragePatch::new();
-    storage_patch_2.set_map_item(
-        map_slot_name.clone(),
+    let mut map_entries_2 = StorageMapPatchEntries::new();
+    map_entries_2.insert(
         StorageMapKey::new([Felt::from(2u32), ZERO, ZERO, ZERO].into()),
         [Felt::from(2000u32), ZERO, ZERO, ZERO].into(),
-    )?;
+    );
+    let storage_patch_2 = AccountStoragePatch::from_entries([(
+        map_slot_name.clone(),
+        StorageSlotPatch::Map(StorageMapPatch::Update { entries: map_entries_2 }),
+    )])?;
     let asset_2 = NonFungibleAsset::new(&NonFungibleAssetDetails::new(
         nf_faucet_id,
         NON_FUNGIBLE_ASSET_DATA.into(),
@@ -1957,10 +1999,10 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(component)
         .build_existing()?;
 
@@ -1974,17 +2016,13 @@ async fn undo_after_update_removes_genuinely_new_entries() -> anyhow::Result<()>
     assert_eq!(m.latest_storage_map_entries, 2, "Initial: 2 map entries");
 
     // Build in-memory state at nonce 2 with {A, B, C, D}: C and D are genuinely new
-    let mut storage_patch_add = AccountStoragePatch::new();
-    storage_patch_add.set_map_item(
+    let mut map_entries_add = StorageMapPatchEntries::new();
+    map_entries_add.insert(key_c, [Felt::from(300u32), ZERO, ZERO, ZERO].into());
+    map_entries_add.insert(key_d, [Felt::from(400u32), ZERO, ZERO, ZERO].into());
+    let storage_patch_add = AccountStoragePatch::from_entries([(
         map_slot_name.clone(),
-        key_c,
-        [Felt::from(300u32), ZERO, ZERO, ZERO].into(),
-    )?;
-    storage_patch_add.set_map_item(
-        map_slot_name.clone(),
-        key_d,
-        [Felt::from(400u32), ZERO, ZERO, ZERO].into(),
-    )?;
+        StorageSlotPatch::Map(StorageMapPatch::Update { entries: map_entries_add }),
+    )])?;
 
     // Also add an asset so the vault root changes (avoids SMT root collision on undo).
     // The account starts with an empty vault, so the absolute value of the added asset is the
@@ -2085,13 +2123,21 @@ fn build_patch_for_snapshot_test(
     value_slot_name: StorageSlotName,
     map_slot_name: StorageSlotName,
 ) -> anyhow::Result<(AccountPatch, Account)> {
-    let mut storage_patch = AccountStoragePatch::new();
-    storage_patch.set_item(value_slot_name, [ZERO, ZERO, ZERO, ONE].into())?;
-    storage_patch.set_map_item(
-        map_slot_name,
-        StorageMapKey::new([ONE, ZERO, ZERO, ZERO].into()),
-        [ONE, ONE, ONE, ONE].into(),
-    )?;
+    let mut map_entries = StorageMapPatchEntries::new();
+    map_entries
+        .insert(StorageMapKey::new([ONE, ZERO, ZERO, ZERO].into()), [ONE, ONE, ONE, ONE].into());
+    let storage_patch = AccountStoragePatch::from_entries([
+        (
+            value_slot_name,
+            StorageSlotPatch::Value(StorageValuePatch::Update {
+                value: [ZERO, ZERO, ZERO, ONE].into(),
+            }),
+        ),
+        (
+            map_slot_name,
+            StorageSlotPatch::Map(StorageMapPatch::Update { entries: map_entries }),
+        ),
+    ])?;
 
     // The account starts with an empty vault, so the absolute value of the added asset is the
     // asset itself.
@@ -2128,10 +2174,10 @@ async fn insert_account_with_storage_for_snapshot_test()
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(dummy_component)
         .build_existing()?;
 
@@ -2244,10 +2290,10 @@ async fn watched_status_survives_state_replacement() -> anyhow::Result<()> {
 
     let account = AccountBuilder::new([0; 32])
         .account_type(AccountType::Private)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             PublicKeyCommitment::from(EMPTY_WORD),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(AccountComponent::new(
             BasicWallet::code().as_library().clone(),
             vec![],

@@ -115,7 +115,7 @@ mod account_reader;
 pub use account_reader::AccountReader;
 /// Raw access to `miden-standards` account modules for items not curated by `miden-client`.
 pub use miden_standards::account as standards;
-use miden_standards::account::auth::AuthSingleSig;
+use miden_standards::account::auth::{Approver, AuthSingleSig};
 use miden_standards::account::faucets::FungibleFaucet;
 // RE-EXPORTS
 // ================================================================================================
@@ -190,7 +190,7 @@ pub mod component {
         TokenMetadataError,
         TokenName,
         create_network_fungible_faucet,
-        create_user_fungible_faucet,
+        create_singlesig_user_fungible_faucet,
     };
     pub use miden_standards::account::policies::{
         AllowlistOwnerControlled,
@@ -637,7 +637,7 @@ pub fn build_wallet_id(
 ) -> Result<AccountId, ClientError> {
     let auth_scheme = public_key.auth_scheme();
     let auth_component: AccountComponent =
-        AuthSingleSig::new(public_key.to_commitment(), auth_scheme).into();
+        AuthSingleSig::new(Approver::new(public_key.to_commitment(), auth_scheme)).into();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(account_visibility)
@@ -658,6 +658,7 @@ mod schema_commitment_tests {
         AccountBuilder,
         AccountBuilderSchemaCommitmentExt,
         AccountType,
+        Approver,
         AuthSingleSig,
         BasicWallet,
     };
@@ -668,10 +669,10 @@ mod schema_commitment_tests {
         let key = AuthSecretKey::new_falcon512_poseidon2();
         let account = AccountBuilder::new([2u8; 32])
             .account_type(AccountType::Private)
-            .with_auth_component(AuthSingleSig::new(
+            .with_auth_component(AuthSingleSig::new(Approver::new(
                 key.public_key().to_commitment(),
                 AuthSchemeId::Falcon512Poseidon2,
-            ))
+            )))
             .with_component(BasicWallet)
             .build_with_schema_commitment()
             .expect("build_with_schema_commitment");

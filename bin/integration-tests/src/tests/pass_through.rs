@@ -12,6 +12,7 @@ use miden_client::account::{
 use miden_client::assembly::CodeBuilder;
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::{
+    Approver,
     AuthSchemeId,
     AuthSingleSigAcl,
     AuthSingleSigAclConfig,
@@ -209,8 +210,10 @@ async fn create_pass_through_account<AUTH: TransactionAuthenticator>(
 
     let acl_config = AuthSingleSigAclConfig::new(BTreeSet::new()).unwrap();
 
-    let auth_component =
-        AuthSingleSigAcl::new(pub_key.into(), AuthSchemeId::Falcon512Poseidon2, acl_config);
+    let auth_component = AuthSingleSigAcl::new(
+        Approver::new(pub_key.into(), AuthSchemeId::Falcon512Poseidon2),
+        acl_config,
+    );
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::Private)
         .with_auth_component(auth_component)
