@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.3 (TBD)
+
+### Enhancements
+
+* [FEATURE][cli] `miden-cli call` now accepts advice map entries supplied via `--inputs-path/-i <FILE.toml>` in the same TOML format as `exec` ([#2244](https://github.com/0xMiden/miden-client/pull/2244)).
+
 ## 0.15.2 (2026-06-18)
 
 ### Features
