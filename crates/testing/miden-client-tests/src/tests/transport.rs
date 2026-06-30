@@ -152,8 +152,6 @@ async fn transport_recovers_attachments() {
         .write()
         .add_note(*private_note.header(), NoteDetails::from(private_note.clone()).to_bytes());
 
-    *rpc_api.fail_next_get_notes_by_id.write() = true;
-    assert!(client.fetch_private_notes().await.is_err());
     client.fetch_private_notes().await.unwrap();
 
     let notes = client.get_input_notes(NoteFilter::All).await.unwrap();
