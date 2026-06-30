@@ -521,6 +521,34 @@ mod test {
         assert_eq!(stored_nodes, expected);
     }
 
+    /// Tests that a failure inserting the MMR nodes rolls back the block header written in the
+    /// same call, proving both land in a single transaction.
+    #[tokio::test]
+    async fn insert_authenticated_block_header_rolls_back_header_when_nodes_fail() {
+        let store = create_test_store().await;
+        let header = BlockHeader::mock(5, None, None, &[], TransactionKernel.to_commitment());
+        // One node so the node insert actually runs (an empty slice would be a no-op).
+        let nodes = [(InOrderIndex::from_leaf_pos(5), header.commitment())];
+
+        // Force the node insert (the second statement in the transaction) to fail.
+        store
+            .interact_with_connection(|conn| {
+                conn.execute("DROP TABLE partial_blockchain_nodes", []).unwrap();
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        let result = Store::insert_authenticated_block_header(&store, &header, true, &nodes).await;
+        assert!(result.is_err(), "node insert must fail against the dropped table");
+
+        // The header must not survive: a non-atomic two-transaction insert would leave it behind.
+        let stored = Store::get_block_headers(&store, &[5.into()].into_iter().collect())
+            .await
+            .unwrap();
+        assert!(stored.is_empty(), "header must roll back when the node insert fails");
+    }
+
     /// Tests that large stored MMRs are built consistently throughout multiple prunes
     #[tokio::test]
     async fn partial_mmr_reconstructs_after_multiple_prune() {

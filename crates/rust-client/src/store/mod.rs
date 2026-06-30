@@ -293,7 +293,9 @@ pub trait Store: Send + Sync {
     /// together.
     ///
     /// The `has_client_notes` flag follows the same insert-if-not-exists upgrade rule as
-    /// [`Self::insert_block_header`].
+    /// [`Self::insert_block_header`]. The MMR nodes are likewise inserted-if-not-exists: an
+    /// `InOrderIndex` already present is left untouched (auth paths of tracked blocks share
+    /// internal nodes, so re-inserting an existing index must be a no-op, not an error).
     async fn insert_authenticated_block_header(
         &self,
         block_header: &BlockHeader,
