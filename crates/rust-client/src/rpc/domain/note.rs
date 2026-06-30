@@ -209,16 +209,52 @@ pub struct NoteSyncBlock {
     pub notes: BTreeMap<NoteId, CommittedNote>,
 }
 
-/// Content resolved for a single note during
-/// [`NodeRpcClient::sync_notes_with_details`](crate::rpc::NodeRpcClient::sync_notes_with_details)
-/// as response from `GetNotesById`.
+/// A block's worth of notes resolved by
+/// [`NodeRpcClient::sync_notes_with_details`](crate::rpc::NodeRpcClient::sync_notes_with_details).
+///
+/// Unlike [`NoteSyncBlock`] (the raw `SyncNotes` response), each note here also carries the body
+/// and attachment content fetched via `GetNotesById`, so a consumer never has to re-join two
+/// parallel collections by note ID.
+#[derive(Debug, Clone)]
+pub struct SyncedNoteBlock {
+    /// Block header containing the matching notes.
+    pub block_header: BlockHeader,
+    /// MMR path for verifying the block's inclusion in the MMR at `block_to`.
+    pub mmr_path: MerklePath,
+    /// Notes matching the requested tags in this block, keyed by note ID.
+    pub notes: BTreeMap<NoteId, SyncedNote>,
+}
+
+/// Everything resolved about a single note during a notes sync: its identity, metadata, and
+/// inclusion proof (always present, from `SyncNotes`), plus any body or attachment content
+/// fetched via `GetNotesById`.
+#[derive(Debug, Clone)]
+pub struct SyncedNote {
+    /// Note identity, metadata, and inclusion proof, as reported by `SyncNotes`.
+    pub committed: CommittedNote,
+    /// Body and/or attachment content resolved via `GetNotesById`, if any was fetched.
+    pub content: SyncedNoteContent,
+}
+
+/// Content resolved for a note via `GetNotesById`.
+///
+/// Notes whose body and attachments were not fetched — plain private notes, or public notes when
+/// bodies were not requested — carry [`SyncedNoteContent::Unresolved`].
+#[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum SyncedNoteDetails {
-    /// A public note's full body.
-    Public(Note),
-    /// A private note's attachment content, if it carries any. Private notes expose no on-chain
-    /// body; only their attachments are resolved.
-    Private(Option<NoteAttachments>),
+pub enum SyncedNoteContent {
+    /// No body or attachment content was fetched for this note.
+    Unresolved,
+    /// A public note's full body together with its attachment content.
+    Public {
+        /// The note's recipient and assets (its on-chain body, without metadata).
+        details: NoteDetails,
+        /// The note's attachment content.
+        attachments: NoteAttachments,
+    },
+    /// A private note's resolved attachment content. Private notes expose no on-chain body; only
+    /// their attachments are resolved.
+    PrivateAttachments(NoteAttachments),
 }
 
 impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for NoteSyncBlock {

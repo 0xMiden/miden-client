@@ -26,7 +26,7 @@ use miden_protocol::note::{
 use miden_tx::auth::TransactionAuthenticator;
 
 use crate::rpc::RpcError;
-use crate::rpc::domain::note::{CommittedNote, FetchedNote, SyncedNoteDetails};
+use crate::rpc::domain::note::{CommittedNote, FetchedNote, SyncedNoteContent};
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{InputNoteRecord, InputNoteState, NoteFilter};
 use crate::sync::NoteTagRecord;
@@ -438,7 +438,7 @@ where
             return Ok(retrieved_proofs);
         }
 
-        let (blocks, synced_notes) = self
+        let blocks = self
             .rpc_api
             .sync_notes_with_attachments(request_block_num, current_block_num, &tracked_tags)
             .await
@@ -450,23 +450,22 @@ where
             }
 
             for sync_note in block.notes.values() {
+                let committed = &sync_note.committed;
                 let Some((commitment, _)) = expected_notes.iter().find(|(commitment, _)| {
-                    NoteId::new(*commitment, sync_note.metadata()) == *sync_note.note_id()
+                    NoteId::new(*commitment, committed.metadata()) == *committed.note_id()
                 }) else {
                     continue;
                 };
 
-                let attachments = match synced_notes.get(sync_note.note_id()) {
-                    Some(SyncedNoteDetails::Public(note)) if !note.attachments().is_empty() => {
-                        Some(note.attachments().clone())
-                    },
-                    Some(SyncedNoteDetails::Private(Some(attachments))) => {
+                let attachments = match &sync_note.content {
+                    SyncedNoteContent::Public { attachments, .. } if !attachments.is_empty() => {
                         Some(attachments.clone())
                     },
+                    SyncedNoteContent::PrivateAttachments(attachments) => Some(attachments.clone()),
                     _ => None,
                 };
 
-                retrieved_proofs.insert(*commitment, (sync_note.clone(), attachments));
+                retrieved_proofs.insert(*commitment, (committed.clone(), attachments));
             }
         }
 

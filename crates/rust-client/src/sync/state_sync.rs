@@ -10,7 +10,7 @@ use miden_protocol::account::{Account, AccountHeader, AccountId, StorageSlotType
 use miden_protocol::block::account_tree::AccountIdKey;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
-use miden_protocol::note::{NoteAttachments, NoteId, NoteTag, NoteType, Nullifier};
+use miden_protocol::note::{NoteId, NoteTag, NoteType, Nullifier};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -31,7 +31,7 @@ use crate::rpc::domain::account::{
     StorageMapFetch,
     VaultFetch,
 };
-use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock, SyncedNoteDetails};
+use crate::rpc::domain::note::{CommittedNote, SyncedNote, SyncedNoteBlock, SyncedNoteContent};
 use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::transaction::TransactionRecord as RpcTransactionRecord;
 use crate::rpc::{AccountStateAt, NodeRpcClient};
@@ -61,11 +61,9 @@ struct FetchedSyncData {
     mmr_delta: MmrDelta,
     /// Chain tip block header.
     chain_tip_header: BlockHeader,
-    /// Blocks with matching notes that the client is interested in.
-    note_blocks: Vec<NoteSyncBlock>,
-    /// Content fetched for the synced notes (public note bodies and private-note attachments),
-    /// keyed by note ID.
-    synced_notes: BTreeMap<NoteId, SyncedNoteDetails>,
+    /// Blocks with matching notes that the client is interested in, each note carrying its fetched
+    /// body and attachment content.
+    note_blocks: Vec<SyncedNoteBlock>,
     /// Transaction records for the synced range, as returned by `sync_transactions`.
     transactions: Vec<RpcTransactionRecord>,
 }
@@ -344,8 +342,8 @@ impl StateSync {
         // for private notes that carry attachments), paginating with the same chain tip so MMR
         // paths are opened at a consistent forest. With no tracked tags there's nothing the node
         // could match, so skip the RPC entirely.
-        let (note_blocks, synced_notes) = if note_tags.is_empty() {
-            (Vec::new(), BTreeMap::new())
+        let note_blocks = if note_tags.is_empty() {
+            Vec::new()
         } else {
             self.rpc_api
                 .sync_notes_with_details(current_block_num + 1, chain_tip, note_tags.as_ref())
@@ -359,7 +357,6 @@ impl StateSync {
         info!(
             blocks_with_notes = note_blocks.len(),
             notes = note_count,
-            synced_notes = synced_notes.len(),
             "Fetched note sync data.",
         );
 
@@ -383,7 +380,6 @@ impl StateSync {
             mmr_delta: chain_mmr_info.mmr_delta,
             chain_tip_header: chain_mmr_info.block_header,
             note_blocks,
-            synced_notes,
             transactions: transaction_records,
         }))
     }
@@ -407,7 +403,6 @@ impl StateSync {
             mmr_delta,
             chain_tip_header,
             note_blocks,
-            synced_notes,
             transactions,
         } = sync_data;
 
@@ -422,7 +417,7 @@ impl StateSync {
             &mut state_sync_update.partial_blockchain_updates,
         )?;
 
-        self.screen_note_blocks(note_blocks, synced_notes, state_sync_update, &mut working_mmr)
+        self.screen_note_blocks(note_blocks, state_sync_update, &mut working_mmr)
             .await?;
 
         self.apply_transactions_and_nullifiers(
@@ -467,7 +462,7 @@ impl StateSync {
     /// Validates that every block returned by `sync_notes` falls in the requested range
     /// `(current_block_num, chain_tip]`.
     fn validate_note_blocks_range(
-        note_blocks: &[NoteSyncBlock],
+        note_blocks: &[SyncedNoteBlock],
         current_block_num: BlockNumber,
         chain_tip: BlockNumber,
     ) -> Result<(), ClientError> {
@@ -554,30 +549,16 @@ impl StateSync {
     /// response.
     async fn screen_note_blocks(
         &self,
-        note_blocks: Vec<NoteSyncBlock>,
-        synced_notes: BTreeMap<NoteId, SyncedNoteDetails>,
+        note_blocks: Vec<SyncedNoteBlock>,
         state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<(), ClientError> {
-        // Attachment content for private notes, keyed by note ID. Joined to each committed note
-        // by ID so the stored record reconstructs the correct note ID.
-        let private_attachments: BTreeMap<NoteId, NoteAttachments> = synced_notes
-            .iter()
-            .filter_map(|(id, synced)| match synced {
-                SyncedNoteDetails::Private(Some(attachments)) => Some((*id, attachments.clone())),
-                _ => None,
-            })
-            .collect();
-        let public_note_records = Self::build_public_note_records(synced_notes, &note_blocks);
-
         for block in note_blocks {
             let found_relevant_note = self
                 .note_state_sync(
                     &mut state_sync_update.note_updates,
                     block.notes,
                     &block.block_header,
-                    &public_note_records,
-                    &private_attachments,
                 )
                 .await?;
 
@@ -994,42 +975,53 @@ impl StateSync {
     /// * Tracked notes that were being processed by a transaction that got committed.
     /// * Tracked notes that were nullified by an external transaction.
     ///
-    /// The `public_notes` parameter provides cached public note details for the current sync
-    /// iteration so the node is only queried once per batch. The `private_attachments` parameter
-    /// carries attachment content resolved for private notes, keyed by note ID; it is joined to
-    /// each committed note by ID so the stored record reconstructs the correct note ID.
+    /// Each [`SyncedNote`] is self-contained: its inclusion proof and metadata come from
+    /// `committed`, and its body and attachment content (when fetched) come from `content`. The
+    /// candidate public note record is built here from that content, so no separate side-table or
+    /// id-keyed join is needed.
     async fn note_state_sync(
         &self,
         note_updates: &mut NoteUpdateTracker,
-        note_inclusions: BTreeMap<NoteId, CommittedNote>,
+        notes: BTreeMap<NoteId, SyncedNote>,
         block_header: &BlockHeader,
-        public_notes: &BTreeMap<NoteId, InputNoteRecord>,
-        private_attachments: &BTreeMap<NoteId, NoteAttachments>,
     ) -> Result<bool, ClientError> {
         // `found_relevant_note` tracks whether we want to persist the block header in the end
         let mut found_relevant_note = false;
 
-        for (_, committed_note) in note_inclusions {
-            let public_note = (committed_note.note_type() != NoteType::Private)
-                .then(|| public_notes.get(committed_note.note_id()))
-                .flatten()
-                .cloned();
+        for (_, SyncedNote { committed, content }) in notes {
+            // Attachment content resolved for a private note, paired with it by construction.
+            let private_attachments = match &content {
+                SyncedNoteContent::PrivateAttachments(attachments) => Some(attachments),
+                _ => None,
+            };
+
+            // For a public note, pair its fetched body with the inclusion proof and metadata from
+            // `committed` (the single source of truth) to build the candidate record.
+            let public_note = if let SyncedNoteContent::Public { details, attachments } = &content {
+                let state = crate::store::input_note_states::UnverifiedNoteState {
+                    metadata: *committed.metadata(),
+                    inclusion_proof: committed.inclusion_proof().clone(),
+                }
+                .into();
+                Some(InputNoteRecord::new(details.clone(), attachments.clone(), None, state))
+            } else {
+                None
+            };
 
             // Observers run BEFORE the screener: they are a side-effect
             // channel independent of the Commit/Insert/Discard decision,
-            // and a failing screener must not rob them of the note. Clone
-            // is skipped when no observers are attached (the common case).
+            // and a failing screener must not rob them of the note.
             if !self.note_observers.is_empty() {
-                // Resolve attachment content for the note from the sync window: public note
-                // bodies carry their attachments on the cached `InputNoteRecord`; private-note
-                // attachments arrive in their own side-table. Both are keyed by note ID.
-                let note_attachments = if committed_note.note_type() == NoteType::Private {
-                    private_attachments.get(committed_note.note_id())
+                // Resolve attachment content for the note: public note bodies carry their
+                // attachments on the candidate `InputNoteRecord`; private-note attachments come
+                // straight from the resolved content.
+                let note_attachments = if committed.note_type() == NoteType::Private {
+                    private_attachments
                 } else {
                     public_note.as_ref().map(InputNoteRecord::attachments)
                 };
                 for obs in &self.note_observers {
-                    match obs.observe(&committed_note, note_attachments).await {
+                    match obs.observe(&committed, note_attachments).await {
                         Ok(true) => found_relevant_note = true,
                         Ok(false) => {},
                         Err(err) => {
@@ -1043,16 +1035,15 @@ impl StateSync {
                 }
             }
 
-            match self.note_screener.on_note_received(committed_note, public_note).await? {
+            match self.note_screener.on_note_received(committed, public_note).await? {
                 NoteUpdateAction::Commit(committed_note) => {
                     // Only mark the downloaded block header as relevant if we are talking about
                     // an input note (output notes get marked as committed but we don't need the
                     // block for anything there)
-                    let attachments = private_attachments.get(committed_note.note_id());
                     found_relevant_note |= note_updates.apply_committed_note_state_transitions(
                         &committed_note,
                         block_header,
-                        attachments,
+                        private_attachments,
                     )?;
                 },
                 NoteUpdateAction::Insert(public_note) => {
@@ -1124,37 +1115,6 @@ impl StateSync {
         }
 
         Ok(())
-    }
-
-    /// Pairs each public note body with the matching inclusion proof from `note_blocks`. Private
-    /// notes and public notes without a matching inclusion proof are dropped.
-    fn build_public_note_records(
-        synced_notes: BTreeMap<NoteId, SyncedNoteDetails>,
-        note_blocks: &[NoteSyncBlock],
-    ) -> BTreeMap<NoteId, InputNoteRecord> {
-        let mut records = BTreeMap::new();
-        for (note_id, synced) in synced_notes {
-            let SyncedNoteDetails::Public(note) = synced else {
-                continue;
-            };
-            let inclusion_proof = note_blocks
-                .iter()
-                .find_map(|b| b.notes.get(&note_id))
-                .map(|committed| committed.inclusion_proof().clone());
-
-            if let Some(inclusion_proof) = inclusion_proof {
-                let state = crate::store::input_note_states::UnverifiedNoteState {
-                    metadata: *note.metadata(),
-                    inclusion_proof,
-                }
-                .into();
-                let attachments = note.attachments().clone();
-                let record = InputNoteRecord::new(note.into(), attachments, None, state);
-                let id = record.id().expect("CommittedNoteState carries metadata, so id() is Some");
-                records.insert(id, record);
-            }
-        }
-        records
     }
 }
 
@@ -2193,7 +2153,7 @@ mod tests {
         let (chain, note_tags) = build_chain_with_mint_notes(10).await;
         let mock_rpc = MockRpcApi::new(chain);
 
-        let (blocks, _synced_notes) = mock_rpc
+        let blocks = mock_rpc
             .sync_notes_with_details(4_u32.into(), 10_u32.into(), &note_tags)
             .await
             .expect("sync notes should succeed");
@@ -2453,7 +2413,7 @@ mod tests {
         StateSync::validate_note_blocks_range(&[], current, chain_tip).unwrap();
 
         // A note block outside the requested range: genesis is always outside it.
-        let genesis_note_block = NoteSyncBlock {
+        let genesis_note_block = SyncedNoteBlock {
             block_header: mock_rpc.mock_chain.read().block_header(0),
             mmr_path: MerklePath::new(Vec::new()),
             notes: BTreeMap::new(),

@@ -56,7 +56,7 @@ use domain::account::{
     StorageMapFetch,
     VaultFetch,
 };
-use domain::note::{FetchedNote, NoteSyncBlock, SyncedNoteDetails};
+use domain::note::{FetchedNote, NoteSyncBlock, SyncedNote, SyncedNoteBlock, SyncedNoteContent};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
@@ -297,14 +297,14 @@ pub trait NodeRpcClient: Send + Sync {
     /// client is interested in. Private notes are only fetched when their synced metadata indicates
     /// non-empty attachments.
     ///
-    /// Returns the resolved note blocks paired with a map of the fetched content (public note
-    /// bodies and private-note attachments), keyed by note ID.
+    /// Returns one [`SyncedNoteBlock`] per matching block, each note carrying its inclusion data
+    /// alongside the fetched content (public note bodies and private-note attachments).
     async fn sync_notes_with_details(
         &self,
         block_from: BlockNumber,
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, SyncedNoteDetails>), RpcError> {
+    ) -> Result<Vec<SyncedNoteBlock>, RpcError> {
         sync_notes_and_fetch_details(self, block_from, block_to, note_tags, true).await
     }
 
@@ -315,7 +315,7 @@ pub trait NodeRpcClient: Send + Sync {
         block_from: BlockNumber,
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, SyncedNoteDetails>), RpcError> {
+    ) -> Result<Vec<SyncedNoteBlock>, RpcError> {
         sync_notes_and_fetch_details(self, block_from, block_to, note_tags, false).await
     }
 
@@ -596,44 +596,76 @@ pub trait NodeRpcClient: Send + Sync {
     ) -> Result<NetworkNoteStatusInfo, RpcError>;
 }
 
-/// Sync notes by tags and fetches note details if either:
-/// 
-/// - The synced note has non-empty attachments
-/// - `get_public_note_deatils` is `false`
+/// Syncs notes by tag, then resolves content via `GetNotesById` and folds it into each note.
+///
+/// A `GetNotesById` fetch is issued for a note when either:
+/// - the note carries non-empty attachments, or
+/// - `get_public_note_details` is `true` and the note is public.
+///
+/// All public notes are fetched (when requested) regardless of which ones the client tracks, so
+/// the request does not reveal the client's interest set.
 async fn sync_notes_and_fetch_details<T: NodeRpcClient + ?Sized>(
     rpc: &T,
     block_from: BlockNumber,
     block_to: BlockNumber,
     note_tags: &BTreeSet<NoteTag>,
     get_public_note_details: bool,
-) -> Result<(Vec<NoteSyncBlock>, BTreeMap<NoteId, SyncedNoteDetails>), RpcError> {
+) -> Result<Vec<SyncedNoteBlock>, RpcError> {
     let blocks = rpc.sync_notes(block_from, block_to, note_tags).await?;
     let note_ids: Vec<NoteId> = blocks
         .iter()
         .flat_map(|block| block.notes.values())
         .filter(|note| {
-            (include_public_notes && note.note_type() == NoteType::Public)
+            (get_public_note_details && note.note_type() == NoteType::Public)
                 || metadata_has_attachments(note.metadata())
         })
         .map(|note| *note.note_id())
         .collect();
-    let mut synced_notes = BTreeMap::new();
 
+    let mut resolved_content: BTreeMap<NoteId, SyncedNoteContent> = BTreeMap::new();
     if !note_ids.is_empty() {
         for fetched_note in rpc.get_notes_by_id(&note_ids).await? {
             match fetched_note {
                 FetchedNote::Public(note, _) => {
-                    synced_notes.insert(note.id(), SyncedNoteDetails::Public(note));
+                    let attachments = note.attachments().clone();
+                    resolved_content.insert(
+                        note.id(),
+                        SyncedNoteContent::Public { details: note.into(), attachments },
+                    );
                 },
                 FetchedNote::Private(note_id, _, attachments, _) => {
-                    let attachments = (!attachments.is_empty()).then_some(attachments);
-                    synced_notes.insert(note_id, SyncedNoteDetails::Private(attachments));
+                    if !attachments.is_empty() {
+                        resolved_content
+                            .insert(note_id, SyncedNoteContent::PrivateAttachments(attachments));
+                    }
                 },
             }
         }
     }
 
-    Ok((blocks, synced_notes))
+    // Fold the resolved content into each note, keeping the per-block grouping so the inclusion
+    // data (header + MMR path) is carried once per block.
+    let synced_blocks = blocks
+        .into_iter()
+        .map(|block| {
+            let notes = block
+                .notes
+                .into_iter()
+                .map(|(note_id, committed)| {
+                    let content =
+                        resolved_content.remove(&note_id).unwrap_or(SyncedNoteContent::Unresolved);
+                    (note_id, SyncedNote { committed, content })
+                })
+                .collect();
+            SyncedNoteBlock {
+                block_header: block.block_header,
+                mmr_path: block.mmr_path,
+                notes,
+            }
+        })
+        .collect();
+
+    Ok(synced_blocks)
 }
 
 // RPC API ENDPOINT
