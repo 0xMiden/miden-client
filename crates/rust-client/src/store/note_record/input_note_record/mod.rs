@@ -1,4 +1,5 @@
 use alloc::string::ToString;
+use alloc::vec;
 
 use miden_protocol::Word;
 use miden_protocol::account::AccountId;
@@ -9,9 +10,12 @@ use miden_protocol::note::{
     NoteAttachments,
     NoteDetails,
     NoteDetailsCommitment,
+    NoteHeader,
     NoteId,
     NoteInclusionProof,
     NoteMetadata,
+    NoteRecipient,
+    NoteStorage,
     Nullifier,
 };
 use miden_protocol::transaction::{InputNote, TransactionId};
@@ -22,6 +26,7 @@ use miden_protocol::utils::serde::{
     DeserializationError,
     Serializable,
 };
+use miden_standards::note::P2idNote;
 
 use super::NoteRecordError;
 
@@ -29,6 +34,7 @@ mod states;
 pub use states::{
     CommittedNoteState,
     ConsumedAuthenticatedLocalNoteState,
+    ConsumedExternalErasedNoteState,
     ConsumedExternalNoteState,
     ConsumedUnauthenticatedLocalNoteState,
     ExpectedNoteState,
@@ -39,6 +45,19 @@ pub use states::{
     ProcessingUnauthenticatedNoteState,
     UnverifiedNoteState,
 };
+
+/// Builds placeholder [`NoteDetails`] for a header-only record (see
+/// [`InputNoteRecord::from_header`]). The bytes are meaningless and must not be inspected
+/// ([`InputNoteRecord::has_details`] returns `false` for these records); the authoritative note id
+/// and metadata live in the [`InputNoteState::ConsumedExternalErased`] state. The note id is folded
+/// into the placeholder's serial number so the resulting details commitment, which is the store's
+/// primary key for input notes, stays unique per note.
+fn placeholder_details(note_id: NoteId) -> NoteDetails {
+    let assets = NoteAssets::new(vec![]).expect("empty assets are valid");
+    let storage = NoteStorage::new(vec![]).expect("empty storage is valid");
+    let recipient = NoteRecipient::new(note_id.as_word(), P2idNote::script(), storage);
+    NoteDetails::new(assets, recipient)
+}
 
 // INPUT NOTE RECORD
 // ================================================================================================
@@ -79,17 +98,55 @@ impl InputNoteRecord {
         InputNoteRecord { details, attachments, created_at, state }
     }
 
+    /// Creates a header-only record for a note consumed as an unauthenticated input (typically an
+    /// erased note) that the client only knows via its
+    /// [`NoteHeader`]. The record is placed in the
+    /// [`InputNoteState::ConsumedExternalErased`] state, which carries the authoritative note id
+    /// and metadata; the `details` field is a placeholder (see `placeholder_details`) and
+    /// [`InputNoteRecord::has_details`] returns `false`.
+    pub fn from_header(
+        header: &NoteHeader,
+        nullifier_block_height: BlockNumber,
+        consumer_account: Option<AccountId>,
+    ) -> InputNoteRecord {
+        let state = ConsumedExternalErasedNoteState {
+            note_id: header.id(),
+            metadata: *header.metadata(),
+            nullifier_block_height,
+            consumer_account,
+            consumed_tx_order: None,
+        };
+        InputNoteRecord {
+            details: placeholder_details(header.id()),
+            attachments: NoteAttachments::default(),
+            created_at: None,
+            state: state.into(),
+        }
+    }
+
     // PUBLIC ACCESSORS
     // ================================================================================================
 
-    /// Returns the input note ID, computed by combining the details commitment with the
-    /// note metadata. Returns `None` when the current state has no metadata (e.g. an
-    /// expected note imported from bare `NoteFile::NoteDetails`, or a note in the
-    /// `ConsumedExternal` state). Use [`Self::details_commitment`] when a stable identifier
-    /// is needed in those cases.
+    /// Returns the input note ID. For header-only records (state
+    /// [`InputNoteState::ConsumedExternalErased`]) this is read from the state; otherwise it is
+    /// computed by combining the details commitment with the note metadata, returning `None` when
+    /// the current state has no metadata (e.g. an expected note imported from bare
+    /// `NoteFile::NoteDetails`, or a `ConsumedExternal` note whose prior state carried no
+    /// metadata). Use [`Self::details_commitment`] when a stable identifier is needed in those
+    /// cases.
     pub fn id(&self) -> Option<NoteId> {
+        if let InputNoteState::ConsumedExternalErased(s) = &self.state {
+            return Some(s.note_id);
+        }
         let metadata = self.metadata()?;
         Some(NoteId::new(self.details.commitment(), metadata))
+    }
+
+    /// Returns `true` when the record carries authoritative note details. Returns `false` for
+    /// header-only records (built via [`InputNoteRecord::from_header`]), whose `details` field is
+    /// a placeholder.
+    pub fn has_details(&self) -> bool {
+        !matches!(self.state, InputNoteState::ConsumedExternalErased(_))
     }
 
     /// Returns the commitment to the note's details (recipient + assets), independent of
@@ -184,6 +241,7 @@ impl InputNoteRecord {
                 Some(s.submission_data.consumer_account)
             },
             InputNoteState::ConsumedExternal(s) => s.consumer_account,
+            InputNoteState::ConsumedExternalErased(s) => s.consumer_account,
             _ => None,
         }
     }
@@ -204,6 +262,7 @@ impl InputNoteRecord {
         matches!(
             self.state,
             InputNoteState::ConsumedExternal { .. }
+                | InputNoteState::ConsumedExternalErased { .. }
                 | InputNoteState::ConsumedAuthenticatedLocal { .. }
                 | InputNoteState::ConsumedUnauthenticatedLocal { .. }
         )

@@ -8,12 +8,21 @@ use miden_protocol::transaction::TransactionId;
 use super::{InputNoteState, NoteStateHandler};
 use crate::store::NoteRecordError;
 
-/// Information related to notes in the [`InputNoteState::ConsumedExternal`] state.
+/// Information related to notes in the [`InputNoteState::ConsumedExternalErased`] state.
 ///
-/// A note enters this state when its nullifier appears on-chain but the consuming transaction was
-/// not submitted by this client.
+/// A record enters this state when a tracked account consumes a note as an unauthenticated input
+/// (typically an erased note, created and consumed in the same batch) whose full details the client
+/// never held, only the note header carried in the consuming transaction. With no authoritative
+/// [`miden_protocol::note::NoteDetails`], the note id cannot be derived the usual way (from the
+/// details commitment and metadata), so it is stored in the state directly.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ConsumedExternalNoteState {
+pub struct ConsumedExternalErasedNoteState {
+    /// The note id, stored directly. Unlike full records, it cannot be derived from the record's
+    /// details, which are a placeholder for this state.
+    pub note_id: NoteId,
+    /// Metadata associated with the note, including sender, note type, tag and other additional
+    /// information.
+    pub metadata: NoteMetadata,
     /// Block height at which the note was nullified.
     pub nullifier_block_height: BlockNumber,
     /// The account that consumed the note, if it is tracked by this client.
@@ -21,14 +30,9 @@ pub struct ConsumedExternalNoteState {
     /// Per-account position of the consuming transaction within the account's execution chain
     /// for the block. `None` if the order has not been determined yet.
     pub consumed_tx_order: Option<u32>,
-    /// Metadata associated with the note (sender, note type, tag and other additional
-    /// information), retained through consumption so the note ID stays recoverable. `None`
-    /// when the prior state had no metadata (e.g. a note imported from bare
-    /// `NoteFile::NoteDetails`).
-    pub metadata: Option<NoteMetadata>,
 }
 
-impl NoteStateHandler for ConsumedExternalNoteState {
+impl NoteStateHandler for ConsumedExternalErasedNoteState {
     fn inclusion_proof_received(
         &self,
         _inclusion_proof: NoteInclusionProof,
@@ -55,8 +59,8 @@ impl NoteStateHandler for ConsumedExternalNoteState {
 
     fn consumed_locally(
         &self,
-        _consumer_account: miden_protocol::account::AccountId,
-        _consumer_transaction: miden_protocol::transaction::TransactionId,
+        _consumer_account: AccountId,
+        _consumer_transaction: TransactionId,
         _current_timestamp: Option<u64>,
     ) -> Result<Option<InputNoteState>, NoteRecordError> {
         Err(NoteRecordError::NoteNotConsumable("Note already consumed".to_string()))
@@ -73,7 +77,7 @@ impl NoteStateHandler for ConsumedExternalNoteState {
     }
 
     fn metadata(&self) -> Option<&NoteMetadata> {
-        self.metadata.as_ref()
+        Some(&self.metadata)
     }
 
     fn inclusion_proof(&self) -> Option<&NoteInclusionProof> {
@@ -85,34 +89,37 @@ impl NoteStateHandler for ConsumedExternalNoteState {
     }
 }
 
-impl miden_tx::utils::serde::Serializable for ConsumedExternalNoteState {
+impl miden_tx::utils::serde::Serializable for ConsumedExternalErasedNoteState {
     fn write_into<W: miden_tx::utils::serde::ByteWriter>(&self, target: &mut W) {
+        self.note_id.write_into(target);
+        self.metadata.write_into(target);
         self.nullifier_block_height.write_into(target);
         self.consumer_account.write_into(target);
         self.consumed_tx_order.write_into(target);
-        self.metadata.write_into(target);
     }
 }
 
-impl miden_tx::utils::serde::Deserializable for ConsumedExternalNoteState {
+impl miden_tx::utils::serde::Deserializable for ConsumedExternalErasedNoteState {
     fn read_from<R: miden_tx::utils::serde::ByteReader>(
         source: &mut R,
     ) -> Result<Self, miden_tx::utils::serde::DeserializationError> {
+        let note_id = NoteId::read_from(source)?;
+        let metadata = NoteMetadata::read_from(source)?;
         let nullifier_block_height = BlockNumber::read_from(source)?;
         let consumer_account = Option::<AccountId>::read_from(source)?;
         let consumed_tx_order = Option::<u32>::read_from(source)?;
-        let metadata = Option::<NoteMetadata>::read_from(source)?;
-        Ok(ConsumedExternalNoteState {
+        Ok(ConsumedExternalErasedNoteState {
+            note_id,
+            metadata,
             nullifier_block_height,
             consumer_account,
             consumed_tx_order,
-            metadata,
         })
     }
 }
 
-impl From<ConsumedExternalNoteState> for InputNoteState {
-    fn from(state: ConsumedExternalNoteState) -> Self {
-        InputNoteState::ConsumedExternal(state)
+impl From<ConsumedExternalErasedNoteState> for InputNoteState {
+    fn from(state: ConsumedExternalErasedNoteState) -> Self {
+        InputNoteState::ConsumedExternalErased(state)
     }
 }
