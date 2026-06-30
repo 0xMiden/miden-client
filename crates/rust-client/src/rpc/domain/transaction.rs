@@ -135,9 +135,9 @@ fn convert_transaction_header(
                 .ok_or(RpcError::ExpectedDataMissing("nullifier".into()))?
                 .try_into()
                 .map_err(|e: RpcConversionError| RpcError::InvalidResponse(e.to_string()))?;
-            // Unauthenticated input notes (which includes same-batch-erased notes) carry their
-            // full header here; preserve it so the consuming account's sync can surface the note
-            // even when the client never held its details.
+            // Unauthenticated input notes (typically erased notes) carry their full header here;
+            // preserve it so the consuming account's sync can record the note even when the client
+            // never held its details.
             let header = d
                 .header
                 .map(NoteHeader::try_from)

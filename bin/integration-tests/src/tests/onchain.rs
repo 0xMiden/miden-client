@@ -721,12 +721,13 @@ pub async fn test_consumed_note_ordering(client_config: ClientConfig) -> Result<
 /// notes the account consumed, intercalated in consumption order.
 ///
 /// Client A owns the faucet and the consumer and drives all activity; client B only
-/// `import_account_by_id`s the consumer. Across increasing blocks the consumer consumes: an erased
+/// `import_account_by_id`s the consumer. Across increasing blocks the consumer consumes an erased
 /// note (minted and consumed in the same batch, so it never lands in a block), then a committed
-/// note, then another erased note. B syncs and its `InputNoteReader` returns all three in order:
-/// the erased ones surface as header-only records (their headers ride the consumer's transaction as
-/// unauthenticated input commitments), the committed one in full. This exercises the consumer-side
-/// header path end to end, and confirms the node populates the header for unauthenticated inputs.
+/// note, then another erased note. B syncs and its `InputNoteReader` returns all three in order,
+/// with the erased ones surfacing as header-only records (their headers ride the consumer's
+/// transaction as unauthenticated input commitments) and the committed one in full. This exercises
+/// the consumer-side header path end to end, and confirms the node populates the header for
+/// unauthenticated inputs.
 pub async fn test_importer_note_reader_finds_erased_and_committed_interleaved(
     client_config: ClientConfig,
 ) -> Result<()> {

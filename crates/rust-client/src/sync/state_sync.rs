@@ -647,9 +647,9 @@ impl StateSync {
             // Detect output notes erased by same-batch note erasure.
             Self::mark_erased_notes_as_consumed(state_sync_update, transaction);
 
-            // Surface notes consumed by this tracked account that the client only learns about from
-            // the consuming transaction's unauthenticated input commitments (e.g. same-batch-erased
-            // notes it never created or discovered).
+            // Record notes consumed by this tracked account that the client only learns about from
+            // the consuming transaction's unauthenticated input commitments (typically erased notes
+            // it never created or discovered).
             Self::record_consumed_unauthenticated_notes(state_sync_update, transaction);
         }
 
@@ -673,10 +673,11 @@ impl StateSync {
         }
     }
 
-    /// Records notes consumed by a tracked account that arrive only as unauthenticated input
-    /// commitments on the consuming transaction (which includes same-batch-erased notes). The
-    /// consumer is the account that executed the transaction; the note's header travels with the
-    /// commitment, so a follower can surface the consumption even without ever holding the note.
+    /// Records header-bearing input commitments from a tracked account's transaction.
+    ///
+    /// Header-bearing commitments are unauthenticated inputs; the transaction's account is their
+    /// consumer. The note's header travels with the commitment, so the consumption can be recorded
+    /// even when the client never held the note's details.
     fn record_consumed_unauthenticated_notes(
         state_sync_update: &mut StateSyncUpdate,
         transaction: &RpcTransactionRecord,

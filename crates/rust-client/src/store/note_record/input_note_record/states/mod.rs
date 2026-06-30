@@ -60,8 +60,8 @@ pub enum InputNoteState {
     ConsumedUnauthenticatedLocal(ConsumedUnauthenticatedLocalNoteState),
     /// Note consumed by a transaction not submitted by this client and confirmed by the network.
     ConsumedExternal(ConsumedExternalNoteState),
-    /// Note discovered as erased (created and consumed within the same batch) for which the
-    /// client never held the full details, only the header from the consuming transaction.
+    /// Note consumed by a transaction not submitted by this client, known only by the header
+    /// carried on the consuming transaction (typically an erased note).
     ConsumedExternalErased(ConsumedExternalErasedNoteState),
 }
 
@@ -351,11 +351,11 @@ impl Display for InputNoteState {
                 if let Some(account) = state.consumer_account {
                     write!(
                         f,
-                        "Consumed erased (at block {} by tracked account {})",
+                        "Consumed (header only, at block {} by tracked account {})",
                         state.nullifier_block_height, account
                     )
                 } else {
-                    write!(f, "Consumed erased (at block {})", state.nullifier_block_height)
+                    write!(f, "Consumed (header only, at block {})", state.nullifier_block_height)
                 }
             },
         }

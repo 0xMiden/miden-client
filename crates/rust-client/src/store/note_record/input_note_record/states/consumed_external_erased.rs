@@ -10,11 +10,11 @@ use crate::store::NoteRecordError;
 
 /// Information related to notes in the [`InputNoteState::ConsumedExternalErased`] state.
 ///
-/// A record enters this state when the client learns about an erased note (created and consumed in
-/// the same batch) whose full details it never held, only the note header carried in the consuming
-/// transaction. With no authoritative [`miden_protocol::note::NoteDetails`], the note id cannot be
-/// derived the usual way (from the details commitment and metadata), so it is carried in the state
-/// directly and surfaced through [`crate::note::InputNoteReader`].
+/// A record enters this state when a tracked account consumes a note as an unauthenticated input
+/// (typically an erased note, created and consumed in the same batch) whose full details the client
+/// never held, only the note header carried in the consuming transaction. With no authoritative
+/// [`miden_protocol::note::NoteDetails`], the note id cannot be derived the usual way (from the
+/// details commitment and metadata), so it is stored in the state directly.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConsumedExternalErasedNoteState {
     /// The note id, stored directly. Unlike full records, it cannot be derived from the record's

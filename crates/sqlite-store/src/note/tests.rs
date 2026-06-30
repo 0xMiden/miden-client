@@ -154,7 +154,7 @@ fn create_erased_header_input_note(
 /// whether each note carries full details (e.g. notes the client created or discovered) or is a
 /// header-only erased note (state `ConsumedExternalErased`, no payload). This is the core proof
 /// that an indexer can read an account's consumed notes, with erased and non-erased entries
-/// intercalated in the right order. Note: this exercises the reader + the new state's storage,
+/// intercalated in the right order. It exercises the reader + the new state's storage,
 /// serialization, filtering and ordering; how header-only records get created during sync is a
 /// separate, node-dependent concern.
 #[tokio::test]
@@ -162,7 +162,7 @@ async fn input_note_reader_interleaves_erased_and_full_notes() {
     let store = create_test_store().await;
     let consumer = AccountId::try_from(ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE).unwrap();
 
-    // The consumer consumes, across increasing blocks: full, erased, full, erased.
+    // The consumer consumes full, erased, full, erased across increasing blocks.
     let full_b1 = create_consumed_input_note_with_consumer(consumer, 0, 1, 0);
     let erased_b2 = create_erased_header_input_note(consumer, 1, 2, 0);
     let full_b3 = create_consumed_input_note_with_consumer(consumer, 2, 3, 0);

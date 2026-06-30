@@ -101,13 +101,7 @@ impl miden_tx::utils::serde::Deserializable for ConsumedExternalNoteState {
         let nullifier_block_height = BlockNumber::read_from(source)?;
         let consumer_account = Option::<AccountId>::read_from(source)?;
         let consumed_tx_order = Option::<u32>::read_from(source)?;
-        // Older persisted records have no metadata tail; when no bytes remain, decode it as `None`.
-        // The state owns its store column, so any remaining bytes belong to this field.
-        let metadata = if source.has_more_bytes() {
-            Option::<NoteMetadata>::read_from(source)?
-        } else {
-            None
-        };
+        let metadata = Option::<NoteMetadata>::read_from(source)?;
         Ok(ConsumedExternalNoteState {
             nullifier_block_height,
             consumer_account,
