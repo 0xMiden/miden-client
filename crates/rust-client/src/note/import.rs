@@ -345,17 +345,17 @@ where
         for (_, details, after_block_num, tag) in &requested_notes {
             if let Some(tag) = tag {
                 note_requests.push((details.commitment(), tag));
-                if after_block_num < &lowest_request_block {
-                    lowest_request_block = *after_block_num;
-                }
+                lowest_request_block = lowest_request_block.min(*after_block_num);
             }
         }
         let mut committed_notes_data =
             self.check_expected_notes(lowest_request_block, note_requests).await?;
 
         let mut note_records = vec![];
+        let mut partial_mmr = self.get_current_partial_mmr().await?;
+
         for (previous_note, details, after_block_num, tag) in requested_notes {
-            let note_record = previous_note.unwrap_or({
+            let mut note_record = previous_note.unwrap_or_else(|| {
                 InputNoteRecord::new(
                     details,
                     NoteAttachments::empty(),
@@ -364,52 +364,45 @@ where
                 )
             });
 
-            match committed_notes_data.remove(&note_record.details_commitment()) {
-                Some((committed_note, attachments)) => {
-                    // Building the MMR outside the loop would fail with BlockHeaderNotFound(0)
-                    // because store will be fresh, which can't happen here.
-                    let mut partial_mmr = self.get_current_partial_mmr().await?;
-                    let block_header = self
-                        .get_and_store_authenticated_block(
-                            committed_note.inclusion_proof().location().block_num(),
-                            &mut partial_mmr,
-                        )
-                        .await?;
+            // Notes the node has not reported as committed keep their expected record untouched.
+            let Some((committed_note, attachments)) =
+                committed_notes_data.remove(&note_record.details_commitment())
+            else {
+                note_records.push(Some(note_record));
+                continue;
+            };
 
-                    self.cache_partial_mmr(partial_mmr).await?;
+            let block_header = self
+                .get_and_store_authenticated_block(committed_note.block_num(), &mut partial_mmr)
+                .await?;
 
-                    let metadata = *committed_note.metadata();
-                    let tag = metadata.tag();
-                    let mut note_record = note_record;
-                    let mut note_changed = note_record.inclusion_proof_received(
-                        committed_note.inclusion_proof().clone(),
-                        metadata,
-                    )?;
-                    if let Some(attachments) = attachments
-                        && note_record.attachments() != &attachments
-                    {
-                        note_record.set_attachments(attachments);
-                        note_changed = true;
-                    }
+            let metadata = *committed_note.metadata();
+            let mut note_changed = note_record
+                .inclusion_proof_received(committed_note.inclusion_proof().clone(), metadata)?;
 
-                    if note_record.block_header_received(&block_header)? | note_changed {
-                        self.store
-                            .remove_note_tag(NoteTagRecord::with_note_source(
-                                tag,
-                                note_record.details_commitment(),
-                            ))
-                            .await?;
-
-                        note_records.push(Some(note_record));
-                    } else {
-                        note_records.push(None);
-                    }
-                },
-                None => {
-                    note_records.push(Some(note_record));
-                },
+            if let Some(attachments) = attachments
+                && note_record.attachments() != &attachments
+            {
+                note_record.set_attachments(attachments);
+                note_changed = true;
             }
+
+            // `block_header_received` transitions the record's state, so it must always run.
+            note_changed |= note_record.block_header_received(&block_header)?;
+
+            // Once committed, the note no longer needs its expected-note tag.
+            if note_changed {
+                self.store
+                    .remove_note_tag(NoteTagRecord::with_note_source(
+                        metadata.tag(),
+                        note_record.details_commitment(),
+                    ))
+                    .await?;
+            }
+
+            note_records.push(note_changed.then_some(note_record));
         }
+        self.cache_partial_mmr(partial_mmr).await?;
 
         Ok(note_records)
     }
@@ -430,7 +423,10 @@ where
         BTreeMap<NoteDetailsCommitment, (CommittedNote, Option<NoteAttachments>)>,
         ClientError,
     > {
-        let tracked_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
+        let sync_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
+        let expected_note_commitments: BTreeSet<NoteDetailsCommitment> =
+            expected_notes.iter().map(|(commitment, _)| *commitment).collect();
+
         let mut retrieved_proofs = BTreeMap::new();
         let current_block_num = self.get_sync_height().await?;
 
@@ -440,7 +436,7 @@ where
 
         let blocks = self
             .rpc_api
-            .sync_notes_with_attachments(request_block_num, current_block_num, &tracked_tags)
+            .sync_notes_with_attachments(request_block_num, current_block_num, &sync_tags)
             .await
             .map_err(ClientError::RpcError)?;
 
@@ -451,7 +447,7 @@ where
 
             for sync_note in block.notes.values() {
                 let committed = &sync_note.committed;
-                let Some((commitment, _)) = expected_notes.iter().find(|(commitment, _)| {
+                let Some(commitment) = expected_note_commitments.iter().find(|&commitment| {
                     NoteId::new(*commitment, committed.metadata()) == *committed.note_id()
                 }) else {
                     continue;

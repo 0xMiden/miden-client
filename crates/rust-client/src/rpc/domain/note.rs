@@ -2,7 +2,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use miden_protocol::account::AccountId;
-use miden_protocol::block::BlockHeader;
+use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::MerklePath;
 use miden_protocol::note::{
     Note,
@@ -252,8 +252,8 @@ pub enum SyncedNoteContent {
         /// The note's attachment content.
         attachments: NoteAttachments,
     },
-    /// A private note's resolved attachment content. Private notes expose no on-chain body; only
-    /// their attachments are resolved.
+    /// A private note's resolved attachment content. Private notes expose no on-chain details;
+    /// onlytheir attachments are resolved.
     PrivateAttachments(NoteAttachments),
 }
 
@@ -334,6 +334,11 @@ impl CommittedNote {
 
     pub fn inclusion_proof(&self) -> &NoteInclusionProof {
         &self.inclusion_proof
+    }
+
+    /// Returns the number of the block in which the note was committed.
+    pub fn block_num(&self) -> BlockNumber {
+        self.inclusion_proof.location().block_num()
     }
 }
 
