@@ -62,6 +62,15 @@ pub enum NoteUpdateType {
     InsertCommitted = 3,
 }
 
+impl NoteUpdateType {
+    /// Whether this update carries a pending store write, as opposed to a note that was merely
+    /// loaded as already-tracked context ([`Self::None`]). True for [`Self::Insert`],
+    /// [`Self::Update`], and [`Self::InsertCommitted`].
+    pub fn is_modified(self) -> bool {
+        matches!(self, Self::Insert | Self::Update | Self::InsertCommitted)
+    }
+}
+
 impl TryFrom<u8> for NoteUpdateType {
     type Error = u8;
 
@@ -304,12 +313,7 @@ impl NoteUpdateTracker {
     /// and have their tags registered. The `update_type` filter ensures notes merely loaded as
     /// already-tracked context (`NoteUpdateType::None`) are not re-emitted.
     pub fn updated_input_notes(&self) -> impl Iterator<Item = &InputNoteUpdate> {
-        self.input_notes.values().filter(|note| {
-            matches!(
-                note.update_type,
-                NoteUpdateType::Insert | NoteUpdateType::Update | NoteUpdateType::InsertCommitted
-            )
-        })
+        self.input_notes.values().filter(|note| note.update_type.is_modified())
     }
 
     /// Returns the ids of updated input notes that are now consumed. An externally consumed note
@@ -318,9 +322,17 @@ impl NoteUpdateTracker {
     pub fn consumed_input_note_ids(&self) -> impl Iterator<Item = NoteId> + '_ {
         self.input_notes_by_id.iter().filter_map(|(note_id, commitment)| {
             let update = self.input_notes.get(commitment)?;
-            (update.update_type != NoteUpdateType::None && update.inner().is_consumed())
-                .then_some(*note_id)
+            (update.update_type.is_modified() && update.inner().is_consumed()).then_some(*note_id)
         })
+    }
+
+    /// `NoteId`s of every input + output note that transitioned to a consumed state this sync.
+    /// These are confirmed consumptions reflected in the tracker, not raw nullifier-prefix hits.
+    pub fn consumed_note_ids(&self) -> impl Iterator<Item = NoteId> + '_ {
+        let output = self.output_notes.iter().filter_map(|(note_id, update)| {
+            (update.update_type.is_modified() && update.inner().is_consumed()).then_some(*note_id)
+        });
+        self.consumed_input_note_ids().chain(output)
     }
 
     /// Returns all output note records that have been updated.
@@ -329,9 +341,7 @@ impl NoteUpdateTracker {
     /// - New notes that have been created that should be inserted.
     /// - Existing tracked notes that should be updated.
     pub fn updated_output_notes(&self) -> impl Iterator<Item = &OutputNoteUpdate> {
-        self.output_notes.values().filter(|note| {
-            matches!(note.update_type, NoteUpdateType::Insert | NoteUpdateType::Update)
-        })
+        self.output_notes.values().filter(|note| note.update_type.is_modified())
     }
 
     /// Returns whether no new note-related information has been retrieved.
