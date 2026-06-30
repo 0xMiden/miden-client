@@ -1101,7 +1101,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2500,7 +2500,7 @@ dependencies = [
 [[package]]
 name = "miden-node-proto-build"
 version = "0.15.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-update-miden-protocol#b77301f76d59d3600a8a7f194d9454f1bdffe560"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-update-miden-protocol#1f529567caf175b6990c1aab2e571738c5449ee6"
 dependencies = [
  "build-rs",
  "codegen",
@@ -2576,7 +2576,7 @@ dependencies = [
 [[package]]
 name = "miden-protocol"
 version = "0.16.0"
-source = "git+https://github.com/0xMiden/protocol.git?branch=next#96878f9fba1648380556996a38978ce81ac625f0"
+source = "git+https://github.com/0xMiden/protocol.git?branch=next#36a1d092d4e8cc3dc1e276d8518eae7b7baa70c5"
 dependencies = [
  "bech32",
  "fs-err",
@@ -2620,7 +2620,7 @@ dependencies = [
 [[package]]
 name = "miden-remote-prover-client"
 version = "0.15.0"
-source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-update-miden-protocol#b77301f76d59d3600a8a7f194d9454f1bdffe560"
+source = "git+https://github.com/0xMiden/miden-node.git?branch=jmunoz-update-miden-protocol#1f529567caf175b6990c1aab2e571738c5449ee6"
 dependencies = [
  "build-rs",
  "fs-err",
@@ -2651,7 +2651,7 @@ dependencies = [
 [[package]]
 name = "miden-standards"
 version = "0.16.0"
-source = "git+https://github.com/0xMiden/protocol.git?branch=next#96878f9fba1648380556996a38978ce81ac625f0"
+source = "git+https://github.com/0xMiden/protocol.git?branch=next#36a1d092d4e8cc3dc1e276d8518eae7b7baa70c5"
 dependencies = [
  "bon",
  "fs-err",
@@ -2709,7 +2709,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.16.0"
-source = "git+https://github.com/0xMiden/protocol.git?branch=next#96878f9fba1648380556996a38978ce81ac625f0"
+source = "git+https://github.com/0xMiden/protocol.git?branch=next#36a1d092d4e8cc3dc1e276d8518eae7b7baa70c5"
 dependencies = [
  "miden-processor",
  "miden-protocol",
@@ -4003,7 +4003,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4510,7 +4510,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5323,7 +5323,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
