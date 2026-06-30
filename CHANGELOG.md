@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Features
+
+* [FEATURE][rust] `InputNoteReader` now returns the erased notes a followed account consumed, surfaced as header-only records in the new `InputNoteState::ConsumedExternalErased` state ([#2293](https://github.com/0xMiden/miden-client/pull/2293)).
+
 ### Fixes
 
 * [FIX][rust] RPC endpoint parsing now rejects endpoint strings that omit either the protocol or host. ([#2266](https://github.com/0xMiden/miden-client/pull/2266))
