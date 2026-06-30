@@ -508,7 +508,9 @@ mod test {
             .unwrap();
         assert_eq!(stored.len(), 1);
         assert_eq!(stored[0].0, header);
-        assert_eq!(Store::get_tracked_block_header_numbers(&store).await.unwrap(), [5].into());
+
+        let tracked = Store::get_tracked_block_header_numbers(&store).await.unwrap();
+        assert_eq!(tracked, [5].into());
 
         // Every authentication node was stored by the same call.
         let stored_nodes =
