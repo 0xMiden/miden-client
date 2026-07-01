@@ -26,7 +26,7 @@ use miden_protocol::note::{
 use miden_tx::auth::TransactionAuthenticator;
 
 use crate::rpc::RpcError;
-use crate::rpc::domain::note::{CommittedNote, FetchedNote, SyncedNoteContent};
+use crate::rpc::domain::note::{FetchedNote, SyncedNote, SyncedNoteContent};
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{InputNoteRecord, InputNoteState, NoteFilter};
 use crate::sync::NoteTagRecord;
@@ -344,7 +344,7 @@ where
         let mut note_requests = vec![];
         for (_, details, after_block_num, tag) in &requested_notes {
             if let Some(tag) = tag {
-                note_requests.push((details.commitment(), tag));
+                note_requests.push((details.commitment(), *tag));
                 lowest_request_block = lowest_request_block.min(*after_block_num);
             }
         }
@@ -365,11 +365,19 @@ where
             });
 
             // Notes the node has not reported as committed keep their expected record untouched.
-            let Some((committed_note, attachments)) =
+            let Some(SyncedNote { committed: committed_note, content }) =
                 committed_notes_data.remove(&note_record.details_commitment())
             else {
                 note_records.push(Some(note_record));
                 continue;
+            };
+
+            let attachments = match content {
+                SyncedNoteContent::Public { attachments, .. } if !attachments.is_empty() => {
+                    Some(attachments)
+                },
+                SyncedNoteContent::PrivateAttachments(attachments) => Some(attachments),
+                _ => None,
             };
 
             let block_header = self
@@ -407,9 +415,9 @@ where
         Ok(note_records)
     }
 
-    /// Checks if notes with the given details commitments and tags are present in the chain between
-    /// `request_block_num` and the current block, returning the committed notes and attachments
-    /// keyed by details commitment.
+    /// Checks whether the expected notes (identified by their details commitments and tags) have
+    /// been committed on chain between `request_block_num` and the current block, returning the
+    /// matching synced notes keyed by details commitment.
     ///
     /// Expected notes have no metadata and thus no `NoteId`, so each committed note is matched by
     /// reconstructing the id from the committed metadata: `NoteId::new(details_commitment,
@@ -417,21 +425,18 @@ where
     async fn check_expected_notes(
         &mut self,
         request_block_num: BlockNumber,
-        // Expected notes' details commitments with their tags
-        expected_notes: Vec<(NoteDetailsCommitment, &NoteTag)>,
-    ) -> Result<
-        BTreeMap<NoteDetailsCommitment, (CommittedNote, Option<NoteAttachments>)>,
-        ClientError,
-    > {
-        let sync_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| **tag).collect();
+        // Expected notes' details commitments with their tags.
+        expected_notes: Vec<(NoteDetailsCommitment, NoteTag)>,
+    ) -> Result<BTreeMap<NoteDetailsCommitment, SyncedNote>, ClientError> {
+        let sync_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| *tag).collect();
         let expected_note_commitments: BTreeSet<NoteDetailsCommitment> =
             expected_notes.iter().map(|(commitment, _)| *commitment).collect();
 
-        let mut retrieved_proofs = BTreeMap::new();
+        let mut matched_notes = BTreeMap::new();
         let current_block_num = self.get_sync_height().await?;
 
         if request_block_num > current_block_num {
-            return Ok(retrieved_proofs);
+            return Ok(matched_notes);
         }
 
         let blocks = self
@@ -440,32 +445,24 @@ where
             .await
             .map_err(ClientError::RpcError)?;
 
-        for block in &blocks {
+        for block in blocks {
             if block.block_header.block_num() > current_block_num {
                 break;
             }
 
-            for sync_note in block.notes.values() {
+            for sync_note in block.notes.into_values() {
                 let committed = &sync_note.committed;
-                let Some(commitment) = expected_note_commitments.iter().find(|&commitment| {
+                let Some(&commitment) = expected_note_commitments.iter().find(|&commitment| {
                     NoteId::new(*commitment, committed.metadata()) == *committed.note_id()
                 }) else {
                     continue;
                 };
 
-                let attachments = match &sync_note.content {
-                    SyncedNoteContent::Public { attachments, .. } if !attachments.is_empty() => {
-                        Some(attachments.clone())
-                    },
-                    SyncedNoteContent::PrivateAttachments(attachments) => Some(attachments.clone()),
-                    _ => None,
-                };
-
-                retrieved_proofs.insert(*commitment, (committed.clone(), attachments));
+                matched_notes.insert(commitment, sync_note);
             }
         }
 
-        Ok(retrieved_proofs)
+        Ok(matched_notes)
     }
 }
 
