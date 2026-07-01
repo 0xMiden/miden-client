@@ -352,7 +352,15 @@ where
             self.check_expected_notes(lowest_request_block, note_requests).await?;
 
         let mut note_records = vec![];
-        let mut partial_mmr = self.get_current_partial_mmr().await?;
+        // Only build the MMR when there are committed notes whose block headers must be
+        // authenticated. On a fresh store — e.g. importing an expected note before any sync —
+        // `get_current_partial_mmr` fails with `BlockHeaderNotFound(0)`, and such an import has no
+        // committed notes to process.
+        let mut partial_mmr = if committed_notes_data.is_empty() {
+            None
+        } else {
+            Some(self.get_current_partial_mmr().await?)
+        };
 
         for (previous_note, details, after_block_num, tag) in requested_notes {
             let mut note_record = previous_note.unwrap_or_else(|| {
@@ -381,7 +389,10 @@ where
             };
 
             let block_header = self
-                .get_and_store_authenticated_block(committed_note.block_num(), &mut partial_mmr)
+                .get_and_store_authenticated_block(
+                    committed_note.block_num(),
+                    partial_mmr.as_mut().expect("MMR is built when committed notes are present"),
+                )
                 .await?;
 
             let metadata = *committed_note.metadata();
@@ -410,7 +421,9 @@ where
 
             note_records.push(note_changed.then_some(note_record));
         }
-        self.cache_partial_mmr(partial_mmr).await?;
+        if let Some(partial_mmr) = partial_mmr {
+            self.cache_partial_mmr(partial_mmr).await?;
+        }
 
         Ok(note_records)
     }
@@ -435,7 +448,11 @@ where
         let mut matched_notes = BTreeMap::new();
         let current_block_num = self.get_sync_height().await?;
 
-        if request_block_num > current_block_num {
+        // An unsynced client (still at genesis) has no chain view, so nothing can be committed
+        // yet: skip the lookup and let every note stay expected until the next sync. This keeps
+        // an offline import fully local. Likewise skip notes expected only after a block we have
+        // not reached.
+        if current_block_num == BlockNumber::GENESIS || request_block_num > current_block_num {
             return Ok(matched_notes);
         }
 
