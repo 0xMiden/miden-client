@@ -176,7 +176,6 @@ impl SqliteStore {
 
         Self::insert_block_header_tx(&tx, block_header, has_client_notes)?;
         Self::insert_partial_blockchain_nodes_tx(&tx, nodes)?;
-
         tx.commit().into_store_error()?;
         Ok(())
     }
