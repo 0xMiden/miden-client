@@ -4,8 +4,13 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use miden_protocol::Word;
-use miden_protocol::account::delta::AccountUpdateDetails;
-use miden_protocol::account::{AccountId, StorageSlot, StorageSlotContent, StorageSlotType};
+use miden_protocol::account::{
+    AccountId,
+    AccountUpdateDetails,
+    StorageSlot,
+    StorageSlotContent,
+    StorageSlotType,
+};
 use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
@@ -165,19 +170,26 @@ impl MockRpcApi {
                 .iter()
                 .filter(|block_acc_update| block_acc_update.account_id() == account_id)
             {
-                let AccountUpdateDetails::Delta(account_delta) = update.details().clone() else {
+                let AccountUpdateDetails::Public(patch) = update.details().clone() else {
                     continue;
                 };
 
-                let vault_delta = account_delta.vault();
+                let vault_patch = patch.vault();
 
-                for asset in vault_delta.added_assets() {
-                    let account_vault_update = AccountVaultUpdate {
+                for asset in vault_patch.updated_assets() {
+                    updates.push(AccountVaultUpdate {
                         block_num: block_number,
                         asset: Some(asset),
                         vault_key: asset.vault_key(),
-                    };
-                    updates.push(account_vault_update);
+                    });
+                }
+
+                for vault_key in vault_patch.removed_asset_keys() {
+                    updates.push(AccountVaultUpdate {
+                        block_num: block_number,
+                        asset: None,
+                        vault_key: *vault_key,
+                    });
                 }
             }
         }
@@ -252,21 +264,23 @@ impl MockRpcApi {
                 .iter()
                 .filter(|block_acc_update| block_acc_update.account_id() == account_id)
             {
-                let AccountUpdateDetails::Delta(account_delta) = update.details().clone() else {
+                let AccountUpdateDetails::Public(patch) = update.details().clone() else {
                     continue;
                 };
 
-                let storage_delta = account_delta.storage();
+                let storage_patch = patch.storage();
 
-                for (slot_name, map_delta) in storage_delta.maps() {
-                    for (key, value) in map_delta.entries() {
-                        let storage_map_info = StorageMapUpdate {
-                            block_num: block_number,
-                            slot_name: slot_name.clone(),
-                            key: *key,
-                            value: *value,
-                        };
-                        updates.push(storage_map_info);
+                for (slot_name, map_patch) in storage_patch.maps() {
+                    if let Some(entries) = map_patch.entries() {
+                        for (key, value) in entries.as_map() {
+                            let storage_map_info = StorageMapUpdate {
+                                block_num: block_number,
+                                slot_name: slot_name.clone(),
+                                key: *key,
+                                value: *value,
+                            };
+                            updates.push(storage_map_info);
+                        }
                     }
                 }
             }
@@ -298,7 +312,7 @@ impl MockRpcApi {
             .read()
             .committed_notes()
             .values()
-            .filter(|n| matches!(n, MockChainNote::Private(_, _, _)))
+            .filter(|n| matches!(n, MockChainNote::Private(_, _, _, _)))
             .cloned()
             .collect()
     }
@@ -419,7 +433,7 @@ impl NodeRpcClient for MockRpcApi {
         let mut return_notes = vec![];
         for note in hit_notes {
             let fetched_note = match note {
-                MockChainNote::Private(note_id, note_metadata, note_inclusion_proof) => {
+                MockChainNote::Private(note_id, note_metadata, _, note_inclusion_proof) => {
                     let attachments = self
                         .private_note_attachments
                         .read()

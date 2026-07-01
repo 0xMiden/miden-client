@@ -4,7 +4,7 @@ use alloc::sync::Arc;
 use miden_client::assembly::CodeBuilder;
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::keystore::Keystore;
-use miden_client::note::{NoteAttachments, P2idNote};
+use miden_client::note::{Note, P2idNote};
 use miden_client::store::NoteFilter;
 use miden_client::transaction::{
     ProvenTransaction,
@@ -36,6 +36,7 @@ use miden_protocol::testing::account_id::{
 };
 use miden_protocol::{Felt, Word};
 use miden_standards::account::AccountBuilderSchemaCommitmentExt;
+use miden_standards::account::auth::Approver;
 use miden_standards::account::wallets::BasicWallet;
 
 use super::PaymentNoteDescription;
@@ -58,10 +59,10 @@ async fn transaction_creates_two_notes() {
 
     let account = AccountBuilder::new(Default::default())
         .with_component(BasicWallet)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             pub_key.to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_assets([asset_1, asset_2])
         .build_existing()
         .unwrap();
@@ -148,15 +149,15 @@ async fn execute_transaction_failure_leaves_store_unchanged() {
     // A note targeting the wallet that is not tracked by the store. Passing it as a request
     // input note is what would trigger an input-note write during preparation.
     let asset = FungibleAsset::new(faucet.id(), 100).unwrap();
-    let unauthenticated_note = P2idNote::create(
-        faucet.id(),
-        wallet.id(),
-        vec![asset.into()],
-        NoteType::Private,
-        NoteAttachments::empty(),
-        client.rng(),
-    )
-    .unwrap();
+    let unauthenticated_note: Note = P2idNote::builder()
+        .sender(faucet.id())
+        .target(wallet.id())
+        .asset(asset)
+        .note_type(NoteType::Private)
+        .generate_serial_number(client.rng())
+        .build()
+        .unwrap()
+        .into();
     let note_id = unauthenticated_note.id();
 
     // An expected output recipient with a non-standard script. Declaring it in the request is
@@ -326,10 +327,10 @@ async fn lazy_foreign_account_loading() {
     let foreign_account = AccountBuilder::new(Default::default())
         .account_type(AccountType::Public)
         .with_component(fpi_component)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             secret_key.public_key().to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .build_with_schema_commitment()
         .unwrap();
     let foreign_account_id = foreign_account.id();

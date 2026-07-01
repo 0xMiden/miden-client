@@ -15,7 +15,13 @@ use miden_client::account::{
     StorageSlotName,
 };
 use miden_client::assembly::CodeBuilder;
-use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
+use miden_client::auth::{
+    Approver,
+    AuthSchemeId,
+    AuthSecretKey,
+    AuthSingleSig,
+    RPO_FALCON_SCHEME_ID,
+};
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::rpc::domain::account::AccountStorageRequirements;
 use miden_client::testing::common::*;
@@ -609,19 +615,19 @@ fn foreign_account_with_code(
     let (key_pair, auth_component) = match auth_scheme {
         AuthSchemeId::Falcon512Poseidon2 => {
             let key_pair = AuthSecretKey::new_falcon512_poseidon2();
-            let auth_component: AccountComponent = AuthSingleSig::new(
+            let auth_component: AccountComponent = AuthSingleSig::new(Approver::new(
                 key_pair.public_key().to_commitment(),
                 AuthSchemeId::Falcon512Poseidon2,
-            )
+            ))
             .into();
             (key_pair, auth_component)
         },
         AuthSchemeId::EcdsaK256Keccak => {
             let key_pair = AuthSecretKey::new_ecdsa_k256_keccak();
-            let auth_component: AccountComponent = AuthSingleSig::new(
+            let auth_component: AccountComponent = AuthSingleSig::new(Approver::new(
                 key_pair.public_key().to_commitment(),
                 AuthSchemeId::EcdsaK256Keccak,
-            )
+            ))
             .into();
             (key_pair, auth_component)
         },

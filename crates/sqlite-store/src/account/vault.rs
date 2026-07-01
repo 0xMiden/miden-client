@@ -1,17 +1,15 @@
 //! Vault/asset-related database operations for accounts.
 
-use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::vec::Vec;
 
-use miden_client::Word;
-use miden_client::account::{AccountDelta, AccountHeader, AccountId};
-use miden_client::asset::{Asset, FungibleAsset, NonFungibleDeltaAction};
+use miden_client::account::{AccountHeader, AccountId, AccountVaultPatch};
+use miden_client::asset::Asset;
 use miden_client::store::{AccountSmtForest, StoreError};
 use miden_protocol::asset::AssetVaultKey;
 use miden_protocol::crypto::merkle::MerkleError;
 use rusqlite::types::Value;
-use rusqlite::{Connection, OptionalExtension, Transaction, params};
+use rusqlite::{OptionalExtension, Transaction, params};
 
 use crate::sql_error::SqlResultExt;
 use crate::{SqliteStore, insert_sql, subst, u64_to_value};
@@ -19,44 +17,6 @@ use crate::{SqliteStore, insert_sql, subst, u64_to_value};
 impl SqliteStore {
     // READER METHODS
     // --------------------------------------------------------------------------------------------
-
-    /// Fetches the relevant fungible assets of an account that will be updated by the account
-    /// delta.
-    pub(crate) fn get_account_fungible_assets_for_delta(
-        conn: &Connection,
-        account_id: AccountId,
-        delta: &AccountDelta,
-    ) -> Result<BTreeMap<AssetVaultKey, FungibleAsset>, StoreError> {
-        let vault_keys = delta
-            .vault()
-            .fungible()
-            .iter()
-            .map(|(vault_key, _)| Value::Text(vault_key.to_string()))
-            .collect::<Vec<Value>>();
-
-        const QUERY: &str = "SELECT vault_key, asset FROM latest_account_assets WHERE account_id = ? AND vault_key IN rarray(?)";
-
-        Ok(conn
-            .prepare(QUERY)
-            .into_store_error()?
-            .query_map(params![account_id.to_hex(), Rc::new(vault_keys)], |row| {
-                let vault_key: String = row.get(0)?;
-                let asset: String = row.get(1)?;
-                Ok((vault_key, asset))
-            })
-            .into_store_error()?
-            .map(|result| {
-                let (vault_key_str, asset_str): (String, String) = result.into_store_error()?;
-                let key_word = Word::try_from(vault_key_str)?;
-                let value_word = Word::try_from(asset_str)?;
-                Ok(Asset::from_key_value_words(key_word, value_word)?)
-            })
-            .collect::<Result<Vec<Asset>, StoreError>>()?
-            .into_iter()
-            // SAFETY: all retrieved assets should be fungible
-            .map(|asset| (asset.vault_key(), asset.unwrap_fungible()))
-            .collect())
-    }
 
     // MUTATOR/WRITER METHODS
     // --------------------------------------------------------------------------------------------
@@ -92,69 +52,26 @@ impl SqliteStore {
     /// The function updates the SMT forest with all asset changes and verifies that the resulting
     /// vault root matches the expected final state. It archives old values from latest to
     /// historical, deletes removed assets from latest, then inserts updated assets.
-    pub(crate) fn apply_account_vault_delta(
+    pub(crate) fn apply_account_vault_patch(
         tx: &Transaction<'_>,
         smt_forest: &mut AccountSmtForest,
         account_id: AccountId,
         init_account_state: &AccountHeader,
         final_account_state: &AccountHeader,
-        mut updated_fungible_assets: BTreeMap<AssetVaultKey, FungibleAsset>,
-        delta: &AccountDelta,
+        vault_patch: &AccountVaultPatch,
     ) -> Result<(), StoreError> {
         let nonce = final_account_state.nonce().as_canonical_u64();
         let account_id_hex = account_id.to_hex();
         let nonce_val = u64_to_value(nonce);
 
-        // Apply vault delta. This map will contain all updated assets (indexed by vault key), both
-        // fungible and non-fungible.
-        let mut updated_assets: BTreeMap<AssetVaultKey, Asset> = BTreeMap::new();
-        let mut removed_vault_keys: Vec<AssetVaultKey> = Vec::new();
+        // The patch carries the absolute final value of every changed entry, so updated assets are
+        // inserted verbatim and removed entries (empty value) are deleted. No prior balance lookup
+        // or signed-amount arithmetic is needed, and the asset value word already encodes the
+        // callback flag for both fungible and non-fungible assets.
+        let updated_assets_values: Vec<Asset> = vault_patch.updated_assets().collect();
+        let removed_vault_keys: Vec<AssetVaultKey> =
+            vault_patch.removed_asset_keys().copied().collect();
 
-        // We first process the fungible assets. Adding or subtracting them from the vault as
-        // requested.
-        for (vault_key, delta) in delta.vault().fungible().iter() {
-            let delta_asset = FungibleAsset::new(vault_key.faucet_id(), delta.unsigned_abs())?
-                .with_callbacks(vault_key.callback_flag());
-
-            let asset = match updated_fungible_assets.remove(vault_key) {
-                Some(asset) => {
-                    // If the asset exists, update it accordingly.
-                    if *delta >= 0 {
-                        asset.add(delta_asset)?
-                    } else {
-                        asset.sub(delta_asset)?
-                    }
-                },
-                None => {
-                    // If the asset doesn't exist, we add it to the map to be inserted.
-                    delta_asset
-                },
-            };
-
-            if asset.amount().as_u64() > 0 {
-                updated_assets.insert(asset.vault_key(), Asset::Fungible(asset));
-            } else {
-                removed_vault_keys.push(asset.vault_key());
-            }
-        }
-
-        // Process non-fungible assets. Here additions or removals don't depend on previous state as
-        // each asset is unique.
-        let (added_nonfungible_assets, removed_nonfungible_assets) =
-            delta.vault().non_fungible().iter().partition::<Vec<_>, _>(|(_, action)| {
-                matches!(action, NonFungibleDeltaAction::Add)
-            });
-
-        updated_assets.extend(
-            added_nonfungible_assets
-                .into_iter()
-                .map(|(asset, _)| (asset.vault_key(), Asset::NonFungible(*asset))),
-        );
-
-        removed_vault_keys
-            .extend(removed_nonfungible_assets.iter().map(|(asset, _)| asset.vault_key()));
-
-        let updated_assets_values: Vec<Asset> = updated_assets.values().copied().collect();
         Self::persist_vault_delta(
             tx,
             &account_id_hex,

@@ -14,6 +14,7 @@ use miden_client::auth::{RPO_FALCON_SCHEME_ID, TransactionAuthenticator};
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::{FeltRng, RandomCoin};
 use miden_client::keystore::Keystore;
+use miden_client::note::standards::NoteSyncHint;
 use miden_client::note::{
     Note,
     NoteAssets,
@@ -988,10 +989,9 @@ async fn debug_mode_outputs_logs() -> Result<()> {
     execute_tx_and_sync(&mut client, account.id(), transaction_request).await?;
 
     // Export the note
-    let note_file: NoteFile = NoteFile::NoteDetails {
+    let note_file: NoteFile = NoteFile::ExpectedNote {
         details: note.clone().into(),
-        after_block_num: 0.into(),
-        tag: Some(note.metadata().tag()),
+        sync_hint: NoteSyncHint::new(0.into(), note.metadata().tag()),
     };
 
     // Import the note into the CLI
@@ -1838,8 +1838,8 @@ fn call_shows_nonce_delta() {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("Nonce incremented by:"),
-        "Expected nonce delta in output:\n{stdout}"
+        stdout.contains("New account nonce:"),
+        "Expected the new account nonce in output:\n{stdout}"
     );
 }
 

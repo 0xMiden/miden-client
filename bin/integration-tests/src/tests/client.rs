@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use assert_matches::assert_matches;
-use miden_client::account::component::{AccountComponent, AccountComponentMetadata};
+use miden_client::account::component::{AccountComponent, AccountComponentMetadata, Approver};
 use miden_client::account::{
     Account,
     AccountBuilder,
@@ -21,6 +21,7 @@ use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::{AuthSchemeId, AuthSecretKey, AuthSingleSig, RPO_FALCON_SCHEME_ID};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
+use miden_client::note::standards::NoteSyncHint;
 use miden_client::note::{BlockNumber, NoteFile, NoteTag, NoteType};
 use miden_client::rpc::domain::account::{
     AccountStorageRequirements,
@@ -284,10 +285,12 @@ pub async fn test_import_expected_notes(client_config: ClientConfig) -> Result<(
     // Import the node before it's committed onchain works if we have full `NoteDetails`
     client_2.add_note_tag(note.metadata().unwrap().tag()).await.unwrap();
     client_2
-        .import_notes(&[NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::ExpectedNote {
             details: note.clone().into(),
-            after_block_num: client_1.get_sync_height().await.unwrap(),
-            tag: Some(note.metadata().unwrap().tag()),
+            sync_hint: NoteSyncHint::new(
+                client_1.get_sync_height().await.unwrap(),
+                note.metadata().unwrap().tag(),
+            ),
         }])
         .await
         .unwrap();
@@ -361,10 +364,9 @@ pub async fn test_import_expected_note_uncommitted(client_config: ClientConfig) 
 
     // If the verification is requested before execution then the import should fail
     let imported_commitment = client_2
-        .import_notes(&[NoteFile::NoteDetails {
-            details: note.into(),
-            after_block_num: 0.into(),
-            tag: None,
+        .import_notes(&[NoteFile::ExpectedNote {
+            details: note.clone().into(),
+            sync_hint: NoteSyncHint::new(0.into(), note.metadata().unwrap().tag()),
         }])
         .await?[0];
 
@@ -412,10 +414,9 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
 
     // importing the note before client_2 is synced will result in a note with `Expected` state
     let commitment = client_2
-        .import_notes(&[NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::ExpectedNote {
             details: note.clone().into(),
-            after_block_num: block_height_before,
-            tag: Some(note.metadata().unwrap().tag()),
+            sync_hint: NoteSyncHint::new(block_height_before, note.metadata().unwrap().tag()),
         }])
         .await?[0];
 
@@ -432,10 +433,9 @@ pub async fn test_import_expected_notes_from_the_past_as_committed(
     // Note already imported
     assert!(
         client_2
-            .import_notes(&[NoteFile::NoteDetails {
+            .import_notes(&[NoteFile::ExpectedNote {
                 details: note.clone().into(),
-                after_block_num: block_height_before,
-                tag: Some(note.metadata().unwrap().tag()),
+                sync_hint: NoteSyncHint::new(block_height_before, note.metadata().unwrap().tag()),
             }])
             .await?
             .is_empty()
@@ -982,10 +982,10 @@ pub async fn test_import_consumed_note_with_proof(client_config: ClientConfig) -
 
     // Import the consumed note
     client_2
-        .import_notes(&[NoteFile::NoteWithProof(
-            note.clone().try_into().unwrap(),
-            note.inclusion_proof().unwrap().clone(),
-        )])
+        .import_notes(&[NoteFile::Committed {
+            note: note.clone().try_into().unwrap(),
+            proof: note.inclusion_proof().unwrap().clone(),
+        }])
         .await?;
 
     // A `ConsumedExternal` note has no metadata, so look it up by its details commitment.
@@ -1115,10 +1115,10 @@ pub async fn test_import_note_with_proof(client_config: ClientConfig) -> Result<
 
     // Import the consumed note
     client_2
-        .import_notes(&[NoteFile::NoteWithProof(
-            note.clone().try_into().unwrap(),
-            note.inclusion_proof().unwrap().clone(),
-        )])
+        .import_notes(&[NoteFile::Committed {
+            note: note.clone().try_into().unwrap(),
+            proof: note.inclusion_proof().unwrap().clone(),
+        }])
         .await?;
 
     let imported_note = client_2.get_input_note(note.id().unwrap()).await?.unwrap();
@@ -1739,9 +1739,11 @@ pub async fn test_get_account_storage_map_key_filtering(client_config: ClientCon
     .map_err(|err| anyhow::anyhow!(err))?;
 
     let key_pair = AuthSecretKey::new_falcon512_poseidon2();
-    let auth_component: AccountComponent =
-        AuthSingleSig::new(key_pair.public_key().to_commitment(), AuthSchemeId::Falcon512Poseidon2)
-            .into();
+    let auth_component: AccountComponent = AuthSingleSig::new(Approver::new(
+        key_pair.public_key().to_commitment(),
+        AuthSchemeId::Falcon512Poseidon2,
+    ))
+    .into();
 
     let account = AccountBuilder::new(Default::default())
         .with_component(component)

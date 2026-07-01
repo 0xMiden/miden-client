@@ -70,6 +70,7 @@ use miden_protocol::account::{
     AccountComponentMetadata,
     AccountHeader,
     AccountId,
+    AccountIdVersion,
     AccountType,
     StorageMap,
     StorageMapKey,
@@ -91,7 +92,6 @@ use miden_protocol::note::{
     Note,
     NoteAssets,
     NoteAttachments,
-    NoteFile,
     NoteRecipient,
     NoteStorage,
     NoteTag,
@@ -112,17 +112,14 @@ use miden_protocol::transaction::RawOutputNote;
 use miden_protocol::vm::AdviceInputs;
 use miden_protocol::{EMPTY_WORD, Felt, ONE, Word};
 use miden_standards::account::AccountBuilderSchemaCommitmentExt;
+use miden_standards::account::auth::Approver;
 use miden_standards::account::faucets::{FungibleFaucet, TokenName};
-use miden_standards::account::interface::AccountInterfaceError;
-use miden_standards::account::policies::{
-    BurnPolicyConfig,
-    MintPolicyConfig,
-    PolicyRegistration,
-    TokenPolicyManager,
-};
+use miden_standards::account::policies::{BurnPolicy, MintPolicy, TokenPolicyManager};
 use miden_standards::account::wallets::BasicWallet;
 use miden_standards::note::{
     NoteConsumptionStatus,
+    NoteFile,
+    NoteSyncHint,
     P2idNote,
     P2idNoteStorage,
     PswapNote,
@@ -131,6 +128,7 @@ use miden_standards::note::{
 };
 use miden_standards::testing::mock_account::MockAccountExt;
 use miden_standards::testing::note::NoteBuilder;
+use miden_standards::tx_script::SendNotesTransactionScriptError;
 use miden_testing::{MockChain, MockChainBuilder, TxContextInput};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
@@ -171,10 +169,10 @@ async fn input_notes_round_trip() {
     // insert notes into database
     for note in &available_notes {
         client
-            .import_notes(&[NoteFile::NoteWithProof(
-                note.note().unwrap().clone(),
-                note.inclusion_proof().clone(),
-            )])
+            .import_notes(&[NoteFile::Committed {
+                note: note.note().unwrap().clone(),
+                proof: note.inclusion_proof().clone(),
+            }])
             .await
             .unwrap();
     }
@@ -207,10 +205,9 @@ async fn get_input_note() {
     // insert Note into database
     let note: InputNoteRecord = original_note.clone().into();
     client
-        .import_notes(&[NoteFile::NoteDetails {
-            details: note.into(),
-            tag: None,
-            after_block_num: 0.into(),
+        .import_notes(&[NoteFile::ExpectedNote {
+            details: note.clone().into(),
+            sync_hint: NoteSyncHint::new(0.into(), note.metadata().unwrap().tag()),
         }])
         .await
         .unwrap();
@@ -331,7 +328,10 @@ async fn insert_same_account_twice_fails() {
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Poseidon2),
+        AuthSingleSig::new(Approver::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Poseidon2,
+        )),
     );
 
     assert!(client.add_account(&account, false).await.is_ok());
@@ -345,7 +345,10 @@ async fn account_code() {
 
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PRIVATE_ACCOUNT_UPDATABLE_CODE,
-        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Poseidon2),
+        AuthSingleSig::new(Approver::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Poseidon2,
+        )),
     );
 
     let account_code = account.code();
@@ -367,7 +370,10 @@ async fn get_account_by_id() {
 
     let account = Account::mock(
         ACCOUNT_ID_REGULAR_PUBLIC_ACCOUNT_UPDATABLE_CODE,
-        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Poseidon2),
+        AuthSingleSig::new(Approver::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Poseidon2,
+        )),
     );
 
     client.add_account(&account, false).await.unwrap();
@@ -399,10 +405,9 @@ async fn sync_state() {
 
     for note in &expected_notes {
         client
-            .import_notes(&[NoteFile::NoteDetails {
+            .import_notes(&[NoteFile::ExpectedNote {
                 details: note.clone().into(),
-                after_block_num: 0.into(),
-                tag: Some(note.metadata().tag()),
+                sync_hint: NoteSyncHint::new(0.into(), note.metadata().tag()),
             }])
             .await
             .unwrap();
@@ -448,10 +453,9 @@ async fn sync_state_mmr() {
 
     for note in &notes {
         client
-            .import_notes(&[NoteFile::NoteDetails {
+            .import_notes(&[NoteFile::ExpectedNote {
                 details: note.clone().into(),
-                after_block_num: 0.into(),
-                tag: Some(note.metadata().tag()),
+                sync_hint: NoteSyncHint::new(0.into(), note.metadata().tag()),
             }])
             .await
             .unwrap();
@@ -546,10 +550,9 @@ async fn stale_cached_partial_mmr_is_rebuilt_from_store() {
         .collect();
     for note in &notes {
         client
-            .import_notes(&[NoteFile::NoteDetails {
+            .import_notes(&[NoteFile::ExpectedNote {
                 details: note.clone().into(),
-                after_block_num: 0.into(),
-                tag: Some(note.metadata().tag()),
+                sync_hint: NoteSyncHint::new(0.into(), note.metadata().tag()),
             }])
             .await
             .unwrap();
@@ -847,7 +850,7 @@ async fn mint_transaction() {
             .unwrap();
     let executed_tx = transaction_result.executed_transaction().clone();
 
-    assert_eq!(executed_tx.account_delta().nonce_delta(), ONE);
+    assert_eq!(executed_tx.account_patch().final_nonce(), Some(ONE));
 }
 
 #[tokio::test]
@@ -886,18 +889,17 @@ async fn import_note_validation() {
     let consumed_note = consumed_note.expect("expected to find at least one consumed note");
 
     client
-        .import_notes(&[NoteFile::NoteWithProof(
-            consumed_note.note().unwrap().clone(),
-            consumed_note.inclusion_proof().clone(),
-        )])
+        .import_notes(&[NoteFile::Committed {
+            note: consumed_note.note().unwrap().clone(),
+            proof: consumed_note.inclusion_proof().clone(),
+        }])
         .await
         .unwrap();
 
     client
-        .import_notes(&[NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::ExpectedNote {
             details: expected_note.note().unwrap().into(),
-            after_block_num: 0.into(),
-            tag: None,
+            sync_hint: NoteSyncHint::new(0.into(), expected_note.note().unwrap().metadata().tag()),
         }])
         .await
         .unwrap();
@@ -1048,9 +1050,11 @@ async fn note_without_asset() {
 
     assert!(matches!(
         error,
-        ClientError::TransactionRequestError(TransactionRequestError::AccountInterfaceError(
-            AccountInterfaceError::FaucetNoteWithoutAsset
-        ))
+        ClientError::TransactionRequestError(
+            TransactionRequestError::SendNotesTransactionScriptError(
+                SendNotesTransactionScriptError::FaucetNoteWithoutAsset
+            )
+        )
     ));
 
     let error = TransactionRequestBuilder::new()
@@ -1381,10 +1385,9 @@ async fn input_note_reader_finds_externally_consumed_notes() {
     // Import the P2ID note as an input note so the client tracks it. The tag lets the import
     // resolve the note's on-chain commitment (and thus its metadata) so it can later be matched
     // when the external consumer's nullifier appears during sync.
-    let note_file = NoteFile::NoteDetails {
+    let note_file = NoteFile::ExpectedNote {
         details: p2id_note.into(),
-        after_block_num: BlockNumber::from(0u32),
-        tag: Some(p2id_tag),
+        sync_hint: NoteSyncHint::new(BlockNumber::from(0u32), p2id_tag),
     };
     client.import_notes(&[note_file]).await.unwrap();
 
@@ -3606,10 +3609,10 @@ async fn empty_storage_map() {
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::Public)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             pub_key.to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(BasicWallet)
         .with_component(component)
         .build_with_schema_commitment()
@@ -3721,10 +3724,10 @@ async fn storage_and_vault_proofs() {
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::Public)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             pub_key.to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(BasicWallet)
         .with_component(bump_item_component)
         .build_with_schema_commitment()
@@ -3781,7 +3784,8 @@ async fn storage_and_vault_proofs() {
             .unwrap()
             .unwrap();
 
-        let expected_witness = AssetWitness::new(vault.open(asset.vault_key()).into()).unwrap();
+        let expected_witness =
+            AssetWitness::new(vault.open(asset.vault_key()).into(), [asset.vault_key()]).unwrap();
         assert_eq!(witness, expected_witness);
 
         // Check that specific map item proof matches the one in the storage
@@ -3816,7 +3820,10 @@ async fn account_addresses_basic_wallet() {
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Poseidon2),
+        AuthSingleSig::new(Approver::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Poseidon2,
+        )),
     );
 
     client.add_account(&account, false).await.unwrap();
@@ -3856,7 +3863,10 @@ async fn account_add_address_after_creation() {
 
     let account = Account::mock(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_2,
-        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Poseidon2),
+        AuthSingleSig::new(Approver::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Poseidon2,
+        )),
     );
 
     client.add_account(&account, false).await.unwrap();
@@ -4150,8 +4160,10 @@ async fn sync_stores_private_note_attachments() {
     // 1. Build a mock chain with a sender and a public target account (the attachment target must
     //    be public).
     let mut mock_chain_builder = MockChainBuilder::new();
+    let faucet_id = AccountId::dummy([7u8; 15], AccountIdVersion::Version1, AccountType::Public);
+    let note_asset = FungibleAsset::new(faucet_id, 100).unwrap();
     let sender = mock_chain_builder
-        .add_existing_mock_account(miden_testing::Auth::IncrNonce)
+        .add_existing_mock_account_with_assets(miden_testing::Auth::IncrNonce, [note_asset.into()])
         .unwrap();
     let target = mock_chain_builder.add_existing_wallet(miden_testing::Auth::IncrNonce).unwrap();
 
@@ -4159,15 +4171,16 @@ async fn sync_stores_private_note_attachments() {
     let ntx_target = NetworkAccountTarget::new(target.id(), NoteExecutionHint::Always).unwrap();
     let attachments = NoteAttachments::new(vec![ntx_target.into()]).unwrap();
     let mut note_rng = RandomCoin::new([1, 2, 3, 4].map(Felt::new_unchecked).into());
-    let private_note = P2idNote::create(
-        sender.id(),
-        target.id(),
-        vec![],
-        NoteType::Private,
-        attachments.clone(),
-        &mut note_rng,
-    )
-    .unwrap();
+    let private_note = P2idNote::builder()
+        .sender(sender.id())
+        .target(target.id())
+        .asset(note_asset)
+        .note_type(NoteType::Private)
+        .attachments(attachments.clone().into_vec())
+        .generate_serial_number(&mut note_rng)
+        .build()
+        .unwrap()
+        .into();
 
     // Declare the note as a spawn note (not yet committed) and build the chain at genesis.
     let spawn_note =
@@ -4219,10 +4232,9 @@ async fn sync_stores_private_note_attachments() {
     let note_tag = private_note.metadata().tag();
     client.add_note_tag(note_tag).await.unwrap();
     client
-        .import_notes(&[NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::ExpectedNote {
             details: private_note.clone().into(),
-            after_block_num: BlockNumber::from(0u32),
-            tag: Some(note_tag),
+            sync_hint: NoteSyncHint::new(BlockNumber::from(0u32), note_tag),
         }])
         .await
         .unwrap();
@@ -4579,10 +4591,10 @@ async fn insert_new_wallet(
 
     let account = AccountBuilder::new(init_seed)
         .account_type(visibility)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             pub_key.to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(BasicWallet)
         .build_with_schema_commitment()
         .unwrap();
@@ -4607,10 +4619,10 @@ async fn insert_new_ecdsa_wallet(
 
     let account = AccountBuilder::new(init_seed)
         .account_type(visibility)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             pub_key.to_commitment(),
             AuthSchemeId::EcdsaK256Keccak,
-        ))
+        )))
         .with_component(BasicWallet)
         .build_with_schema_commitment()
         .unwrap();
@@ -4646,18 +4658,17 @@ async fn insert_new_fungible_faucet(
         .unwrap();
     // Only mint/burn policies — see test_utils/common.rs::insert_new_fungible_faucet for the
     // reason transfer policies are intentionally omitted.
-    let policy_manager = TokenPolicyManager::new()
-        .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap()
-        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap();
+    let policy_manager = TokenPolicyManager::builder()
+        .active_mint_policy(MintPolicy::allow_all())
+        .active_burn_policy(BurnPolicy::allow_all())
+        .build();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(visibility)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             pub_key.to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(faucet)
         .with_components(policy_manager)
         .build_with_schema_commitment()
@@ -4696,18 +4707,17 @@ async fn insert_new_ecdsa_fungible_faucet(
         .unwrap();
     // Only mint/burn policies — see test_utils/common.rs::insert_new_fungible_faucet for the
     // reason transfer policies are intentionally omitted.
-    let policy_manager = TokenPolicyManager::new()
-        .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap()
-        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap();
+    let policy_manager = TokenPolicyManager::builder()
+        .active_mint_policy(MintPolicy::allow_all())
+        .active_burn_policy(BurnPolicy::allow_all())
+        .build();
 
     let account = AccountBuilder::new(init_seed)
         .account_type(visibility)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             pub_key.to_commitment(),
             AuthSchemeId::EcdsaK256Keccak,
-        ))
+        )))
         .with_component(faucet)
         .with_components(policy_manager)
         .build_with_schema_commitment()
@@ -4775,10 +4785,10 @@ async fn storage_and_vault_proofs_ecdsa() {
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::Public)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             pub_key.to_commitment(),
             AuthSchemeId::EcdsaK256Keccak,
-        ))
+        )))
         .with_component(BasicWallet)
         .with_component(bump_item_component)
         .build_with_schema_commitment()
@@ -4835,7 +4845,8 @@ async fn storage_and_vault_proofs_ecdsa() {
             .unwrap()
             .unwrap();
 
-        let expected_witness = AssetWitness::new(vault.open(asset.vault_key()).into()).unwrap();
+        let expected_witness =
+            AssetWitness::new(vault.open(asset.vault_key()).into(), [asset.vault_key()]).unwrap();
         assert_eq!(witness, expected_witness);
 
         // Check that specific map item proof matches the one in the storage
@@ -4871,8 +4882,10 @@ async fn execute_transaction_fails_for_watched_account() {
     // public `add_account`/`import_watched_account_by_id` paths so we don't need a mock RPC
     // round-trip.
     let key_pair = AuthSecretKey::new_falcon512_poseidon2();
-    let auth_component =
-        AuthSingleSig::new(key_pair.public_key().to_commitment(), AuthSchemeId::Falcon512Poseidon2);
+    let auth_component = AuthSingleSig::new(Approver::new(
+        key_pair.public_key().to_commitment(),
+        AuthSchemeId::Falcon512Poseidon2,
+    ));
 
     let mut init_seed = [0u8; 32];
     client.rng().fill_bytes(&mut init_seed);
@@ -4887,11 +4900,10 @@ async fn execute_transaction_fails_for_watched_account() {
         .max_supply(AssetAmount::new(max_supply).unwrap())
         .build()
         .unwrap();
-    let policy_manager = TokenPolicyManager::new()
-        .with_mint_policy(MintPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap()
-        .with_burn_policy(BurnPolicyConfig::AllowAll, PolicyRegistration::Active)
-        .unwrap();
+    let policy_manager = TokenPolicyManager::builder()
+        .active_mint_policy(MintPolicy::allow_all())
+        .active_burn_policy(BurnPolicy::allow_all())
+        .build();
     let faucet = AccountBuilder::new(init_seed)
         .account_type(AccountType::Public)
         .with_auth_component(auth_component)

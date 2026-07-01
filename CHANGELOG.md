@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changes
+
+* [BREAKING][rust] Migrated to `miden-protocol` 0.16. Transaction-level fees were removed, block-level `FeeParameters` are unchanged. The relative `AccountDelta` model was replaced by the absolute `AccountPatch` model for account updates: `TransactionResult::account_delta` is now `account_patch`, `AccountUpdateDetails::Public` now carries an `AccountPatch`, account reconstruction is done via `Account::try_from(&AccountPatch)` or `Account::apply_patch` instead of previous `apply_delta`. Re-exports changed accordingly: `AccountStorageDelta` for `AccountStoragePatch`, `StorageMapDelta` for `StorageMapPatch`, and so on. Standards APIs were updated: `AuthMethod` was removed (use the concrete auth components), `create_fungible_faucet` became `create_user_fungible_faucet`. ([#XXXX](https://github.com/0xMiden/rust-sdk/pull/XXXX)).
+
 ### Fixes
 
 * [FIX][rust] RPC endpoint parsing now rejects endpoint strings that omit either the protocol or host. ([#2266](https://github.com/0xMiden/miden-client/pull/2266))

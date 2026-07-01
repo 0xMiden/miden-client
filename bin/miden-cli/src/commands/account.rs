@@ -318,7 +318,7 @@ fn account_kind_display_name(token_symbol: Option<&str>) -> String {
 /// Takes the [`AccountCode`] rather than the full [`Account`] so callers can avoid loading the
 /// account's vault and storage just to inspect its interface.
 pub(crate) fn account_code_has_basic_wallet(account_id: AccountId, code: &AccountCode) -> bool {
-    AccountInterface::from_code(account_id, Vec::new(), code)
+    AccountInterface::from_code(account_id, code)
         .components()
         .iter()
         .any(|c| matches!(c, AccountComponentInterface::BasicWallet))

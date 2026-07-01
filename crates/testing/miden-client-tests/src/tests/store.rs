@@ -28,6 +28,7 @@ use miden_protocol::testing::account_id::{
 use miden_protocol::transaction::TransactionKernel;
 use miden_protocol::{EMPTY_WORD, Felt, Word, ZERO};
 use miden_standards::account::AccountBuilderSchemaCommitmentExt;
+use miden_standards::account::auth::Approver;
 use miden_standards::account::wallets::BasicWallet;
 use miden_standards::testing::mock_account::MockAccountExt;
 use rand::RngCore;
@@ -37,7 +38,10 @@ use crate::tests::{create_test_client, insert_new_fungible_faucet, insert_new_wa
 fn create_account_data(account_id: u128) -> AccountFile {
     let account = Account::mock(
         account_id,
-        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Poseidon2),
+        AuthSingleSig::new(Approver::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Poseidon2,
+        )),
     );
 
     AccountFile::new(account.clone(), vec![AuthSecretKey::new_falcon512_poseidon2()])
@@ -46,7 +50,10 @@ fn create_account_data(account_id: u128) -> AccountFile {
 fn create_ecdsa_account_data(account_id: u128) -> AccountFile {
     let account = Account::mock(
         account_id,
-        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::EcdsaK256Keccak),
+        AuthSingleSig::new(Approver::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::EcdsaK256Keccak,
+        )),
     );
 
     AccountFile::new(account.clone(), vec![AuthSecretKey::new_falcon512_poseidon2()])
@@ -81,7 +88,10 @@ pub async fn try_add_account() {
 
     let account = Account::mock(
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::Falcon512Poseidon2),
+        AuthSingleSig::new(Approver::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::Falcon512Poseidon2,
+        )),
     );
 
     // The mock account has nonce 1, we need it to be 0 for the test.
@@ -103,7 +113,10 @@ pub async fn try_add_ecdsa_account() {
 
     let account = Account::mock(
         ACCOUNT_ID_PRIVATE_FUNGIBLE_FAUCET,
-        AuthSingleSig::new(PublicKeyCommitment::from(EMPTY_WORD), AuthSchemeId::EcdsaK256Keccak),
+        AuthSingleSig::new(Approver::new(
+            PublicKeyCommitment::from(EMPTY_WORD),
+            AuthSchemeId::EcdsaK256Keccak,
+        )),
     );
 
     // The mock account has nonce 1, we need it to be 0 for the test.
@@ -315,10 +328,10 @@ async fn build_three_slot_account(
 
     let account = AccountBuilder::new(init_seed)
         .account_type(AccountType::Public)
-        .with_auth_component(AuthSingleSig::new(
+        .with_auth_component(AuthSingleSig::new(Approver::new(
             pub_key.to_commitment(),
             AuthSchemeId::Falcon512Poseidon2,
-        ))
+        )))
         .with_component(BasicWallet)
         .with_component(component)
         .build_with_schema_commitment()

@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use miden_client::account::AccountType;
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
+use miden_client::note::standards::NoteSyncHint;
 use miden_client::note::{Note, NoteDetails, NoteFile, NoteType, SwapNote};
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::*;
@@ -265,10 +266,9 @@ pub async fn test_swap_private(client_config: ClientConfig) -> Result<()> {
     );
     client2.add_note_tag(tag).await?;
     client2
-        .import_notes(&[NoteFile::NoteDetails {
+        .import_notes(&[NoteFile::ExpectedNote {
             details: output_note.try_into()?,
-            after_block_num: client1.get_sync_height().await?,
-            tag: Some(tag),
+            sync_hint: NoteSyncHint::new(client1.get_sync_height().await?, tag),
         }])
         .await?;
 

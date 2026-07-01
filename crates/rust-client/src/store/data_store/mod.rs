@@ -290,13 +290,13 @@ impl DataStore for ClientDataStore {
                         return Err(DataStoreError::other("Vault root mismatch"));
                     }
 
-                    let asset_witness =
-                        AssetWitness::new(vault.open(vault_key).into()).map_err(|err| {
-                            DataStoreError::other_with_source(
-                                "Failed to open vault asset tree",
-                                err,
-                            )
-                        })?;
+                    let asset_witness = AssetWitness::new(
+                        vault.open(vault_key).into(),
+                        [vault_key],
+                    )
+                    .map_err(|err| {
+                        DataStoreError::other_with_source("Failed to open vault asset tree", err)
+                    })?;
                     asset_witnesses.push(asset_witness);
                 },
                 Err(err) => {

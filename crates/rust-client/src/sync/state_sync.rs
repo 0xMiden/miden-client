@@ -18,7 +18,7 @@ use super::{
     AccountUpdates,
     NoteObserver,
     PartialBlockchainUpdates,
-    PublicAccountDelta,
+    PublicAccountPatch,
     PublicAccountUpdate,
     StateSyncUpdate,
 };
@@ -972,7 +972,7 @@ impl StateSync {
             .await
             .map_err(ClientError::RpcError)?;
 
-        Ok(PublicAccountUpdate::Delta(PublicAccountDelta::new(
+        Ok(PublicAccountUpdate::Patch(PublicAccountPatch::new(
             details.header.clone(),
             block_from,
             block_to,
@@ -1312,7 +1312,6 @@ mod tests {
     use miden_testing::{MockChainBuilder, TxContextInput};
 
     use super::*;
-    use crate::rpc::domain::transaction::ACCOUNT_ID_NATIVE_ASSET_FAUCET;
     use crate::store::{OutputNoteRecord, OutputNoteState};
     use crate::test_utils::mock::MockRpcApi;
 
@@ -1641,16 +1640,12 @@ mod tests {
     mod compute_nullifiers_tests {
         use alloc::vec;
 
-        use miden_protocol::asset::FungibleAsset;
         use miden_protocol::block::BlockNumber;
         use miden_protocol::note::Nullifier;
         use miden_protocol::transaction::{InputNoteCommitment, InputNotes, TransactionHeader};
 
         use super::word;
-        use crate::rpc::domain::transaction::{
-            ACCOUNT_ID_NATIVE_ASSET_FAUCET,
-            TransactionRecord as RpcTransactionRecord,
-        };
+        use crate::rpc::domain::transaction::TransactionRecord as RpcTransactionRecord;
 
         fn make_rpc_tx(
             init_state: u64,
@@ -1670,10 +1665,6 @@ mod tests {
                     .collect(),
             );
 
-            let fee =
-                FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("valid"), 0u64)
-                    .unwrap();
-
             RpcTransactionRecord {
                 block_num: BlockNumber::from(block_number),
                 transaction_header: TransactionHeader::new(
@@ -1682,7 +1673,6 @@ mod tests {
                     word(final_state),
                     input_notes,
                     vec![],
-                    fee,
                 ),
                 output_notes: vec![],
                 erased_output_notes: vec![],
@@ -1719,10 +1709,6 @@ mod tests {
             )
             .unwrap();
 
-            let fee =
-                FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("valid"), 0u64)
-                    .unwrap();
-
             let tx_b1 = RpcTransactionRecord {
                 block_num: BlockNumber::from(5u32),
                 transaction_header: TransactionHeader::new(
@@ -1733,7 +1719,6 @@ mod tests {
                         Nullifier::from_raw(word(40)),
                     )]),
                     vec![],
-                    fee,
                 ),
                 output_notes: vec![],
                 erased_output_notes: vec![],
@@ -1786,9 +1771,6 @@ mod tests {
     /// - Account B, block 6: single tx 10 - 20 (final state = 20).
     #[test]
     fn derive_account_commitments_walks_chains_per_account() {
-        let fee =
-            FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("valid"), 0u64)
-                .unwrap();
         let make_tx = |account: AccountId, init_state: u64, final_state: u64, block_num: u32| {
             RpcTransactionRecord {
                 block_num: BlockNumber::from(block_num),
@@ -1798,7 +1780,6 @@ mod tests {
                     word(final_state),
                     InputNotes::new_unchecked(vec![]),
                     vec![],
-                    fee,
                 ),
                 output_notes: vec![],
                 erased_output_notes: vec![],
@@ -1892,7 +1873,7 @@ mod tests {
             )
             .await
             .unwrap();
-            current_account.apply_delta(tx.account_delta()).unwrap();
+            current_account.apply_patch(tx.account_patch()).unwrap();
             chain.add_pending_executed_transaction(&tx).unwrap();
         }
 
@@ -2100,7 +2081,7 @@ mod tests {
                 note_tags.insert(output_note.metadata().tag());
             }
 
-            faucet_account.apply_delta(tx.account_delta()).unwrap();
+            faucet_account.apply_patch(tx.account_patch()).unwrap();
             chain.add_pending_executed_transaction(&tx).unwrap();
             chain.prove_next_block().unwrap();
         }
@@ -2506,9 +2487,6 @@ mod tests {
 
     /// Builds a minimal RPC transaction record at `block_num`, for range-validation tests.
     fn make_tx_record(account_id: AccountId, block_num: u32) -> RpcTransactionRecord {
-        let fee =
-            FungibleAsset::new(ACCOUNT_ID_NATIVE_ASSET_FAUCET.try_into().expect("valid"), 0u64)
-                .unwrap();
         RpcTransactionRecord {
             block_num: BlockNumber::from(block_num),
             transaction_header: TransactionHeader::new(
@@ -2517,7 +2495,6 @@ mod tests {
                 word(2),
                 InputNotes::new_unchecked(vec![]),
                 vec![],
-                fee,
             ),
             output_notes: vec![],
             erased_output_notes: vec![],
