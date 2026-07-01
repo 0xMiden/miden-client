@@ -287,8 +287,8 @@ pub trait Store: Send + Sync {
     async fn insert_block_header(
         &self,
         block_header: &BlockHeader,
-        has_client_notes: bool,
         nodes: &[(InOrderIndex, Word)],
+        has_client_notes: bool,
     ) -> Result<(), StoreError>;
 
     /// Prunes irrelevant block data from the store.

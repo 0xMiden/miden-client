@@ -156,8 +156,8 @@ impl SqliteStore {
     pub(crate) fn insert_block_header(
         conn: &mut Connection,
         block_header: &BlockHeader,
-        has_client_notes: bool,
         nodes: &[(InOrderIndex, Word)],
+        has_client_notes: bool,
     ) -> Result<(), StoreError> {
         let tx = conn.transaction().into_store_error()?;
 
@@ -484,7 +484,7 @@ mod test {
         let auth_nodes = collect_auth_nodes(&mmr, &headers, &tracked);
         let header = headers[5].clone();
 
-        Store::insert_block_header(&store, &header, true, &auth_nodes).await.unwrap();
+        Store::insert_block_header(&store, &header, &auth_nodes, true).await.unwrap();
 
         // The header is stored and marked as tracked.
         let stored = Store::get_block_headers(&store, &[5.into()].into_iter().collect())
@@ -523,7 +523,7 @@ mod test {
             .await
             .unwrap();
 
-        let result = Store::insert_block_header(&store, &header, true, &nodes).await;
+        let result = Store::insert_block_header(&store, &header, &nodes, true).await;
         assert!(result.is_err(), "node insert must fail against the dropped table");
 
         // The header must not survive: a non-atomic two-transaction insert would leave it behind.

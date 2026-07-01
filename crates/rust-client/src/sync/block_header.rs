@@ -39,7 +39,7 @@ impl<AUTH> Client<AUTH> {
             .get_block_header_by_number(Some(BlockNumber::GENESIS), false)
             .await?;
 
-        self.store.insert_block_header(&genesis, false, &[]).await?;
+        self.store.insert_block_header(&genesis, &[], false).await?;
         self.rpc_api.set_genesis_commitment(genesis.commitment()).await?;
         Ok(())
     }
@@ -144,7 +144,7 @@ impl<AUTH> Client<AUTH> {
         let tracked_nodes = authenticated_block_nodes(&block_header, path_nodes);
 
         // Insert header and MMR nodes atomically
-        self.store.insert_block_header(&block_header, true, &tracked_nodes).await?;
+        self.store.insert_block_header(&block_header, &tracked_nodes, true).await?;
 
         Ok(block_header)
     }
