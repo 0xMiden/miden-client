@@ -275,28 +275,16 @@ pub trait Store: Send + Sync {
     /// Before the first sync, returns an empty [`MmrPeaks`].
     async fn get_current_blockchain_peaks(&self) -> Result<MmrPeaks, StoreError>;
 
-    /// Inserts a block header into the store.
-    ///
-    /// Insert-if-not-exists with a one-way flag upgrade: on conflict with an existing row,
-    /// `header` is preserved and `has_client_notes` is only upgraded from `false` to `true`;
-    /// never downgraded.
-    // TODO: this method's name only tells half the story. The insert is conditional and
-    // the flag has its own upgrade rule. Revisit the name in a follow-up.
-    async fn insert_block_header(
-        &self,
-        block_header: &BlockHeader,
-        has_client_notes: bool,
-    ) -> Result<(), StoreError>;
-
     /// Inserts a block header together with its MMR authentication nodes in a single
     /// transaction, so the header and the nodes that rebuild its `PartialMmr` are committed
     /// together.
     ///
-    /// The `has_client_notes` flag follows the same insert-if-not-exists upgrade rule as
-    /// [`Self::insert_block_header`]. The MMR nodes are likewise inserted-if-not-exists: an
+    /// The header is inserted-if-not-exists with a one-way `has_client_notes` upgrade: on
+    /// conflict the stored `header` is preserved and the flag only moves from `false` to
+    /// `true`, never back. The MMR nodes are likewise inserted-if-not-exists: an
     /// `InOrderIndex` already present is left untouched (auth paths of tracked blocks share
     /// internal nodes, so re-inserting an existing index must be a no-op, not an error).
-    async fn insert_authenticated_block_header(
+    async fn insert_block_header(
         &self,
         block_header: &BlockHeader,
         has_client_notes: bool,

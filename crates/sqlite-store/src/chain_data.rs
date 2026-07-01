@@ -39,19 +39,6 @@ struct SerializedPartialBlockchainNodeParts {
 }
 
 impl SqliteStore {
-    pub(crate) fn insert_block_header(
-        conn: &mut Connection,
-        block_header: &BlockHeader,
-        has_client_notes: bool,
-    ) -> Result<(), StoreError> {
-        let tx = conn.transaction().into_store_error()?;
-
-        Self::insert_block_header_tx(&tx, block_header, has_client_notes)?;
-
-        tx.commit().into_store_error()?;
-        Ok(())
-    }
-
     pub(crate) fn get_block_headers(
         conn: &mut Connection,
         block_numbers: &BTreeSet<BlockNumber>,
@@ -166,7 +153,7 @@ impl SqliteStore {
         }
     }
 
-    pub(crate) fn insert_authenticated_block_header(
+    pub(crate) fn insert_block_header(
         conn: &mut Connection,
         block_header: &BlockHeader,
         has_client_notes: bool,
@@ -477,10 +464,10 @@ mod test {
         );
     }
 
-    /// Tests that `insert_authenticated_block_header` persists the tracked header and its MMR
+    /// Tests that `insert_block_header` persists the tracked header and its MMR
     /// authentication nodes in the same call, so both are retrievable afterwards.
     #[tokio::test]
-    async fn insert_authenticated_block_header_stores_header_and_nodes() {
+    async fn insert_block_header_stores_header_and_nodes() {
         let store = create_test_store().await;
         const TOTAL_BLOCKS: usize = 8;
         let tx_kernel = TransactionKernel.to_commitment();
@@ -497,9 +484,7 @@ mod test {
         let auth_nodes = collect_auth_nodes(&mmr, &headers, &tracked);
         let header = headers[5].clone();
 
-        Store::insert_authenticated_block_header(&store, &header, true, &auth_nodes)
-            .await
-            .unwrap();
+        Store::insert_block_header(&store, &header, true, &auth_nodes).await.unwrap();
 
         // The header is stored and marked as tracked.
         let stored = Store::get_block_headers(&store, &[5.into()].into_iter().collect())
@@ -523,7 +508,7 @@ mod test {
     /// Tests that a failure inserting the MMR nodes rolls back the block header written in the
     /// same call, proving both land in a single transaction.
     #[tokio::test]
-    async fn insert_authenticated_block_header_rolls_back_header_when_nodes_fail() {
+    async fn insert_block_header_rolls_back_header_when_nodes_fail() {
         let store = create_test_store().await;
         let header = BlockHeader::mock(5, None, None, &[], TransactionKernel.to_commitment());
         // One node so the node insert actually runs (an empty slice would be a no-op).
@@ -538,7 +523,7 @@ mod test {
             .await
             .unwrap();
 
-        let result = Store::insert_authenticated_block_header(&store, &header, true, &nodes).await;
+        let result = Store::insert_block_header(&store, &header, true, &nodes).await;
         assert!(result.is_err(), "node insert must fail against the dropped table");
 
         // The header must not survive: a non-atomic two-transaction insert would leave it behind.
