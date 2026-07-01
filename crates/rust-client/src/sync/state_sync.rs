@@ -989,24 +989,32 @@ impl StateSync {
         let mut found_relevant_note = false;
 
         for (_, SyncedNote { committed, content }) in notes {
-            // Attachment content resolved for a private note, paired with it by construction.
-            let private_attachments = match &content {
-                SyncedNoteContent::PrivateAttachments(attachments) => Some(attachments),
-                _ => None,
+            let resolved = match &content {
+                SyncedNoteContent::Resolved(resolved) => Some(resolved),
+                SyncedNoteContent::Unresolved => None,
             };
+
+            // A private note's resolved content carries only attachments (no on-chain body).
+            let private_attachments = resolved
+                .filter(|_| committed.note_type() == NoteType::Private)
+                .map(|resolved| &resolved.attachments);
 
             // For a public note, pair its fetched body with the inclusion proof and metadata from
             // `committed` (the single source of truth) to build the candidate record.
-            let public_note = if let SyncedNoteContent::Public { details, attachments } = &content {
+            let public_note = resolved.and_then(|resolved| {
+                let details = resolved.details.as_ref()?;
                 let state = crate::store::input_note_states::UnverifiedNoteState {
                     metadata: *committed.metadata(),
                     inclusion_proof: committed.inclusion_proof().clone(),
                 }
                 .into();
-                Some(InputNoteRecord::new(details.clone(), attachments.clone(), None, state))
-            } else {
-                None
-            };
+                Some(InputNoteRecord::new(
+                    details.clone(),
+                    resolved.attachments.clone(),
+                    None,
+                    state,
+                ))
+            });
 
             // Observers run BEFORE the screener: they are a side-effect
             // channel independent of the Commit/Insert/Discard decision,

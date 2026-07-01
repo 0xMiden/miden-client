@@ -239,22 +239,29 @@ pub struct SyncedNote {
 /// Content resolved for a note via `GetNotesById`.
 ///
 /// Notes whose body and attachments were not fetched — plain private notes, or public notes when
-/// bodies were not requested — carry [`SyncedNoteContent::Unresolved`].
+/// bodies were not requested — carry [`SyncedNoteContent::Unresolved`]. Everything that *was*
+/// fetched lives in [`ResolvedNoteContent`], so a resolved note can be handed to code that requires
+/// content without re-checking the unresolved case.
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum SyncedNoteContent {
     /// No body or attachment content was fetched for this note.
     Unresolved,
-    /// A public note's full body together with its attachment content.
-    Public {
-        /// The note's recipient and assets (its on-chain body, without metadata).
-        details: NoteDetails,
-        /// The note's attachment content.
-        attachments: NoteAttachments,
-    },
-    /// A private note's resolved attachment content. Private notes expose no on-chain details;
-    /// onlytheir attachments are resolved.
-    PrivateAttachments(NoteAttachments),
+    /// Body and/or attachment content fetched via `GetNotesById`.
+    Resolved(ResolvedNoteContent),
+}
+
+/// Body and attachment content fetched for a note via `GetNotesById`.
+///
+/// Whether the note is public or private is authoritative in its [`CommittedNote`] metadata, so it
+/// is not re-encoded here: `details` is `Some` exactly for public notes (private notes expose no
+/// on-chain body), while `attachments` is common to both.
+#[derive(Debug, Clone)]
+pub struct ResolvedNoteContent {
+    /// The public note body (recipient and assets, without metadata). `None` for private notes.
+    pub details: Option<NoteDetails>,
+    /// The note's attachment content. May be empty for a public note that carries none.
+    pub attachments: NoteAttachments,
 }
 
 impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for NoteSyncBlock {

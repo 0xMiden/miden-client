@@ -56,7 +56,14 @@ use domain::account::{
     StorageMapFetch,
     VaultFetch,
 };
-use domain::note::{FetchedNote, NoteSyncBlock, SyncedNote, SyncedNoteBlock, SyncedNoteContent};
+use domain::note::{
+    FetchedNote,
+    NoteSyncBlock,
+    ResolvedNoteContent,
+    SyncedNote,
+    SyncedNoteBlock,
+    SyncedNoteContent,
+};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
@@ -630,13 +637,21 @@ async fn sync_notes_and_fetch_details<T: NodeRpcClient + ?Sized>(
                     let attachments = note.attachments().clone();
                     resolved_content.insert(
                         note.id(),
-                        SyncedNoteContent::Public { details: note.into(), attachments },
+                        SyncedNoteContent::Resolved(ResolvedNoteContent {
+                            details: Some(note.into()),
+                            attachments,
+                        }),
                     );
                 },
                 FetchedNote::Private(note_id, _, attachments, _) => {
                     if !attachments.is_empty() {
-                        resolved_content
-                            .insert(note_id, SyncedNoteContent::PrivateAttachments(attachments));
+                        resolved_content.insert(
+                            note_id,
+                            SyncedNoteContent::Resolved(ResolvedNoteContent {
+                                details: None,
+                                attachments,
+                            }),
+                        );
                     }
                 },
             }

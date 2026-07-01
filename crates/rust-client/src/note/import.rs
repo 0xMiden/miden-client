@@ -26,7 +26,7 @@ use miden_protocol::note::{
 use miden_tx::auth::TransactionAuthenticator;
 
 use crate::rpc::RpcError;
-use crate::rpc::domain::note::{FetchedNote, SyncedNote, SyncedNoteContent};
+use crate::rpc::domain::note::{FetchedNote, ResolvedNoteContent, SyncedNote, SyncedNoteContent};
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{InputNoteRecord, InputNoteState, NoteFilter};
 use crate::sync::NoteTagRecord;
@@ -300,17 +300,15 @@ where
                     note_record.inclusion_proof_received(inclusion_proof, metadata)?;
 
                 if block_height <= current_block_num {
-                    // If the note is committed in the past we need to manually fetch the block
-                    // header and MMR proof to verify the inclusion proof.
-                    //
-                    // Building the MMR outside the loop would fail with BlockHeaderNotFound(0)
-                    // because store will be fresh, which can't happen here.
+                    // A note committed in the past needs its block header fetched and
+                    // authenticated to verify the inclusion proof. The store isn't fresh here (the
+                    // note is committed at or below the sync height), so building the MMR can't hit
+                    // BlockHeaderNotFound(0).
                     let mut partial_mmr = self.get_current_partial_mmr().await?;
                     let block_header = self
                         .get_and_store_authenticated_block(block_height, &mut partial_mmr)
                         .await?;
                     self.cache_partial_mmr(partial_mmr).await?;
-
                     note_changed |= note_record.block_header_received(&block_header)?;
                 } else {
                     // If the note is in the future we import it as unverified. We add the note tag
@@ -381,10 +379,11 @@ where
             };
 
             let attachments = match content {
-                SyncedNoteContent::Public { attachments, .. } if !attachments.is_empty() => {
+                SyncedNoteContent::Resolved(ResolvedNoteContent { attachments, .. })
+                    if !attachments.is_empty() =>
+                {
                     Some(attachments)
                 },
-                SyncedNoteContent::PrivateAttachments(attachments) => Some(attachments),
                 _ => None,
             };
 
