@@ -1,4 +1,5 @@
 use alloc::collections::BTreeMap;
+use alloc::format;
 use alloc::vec::Vec;
 
 use miden_protocol::account::AccountId;
@@ -209,6 +210,38 @@ pub struct NoteSyncBlock {
     pub notes: BTreeMap<NoteId, CommittedNote>,
 }
 
+impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for NoteSyncBlock {
+    type Error = RpcError;
+
+    fn try_from(
+        block: proto::rpc::sync_notes_response::NoteSyncBlock,
+    ) -> Result<Self, Self::Error> {
+        let block_header = block
+            .block_header
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(blocks.block_header)))?
+            .try_into()?;
+
+        let mmr_path = block
+            .mmr_path
+            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(blocks.mmr_path)))?
+            .try_into()?;
+
+        let notes: BTreeMap<NoteId, CommittedNote> = block
+            .notes
+            .into_iter()
+            .map(|n| {
+                let note = CommittedNote::try_from(n)?;
+                Ok((*note.note_id(), note))
+            })
+            .collect::<Result<_, RpcConversionError>>()?;
+
+        Ok(NoteSyncBlock { block_header, mmr_path, notes })
+    }
+}
+
+// SYNCED NOTE
+// ================================================================================================
+
 /// A block's worth of notes resolved by
 /// [`NodeRpcClient::sync_notes_with_details`](crate::rpc::NodeRpcClient::sync_notes_with_details).
 ///
@@ -234,6 +267,43 @@ pub struct SyncedNote {
     pub committed: CommittedNote,
     /// Body and/or attachment content resolved via `GetNotesById`, if any was fetched.
     pub content: SyncedNoteContent,
+}
+
+impl SyncedNote {
+    /// Pairs a sync record with the content resolved for it, checking that the content is
+    /// consistent with the record's metadata:
+    ///
+    /// - Resolved attachments must hash to the metadata's attachments commitment — the metadata is
+    ///   what inclusion-proof verification later authenticates, so this binds the fetched bytes to
+    ///   the on-chain note.
+    /// - A note whose metadata advertises attachments must have resolved content: storing such a
+    ///   note without its attachment content would leave it unconsumable with no retry path once
+    ///   its expected-note tag is dropped.
+    pub fn new(committed: CommittedNote, content: SyncedNoteContent) -> Result<Self, RpcError> {
+        match &content {
+            SyncedNoteContent::Resolved(resolved) => {
+                if resolved.attachments.to_commitment()
+                    != committed.metadata().attachments_commitment()
+                {
+                    return Err(RpcError::InvalidResponse(format!(
+                        "attachment content returned for note {} does not match the note's \
+                         attachments commitment",
+                        committed.note_id()
+                    )));
+                }
+            },
+            SyncedNoteContent::Unresolved => {
+                if committed.has_attachments() {
+                    return Err(RpcError::InvalidResponse(format!(
+                        "note {} advertises attachments but the node did not return their content",
+                        committed.note_id()
+                    )));
+                }
+            },
+        }
+
+        Ok(Self { committed, content })
+    }
 }
 
 /// Content resolved for a note via `GetNotesById`.
@@ -262,35 +332,6 @@ pub struct ResolvedNoteContent {
     pub details: Option<NoteDetails>,
     /// The note's attachment content. May be empty for a public note that carries none.
     pub attachments: NoteAttachments,
-}
-
-impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for NoteSyncBlock {
-    type Error = RpcError;
-
-    fn try_from(
-        block: proto::rpc::sync_notes_response::NoteSyncBlock,
-    ) -> Result<Self, Self::Error> {
-        let block_header = block
-            .block_header
-            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(blocks.block_header)))?
-            .try_into()?;
-
-        let mmr_path = block
-            .mmr_path
-            .ok_or(proto::rpc::SyncNotesResponse::missing_field(stringify!(blocks.mmr_path)))?
-            .try_into()?;
-
-        let notes: BTreeMap<NoteId, CommittedNote> = block
-            .notes
-            .into_iter()
-            .map(|n| {
-                let note = CommittedNote::try_from(n)?;
-                Ok((*note.note_id(), note))
-            })
-            .collect::<Result<_, RpcConversionError>>()?;
-
-        Ok(NoteSyncBlock { block_header, mmr_path, notes })
-    }
 }
 
 // COMMITTED NOTE
@@ -337,6 +378,18 @@ impl CommittedNote {
     /// Returns the full note metadata.
     pub fn metadata(&self) -> &NoteMetadata {
         &self.metadata
+    }
+
+    /// Returns `true` if the note's metadata advertises at least one attachment.
+    ///
+    /// Sync records carry attachment scheme markers (not the attachment content), so a present
+    /// scheme in any header slot indicates the note has attachments whose content must be fetched
+    /// separately via `GetNotesById`.
+    pub fn has_attachments(&self) -> bool {
+        self.metadata
+            .attachment_headers()
+            .iter()
+            .any(|header| header.scheme().is_some())
     }
 
     pub fn inclusion_proof(&self) -> &NoteInclusionProof {

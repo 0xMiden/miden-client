@@ -10,7 +10,7 @@ use miden_protocol::account::{Account, AccountHeader, AccountId, StorageSlotType
 use miden_protocol::block::account_tree::AccountIdKey;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
-use miden_protocol::note::{NoteId, NoteTag, NoteType, Nullifier};
+use miden_protocol::note::{NoteId, NoteTag, Nullifier};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -977,8 +977,8 @@ impl StateSync {
     ///
     /// Each [`SyncedNote`] is self-contained: its inclusion proof and metadata come from
     /// `committed`, and its body and attachment content (when fetched) come from `content`. The
-    /// candidate public note record is built here from that content, so no separate side-table or
-    /// id-keyed join is needed.
+    /// candidate public note record and the attachments applied to tracked records are both built
+    /// here from that content.
     async fn note_state_sync(
         &self,
         note_updates: &mut NoteUpdateTracker,
@@ -994,10 +994,10 @@ impl StateSync {
                 SyncedNoteContent::Unresolved => None,
             };
 
-            // A private note's resolved content carries only attachments (no on-chain body).
-            let private_attachments = resolved
-                .filter(|_| committed.note_type() == NoteType::Private)
-                .map(|resolved| &resolved.attachments);
+            // Attachment content fetched for the note. Attachments are a public extension stored
+            // on-chain for private and public notes alike, so they are applied to the record
+            // regardless of note type.
+            let attachments = resolved.map(|resolved| &resolved.attachments);
 
             // For a public note, pair its fetched body with the inclusion proof and metadata from
             // `committed` (the single source of truth) to build the candidate record.
@@ -1020,16 +1020,8 @@ impl StateSync {
             // channel independent of the Commit/Insert/Discard decision,
             // and a failing screener must not rob them of the note.
             if !self.note_observers.is_empty() {
-                // Resolve attachment content for the note: public note bodies carry their
-                // attachments on the candidate `InputNoteRecord`; private-note attachments come
-                // straight from the resolved content.
-                let note_attachments = if committed.note_type() == NoteType::Private {
-                    private_attachments
-                } else {
-                    public_note.as_ref().map(InputNoteRecord::attachments)
-                };
                 for obs in &self.note_observers {
-                    match obs.observe(&committed, note_attachments).await {
+                    match obs.observe(&committed, attachments).await {
                         Ok(true) => found_relevant_note = true,
                         Ok(false) => {},
                         Err(err) => {
@@ -1051,7 +1043,7 @@ impl StateSync {
                     found_relevant_note |= note_updates.apply_committed_note_state_transitions(
                         &committed_note,
                         block_header,
-                        private_attachments,
+                        attachments,
                     )?;
                 },
                 NoteUpdateAction::Insert(public_note) => {

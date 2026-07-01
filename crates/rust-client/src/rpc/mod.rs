@@ -72,7 +72,7 @@ use miden_protocol::address::NetworkId;
 use miden_protocol::batch::{ProposedBatch, ProvenBatch};
 use miden_protocol::block::{BlockHeader, BlockNumber, ProvenBlock};
 use miden_protocol::crypto::merkle::mmr::MmrProof;
-use miden_protocol::note::{NoteId, NoteMetadata, NoteScript, NoteTag, NoteType, Nullifier};
+use miden_protocol::note::{NoteId, NoteScript, NoteTag, NoteType, Nullifier};
 use miden_protocol::transaction::{ProvenTransaction, TransactionInputs};
 
 use crate::rpc::domain::storage_map::StorageMapInfo;
@@ -113,14 +113,6 @@ pub enum AccountStateAt {
     ChainTip,
     /// Gets the state at a specific block number
     Block(BlockNumber),
-}
-
-/// Returns `true` if the note's metadata advertises at least one attachment.
-///
-/// Sync records carry attachment scheme markers (not the attachment content), so a present scheme
-/// in any header slot indicates the note has attachments whose content must be fetched separately.
-fn metadata_has_attachments(metadata: &NoteMetadata) -> bool {
-    metadata.attachment_headers().iter().any(|header| header.scheme().is_some())
 }
 
 // NODE RPC CLIENT TRAIT
@@ -603,6 +595,9 @@ pub trait NodeRpcClient: Send + Sync {
     ) -> Result<NetworkNoteStatusInfo, RpcError>;
 }
 
+// HELPERS
+// ================================================================================================
+
 /// Syncs notes by tag, then resolves content via `GetNotesById` and folds it into each note.
 ///
 /// A `GetNotesById` fetch is issued for a note when either:
@@ -624,7 +619,7 @@ async fn sync_notes_and_fetch_details<T: NodeRpcClient + ?Sized>(
         .flat_map(|block| block.notes.values())
         .filter(|note| {
             (get_public_note_details && note.note_type() == NoteType::Public)
-                || metadata_has_attachments(note.metadata())
+                || note.has_attachments()
         })
         .map(|note| *note.note_id())
         .collect();
@@ -659,26 +654,22 @@ async fn sync_notes_and_fetch_details<T: NodeRpcClient + ?Sized>(
     }
 
     // Fold the resolved content into each note, keeping the per-block grouping so the inclusion
-    // data (header + MMR path) is carried once per block.
-    let synced_blocks = blocks
-        .into_iter()
-        .map(|block| {
-            let notes = block
-                .notes
-                .into_iter()
-                .map(|(note_id, committed)| {
-                    let content =
-                        resolved_content.remove(&note_id).unwrap_or(SyncedNoteContent::Unresolved);
-                    (note_id, SyncedNote { committed, content })
-                })
-                .collect();
-            SyncedNoteBlock {
-                block_header: block.block_header,
-                mmr_path: block.mmr_path,
-                notes,
-            }
-        })
-        .collect();
+    // data (header + MMR path) is carried once per block. `SyncedNote::new` rejects content that
+    // is inconsistent with its sync record (mismatched or missing attachment content).
+    let mut synced_blocks = Vec::with_capacity(blocks.len());
+    for block in blocks {
+        let mut notes = BTreeMap::new();
+        for (note_id, committed) in block.notes {
+            let content =
+                resolved_content.remove(&note_id).unwrap_or(SyncedNoteContent::Unresolved);
+            notes.insert(note_id, SyncedNote::new(committed, content)?);
+        }
+        synced_blocks.push(SyncedNoteBlock {
+            block_header: block.block_header,
+            mmr_path: block.mmr_path,
+            notes,
+        });
+    }
 
     Ok(synced_blocks)
 }

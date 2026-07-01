@@ -66,6 +66,8 @@ where
         &mut self,
         note_files: &[NoteFile],
     ) -> Result<Vec<NoteDetailsCommitment>, ClientError> {
+        self.ensure_genesis_in_place().await?;
+
         // Deduplicate the incoming files, keeping note IDs and details commitments in separate
         // collections. `NoteFile::NoteId` entries are keyed by their note ID; detail-carrying
         // entries (`NoteDetails`/`NoteWithProof`) are keyed by their details commitment, since
@@ -267,6 +269,7 @@ where
             .rpc_api
             .get_nullifier_commit_heights(nullifier_requests, lowest_block_height)
             .await?;
+        let mut partial_mmr = self.get_current_partial_mmr().await?;
 
         for (previous_note, note, inclusion_proof) in requested_notes {
             let metadata = *note.metadata();
@@ -301,14 +304,10 @@ where
 
                 if block_height <= current_block_num {
                     // A note committed in the past needs its block header fetched and
-                    // authenticated to verify the inclusion proof. The store isn't fresh here (the
-                    // note is committed at or below the sync height), so building the MMR can't hit
-                    // BlockHeaderNotFound(0).
-                    let mut partial_mmr = self.get_current_partial_mmr().await?;
+                    // authenticated to verify the inclusion proof.
                     let block_header = self
                         .get_and_store_authenticated_block(block_height, &mut partial_mmr)
                         .await?;
-                    self.cache_partial_mmr(partial_mmr).await?;
                     note_changed |= note_record.block_header_received(&block_header)?;
                 } else {
                     // If the note is in the future we import it as unverified. We add the note tag
@@ -328,6 +327,7 @@ where
                 }
             }
         }
+        self.cache_partial_mmr(partial_mmr).await?;
 
         Ok(note_records)
     }
@@ -350,15 +350,7 @@ where
             self.check_expected_notes(lowest_request_block, note_requests).await?;
 
         let mut note_records = vec![];
-        // Only build the MMR when there are committed notes whose block headers must be
-        // authenticated. On a fresh store — e.g. importing an expected note before any sync —
-        // `get_current_partial_mmr` fails with `BlockHeaderNotFound(0)`, and such an import has no
-        // committed notes to process.
-        let mut partial_mmr = if committed_notes_data.is_empty() {
-            None
-        } else {
-            Some(self.get_current_partial_mmr().await?)
-        };
+        let mut partial_mmr = self.get_current_partial_mmr().await?;
 
         for (previous_note, details, after_block_num, tag) in requested_notes {
             let mut note_record = previous_note.unwrap_or_else(|| {
@@ -388,10 +380,7 @@ where
             };
 
             let block_header = self
-                .get_and_store_authenticated_block(
-                    committed_note.block_num(),
-                    partial_mmr.as_mut().expect("MMR is built when committed notes are present"),
-                )
+                .get_and_store_authenticated_block(committed_note.block_num(), &mut partial_mmr)
                 .await?;
 
             let metadata = *committed_note.metadata();
@@ -420,9 +409,7 @@ where
 
             note_records.push(note_changed.then_some(note_record));
         }
-        if let Some(partial_mmr) = partial_mmr {
-            self.cache_partial_mmr(partial_mmr).await?;
-        }
+        self.cache_partial_mmr(partial_mmr).await?;
 
         Ok(note_records)
     }
@@ -441,17 +428,13 @@ where
         expected_notes: Vec<(NoteDetailsCommitment, NoteTag)>,
     ) -> Result<BTreeMap<NoteDetailsCommitment, SyncedNote>, ClientError> {
         let sync_tags: BTreeSet<NoteTag> = expected_notes.iter().map(|(_, tag)| *tag).collect();
-        let expected_note_commitments: BTreeSet<NoteDetailsCommitment> =
-            expected_notes.iter().map(|(commitment, _)| *commitment).collect();
 
         let mut matched_notes = BTreeMap::new();
         let current_block_num = self.get_sync_height().await?;
 
-        // An unsynced client (still at genesis) has no chain view, so nothing can be committed
-        // yet: skip the lookup and let every note stay expected until the next sync. This keeps
-        // an offline import fully local. Likewise skip notes expected only after a block we have
-        // not reached.
-        if current_block_num == BlockNumber::GENESIS || request_block_num > current_block_num {
+        // Notes expected only after a block we have not reached can't be committed within our
+        // synced view yet: skip the lookup and let them stay expected until a future sync.
+        if request_block_num > current_block_num {
             return Ok(matched_notes);
         }
 
@@ -468,13 +451,13 @@ where
 
             for sync_note in block.notes.into_values() {
                 let committed = &sync_note.committed;
-                let Some(&commitment) = expected_note_commitments.iter().find(|&commitment| {
+                let Some((commitment, _)) = expected_notes.iter().find(|(commitment, _)| {
                     NoteId::new(*commitment, committed.metadata()) == *committed.note_id()
                 }) else {
                     continue;
                 };
 
-                matched_notes.insert(commitment, sync_note);
+                matched_notes.insert(*commitment, sync_note);
             }
         }
 
