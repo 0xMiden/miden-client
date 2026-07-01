@@ -2576,7 +2576,7 @@ dependencies = [
 [[package]]
 name = "miden-protocol"
 version = "0.16.0"
-source = "git+https://github.com/0xMiden/protocol.git?branch=next#36a1d092d4e8cc3dc1e276d8518eae7b7baa70c5"
+source = "git+https://github.com/0xMiden/protocol.git?branch=next#96878f9fba1648380556996a38978ce81ac625f0"
 dependencies = [
  "bech32",
  "fs-err",
@@ -2651,7 +2651,7 @@ dependencies = [
 [[package]]
 name = "miden-standards"
 version = "0.16.0"
-source = "git+https://github.com/0xMiden/protocol.git?branch=next#36a1d092d4e8cc3dc1e276d8518eae7b7baa70c5"
+source = "git+https://github.com/0xMiden/protocol.git?branch=next#96878f9fba1648380556996a38978ce81ac625f0"
 dependencies = [
  "bon",
  "fs-err",
@@ -2709,7 +2709,7 @@ dependencies = [
 [[package]]
 name = "miden-tx"
 version = "0.16.0"
-source = "git+https://github.com/0xMiden/protocol.git?branch=next#36a1d092d4e8cc3dc1e276d8518eae7b7baa70c5"
+source = "git+https://github.com/0xMiden/protocol.git?branch=next#96878f9fba1648380556996a38978ce81ac625f0"
 dependencies = [
  "miden-processor",
  "miden-protocol",
