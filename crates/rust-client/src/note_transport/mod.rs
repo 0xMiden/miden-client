@@ -354,6 +354,7 @@ where
         const NOTE_LOOKBACK_BLOCKS: u32 = 20;
 
         let mut notes = Vec::new();
+        let mut id_by_commitment: BTreeMap<NoteDetailsCommitment, NoteId> = BTreeMap::new();
         let (note_infos, rcursor) =
             self.get_note_transport_api()?.fetch_notes(tags, cursor).await?;
         for note_info in &note_infos {
@@ -361,22 +362,19 @@ where
             // for key in self.store.decryption_keys() try
             // key.decrypt(details_bytes_encrypted)
             let note = rejoin_note(&note_info.header, &note_info.details_bytes)?;
-            let note_id = note_info.header.id();
 
             // The header carries the attachment-aware (on-chain) note id; the rejoined note has
             // empty attachments and would hash to a different id, so key off the header.
-            notes.push((note_id, note, note_info.block_hint));
+            id_by_commitment.insert(note.details_commitment(), note_info.header.id());
+            notes.push((note, note_info.block_hint));
         }
 
         let sync_height = self.get_sync_height().await?;
         let fallback_after_block_num =
             BlockNumber::from(sync_height.as_u32().saturating_sub(NOTE_LOOKBACK_BLOCKS));
 
-        let id_by_commitment: BTreeMap<NoteDetailsCommitment, NoteId> =
-            notes.iter().map(|(id, note, _)| (note.details_commitment(), *id)).collect();
-
         let mut note_requests = Vec::with_capacity(notes.len());
-        for (_, note, block_hint) in notes {
+        for (note, block_hint) in notes {
             let tag = note.metadata().tag();
             // Prefer the sender-provided hint, falling back to the lookback window when absent.
             let after_block_num = block_hint.unwrap_or(fallback_after_block_num);

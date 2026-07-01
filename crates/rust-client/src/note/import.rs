@@ -25,8 +25,8 @@ use miden_protocol::note::{
 };
 use miden_tx::auth::TransactionAuthenticator;
 
-use crate::rpc::RpcError;
-use crate::rpc::domain::note::{FetchedNote, ResolvedNoteContent, SyncedNote, SyncedNoteContent};
+use crate::rpc::domain::note::{FetchedNote, ResolvedNoteContent, SyncedNote};
+use crate::rpc::{NoteContentFetch, RpcError};
 use crate::store::input_note_states::ExpectedNoteState;
 use crate::store::{InputNoteRecord, InputNoteState, NoteFilter};
 use crate::sync::NoteTagRecord;
@@ -370,14 +370,9 @@ where
                 continue;
             };
 
-            let attachments = match content {
-                SyncedNoteContent::Resolved(ResolvedNoteContent { attachments, .. })
-                    if !attachments.is_empty() =>
-                {
-                    Some(attachments)
-                },
-                _ => None,
-            };
+            let attachments = content
+                .map(ResolvedNoteContent::into_attachments)
+                .filter(|attachments| !attachments.is_empty());
 
             let block_header = self
                 .get_and_store_authenticated_block(committed_note.block_num(), &mut partial_mmr)
@@ -387,11 +382,8 @@ where
             let mut note_changed = note_record
                 .inclusion_proof_received(committed_note.inclusion_proof().clone(), metadata)?;
 
-            if let Some(attachments) = attachments
-                && note_record.attachments() != &attachments
-            {
-                note_record.set_attachments(attachments);
-                note_changed = true;
+            if let Some(attachments) = attachments {
+                note_changed |= note_record.attachments_received(attachments);
             }
 
             // `block_header_received` transitions the record's state, so it must always run.
@@ -440,7 +432,12 @@ where
 
         let blocks = self
             .rpc_api
-            .sync_notes_with_attachments(request_block_num, current_block_num, &sync_tags)
+            .sync_notes_with_content(
+                request_block_num,
+                current_block_num,
+                &sync_tags,
+                NoteContentFetch::AttachmentsOnly,
+            )
             .await
             .map_err(ClientError::RpcError)?;
 

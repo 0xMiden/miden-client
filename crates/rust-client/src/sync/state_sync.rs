@@ -10,7 +10,7 @@ use miden_protocol::account::{Account, AccountHeader, AccountId, StorageSlotType
 use miden_protocol::block::account_tree::AccountIdKey;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
-use miden_protocol::note::{NoteId, NoteTag, Nullifier};
+use miden_protocol::note::{NoteAttachments, NoteId, NoteTag, Nullifier};
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -31,10 +31,10 @@ use crate::rpc::domain::account::{
     StorageMapFetch,
     VaultFetch,
 };
-use crate::rpc::domain::note::{CommittedNote, SyncedNote, SyncedNoteBlock, SyncedNoteContent};
+use crate::rpc::domain::note::{CommittedNote, ResolvedNoteContent, SyncedNote, SyncedNoteBlock};
 use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::transaction::TransactionRecord as RpcTransactionRecord;
-use crate::rpc::{AccountStateAt, NodeRpcClient};
+use crate::rpc::{AccountStateAt, NodeRpcClient, NoteContentFetch};
 use crate::store::{InputNoteRecord, OutputNoteRecord, StoreError};
 use crate::transaction::TransactionRecord;
 
@@ -346,7 +346,12 @@ impl StateSync {
             Vec::new()
         } else {
             self.rpc_api
-                .sync_notes_with_details(current_block_num + 1, chain_tip, note_tags.as_ref())
+                .sync_notes_with_content(
+                    current_block_num + 1,
+                    chain_tip,
+                    note_tags.as_ref(),
+                    NoteContentFetch::PublicBodiesAndAttachments,
+                )
                 .await?
         };
 
@@ -989,31 +994,31 @@ impl StateSync {
         let mut found_relevant_note = false;
 
         for (_, SyncedNote { committed, content }) in notes {
-            let resolved = match &content {
-                SyncedNoteContent::Resolved(resolved) => Some(resolved),
-                SyncedNoteContent::Unresolved => None,
-            };
-
             // Attachment content fetched for the note. Attachments are a public extension stored
             // on-chain for private and public notes alike, so they are applied to the record
             // regardless of note type.
-            let attachments = resolved.map(|resolved| &resolved.attachments);
+            let (details, attachments) = match content {
+                Some(ResolvedNoteContent::Public { details, attachments }) => {
+                    (Some(details), Some(attachments))
+                },
+                Some(ResolvedNoteContent::Private { attachments }) => (None, Some(attachments)),
+                None => (None, None),
+            };
 
             // For a public note, pair its fetched body with the inclusion proof and metadata from
             // `committed` (the single source of truth) to build the candidate record.
-            let public_note = resolved.and_then(|resolved| {
-                let details = resolved.details.as_ref()?;
+            let public_note = details.map(|details| {
                 let state = crate::store::input_note_states::UnverifiedNoteState {
                     metadata: *committed.metadata(),
                     inclusion_proof: committed.inclusion_proof().clone(),
                 }
                 .into();
-                Some(InputNoteRecord::new(
-                    details.clone(),
-                    resolved.attachments.clone(),
+                InputNoteRecord::new(
+                    details,
+                    attachments.clone().unwrap_or_else(NoteAttachments::empty),
                     None,
                     state,
-                ))
+                )
             });
 
             // Observers run BEFORE the screener: they are a side-effect
@@ -1021,7 +1026,7 @@ impl StateSync {
             // and a failing screener must not rob them of the note.
             if !self.note_observers.is_empty() {
                 for obs in &self.note_observers {
-                    match obs.observe(&committed, attachments).await {
+                    match obs.observe(&committed, attachments.as_ref()).await {
                         Ok(true) => found_relevant_note = true,
                         Ok(false) => {},
                         Err(err) => {
@@ -1043,7 +1048,7 @@ impl StateSync {
                     found_relevant_note |= note_updates.apply_committed_note_state_transitions(
                         &committed_note,
                         block_header,
-                        attachments,
+                        attachments.as_ref(),
                     )?;
                 },
                 NoteUpdateAction::Insert(public_note) => {
@@ -2149,12 +2154,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn sync_notes_with_details_fetches_inclusive_upper_bound_page() {
+    async fn sync_notes_with_content_fetches_inclusive_upper_bound_page() {
         let (chain, note_tags) = build_chain_with_mint_notes(10).await;
         let mock_rpc = MockRpcApi::new(chain);
 
         let blocks = mock_rpc
-            .sync_notes_with_details(4_u32.into(), 10_u32.into(), &note_tags)
+            .sync_notes_with_content(
+                4_u32.into(),
+                10_u32.into(),
+                &note_tags,
+                NoteContentFetch::PublicBodiesAndAttachments,
+            )
             .await
             .expect("sync notes should succeed");
 

@@ -243,7 +243,7 @@ impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for NoteSyncBlock {
 // ================================================================================================
 
 /// A block's worth of notes resolved by
-/// [`NodeRpcClient::sync_notes_with_details`](crate::rpc::NodeRpcClient::sync_notes_with_details).
+/// [`NodeRpcClient::sync_notes_with_content`](crate::rpc::NodeRpcClient::sync_notes_with_content).
 ///
 /// Unlike [`NoteSyncBlock`] (the raw `SyncNotes` response), each note here also carries the body
 /// and attachment content fetched via `GetNotesById`, so a consumer never has to re-join two
@@ -265,24 +265,40 @@ pub struct SyncedNoteBlock {
 pub struct SyncedNote {
     /// Note identity, metadata, and inclusion proof, as reported by `SyncNotes`.
     pub committed: CommittedNote,
-    /// Body and/or attachment content resolved via `GetNotesById`, if any was fetched.
-    pub content: SyncedNoteContent,
+    /// Body and/or attachment content resolved via `GetNotesById`; `None` if none was fetched
+    /// (plain private notes, or public notes when bodies were not requested).
+    pub content: Option<ResolvedNoteContent>,
 }
 
 impl SyncedNote {
     /// Pairs a sync record with the content resolved for it, checking that the content is
     /// consistent with the record's metadata:
     ///
+    /// - The content variant must match the record's note type.
     /// - Resolved attachments must hash to the metadata's attachments commitment — the metadata is
     ///   what inclusion-proof verification later authenticates, so this binds the fetched bytes to
     ///   the on-chain note.
     /// - A note whose metadata advertises attachments must have resolved content: storing such a
     ///   note without its attachment content would leave it unconsumable with no retry path once
     ///   its expected-note tag is dropped.
-    pub fn new(committed: CommittedNote, content: SyncedNoteContent) -> Result<Self, RpcError> {
+    pub fn new(
+        committed: CommittedNote,
+        content: Option<ResolvedNoteContent>,
+    ) -> Result<Self, RpcError> {
         match &content {
-            SyncedNoteContent::Resolved(resolved) => {
-                if resolved.attachments.to_commitment()
+            Some(resolved) => {
+                let expected_note_type = match resolved {
+                    ResolvedNoteContent::Public { .. } => NoteType::Public,
+                    ResolvedNoteContent::Private { .. } => NoteType::Private,
+                };
+                if committed.note_type() != expected_note_type {
+                    return Err(RpcError::InvalidResponse(format!(
+                        "content returned for note {} does not match the note's type",
+                        committed.note_id()
+                    )));
+                }
+
+                if resolved.attachments().to_commitment()
                     != committed.metadata().attachments_commitment()
                 {
                     return Err(RpcError::InvalidResponse(format!(
@@ -292,7 +308,7 @@ impl SyncedNote {
                     )));
                 }
             },
-            SyncedNoteContent::Unresolved => {
+            None => {
                 if committed.has_attachments() {
                     return Err(RpcError::InvalidResponse(format!(
                         "note {} advertises attachments but the node did not return their content",
@@ -306,32 +322,39 @@ impl SyncedNote {
     }
 }
 
-/// Content resolved for a note via `GetNotesById`.
-///
-/// Notes whose body and attachments were not fetched — plain private notes, or public notes when
-/// bodies were not requested — carry [`SyncedNoteContent::Unresolved`]. Everything that *was*
-/// fetched lives in [`ResolvedNoteContent`], so a resolved note can be handed to code that requires
-/// content without re-checking the unresolved case.
+/// Body and attachment content fetched for a note via `GetNotesById`.
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum SyncedNoteContent {
-    /// No body or attachment content was fetched for this note.
-    Unresolved,
-    /// Body and/or attachment content fetched via `GetNotesById`.
-    Resolved(ResolvedNoteContent),
+pub enum ResolvedNoteContent {
+    /// Content fetched for a public note.
+    Public {
+        /// The public note body (recipient and assets, without metadata).
+        details: NoteDetails,
+        /// The note's attachment content. May be empty for a public note that carries none.
+        attachments: NoteAttachments,
+    },
+    /// Content fetched for a private note. Private notes expose no on-chain body, so only their
+    /// attachment content is resolved.
+    Private {
+        /// The note's attachment content.
+        attachments: NoteAttachments,
+    },
 }
 
-/// Body and attachment content fetched for a note via `GetNotesById`.
-///
-/// Whether the note is public or private is authoritative in its [`CommittedNote`] metadata, so it
-/// is not re-encoded here: `details` is `Some` exactly for public notes (private notes expose no
-/// on-chain body), while `attachments` is common to both.
-#[derive(Debug, Clone)]
-pub struct ResolvedNoteContent {
-    /// The public note body (recipient and assets, without metadata). `None` for private notes.
-    pub details: Option<NoteDetails>,
-    /// The note's attachment content. May be empty for a public note that carries none.
-    pub attachments: NoteAttachments,
+impl ResolvedNoteContent {
+    /// Returns the attachment content fetched for the note.
+    pub fn attachments(&self) -> &NoteAttachments {
+        match self {
+            Self::Public { attachments, .. } | Self::Private { attachments } => attachments,
+        }
+    }
+
+    /// Consumes the content and returns the attachment content fetched for the note.
+    pub fn into_attachments(self) -> NoteAttachments {
+        match self {
+            Self::Public { attachments, .. } | Self::Private { attachments } => attachments,
+        }
+    }
 }
 
 // COMMITTED NOTE
