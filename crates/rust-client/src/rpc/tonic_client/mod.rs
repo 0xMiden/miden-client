@@ -124,15 +124,8 @@ impl BlockPagination {
 // GRPC CLIENT
 // ================================================================================================
 
-/// Default maximum size (in bytes) of a decoded gRPC response the client will accept.
-///
-/// When no decode limit is set on a tonic client, the decoder falls back to tonic's built-in
-/// `DEFAULT_MAX_RECV_MESSAGE_SIZE` of 4 MiB, applied at these [`unwrap_or`
-/// fallbacks][tonic-decode]. Passing this value explicitly overrides that fallback and lifts the
-/// ceiling to 15% above 4 MiB, so responses that land slightly over 4 MiB still decode. Callers
-/// that need more can raise it further with [`GrpcClient::with_max_decoding_message_size`].
-///
-/// [tonic-decode]: https://github.com/hyperium/tonic/blob/6cb6056b5a748bc5a29bd48f4602dbc4e552bb7d/tonic/src/codec/decode.rs#L192-L218
+/// Default maximum size (in bytes) of a decoded gRPC response the client will accept: 15% above
+/// tonic's built-in 4 MiB receive limit. See [`GrpcClient::with_max_decoding_message_size`].
 const DEFAULT_MAX_DECODING_MESSAGE_SIZE: usize = 4 * 1024 * 1024 * 115 / 100;
 
 /// Client for the Node RPC API using gRPC.
@@ -204,10 +197,10 @@ impl GrpcClient {
 
     /// Sets the maximum size (in bytes) of a decoded gRPC response the client will accept.
     ///
-    /// Defaults to a 15% margin over the node's 4 MiB payload budget. Raise this when the node
-    /// returns responses larger than the default and a sync fails with a "decoded message length
-    /// too large" error. This only changes what the client is willing to receive; it does not
-    /// affect how much data the node produces.
+    /// Defaults to 15% above [tonic's built-in 4 MiB receive limit][tonic-decode], leaving headroom
+    /// for responses that land slightly over 4 MiB.
+    ///
+    /// [tonic-decode]: https://github.com/hyperium/tonic/blob/6cb6056b5a748bc5a29bd48f4602dbc4e552bb7d/tonic/src/codec/decode.rs#L192-L218
     #[must_use]
     pub fn with_max_decoding_message_size(mut self, max_decoding_message_size: usize) -> Self {
         self.max_decoding_message_size = max_decoding_message_size;
