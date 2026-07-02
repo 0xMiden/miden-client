@@ -21,8 +21,7 @@ use miden_protocol::transaction::TransactionId;
 use miden_protocol::{Felt, Word};
 
 use super::SyncSummary;
-use crate::ClientError;
-use crate::note::{NoteConsumption, NoteUpdateTracker, NoteUpdateType};
+use crate::note::{NoteUpdateTracker, NoteUpdateType};
 use crate::rpc::domain::account_vault::AccountVaultUpdate;
 use crate::rpc::domain::storage_map::StorageMapUpdate;
 use crate::rpc::domain::transaction::TransactionRecord as RpcTransactionRecord;
@@ -32,7 +31,10 @@ use crate::transaction::{DiscardCause, TransactionRecord, TransactionStatus};
 // ================================================================================================
 
 /// Contains all information needed to apply the update in the store after syncing with the node.
-#[derive(Default)]
+///
+/// Immutable once built: [`StateSync::sync_state`](super::StateSync::sync_state) assembles the
+/// individual trackers and seals them into this type at the end of the sync pass. Use
+/// [`Self::from_parts`] to build one directly.
 pub struct StateSyncUpdate {
     /// The block number of the last block that was synced.
     block_num: BlockNumber,
@@ -47,64 +49,31 @@ pub struct StateSyncUpdate {
 }
 
 impl StateSyncUpdate {
-    /// Creates a new update for a sync starting at `block_num`, seeded with the notes and
-    /// transactions to reconcile.
+    /// Assembles an update from its constituent parts, mirroring [`Self::into_parts`].
     ///
-    /// The blockchain and account updates start empty; the sync stages fill them in as they run.
-    pub(super) fn new(
+    /// The parts are stored as given: no validation or minimization is applied. In particular,
+    /// blockchain updates for blocks whose notes are all spent are kept as-is —
+    /// [`StateSync::sync_state`](super::StateSync::sync_state) strips those before assembling
+    /// the update it returns.
+    pub fn from_parts(
         block_num: BlockNumber,
+        partial_blockchain_updates: PartialBlockchainUpdates,
         note_updates: NoteUpdateTracker,
         transaction_updates: TransactionUpdateTracker,
+        account_updates: AccountUpdates,
     ) -> Self {
         Self {
             block_num,
+            partial_blockchain_updates,
             note_updates,
             transaction_updates,
-            ..Default::default()
+            account_updates,
         }
     }
 
     /// Returns the block number of the last synced block.
     pub fn block_num(&self) -> BlockNumber {
         self.block_num
-    }
-
-    /// Sets the block number of the last synced block.
-    pub(super) fn set_block_num(&mut self, block_num: BlockNumber) {
-        self.block_num = block_num;
-    }
-
-    /// Returns a mutable reference to the partial blockchain updates.
-    pub(super) fn partial_blockchain_updates_mut(&mut self) -> &mut PartialBlockchainUpdates {
-        &mut self.partial_blockchain_updates
-    }
-
-    /// Returns a mutable reference to the note updates.
-    pub(super) fn note_updates_mut(&mut self) -> &mut NoteUpdateTracker {
-        &mut self.note_updates
-    }
-
-    /// Returns a mutable reference to the transaction updates.
-    pub(super) fn transaction_updates_mut(&mut self) -> &mut TransactionUpdateTracker {
-        &mut self.transaction_updates
-    }
-
-    /// Returns a mutable reference to the account updates.
-    pub(super) fn account_updates_mut(&mut self) -> &mut AccountUpdates {
-        &mut self.account_updates
-    }
-
-    /// Applies a note consumption to the note updates, resolving the consumer against the
-    /// update's committed transactions.
-    ///
-    /// Performs the disjoint borrow of the note and transaction trackers that callers outside
-    /// this type cannot express through the accessors.
-    pub(super) fn apply_note_consumption(
-        &mut self,
-        consumption: &NoteConsumption,
-    ) -> Result<(), ClientError> {
-        self.note_updates
-            .apply_note_consumption(consumption, self.transaction_updates.committed_transactions())
     }
 
     /// Returns the partial blockchain updates.
@@ -144,14 +113,6 @@ impl StateSyncUpdate {
             self.transaction_updates,
             self.account_updates,
         )
-    }
-
-    /// Removes newly-synced block data that is not needed after applying all state transitions.
-    pub(crate) fn minimize(&mut self, partial_mmr: &mut PartialMmr) {
-        let live_blocks: BTreeSet<BlockNumber> =
-            self.note_updates.unspent_input_note_block_numbers().collect();
-        self.partial_blockchain_updates
-            .untrack_irrelevant_note_blocks(&live_blocks, partial_mmr);
     }
 }
 
@@ -284,7 +245,10 @@ impl PartialBlockchainUpdates {
         &self.new_authentication_nodes
     }
 
-    fn untrack_irrelevant_note_blocks(
+    /// Untracks note blocks that are not in `live_blocks`: clears their `has_client_notes` flag,
+    /// untracks their leaves from `partial_mmr`, and drops the authentication nodes that no
+    /// remaining tracked leaf needs.
+    pub(super) fn untrack_irrelevant_note_blocks(
         &mut self,
         live_blocks: &BTreeSet<BlockNumber>,
         partial_mmr: &mut PartialMmr,
