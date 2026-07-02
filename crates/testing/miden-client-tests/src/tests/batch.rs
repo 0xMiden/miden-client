@@ -5,6 +5,7 @@ use miden_client::account::AccountType;
 use miden_client::asset::{Asset, FungibleAsset};
 use miden_client::auth::RPO_FALCON_SCHEME_ID;
 use miden_client::builder::ClientBuilder;
+use miden_client::crypto::DefaultFeltRng;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::note::{NoteType, NoteUpdateTracker};
 use miden_client::rpc::NodeRpcClient;
@@ -26,8 +27,6 @@ use miden_client::transaction::{
 };
 use miden_client::{ClientError, DebugMode};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
-use miden_protocol::Felt;
-use miden_protocol::crypto::rand::RandomCoin;
 use miden_testing::{Auth, MockChainBuilder, TxContextInput};
 
 use crate::tests::create_test_client;
@@ -158,8 +157,7 @@ async fn apply_transaction_batch_rolls_back_on_mid_batch_failure() {
     let mock_chain = chain_builder.build().unwrap();
 
     // Build a client backed by the mock chain.
-    let rng =
-        RandomCoin::new(rand::random::<[u64; 4]>().map(|v| Felt::new_unchecked(v >> 1)).into());
+    let rng = DefaultFeltRng::from_seed(rand::random());
     let keystore = FilesystemKeyStore::new(std::env::temp_dir()).unwrap();
     let rpc_api = MockRpcApi::new(mock_chain);
     let mut client = ClientBuilder::new()
@@ -435,7 +433,7 @@ async fn batch_builder_submits_txs_across_multiple_accounts() {
     let account_id_b = account_b.id();
     let mock_chain = chain_builder.build().unwrap();
 
-    let rng = RandomCoin::new(rand::random::<[u64; 4]>().map(Felt::new_unchecked).into());
+    let rng = DefaultFeltRng::from_seed(rand::random());
     let keystore = FilesystemKeyStore::new(std::env::temp_dir()).unwrap();
     let rpc_api = MockRpcApi::new(mock_chain);
     let mut client = ClientBuilder::new()

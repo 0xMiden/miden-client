@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use miden_client::builder::ClientBuilder;
-use miden_client::crypto::RandomCoin;
+use miden_client::crypto::DefaultFeltRng;
 use miden_client::grpc_support::{DEVNET_PROVER_ENDPOINT, TESTNET_PROVER_ENDPOINT};
 use miden_client::note_transport::grpc::GrpcNoteTransportClient;
 use miden_client::note_transport::{
@@ -15,7 +15,7 @@ use miden_client::note_transport::{
 };
 use miden_client::rpc::{Endpoint, GrpcClient};
 use miden_client::testing::common::{FilesystemKeyStore, TestClient, create_test_store_path};
-use miden_client::{DebugMode, Felt, RemoteTransactionProver};
+use miden_client::{DebugMode, RemoteTransactionProver};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use rand::Rng;
 use uuid::Uuid;
@@ -135,9 +135,9 @@ impl ClientConfig {
         let (rpc_endpoint, rpc_timeout, store_config, auth_path) = self.as_parts();
 
         let mut rng = rand::rng();
-        let coin_seed: [u64; 4] = rng.random();
+        let seed: [u8; 32] = rng.random();
 
-        let rng = RandomCoin::new(coin_seed.map(Felt::new_unchecked).into());
+        let rng = DefaultFeltRng::from_seed(seed);
 
         let keystore = FilesystemKeyStore::new(auth_path.clone()).with_context(|| {
             format!("failed to create keystore at path: {}", auth_path.to_string_lossy())

@@ -52,6 +52,7 @@
 
 ### Changes
 
+* [BREAKING][rust] Removed the `RandomCoin` re-export from `miden_client::crypto`. The client now ships a `ChaCha20`-backed `FeltRng` as its default RNG (`DefaultFeltRng`), and `FeltRngAdapter` lifts any `RngCore` into a `FeltRng`. ([#2223](https://github.com/0xMiden/rust-sdk/pull/2223))
 * [BREAKING][rust] Added a `Subscription(Word)` variant to `NoteTagSource`. ([#2248](https://github.com/0xMiden/rust-sdk/pull/2248))
 * [rust] Added `Store::apply_settings_mutations` for batched `settings` writes. ([#2248](https://github.com/0xMiden/rust-sdk/pull/2248))
 * [BREAKING][param][rust] `NodeRpcClient::get_block_by_number()` now takes an `include_proof: bool` parameter to control whether the block proof is included in the response. ([#1991](https://github.com/0xMiden/rust-sdk/pull/1991))

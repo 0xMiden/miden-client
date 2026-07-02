@@ -17,6 +17,7 @@ use miden_client::auth::{
     RPO_FALCON_SCHEME_ID,
 };
 use miden_client::builder::ClientBuilder;
+use miden_client::crypto::DefaultFeltRng;
 use miden_client::keystore::{FilesystemKeyStore, Keystore};
 use miden_client::note::{BlockNumber, NetworkAccountTarget, NoteExecutionHint};
 use miden_client::pswap::PswapLineageState;
@@ -86,7 +87,7 @@ use miden_protocol::asset::{
     FungibleAsset,
     TokenSymbol,
 };
-use miden_protocol::crypto::rand::{FeltRng, RandomCoin};
+use miden_protocol::crypto::rand::FeltRng;
 use miden_protocol::note::{
     Note,
     NoteAssets,
@@ -1357,8 +1358,7 @@ async fn input_note_reader_finds_externally_consumed_notes() {
     chain.prove_next_block().unwrap();
 
     // Build a client backed by this chain.
-    let rng =
-        RandomCoin::new(rand::random::<[u64; 4]>().map(|v| Felt::new_unchecked(v >> 1)).into());
+    let rng = DefaultFeltRng::from_seed(rand::random());
     let keystore_path = std::env::temp_dir();
     let keystore = FilesystemKeyStore::new(keystore_path).unwrap();
     let mock_rpc = MockRpcApi::new(chain);
@@ -1435,22 +1435,16 @@ async fn setup_prunable_block_scenario(
     let mut builder = MockChainBuilder::new();
     let mock_account = builder.add_existing_mock_account(miden_testing::Auth::IncrNonce).unwrap();
 
-    let note_first = NoteBuilder::new(
-        mock_account.id(),
-        RandomCoin::new([0, 0, 0, 0].map(Felt::new_unchecked).into()),
-    )
-    .note_type(NoteType::Public)
-    .tag(NoteTag::new(0).into())
-    .build()
-    .unwrap();
-    let note_second = NoteBuilder::new(
-        mock_account.id(),
-        RandomCoin::new([0, 0, 0, 1].map(Felt::new_unchecked).into()),
-    )
-    .note_type(NoteType::Public)
-    .tag(NoteTag::new(0).into())
-    .build()
-    .unwrap();
+    let note_first = NoteBuilder::new(mock_account.id(), DefaultFeltRng::from_seed([0u8; 32]))
+        .note_type(NoteType::Public)
+        .tag(NoteTag::new(0).into())
+        .build()
+        .unwrap();
+    let note_second = NoteBuilder::new(mock_account.id(), DefaultFeltRng::from_seed([1u8; 32]))
+        .note_type(NoteType::Public)
+        .tag(NoteTag::new(0).into())
+        .build()
+        .unwrap();
 
     let spawn_note_1 = builder.add_spawn_note(std::slice::from_ref(&note_first)).unwrap();
     let spawn_note_2 = builder.add_spawn_note(std::slice::from_ref(&note_second)).unwrap();
@@ -1492,8 +1486,7 @@ async fn setup_prunable_block_scenario(
     chain.add_pending_executed_transaction(&tx).unwrap();
     chain.prove_next_block().unwrap();
 
-    let rng =
-        RandomCoin::new(rand::random::<[u64; 4]>().map(|v| Felt::new_unchecked(v >> 1)).into());
+    let rng = DefaultFeltRng::from_seed(rand::random());
     let keystore = FilesystemKeyStore::new(std::env::temp_dir()).unwrap();
     let mock_rpc = MockRpcApi::new(chain);
 
@@ -2943,9 +2936,7 @@ async fn pswap_cancel_test() {
 async fn create_pswap_test_client(
     mock_rpc_api: &MockRpcApi,
 ) -> (MockClient<FilesystemKeyStore>, FilesystemKeyStore) {
-    let mut seed_rng = rand::rng();
-    let coin_seed: [u64; 4] = seed_rng.random();
-    let rng = RandomCoin::new(coin_seed.map(|v| Felt::new_unchecked(v >> 1)).into());
+    let rng = DefaultFeltRng::from_seed(rand::random());
 
     let keystore = FilesystemKeyStore::new(temp_dir()).unwrap();
 
@@ -3901,8 +3892,8 @@ async fn import_watched_account_by_id_rejects_already_tracked_native_account() {
     let rpc_api = MockRpcApi::new(mock_chain_builder.build().unwrap());
     let arc_rpc_api = Arc::new(rpc_api);
     let mut rng = rand::rng();
-    let coin_seed: [u64; 4] = rng.random();
-    let rng = RandomCoin::new(coin_seed.map(|v| Felt::new_unchecked(v >> 1)).into());
+    let seed: [u8; 32] = rng.random();
+    let rng = DefaultFeltRng::from_seed(seed);
     let keystore = FilesystemKeyStore::new(temp_dir()).unwrap();
     let mut client = ClientBuilder::new()
         .rpc(arc_rpc_api)
@@ -4158,7 +4149,7 @@ async fn sync_stores_private_note_attachments() {
     // 2. Build a PRIVATE P2ID note carrying a NetworkAccountTarget attachment.
     let ntx_target = NetworkAccountTarget::new(target.id(), NoteExecutionHint::Always).unwrap();
     let attachments = NoteAttachments::new(vec![ntx_target.into()]).unwrap();
-    let mut note_rng = RandomCoin::new([1, 2, 3, 4].map(Felt::new_unchecked).into());
+    let mut note_rng = DefaultFeltRng::from_seed([1u8; 32]);
     let private_note = P2idNote::create(
         sender.id(),
         target.id(),
@@ -4198,8 +4189,7 @@ async fn sync_stores_private_note_attachments() {
     let rpc_api = Arc::new(MockRpcApi::new(mock_chain));
     rpc_api.register_private_note_attachments(private_note.id(), attachments.clone());
 
-    let rng =
-        RandomCoin::new(rand::random::<[u64; 4]>().map(|v| Felt::new_unchecked(v >> 1)).into());
+    let rng = DefaultFeltRng::from_seed(rand::random());
     let keystore = FilesystemKeyStore::new(std::env::temp_dir()).unwrap();
     let mut client = ClientBuilder::new()
         .rpc(rpc_api)
@@ -4344,8 +4334,8 @@ async fn sync_large_public_account() {
     // 4. Build a client and add the ORIGINAL (pre-tx) account.
     // The pre-tx commitment differs from on-chain, which triggers sync.
     let mut rng = rand::rng();
-    let coin_seed: [u64; 4] = rng.random();
-    let rng = RandomCoin::new(coin_seed.map(|v| Felt::new_unchecked(v >> 1)).into());
+    let seed: [u8; 32] = rng.random();
+    let rng = DefaultFeltRng::from_seed(seed);
 
     let keystore_path = temp_dir();
     let keystore = FilesystemKeyStore::new(keystore_path).unwrap();
@@ -4409,8 +4399,8 @@ async fn prepare_offline_bootstrap_inserts_mock_chain_genesis() {
     use miden_protocol::transaction::TransactionKernel;
 
     let mut rng_seed = rand::rng();
-    let coin_seed: [u64; 4] = rng_seed.random();
-    let rng = RandomCoin::new(coin_seed.map(Felt::new_unchecked).into());
+    let seed: [u8; 32] = rng_seed.random();
+    let rng = DefaultFeltRng::from_seed(seed);
 
     let reference_rpc = MockRpcApi::default();
     let (expected_genesis, _) = reference_rpc
@@ -4460,9 +4450,9 @@ pub async fn create_test_client() -> (MockClient<FilesystemKeyStore>, MockRpcApi
 pub async fn create_test_client_builder()
 -> (ClientBuilder<FilesystemKeyStore>, MockRpcApi, FilesystemKeyStore) {
     let mut rng = rand::rng();
-    let coin_seed: [u64; 4] = rng.random();
+    let seed: [u8; 32] = rng.random();
 
-    let rng = RandomCoin::new(coin_seed.map(|v| Felt::new_unchecked(v >> 1)).into());
+    let rng = DefaultFeltRng::from_seed(seed);
 
     let keystore_path = temp_dir();
     let keystore = FilesystemKeyStore::new(keystore_path).unwrap();
@@ -4487,23 +4477,17 @@ pub async fn create_prebuilt_mock_chain() -> MockChain {
         .add_existing_mock_account(miden_testing::Auth::IncrNonce)
         .unwrap();
 
-    let note_first = NoteBuilder::new(
-        mock_account.id(),
-        RandomCoin::new([0, 0, 0, 0].map(Felt::new_unchecked).into()),
-    )
-    .note_type(NoteType::Public)
-    .tag(NoteTag::new(0).into())
-    .build()
-    .unwrap();
+    let note_first = NoteBuilder::new(mock_account.id(), DefaultFeltRng::from_seed([0u8; 32]))
+        .note_type(NoteType::Public)
+        .tag(NoteTag::new(0).into())
+        .build()
+        .unwrap();
 
-    let note_second = NoteBuilder::new(
-        mock_account.id(),
-        RandomCoin::new([0, 0, 0, 1].map(Felt::new_unchecked).into()),
-    )
-    .note_type(NoteType::Public)
-    .tag(NoteTag::new(0).into())
-    .build()
-    .unwrap();
+    let note_second = NoteBuilder::new(mock_account.id(), DefaultFeltRng::from_seed([1u8; 32]))
+        .note_type(NoteType::Public)
+        .tag(NoteTag::new(0).into())
+        .build()
+        .unwrap();
     let spawn_note_1 =
         mock_chain_builder.add_spawn_note(std::slice::from_ref(&note_first)).unwrap();
     let spawn_note_2 =
