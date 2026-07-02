@@ -2082,7 +2082,7 @@ mod tests {
     /// (batched `SyncNotes` response) and tracks their blocks in the partial MMR.
     ///
     /// This test creates a faucet and mints notes in separate blocks (blocks 1, 2, 3),
-    /// so `sync_notes` returns multiple `NoteSyncBlock`s. It then verifies:
+    /// so `sync_notes` returns multiple `SyncNotesBlock`s. It then verifies:
     /// - The MMR is advanced to the chain tip
     /// - Blocks containing relevant notes are tracked in the partial MMR via `track()`
     /// - Note inclusion proofs are set correctly

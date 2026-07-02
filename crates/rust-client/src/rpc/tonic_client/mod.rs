@@ -645,7 +645,7 @@ impl NodeRpcClient for GrpcClient {
     }
 
     /// Sends one or more `SyncNoteRequest`s to the node and merges the responses into a list of
-    /// [`NoteSyncBlock`]s.
+    /// [`SyncNotesBlock`]s.
     ///
     /// Chunks `note_tags` by [`RpcLimits::note_tags_limit`] and paginates each chunk across the
     /// requested block range.
