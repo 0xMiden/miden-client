@@ -129,7 +129,7 @@ impl BlockPagination {
 /// The node targets a 4 MiB budget for paginated responses but sizes them with a best-effort
 /// estimate that omits protobuf framing and some fields, so an encoded message can land a little
 /// above 4 MiB. This default adds a 15% margin over that budget to absorb the overhead. Callers
-/// that still exceed it can raise the ceiling with [`GrpcClient::with_max_message_size`].
+/// that still exceed it can raise the ceiling with [`GrpcClient::with_max_decoding_message_size`].
 const DEFAULT_MAX_DECODING_MESSAGE_SIZE: usize = 4 * 1024 * 1024 * 115 / 100;
 
 /// Client for the Node RPC API using gRPC.
@@ -206,7 +206,7 @@ impl GrpcClient {
     /// too large" error. This only changes what the client is willing to receive; it does not
     /// affect how much data the node produces.
     #[must_use]
-    pub fn with_max_message_size(mut self, max_decoding_message_size: usize) -> Self {
+    pub fn with_max_decoding_message_size(mut self, max_decoding_message_size: usize) -> Self {
         self.max_decoding_message_size = max_decoding_message_size;
         self
     }
@@ -1191,7 +1191,7 @@ mod tests {
     }
 
     #[test]
-    fn with_max_message_size_overrides_default() {
+    fn with_max_decoding_message_size_overrides_default() {
         let endpoint = &Endpoint::devnet();
 
         // A fresh client uses the default decode ceiling.
@@ -1199,7 +1199,8 @@ mod tests {
         assert_eq!(default_client.max_decoding_message_size, DEFAULT_MAX_DECODING_MESSAGE_SIZE);
 
         // The knob overrides it for callers that hit responses above the default.
-        let custom = GrpcClient::new(endpoint, 10_000).with_max_message_size(8 * 1024 * 1024);
+        let custom =
+            GrpcClient::new(endpoint, 10_000).with_max_decoding_message_size(8 * 1024 * 1024);
         assert_eq!(custom.max_decoding_message_size, 8 * 1024 * 1024);
     }
 
