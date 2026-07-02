@@ -32,7 +32,7 @@ use super::domain::account::{
     GetAccountRequest,
     StorageMapFetch,
 };
-use super::domain::note::{CommittedNote, FetchedNote, NoteSyncBlock};
+use super::domain::note::{FetchedNote, NoteSyncBlock};
 use super::domain::nullifier::NullifierUpdate;
 use super::generated::rpc::AccountRequest;
 use super::generated::rpc::account_request::AccountDetailRequest;
@@ -119,60 +119,6 @@ impl BlockPagination {
 
         Ok(PaginationResult::Continue)
     }
-}
-
-/// Returns [`RpcError::InvalidResponse`] if any update in the `sync_nullifiers` batch carries a
-/// nullifier whose prefix was not requested.
-fn ensure_requested_nullifiers(
-    requested_prefixes: &BTreeSet<u16>,
-    batch: &[NullifierUpdate],
-) -> Result<(), RpcError> {
-    for update in batch {
-        let prefix = update.nullifier.prefix();
-        if !requested_prefixes.contains(&prefix) {
-            let requested = requested_prefixes
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join(", ");
-            return Err(RpcError::InvalidResponse(format!(
-                "node returned nullifier with prefix {prefix} but [{requested}] were requested"
-            )));
-        }
-    }
-    Ok(())
-}
-
-/// Returns an error if any note in a `sync_notes` response carries a tag that was not requested.
-fn ensure_requested_tags(
-    requested: &BTreeSet<NoteTag>,
-    returned: impl IntoIterator<Item = NoteTag>,
-) -> Result<(), RpcError> {
-    for tag in returned {
-        if !requested.contains(&tag) {
-            let list = requested.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
-            return Err(RpcError::InvalidResponse(format!(
-                "node returned note with tag {tag} but [{list}] were requested"
-            )));
-        }
-    }
-    Ok(())
-}
-
-/// Returns an error if any note in a `GetNotesById` response has an ID that was not requested.
-fn ensure_requested_note_ids(
-    requested: &BTreeSet<NoteId>,
-    returned: impl IntoIterator<Item = NoteId>,
-) -> Result<(), RpcError> {
-    for id in returned {
-        if !requested.contains(&id) {
-            let list = requested.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
-            return Err(RpcError::InvalidResponse(format!(
-                "node returned note {id} but [{list}] were requested"
-            )));
-        }
-    }
-    Ok(())
 }
 
 // GRPC CLIENT
@@ -434,7 +380,7 @@ impl NodeRpcClient for GrpcClient {
         Ok(BlockNumber::from(api_response.into_inner().block_num))
     }
 
-    async fn get_block_header_by_number(
+    async fn get_block_header_by_number_unchecked(
         &self,
         block_num: Option<BlockNumber>,
         include_mmr_proof: bool,
@@ -458,15 +404,6 @@ impl NodeRpcClient for GrpcClient {
             .block_header
             .ok_or(RpcError::ExpectedDataMissing("BlockHeader".into()))?
             .try_into()?;
-
-        if let Some(requested) = block_num
-            && block_header.block_num() != requested
-        {
-            return Err(RpcError::InvalidResponse(format!(
-                "node returned header for block {} but block {requested} was requested",
-                block_header.block_num(),
-            )));
-        }
 
         let mmr_proof = if include_mmr_proof {
             let forest = response
@@ -492,9 +429,11 @@ impl NodeRpcClient for GrpcClient {
         Ok((block_header, mmr_proof))
     }
 
-    async fn get_notes_by_id(&self, note_ids: &[NoteId]) -> Result<Vec<FetchedNote>, RpcError> {
+    async fn get_notes_by_id_unchecked(
+        &self,
+        note_ids: &[NoteId],
+    ) -> Result<Vec<FetchedNote>, RpcError> {
         let limits = self.get_rpc_limits().await?;
-        let requested_ids: BTreeSet<NoteId> = note_ids.iter().copied().collect();
         let mut notes = Vec::with_capacity(note_ids.len());
         for chunk in note_ids.chunks(limits.note_ids_limit as usize) {
             let request = proto::note::NoteIdList {
@@ -514,8 +453,6 @@ impl NodeRpcClient for GrpcClient {
                 .into_iter()
                 .map(FetchedNote::try_from)
                 .collect::<Result<Vec<FetchedNote>, RpcConversionError>>()?;
-
-            ensure_requested_note_ids(&requested_ids, response_notes.iter().map(FetchedNote::id))?;
 
             notes.extend(response_notes);
         }
@@ -551,11 +488,10 @@ impl NodeRpcClient for GrpcClient {
     /// This function will return an error if:
     ///
     /// - The requested Account isn't returned by the node.
-    /// - The block number of the requested Account doesn't match the response block number.
     /// - There was an error sending the request to the node.
     /// - The answer had a `None` for one of the expected fields.
     /// - There is an error during storage deserialization.
-    async fn get_account(
+    async fn get_account_unchecked(
         &self,
         account_id: AccountId,
         request: GetAccountRequest,
@@ -616,16 +552,6 @@ impl NodeRpcClient for GrpcClient {
             .block_num
             .into();
 
-        if let Some(requested) = block_num
-            && requested.block_num != response_block_num.as_u32()
-        {
-            return Err(RpcError::InvalidResponse(format!(
-                "node returned header for block {} but block {} was requested",
-                response_block_num.as_u32(),
-                requested.block_num
-            )));
-        }
-
         // For accounts with public state, details should be present when requested
         let headers = if account_witness.id().is_public() {
             let details = response
@@ -649,7 +575,7 @@ impl NodeRpcClient for GrpcClient {
     ///
     /// Chunks `note_tags` by [`RpcLimits::note_tags_limit`] and paginates each chunk across the
     /// requested block range.
-    async fn sync_notes(
+    async fn sync_notes_unchecked(
         &self,
         block_from: BlockNumber,
         block_to: BlockNumber,
@@ -668,7 +594,6 @@ impl NodeRpcClient for GrpcClient {
 
         for chunk in tags.chunks(limits.note_tags_limit as usize) {
             let proto_tags: Vec<u32> = chunk.iter().map(|&t| t.into()).collect();
-            let requested_tags: BTreeSet<NoteTag> = chunk.iter().copied().collect();
             let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
@@ -696,10 +621,6 @@ impl NodeRpcClient for GrpcClient {
 
                 for proto_block in response.blocks {
                     let block: NoteSyncBlock = proto_block.try_into()?;
-                    ensure_requested_tags(
-                        &requested_tags,
-                        block.notes.values().map(CommittedNote::tag),
-                    )?;
                     let bn = block.block_header.block_num();
                     if let Some(existing) = merged_blocks.get_mut(&bn) {
                         for (id, note) in block.notes {
@@ -720,7 +641,7 @@ impl NodeRpcClient for GrpcClient {
         Ok(merged_blocks.into_values().collect())
     }
 
-    async fn sync_nullifiers(
+    async fn sync_nullifiers_unchecked(
         &self,
         prefixes: &[u16],
         block_from: BlockNumber,
@@ -733,7 +654,6 @@ impl NodeRpcClient for GrpcClient {
         // violating the RPC limit.
         for chunk in prefixes.chunks(limits.nullifiers_limit as usize) {
             let proto_prefixes: Vec<u32> = chunk.iter().map(|&x| u32::from(x)).collect();
-            let requested_prefixes: BTreeSet<u16> = chunk.iter().copied().collect();
             let mut pagination = BlockPagination::new(block_from, block_to);
 
             loop {
@@ -761,7 +681,6 @@ impl NodeRpcClient for GrpcClient {
                     .collect::<Result<Vec<NullifierUpdate>, _>>()
                     .map_err(|err| RpcError::InvalidResponse(err.to_string()))?;
 
-                ensure_requested_nullifiers(&requested_prefixes, &batch_nullifiers)?;
                 all_nullifiers.extend(batch_nullifiers);
 
                 let page = response.pagination_info.ok_or(RpcError::ExpectedDataMissing(
@@ -777,7 +696,7 @@ impl NodeRpcClient for GrpcClient {
         Ok(all_nullifiers.into_iter().collect::<Vec<_>>())
     }
 
-    async fn get_block_by_number(
+    async fn get_block_by_number_unchecked(
         &self,
         block_num: BlockNumber,
         include_proof: bool,
@@ -799,17 +718,13 @@ impl NodeRpcClient for GrpcClient {
                 "GetBlockByNumberResponse.block".to_string(),
             ))?)?;
 
-        if block.header().block_num() != block_num {
-            return Err(RpcError::InvalidResponse(format!(
-                "node returned header for block {} but block {block_num} was requested",
-                block.header().block_num(),
-            )));
-        }
-
         Ok(block)
     }
 
-    async fn get_note_script_by_root(&self, root: Word) -> Result<Option<NoteScript>, RpcError> {
+    async fn get_note_script_by_root_unchecked(
+        &self,
+        root: Word,
+    ) -> Result<Option<NoteScript>, RpcError> {
         let request = proto::note::NoteScriptRoot { root: Some(root.into()) };
 
         let response = self
@@ -823,13 +738,6 @@ impl NodeRpcClient for GrpcClient {
             return Ok(None);
         };
         let note_script = NoteScript::try_from(script)?;
-
-        let fetched_root = note_script.root();
-        if Word::from(fetched_root) != root {
-            return Err(RpcError::InvalidResponse(format!(
-                "node returned note script with root {fetched_root} for requested root {root}",
-            )));
-        }
 
         Ok(Some(note_script))
     }
@@ -1080,23 +988,12 @@ impl From<&Status> for GrpcError {
 
 #[cfg(test)]
 mod tests {
-    use core::slice;
     use std::boxed::Box;
-    use std::collections::BTreeSet;
 
+    use miden_protocol::Word;
     use miden_protocol::block::BlockNumber;
-    use miden_protocol::note::{NoteId, NoteTag, Nullifier};
-    use miden_protocol::{Felt, Word};
 
-    use super::{
-        BlockPagination,
-        GrpcClient,
-        NullifierUpdate,
-        PaginationResult,
-        ensure_requested_note_ids,
-        ensure_requested_nullifiers,
-        ensure_requested_tags,
-    };
+    use super::{BlockPagination, GrpcClient, PaginationResult};
     use crate::alloc::string::ToString;
     use crate::rpc::{Endpoint, NodeRpcClient, RpcError};
 
@@ -1288,66 +1185,5 @@ mod tests {
             .await
             .expect("testnet status with caller auth header must succeed");
         assert!(!status.version.is_empty(), "status must include a server version");
-    }
-
-    fn nullifier_with_prefix(prefix: u16) -> Nullifier {
-        Nullifier::from_raw(Word::new([
-            Felt::ZERO,
-            Felt::ZERO,
-            Felt::ZERO,
-            Felt::new_unchecked(u64::from(prefix) << 48),
-        ]))
-    }
-
-    #[test]
-    fn verify_requested_nullifiers_rejects_unrequested_prefix() {
-        let requested = NullifierUpdate {
-            nullifier: nullifier_with_prefix(0x1234),
-            block_num: 1u32.into(),
-        };
-        let unrequested = NullifierUpdate {
-            nullifier: nullifier_with_prefix(0xabcd),
-            block_num: 2u32.into(),
-        };
-
-        let requested_prefixes: BTreeSet<u16> = BTreeSet::from([0x1234]);
-
-        ensure_requested_nullifiers(&requested_prefixes, slice::from_ref(&requested))
-            .expect("requested prefix must be accepted");
-
-        let err = ensure_requested_nullifiers(&requested_prefixes, &[requested, unrequested])
-            .expect_err("unrequested prefix must be rejected");
-        assert!(matches!(err, RpcError::InvalidResponse(_)));
-    }
-
-    #[test]
-    fn ensure_requested_tags_rejects_unrequested() {
-        let requested = NoteTag::new(1);
-        let other = NoteTag::new(2);
-        let requested_set = BTreeSet::from([requested]);
-
-        ensure_requested_tags(&requested_set, [requested]).expect("requested tag must be accepted");
-
-        let err = ensure_requested_tags(&requested_set, [other])
-            .expect_err("unrequested tag must be rejected");
-        assert!(matches!(err, RpcError::InvalidResponse(_)));
-    }
-
-    fn note_id(n: u32) -> NoteId {
-        NoteId::from_raw(Word::from([n, 0, 0, 0]))
-    }
-
-    #[test]
-    fn ensure_requested_note_ids_rejects_unrequested() {
-        let requested = note_id(1);
-        let other = note_id(2);
-        let requested_set = BTreeSet::from([requested]);
-
-        ensure_requested_note_ids(&requested_set, [requested])
-            .expect("requested note id must be accepted");
-
-        let err = ensure_requested_note_ids(&requested_set, [other])
-            .expect_err("unrequested note id must be rejected");
-        assert!(matches!(err, RpcError::InvalidResponse(_)));
     }
 }

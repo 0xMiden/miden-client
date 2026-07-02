@@ -4,6 +4,7 @@
 
 ### Breaking Changes
 
+* [BREAKING][rust] `NodeRpcClient` response verification moved into the trait's default methods; implementors now provide the raw transport via `get_block_header_by_number_unchecked`, `get_block_by_number_unchecked`, `get_notes_by_id_unchecked`, `sync_notes_unchecked`, `sync_nullifiers_unchecked`, `get_account_unchecked`, and `get_note_script_by_root_unchecked`, and the public methods verify the response ([#2278](https://github.com/0xMiden/rust-sdk/pull/2278)).
 * [BREAKING][param][store] `Store::insert_block_header` now takes a `nodes` argument and persists the header with its MMR authentication nodes in a single transaction; the standalone `Store::insert_partial_blockchain_nodes` is removed. Header-only inserts (e.g. genesis) pass an empty slice ([#2294](https://github.com/0xMiden/rust-sdk/pull/2294)).
 
 ### Fixes
