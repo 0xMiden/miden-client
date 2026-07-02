@@ -10,7 +10,8 @@ use miden_protocol::account::{Account, AccountHeader, AccountId, StorageSlotType
 use miden_protocol::block::account_tree::AccountIdKey;
 use miden_protocol::block::{BlockHeader, BlockNumber};
 use miden_protocol::crypto::merkle::mmr::{MmrDelta, PartialMmr};
-use miden_protocol::note::{NoteAttachments, NoteId, NoteTag, NoteType, Nullifier};
+use miden_protocol::note::{Note, NoteAttachments, NoteId, NoteTag, NoteType, Nullifier};
+use miden_protocol::transaction::InputNoteCommitment;
 use tracing::info;
 
 use super::state_sync_update::TransactionUpdateTracker;
@@ -31,7 +32,7 @@ use crate::rpc::domain::account::{
     StorageMapFetch,
     VaultFetch,
 };
-use crate::rpc::domain::note::{CommittedNote, NoteSyncBlock, SyncedNoteDetails};
+use crate::rpc::domain::note::{CommittedNote, FetchedNote, NoteSyncBlock, SyncedNoteDetails};
 use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::transaction::TransactionRecord as RpcTransactionRecord;
 use crate::rpc::{AccountStateAt, NodeRpcClient};
@@ -68,6 +69,17 @@ struct FetchedSyncData {
     synced_notes: BTreeMap<NoteId, SyncedNoteDetails>,
     /// Transaction records for the synced range, as returned by `sync_transactions`.
     transactions: Vec<RpcTransactionRecord>,
+}
+
+/// A note a watched account consumed, carrying what recovery needs to fetch and attribute it.
+///
+/// Enriches the node's `(nullifier, note_id)` reference with the consuming account and block.
+/// Captured early in `sync_state`, since the owning sync data is moved before recovery runs.
+struct RecoverableConsumedNote {
+    note_id: NoteId,
+    nullifier: Nullifier,
+    consumer: AccountId,
+    block_num: BlockNumber,
 }
 
 // SYNC REQUEST
@@ -275,6 +287,34 @@ impl StateSync {
 
         state_sync_update.block_num = sync_data.chain_tip_header.block_num();
 
+        // Capture the consumed-note references before `sync_data` is consumed below, so the notes
+        // can be recovered once the consumption order is known. Only trust a reference whose
+        // nullifier the transaction actually consumed, so a node can't attribute an unrelated note
+        // to this account.
+        let recoverable_consumed_notes: Vec<RecoverableConsumedNote> = sync_data
+            .transactions
+            .iter()
+            .flat_map(|tx| {
+                let consumer = tx.transaction_header.account_id();
+                let block_num = tx.block_num;
+                let consumed_nullifiers: BTreeSet<Nullifier> = tx
+                    .transaction_header
+                    .input_notes()
+                    .iter()
+                    .map(InputNoteCommitment::nullifier)
+                    .collect();
+                tx.consumed_note_refs
+                    .iter()
+                    .filter(move |&&(nullifier, _)| consumed_nullifiers.contains(&nullifier))
+                    .map(move |&(nullifier, note_id)| RecoverableConsumedNote {
+                        note_id,
+                        nullifier,
+                        consumer,
+                        block_num,
+                    })
+            })
+            .collect();
+
         let new_commitments = derive_account_commitments(&sync_data.transactions);
         let superseded_states = self
             .account_state_sync(
@@ -301,7 +341,51 @@ impl StateSync {
             self.nullifiers_state_sync(&mut state_sync_update, block_num).await?;
         }
 
+        self.recover_consumed_public_notes(&mut state_sync_update, recoverable_consumed_notes)
+            .await?;
+
         Ok(state_sync_update)
+    }
+
+    /// Recovers public notes a watched account consumed, from the `consumed_note_refs` the node
+    /// attaches to its transactions. Fetches the body of each not-yet-tracked note by id and hands
+    /// it to [`NoteUpdateTracker::insert_consumed_public_note`]. Private notes and notes the node
+    /// can't return are skipped.
+    async fn recover_consumed_public_notes(
+        &self,
+        state_sync_update: &mut StateSyncUpdate,
+        recoverable_consumed_notes: Vec<RecoverableConsumedNote>,
+    ) -> Result<(), ClientError> {
+        // Skip references whose note the client already tracks (e.g. discovered by tag), to avoid
+        // clobbering full-detail records and fetching bodies we already hold.
+        let pending: Vec<_> = recoverable_consumed_notes
+            .into_iter()
+            .filter(|note| !state_sync_update.note_updates.tracks_note(note.note_id))
+            .collect();
+        if pending.is_empty() {
+            return Ok(());
+        }
+
+        let note_ids: Vec<NoteId> = pending.iter().map(|note| note.note_id).collect();
+        let mut bodies: BTreeMap<NoteId, Note> = BTreeMap::new();
+        for fetched in self.rpc_api.get_notes_by_id(&note_ids).await? {
+            if let FetchedNote::Public(note, _) = fetched {
+                bodies.insert(note.id(), note);
+            }
+        }
+
+        for recoverable in pending {
+            if let Some(note) = bodies.get(&recoverable.note_id) {
+                state_sync_update.note_updates.insert_consumed_public_note(
+                    note.clone(),
+                    recoverable.nullifier,
+                    recoverable.consumer,
+                    recoverable.block_num,
+                )?;
+            }
+        }
+
+        Ok(())
     }
 
     /// Fetches the sync data from the node by calling the following endpoints:
@@ -1686,6 +1770,7 @@ mod tests {
                 ),
                 output_notes: vec![],
                 erased_output_notes: vec![],
+                consumed_note_refs: vec![],
             }
         }
 
@@ -1737,6 +1822,7 @@ mod tests {
                 ),
                 output_notes: vec![],
                 erased_output_notes: vec![],
+                consumed_note_refs: vec![],
             };
 
             let result = super::super::compute_ordered_nullifiers(&[tx_a2, tx_b1, tx_a3, tx_a1]);
@@ -1802,6 +1888,7 @@ mod tests {
                 ),
                 output_notes: vec![],
                 erased_output_notes: vec![],
+                consumed_note_refs: vec![],
             }
         };
 
@@ -2521,6 +2608,7 @@ mod tests {
             ),
             output_notes: vec![],
             erased_output_notes: vec![],
+            consumed_note_refs: vec![],
         }
     }
 }

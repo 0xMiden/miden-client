@@ -318,9 +318,10 @@ impl NoteUpdateTracker {
             .filter(|note| note.update_type.is_modified())
     }
 
-    /// Returns the ids of updated input notes that are now consumed, by tracking key. Consumed
-    /// states carry no metadata, so `InputNoteRecord::id` is `None`; the key (the id assigned at
-    /// commit) is used instead.
+    /// Returns the ids of updated input notes that are now consumed, by tracking key. The tracking
+    /// key (the id assigned when the record was inserted) is used rather than
+    /// `InputNoteRecord::id`, which is `None` for a consumed record whose state carries no
+    /// metadata.
     pub fn consumed_input_note_ids(&self) -> impl Iterator<Item = NoteId> + '_ {
         self.input_notes
             .iter()
@@ -509,6 +510,37 @@ impl NoteUpdateTracker {
             input_note_update.inner_mut().set_consumed_tx_order(Some(0));
         }
 
+        Ok(())
+    }
+
+    /// Returns whether the note is already tracked as an input or output record.
+    pub(crate) fn tracks_note(&self, note_id: NoteId) -> bool {
+        self.input_notes.contains_key(&note_id) || self.output_notes.contains_key(&note_id)
+    }
+
+    /// Records a public note a watched account consumed but the client never tracked, from the
+    /// full body fetched by id. Builds a [`crate::store::InputNoteState::ConsumedExternal`] record
+    /// attributed to `consumer` so it surfaces through [`crate::note::InputNoteReader`]. No-op when
+    /// the note is already tracked, or when the body's nullifier doesn't match `nullifier` (so a
+    /// mismatched body is never attributed to the consumption).
+    pub(crate) fn insert_consumed_public_note(
+        &mut self,
+        note: Note,
+        nullifier: Nullifier,
+        consumer: AccountId,
+        block_num: BlockNumber,
+    ) -> Result<(), ClientError> {
+        if self.tracks_note(note.id()) {
+            return Ok(());
+        }
+        let mut record = InputNoteRecord::from(note);
+        if record.nullifier() != Some(nullifier) {
+            return Ok(());
+        }
+        let order = self.get_nullifier_order(nullifier).or(Some(0));
+        record.consumed_externally(nullifier, block_num, Some(consumer))?;
+        record.set_consumed_tx_order(order);
+        self.insert_input_note(record, NoteUpdateType::Insert);
         Ok(())
     }
 
