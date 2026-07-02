@@ -126,7 +126,7 @@ impl BlockPagination {
 
 /// Default maximum size (in bytes) of a decoded gRPC response the client will accept: 15% above
 /// tonic's built-in 4 MiB receive limit. See [`GrpcClient::with_max_decoding_message_size`].
-const DEFAULT_MAX_DECODING_MESSAGE_SIZE: usize = 4 * 1024 * 1024 * 115 / 100;
+const DEFAULT_MAX_RESPONSE_SIZE_BYTES: usize = 4 * 1024 * 1024 * 115 / 100;
 
 /// Client for the Node RPC API using gRPC.
 ///
