@@ -124,6 +124,14 @@ impl BlockPagination {
 // GRPC CLIENT
 // ================================================================================================
 
+/// Default maximum size (in bytes) of a decoded gRPC response the client will accept.
+///
+/// The node targets a 4 MiB budget for paginated responses but sizes them with a best-effort
+/// estimate that omits protobuf framing and some fields, so an encoded message can land a little
+/// above 4 MiB. This default adds a 15% margin over that budget to absorb the overhead. Callers
+/// that still exceed it can raise the ceiling with [`GrpcClient::with_max_message_size`].
+const DEFAULT_MAX_DECODING_MESSAGE_SIZE: usize = 4 * 1024 * 1024 * 115 / 100;
+
 /// Client for the Node RPC API using gRPC.
 ///
 /// If the `tonic` feature is enabled, this client will use a `tonic::transport::Channel` to
@@ -153,6 +161,9 @@ pub struct GrpcClient {
     /// gRPC call, alongside the standard `accept` header. Used when talking to an
     /// authenticating gateway in front of the node.
     bearer_token: Option<String>,
+    /// Maximum size (in bytes) of a decoded gRPC response the client will accept. Defaults to
+    /// [`DEFAULT_MAX_DECODING_MESSAGE_SIZE`].
+    max_decoding_message_size: usize,
 }
 
 impl GrpcClient {
@@ -168,6 +179,7 @@ impl GrpcClient {
             max_retries: retry::DEFAULT_MAX_RETRIES,
             retry_interval_ms: retry::DEFAULT_RETRY_INTERVAL_MS,
             bearer_token: None,
+            max_decoding_message_size: DEFAULT_MAX_DECODING_MESSAGE_SIZE,
         }
     }
 
@@ -184,6 +196,18 @@ impl GrpcClient {
     #[must_use]
     pub fn with_retry_interval_ms(mut self, retry_interval_ms: u64) -> Self {
         self.retry_interval_ms = retry_interval_ms;
+        self
+    }
+
+    /// Sets the maximum size (in bytes) of a decoded gRPC response the client will accept.
+    ///
+    /// Defaults to a 15% margin over the node's 4 MiB payload budget. Raise this when the node
+    /// returns responses larger than the default and a sync fails with a "decoded message length
+    /// too large" error. This only changes what the client is willing to receive; it does not
+    /// affect how much data the node produces.
+    #[must_use]
+    pub fn with_max_message_size(mut self, max_decoding_message_size: usize) -> Self {
+        self.max_decoding_message_size = max_decoding_message_size;
         self
     }
 
@@ -236,6 +260,7 @@ impl GrpcClient {
             self.timeout_ms,
             genesis_commitment,
             self.bearer_token.clone(),
+            self.max_decoding_message_size,
         )
         .await?;
         let mut client = self.client.write();
@@ -296,6 +321,7 @@ impl GrpcClient {
             self.endpoint.clone(),
             self.timeout_ms,
             self.bearer_token.clone(),
+            self.max_decoding_message_size,
         )
         .await?;
         rpc_api
@@ -994,7 +1020,7 @@ mod tests {
     use miden_protocol::Word;
     use miden_protocol::block::BlockNumber;
 
-    use super::{BlockPagination, GrpcClient, PaginationResult};
+    use super::{BlockPagination, DEFAULT_MAX_DECODING_MESSAGE_SIZE, GrpcClient, PaginationResult};
     use crate::alloc::string::ToString;
     use crate::rpc::{Endpoint, NodeRpcClient, RpcError};
 
@@ -1162,6 +1188,19 @@ mod tests {
         // Rebuilding the interceptor after a genesis update must not drop the caller token.
         assert_eq!(client.bearer_token.as_deref(), Some("token"));
         assert!(client.client.read().as_ref().is_some());
+    }
+
+    #[test]
+    fn with_max_message_size_overrides_default() {
+        let endpoint = &Endpoint::devnet();
+
+        // A fresh client uses the default decode ceiling.
+        let default_client = GrpcClient::new(endpoint, 10_000);
+        assert_eq!(default_client.max_decoding_message_size, DEFAULT_MAX_DECODING_MESSAGE_SIZE);
+
+        // The knob overrides it for callers that hit responses above the default.
+        let custom = GrpcClient::new(endpoint, 10_000).with_max_message_size(8 * 1024 * 1024);
+        assert_eq!(custom.max_decoding_message_size, 8 * 1024 * 1024);
     }
 
     /// Real-network smoke test: hitting the public testnet with a caller-supplied bearer
