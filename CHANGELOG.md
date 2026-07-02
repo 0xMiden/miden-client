@@ -5,7 +5,7 @@
 ### Enhancements
 
 * [FEATURE][cli] `miden-cli call` now accepts advice map entries supplied via `--inputs-path/-i <FILE.toml>` in the same TOML format as `exec` ([#2244](https://github.com/0xMiden/miden-client/pull/2244)).
-* [FEATURE][rust] The gRPC client now accepts responses up to 15% above the node's 4 MiB payload budget by default, and `GrpcClient::with_max_decoding_message_size` lets callers raise the decode ceiling further. This prevents syncs from failing with a "decoded message length too large" error when a node response slightly exceeds the previous hard 4 MiB limit ([#2298](https://github.com/0xMiden/miden-client/issues/2298)).
+* [FEATURE][rust] The gRPC client now accepts responses up to 15% above the node's 4 MiB payload budget by default, and `GrpcClient::with_max_decoding_message_size` lets callers raise the decode ceiling further. This prevents syncs from failing with a "decoded message length too large" error when a node response slightly exceeds the previous hard 4 MiB limit ([#2298](https://github.com/0xMiden/miden-client/pull/2299)).
 
 ## 0.15.2 (2026-06-18)
 
