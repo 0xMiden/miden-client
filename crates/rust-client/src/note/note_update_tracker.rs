@@ -518,11 +518,10 @@ impl NoteUpdateTracker {
         self.input_notes.contains_key(&note_id) || self.output_notes.contains_key(&note_id)
     }
 
-    /// Records a public note a watched account consumed but the client never tracked, from the
-    /// full body fetched by id. Builds a [`crate::store::InputNoteState::ConsumedExternal`] record
-    /// attributed to `consumer` so it surfaces through [`crate::note::InputNoteReader`]. No-op when
-    /// the note is already tracked, or when the body's nullifier doesn't match `nullifier` (so a
-    /// mismatched body is never attributed to the consumption).
+    /// Records `note` as consumed by `consumer`, as a
+    /// [`ConsumedExternal`](crate::store::InputNoteState::ConsumedExternal) input-note record.
+    /// No-op when the note is already tracked, or when its nullifier doesn't match `nullifier`
+    /// (so a mismatched body is never attributed to the consumption).
     pub(crate) fn insert_consumed_public_note(
         &mut self,
         note: Note,

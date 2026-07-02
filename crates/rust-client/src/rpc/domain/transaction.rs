@@ -69,8 +69,8 @@ pub struct TransactionRecord {
     /// Output notes that were erased by same-batch note erasure.
     pub erased_output_notes: Vec<NoteHeader>,
     /// Maps each consumed input note's nullifier to its note id, for public notes the node could
-    /// resolve. Lets a client recover, by id, a note a watched account consumed but never
-    /// tracked. Empty for private/unresolvable inputs.
+    /// resolve. Lets a client recover, by id, a consumed note it never tracked. Empty for
+    /// private/unresolvable inputs.
     // TODO: perhaps we might want to rename this field (see https://github.com/0xMiden/node/pull/2304#discussion_r3511308376)
     pub consumed_note_refs: Vec<(Nullifier, NoteId)>,
 }
