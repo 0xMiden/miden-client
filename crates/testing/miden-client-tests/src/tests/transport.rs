@@ -6,7 +6,15 @@ use miden_client::account::{Account, AccountType};
 use miden_client::address::{Address, AddressInterface, RoutingParameters};
 use miden_client::builder::ClientBuilder;
 use miden_client::keystore::FilesystemKeyStore;
-use miden_client::note::{Note, NoteAttachments, NoteDetails, NoteTag, NoteType};
+use miden_client::note::{
+    NetworkAccountTarget,
+    Note,
+    NoteAttachments,
+    NoteDetails,
+    NoteExecutionHint,
+    NoteTag,
+    NoteType,
+};
 use miden_client::note_transport::NoteTransportClient;
 use miden_client::store::NoteFilter;
 use miden_client::testing::common::create_test_store_path;
@@ -26,7 +34,7 @@ use miden_protocol::transaction::RawOutputNote;
 use miden_protocol::utils::serde::Serializable;
 use miden_standards::note::P2idNote;
 use miden_standards::testing::note::NoteBuilder;
-use miden_testing::{MockChainBuilder, TxContextInput};
+use miden_testing::{Auth, MockChainBuilder, TxContextInput};
 use rand::Rng;
 
 use crate::tests::{create_test_client_builder, insert_new_wallet};
@@ -79,6 +87,80 @@ async fn transport_basic() {
     observer.sync_state().await.unwrap();
     let notes = observer.get_input_notes(NoteFilter::All).await.unwrap();
     assert_eq!(notes.len(), 0);
+}
+
+/// Recovers attachments from the node for notes received over NTL.
+#[tokio::test]
+async fn transport_recovers_attachments() {
+    let mut mock_chain_builder = MockChainBuilder::new();
+    let sender = mock_chain_builder.add_existing_mock_account(Auth::IncrNonce).unwrap();
+    let target = mock_chain_builder.add_existing_wallet(Auth::IncrNonce).unwrap();
+
+    let ntx_target = NetworkAccountTarget::new(target.id(), NoteExecutionHint::Always).unwrap();
+    let attachments = NoteAttachments::new(vec![ntx_target.into()]).unwrap();
+    let mut note_rng = RandomCoin::new([1, 2, 3, 4].map(Felt::new_unchecked).into());
+    let private_note = P2idNote::create(
+        sender.id(),
+        target.id(),
+        vec![],
+        NoteType::Private,
+        attachments.clone(),
+        &mut note_rng,
+    )
+    .unwrap();
+
+    let spawn_note =
+        mock_chain_builder.add_spawn_note(std::slice::from_ref(&private_note)).unwrap();
+    let mut mock_chain = mock_chain_builder.build().unwrap();
+    let tx = Box::pin(
+        mock_chain
+            .build_tx_context(TxContextInput::AccountId(sender.id()), &[], &[spawn_note])
+            .unwrap()
+            .extend_expected_output_notes(vec![RawOutputNote::Full(private_note.clone())])
+            .build()
+            .unwrap()
+            .execute(),
+    )
+    .await
+    .unwrap();
+    mock_chain.add_pending_executed_transaction(&tx).unwrap();
+    mock_chain.prove_next_block().unwrap();
+
+    let rpc_api = Arc::new(MockRpcApi::new(mock_chain));
+    rpc_api.register_private_note_attachments(private_note.id(), attachments.clone());
+
+    let mock_node = Arc::new(RwLock::new(MockNoteTransportNode::new()));
+    let keystore = FilesystemKeyStore::new(temp_dir()).unwrap();
+    let rng =
+        RandomCoin::new(rand::random::<[u64; 4]>().map(|v| Felt::new_unchecked(v >> 1)).into());
+    let mut client = ClientBuilder::new()
+        .rpc(rpc_api.clone())
+        .rng(Box::new(rng))
+        .sqlite_store(create_test_store_path())
+        .authenticator(Arc::new(keystore))
+        .note_transport(Arc::new(MockNoteTransportApi::new(mock_node.clone())))
+        .in_debug_mode(DebugMode::Enabled)
+        .tx_discard_delta(None)
+        .build()
+        .await
+        .unwrap();
+    client.ensure_genesis_in_place().await.unwrap();
+    client.sync_state().await.unwrap();
+
+    client.add_note_tag(private_note.metadata().tag()).await.unwrap();
+    mock_node
+        .write()
+        .add_note(*private_note.header(), NoteDetails::from(private_note.clone()).to_bytes());
+
+    client.fetch_private_notes().await.unwrap();
+
+    let notes = client.get_input_notes(NoteFilter::All).await.unwrap();
+    assert_eq!(notes.len(), 1);
+    assert_eq!(
+        notes[0].attachments(),
+        &attachments,
+        "note transport recipient should recover attachments via get_notes_by_id",
+    );
 }
 
 /// Verifies that cursor-based pagination works: a second sync only receives newly sent notes.
