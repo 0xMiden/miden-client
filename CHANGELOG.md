@@ -2,8 +2,14 @@
 
 ## Unreleased
 
+### Features
+
+* [FEATURE][rust] A client that only watches a public account now recovers notes the account consumed authenticated, even when it never tracked them by tag. During sync it reads the note references the node attaches to the account's transactions, fetches each note body by id, and surfaces it through `InputNoteReader`. Requires node `0.15.1` ([#2300](https://github.com/0xMiden/miden-client/pull/2300)).
+
 ### Breaking Changes
 
+* [BREAKING][type][rust] `rpc::domain::transaction::TransactionRecord` gained a public `consumed_note_refs: Vec<(Nullifier, NoteId)>` field; code that builds it with a struct literal must add the field ([#2300](https://github.com/0xMiden/miden-client/pull/2300)).
+* [BREAKING][behavior][store] The `ConsumedExternal` input-note state now stores the note's metadata, changing its serialized layout ([#2300](https://github.com/0xMiden/miden-client/pull/2300)).
 * [BREAKING][param][store] `Store::insert_block_header` now takes a `nodes` argument and persists the header with its MMR authentication nodes in a single transaction; the standalone `Store::insert_partial_blockchain_nodes` is removed. Header-only inserts (e.g. genesis) pass an empty slice ([#2294](https://github.com/0xMiden/rust-sdk/pull/2294)).
 
 ### Fixes

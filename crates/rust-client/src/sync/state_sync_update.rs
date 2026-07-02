@@ -52,7 +52,12 @@ impl From<&StateSyncUpdate> for SyncSummary {
             .updated_input_notes()
             .filter_map(|note_update| {
                 let note = note_update.inner();
-                if let NoteUpdateType::Insert = note_update.update_type() {
+                // A recovered externally-consumed note is inserted but already spent, so count it
+                // only under consumed notes (see `consumed_note_ids`), not as a newly-discovered
+                // one.
+                if let NoteUpdateType::Insert = note_update.update_type()
+                    && !note.is_consumed()
+                {
                     note.id()
                 } else {
                     None

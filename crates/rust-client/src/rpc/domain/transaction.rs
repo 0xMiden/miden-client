@@ -68,6 +68,11 @@ pub struct TransactionRecord {
     pub output_notes: Vec<CommittedNote>,
     /// Output notes that were erased by same-batch note erasure.
     pub erased_output_notes: Vec<NoteHeader>,
+    /// Maps each consumed input note's nullifier to its note id, for public notes the node could
+    /// resolve. Lets a client recover, by id, a consumed note it never tracked. Empty for
+    /// private/unresolvable inputs.
+    // TODO: perhaps we might want to rename this field (see https://github.com/0xMiden/node/pull/2304#discussion_r3511308376)
+    pub consumed_note_refs: Vec<(Nullifier, NoteId)>,
 }
 
 impl TryFrom<proto::rpc::TransactionRecord> for TransactionRecord {
@@ -84,11 +89,30 @@ impl TryFrom<proto::rpc::TransactionRecord> for TransactionRecord {
         let (transaction_header, output_notes, erased_output_notes) =
             convert_transaction_header(proto_header, value.output_note_proofs)?;
 
+        let consumed_note_refs = value
+            .consumed_note_refs
+            .into_iter()
+            .map(|r| {
+                let word: Word = r
+                    .nullifier
+                    .ok_or(RpcError::ExpectedDataMissing("consumed_note_ref.nullifier".into()))?
+                    .try_into()
+                    .map_err(|e: RpcConversionError| RpcError::InvalidResponse(e.to_string()))?;
+                let note_id = r
+                    .note_id
+                    .ok_or(RpcError::ExpectedDataMissing("consumed_note_ref.note_id".into()))?
+                    .try_into()
+                    .map_err(|e: RpcConversionError| RpcError::InvalidResponse(e.to_string()))?;
+                Ok((Nullifier::from_raw(word), note_id))
+            })
+            .collect::<Result<Vec<_>, RpcError>>()?;
+
         Ok(Self {
             block_num,
             transaction_header,
             output_notes,
             erased_output_notes,
+            consumed_note_refs,
         })
     }
 }

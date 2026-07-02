@@ -2478,9 +2478,9 @@ dependencies = [
 
 [[package]]
 name = "miden-node-proto-build"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef3b301741cedd6d0b532583690bc21dbf856d4e14218c591f3924bc905c660a"
+checksum = "682ea08edd5da59447e24acd6c0ce4e5d06c759ea6e58a3db553f3de3d5aa6b2"
 dependencies = [
  "build-rs",
  "codegen",

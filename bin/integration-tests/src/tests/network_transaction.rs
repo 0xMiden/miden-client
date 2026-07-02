@@ -612,9 +612,9 @@ pub async fn test_network_note_consumed_by_ntx(client_config: ClientConfig) -> R
         client.source_manager(),
         &mut client.rng(),
     )?;
-    // Captured before `network_note` is moved into the request below: once the network account
-    // consumes it the note is `ConsumedExternal` (no metadata), so it can only be resolved by its
-    // details commitment, not its note ID.
+    // Captured before `network_note` is moved into the request below. Once the network account
+    // consumes it the note becomes `ConsumedExternal`, resolved here by its stable details
+    // commitment.
     let details_commitment = network_note.details_commitment();
 
     let tx_request =
