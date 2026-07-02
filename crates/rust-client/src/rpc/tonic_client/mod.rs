@@ -126,10 +126,13 @@ impl BlockPagination {
 
 /// Default maximum size (in bytes) of a decoded gRPC response the client will accept.
 ///
-/// The node targets a 4 MiB budget for paginated responses but sizes them with a best-effort
-/// estimate that omits protobuf framing and some fields, so an encoded message can land a little
-/// above 4 MiB. This default adds a 15% margin over that budget to absorb the overhead. Callers
-/// that still exceed it can raise the ceiling with [`GrpcClient::with_max_decoding_message_size`].
+/// When no decode limit is set on a tonic client, the decoder falls back to tonic's built-in
+/// `DEFAULT_MAX_RECV_MESSAGE_SIZE` of 4 MiB, applied at these [`unwrap_or`
+/// fallbacks][tonic-decode]. Passing this value explicitly overrides that fallback and lifts the
+/// ceiling to 15% above 4 MiB, so responses that land slightly over 4 MiB still decode. Callers
+/// that need more can raise it further with [`GrpcClient::with_max_decoding_message_size`].
+///
+/// [tonic-decode]: https://github.com/hyperium/tonic/blob/6cb6056b5a748bc5a29bd48f4602dbc4e552bb7d/tonic/src/codec/decode.rs#L192-L218
 const DEFAULT_MAX_DECODING_MESSAGE_SIZE: usize = 4 * 1024 * 1024 * 115 / 100;
 
 /// Client for the Node RPC API using gRPC.
