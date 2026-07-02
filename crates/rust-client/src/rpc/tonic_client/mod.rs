@@ -158,7 +158,7 @@ pub struct GrpcClient {
     /// authenticating gateway in front of the node.
     bearer_token: Option<String>,
     /// Maximum size (in bytes) of a decoded gRPC response the client will accept. Defaults to
-    /// [`DEFAULT_MAX_DECODING_MESSAGE_SIZE`].
+    /// [`DEFAULT_MAX_RESPONSE_SIZE_BYTES`].
     max_decoding_message_size: usize,
 }
 
@@ -175,7 +175,7 @@ impl GrpcClient {
             max_retries: retry::DEFAULT_MAX_RETRIES,
             retry_interval_ms: retry::DEFAULT_RETRY_INTERVAL_MS,
             bearer_token: None,
-            max_decoding_message_size: DEFAULT_MAX_DECODING_MESSAGE_SIZE,
+            max_decoding_message_size: DEFAULT_MAX_RESPONSE_SIZE_BYTES,
         }
     }
 
@@ -1016,7 +1016,7 @@ mod tests {
     use miden_protocol::Word;
     use miden_protocol::block::BlockNumber;
 
-    use super::{BlockPagination, DEFAULT_MAX_DECODING_MESSAGE_SIZE, GrpcClient, PaginationResult};
+    use super::{BlockPagination, DEFAULT_MAX_RESPONSE_SIZE_BYTES, GrpcClient, PaginationResult};
     use crate::alloc::string::ToString;
     use crate::rpc::{Endpoint, NodeRpcClient, RpcError};
 
@@ -1192,7 +1192,7 @@ mod tests {
 
         // A fresh client uses the default decode ceiling.
         let default_client = GrpcClient::new(endpoint, 10_000);
-        assert_eq!(default_client.max_decoding_message_size, DEFAULT_MAX_DECODING_MESSAGE_SIZE);
+        assert_eq!(default_client.max_decoding_message_size, DEFAULT_MAX_RESPONSE_SIZE_BYTES);
 
         // The knob overrides it for callers that hit responses above the default.
         let custom =
