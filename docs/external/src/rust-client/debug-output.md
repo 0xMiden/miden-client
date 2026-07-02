@@ -15,13 +15,38 @@ They only print when the client that **executes** the script is in debug mode �
 `.in_debug_mode(DebugMode::Enabled)` on the builder, or run the CLI with `--debug` (or
 `MIDEN_DEBUG=true`). Compilation is unaffected; the decorators are always retained in freshly
 compiled scripts. Output goes to the client's standard output (not `tracing`/`RUST_LOG`, not the
-node logs), for example:
+node logs).
+
+## Example
+
+Compile and execute a script containing `debug.stack` with a debug-mode client:
+
+```rust
+// Client built with `.in_debug_mode(DebugMode::Enabled)`.
+let tx_script = client.code_builder().compile_tx_script(
+    "
+    begin
+        push.1.2.3
+        debug.stack.3
+        drop drop drop
+    end
+    ",
+)?;
+
+client
+    .execute_program(account_id, tx_script, AdviceInputs::default(), BTreeMap::new())
+    .await?;
+```
+
+Executing it prints the top three stack elements to the client's standard output (the step count
+includes the transaction prologue that runs before the script):
 
 ```text
-Stack state before step 5:
-├── 0: 1
+Stack state in interval [0, 2] before step 2419:
+├── 0: 3
 ├── 1: 2
-└── ...
+├── 2: 1
+└── (16 more items)
 ```
 
 :::note
