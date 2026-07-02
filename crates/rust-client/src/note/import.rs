@@ -62,6 +62,8 @@ where
     ///
     /// Note: This operation is atomic. If any note file is invalid or any existing note is in the
     /// processing state, the entire operation fails and no notes are imported.
+    // TODO: Validations need to be added to the import workflows. For example, when adding a block
+    // header for a note we need to check the chain root validity, etc.
     pub async fn import_notes(
         &mut self,
         note_files: &[NoteFile],
@@ -347,7 +349,7 @@ where
             }
         }
         let mut committed_notes_data =
-            self.check_expected_notes(lowest_request_block, note_requests).await?;
+            self.sync_expected_notes(lowest_request_block, note_requests).await?;
 
         let mut note_records = vec![];
         let mut partial_mmr = self.get_current_partial_mmr().await?;
@@ -413,7 +415,7 @@ where
     /// Expected notes have no metadata and thus no `NoteId`, so each committed note is matched by
     /// reconstructing the id from the committed metadata: `NoteId::new(details_commitment,
     /// metadata)`.
-    async fn check_expected_notes(
+    async fn sync_expected_notes(
         &mut self,
         request_block_num: BlockNumber,
         // Expected notes' details commitments with their tags.

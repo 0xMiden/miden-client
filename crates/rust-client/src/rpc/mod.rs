@@ -56,7 +56,13 @@ use domain::account::{
     StorageMapFetch,
     VaultFetch,
 };
-use domain::note::{FetchedNote, NoteSyncBlock, ResolvedNoteContent, SyncedNote, SyncedNoteBlock};
+use domain::note::{
+    FetchedNote,
+    ResolvedNoteContent,
+    ResolvedSyncNotesBlock,
+    SyncNotesBlock,
+    SyncedNote,
+};
 use domain::nullifier::NullifierUpdate;
 use domain::sync::{ChainMmrInfo, SyncTarget};
 use miden_protocol::Word;
@@ -280,32 +286,32 @@ pub trait NodeRpcClient: Send + Sync {
         block_from: BlockNumber,
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<Vec<NoteSyncBlock>, RpcError>;
+    ) -> Result<Vec<SyncNotesBlock>, RpcError>;
 
     /// Calls [`NodeRpcClient::sync_notes`] for the requested range, then makes a single
     /// [`NodeRpcClient::get_notes_by_id`] call to resolve note content according to `fetch`,
     /// folding it into each note.
     ///
     /// Notes whose metadata advertises attachments always have their attachment content fetched.
-    /// With [`NoteContentFetch::PublicBodiesAndAttachments`], all public notes in the range are
+    /// With [`NoteContentFetch::PublicDetailsAndAttachments`], all public notes in the range are
     /// additionally fetched (regardless of which ones the client tracks) so the request does not
     /// reveal the client's interest set.
     ///
-    /// Returns one [`SyncedNoteBlock`] per matching block, each note carrying its inclusion data
-    /// alongside the fetched content.
+    /// Returns one [`ResolvedSyncNotesBlock`] per matching block, each note carrying its inclusion
+    /// data alongside the fetched content.
     async fn sync_notes_with_content(
         &self,
         block_from: BlockNumber,
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
         fetch: NoteContentFetch,
-    ) -> Result<Vec<SyncedNoteBlock>, RpcError> {
+    ) -> Result<Vec<ResolvedSyncNotesBlock>, RpcError> {
         let blocks = self.sync_notes(block_from, block_to, note_tags).await?;
         let note_ids: Vec<NoteId> = blocks
             .iter()
             .flat_map(|block| block.notes.values())
             .filter(|note| match fetch {
-                NoteContentFetch::PublicBodiesAndAttachments => {
+                NoteContentFetch::PublicDetailsAndAttachments => {
                     note.note_type() == NoteType::Public || note.has_attachments()
                 },
                 NoteContentFetch::AttachmentsOnly => note.has_attachments(),
@@ -349,7 +355,7 @@ pub trait NodeRpcClient: Send + Sync {
                 let content = resolved_content.remove(&note_id);
                 notes.insert(note_id, SyncedNote::new(committed, content)?);
             }
-            synced_blocks.push(SyncedNoteBlock {
+            synced_blocks.push(ResolvedSyncNotesBlock {
                 block_header: block.block_header,
                 mmr_path: block.mmr_path,
                 notes,
@@ -639,12 +645,17 @@ pub trait NodeRpcClient: Send + Sync {
 /// Selects which note content [`NodeRpcClient::sync_notes_with_content`] resolves via
 /// `GetNotesById` after syncing note inclusions.
 ///
+/// This enables the possibility of optimizing the call by not requesting more data than needed.
+/// For example, when a public note's details are already known (but not the attachments),
+/// `AttachmentsOnly` can be used. One example of this is when importing notes through
+/// `NoteDetails`.
+///
 /// Attachment content is always fetched for notes whose metadata advertises attachments,
 /// regardless of the selected policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoteContentFetch {
     /// Fetch the full body of every public note in the range, plus attachment content.
-    PublicBodiesAndAttachments,
+    PublicDetailsAndAttachments,
     /// Fetch only attachment content.
     AttachmentsOnly,
 }

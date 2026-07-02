@@ -201,7 +201,7 @@ impl TryFrom<proto::note::NoteInclusionInBlockProof> for NoteInclusionProof {
 
 /// Represents a single block's worth of note sync data from the `SyncNotesResponse`.
 #[derive(Debug, Clone)]
-pub struct NoteSyncBlock {
+pub struct SyncNotesBlock {
     /// Block header containing the matching notes.
     pub block_header: BlockHeader,
     /// MMR path for verifying the block's inclusion in the MMR at `block_to`.
@@ -210,7 +210,7 @@ pub struct NoteSyncBlock {
     pub notes: BTreeMap<NoteId, CommittedNote>,
 }
 
-impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for NoteSyncBlock {
+impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for SyncNotesBlock {
     type Error = RpcError;
 
     fn try_from(
@@ -235,7 +235,7 @@ impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for NoteSyncBlock {
             })
             .collect::<Result<_, RpcConversionError>>()?;
 
-        Ok(NoteSyncBlock { block_header, mmr_path, notes })
+        Ok(SyncNotesBlock { block_header, mmr_path, notes })
     }
 }
 
@@ -245,11 +245,11 @@ impl TryFrom<proto::rpc::sync_notes_response::NoteSyncBlock> for NoteSyncBlock {
 /// A block's worth of notes resolved by
 /// [`NodeRpcClient::sync_notes_with_content`](crate::rpc::NodeRpcClient::sync_notes_with_content).
 ///
-/// Unlike [`NoteSyncBlock`] (the raw `SyncNotes` response), each note here also carries the body
+/// Unlike [`SyncNotesBlock`] (the raw `SyncNotes` response), each note here also carries the body
 /// and attachment content fetched via `GetNotesById`, so a consumer never has to re-join two
 /// parallel collections by note ID.
 #[derive(Debug, Clone)]
-pub struct SyncedNoteBlock {
+pub struct ResolvedSyncNotesBlock {
     /// Block header containing the matching notes.
     pub block_header: BlockHeader,
     /// MMR path for verifying the block's inclusion in the MMR at `block_to`.

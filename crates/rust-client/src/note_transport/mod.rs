@@ -354,6 +354,9 @@ where
         const NOTE_LOOKBACK_BLOCKS: u32 = 20;
 
         let mut notes = Vec::new();
+        // TODO: perhaps we should not need to map received IDs with details commitments, and
+        // instead we may allow `InputNoteRecord` to optionally keep NoteIds. Then within
+        // `import_note` we could match everything by ID and remove this map check
         let mut id_by_commitment: BTreeMap<NoteDetailsCommitment, NoteId> = BTreeMap::new();
         let (note_infos, rcursor) =
             self.get_note_transport_api()?.fetch_notes(tags, cursor).await?;

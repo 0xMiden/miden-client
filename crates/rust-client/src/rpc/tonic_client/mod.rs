@@ -32,7 +32,7 @@ use super::domain::account::{
     GetAccountRequest,
     StorageMapFetch,
 };
-use super::domain::note::{CommittedNote, FetchedNote, NoteSyncBlock};
+use super::domain::note::{CommittedNote, FetchedNote, SyncNotesBlock};
 use super::domain::nullifier::NullifierUpdate;
 use super::generated::rpc::AccountRequest;
 use super::generated::rpc::account_request::AccountDetailRequest;
@@ -654,7 +654,7 @@ impl NodeRpcClient for GrpcClient {
         block_from: BlockNumber,
         block_to: BlockNumber,
         note_tags: &BTreeSet<NoteTag>,
-    ) -> Result<Vec<NoteSyncBlock>, RpcError> {
+    ) -> Result<Vec<SyncNotesBlock>, RpcError> {
         if note_tags.is_empty() {
             return Ok(Vec::new());
         }
@@ -664,7 +664,7 @@ impl NodeRpcClient for GrpcClient {
 
         // Merge blocks across tag-chunks: a single block can hold notes whose tags fall into
         // different chunks, so the same block can appear in multiple chunks' responses.
-        let mut merged_blocks: BTreeMap<BlockNumber, NoteSyncBlock> = BTreeMap::new();
+        let mut merged_blocks: BTreeMap<BlockNumber, SyncNotesBlock> = BTreeMap::new();
 
         for chunk in tags.chunks(limits.note_tags_limit as usize) {
             let proto_tags: Vec<u32> = chunk.iter().map(|&t| t.into()).collect();
@@ -695,7 +695,7 @@ impl NodeRpcClient for GrpcClient {
                 let page_block_to = BlockNumber::from(page.block_num);
 
                 for proto_block in response.blocks {
-                    let block: NoteSyncBlock = proto_block.try_into()?;
+                    let block: SyncNotesBlock = proto_block.try_into()?;
                     ensure_requested_tags(
                         &requested_tags,
                         block.notes.values().map(CommittedNote::tag),

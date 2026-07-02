@@ -31,7 +31,12 @@ use crate::rpc::domain::account::{
     StorageMapFetch,
     VaultFetch,
 };
-use crate::rpc::domain::note::{CommittedNote, ResolvedNoteContent, SyncedNote, SyncedNoteBlock};
+use crate::rpc::domain::note::{
+    CommittedNote,
+    ResolvedNoteContent,
+    ResolvedSyncNotesBlock,
+    SyncedNote,
+};
 use crate::rpc::domain::sync::{ChainMmrInfo, SyncTarget};
 use crate::rpc::domain::transaction::TransactionRecord as RpcTransactionRecord;
 use crate::rpc::{AccountStateAt, NodeRpcClient, NoteContentFetch};
@@ -63,7 +68,7 @@ struct FetchedSyncData {
     chain_tip_header: BlockHeader,
     /// Blocks with matching notes that the client is interested in, each note carrying its fetched
     /// body and attachment content.
-    note_blocks: Vec<SyncedNoteBlock>,
+    note_blocks: Vec<ResolvedSyncNotesBlock>,
     /// Transaction records for the synced range, as returned by `sync_transactions`.
     transactions: Vec<RpcTransactionRecord>,
 }
@@ -350,7 +355,7 @@ impl StateSync {
                     current_block_num + 1,
                     chain_tip,
                     note_tags.as_ref(),
-                    NoteContentFetch::PublicBodiesAndAttachments,
+                    NoteContentFetch::PublicDetailsAndAttachments,
                 )
                 .await?
         };
@@ -467,7 +472,7 @@ impl StateSync {
     /// Validates that every block returned by `sync_notes` falls in the requested range
     /// `(current_block_num, chain_tip]`.
     fn validate_note_blocks_range(
-        note_blocks: &[SyncedNoteBlock],
+        note_blocks: &[ResolvedSyncNotesBlock],
         current_block_num: BlockNumber,
         chain_tip: BlockNumber,
     ) -> Result<(), ClientError> {
@@ -554,7 +559,7 @@ impl StateSync {
     /// response.
     async fn screen_note_blocks(
         &self,
-        note_blocks: Vec<SyncedNoteBlock>,
+        note_blocks: Vec<ResolvedSyncNotesBlock>,
         state_sync_update: &mut StateSyncUpdate,
         current_partial_mmr: &mut PartialMmr,
     ) -> Result<(), ClientError> {
@@ -2163,7 +2168,7 @@ mod tests {
                 4_u32.into(),
                 10_u32.into(),
                 &note_tags,
-                NoteContentFetch::PublicBodiesAndAttachments,
+                NoteContentFetch::PublicDetailsAndAttachments,
             )
             .await
             .expect("sync notes should succeed");
@@ -2423,7 +2428,7 @@ mod tests {
         StateSync::validate_note_blocks_range(&[], current, chain_tip).unwrap();
 
         // A note block outside the requested range: genesis is always outside it.
-        let genesis_note_block = SyncedNoteBlock {
+        let genesis_note_block = ResolvedSyncNotesBlock {
             block_header: mock_rpc.mock_chain.read().block_header(0),
             mmr_path: MerklePath::new(Vec::new()),
             notes: BTreeMap::new(),
